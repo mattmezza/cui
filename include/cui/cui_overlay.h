@@ -10,7 +10,7 @@ extern "C" {
 typedef struct {
     cui_id id, trigger;
     cui_rect bounds;
-    bool open, modal, dismiss_on_escape, dismiss_on_outside;
+    bool open, modal, dismiss_on_escape, dismiss_on_outside, has_bounds;
 } cui_overlay;
 void cui_overlay_init(cui_overlay *, cui_id id, bool modal);
 void cui_overlay_open(cui_context *, cui_overlay *, cui_id trigger);

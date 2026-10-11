@@ -10,6 +10,8 @@ focus. After each `cui_begin_frame`, call `cui_overlay_update` before submitting
 controls, processing nested overlays innermost first. If `cui_overlay_begin`
 returns true, submit the panel and its controls, then call `cui_overlay_end`.
 After layout, save the panel's resolved bounds with `cui_overlay_set_bounds`.
+Outside dismissal arms only after bounds are supplied for the current opening,
+so opening a popup cannot dismiss against stale or absent panel geometry.
 The existing `cui_popup_place` model can determine an overlay's desired bounds;
 absolute positioning/portals are not currently supplied by this module.
 

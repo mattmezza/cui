@@ -13,6 +13,7 @@ void cui_overlay_open(cui_context *ui, cui_overlay *overlay, cui_id trigger) {
         return;
     overlay->trigger = trigger ? trigger : cui_focused(ui);
     overlay->open = true;
+    overlay->has_bounds = false;
     cui_invalidate(ui);
 }
 void cui_overlay_close(cui_context *ui, cui_overlay *overlay) {
@@ -24,8 +25,10 @@ void cui_overlay_close(cui_context *ui, cui_overlay *overlay) {
     cui_invalidate(ui);
 }
 void cui_overlay_set_bounds(cui_overlay *overlay, cui_rect bounds) {
-    if (overlay)
+    if (overlay) {
         overlay->bounds = bounds;
+        overlay->has_bounds = true;
+    }
 }
 bool cui_overlay_update(cui_context *ui, cui_overlay *overlay) {
     if (!ui || !overlay || !overlay->open)
@@ -37,7 +40,8 @@ bool cui_overlay_update(cui_context *ui, cui_overlay *overlay) {
         cui_id target = cui_event_target(ui, i);
         bool escape = overlay->dismiss_on_escape && event.type == CUI_EVENT_KEY_DOWN &&
                       event.key == CUI_KEY_ESCAPE && !event.repeat && target == overlay->id;
-        bool outside = overlay->dismiss_on_outside && event.type == CUI_EVENT_POINTER_DOWN &&
+        bool outside = overlay->has_bounds && overlay->dismiss_on_outside &&
+                       event.type == CUI_EVENT_POINTER_DOWN &&
                        (!overlay->modal || target == overlay->id) &&
                        !cui_overlay_contains(overlay->bounds, event.x, event.y);
         if (escape || outside) {

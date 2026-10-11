@@ -109,7 +109,9 @@ int main(void) {
     outer.modal = false;
     frame();
     cui_overlay_open(ui, &outer, 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 390, .y = 390}));
     frame();
+    assert(outer.open); /* Opening has no previous panel bounds to dismiss against. */
     click(cui_bounds(ui, 1));
     assert(!outer.open && trigger_activations == 2);
     cui_overlay_open(ui, &outer, 1);

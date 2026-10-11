@@ -2,7 +2,7 @@
 
 An experimental C11 native UI framework: Clay layout, unstyled interaction primitives, themed controls, and independent renderer adapters. Embed it in an existing host or run the SDL3 workbench. No browser engine, JavaScript VM, Rust runtime, or platform types in the public core API.
 
-**Development snapshot, not production-ready or full GPUI Kit parity.** The complete78-family target is tracked in [the feature manifest](docs/gpui-parity.json). Working partial controls include buttons, checked/pressed selection, sliders and a UTF-8 scalar Input preview. Core focus/capture, semantic snapshots, bounded undo/redo, modal scopes, popup reducers, Gregorian geometry and keyed variable-height virtualization have behavioral tests. Native accessibility bridges, complete text editing/IME/bidi/fallback, full compound widgets and other platform runtimes remain pending.
+**Development snapshot, not production-ready or full GPUI Kit parity.** The complete78-family target is tracked in [the feature manifest](docs/gpui-parity.json). Working partial controls include buttons, checked/pressed selection, sliders and a UTF-8 scalar Input preview. Core focus/capture, semantic snapshots, bounded undo/redo, modal scopes, popup reducers, Gregorian geometry and keyed variable-height virtualization and a retained docking tree have behavioral tests. Native accessibility bridges, complete text editing/IME/bidi/fallback, full compound widgets and other platform runtimes remain pending.
 
 ![Actual CUI software-rendered workbench](docs/screenshots/gallery-light.png)
 
@@ -25,7 +25,7 @@ cmake --preset sanitize && cmake --build --preset sanitize && ctest --preset san
 ./build/cui_gallery --smoke 3 --screenshot build/native.bmp
 ```
 
-The SDL_Renderer compatibility adapter reports its actual renderer name. The separate SDL_GPU implementation uses a borrowed device/window, SPIR-V/Vulkan shaders, antialiased geometry and a bounded glyph atlas. It has been exercised on Linux Xorg with an Intel Graphics device reported by SDL. Metal/D3D shader formats remain pending; SDL_GPU backend selection alone does not establish hardware acceleration. GPU tests register only with `-DCUI_GPU_TESTS=ON`, requiring an actual device/window. Sokol integration is tracked separately.
+The SDL_Renderer compatibility adapter reports its actual renderer name. The separate SDL_GPU implementation uses a borrowed device/window, SPIR-V/Vulkan shaders, antialiased geometry and a bounded glyph atlas. It has been exercised on Linux Xorg with an Intel Graphics device reported by SDL. Metal/D3D shader formats remain pending; SDL_GPU backend selection alone does not establish hardware acceleration. GPU tests register only with `-DCUI_GPU_TESTS=ON`, requiring an actual device/window. The independent Sokol GLCORE adapter borrows a host OpenGL context and framebuffer and has actual pixel/cache tests on the same Intel/Mesa device; see [its contract](backends/sokol/README.md). It has no SDL dependency.
 
 ## A small application
 
@@ -64,7 +64,7 @@ Create/destroy the context in the host; queue input before begin. Width/height0 
 #include "cui_components.h"
 ```
 
-Other translation units include those headers without implementation macros. Base includes the editor implementation; styled components include theme implementation. Optional overlay and virtual models have their own implementation macros. Single-TU and multi-TU executables are tested. Conventional static library targets use `include/cui/`. C++ and Zig host examples are in [examples/embedding](examples/embedding).
+Other translation units include those headers without implementation macros. Base includes the editor implementation; styled components include theme implementation. Optional overlay, virtual and dock models have their own implementation macros. Single-TU and multi-TU executables are tested. Conventional static library targets use `include/cui/`. C++ and Zig host examples are in [examples/embedding](examples/embedding).
 
 `python scripts/amalgamate.py` regenerates; `make dist-check` checks exact reproducibility. `python tools/component_vendor/vendor.py /empty/destination --layer components` copies the layer dependency closure and licenses. This currently vendors all implemented controls in that layer; per-component source slicing is pending. No CLI is required to consume the library.
 
@@ -74,4 +74,4 @@ Other translation units include those headers without implementation macros. Bas
 
 Read [the nightly report](docs/NIGHTLY_REPORT.md), [full component reference](docs/COMPONENTS.md), [architecture](docs/ARCHITECTURE.md), [component authoring](docs/COMPONENT_AUTHORING.md), and [remaining maintainer actions](docs/MAINTAINER_ACTIONS.md). All performance figures include workload context in [PERFORMANCE.md](docs/PERFORMANCE.md); none compare to other frameworks.
 
-Original CUI source is MIT. Vendored Clay is zlib-licensed. GPUI Kit0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).
+Original CUI source is MIT. Vendored Clay and Sokol are zlib-licensed. GPUI Kit0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).

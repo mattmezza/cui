@@ -20,6 +20,7 @@ jobs:
   linux-native:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         compiler: [gcc, clang]
     env:
@@ -32,6 +33,8 @@ jobs:
       - run: ctest --test-dir build --output-on-failure
       - name: X11 compatibility smoke (software forced; GPU unverified)
         run: xvfb-run -a env SDL_RENDER_DRIVER=software ./build/cui_gallery --smoke 3
+      - name: Independent Sokol OpenGL pixel readback (actual driver reported)
+        run: xvfb-run -a ./build/test_sokol
   distribution-and-style:
     runs-on: ubuntu-latest
     steps:

@@ -3339,22 +3339,36 @@
       "name": "Dock",
       "reference_url": "https://gpui-kit.com/component/dock/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_dock_create",
+        "cui_dock_split",
+        "cui_dock_move",
+        "cui_dock_layout",
+        "cui_dock_serialize",
+        "cui_dock_restore"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_dock.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_dock.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Retained split/tab tree, stable keys, constrained geometry and transactional versioned persistence tested. Styled Dock, drag/drop, resize gestures, floating windows and keyboard/focus integration pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "nested splits and tab groups",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "docs/DOCK_MODEL.md"
+          ]
         },
         {
           "name": "drag reorder/resize/edge docks",
@@ -3363,8 +3377,11 @@
         },
         {
           "name": "versioned serialization/restore",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "docs/DOCK_MODEL.md"
+          ]
         },
         {
           "name": "focus and keyboard behavior",
@@ -3383,7 +3400,8 @@
           "Style the workspace",
           "Runnable example"
         ]
-      }
+      },
+      "last_tested_commit": "b3b18df23f05e6fc732648794a2cc7935274439b"
     },
     {
       "name": "List",
@@ -4288,23 +4306,35 @@
       "features": [
         {
           "name": "variable-height efficient offsets",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_virtual.c",
+            "docs/VIRTUALIZATION.md"
+          ]
         },
         {
           "name": "stable keyed incremental items",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_virtual.c",
+            "docs/VIRTUALIZATION.md"
+          ]
         },
         {
           "name": "viewport overscan and scroll restore",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_virtual.c",
+            "docs/VIRTUALIZATION.md"
+          ]
         },
         {
           "name": "1K/10K/100K benchmark",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_virtual.c",
+            "docs/VIRTUALIZATION.md"
+          ]
         }
       ],
       "upstream_doc": {

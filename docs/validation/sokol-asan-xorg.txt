@@ -1,0 +1,2 @@
+Sokol shaped text pixel readback, cache tint reuse and eviction passed
+Sokol GLCORE; vendor=Intel; renderer=Mesa Intel(R) Graphics (ARL); nested clip, blend, rounded geometry/readback and runtime ownership passed

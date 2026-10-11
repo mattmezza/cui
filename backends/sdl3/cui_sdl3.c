@@ -4,7 +4,10 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-struct cui_sdl3 { SDL_Window *window; SDL_Renderer *renderer; cui_font *font; cui_color ink; bool quit; };
+#define GLYPH_CACHE_SLOTS 256
+#define GLYPH_CACHE_BYTES (4u*1024u*1024u)
+typedef struct { SDL_Texture *texture; unsigned char *coverage; int w,h; uint64_t hash,used; } glyph_entry;
+struct cui_sdl3 { SDL_Window *window; SDL_Renderer *renderer; cui_font *font; cui_color ink; bool quit,glyph_ok; glyph_entry glyphs[GLYPH_CACHE_SLOTS]; size_t glyph_bytes; uint64_t clock,hits,misses; char *clipboard; };
 cui_sdl3 *cui_sdl3_create(const char *title,int w,int h,cui_font *font) {
     if(!SDL_InitSubSystem(SDL_INIT_VIDEO))return NULL;
     cui_sdl3 *s=calloc(1,sizeof(*s));if(!s){SDL_QuitSubSystem(SDL_INIT_VIDEO);return NULL;}
@@ -13,7 +16,7 @@ cui_sdl3 *cui_sdl3_create(const char *title,int w,int h,cui_font *font) {
     if(!s->renderer){cui_sdl3_destroy(s);return NULL;}
     SDL_SetRenderDrawBlendMode(s->renderer,SDL_BLENDMODE_BLEND);SDL_SetRenderVSync(s->renderer,1);SDL_StartTextInput(s->window);return s;
 }
-void cui_sdl3_destroy(cui_sdl3 *s){if(!s)return;SDL_DestroyRenderer(s->renderer);SDL_DestroyWindow(s->window);free(s);SDL_QuitSubSystem(SDL_INIT_VIDEO);}
+void cui_sdl3_destroy(cui_sdl3 *s){if(!s)return;for(size_t i=0;i<GLYPH_CACHE_SLOTS;i++){SDL_DestroyTexture(s->glyphs[i].texture);free(s->glyphs[i].coverage);}SDL_free(s->clipboard);SDL_DestroyRenderer(s->renderer);SDL_DestroyWindow(s->window);free(s);SDL_QuitSubSystem(SDL_INIT_VIDEO);}
 static cui_key key(SDL_Keycode k){switch(k){case SDLK_TAB:return CUI_KEY_TAB;case SDLK_RETURN:return CUI_KEY_ENTER;case SDLK_SPACE:return CUI_KEY_SPACE;case SDLK_ESCAPE:return CUI_KEY_ESCAPE;case SDLK_LEFT:return CUI_KEY_LEFT;case SDLK_RIGHT:return CUI_KEY_RIGHT;case SDLK_UP:return CUI_KEY_UP;case SDLK_DOWN:return CUI_KEY_DOWN;case SDLK_HOME:return CUI_KEY_HOME;case SDLK_END:return CUI_KEY_END;case SDLK_BACKSPACE:return CUI_KEY_BACKSPACE;case SDLK_DELETE:return CUI_KEY_DELETE;case SDLK_A:return CUI_KEY_A;default:return CUI_KEY_NONE;}}
 bool cui_sdl3_poll(cui_sdl3 *s,cui_context *ui){
     SDL_Event e;while(SDL_PollEvent(&e)){cui_event v={0};bool send=true;
@@ -41,12 +44,36 @@ static bool rect(cui_sdl3 *s,const cui_draw_command *c){
         if(!SDL_RenderFillRect(s->renderer,&r))return false;
     }return true;
 }
+static void evict(cui_sdl3 *s,glyph_entry *e){if(e->coverage)s->glyph_bytes-=(size_t)e->w*e->h;SDL_DestroyTexture(e->texture);free(e->coverage);memset(e,0,sizeof(*e));}
+static glyph_entry *oldest(cui_sdl3 *s){glyph_entry *best=&s->glyphs[0];for(size_t i=0;i<GLYPH_CACHE_SLOTS;i++){glyph_entry *e=&s->glyphs[i];if(!e->texture)return e;if(e->used<best->used)best=e;}return best;}
+static SDL_Texture *cached_glyph(cui_sdl3 *s,int w,int h,int pitch,const unsigned char *data){
+    if(w<0 || h<0 || (size_t)w>GLYPH_CACHE_BYTES/(size_t)h){SDL_SetError("CUI glyph exceeds the bounded cache memory budget");return NULL;}
+    size_t bytes=(size_t)w*h;uint64_t hash=UINT64_C(14695981039346656037);
+    for(int j=0;j<h;j++)for(int i=0;i<w;i++){hash^=data[j*pitch+i];hash*=UINT64_C(1099511628211);}
+    for(size_t i=0;i<GLYPH_CACHE_SLOTS;i++){
+        glyph_entry *e=&s->glyphs[i];if(e->texture && e->w==w && e->h==h && e->hash==hash){
+            bool same=true;for(int j=0;j<h && same;j++)same=memcmp(e->coverage+(size_t)j*w,data+j*pitch,(size_t)w)==0;
+            if(same){e->used=++s->clock;s->hits++;return e->texture;}
+        }
+    }
+    s->misses++;
+    while(s->glyph_bytes+bytes>GLYPH_CACHE_BYTES){glyph_entry *e=oldest(s);if(!e->texture){ /* Find the oldest populated entry when empty slots remain. */
+            for(size_t i=0;i<GLYPH_CACHE_SLOTS;i++)if(s->glyphs[i].texture && (!e->texture || s->glyphs[i].used<e->used))e=&s->glyphs[i];
+        }evict(s,e);}
+    glyph_entry *e=oldest(s);if(e->texture)evict(s,e);
+    SDL_Surface *surface=SDL_CreateSurface(w,h,SDL_PIXELFORMAT_RGBA32);if(!surface)return NULL;
+    for(int j=0;j<h;j++){unsigned char *p=(unsigned char*)surface->pixels+j*surface->pitch;for(int i=0;i<w;i++){p[i*4]=255;p[i*4+1]=255;p[i*4+2]=255;p[i*4+3]=data[j*pitch+i];}}
+    SDL_Texture *t=SDL_CreateTextureFromSurface(s->renderer,surface);SDL_DestroySurface(surface);if(!t)return NULL;
+    unsigned char *copy=malloc(bytes);if(!copy){SDL_DestroyTexture(t);SDL_SetError("CUI glyph coverage allocation failed");return NULL;}
+    for(int j=0;j<h;j++)memcpy(copy+(size_t)j*w,data+j*pitch,(size_t)w);
+    if(!SDL_SetTextureBlendMode(t,SDL_BLENDMODE_BLEND)){SDL_DestroyTexture(t);free(copy);return NULL;}
+    *e=(glyph_entry){t,copy,w,h,hash,++s->clock};s->glyph_bytes+=bytes;return t;
+}
 static void glyph(void *user,int x,int y,int w,int h,int pitch,const unsigned char *data){
-    cui_sdl3 *s=user;if(!w || !h || !data)return;
-    SDL_Surface *surface=SDL_CreateSurface(w,h,SDL_PIXELFORMAT_RGBA32);if(!surface)return;
-    for(int j=0;j<h;j++){unsigned char *p=(unsigned char*)surface->pixels+j*surface->pitch;for(int i=0;i<w;i++){p[i*4]=s->ink.r;p[i*4+1]=s->ink.g;p[i*4+2]=s->ink.b;p[i*4+3]=(unsigned char)((unsigned)s->ink.a*data[j*pitch+i]/255);}}
-    SDL_Texture *t=SDL_CreateTextureFromSurface(s->renderer,surface);SDL_DestroySurface(surface);if(!t)return;
-    SDL_SetTextureBlendMode(t,SDL_BLENDMODE_BLEND);SDL_FRect r={(float)x,(float)y,(float)w,(float)h};SDL_RenderTexture(s->renderer,t,NULL,&r);SDL_DestroyTexture(t);
+    cui_sdl3 *s=user;if(!w || !h || !data || !s->glyph_ok)return;
+    SDL_Texture *t=cached_glyph(s,w,h,pitch,data);if(!t){s->glyph_ok=false;return;}
+    SDL_FRect r={(float)x,(float)y,(float)w,(float)h};
+    if(!SDL_SetTextureColorMod(t,s->ink.r,s->ink.g,s->ink.b) || !SDL_SetTextureAlphaMod(t,s->ink.a) || !SDL_RenderTexture(s->renderer,t,NULL,&r))s->glyph_ok=false;
 }
 bool cui_sdl3_render_capture(cui_sdl3 *s,const cui_draw_list *list,cui_color clear,const char *path){
     if(!s||!list || (!list->commands && list->count) || !isfinite(list->width) || !isfinite(list->height) || list->width<0 || list->height<0 || list->width>16384 || list->height>16384)return false;
@@ -56,7 +83,7 @@ bool cui_sdl3_render_capture(cui_sdl3 *s,const cui_draw_list *list,cui_color cle
     if(!isfinite(c->bounds.x)||!isfinite(c->bounds.y)||!isfinite(c->bounds.w)||!isfinite(c->bounds.h)||!isfinite(c->radius)||!isfinite(c->stroke)||fabsf(c->bounds.x)>1e6f||fabsf(c->bounds.y)>1e6f||fabsf(c->bounds.w)>16384||fabsf(c->bounds.h)>16384)return false;
     switch(c->type){
     case CUI_DRAW_RECT:case CUI_DRAW_BORDER:if(!rect(s,c))return false;break;
-    case CUI_DRAW_TEXT:s->ink=c->color;if(!s->font || !cui_font_draw(s->font,c->text,c->font_size,c->bounds.x,c->bounds.y,glyph,s))return false;break;
+    case CUI_DRAW_TEXT:s->ink=c->color;s->glyph_ok=true;if(!s->font || !cui_font_draw(s->font,c->text,c->font_size,c->bounds.x,c->bounds.y,glyph,s) || !s->glyph_ok)return false;break;
     case CUI_DRAW_CLIP_PUSH:{if(depth==64)return false;stack[depth++]=clip;SDL_Rect next={(int)floorf(c->bounds.x),(int)floorf(c->bounds.y),(int)ceilf(c->bounds.w),(int)ceilf(c->bounds.h)};if(!SDL_GetRectIntersection(&clip,&next,&clip))clip=(SDL_Rect){0,0,0,0};SDL_SetRenderClipRect(s->renderer,&clip);break;}
     case CUI_DRAW_CLIP_POP:if(!depth)return false;clip=stack[--depth];SDL_SetRenderClipRect(s->renderer,depth?&clip:NULL);break;
     default:return false;}}
@@ -69,6 +96,13 @@ bool cui_sdl3_save_bmp(cui_sdl3 *s,const char *path){SDL_Surface *surface=SDL_Re
 const char *cui_sdl3_driver(cui_sdl3 *s){return s?SDL_GetRendererName(s->renderer):"unavailable";}
 const char *cui_sdl3_video_driver(void){return SDL_GetCurrentVideoDriver();}
 const char *cui_sdl3_error(void){return SDL_GetError();}
+cui_sdl3_cache_stats cui_sdl3_glyph_cache_stats(cui_sdl3 *s){cui_sdl3_cache_stats stats={0};if(!s)return stats;stats.coverage_bytes=s->glyph_bytes;stats.hits=s->hits;stats.misses=s->misses;for(size_t i=0;i<GLYPH_CACHE_SLOTS;i++)stats.entries+=s->glyphs[i].texture!=NULL;return stats;}
+static bool clipboard_set(void *user,cui_str text){
+    if(!user || (!text.data && text.length) || text.length>16u*1024u*1024u || (text.length && memchr(text.data,0,text.length)))return false;
+    char *copy=malloc(text.length+1);if(!copy)return false;if(text.length)memcpy(copy,text.data,text.length);copy[text.length]=0;bool ok=SDL_SetClipboardText(copy);free(copy);return ok;
+}
+static cui_str clipboard_get(void *user){cui_sdl3 *s=user;if(!s)return(cui_str){NULL,0};SDL_free(s->clipboard);s->clipboard=SDL_GetClipboardText();return(cui_str){s->clipboard,s->clipboard?strlen(s->clipboard):0};}
+cui_platform cui_sdl3_clipboard_interface(cui_sdl3 *s){return(cui_platform){.user=s,.capabilities=s?CUI_PLATFORM_CLIPBOARD:0,.clipboard_set=clipboard_set,.clipboard_get=clipboard_get};}
 void cui_sdl3_wait(unsigned ms){SDL_Delay(ms);}
 static bool render(void *s,const cui_draw_list *l,cui_color c){return cui_sdl3_render(s,l,c);}
 static void destroy(void *s){cui_sdl3_destroy(s);}

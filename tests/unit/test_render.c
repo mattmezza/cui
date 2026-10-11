@@ -13,6 +13,7 @@ static void glyph_count(void *user,int x,int y,int w,int h,int pitch,const unsig
     for(int j=0;j<h;j++)for(int i=0;i<w;i++)s->coverage+=data[j*pitch+i]!=0;
 }
 static void test_text(void){
+    assert(!cui_font_open(NULL));assert(!cui_font_open("/cui-test/nonexistent/font.ttf"));
     const char *requested=getenv("CUI_TEST_FONT");
     const char *paths[]={requested,"/usr/share/fonts/noto/NotoSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","/usr/share/fonts/TTF/DejaVuSans.ttf"};
     cui_font *font=NULL;
@@ -22,9 +23,13 @@ static void test_text(void){
     cui_size size=cui_font_measure(font,str,18);assert(size.width>40 && size.height>18);
     cui_size double_size=cui_font_measure(font,str,36);assert(double_size.width>size.width*1.8f);
     glyph_stats stats={0};assert(cui_font_draw(font,str,18,0,0,glyph_count,&stats));assert(stats.glyphs>0 && stats.coverage>0);
+    stats=(glyph_stats){0};assert(cui_font_draw(font,(cui_str){"ffi",3},18,0,0,glyph_count,&stats));
+    assert(stats.glyphs>0 && stats.glyphs<=3);if(!requested)assert(stats.glyphs<3); /* packaged default fonts have an ffi ligature */
     const char rtl[]={ '\xd8','\xb3','\xd9','\x84','\xd8','\xa7','\xd9','\x85' };
     stats=(glyph_stats){0};assert(cui_font_draw(font,(cui_str){rtl,sizeof(rtl)},20,0,0,glyph_count,&stats));assert(stats.glyphs>0);
-    assert(cui_font_measure(font,str,NAN).width==0);assert(!cui_font_draw(font,str,18,INFINITY,0,glyph_count,&stats));
+    assert(cui_font_measure(font,str,NAN).width==0);assert(cui_font_measure(font,str,-1).width==0);
+    assert(cui_font_measure(font,(cui_str){NULL,4},18).width==0);
+    assert(!cui_font_draw(font,str,18,INFINITY,0,glyph_count,&stats));
     cui_font_close(font);puts("HarfBuzz multilingual shaping and FreeType coverage passed");
 }
 #endif

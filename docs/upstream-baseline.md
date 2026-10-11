@@ -1,0 +1,3 @@
+# Frozen upstream baseline
+Inspected 2026-10-12. GPUI Kit v0.7.1 commit 87d10ae5e1299d1be18670a37570c5402f952e34, https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34 . Reference checkout /tmp/cui-gpui-reference (not a build dependency). Catalog https://gpui-kit.com/component/ and base https://gpui-kit.com/base/ . Architecture docs/ARCHITECTURE.md; website/docs/design-guides.md; crates/base/src and crates/component/src are functional references. Original C implementation, no Rust runtime. Software Apache-2.0, website documentation CC BY 4.0: do not copy prose/assets wholesale.
+Clay pinned e6cc36941ab2af5d81107617039d6f527a1c660b from https://github.com/nicbarker/clay ; zlib license vendored with source. No moving-main dependency.

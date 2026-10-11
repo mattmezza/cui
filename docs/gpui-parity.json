@@ -1,0 +1,1254 @@
+{
+  "version": 1,
+  "baseline": "0.7.1",
+  "components": [
+    {
+      "name": "Accordion",
+      "reference_url": "https://gpui-kit.com/component/accordion/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "AlertDialog",
+      "reference_url": "https://gpui-kit.com/component/alert-dialog/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Alert",
+      "reference_url": "https://gpui-kit.com/component/alert/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Attachment",
+      "reference_url": "https://gpui-kit.com/component/attachment/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Avatar",
+      "reference_url": "https://gpui-kit.com/component/avatar/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Badge",
+      "reference_url": "https://gpui-kit.com/component/badge/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Bubble",
+      "reference_url": "https://gpui-kit.com/component/bubble/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Button",
+      "reference_url": "https://gpui-kit.com/component/button/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Checkbox",
+      "reference_url": "https://gpui-kit.com/component/checkbox/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Clipboard",
+      "reference_url": "https://gpui-kit.com/component/clipboard/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Collapsible",
+      "reference_url": "https://gpui-kit.com/component/collapsible/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "DropdownButton",
+      "reference_url": "https://gpui-kit.com/component/dropdown-button/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Empty",
+      "reference_url": "https://gpui-kit.com/component/empty/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Focus Trap",
+      "reference_url": "https://gpui-kit.com/component/focus-trap/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "GroupBox",
+      "reference_url": "https://gpui-kit.com/component/group-box/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "HoverCard",
+      "reference_url": "https://gpui-kit.com/component/hover-card/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Icon",
+      "reference_url": "https://gpui-kit.com/component/icon/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Image",
+      "reference_url": "https://gpui-kit.com/component/image/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Kbd",
+      "reference_url": "https://gpui-kit.com/component/kbd/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Label",
+      "reference_url": "https://gpui-kit.com/component/label/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Marker",
+      "reference_url": "https://gpui-kit.com/component/marker/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Message",
+      "reference_url": "https://gpui-kit.com/component/message/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "MessageScroller",
+      "reference_url": "https://gpui-kit.com/component/message-scroller/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Notification",
+      "reference_url": "https://gpui-kit.com/component/notification/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Pagination",
+      "reference_url": "https://gpui-kit.com/component/pagination/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Progress",
+      "reference_url": "https://gpui-kit.com/component/progress/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Radio",
+      "reference_url": "https://gpui-kit.com/component/radio/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Rating",
+      "reference_url": "https://gpui-kit.com/component/rating/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Shimmer",
+      "reference_url": "https://gpui-kit.com/component/shimmer/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Skeleton",
+      "reference_url": "https://gpui-kit.com/component/skeleton/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Spinner",
+      "reference_url": "https://gpui-kit.com/component/spinner/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Stepper",
+      "reference_url": "https://gpui-kit.com/component/stepper/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Switch",
+      "reference_url": "https://gpui-kit.com/component/switch/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Tag",
+      "reference_url": "https://gpui-kit.com/component/tag/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Toggle",
+      "reference_url": "https://gpui-kit.com/component/toggle/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Tooltip",
+      "reference_url": "https://gpui-kit.com/component/tooltip/",
+      "category": "fundamentals",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Calendar",
+      "reference_url": "https://gpui-kit.com/component/calendar/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "ColorPicker",
+      "reference_url": "https://gpui-kit.com/component/color-picker/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Combobox",
+      "reference_url": "https://gpui-kit.com/component/combobox/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "DatePicker",
+      "reference_url": "https://gpui-kit.com/component/date-picker/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Editor",
+      "reference_url": "https://gpui-kit.com/component/editor/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Form",
+      "reference_url": "https://gpui-kit.com/component/form/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Input",
+      "reference_url": "https://gpui-kit.com/component/input/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Input Group",
+      "reference_url": "https://gpui-kit.com/component/input-group/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "NumberInput",
+      "reference_url": "https://gpui-kit.com/component/number-input/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "OtpInput",
+      "reference_url": "https://gpui-kit.com/component/otp-input/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Questionnaire",
+      "reference_url": "https://gpui-kit.com/component/questionnaire/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Select",
+      "reference_url": "https://gpui-kit.com/component/select/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Slider",
+      "reference_url": "https://gpui-kit.com/component/slider/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Speech",
+      "reference_url": "https://gpui-kit.com/component/speech/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Textarea",
+      "reference_url": "https://gpui-kit.com/component/textarea/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "TimeField",
+      "reference_url": "https://gpui-kit.com/component/time-field/",
+      "category": "forms",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Carousel",
+      "reference_url": "https://gpui-kit.com/component/carousel/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "DescriptionList",
+      "reference_url": "https://gpui-kit.com/component/description-list/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Dialog",
+      "reference_url": "https://gpui-kit.com/component/dialog/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Dock",
+      "reference_url": "https://gpui-kit.com/component/dock/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "List",
+      "reference_url": "https://gpui-kit.com/component/list/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Menu",
+      "reference_url": "https://gpui-kit.com/component/menu/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Popover",
+      "reference_url": "https://gpui-kit.com/component/popover/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Resizable",
+      "reference_url": "https://gpui-kit.com/component/resizable/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Root View",
+      "reference_url": "https://gpui-kit.com/component/root-view/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Scrollable",
+      "reference_url": "https://gpui-kit.com/component/scrollable/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Settings",
+      "reference_url": "https://gpui-kit.com/component/settings/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Sheet",
+      "reference_url": "https://gpui-kit.com/component/sheet/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Sidebar",
+      "reference_url": "https://gpui-kit.com/component/sidebar/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "StatusBar",
+      "reference_url": "https://gpui-kit.com/component/status-bar/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Tabs",
+      "reference_url": "https://gpui-kit.com/component/tabs/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Theme",
+      "reference_url": "https://gpui-kit.com/component/theme/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "TitleBar",
+      "reference_url": "https://gpui-kit.com/component/title-bar/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Toolbar",
+      "reference_url": "https://gpui-kit.com/component/toolbar/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Tree",
+      "reference_url": "https://gpui-kit.com/component/tree/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "VirtualList",
+      "reference_url": "https://gpui-kit.com/component/virtual-list/",
+      "category": "layout",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Chart",
+      "reference_url": "https://gpui-kit.com/component/chart/",
+      "category": "advanced",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Command",
+      "reference_url": "https://gpui-kit.com/component/command/",
+      "category": "advanced",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "DataTable",
+      "reference_url": "https://gpui-kit.com/component/data-table/",
+      "category": "advanced",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Plot",
+      "reference_url": "https://gpui-kit.com/component/plot/",
+      "category": "advanced",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "Table",
+      "reference_url": "https://gpui-kit.com/component/table/",
+      "category": "advanced",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    },
+    {
+      "name": "TextView",
+      "reference_url": "https://gpui-kit.com/component/text-view/",
+      "category": "advanced",
+      "base_behavior": [],
+      "public_header": null,
+      "sample": null,
+      "tests": [],
+      "status": "not_started",
+      "platforms": {},
+      "limitations": [
+        "Full documented behavior pending implementation and audit."
+      ],
+      "owner": "unassigned",
+      "last_verified_commit": null
+    }
+  ]
+}

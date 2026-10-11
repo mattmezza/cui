@@ -12,26 +12,34 @@
 #pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #endif
+#ifndef CLAY_IMPLEMENTATION
 #define CLAY_IMPLEMENTATION
+#define CUI_CORE_DEFINED_CLAY_IMPLEMENTATION
+#endif
 #include "clay.h"
+#ifdef CUI_CORE_DEFINED_CLAY_IMPLEMENTATION
+#undef CLAY_IMPLEMENTATION
+#undef CUI_CORE_DEFINED_CLAY_IMPLEMENTATION
+#endif
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
-#define STACK_MAX 256
-#define EVENT_MAX 256
+#define CUI_CORE_STACK_MAX 256
+#define CUI_CORE_EVENT_MAX 256
 typedef struct {
   uint32_t clay_id;
   size_t parent;
   bool clip;
-} box_node;
+} cui_core_box_node;
 typedef struct {
   cui_id id;
   size_t parent;
   bool modal;
-} focus_scope;
+} cui_core_focus_scope;
 struct cui_context {
-  focus_scope focus_scopes[STACK_MAX], previous_focus_scopes[STACK_MAX];
-  size_t focus_stack[STACK_MAX], focus_depth, focus_scope_count,
+  cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
+      previous_focus_scopes[CUI_CORE_STACK_MAX];
+  size_t focus_stack[CUI_CORE_STACK_MAX], focus_depth, focus_scope_count,
       previous_focus_scope_count, top_modal, previous_top_modal;
   size_t *semantic_scopes, *previous_semantic_scopes;
   Clay_Context *clay;
@@ -39,20 +47,20 @@ struct cui_context {
   cui_config config;
   cui_draw_command *commands;
   size_t count;
-  box_node *nodes;
+  cui_core_box_node *nodes;
   size_t *semantic_nodes;
-  size_t node_count, node_stack[STACK_MAX];
+  size_t node_count, node_stack[CUI_CORE_STACK_MAX];
   cui_rect *previous_hits;
   cui_semantic *semantics, *previous;
   size_t semantic_count, previous_count;
   cui_id *ids, *activations;
   size_t id_count, activation_count;
-  cui_event queued[EVENT_MAX], events[EVENT_MAX];
+  cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_EVENT_MAX];
   size_t queued_count, event_count;
-  cui_id event_targets[EVENT_MAX];
-  uint64_t scopes[STACK_MAX];
+  cui_id event_targets[CUI_CORE_EVENT_MAX];
+  uint64_t scopes[CUI_CORE_STACK_MAX];
   size_t scope_count;
-  bool opened[STACK_MAX];
+  bool opened[CUI_CORE_STACK_MAX];
   size_t depth, overflow_depth, element_count;
   char *strings;
   size_t string_used;
@@ -61,25 +69,25 @@ struct cui_context {
   cui_error error;
   bool in_frame, focus_visible, dirty;
 };
-static void fail(cui_context *ui, cui_error e) {
+static void cui_core_fail(cui_context *ui, cui_error e) {
   if (ui && ui->error == CUI_OK)
     ui->error = e;
 }
-static void select_context(cui_context *ui) {
+static void cui_core_select_context(cui_context *ui) {
   Clay_SetCurrentContext(ui->clay);
 }
-static bool active(cui_context *ui) {
+static bool cui_core_active(cui_context *ui) {
   if (!ui)
     return false;
   if (!ui->in_frame) {
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     return false;
   }
-  select_context(ui);
+  cui_core_select_context(ui);
   return true;
 }
-static Clay_Dimensions measure(Clay_StringSlice s, Clay_TextElementConfig *c,
-                               void *u) {
+static Clay_Dimensions cui_core_measure(Clay_StringSlice s,
+                                        Clay_TextElementConfig *c, void *u) {
   cui_context *ui = u;
   if (ui->config.measure) {
     cui_size z =
@@ -89,7 +97,7 @@ static Clay_Dimensions measure(Clay_StringSlice s, Clay_TextElementConfig *c,
   }
   return (Clay_Dimensions){s.length * c->fontSize * 0.6f, c->fontSize * 1.3f};
 }
-static void clay_error(Clay_ErrorData e) {
+static void cui_core_clay_error(Clay_ErrorData e) {
   cui_error kind = CUI_ERROR_LAYOUT;
   if (e.errorType == CLAY_ERROR_TYPE_DUPLICATE_ID)
     kind = CUI_ERROR_DUPLICATE_ID;
@@ -98,7 +106,7 @@ static void clay_error(Clay_ErrorData e) {
       e.errorType == CLAY_ERROR_TYPE_TEXT_MEASUREMENT_CAPACITY_EXCEEDED ||
       e.errorType == CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED)
     kind = CUI_ERROR_CAPACITY;
-  fail(e.userData, kind);
+  cui_core_fail(e.userData, kind);
 }
 cui_str cui_string(const char *s) { return (cui_str){s, s ? strlen(s) : 0}; }
 cui_context *cui_create(cui_config config) {
@@ -118,7 +126,7 @@ cui_context *cui_create(cui_config config) {
       config.max_commands > (size_t)PTRDIFF_MAX / sizeof(cui_draw_command) ||
       config.max_elements > SIZE_MAX / sizeof(cui_semantic) ||
       config.max_elements > SIZE_MAX / sizeof(cui_id) ||
-      config.max_elements > SIZE_MAX / sizeof(box_node) ||
+      config.max_elements > SIZE_MAX / sizeof(cui_core_box_node) ||
       config.max_elements > SIZE_MAX / sizeof(size_t) ||
       config.max_elements > SIZE_MAX / sizeof(cui_rect)) {
     free(ui);
@@ -131,7 +139,7 @@ cui_context *cui_create(cui_config config) {
   ui->semantics = calloc(config.max_elements, sizeof(*ui->semantics));
   ui->previous = calloc(config.max_elements, sizeof(*ui->previous));
   ui->ids = calloc(config.max_elements, sizeof(*ui->ids));
-  ui->activations = calloc(EVENT_MAX, sizeof(*ui->activations));
+  ui->activations = calloc(CUI_CORE_EVENT_MAX, sizeof(*ui->activations));
   ui->semantic_scopes =
       calloc(config.max_elements, sizeof(*ui->semantic_scopes));
   ui->previous_semantic_scopes =
@@ -156,9 +164,9 @@ cui_context *cui_create(cui_config config) {
   ui->clay =
       Clay_Initialize(Clay_CreateArenaWithCapacityAndMemory(n, ui->arena),
                       (Clay_Dimensions){config.width, config.height},
-                      (Clay_ErrorHandler){clay_error, ui});
+                      (Clay_ErrorHandler){cui_core_clay_error, ui});
   if (ui->clay)
-    Clay_SetMeasureTextFunction(measure, ui);
+    Clay_SetMeasureTextFunction(cui_core_measure, ui);
   Clay_SetCurrentContext(saved);
   if (!ui->clay || ui->error) {
     cui_destroy(ui);
@@ -185,15 +193,15 @@ void cui_destroy(cui_context *ui) {
   free(ui->arena);
   free(ui);
 }
-static bool inside(cui_rect r, float x, float y) {
+static bool cui_core_inside(cui_rect r, float x, float y) {
   return r.w > 0 && r.h > 0 && x >= r.x && y >= r.y && x < r.x + r.w &&
          y < r.y + r.h;
 }
-static bool focusable(const cui_semantic *s) {
+static bool cui_core_focusable(const cui_semantic *s) {
   return !s->disabled && s->role != CUI_ROLE_NONE && s->role != CUI_ROLE_LABEL;
 }
-static bool scope_contains(const focus_scope *scopes, size_t child,
-                           size_t ancestor) {
+static bool cui_core_scope_contains(const cui_core_focus_scope *scopes,
+                                    size_t child, size_t ancestor) {
   if (ancestor == SIZE_MAX)
     return true;
   while (child != SIZE_MAX) {
@@ -203,23 +211,24 @@ static bool scope_contains(const focus_scope *scopes, size_t child,
   }
   return false;
 }
-static bool previous_allowed(cui_context *ui, size_t i) {
-  return scope_contains(ui->previous_focus_scopes,
-                        ui->previous_semantic_scopes[i],
-                        ui->previous_top_modal);
+static bool cui_core_previous_allowed(cui_context *ui, size_t i) {
+  return cui_core_scope_contains(ui->previous_focus_scopes,
+                                 ui->previous_semantic_scopes[i],
+                                 ui->previous_top_modal);
 }
-static cui_id hit(cui_context *ui, float x, float y) {
+static cui_id cui_core_hit(cui_context *ui, float x, float y) {
   for (size_t i = ui->previous_count; i > 0; i--)
-    if (focusable(&ui->previous[i - 1]) && previous_allowed(ui, i - 1) &&
-        inside(ui->previous_hits[i - 1], x, y))
+    if (cui_core_focusable(&ui->previous[i - 1]) &&
+        cui_core_previous_allowed(ui, i - 1) &&
+        cui_core_inside(ui->previous_hits[i - 1], x, y))
       return ui->previous[i - 1].id;
   return 0;
 }
-static void activate(cui_context *ui, cui_id id) {
-  if (id && ui->activation_count < EVENT_MAX)
+static void cui_core_activate(cui_context *ui, cui_id id) {
+  if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
     ui->activations[ui->activation_count++] = id;
 }
-static void tab(cui_context *ui, bool reverse) {
+static void cui_core_tab(cui_context *ui, bool reverse) {
   size_t found = ui->previous_count;
   for (size_t i = 0; i < ui->previous_count; i++)
     if (ui->previous[i].id == ui->focus)
@@ -233,7 +242,8 @@ static void tab(cui_context *ui, bool reverse) {
             : (found == ui->previous_count
                    ? step - 1
                    : (found + step) % ui->previous_count);
-    if (focusable(&ui->previous[i]) && previous_allowed(ui, i)) {
+    if (cui_core_focusable(&ui->previous[i]) &&
+        cui_core_previous_allowed(ui, i)) {
       ui->focus = ui->previous[i].id;
       break;
     }
@@ -244,11 +254,11 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
   if (!ui)
     return false;
   if (ui->in_frame) {
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     return false;
   }
-  if (ui->queued_count == EVENT_MAX) {
-    fail(ui, CUI_ERROR_CAPACITY);
+  if (ui->queued_count == CUI_CORE_EVENT_MAX) {
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return false;
   }
   ui->queued[ui->queued_count++] = e;
@@ -259,24 +269,26 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
   if (!ui)
     return false;
   if (ui->in_frame) {
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     return false;
   }
   if (!isfinite(w) || !isfinite(h) || w < 0 || h < 0 || !isfinite(dt) ||
       dt < 0) {
-    fail(ui, CUI_ERROR_LAYOUT);
+    cui_core_fail(ui, CUI_ERROR_LAYOUT);
     return false;
   }
   if (ui->previous_top_modal != SIZE_MAX) {
     bool allowed = false;
     for (size_t i = 0; i < ui->previous_count; i++)
-      if (ui->previous[i].id == ui->focus && focusable(&ui->previous[i]) &&
-          previous_allowed(ui, i))
+      if (ui->previous[i].id == ui->focus &&
+          cui_core_focusable(&ui->previous[i]) &&
+          cui_core_previous_allowed(ui, i))
         allowed = true;
     if (!allowed) {
       ui->focus = 0;
       for (size_t i = 0; i < ui->previous_count; i++)
-        if (focusable(&ui->previous[i]) && previous_allowed(ui, i)) {
+        if (cui_core_focusable(&ui->previous[i]) &&
+            cui_core_previous_allowed(ui, i)) {
           ui->focus = ui->previous[i].id;
           break;
         }
@@ -292,7 +304,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_UP)
       ui->event_targets[i] = ui->capture;
     if (e.type == CUI_EVENT_POINTER_DOWN) {
-      ui->event_targets[i] = hit(ui, e.x, e.y);
+      ui->event_targets[i] = cui_core_hit(ui, e.x, e.y);
       if (!ui->event_targets[i] && ui->previous_top_modal != SIZE_MAX)
         ui->event_targets[i] =
             ui->previous_focus_scopes[ui->previous_top_modal].id;
@@ -314,22 +326,22 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
       ui->pointer_y = e.y;
     }
     if (e.type == CUI_EVENT_POINTER_DOWN) {
-      ui->capture = hit(ui, e.x, e.y);
+      ui->capture = cui_core_hit(ui, e.x, e.y);
       if (ui->capture || ui->previous_top_modal == SIZE_MAX)
         ui->focus = ui->capture;
       ui->focus_visible = false;
     } else if (e.type == CUI_EVENT_POINTER_UP) {
-      if (ui->capture == hit(ui, e.x, e.y))
-        activate(ui, ui->capture);
+      if (ui->capture == cui_core_hit(ui, e.x, e.y))
+        cui_core_activate(ui, ui->capture);
       ui->capture = 0;
     } else if (e.type == CUI_EVENT_CANCEL) {
       ui->capture = 0;
       ui->space_capture = 0;
     } else if (e.type == CUI_EVENT_KEY_DOWN && !e.repeat) {
       if (e.key == CUI_KEY_TAB)
-        tab(ui, (e.modifiers & CUI_MOD_SHIFT) != 0);
+        cui_core_tab(ui, (e.modifiers & CUI_MOD_SHIFT) != 0);
       else if (e.key == CUI_KEY_ENTER)
-        activate(ui, ui->focus);
+        cui_core_activate(ui, ui->focus);
       else if (e.key == CUI_KEY_SPACE)
         ui->space_capture = ui->focus;
       else if (e.key == CUI_KEY_ESCAPE) {
@@ -338,7 +350,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
       }
     } else if (e.type == CUI_EVENT_KEY_UP && e.key == CUI_KEY_SPACE) {
       if (ui->space_capture == ui->focus)
-        activate(ui, ui->focus);
+        cui_core_activate(ui, ui->focus);
       ui->space_capture = 0;
     }
   }
@@ -349,7 +361,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
   ui->semantic_count = ui->id_count = ui->element_count = ui->scope_count =
       ui->depth = ui->string_used = 0;
   ui->count = 0;
-  select_context(ui);
+  cui_core_select_context(ui);
   Clay_SetLayoutDimensions((Clay_Dimensions){w, h});
   Clay_BeginLayout();
   ui->config.width = w;
@@ -359,7 +371,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
   ui->dirty = false;
   return true;
 }
-static uint32_t folded(cui_id id) {
+static uint32_t cui_core_folded(cui_id id) {
   /* Avalanche in a CUI domain: Clay auto IDs combine parent ID + child
      ordinal, so consecutive raw public IDs can alias auto text IDs. */
   uint64_t x = id ^ UINT64_C(0x4355492d454c454d);
@@ -369,7 +381,7 @@ static uint32_t folded(cui_id id) {
   uint32_t out = (uint32_t)x ^ (uint32_t)(x >> 32);
   return out ? out : 1;
 }
-static Clay_SizingAxis axis(float n) {
+static Clay_SizingAxis cui_core_axis(float n) {
   if (n > 0)
     return (Clay_SizingAxis){.size = {.minMax = {n, n}},
                              .type = CLAY__SIZING_TYPE_FIXED};
@@ -377,46 +389,47 @@ static Clay_SizingAxis axis(float n) {
                            .type = n < 0 ? CLAY__SIZING_TYPE_GROW
                                          : CLAY__SIZING_TYPE_FIT};
 }
-static uint16_t scalar(float x) {
+static uint16_t cui_core_scalar(float x) {
   return !isfinite(x) || x < 0 ? 0 : x > 65535 ? 65535 : (uint16_t)x;
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return;
-  if (ui->depth == STACK_MAX || ui->overflow_depth) {
+  if (ui->depth == CUI_CORE_STACK_MAX || ui->overflow_depth) {
     ui->overflow_depth++;
-    fail(ui, CUI_ERROR_CAPACITY);
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return;
   }
   bool ok = ui->element_count < ui->config.max_elements &&
             (ui->depth == 0 || ui->opened[ui->depth - 1]);
   if (id)
     for (size_t i = 0; i < ui->id_count; i++)
-      if (ui->ids[i] == id || folded(ui->ids[i]) == folded(id)) {
-        fail(ui, CUI_ERROR_DUPLICATE_ID);
+      if (ui->ids[i] == id ||
+          cui_core_folded(ui->ids[i]) == cui_core_folded(id)) {
+        cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
         ok = false;
         break;
       }
   ui->opened[ui->depth++] = ok;
   if (!ok) {
     if (ui->element_count >= ui->config.max_elements)
-      fail(ui, CUI_ERROR_CAPACITY);
+      cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return;
   }
   ui->element_count++;
   if (id)
     ui->ids[ui->id_count++] = id;
   uint32_t internal_id =
-      folded(id ? id : (cui_id)(ui->element_count + 0x80000000u));
+      cui_core_folded(id ? id : (cui_id)(ui->element_count + 0x80000000u));
   size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
-  ui->nodes[ui->node_count] = (box_node){internal_id, parent, b.clip};
+  ui->nodes[ui->node_count] = (cui_core_box_node){internal_id, parent, b.clip};
   ui->node_stack[ui->depth - 1] = ui->node_count++;
   Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
-  uint16_t bw = scalar(b.border_width);
+  uint16_t bw = cui_core_scalar(b.border_width);
   Clay__ConfigureOpenElement((Clay_ElementDeclaration){
-      .layout = {.sizing = {axis(b.width), axis(b.height)},
-                 .padding = CLAY_PADDING_ALL(scalar(b.padding)),
-                 .childGap = scalar(b.gap),
+      .layout = {.sizing = {cui_core_axis(b.width), cui_core_axis(b.height)},
+                 .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
+                 .childGap = cui_core_scalar(b.gap),
                  .layoutDirection =
                      b.row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM},
       .backgroundColor = {b.background.r, b.background.g, b.background.b,
@@ -427,25 +440,25 @@ void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
                  .width = {bw, bw, bw, bw, 0}}});
 }
 void cui_end_box(cui_context *ui) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return;
   if (ui->overflow_depth) {
     ui->overflow_depth--;
     return;
   }
   if (!ui->depth) {
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     return;
   }
   if (ui->opened[--ui->depth])
     Clay__CloseElement();
 }
-static cui_str copy_string(cui_context *ui, cui_str s) {
+static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
   if (!s.length)
     return (cui_str){"", 0};
   if (!s.data || s.length > (size_t)INT32_MAX ||
       s.length >= ui->config.frame_bytes - ui->string_used) {
-    fail(ui, CUI_ERROR_CAPACITY);
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return (cui_str){"", 0};
   }
   char *p = ui->strings + ui->string_used;
@@ -455,22 +468,22 @@ static cui_str copy_string(cui_context *ui, cui_str s) {
   return (cui_str){p, s.length};
 }
 void cui_text(cui_context *ui, cui_str t, float size, cui_color c) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return;
   if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
     return;
   if (ui->element_count == ui->config.max_elements) {
-    fail(ui, CUI_ERROR_CAPACITY);
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return;
   }
   ui->element_count++;
-  t = copy_string(ui, t);
+  t = cui_core_copy_string(ui, t);
   Clay__OpenTextElement(
       (Clay_String){false, (int32_t)t.length, t.data},
-      (Clay_TextElementConfig){.fontSize = scalar(size),
+      (Clay_TextElementConfig){.fontSize = cui_core_scalar(size),
                                .textColor = {c.r, c.g, c.b, c.a}});
 }
-static uint64_t hash(uint64_t h, const char *s) {
+static uint64_t cui_core_hash(uint64_t h, const char *s) {
   if (s)
     while (*s) {
       h ^= (unsigned char)*s++;
@@ -479,15 +492,15 @@ static uint64_t hash(uint64_t h, const char *s) {
   return h ? h : 1;
 }
 cui_id cui_id_from(cui_context *ui, const char *s) {
-  return hash(ui && ui->scope_count ? ui->scopes[ui->scope_count - 1]
-                                    : 14695981039346656037ULL,
-              s);
+  return cui_core_hash(ui && ui->scope_count ? ui->scopes[ui->scope_count - 1]
+                                             : 14695981039346656037ULL,
+                       s);
 }
 bool cui_push_id(cui_context *ui, const char *key) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return false;
-  if (ui->scope_count == STACK_MAX) {
-    fail(ui, CUI_ERROR_CAPACITY);
+  if (ui->scope_count == CUI_CORE_STACK_MAX) {
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return false;
   }
   uint64_t h = cui_id_from(ui, key);
@@ -497,10 +510,10 @@ bool cui_push_id(cui_context *ui, const char *key) {
   return true;
 }
 void cui_pop_id(cui_context *ui) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return;
   if (!ui->scope_count)
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
   else
     ui->scope_count--;
 }
@@ -510,8 +523,9 @@ cui_rect cui_bounds(cui_context *ui, cui_id id) {
   for (size_t i = 0; i < ui->previous_count; i++)
     if (ui->previous[i].id == id)
       return ui->previous[i].bounds;
-  select_context(ui);
-  Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = folded(id)});
+  cui_core_select_context(ui);
+  Clay_ElementData d =
+      Clay_GetElementData((Clay_ElementId){.id = cui_core_folded(id)});
   return (cui_rect){d.boundingBox.x, d.boundingBox.y, d.boundingBox.width,
                     d.boundingBox.height};
 }
@@ -519,17 +533,17 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role,
                              cui_str name, bool disabled, bool checked,
                              float value) {
   cui_interaction out = {0};
-  if (!active(ui) || !id)
+  if (!cui_core_active(ui) || !id)
     return out;
   if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
     return out;
   for (size_t i = 0; i < ui->semantic_count; i++)
     if (ui->semantics[i].id == id) {
-      fail(ui, CUI_ERROR_DUPLICATE_ID);
+      cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
       return out;
     }
   if (ui->semantic_count == ui->config.max_elements) {
-    fail(ui, CUI_ERROR_CAPACITY);
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return out;
   }
   if (disabled) {
@@ -542,7 +556,7 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role,
   }
   cui_rect bounds = cui_bounds(ui, id);
   if (!disabled) {
-    out.hovered = inside(bounds, ui->pointer_x, ui->pointer_y);
+    out.hovered = cui_core_inside(bounds, ui->pointer_x, ui->pointer_y);
     out.pressed = ui->capture == id || ui->space_capture == id;
     out.focused = ui->focus == id;
     out.focus_visible = out.focused && ui->focus_visible;
@@ -557,19 +571,19 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role,
   ui->semantic_nodes[ui->semantic_count] =
       ui->depth && ui->opened[ui->depth - 1] ? ui->node_stack[ui->depth - 1]
                                              : SIZE_MAX;
-  ui->semantics[ui->semantic_count++] =
-      (cui_semantic){id,       role,    bounds,      copy_string(ui, name),
-                     disabled, checked, out.focused, value};
+  ui->semantics[ui->semantic_count++] = (cui_semantic){
+      id,       role,    bounds,      cui_core_copy_string(ui, name),
+      disabled, checked, out.focused, value};
   return out;
 }
-static cui_color color(Clay_Color c) {
+static cui_color cui_core_color(Clay_Color c) {
   return (cui_color){(uint8_t)c.r, (uint8_t)c.g, (uint8_t)c.b, (uint8_t)c.a};
 }
 cui_draw_list cui_end_frame(cui_context *ui) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return (cui_draw_list){0};
   if (ui->depth || ui->overflow_depth || ui->scope_count || ui->focus_depth)
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
   ui->overflow_depth = 0;
   while (ui->depth)
     cui_end_box(ui);
@@ -583,12 +597,12 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     switch (c->commandType) {
     case CLAY_RENDER_COMMAND_TYPE_RECTANGLE:
       d.type = CUI_DRAW_RECT;
-      d.color = color(c->renderData.rectangle.backgroundColor);
+      d.color = cui_core_color(c->renderData.rectangle.backgroundColor);
       d.radius = c->renderData.rectangle.cornerRadius.topLeft;
       break;
     case CLAY_RENDER_COMMAND_TYPE_BORDER:
       d.type = CUI_DRAW_BORDER;
-      d.color = color(c->renderData.border.color);
+      d.color = cui_core_color(c->renderData.border.color);
       d.radius = c->renderData.border.cornerRadius.topLeft;
       d.stroke = c->renderData.border.width.left;
       break;
@@ -597,7 +611,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
       d.text = (cui_str){c->renderData.text.stringContents.chars,
                          (size_t)c->renderData.text.stringContents.length};
       d.font_size = c->renderData.text.fontSize;
-      d.color = color(c->renderData.text.textColor);
+      d.color = cui_core_color(c->renderData.text.textColor);
       break;
     case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START:
       d.type = CUI_DRAW_CLIP_PUSH;
@@ -609,7 +623,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
       continue;
     }
     if (ui->count == ui->config.max_commands) {
-      fail(ui, CUI_ERROR_CAPACITY);
+      cui_core_fail(ui, CUI_ERROR_CAPACITY);
       ui->count = 0;
       break;
     }
@@ -619,7 +633,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
   for (size_t i = 0; i < ui->semantic_count; i++) {
     cui_semantic *s = &ui->semantics[i];
     Clay_ElementData d =
-        Clay_GetElementData((Clay_ElementId){.id = folded(s->id)});
+        Clay_GetElementData((Clay_ElementId){.id = cui_core_folded(s->id)});
     s->bounds = (cui_rect){d.boundingBox.x, d.boundingBox.y,
                            d.boundingBox.width, d.boundingBox.height};
     cui_rect clipped = s->bounds;
@@ -639,10 +653,10 @@ cui_draw_list cui_end_frame(cui_context *ui) {
       }
     }
     ui->previous_hits[i] = clipped;
-    if (focusable(s)) {
+    if (cui_core_focusable(s)) {
       retained |= s->id == ui->focus;
-      if (scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
-                         ui->top_modal)) {
+      if (cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
+                                  ui->top_modal)) {
         captured |= s->id == ui->capture;
         space |= s->id == ui->space_capture;
       }
@@ -654,16 +668,17 @@ cui_draw_list cui_end_frame(cui_context *ui) {
   if (ui->top_modal != SIZE_MAX) {
     bool allowed = false;
     for (size_t i = 0; i < ui->semantic_count; i++)
-      if (ui->semantics[i].id == ui->focus && focusable(&ui->semantics[i]) &&
-          scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
-                         ui->top_modal))
+      if (ui->semantics[i].id == ui->focus &&
+          cui_core_focusable(&ui->semantics[i]) &&
+          cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
+                                  ui->top_modal))
         allowed = true;
     if (!allowed) {
       ui->focus = 0;
       for (size_t i = 0; i < ui->semantic_count; i++)
-        if (focusable(&ui->semantics[i]) &&
-            scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
-                           ui->top_modal)) {
+        if (cui_core_focusable(&ui->semantics[i]) &&
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
+                                    ui->top_modal)) {
           ui->focus = ui->semantics[i].id;
           ui->focus_visible = true;
           ui->dirty = true;
@@ -724,7 +739,7 @@ void cui_invalidate(cui_context *ui) {
 
 void cui_update_semantic(cui_context *ui, cui_id id, bool checked,
                          float value) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return;
   for (size_t i = 0; i < ui->semantic_count; i++)
     if (ui->semantics[i].id == id) {
@@ -738,23 +753,24 @@ cui_id cui_event_target(cui_context *ui, size_t index) {
 }
 
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return false;
   if (!id) {
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     return false;
   }
-  if (ui->focus_depth == STACK_MAX || ui->focus_scope_count == STACK_MAX) {
-    fail(ui, CUI_ERROR_CAPACITY);
+  if (ui->focus_depth == CUI_CORE_STACK_MAX ||
+      ui->focus_scope_count == CUI_CORE_STACK_MAX) {
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
     return false;
   }
   for (size_t i = 0; i < ui->focus_scope_count; i++)
     if (ui->focus_scopes[i].id == id) {
-      fail(ui, CUI_ERROR_DUPLICATE_ID);
+      cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
       return false;
     }
   size_t n = ui->focus_scope_count++;
-  ui->focus_scopes[n] = (focus_scope){
+  ui->focus_scopes[n] = (cui_core_focus_scope){
       id, ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX,
       modal};
   ui->focus_stack[ui->focus_depth++] = n;
@@ -763,10 +779,10 @@ bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {
   return true;
 }
 void cui_end_focus_scope(cui_context *ui) {
-  if (!active(ui))
+  if (!cui_core_active(ui))
     return;
   if (!ui->focus_depth)
-    fail(ui, CUI_ERROR_LIFECYCLE);
+    cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
   else
     ui->focus_depth--;
 }
@@ -774,7 +790,7 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
   if (!ui)
     return false;
   for (size_t i = 0; i < ui->previous_count; i++)
-    if (ui->previous[i].id == trigger && focusable(&ui->previous[i])) {
+    if (ui->previous[i].id == trigger && cui_core_focusable(&ui->previous[i])) {
       ui->focus = trigger;
       ui->focus_visible = true;
       ui->dirty = true;

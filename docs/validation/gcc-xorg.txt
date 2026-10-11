@@ -16,7 +16,7 @@ Test project /home/matteo/dev/cui/build
       Start  8: virtual
  8/24 Test  #8: virtual ..........................   Passed    0.07 sec
       Start  9: dock
- 9/24 Test  #9: dock .............................   Passed    0.25 sec
+ 9/24 Test  #9: dock .............................   Passed    0.27 sec
       Start 10: plot
 10/24 Test #10: plot .............................   Passed    0.01 sec
       Start 11: example_unstyled
@@ -24,9 +24,9 @@ Test project /home/matteo/dev/cui/build
       Start 12: example_styled_settings
 12/24 Test #12: example_styled_settings ..........   Passed    0.00 sec
       Start 13: manifest
-13/24 Test #13: manifest .........................   Passed    0.14 sec
+13/24 Test #13: manifest .........................   Passed    0.13 sec
       Start 14: licenses
-14/24 Test #14: licenses .........................   Passed    0.15 sec
+14/24 Test #14: licenses .........................   Passed    0.14 sec
       Start 15: distribution
 15/24 Test #15: distribution .....................   Passed    0.18 sec
       Start 16: cpp_embedding
@@ -38,16 +38,16 @@ Test project /home/matteo/dev/cui/build
       Start 19: sdl3_services
 19/24 Test #19: sdl3_services ....................   Passed    0.74 sec
       Start 20: gpu_rendering
-20/24 Test #20: gpu_rendering ....................   Passed    1.53 sec
+20/24 Test #20: gpu_rendering ....................   Passed    1.52 sec
       Start 21: gallery_layout
 21/24 Test #21: gallery_layout ...................   Passed    0.01 sec
       Start 22: gallery_capture
-22/24 Test #22: gallery_capture ..................   Passed    0.12 sec
+22/24 Test #22: gallery_capture ..................   Passed    0.15 sec
       Start 23: implementation_embedding
 23/24 Test #23: implementation_embedding .........   Passed    0.00 sec
       Start 24: sokol_rendering
-24/24 Test #24: sokol_rendering ..................   Passed    0.23 sec
+24/24 Test #24: sokol_rendering ..................   Passed    0.24 sec
 
 100% tests passed out of 24
 
-Total Test time (real) =   3.51 sec
+Total Test time (real) =   3.53 sec

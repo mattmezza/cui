@@ -647,18 +647,16 @@ static bool cui_dock_private_read_number(cui_dock_private_parser *p, double *out
     if (!cui_dock_private_token(p, token))
         return false;
     size_t i = 0, digits = 0;
-    long double value = 0;
-    int decimals = 0, exponent = 0, sign = 1;
+    int exponent = 0;
     while (token[i] >= '0' && token[i] <= '9') {
-        value = value * 10 + (token[i++] - '0');
+        i++;
         digits++;
     }
     if (token[i] == '.') {
         i++;
         while (token[i] >= '0' && token[i] <= '9') {
-            value = value * 10 + (token[i++] - '0');
+            i++;
             digits++;
-            decimals++;
         }
     }
     if (!digits || digits > 32) {
@@ -667,11 +665,8 @@ static bool cui_dock_private_read_number(cui_dock_private_parser *p, double *out
     }
     if (token[i] == 'e' || token[i] == 'E') {
         i++;
-        if (token[i] == '+' || token[i] == '-') {
-            if (token[i] == '-')
-                sign = -1;
+        if (token[i] == '+' || token[i] == '-')
             i++;
-        }
         size_t start = i;
         while (token[i] >= '0' && token[i] <= '9') {
             if (exponent > 400) {
@@ -689,8 +684,35 @@ static bool cui_dock_private_read_number(cui_dock_private_parser *p, double *out
         p->error = CUI_DOCK_INVALID;
         return false;
     }
-    value *= powl(10.0L, (long double)(sign * exponent - decimals));
-    *out = (double)value;
+    /* Accumulating decimal digits and multiplying by a rounded power of ten
+       can round twice when long double is only double (e.g. macOS ARM).
+       Delegate conversion once to strtod after validating the ASCII grammar.
+       Adapt only its radix to the current locale, without changing locale. */
+    char localized[128];
+    const char *dot = strchr(token, '.');
+    if (dot) {
+        const char *point = localeconv()->decimal_point;
+        size_t point_length = 0;
+        if (point)
+            while (point_length < 32 && point[point_length])
+                point_length++;
+        if (!point_length || point_length == 32) {
+            p->error = CUI_DOCK_INVALID;
+            return false;
+        }
+        size_t prefix = (size_t)(dot - token), suffix = strlen(dot + 1);
+        memcpy(localized, token, prefix);
+        memcpy(localized + prefix, point, point_length);
+        memcpy(localized + prefix + point_length, dot + 1, suffix + 1);
+    } else {
+        memcpy(localized, token, strlen(token) + 1);
+    }
+    char *end;
+    *out = strtod(localized, &end);
+    if (*end) {
+        p->error = CUI_DOCK_INVALID;
+        return false;
+    }
     if (!isfinite(*out)) {
         p->error = CUI_DOCK_INVALID;
         return false;

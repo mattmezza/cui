@@ -12,10 +12,12 @@ flowchart TD
     Draw --> Software[Deterministic software]
     Draw --> SDL2D[SDL3 Renderer compatibility]
     Draw --> GPU[SDL_GPU / SPIR-V]
+    Draw --> Sokol[Sokol / GLCORE]
     Platform[Host or SDL3 events / clipboard] --> Core
     Text[Optional FreeType + HarfBuzz] --> Core
     Text --> Software
     Text --> SDL2D
+    Text --> Sokol
     Text --> GPU
 ```
 
@@ -26,3 +28,7 @@ Contexts own fixed-budget Clay memory, commands, copied frame strings, semantics
 Events queue before begin and dispatch in order against the previous completed layout. The initial frame establishes hit regions. Core focus scopes keep modal events inside the prior top scope, route dismissal to its reducer, and restore an enabled submitted trigger. Current composition then consumes activation and builds the next semantic and paint snapshots. Native widgets and semantic adapters remain future work.
 
 Single-TU distribution is generated from modular source; the same source compiles into a static library. Third-party source stays pinned and attributed. No JavaScript or Rust runtime is required. All 78 families remain in the status manifest; tested partial APIs are not full family verification.
+
+The independent Sokol adapter borrows a current OpenGL context and framebuffer descriptor. It owns bounded GPU buffers, shaders and a glyph LRU; it can borrow the host Sokol runtime or initialize its own. The adapter has no SDL dependency. GLCORE is the implemented backend, with actual Intel/Mesa pixel evidence; upstream backend availability is not CUI backend support. See backends/sokol/README.md for commit ordering and ownership.
+
+The virtual-list and dock handles retain data between frames with fixed configured capacity. Dock owns its split/tab tree and transactional restore bank; the application owns panel content. Plot scales and clipped geometry are allocation-free value operations. These are base models; their styled widgets and compound keyboard/accessibility behavior remain pending.

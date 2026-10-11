@@ -2,7 +2,7 @@ Test project /home/matteo/dev/cui/build-sanitize
       Start  1: bootstrap
  1/22 Test  #1: bootstrap ........................   Passed    0.02 sec
       Start  2: core
- 2/22 Test  #2: core .............................   Passed    0.04 sec
+ 2/22 Test  #2: core .............................   Passed    0.03 sec
       Start  3: base
  3/22 Test  #3: base .............................   Passed    0.03 sec
       Start  4: components
@@ -10,13 +10,13 @@ Test project /home/matteo/dev/cui/build-sanitize
       Start  5: render
  5/22 Test  #5: render ...........................   Passed    0.03 sec
       Start  6: edit
- 6/22 Test  #6: edit .............................   Passed    0.04 sec
+ 6/22 Test  #6: edit .............................   Passed    0.03 sec
       Start  7: overlay
- 7/22 Test  #7: overlay ..........................   Passed    0.03 sec
+ 7/22 Test  #7: overlay ..........................   Passed    0.02 sec
       Start  8: virtual
  8/22 Test  #8: virtual ..........................   Passed    0.09 sec
       Start  9: dock
- 9/22 Test  #9: dock .............................   Passed    0.81 sec
+ 9/22 Test  #9: dock .............................   Passed    0.84 sec
       Start 10: plot
 10/22 Test #10: plot .............................   Passed    0.03 sec
       Start 11: example_unstyled
@@ -26,7 +26,7 @@ Test project /home/matteo/dev/cui/build-sanitize
       Start 13: manifest
 13/22 Test #13: manifest .........................   Passed    0.14 sec
       Start 14: licenses
-14/22 Test #14: licenses .........................   Passed    0.16 sec
+14/22 Test #14: licenses .........................   Passed    0.14 sec
       Start 15: distribution
 15/22 Test #15: distribution .....................   Passed    0.17 sec
       Start 16: cpp_embedding
@@ -40,10 +40,10 @@ Test project /home/matteo/dev/cui/build-sanitize
       Start 20: gallery_layout
 20/22 Test #20: gallery_layout ...................   Passed    0.05 sec
       Start 21: gallery_capture
-21/22 Test #21: gallery_capture ..................   Passed    0.43 sec
+21/22 Test #21: gallery_capture ..................   Passed    0.48 sec
       Start 22: implementation_embedding
 22/22 Test #22: implementation_embedding .........   Passed    0.02 sec
 
 100% tests passed out of 22
 
-Total Test time (real) =   3.03 sec
+Total Test time (real) =   3.06 sec

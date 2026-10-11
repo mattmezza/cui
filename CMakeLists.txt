@@ -240,3 +240,7 @@ if(TARGET cui_sokol)
   cui_adapter_package(cui_sokol cui-sokol "Borrowed OpenGL Sokol geometry renderer" cui gl)
  endif()
 endif()
+
+# Bound failed assertions/driver initialization on unattended CI runners.
+get_property(CUI_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)
+set_tests_properties(${CUI_REGISTERED_TESTS} PROPERTIES TIMEOUT 60)

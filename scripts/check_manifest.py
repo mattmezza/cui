@@ -10,6 +10,12 @@ required={'name','reference_url','category','base_behavior','public_header','sam
 for e in entries:
     assert required<=e.keys(),e['name']
     assert e['status'] in {'not_started','scaffolded','implemented','tested','verified'},e['name']
+    for p in [e['sample'],e['public_header'],*e['tests']]:
+        if p:assert (r/p).is_file(),(e['name'],p)
+    assert e.get('features'),e['name']
+    for f in e['features']:
+        assert f['status'] in {'not_started','scaffolded','implemented','tested','verified'},(e['name'],f)
+        if f['status'] in {'tested','verified'}:assert f.get('evidence'),(e['name'],f)
     if e['status']=='verified':
         assert e['sample'] and e['tests'] and e['public_header'] and e['last_verified_commit'],e['name']
         for p in [e['sample'],e['public_header'],*e['tests']]:assert (r/p).is_file(),(e['name'],p)

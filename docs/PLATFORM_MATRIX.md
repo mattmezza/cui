@@ -5,10 +5,12 @@
 | Linux Xorg | tested partial | Native SDL_Renderer OpenGL, independent Sokol GLCORE and SDL_GPU Vulkan on Intel Graphics; actual frames/readbacks, pointer/key model and clipboard tests. No screen-reader/IME bridge. |
 | Linux headless | tested partial | GCC C11/software renderer, behavioral suites, ASan/UBSan, SDL dummy services. |
 | Linux Wayland | untested | SDL supports host integration; no compositor smoke run yet. Xorg is not Wayland evidence. |
-| Windows | tested portable subset with failed script gates | MSVC core/software behavioral executables passed on CI run38185199059; encoding/hash checks failed and fixes are being retested. Native GUI untested. |
-| macOS | tested portable subset | Hosted Apple Clang core/software behavioral tests passed on CI run38185199059. Native GUI/Metal untested. |
+| Windows | tested portable subset | Hosted MSVC:19/19 core/software checks passed on the same CI run, including encoding/hash/distribution gates. Native GUI untested. |
+| macOS | tested portable subset | Hosted Apple Clang:19/19 core/software checks passed on [CI run38186085456](https://github.com/mattmezza/cui/actions/runs/38186085456). Native GUI/Metal untested. |
 | Android | untested | No wrapper/device validation. |
 | iOS | untested | No wrapper/simulator/device validation/signing. |
 | WASM/WASI | tested headless WASI subset | Zig0.16/Wasmtime49:15 portable behavioral/embedding suites compiled and ran. Browser-host integration untested; see [WASI.md](WASI.md). |
 
 Optional unavailable integrations are explicit. Compilation will be recorded separately from runtime tests. SDL_GPU SPIR-V shader support currently confines that adapter to Vulkan-capable devices; D3D12/Metal formats are pending. Sokol GLCORE is tested on Linux Xorg; its other backends and platforms are pending.
+
+Linux hosted GCC and Clang each passed22/22 native/sanitizer checks plus Xvfb gallery smoke and Sokol pixel/cache tests. The CI GL driver reported **llvmpipe**, a software driver; this is API/readback coverage and is separate from the actual Intel/Mesa hardware evidence on the development Xorg host. Saved [CI summary](validation/ci-01865d5.txt) and [job metadata](validation/ci-01865d5.json) record exact source and outcomes.

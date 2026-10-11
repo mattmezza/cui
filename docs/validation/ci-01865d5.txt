@@ -1,0 +1,29 @@
+CI source: 01865d5b99bb7908ac838bdf4efe642c31ce6e9e
+CI run: https://github.com/mattmezza/cui/actions/runs/38186085456
+Conclusion: success
+
+distribution-and-style: success
+portable (macos-latest): success
+2026-10-11T23:55:57.0215830Z 100% tests passed out of 19
+2026-10-11T23:55:57.0216690Z Total Test time (real) =   0.68 sec
+
+linux-native (clang): success
+2026-10-11T23:56:49.2917346Z 100% tests passed, 0 tests failed out of 22
+2026-10-11T23:56:49.2918360Z Total Test time (real) =   2.45 sec
+2026-10-11T23:56:55.4337610Z Sokol shaped text pixel readback, cache tint reuse and eviction passed
+2026-10-11T23:56:55.4355772Z Sokol GLCORE; vendor=Mesa; renderer=llvmpipe (LLVM 20.1.2, 256 bits); nested clip, blend, rounded geometry/readback and runtime ownership passed
+
+linux-native (gcc): success
+2026-10-11T23:56:49.2926282Z 100% tests passed, 0 tests failed out of 22
+2026-10-11T23:56:49.2927385Z Total Test time (real) =   2.27 sec
+2026-10-11T23:56:52.8519942Z Sokol shaped text pixel readback, cache tint reuse and eviction passed
+2026-10-11T23:56:52.8521204Z Sokol GLCORE; vendor=Mesa; renderer=llvmpipe (LLVM 20.1.2, 256 bits); nested clip, blend, rounded geometry/readback and runtime ownership passed
+
+portable (windows-latest): success
+2026-10-11T23:56:09.3874612Z 100% tests passed out of 19
+2026-10-11T23:56:09.3877214Z Total Test time (real) =   1.73 sec
+
+portable (ubuntu-latest): success
+2026-10-11T23:55:45.2670544Z 100% tests passed, 0 tests failed out of 19
+2026-10-11T23:55:45.2675231Z Total Test time (real) =   0.44 sec
+

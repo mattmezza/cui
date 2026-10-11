@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `01865d5b99bb7908ac838bdf4efe642c31ce6e9e`. Sources are on the safe integration branch; see push/CI notes below.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `b5609160b0ab6111555b19b14c11afe852d85de0`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -22,7 +22,9 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Latest stored logs (each contains the actual test result, not assumed success):
+The source checkpoint passed all six hosted CI jobs: Ubuntu/macOS/Windows portable19/19 each, Linux GCC/Clang native sanitizer22/22 each plus gallery smoke and Sokol readback, and distribution/style gates. CI Sokol reported llvmpipe software rendering; development-host Intel/Mesa hardware evidence is separate. Local runs passed GCC/native24/24, sanitizer22/22, Clang19/19, Release19/19 and WASI15/15.
+
+Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
 - [clang-zig-headless.txt](validation/clang-zig-headless.txt)
@@ -39,13 +41,13 @@ Linux Xorg actual runtime: SDL_Renderer OpenGL; SDL_GPU Vulkan reported Intel(R)
 
 ## Captures and performance
 
-Actual generated frames are in [screenshots](screenshots/): light gallery, dark text preview, narrow values, tiny-window resize fallback SDL_GPU and Sokol. They are not borrowed upstream imagery. Fresh gallery review scored both material narrow/tiny fixes resolved; approval is bounded to the development gallery. No video captured.
+Actual generated frames are in [screenshots](screenshots/): light gallery, dark text preview, narrow values, tiny-window resize fallback, SDL_GPU and Sokol. They are not borrowed upstream imagery. Fresh gallery review scored both material narrow/tiny fixes resolved; approval is bounded to the development gallery. No video captured.
 
 CPU layout benchmark initial default unoptimized build on Intel Core Ultra 5 235U/Arch/GCC 16.2.1:500 frames × 100 boxes, 0.196 ms/frame CPU clock, 28000 visible commands after culling. This excludes shaping/rendering and is not a GPU frame or competitor benchmark. Keyed virtualization measurements/workload/memory are in VIRTUALIZATION.md. Reproduce with `make bench` and `./build/test_virtual --benchmark`.
 
 ## Platform matrix
 
-Linux Xorg and headless: tested partial. Wayland: untested. Windows/macOS: hosted portable C suites run; results and outstanding failures are in the platform matrix. Android/iOS/browser WASM: untested; 15 actual Zig/Wasmtime headless WASI suites passed, separately from browser integration. See [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md) for current observed CI changes. SDL_GPU currently SPIR-V/Vulkan only; Metal/D3D shaders pending. Native screen-reader bridges absent.
+Linux Xorg and headless: tested partial. Wayland: untested. Windows/macOS: hosted portable C suites run; results and coverage limits are in the platform matrix. Android/iOS/browser WASM: untested; 15 actual Zig/Wasmtime headless WASI suites passed, separately from browser integration. See [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md) for current observed CI changes. SDL_GPU currently SPIR-V/Vulkan only; Metal/D3D shaders pending. Native screen-reader bridges absent.
 
 ## Risks and next tasks
 

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_base.h"
 #include <math.h>
-static float clamp(float x,float a,float b){return x<a?a:x>b?b:x;}
-static cui_rect candidate(cui_rect a,cui_size s,cui_popup_side side,float g){
+static float cui_models_clamp(float x,float a,float b){return x<a?a:x>b?b:x;}
+static cui_rect cui_models_candidate(cui_rect a,cui_size s,cui_popup_side side,float g){
  cui_rect r={a.x,a.y,s.width,s.height};
  if(side==CUI_POPUP_BELOW)r.y=a.y+a.h+g;
  else if(side==CUI_POPUP_ABOVE)r.y=a.y-s.height-g;
@@ -10,7 +10,7 @@ static cui_rect candidate(cui_rect a,cui_size s,cui_popup_side side,float g){
  else r.x=a.x-s.width-g;
  return r;
 }
-static float overflow(cui_rect r,cui_rect v){
+static float cui_models_overflow(cui_rect r,cui_rect v){
  return fmaxf(v.x-r.x,0)+fmaxf(v.y-r.y,0)+fmaxf(r.x+r.w-v.x-v.w,0)+fmaxf(r.y+r.h-v.y-v.h,0);
 }
 cui_popup_result cui_popup_place(cui_rect a,cui_size s,cui_rect v,cui_popup_side side,float gap){
@@ -18,21 +18,21 @@ cui_popup_result cui_popup_place(cui_rect a,cui_size s,cui_rect v,cui_popup_side
  if(!isfinite(gap)||gap<0)gap=0;
  v.w=fmaxf(v.w,0);v.h=fmaxf(v.h,0);s.width=fmaxf(s.width,0);s.height=fmaxf(s.height,0);
  cui_popup_side opposite=side==CUI_POPUP_BELOW?CUI_POPUP_ABOVE:side==CUI_POPUP_ABOVE?CUI_POPUP_BELOW:side==CUI_POPUP_RIGHT?CUI_POPUP_LEFT:CUI_POPUP_RIGHT;
- cui_rect r=candidate(a,s,side,gap),other=candidate(a,s,opposite,gap);bool flip=overflow(other,v)<overflow(r,v);
+ cui_rect r=cui_models_candidate(a,s,side,gap),other=cui_models_candidate(a,s,opposite,gap);bool flip=cui_models_overflow(other,v)<cui_models_overflow(r,v);
  if(flip){r=other;side=opposite;}
- r.w=fminf(r.w,v.w);r.h=fminf(r.h,v.h);r.x=clamp(r.x,v.x,v.x+v.w-r.w);r.y=clamp(r.y,v.y,v.y+v.h-r.h);
+ r.w=fminf(r.w,v.w);r.h=fminf(r.h,v.h);r.x=cui_models_clamp(r.x,v.x,v.x+v.w-r.w);r.y=cui_models_clamp(r.y,v.y,v.y+v.h-r.h);
  return (cui_popup_result){r,side,flip};
 }
-static float height(const float *h,size_t i){return h&&isfinite(h[i])&&h[i]>0?h[i]:0;}
+static float cui_models_height(const float *h,size_t i){return h&&isfinite(h[i])&&h[i]>0?h[i]:0;}
 cui_virtual_range cui_virtualize(const float *h,size_t n,float scroll,float viewport,size_t overscan){
  cui_virtual_range r={0};if(!isfinite(viewport)||viewport<0)viewport=0;
- for(size_t i=0;i<n;i++)r.total+=height(h,i);
- r.scroll=clamp(isfinite(scroll)?scroll:0,0,fmaxf(r.total-viewport,0));
- float y=0;size_t first=0;while(first<n&&y+height(h,first)<=r.scroll){y+=height(h,first);first++;}
- size_t last=first;float bottom=y;while(last<n&&bottom<r.scroll+viewport){bottom+=height(h,last);last++;}
+ for(size_t i=0;i<n;i++)r.total+=cui_models_height(h,i);
+ r.scroll=cui_models_clamp(isfinite(scroll)?scroll:0,0,fmaxf(r.total-viewport,0));
+ float y=0;size_t first=0;while(first<n&&y+cui_models_height(h,first)<=r.scroll){y+=cui_models_height(h,first);first++;}
+ size_t last=first;float bottom=y;while(last<n&&bottom<r.scroll+viewport){bottom+=cui_models_height(h,last);last++;}
  r.begin=first>overscan?first-overscan:0;r.end=overscan>n-last?n:last+overscan;
- for(size_t i=0;i<r.begin;i++)r.before+=height(h,i);
- float used=r.before;for(size_t i=r.begin;i<r.end;i++)used+=height(h,i);r.after=fmaxf(r.total-used,0);return r;
+ for(size_t i=0;i<r.begin;i++)r.before+=cui_models_height(h,i);
+ float used=r.before;for(size_t i=r.begin;i<r.end;i++)used+=cui_models_height(h,i);r.after=fmaxf(r.total-used,0);return r;
 }
 int cui_date_days_in_month(int year,int month){
  static const int days[]={31,28,31,30,31,30,31,31,30,31,30,31};

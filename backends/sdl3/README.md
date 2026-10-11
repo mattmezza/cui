@@ -1,0 +1,39 @@
+# SDL3 compatibility adapter
+
+This optional C11 adapter owns an SDL window and an `SDL_Renderer`. It is separate
+from the SDL_GPU adapter. `cui_sdl3_driver()` reports the renderer selected by SDL;
+the accelerated capability is set only for a selected driver other than
+`software`. A detected OpenGL driver does not prove hardware execution rather
+than a Mesa software driver.
+
+Call creation, input polling, rendering and destruction on the main thread.
+The caller owns the `cui_font` and must keep it alive until adapter destruction.
+Only the primary mouse button is translated to CUI pointer activation. Keyboard
+modifiers, repeated key events, wheel events, committed UTF-8 text and window
+focus loss are translated. Window resize/expose invalidates the UI. Quit and
+window close cause `cui_sdl3_poll()` to return false.
+
+The clipboard-only `cui_platform` interface supplies `clipboard_set` and
+`clipboard_get`; its `poll` and `text_input` callbacks are null. The getter's
+storage lasts until the next getter call or adapter destruction. Embedded NUL
+bytes are rejected on set. SDL committed text input is enabled at creation, but
+composition/preedit events are not represented by this adapter or claimed as an
+IME capability.
+
+Rendering supports solid fills, rounded rectangles and borders, nested rectangle
+clipping, source-alpha blending and HarfBuzz/FreeType glyph coverage. Rounded
+geometry uses one horizontal strip per pixel row; it has no multisample edge
+antialiasing. Textures persist in an LRU cache with at most 256 entries and 4 MiB
+of stored grayscale coverage (up to 16 MiB of RGBA texture data). A cache key uses
+dimensions, coverage hash and byte comparison; texture color/alpha modulation
+allows reuse across theme changes. Allocation, font and draw failures propagate
+as `false`. Glyphs that exceed the cache memory budget fail explicitly.
+
+Use `cui_sdl3_render_capture()` to save a BMP before presentation while framebuffer
+contents are defined. The lower-level `cui_sdl3_save_bmp()` reads the current
+framebuffer; do not rely on its contents after `SDL_RenderPresent`.
+
+Validation on the development machine: SDL3 3.4.16, Linux Xorg with SDL `opengl`
+driver, and SDL dummy video with `software` driver. Other platforms and Wayland
+require their own runtime validation. The adapter does not provide native
+accessibility bridges, touch/pen input, GPU resource sharing or image commands.

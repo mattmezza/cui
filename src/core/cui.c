@@ -57,8 +57,9 @@ cui_context *cui_create(cui_config config) {
     if(!config.frame_bytes)config.frame_bytes=262144;
     /* Clay reports arena sizes through uint32_t, so retain a conservative
        supported element ceiling before its sizing or any allocations. */
-    if(config.max_elements>1000000 ||
-       config.max_commands>SIZE_MAX/sizeof(cui_draw_command) ||
+    if(config.frame_bytes>(size_t)PTRDIFF_MAX ||
+       config.max_elements>1000000 ||
+       config.max_commands>(size_t)PTRDIFF_MAX/sizeof(cui_draw_command) ||
        config.max_elements>SIZE_MAX/sizeof(cui_semantic) ||
        config.max_elements>SIZE_MAX/sizeof(cui_id) ||
        config.max_elements>SIZE_MAX/sizeof(box_node) ||

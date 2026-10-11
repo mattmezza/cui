@@ -14,9 +14,9 @@ Test project /home/matteo/dev/cui/build-release
       Start  7: overlay
  7/19 Test  #7: overlay ..........................   Passed    0.00 sec
       Start  8: virtual
- 8/19 Test  #8: virtual ..........................   Passed    0.02 sec
+ 8/19 Test  #8: virtual ..........................   Passed    0.03 sec
       Start  9: dock
- 9/19 Test  #9: dock .............................   Passed    0.27 sec
+ 9/19 Test  #9: dock .............................   Passed    0.22 sec
       Start 10: plot
 10/19 Test #10: plot .............................   Passed    0.01 sec
       Start 11: example_unstyled
@@ -24,13 +24,13 @@ Test project /home/matteo/dev/cui/build-release
       Start 12: example_styled_settings
 12/19 Test #12: example_styled_settings ..........   Passed    0.00 sec
       Start 13: manifest
-13/19 Test #13: manifest .........................   Passed    0.15 sec
+13/19 Test #13: manifest .........................   Passed    0.14 sec
       Start 14: licenses
-14/19 Test #14: licenses .........................   Passed    0.14 sec
+14/19 Test #14: licenses .........................   Passed    0.13 sec
       Start 15: distribution
 15/19 Test #15: distribution .....................   Passed    0.18 sec
       Start 16: cpp_embedding
-16/19 Test #16: cpp_embedding ....................   Passed    0.00 sec
+16/19 Test #16: cpp_embedding ....................   Passed    0.01 sec
       Start 17: distribution_single
 17/19 Test #17: distribution_single ..............   Passed    0.00 sec
       Start 18: distribution_multi
@@ -40,4 +40,4 @@ Test project /home/matteo/dev/cui/build-release
 
 100% tests passed out of 19
 
-Total Test time (real) =   0.83 sec
+Total Test time (real) =   0.76 sec

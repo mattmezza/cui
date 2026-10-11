@@ -158,10 +158,14 @@ static long double cui_plot_tick_step(const cui_plot_scale *s, size_t desired) {
     if (power == 0)
         power = DBL_TRUE_MIN;
     long double normalized = raw / power;
-    long double step = power * (normalized <= 1   ? 1
-                                : normalized <= 2 ? 2
-                                : normalized <= 5 ? 5
-                                                  : 10);
+    /* log10l/powl and the span division can straddle an exact nice-step
+       threshold by a few arithmetic ulps. Do not double a nominal unit step
+       merely because one libm returns log10l(1000) just above 3. */
+    long double rounding = 1 + 8 * LDBL_EPSILON;
+    long double step = power * (normalized <= rounding       ? 1
+                                : normalized <= 2 * rounding ? 2
+                                : normalized <= 5 * rounding ? 5
+                                                             : 10);
     if (s->kind == CUI_PLOT_LINEAR) {
         double magnitude = fmax(fabs(s->domain_min), fabs(s->domain_max));
         double ulp = magnitude - nextafter(magnitude, 0);
@@ -183,13 +187,18 @@ cui_plot_result cui_plot_ticks(const cui_plot_scale *s, size_t desired, double *
     long double a = cui_plot_transform(s->kind, s->domain_min);
     long double b = cui_plot_transform(s->kind, s->domain_max);
     long double step = cui_plot_tick_step(s, desired);
-    long double first = ceill(a / step);
+    /* Inspect the adjacent grid index on each side: a transformed endpoint
+       can round across its exact index. Inclusion is decided below in the
+       original double domain, never by a tolerant out-of-domain comparison. */
+    long double first = ceill(a / step) - 1;
+    long double last = floorl(b / step) + 1;
     double values[CUI_PLOT_MAX_TICKS];
     size_t n = 0;
     for (size_t i = 0; i < CUI_PLOT_MAX_TICKS; ++i) {
-        long double tick = (first + i) * step;
-        if (tick > b)
+        long double index = first + i;
+        if (index > last)
             break;
+        long double tick = index * step;
         double value;
         status = cui_plot_untransform(s->kind, tick, &value);
         if (status != CUI_PLOT_OK)

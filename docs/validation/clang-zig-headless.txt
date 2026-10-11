@@ -2,21 +2,21 @@ Test project /home/matteo/dev/cui/build-clang
       Start  1: bootstrap
  1/19 Test  #1: bootstrap ........................   Passed    0.00 sec
       Start  2: core
- 2/19 Test  #2: core .............................   Passed    0.00 sec
+ 2/19 Test  #2: core .............................   Passed    0.01 sec
       Start  3: base
  3/19 Test  #3: base .............................   Passed    0.01 sec
       Start  4: components
- 4/19 Test  #4: components .......................   Passed    0.00 sec
+ 4/19 Test  #4: components .......................   Passed    0.01 sec
       Start  5: render
  5/19 Test  #5: render ...........................   Passed    0.00 sec
       Start  6: edit
- 6/19 Test  #6: edit .............................   Passed    0.01 sec
+ 6/19 Test  #6: edit .............................   Passed    0.02 sec
       Start  7: overlay
- 7/19 Test  #7: overlay ..........................   Passed    0.01 sec
+ 7/19 Test  #7: overlay ..........................   Passed    0.00 sec
       Start  8: virtual
- 8/19 Test  #8: virtual ..........................   Passed    0.09 sec
+ 8/19 Test  #8: virtual ..........................   Passed    0.08 sec
       Start  9: dock
- 9/19 Test  #9: dock .............................   Passed    0.47 sec
+ 9/19 Test  #9: dock .............................   Passed    0.46 sec
       Start 10: plot
 10/19 Test #10: plot .............................   Passed    0.01 sec
       Start 11: example_unstyled
@@ -24,11 +24,11 @@ Test project /home/matteo/dev/cui/build-clang
       Start 12: example_styled_settings
 12/19 Test #12: example_styled_settings ..........   Passed    0.00 sec
       Start 13: manifest
-13/19 Test #13: manifest .........................   Passed    0.13 sec
+13/19 Test #13: manifest .........................   Passed    0.14 sec
       Start 14: licenses
-14/19 Test #14: licenses .........................   Passed    0.15 sec
+14/19 Test #14: licenses .........................   Passed    0.16 sec
       Start 15: distribution
-15/19 Test #15: distribution .....................   Passed    0.19 sec
+15/19 Test #15: distribution .....................   Passed    0.21 sec
       Start 16: cpp_embedding
 16/19 Test #16: cpp_embedding ....................   Passed    0.00 sec
       Start 17: distribution_single
@@ -40,4 +40,4 @@ Test project /home/matteo/dev/cui/build-clang
 
 100% tests passed out of 19
 
-Total Test time (real) =   1.10 sec
+Total Test time (real) =   1.14 sec

@@ -2,7 +2,7 @@
 
 An experimental C11 native UI framework: Clay layout, unstyled interaction primitives, themed controls, and independent renderer adapters. Embed it in an existing host or run the SDL3 workbench. No browser engine, JavaScript VM, Rust runtime, or platform types in the public core API.
 
-**Development snapshot, not production-ready or full GPUI Kit parity.** The complete78-family target is tracked in [the feature manifest](docs/gpui-parity.json). Working partial controls include buttons, checked/pressed selection, sliders and a UTF-8 scalar Input preview. Core focus/capture, semantic snapshots, bounded undo/redo, modal scopes, popup reducers, Gregorian geometry and keyed variable-height virtualization and a retained docking tree have behavioral tests. Native accessibility bridges, complete text editing/IME/bidi/fallback, full compound widgets and other platform runtimes remain pending.
+**Development snapshot, not production-ready or full GPUI Kit parity.** The complete 78-family target is tracked in [the feature manifest](docs/gpui-parity.json). Working partial controls include buttons, checked/pressed selection, sliders and a UTF-8 scalar Input preview. Core focus/capture, semantic snapshots, bounded undo/redo, modal scopes, popup reducers, Gregorian geometry and keyed variable-height virtualization and a retained docking tree have behavioral tests. Native accessibility bridges, complete text editing/IME/bidi/fallback, full compound widgets and other platform runtimes remain pending.
 
 ![Actual CUI software-rendered workbench](docs/screenshots/gallery-light.png)
 
@@ -49,7 +49,7 @@ void settings_frame(cui_context *ui, bool *notifications) {
 }
 ```
 
-Create/destroy the context in the host; queue input before begin. Width/height0 fit, negative grow, positive fix logical pixels. Stable scoped keys retain identity when lists reorder. Strings are copied to a bounded frame arena; returned draw/semantic pointers expire at the next begin. Read [API ownership](docs/API.md) and [the core contract](docs/CORE.md).
+Create/destroy the context in the host; queue input before begin. Width/height 0 fit, negative grow, positive fix logical pixels. Stable scoped keys retain identity when lists reorder. Strings are copied to a bounded frame arena; returned draw/semantic pointers expire at the next begin. Read [API ownership](docs/API.md) and [the core contract](docs/CORE.md).
 
 ## Header-only distribution
 
@@ -70,8 +70,8 @@ Other translation units include those headers without implementation macros. Bas
 
 ## Validation and scope
 
-`make check lint format-check dist-check`, `make bench`, and `make gallery` are available. Tests cover previous-frame ordered routing, nested capture/clips/focus scopes, Unicode scalar editing and history, randomized keyed virtualization, independent semantics, software pixels, shaped text, SDL cache/clipboard services, actual GPU readback, embedding, and gallery bounds. [Platform matrix](docs/PLATFORM_MATRIX.md) distinguishes runtime evidence from authored CI. Windows/macOS CI jobs are configured; their results are recorded when run.
+`make check lint format-check dist-check`, `make bench`, and `make gallery` are available. Tests cover previous-frame ordered routing, nested capture/clips/focus scopes, Unicode scalar editing and history, randomized keyed virtualization, independent semantics, software pixels, shaped text, SDL cache/clipboard services, actual GPU readback, embedding, and gallery bounds. [Platform matrix](docs/PLATFORM_MATRIX.md) distinguishes runtime evidence from authored CI. Windows/macOS portable CI jobs are configured; results and limitations are recorded in the matrix. Fifteen headless modules also run in a pinned [WASI runner](docs/WASI.md); this is separate from browser support.
 
 Read [the nightly report](docs/NIGHTLY_REPORT.md), [full component reference](docs/COMPONENTS.md), [architecture](docs/ARCHITECTURE.md), [component authoring](docs/COMPONENT_AUTHORING.md), and [remaining maintainer actions](docs/MAINTAINER_ACTIONS.md). All performance figures include workload context in [PERFORMANCE.md](docs/PERFORMANCE.md); none compare to other frameworks.
 
-Original CUI source is MIT. Vendored Clay and Sokol are zlib-licensed. GPUI Kit0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).
+Original CUI source is MIT. Vendored Clay and Sokol are zlib-licensed. GPUI Kit 0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).

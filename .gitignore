@@ -3,3 +3,4 @@ build*/
 !.impeccable/design.json
 *.ppm
 *.bmp
+__pycache__/

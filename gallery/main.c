@@ -43,11 +43,23 @@ static cui_draw_list frame(cui_context *ui, gallery_state *s, float w,
       ui, id(ui, "root"),
       (cui_box){
           .width = w, .height = h, .clip = true, .background = t.background});
-  box(ui, "toolbar", -1, 84, true, 24, 32, t.surface);
+  /* Below the supported specimen size, do not submit controls that cannot be
+     seen. This also removes their focus targets from the current tree. */
+  if (w < 600 || h < 700) {
+    box(ui, "resize_notice", -1, -1, false, 12, 10, t.background);
+    cui_text(ui, cui_string("Window too small"), 16, t.text);
+    cui_text(ui, cui_string("Resize to 600 x 700"), 14, t.text);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    return cui_end_frame(ui);
+  }
+  bool compact = w < 800;
+  box(ui, "toolbar", -1, compact ? 64 : 84, true, compact ? 16 : 24,
+      compact ? 16 : 32, t.surface);
   heading(ui, &t, "CUI / component workbench");
   cui_badge(ui, id(ui, "version"), &t, cui_string("Development"));
   cui_end_box(ui);
-  box(ui, "workspace", -1, -1, true, 24, 32, t.background);
+  box(ui, "workspace", -1, -1, true, compact ? 16 : 24, 32, t.background);
   if (w >= 800) {
     box(ui, "navigation", 210, -1, false, 0, 10, (cui_color){0});
     cui_text(ui, cui_string("Explore"), 18, t.text);
@@ -75,7 +87,7 @@ static cui_draw_list frame(cui_context *ui, gallery_state *s, float w,
     cui_text(ui, cui_string("Arrows: adjust values"), 12, t.muted);
     cui_end_box(ui);
   }
-  box(ui, "content", -1, -1, false, 0, 18, (cui_color){0});
+  box(ui, "content", -1, -1, false, 0, compact ? 10 : 18, (cui_color){0});
   if (w < 800) {
     cui_switch(ui, id(ui, "dark"), &t, cui_string("Dark theme"), &s->dark,
                false);
@@ -129,12 +141,19 @@ static cui_draw_list frame(cui_context *ui, gallery_state *s, float w,
           "theme.");
     cui_separator(ui, id(ui, "selection_separator"), &t, -1);
     cui_text(ui, cui_string("Update channel"), 18, t.text);
-    cui_radio(ui, id(ui, "stable"), &t, cui_string("Stable releases"),
-              &s->choice, 0, s->disabled);
-    cui_radio(ui, id(ui, "preview"), &t, cui_string("Preview releases"),
-              &s->choice, 1, s->disabled);
-    cui_radio(ui, id(ui, "nightly"), &t, cui_string("Nightly builds"),
-              &s->choice, 2, s->disabled);
+    if (compact)
+      box(ui, "channel_options", -1, 0, true, 0, 10, (cui_color){0});
+    cui_radio(ui, id(ui, "stable"), &t,
+              cui_string(compact ? "Stable" : "Stable releases"), &s->choice, 0,
+              s->disabled);
+    cui_radio(ui, id(ui, "preview"), &t,
+              cui_string(compact ? "Preview" : "Preview releases"), &s->choice,
+              1, s->disabled);
+    cui_radio(ui, id(ui, "nightly"), &t,
+              cui_string(compact ? "Nightly" : "Nightly builds"), &s->choice, 2,
+              s->disabled);
+    if (compact)
+      cui_end_box(ui);
     cui_text(ui, cui_string("Volume"), 18, t.text);
     cui_slider(ui, id(ui, "volume"), &t, cui_string("Volume"), &s->volume, 0,
                100, 5, s->disabled);
@@ -197,12 +216,14 @@ static cui_draw_list frame(cui_context *ui, gallery_state *s, float w,
   }
   cui_end_box(ui);
   cui_end_box(ui);
-  box(ui, "footer", -1, 44, true, 12, 16, t.surface);
-  cui_text(
-      ui,
-      cui_string(
-          "CUI 0.1 / state and semantics are independent of painted pixels"),
-      12, t.muted);
+  box(ui, "footer", -1, compact ? 36 : 44, true, compact ? 8 : 12, 16,
+      t.surface);
+  cui_text(ui,
+           cui_string(compact
+                          ? "CUI development / Tab moves focus"
+                          : "CUI 0.1 / state and semantics are independent of "
+                            "painted pixels"),
+           12, t.muted);
   cui_end_box(ui);
   cui_end_box(ui);
   cui_draw_list result = cui_end_frame(ui);

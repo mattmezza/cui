@@ -16,7 +16,43 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "single/multiple expanded items",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "controlled state and disabled items",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard focus and disclosure semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/accordion.md",
+        "sha256": "2509e7134e4b8faafe84f5259579111ed1cd6ae778bc545833f2bd7342dac164",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Accordion",
+          "Multiple Open Items",
+          "With Borders",
+          "Different Sizes",
+          "Handle Toggle Events",
+          "Disabled State",
+          "API Reference",
+          "Sizing",
+          "Examples",
+          "With Custom Icons",
+          "Nested Accordions"
+        ]
+      }
     },
     {
       "name": "AlertDialog",
@@ -32,7 +68,55 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "modal focus trap and restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "confirm/cancel actions",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "dismissal policies and semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/alert-dialog.md",
+        "sha256": "93d92e5e4fae1c845732b3a52901e8126e0d500b82454f9b23ab9fc733b4c04b",
+        "headings": [
+          "Differences from Dialog",
+          "Import",
+          "Usage",
+          "Setup Application Root View",
+          "Basic AlertDialog (Declarative API)",
+          "Using DialogAction and DialogClose",
+          "Basic AlertDialog (Imperative API)",
+          "Custom Buttons",
+          "AlertDialog with Icon",
+          "Destructive Action Confirmation",
+          "Custom Width",
+          "Controlling Dialog Close Behavior",
+          "Prevent Dialog from Closing",
+          "Dialog Close Callback",
+          "API Reference",
+          "AlertDialog",
+          "DialogButtonProps",
+          "DialogAction",
+          "DialogClose",
+          "Examples",
+          "Delete Confirmation",
+          "Session Timeout",
+          "Update Available",
+          "Best Practices",
+          "Related Components"
+        ]
+      }
     },
     {
       "name": "Alert",
@@ -48,7 +132,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "severity variants",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "title/content/action slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible announcement",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/alert.md",
+        "sha256": "94639b729aa0bf0ec6cae9999db0b3f5a66cabca41cb6a8d02f40ece12f697ef",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Alert",
+          "Alert with Title",
+          "Alert Variants",
+          "Alert Sizes",
+          "Closable Alerts",
+          "Banner Mode",
+          "Custom Icons",
+          "With Markdown Content",
+          "Conditional Visibility",
+          "API Reference",
+          "Examples",
+          "Form Validation Errors",
+          "Success Notification",
+          "System Status Banner",
+          "Interactive Alert with Custom Action",
+          "Multi-line Content with Formatting"
+        ]
+      }
     },
     {
       "name": "Attachment",
@@ -64,7 +189,49 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "file/media metadata",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "preview/remove actions",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "loading/error states",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/attachment.md",
+        "sha256": "3bcf5123374746932fb417701ade967a533616679efc854bf65e4ca92d03efef",
+        "headings": [
+          "Import",
+          "Anatomy and basic usage",
+          "Media and image previews",
+          "Lifecycle states",
+          "Status inheritance and overrides",
+          "Sizes and axes",
+          "Content and actions",
+          "Whole-card click",
+          "Remove and retry controls",
+          "Groups",
+          "Custom styling and theme tokens",
+          "Accessibility and state guidance",
+          "Component boundaries",
+          "API reference",
+          "`Attachment`",
+          "`AttachmentMedia`",
+          "`AttachmentContent`, `AttachmentTitle`, and `AttachmentDescription`",
+          "`AttachmentActions` and `AttachmentGroup`",
+          "Related types"
+        ]
+      }
     },
     {
       "name": "Avatar",
@@ -80,23 +247,112 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "image source and fallback initials",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "size variants",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "image failures and accessible name",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/avatar.md",
+        "sha256": "1f01b465097493cfaa313784eae906e3bc0174e781f60fe408ba9425f71b9922",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Avatar",
+          "Avatar with Fallback Text",
+          "Avatar Placeholder",
+          "Avatar Sizes",
+          "Custom Styling",
+          "AvatarGroup",
+          "Basic Group",
+          "Group with Limit",
+          "Group with Ellipsis",
+          "Group Sizes",
+          "Adding Multiple Avatars",
+          "API Reference",
+          "Examples",
+          "Team Display",
+          "User Profile Header",
+          "Anonymous User",
+          "Avatar with Custom Colors"
+        ]
+      }
     },
     {
       "name": "Badge",
       "reference_url": "https://gpui-kit.com/component/badge/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "implemented",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Themed text badge renders. Count/dot/overflow and standalone semantic tests pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "count and dot variants",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "overflow count",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "theme and accessible content",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/badge.md",
+        "sha256": "87c7eca64a16f293ab94bcc8377b25a281960ae58f1709f92ef7e8b05e750c14",
+        "headings": [
+          "Import",
+          "Usage",
+          "Badge with Count",
+          "Variants",
+          "Badge Sizes",
+          "Badge Colors",
+          "Badge on Icons",
+          "Badge on Avatars",
+          "Complex Nested Badges",
+          "API Reference",
+          "Examples",
+          "Notification Indicators",
+          "Status Indicators",
+          "Different Badge Positions",
+          "Count Formatting"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Bubble",
@@ -112,55 +368,244 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "incoming/outgoing alignment",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "message/reaction slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "theme variants",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/bubble.md",
+        "sha256": "50508fae22c90eabae57285efc47b97559376e9e3bd965fb3d25853bb7d1151d",
+        "headings": [
+          "Import",
+          "Anatomy and basic usage",
+          "Alignment",
+          "Variants",
+          "Rich content and long messages",
+          "Groups",
+          "Reactions and interactive content",
+          "Custom styling and theme tokens",
+          "Accessibility and state guidance",
+          "When to use another component",
+          "API reference",
+          "`Bubble`",
+          "`BubbleContent`",
+          "`BubbleGroup`",
+          "`BubbleReactions`",
+          "Related types"
+        ]
+      }
     },
     {
       "name": "Button",
       "reference_url": "https://gpui-kit.com/component/button/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Activation, focus and disabled states tested; variants/sizes/icons/loading/error/slots remain incomplete."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "pointer press/release/capture",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "keyboard activation and focus",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "disabled/loading/error states",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "variants/sizes/icons/slots",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/button.md",
+        "sha256": "73f9d821caac7559ca3249f8284f3014af902b2ee5765530c4704d0dffef3317",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Button",
+          "Variants",
+          "Outline Buttons",
+          "Compact Button",
+          "Sizeable",
+          "With Icons",
+          "With a dropdown caret icon",
+          "Button States",
+          "Button Group",
+          "Toggle Button Group",
+          "Custom Variant",
+          "API Reference",
+          "Examples",
+          "With Tooltip",
+          "Custom Children"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Checkbox",
       "reference_url": "https://gpui-kit.com/component/checkbox/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Binary and mixed base state tested; styled mixed state, real check geometry and validation states pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "unchecked/checked/mixed state",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "controlled value and activation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "disabled/keyboard/semantic state",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/checkbox.md",
+        "sha256": "8152da8c61d8a880cf9e09bda44029c60839d2ef498bd7d2d977893dffb06b93",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Checkbox",
+          "Controlled Checkbox",
+          "Different Sizes",
+          "Disabled State",
+          "Without Label",
+          "Custom Tab Order",
+          "API Reference",
+          "Styling",
+          "Examples",
+          "Checkbox List",
+          "Form Integration"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Clipboard",
       "reference_url": "https://gpui-kit.com/component/clipboard/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_sdl3.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_sdl3.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "SDL native/dummy roundtrip and optional capability adapter tested; core input paste/cut integration pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "OS read/write adapter",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "capability failure handling",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "headless adapter tests",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/clipboard.md",
+        "sha256": "540e4be44727b4edd3b5d8a58c51f9ba84c96b274b6ab12739e64f369ea45a39",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Clipboard",
+          "Using Dynamic Values",
+          "With Custom Content",
+          "In Input Fields",
+          "API Reference",
+          "Examples",
+          "Simple Text Copy",
+          "With User Feedback",
+          "Form Field Integration",
+          "Dynamic Content Copy",
+          "Data Types"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Collapsible",
@@ -176,11 +621,38 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "controlled disclosure",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard trigger",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "semantic expanded relation",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/collapsible.md",
+        "sha256": "4790de53657d47d93c5cbe3f4def5aed350691c809e41914b93dd13de277612e",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Use",
+          "Animated reveal"
+        ]
+      }
     },
     {
       "name": "DropdownButton",
-      "reference_url": "https://gpui-kit.com/component/dropdown-button/",
+      "reference_url": "https://gpui-kit.com/component/dropdown_button/",
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": null,
@@ -189,10 +661,32 @@
       "status": "not_started",
       "platforms": {},
       "limitations": [
-        "Full documented behavior pending implementation and audit."
+        "Split button/menu functionality pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "split primary and menu actions",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard opening and focus restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "disabled/loading state",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/dropdown_button.md",
+        "sha256": "8395bb36c1344dce73e4c13055d3c525c0929af3b2d507d2783b75efee6bb281",
+        "headings": []
+      }
     },
     {
       "name": "Empty",
@@ -208,23 +702,109 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "title/description/media/action slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "themed layout",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible content",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/empty.md",
+        "sha256": "968f95545deb8c0b569496c9c0187f7997828a0ba9db9e3db47da576deea5237",
+        "headings": [
+          "Import",
+          "Basic usage",
+          "Anatomy",
+          "Outline",
+          "Background",
+          "Avatar",
+          "Avatar group",
+          "Inputs and custom content",
+          "Constrained layouts",
+          "Styling defaults"
+        ]
+      }
     },
     {
       "name": "Focus Trap",
       "reference_url": "https://gpui-kit.com/component/focus-trap/",
       "category": "fundamentals",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_begin_focus_scope",
+        "cui_end_focus_scope",
+        "cui_overlay_begin"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "public_header": "include/cui/cui_overlay.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_overlay.c",
+        "tests/unit/test_core.c",
+        "tests/unit/test_base.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Core nested modal scopes and overlay state tested. No OS accessibility bridge or full modal relationship semantics."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "tab and reverse cycling",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "nested scope and restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "disabled/removed target cleanup",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/focus-trap.md",
+        "sha256": "78ee3ac3b6b4371f07433acc5ca7c6836f232bdfd269da5f8dce12960f89f349",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Focus Trap",
+          "Multiple Focus Traps",
+          "Focus Trap with Dialog",
+          "Focus Trap with Sheet",
+          "How It Works",
+          "Built-in Focus Trap Components",
+          "API Reference",
+          "Examples",
+          "Custom Modal with Focus Trap",
+          "Nested Focus Traps",
+          "Conditional Focus Trap",
+          "Accessibility Notes",
+          "See Also"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "GroupBox",
@@ -240,7 +820,50 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "title/content slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "themed border/layout",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "group semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/group-box.md",
+        "sha256": "930cacb9d6a8821152b178ef4386c8da96d79bc7298c2899e373306437f78e2f",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic GroupBox",
+          "GroupBox Variants",
+          "With Title",
+          "Footer outside the surface",
+          "Custom ID",
+          "Custom Title Styling",
+          "Custom Content Styling",
+          "Complex Example",
+          "Examples",
+          "Form Section",
+          "Settings Panel",
+          "Subscription Management",
+          "Without Title",
+          "Styling",
+          "Theme Integration",
+          "Custom Appearance",
+          "Best Practices",
+          "Related Components"
+        ]
+      }
     },
     {
       "name": "HoverCard",
@@ -256,7 +879,46 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "hover/focus delay",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "popup placement/collision",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "dismissal and accessible relationship",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/hover-card.md",
+        "sha256": "011949ea191adb06ea94ab370d09dca79d5ee44764a232d5de8ff0e4007bd647",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic HoverCard",
+          "User Profile Preview",
+          "Custom Timing",
+          "Positioning",
+          "Custom Content Builder",
+          "Styling",
+          "API Reference",
+          "HoverCard Methods",
+          "HoverCardState Methods",
+          "Behavior Details",
+          "Hover Timing",
+          "Edge Cases Handled",
+          "Best Practices",
+          "Differences from [Popover]"
+        ]
+      }
     },
     {
       "name": "Icon",
@@ -272,7 +934,59 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "original/licensed vector set",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "size/stroke/theme",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible/decorative distinction",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/icon.md",
+        "sha256": "e8b336048b6f7dd018159564c15f0e9f1b8e32a84b387fa3cd59ca3ac1fabd2b",
+        "headings": [
+          "Additional application icons",
+          "Import",
+          "Usage",
+          "Basic Icon",
+          "Icon with Custom Size",
+          "Icon with Custom Color",
+          "Rotated Icons",
+          "Custom SVG Path",
+          "SVG Bytes",
+          "Custom Icon Types with SVG Bytes",
+          "Available Icons",
+          "Navigation",
+          "Actions",
+          "Files & Folders",
+          "UI Elements",
+          "Social & External",
+          "Status & Alerts",
+          "Panels & Layout",
+          "Users & Profile",
+          "Other",
+          "Icon Sizes",
+          "Build you own `IconName`.",
+          "Examples",
+          "Icon in Button",
+          "Animated Loading Icon",
+          "Status Icons",
+          "Navigation Icons",
+          "Custom Icon from Assets",
+          "Notes"
+        ]
+      }
     },
     {
       "name": "Image",
@@ -288,7 +1002,35 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "host resource lifecycle",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "scaling/clipping/fallback",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "loading/error/accessibility",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/image.md",
+        "sha256": "185fb3f06aaf12f69f63207d106a737da753d352d8a1211accb705bc80eaeb66",
+        "headings": [
+          "Start with a working image",
+          "Common patterns",
+          "Gallery with selection",
+          "Accessibility",
+          "Learn more"
+        ]
+      }
     },
     {
       "name": "Kbd",
@@ -304,23 +1046,118 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "platform key labels",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "grouped shortcut rendering",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible description",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/kbd.md",
+        "sha256": "d41e28a5eaeb4d61f2e7e8b9414dd3879cbfb0c03ed8f775e659bc1a5a115ee7",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Keyboard Shortcut",
+          "Common Shortcuts",
+          "Multiple Modifiers",
+          "Arrow Keys and Function Keys",
+          "Without Visual Styling",
+          "From Action Bindings",
+          "Platform Differences",
+          "macOS",
+          "Windows/Linux",
+          "Examples by Platform",
+          "Examples",
+          "Keyboard Shortcut Help",
+          "Menu Item with Shortcut",
+          "Inline Documentation",
+          "Custom Styling",
+          "Text-Only Format",
+          "Styling"
+        ]
+      }
     },
     {
       "name": "Label",
       "reference_url": "https://gpui-kit.com/component/label/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "implemented",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Text wrapper renders, but control association and standalone semantic labeling pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "UTF-8 text and theme size",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "control association",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "disabled/error presentation",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/label.md",
+        "sha256": "1b33a167de79356ae7dbcf41af97e3735013483cb070d7121ab6b4a3093d7129",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Label",
+          "Label with Secondary Text",
+          "Text Alignment",
+          "Text Highlighting",
+          "Color and Styling",
+          "Masked Labels",
+          "Multi-line Text",
+          "Different Sizes",
+          "API Reference",
+          "Label",
+          "HighlightsMatch",
+          "Styling Methods (via Styled trait)",
+          "Examples",
+          "Form Labels",
+          "Search Highlighting",
+          "Sensitive Information",
+          "Multi-language Support",
+          "Status Indicators",
+          "Custom Layouts"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Marker",
@@ -336,7 +1173,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "status/separator modes",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "semantic content",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "themed styling",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/marker.md",
+        "sha256": "772c4bed8c1e162814230114c24b579270c18254b85de79a7514b88d706e7934",
+        "headings": [
+          "Import",
+          "Anatomy and basic usage",
+          "Variants",
+          "Plain",
+          "Separator",
+          "Border",
+          "Alignment",
+          "Loading styles",
+          "Shimmer configuration",
+          "Icons, content, and interactive children",
+          "Custom styling and theme tokens",
+          "Accessibility and motion guidance",
+          "When to use another component",
+          "API reference",
+          "`Marker`",
+          "`MarkerIcon`",
+          "`MarkerContent`",
+          "Related types"
+        ]
+      }
     },
     {
       "name": "Message",
@@ -352,7 +1230,51 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "sender/time/content slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "attachments and reactions",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessibility and alignment",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/message.md",
+        "sha256": "1e5904f16154d6da923dcc47a6db58012541c7f4d6e03ff45e4f08633b29e66d",
+        "headings": [
+          "Import",
+          "Anatomy and basic usage",
+          "Alignment",
+          "Avatar, header, content, and footer",
+          "Avatar",
+          "Header",
+          "Content",
+          "Footer",
+          "Rich content and actions",
+          "Grouping",
+          "Ghost surfaces and content insets",
+          "Custom styling and theme tokens",
+          "Accessibility and state guidance",
+          "Component boundaries",
+          "API reference",
+          "`Message`",
+          "`MessageGroup`",
+          "`MessageAvatar`",
+          "`MessageHeader` and `MessageFooter`",
+          "`MessageContent`",
+          "Related types"
+        ]
+      }
     },
     {
       "name": "MessageScroller",
@@ -368,7 +1290,43 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "variable-height virtualization",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "stable keys and incremental updates",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "tail following/scroll restore",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/message-scroller.md",
+        "sha256": "2c3afa8eca3d54cac2fa3cd322c65e1a5e84c1e7c361a497bb1024c0c6446afa",
+        "headings": [
+          "Import",
+          "Create state and choose the starting position",
+          "Render rows and an empty state",
+          "Append, streaming, and follow-tail behavior",
+          "Prepend earlier history",
+          "Unread and arbitrary navigation",
+          "Dynamic row heights and structural updates",
+          "Jump-to-latest controls",
+          "Scrollbar and style slots",
+          "Virtualization, accessibility, and application boundaries",
+          "API reference",
+          "`MessageScrollerState`",
+          "`MessageScroller`"
+        ]
+      }
     },
     {
       "name": "Notification",
@@ -384,7 +1342,51 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "toast queue/lifetimes",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "actions/dismissal",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible live region",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/notification.md",
+        "sha256": "e4bbab9cd68c52f930aa3002ac512781e1af334395daa53452df3175b5eb2ffb",
+        "headings": [
+          "Import",
+          "Usage",
+          "Where notifications render",
+          "Basic Notification",
+          "Notification Types",
+          "Notification with Title",
+          "Auto-hide Control",
+          "Placement",
+          "With Action Button",
+          "Clickable Notifications",
+          "Custom Content",
+          "Custom Notification",
+          "Unique Notifications",
+          "System Notification",
+          "Examples",
+          "Form Validation Error",
+          "File Upload Progress",
+          "System Status Updates",
+          "Batch Operation Results",
+          "Batch Operation Complete",
+          "Interactive Confirmation"
+        ]
+      }
     },
     {
       "name": "Pagination",
@@ -400,39 +1402,183 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "controlled page bounds",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard and disabled actions",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "page-count/ellipsis presentation",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/pagination.md",
+        "sha256": "f08c3a71c908dbfac59f57ba9b393d30da1c487faaa2122513a3e9d478181fc0",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Pagination",
+          "With Visible Pages",
+          "Compact Style",
+          "Different Sizes",
+          "Disabled State",
+          "Handle Page Change Events",
+          "API Reference",
+          "Sizing",
+          "Methods",
+          "Examples",
+          "With State Management",
+          "Large Dataset Pagination"
+        ]
+      }
     },
     {
       "name": "Progress",
       "reference_url": "https://gpui-kit.com/component/progress/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "implemented",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Determinate bar renders/clamps. Indeterminate motion, semantic values and dedicated story tests pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "determinate and indeterminate",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "value semantics",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "theme variants and reduced motion",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/progress.md",
+        "sha256": "07f81ca5d0c822634938c0aabc9420ed26bbcf014ba0dfe4ad936cf965eb0dc3",
+        "headings": [
+          "Progress",
+          "Usage",
+          "Different Progress Values",
+          "Loading State",
+          "Sizes",
+          "Custom Style",
+          "Dynamic Progress Updates",
+          "API Reference",
+          "ProgressCircle",
+          "Usage",
+          "Loading State",
+          "Sizes",
+          "Custom Color",
+          "With Inner Content",
+          "Inline with Label",
+          "API Reference",
+          "Examples",
+          "File Upload",
+          "Initialization with Loading State",
+          "Multi-Step Process"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Radio",
       "reference_url": "https://gpui-kit.com/component/radio/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Selection/exclusivity tested; full radio-group roving focus and arrow navigation pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "group exclusivity and roving focus",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "controlled selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "disabled/keyboard semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/radio.md",
+        "sha256": "691afd24159055a7db7195efaff698a483fdc6c3df94dcd32a02790d3868b8fa",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Radio Button",
+          "Controlled Radio Button",
+          "Radio Group (Recommended)",
+          "Different Sizes",
+          "Disabled State",
+          "Multi-line Label with Custom Content",
+          "Custom Tab Order",
+          "Radio Group Usage",
+          "Horizontal Layout",
+          "Vertical Layout",
+          "Styled Radio Group",
+          "Disabled Radio Group",
+          "API Reference",
+          "Radio",
+          "RadioGroup",
+          "Styling",
+          "Examples",
+          "Settings Panel",
+          "Survey Form",
+          "Payment Method Selection",
+          "Best Practices"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Rating",
@@ -448,7 +1594,45 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "pointer and keyboard value",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "read-only/disabled states",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "fractional values and semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/rating.md",
+        "sha256": "b0f7e4c06bbeace69e6f2644b72a28c9f3b183cf97bdcd5fa226028fe2b1a30e",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Rating",
+          "Controlled Rating",
+          "Different Sizes",
+          "Custom Color",
+          "Disabled State",
+          "Custom Maximum",
+          "Click Behavior",
+          "API Reference",
+          "Methods",
+          "Examples",
+          "Read-only Display",
+          "Interactive Rating with State",
+          "Large Rating with Custom Color"
+        ]
+      }
     },
     {
       "name": "Shimmer",
@@ -464,7 +1648,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "animation scheduling",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "reduced-motion fallback",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "loading region semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/shimmer.md",
+        "sha256": "5ba637dd9b77119f161ea873ca3973931fff2b30e2216906030530419c418b93",
+        "headings": [
+          "When to use",
+          "Import",
+          "Basic usage",
+          "Configure `ShimmerStyle`",
+          "Duration",
+          "Highlight color",
+          "Spread",
+          "Direction and play-once",
+          "Compose with Marker",
+          "Compose with Attachment",
+          "Use with messages and bubbles",
+          "Styling, theme, and reduced motion",
+          "Accessibility guidance",
+          "When not to use Shimmer",
+          "API reference",
+          "`ShimmerStyle`",
+          "`ShimmerText`",
+          "Related components"
+        ]
+      }
     },
     {
       "name": "Skeleton",
@@ -480,7 +1705,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "placeholder sizes/layout",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "loading semantics",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "theme/motion states",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/skeleton.md",
+        "sha256": "da87bfccdb5f32831a146db75706f6b41aa5f511fab70956142ea8fac3fa4adb",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Skeleton",
+          "Text Line Skeleton",
+          "Circle Skeleton",
+          "Rectangle Skeleton",
+          "Different Shapes",
+          "Secondary Variant",
+          "Animation",
+          "Sizes",
+          "Examples",
+          "Loading Profile Card",
+          "Loading Article List",
+          "Loading Table Rows",
+          "Loading Button States",
+          "Loading Form Fields",
+          "Conditional Loading",
+          "Theming"
+        ]
+      }
     },
     {
       "name": "Spinner",
@@ -496,7 +1762,52 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "animation scheduling",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "sizes and theme",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "reduced motion and status semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/spinner.md",
+        "sha256": "a19b69831b06d9349ed8ed70b0f8bea0110bb03abebc46eea976fda7e7d8aacf",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic",
+          "Spinner with Custom Color",
+          "Spinner Sizes",
+          "Spinner with Custom Icon",
+          "Available Icons",
+          "Loading Icons",
+          "Other Compatible Icons",
+          "Animation",
+          "Size Reference",
+          "Examples",
+          "Loading States",
+          "Different Loading Icons",
+          "Status Spinners",
+          "Size Variations",
+          "In UI Components",
+          "Performance Considerations",
+          "Common Patterns",
+          "Conditional Loading",
+          "Loading with Text",
+          "Overlay Loading"
+        ]
+      }
     },
     {
       "name": "Stepper",
@@ -512,23 +1823,114 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "steps/current/completed state",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "navigation/validation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard and semantic progress",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/stepper.md",
+        "sha256": "bf75e5c5def80b845e49e3739ee65399b06fc3d3863fc46309afcab35631d0b8",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Stepper",
+          "With Icons",
+          "Vertical Layout",
+          "Text Center",
+          "Different Sizes",
+          "Disabled State",
+          "Handle Click Events",
+          "API Reference",
+          "Sizing",
+          "Examples",
+          "Multi-step Form",
+          "Disabled Individual Steps"
+        ]
+      }
     },
     {
       "name": "Switch",
       "reference_url": "https://gpui-kit.com/component/switch/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Controlled activation tested; native switch geometry, theme variants and touch pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "controlled binary activation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "keyboard/pointer/disabled behavior",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "semantic checked state and theme",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/switch.md",
+        "sha256": "6292bd0386537692321e0d245dd908e8eca95adc0c2bc2d80a2130d53a052200",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Switch",
+          "Controlled Switch",
+          "With Label",
+          "Different Sizes",
+          "Disabled State",
+          "Custom Color",
+          "With Tooltip",
+          "Keyboard Focus",
+          "API Reference",
+          "Switch",
+          "Styling",
+          "Styling Properties",
+          "Examples",
+          "Settings Panel",
+          "Compact Settings List",
+          "Form Integration",
+          "Custom Styling",
+          "Animation"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Tag",
@@ -544,23 +1946,133 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "variants and close action",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "disabled/focus behavior",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible removal",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/tag.md",
+        "sha256": "efb69e69465f38052b8cc6e916ead7d30c7c039aa1488ee848c33712fff17cb2",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Tags",
+          "Tag Variants",
+          "Outline Tags",
+          "Tag Sizes",
+          "Custom Colors",
+          "Custom HSLA Colors",
+          "Rounded Corners",
+          "Combined Styles",
+          "Tag Categories and Use Cases",
+          "Status Tags",
+          "Category Labels",
+          "Priority Indicators",
+          "Feature Tags",
+          "API Reference",
+          "Tag Creation Methods",
+          "Style Methods",
+          "Size Methods (from Sizable trait)",
+          "Content Methods (from ParentElement trait)",
+          "Examples",
+          "Tag Collections",
+          "Status Dashboard Tags",
+          "Interactive Tag Lists",
+          "Color-Coded Categories",
+          "Pill-Style Tags",
+          "Behavior Notes",
+          "Design Guidelines",
+          "When to Use Tags",
+          "Color Usage",
+          "Size Guidelines"
+        ]
+      }
     },
     {
       "name": "Toggle",
       "reference_url": "https://gpui-kit.com/component/toggle/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Controlled press state tested; toggle groups and full visual states pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "controlled pressed state",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "keyboard/pointer/disabled behavior",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "pressed semantics/theme variants",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/toggle.md",
+        "sha256": "b0889bca6cead8bb7dc92be878c3ea16eb5612493554326e9ff027a36a2074b4",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Toggle",
+          "Icon Toggle",
+          "Controlled Toggle",
+          "Toggle Variants",
+          "Different Sizes",
+          "Disabled State",
+          "Toggle vs Switch",
+          "Integration with ToggleGroup",
+          "Basic Toggle Group",
+          "Toggle Group with Controlled State",
+          "Toggle Group Variants and Sizes",
+          "Segmented Toggle Group",
+          "Event Handling",
+          "Individual Toggle Events",
+          "Examples",
+          "Toolbar with Toggle Buttons",
+          "Filter Interface",
+          "Settings with Individual Toggles",
+          "Multi-select Options",
+          "Best Practices"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Tooltip",
@@ -576,23 +2088,132 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "hover/focus timing",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "popup collision",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "dismissal and accessible description",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/tooltip.md",
+        "sha256": "c32a6dc68b601af8d294bc15834ebffc4322669dc7f933eed8128c16c65ce7c5",
+        "headings": [
+          "Mobile behavior",
+          "Import",
+          "Usage",
+          "Basic Tooltip with Text",
+          "Button with Tooltip",
+          "Tooltip with Action/Keybinding",
+          "Custom Element Tooltip",
+          "Tooltip with Manual Keybinding",
+          "Advanced Usage",
+          "Components with Built-in Tooltip Support",
+          "Complex Tooltip Content",
+          "Tooltip in Form Elements",
+          "API Reference",
+          "Tooltip",
+          "Built-in Tooltip Methods",
+          "Tooltip Styling",
+          "Examples",
+          "Toolbar with Tooltips",
+          "Status Indicators with Tooltips",
+          "Interactive Elements with Rich Tooltips",
+          "Form Validation with Tooltips",
+          "Best Practices",
+          "Content Guidelines",
+          "Usage Guidelines",
+          "Examples of Good Tooltip Content",
+          "Examples to Avoid"
+        ]
+      }
     },
     {
       "name": "Calendar",
       "reference_url": "https://gpui-kit.com/component/calendar/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_base.h",
+      "sample": "examples/unstyled/main.c",
+      "tests": [
+        "tests/unit/test_base.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Base Gregorian date arithmetic only. No calendar widget, range selection, locale or keyboard grid."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "date/leap-year/month geometry",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "min/max bounds and range selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/localized semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/calendar.md",
+        "sha256": "e9a388c6b802b26c63cf44620059546929d3cf8b02403708badbb71fc8262f8b",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Calendar",
+          "Calendar with Initial Date",
+          "Date Range Calendar",
+          "Multiple Months Display",
+          "Calendar Sizes",
+          "Date Restrictions",
+          "Disabled Weekends",
+          "Disabled Specific Weekdays",
+          "Disabled Date Range",
+          "Disabled Date Interval",
+          "Custom Disabled Dates",
+          "Month/Year Navigation",
+          "Custom Year Range",
+          "Handle Selection Events",
+          "Advanced Examples",
+          "Business Days Only Calendar",
+          "Holiday Calendar",
+          "Multi-Month Range Selector",
+          "Quarterly View Calendar",
+          "Custom Styling",
+          "API Reference",
+          "Examples",
+          "Event Planning Calendar",
+          "Vacation Booking Calendar",
+          "Report Date Range Selector",
+          "Availability Calendar"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "ColorPicker",
@@ -608,7 +2229,57 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "color-space model and conversion",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "picker geometry and pointer drag",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/validation/theme",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/color-picker.md",
+        "sha256": "344c0c09a8593004bce915dcb508cc0edc04372512066edd0b6af3519fb9c9e5",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Color Picker",
+          "With Event Handling",
+          "Setting Default Color",
+          "Different Sizes",
+          "With Custom Featured Colors",
+          "With Icon Instead of Color Square",
+          "With Label",
+          "Custom Anchor Position",
+          "Color Select",
+          "Color Selection Interface",
+          "Color Palettes",
+          "Featured Colors Section",
+          "Hex Input Field",
+          "Color Formats",
+          "RGB (Red, Green, Blue)",
+          "HSL (Hue, Saturation, Lightness)",
+          "Hex Format",
+          "Alpha Channel",
+          "API Reference",
+          "Examples",
+          "Color Theme Editor",
+          "Brand Color Selector",
+          "Toolbar Color Picker",
+          "Color Palette Builder",
+          "With Color Validation"
+        ]
+      }
     },
     {
       "name": "Combobox",
@@ -624,7 +2295,49 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "filter/single/multiple selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "active descendant and keyboard",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "popup focus/dismissal/accessibility",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/combobox.md",
+        "sha256": "5b7a13c5414c427d600914d257975a8897bec5554543b77f70acbf7b7c58f5de",
+        "headings": [
+          "Select vs Combobox",
+          "Import",
+          "Usage",
+          "Basic Single-Select",
+          "Multi-Select",
+          "Pre-selected Item",
+          "Grouped Items",
+          "Implementing `SearchableListItem`",
+          "Disabled Items",
+          "Custom Check Icon",
+          "Footer Action",
+          "Custom Trigger",
+          "Sizes",
+          "Cleanable",
+          "Disabled",
+          "Events",
+          "Mutating Programmatically",
+          "Keyboard Shortcuts",
+          "Theming"
+        ]
+      }
     },
     {
       "name": "DatePicker",
@@ -640,23 +2353,131 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "calendar popup composition",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "parse/format and bounds",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/localization/accessibility",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/date-picker.md",
+        "sha256": "ba01aea736a1b7cb54c77519f7c75a1803654f45a9c7133f737a4b6e4bec9898",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Date Picker",
+          "With Initial Date",
+          "Date Range Picker",
+          "Date and Time",
+          "With Custom Date Format",
+          "With Placeholder",
+          "Cleanable Date Picker",
+          "Different Sizes",
+          "Disabled State",
+          "Custom Appearance",
+          "Date Restrictions",
+          "Disabled Weekends",
+          "Disabled Date Range",
+          "Disabled Date Interval",
+          "Custom Disabled Dates",
+          "Custom Year Range",
+          "Preset Ranges",
+          "Single Date Presets",
+          "Date Range Presets",
+          "Handle Date Selection Events",
+          "Multiple Months Display",
+          "Advanced Examples",
+          "Business Days Only",
+          "Date Range with Max Duration",
+          "Quarter Presets",
+          "Examples",
+          "Event Date Picker",
+          "Booking System Date Range",
+          "Financial Period Selector"
+        ]
+      }
     },
     {
       "name": "Editor",
       "reference_url": "https://gpui-kit.com/component/editor/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_edit.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_edit.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "implemented",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Reusable bounded UTF-8 scalar editing model exists. No source editor, gutter, highlighting, diagnostics, grapheme editing or200K-line validation."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "UTF-8 grapheme editing and selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "undo/redo and multiline indentation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "gutter/wrap/find/replace",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "highlight/diagnostic/completion callbacks",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "200K-line benchmark",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/editor.md",
+        "sha256": "40b6974d90cdde80ef8cfb271d89989f0cf66b477f8b5332075c3cb7b0af3a9f",
+        "headings": [
+          "Import",
+          "Language editing rules",
+          "Basic usage",
+          "Editor options",
+          "Keyboard shortcuts and column selection",
+          "Search",
+          "Custom search UI",
+          "Decorations",
+          "Geometric range decorations",
+          "Value and events",
+          "Font",
+          "Appearance"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Form",
@@ -672,23 +2493,146 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "field registration and validation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "error/required labels",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "submit/reset and keyboard",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/form.md",
+        "sha256": "202c80e5bbe478b718b7c2d78a2ba70fc4644f4e15d1fc047099c3197dbe37f2",
+        "headings": [
+          "Import",
+          "Predictable composition",
+          "Usage",
+          "Basic Form",
+          "Horizontal Form Layout",
+          "Multi-Column Form",
+          "Form Container and Layout",
+          "Vertical Layout (Default)",
+          "Horizontal Layout",
+          "Custom Sizing",
+          "Form Validation",
+          "Required Fields",
+          "Field Descriptions",
+          "Dynamic Descriptions",
+          "Field Visibility",
+          "Submit Handling",
+          "Basic Submit Pattern",
+          "Form with Action Buttons",
+          "Field Groups",
+          "Related Fields",
+          "Custom Field Components",
+          "Conditional Fields",
+          "Grid Layout and Positioning",
+          "Column Spanning",
+          "Column Positioning",
+          "Responsive Layout",
+          "Examples",
+          "User Registration Form",
+          "Settings Form with Sections",
+          "Contact Form"
+        ]
+      }
     },
     {
       "name": "Input",
       "reference_url": "https://gpui-kit.com/component/input/",
       "category": "forms",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_base_input",
+        "cui_edit_apply_events"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Real UTF-8 scalar editor with bounded undo/redo; no caret/selection painting, graphemes, IME, clipboard integration or pointer position."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "UTF-8 insertion/deletion/selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "clipboard and IME",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "undo/redo and grapheme boundaries",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "validation/disabled/error/semantic states",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/input.md",
+        "sha256": "10a4ec8465e3a696002dd8f5251ddf51f0847c5ef8b71138a0e3129c8956230d",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Input",
+          "With Placeholder",
+          "With Default Value",
+          "Cleanable Input",
+          "With Prefix and Suffix",
+          "Password Input (Masked)",
+          "Input Sizes",
+          "Disabled Input",
+          "Read-only Input",
+          "Clean on ESC",
+          "Input Validation",
+          "Input Masking",
+          "Handle Input Events",
+          "Custom Appearance",
+          "Context Menu",
+          "Touch Selection",
+          "Paste Hook",
+          "Examples",
+          "Search Input",
+          "Currency Input",
+          "Form with Multiple Inputs",
+          "Atomic inline tokens",
+          "Insert a reference",
+          "Customize appearance and opening a reference",
+          "Show a tooltip or preview on hover",
+          "Save, restore and submit",
+          "Validation and supported inputs",
+          "JavaScript"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Input Group",
@@ -704,7 +2648,38 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "prefix/suffix/button slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "focus and disabled propagation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "validation and layout",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/input-group.md",
+        "sha256": "a887c9abb9ec72601ed822b64f29537d174d828c06f770ef15bcd157f69542bd",
+        "headings": [
+          "Input with a clear button",
+          "Parts and alignment",
+          "Buttons, icons, and menus",
+          "Textarea with a counter and submit action",
+          "Disabled, read-only, and validation",
+          "Sizes and custom styles",
+          "JavaScript",
+          "Inline references"
+        ]
+      }
     },
     {
       "name": "NumberInput",
@@ -720,7 +2695,56 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "numeric parsing and bounds",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "increment/decrement/step",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/disabled/semantic value",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/number-input.md",
+        "sha256": "6dbf9dac065dc856ce5969f4eb64e093fce5f3a4b826d953c39bdbc3df0722b8",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Number Input",
+          "Input Restriction and Normalization",
+          "With Min/Max/Step",
+          "Dynamic Step",
+          "With Number Formatting",
+          "Different Sizes",
+          "With Prefix and Suffix",
+          "Disabled State",
+          "Without Default Styling",
+          "Handle Number Input Events",
+          "Programmatic Control",
+          "API Reference",
+          "NumberInput",
+          "NumberInputEvent",
+          "StepAction",
+          "InputState (Number-specific methods)",
+          "MaskPattern::Number",
+          "Keyboard Navigation",
+          "Examples",
+          "Integer Counter",
+          "Currency Input",
+          "Quantity Selector with Limits",
+          "Floating Point Input",
+          "Best Practices"
+        ]
+      }
     },
     {
       "name": "OtpInput",
@@ -736,7 +2760,57 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "segmented input focus",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "paste and validation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/accessible labels",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/otp-input.md",
+        "sha256": "6981bdcf09dc0f5fcad7f6af7b835e56c8dbf9c14442b18f224daa896be63f55",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic OTP Input",
+          "With Default Value",
+          "Masked OTP Input",
+          "Different Sizes",
+          "Grouped Layout",
+          "Disabled State",
+          "Different Length Codes",
+          "Handle OTP Events",
+          "Programmatic Control",
+          "API Reference",
+          "OtpState",
+          "OtpInput",
+          "InputEvent",
+          "Examples",
+          "SMS Verification",
+          "Two-Factor Authentication",
+          "PIN Entry",
+          "Behavior",
+          "Input Handling",
+          "Visual Feedback",
+          "Keyboard Navigation",
+          "Common Patterns",
+          "Auto-Submit on Complete",
+          "Clear on Focus",
+          "Resend Code Timer"
+        ]
+      }
     },
     {
       "name": "Questionnaire",
@@ -752,7 +2826,51 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "step and answer models",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "validation/navigation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "compound UI semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/questionnaire.md",
+        "sha256": "4dd0da1253b532ce55600868bb1a10fbe74a3c91c70b435176957224401e3d28",
+        "headings": [
+          "Import",
+          "Usage",
+          "Composition",
+          "Choices",
+          "Freeform answer",
+          "Validation",
+          "Navigation and submission",
+          "Skipping",
+          "Events and submission",
+          "Controlling the state",
+          "Reset",
+          "Conditional items",
+          "Keyboard shortcuts",
+          "Progress",
+          "Sizes and theming",
+          "Card and Dialog composition",
+          "Accessibility",
+          "Current scope",
+          "API reference",
+          "Compound parts",
+          "State, answers, and events"
+        ]
+      }
     },
     {
       "name": "Select",
@@ -768,23 +2886,128 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "single/multiple controlled selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard active descendant",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "popup dismissal/focus restoration",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/select.md",
+        "sha256": "5f889d453e4608fa2bfba5740da50c4536859573fda58e47f7cfe509c55e1d35",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Select",
+          "Placeholder",
+          "Accessibility",
+          "Searchable",
+          "Impl SelectItem",
+          "Group Items",
+          "Sizes",
+          "Disabled State",
+          "Cleanable",
+          "Custom Appearance",
+          "Empty State",
+          "Events",
+          "Mutating",
+          "Examples",
+          "Language Selector",
+          "Country/Region Selector",
+          "Integrated with Input Field",
+          "Multi-level Grouped Select",
+          "Keyboard Shortcuts",
+          "Theming"
+        ]
+      }
     },
     {
       "name": "Slider",
       "reference_url": "https://gpui-kit.com/component/slider/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Capture drag, keyboard step/clamp and disabled tests pass; tick/handle geometry and touch pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "pointer drag capture",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "keyboard range/step/clamp",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "controlled value and semantics",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "disabled/theme variants",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/slider.md",
+        "sha256": "3d6b298dc2210fdaacff03a512e5217ad34800b7038f81f7f6549a8162f2649b",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Slider",
+          "Slider with Event Handling",
+          "Range Slider",
+          "Vertical Slider",
+          "Custom Step Intervals",
+          "Min/Max Configuration",
+          "Disabled State",
+          "Custom Styling",
+          "Scale",
+          "SliderEvent",
+          "Styling",
+          "Examples",
+          "Color Picker",
+          "Volume Control",
+          "Price Range Filter",
+          "Temperature Slider with Custom Styling",
+          "Keyboard Shortcuts"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Speech",
@@ -800,7 +3023,45 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "capability/permission adapter",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "recognition callback lifecycle",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "fake adapter tests and explicit unavailability",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/speech.md",
+        "sha256": "b992ce8b9eb45a5de39e0ff67c34a446c074cdc39b30699c9c44ff37643721bd",
+        "headings": [
+          "Enable the feature",
+          "Import",
+          "Usage",
+          "Dictate into an input",
+          "Events",
+          "Session control",
+          "Button states",
+          "Choose a recognizer",
+          "Implement a recognizer",
+          "Provide audio",
+          "Platform support",
+          "macOS",
+          "Windows",
+          "Linux",
+          "API Reference"
+        ]
+      }
     },
     {
       "name": "Textarea",
@@ -816,7 +3077,37 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "multiline editing/selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "wrap and auto-grow",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "clipboard/IME/undo/semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/textarea.md",
+        "sha256": "a58119d4d5225655c6b109876b742680c9a3789bc1da2a382414e913715d4d86",
+        "headings": [
+          "Import",
+          "Basic usage",
+          "Auto-grow",
+          "Value and events",
+          "Sizes",
+          "Appearance",
+          "Atomic inline tokens"
+        ]
+      }
     },
     {
       "name": "TimeField",
@@ -832,7 +3123,38 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "segmented hour/minute/second model",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "parse/validation/localization",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/semantic segments",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/time-field.md",
+        "sha256": "241e3e4da93bf5b091020a857b36ed35bc483c0f11231d382e1529b88d634363",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Time Field",
+          "With Seconds",
+          "12-Hour Clock",
+          "Sizes, Disabled and Invalid",
+          "Handle Changes",
+          "Keyboard"
+        ]
+      }
     },
     {
       "name": "Carousel",
@@ -848,7 +3170,42 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "controlled current item",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/drag navigation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible position and theme",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/carousel.md",
+        "sha256": "f1107478a1ae7673e8bdedddd4a93ec9194bbade675eb25e88b5057c998d2a4a",
+        "headings": [
+          "Import",
+          "Usage",
+          "Composition",
+          "Multiple items",
+          "Orientation",
+          "Looping",
+          "Controlled selection",
+          "Events",
+          "Pagination indicators",
+          "Control size",
+          "Custom controls",
+          "Accessibility"
+        ]
+      }
     },
     {
       "name": "DescriptionList",
@@ -864,7 +3221,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "key/value composition",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "responsive layout",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "list semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/description-list.md",
+        "sha256": "9362602007fc7f044f7dd52a115b0745bfe26117fcb801e2c5866244dabb6b1a",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Description List",
+          "Using DescriptionItem Builder",
+          "Different Layouts",
+          "Multiple Columns with Spans",
+          "With Separators",
+          "Different Sizes",
+          "Without Borders",
+          "Custom Label Width (Horizontal Layout)",
+          "Rich Content with Custom Elements",
+          "Complex Example with Mixed Content",
+          "Examples",
+          "User Profile Information",
+          "System Information",
+          "Product Specifications",
+          "Configuration Settings",
+          "Design Guidelines"
+        ]
+      }
     },
     {
       "name": "Dialog",
@@ -880,7 +3278,62 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "modal overlay/dismissal",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "focus trap/restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "title/description/action slots",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/dialog.md",
+        "sha256": "068f7898bbfa4063bf83b9c15a3699650de9c4df299d517e7872485e838bd5b8",
+        "headings": [
+          "Import",
+          "Usage",
+          "Where dialogs render",
+          "Basic Dialog",
+          "Form Dialog",
+          "Dialog with Icon",
+          "Scrollable Dialog",
+          "Dialog Options",
+          "Action Buttons",
+          "Nested Dialogs",
+          "Custom Styling",
+          "Custom Padding",
+          "Close Dialog Programmatically",
+          "Declarative API",
+          "Import",
+          "Trigger-based Dialog",
+          "Content Builder Pattern",
+          "Declarative Components",
+          "Form Dialog with Declarative API",
+          "Styled Footer",
+          "DialogContent Container",
+          "API Reference - Declarative Components",
+          "Dialog",
+          "DialogContent",
+          "DialogHeader",
+          "DialogTitle",
+          "DialogDescription",
+          "DialogFooter",
+          "Breaking Changes",
+          "Dialog::new() Signature Change",
+          "Content Builder Function",
+          "Best Practices"
+        ]
+      }
     },
     {
       "name": "Dock",
@@ -896,7 +3349,41 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "nested splits and tab groups",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "drag reorder/resize/edge docks",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "versioned serialization/restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "focus and keyboard behavior",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/dock.md",
+        "sha256": "9fb39f937a45f373d25cba96a20ec4b99a5075905d8b4b539a986f9d02fb30c7",
+        "headings": [
+          "Create a dock area",
+          "Define a panel",
+          "Describe the initial layout",
+          "Restore and persist layouts",
+          "Style the workspace",
+          "Runnable example"
+        ]
+      }
     },
     {
       "name": "List",
@@ -912,7 +3399,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "selection and item keys",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard navigation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "item rendering and semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/list.md",
+        "sha256": "3dd4b98b076513e289469408f18079764cdd12f50b7d473a3b7de1506b2a53b0",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic List",
+          "List with Sections",
+          "List Items with Icons and Actions",
+          "List with Search",
+          "List with Loading State",
+          "Infinite Scrolling",
+          "List Events",
+          "Different Item Styles",
+          "Drag and Drop Reordering",
+          "Custom Empty State",
+          "Configuration Options",
+          "List Configuration",
+          "Scrolling Control",
+          "Examples",
+          "File Browser List",
+          "Contact List with Sections"
+        ]
+      }
     },
     {
       "name": "Menu",
@@ -928,23 +3456,118 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "roving item focus/actions",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "nested popup collision",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "dismissal/restore/disabled semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/menu.md",
+        "sha256": "a7895ba14afb7a6e58ca150c6061051caa2a4ef922427e08b4d465801f53b235",
+        "headings": [
+          "Import",
+          "Usage",
+          "ContextMenu",
+          "DropdownMenu",
+          "Anchor Position",
+          "Icons",
+          "Disabled State",
+          "Check state",
+          "Separators",
+          "Labels",
+          "Link MenuItem",
+          "Custom Element",
+          "Keyboard Shortcuts",
+          "Submenus",
+          "Submenus with Icons",
+          "Scrollable Menus",
+          "Menu Sizing",
+          "Action Context",
+          "API Reference",
+          "Examples",
+          "File Manager Context Menu",
+          "Add MenuItem without action",
+          "Editor Menu with Shortcuts",
+          "Settings Menu with Custom Elements",
+          "Keyboard Shortcuts",
+          "Best Practices"
+        ]
+      }
     },
     {
       "name": "Popover",
       "reference_url": "https://gpui-kit.com/component/popover/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_overlay.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_overlay.c",
+        "tests/unit/test_core.c",
+        "tests/unit/test_base.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Base collision placement and popup dismissal reducer only. No styled portal/anchor UI or semantic relationship."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "anchor placement/collision",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "controlled open/dismissal",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "focus and accessible relationship",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/popover.md",
+        "sha256": "f57451c6a7baefd938a0729c589192c35ef7fcbbeac1a38c8b3cbf4ab6d51eb3",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Popover",
+          "Popover with Custom Positioning",
+          "View in Popover",
+          "Add content by `content` method",
+          "Right-Click Popover",
+          "Dismiss Popover manually",
+          "Styling Popover",
+          "Control Open State",
+          "Default Open",
+          "Custom Trigger"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Resizable",
@@ -960,11 +3583,49 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "split geometry/min/max",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "pointer drag and keyboard resize",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "semantic separator and persistence",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/resizable.md",
+        "sha256": "f4eac55aa90bfd837b113c8ab142feb6184910f08621ed97c5ec47b8af1613f8",
+        "headings": [
+          "Import",
+          "Usage",
+          "Resize Handle Appearance",
+          "Panel Size Constraints",
+          "Multiple Panels",
+          "Nested Layouts",
+          "Nested Panel Groups",
+          "Conditional Panel Visibility",
+          "Panel with Size Limits",
+          "Examples",
+          "File Explorer Layout",
+          "IDE Layout",
+          "Dashboard with Widgets",
+          "Settings Panel",
+          "Best Practices"
+        ]
+      }
     },
     {
       "name": "Root View",
-      "reference_url": "https://gpui-kit.com/component/root-view/",
+      "reference_url": "https://gpui-kit.com/component/root/",
       "category": "layout",
       "base_behavior": [],
       "public_header": null,
@@ -976,7 +3637,33 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "theme/overlay/notification providers",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "window lifecycle and focus scopes",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "safe area/scaling",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/root.md",
+        "sha256": "37a2bbf2749542495756d772d4f659e4f1f20f1b2d393505793b5f314a99f465",
+        "headings": [
+          "Closing windows and quitting",
+          "Overlays",
+          "Migrating to 0.7.0"
+        ]
+      }
     },
     {
       "name": "Scrollable",
@@ -992,7 +3679,50 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "scroll bounds and nested clipping",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "wheel/drag scrollbar",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard and coordinate hit testing",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/scrollable.md",
+        "sha256": "172e9e329f02672b7a51b22e7ba72888f2dbc8251c9f7958e5b7442a0dcb9a5a",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Scrollable Container",
+          "Vertical Scrolling",
+          "Horizontal Scrolling",
+          "Both Directions",
+          "Custom Scrollbars",
+          "Manual Scrollbar Creation",
+          "Virtualization",
+          "VirtualList for Large Datasets",
+          "Scrolling to Specific Items",
+          "Variable Item Sizes",
+          "Theme Customization",
+          "Scrollbar Appearance",
+          "Scrollbar Show Modes",
+          "System Integration",
+          "Examples",
+          "File Browser with Scrolling",
+          "Chat Messages with Auto-scroll",
+          "Data Table with Virtual Scrolling"
+        ]
+      }
     },
     {
       "name": "Settings",
@@ -1008,7 +3738,68 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "grouped settings models",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "validation and persistence hooks",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard/accessibility composition",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/settings.md",
+        "sha256": "c2080eb9c240ee33c1adb61ffbfc14136c97d63fa7296d1d6bb8233ba8e86911",
+        "headings": [
+          "Import",
+          "Usage",
+          "Build a settings",
+          "Basic Settings",
+          "With Multiple Pages",
+          "Selection While Searching",
+          "Group Variants",
+          "Setting Page",
+          "Basic Page",
+          "Multiple Groups",
+          "Icon",
+          "Title Suffix",
+          "Default Open",
+          "resettable",
+          "Setting Group",
+          "Basic Group",
+          "Single Item",
+          "Without Title",
+          "Footer outside the group surface",
+          "Setting Item",
+          "Basic Item",
+          "Custom Item with a render closure",
+          "Vertical Layout",
+          "With Markdown Description",
+          "Disabled",
+          "Search Keywords",
+          "Setting Fields",
+          "Switch",
+          "Checkbox",
+          "Input",
+          "Dropdown",
+          "NumberInput",
+          "Custom Field by Render Closure",
+          "Custom Field Element",
+          "API Reference",
+          "Sizing",
+          "Examples",
+          "Complete Settings Example"
+        ]
+      }
     },
     {
       "name": "Sheet",
@@ -1024,7 +3815,55 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "edge placement and transition",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "focus trap/restore/dismissal",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "theme/reduced motion",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/sheet.md",
+        "sha256": "6934933d2d945e0fed359be81949f36e64c7e14b99cd092c17c3470ed0dd5dde",
+        "headings": [
+          "Import",
+          "Usage",
+          "Where sheets render",
+          "Basic Sheet",
+          "Sheet with Placement",
+          "Sheet with Custom Size",
+          "Sheet with Form Content",
+          "Overlay Options",
+          "Resizable Sheet",
+          "Custom Margin and Positioning",
+          "Sheet with List",
+          "Close Event Handling",
+          "Navigation Sheet",
+          "Custom Styling",
+          "Programmatic Close",
+          "API Reference",
+          "Window Extensions",
+          "Sheet Builder",
+          "Placement Options",
+          "Styling Methods",
+          "Examples",
+          "Settings Panel",
+          "File Browser",
+          "Help Panel",
+          "Best Practices"
+        ]
+      }
     },
     {
       "name": "Sidebar",
@@ -1040,7 +3879,48 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "hierarchical navigation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "collapsed/selected/disabled state",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard and accessible navigation",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/sidebar.md",
+        "sha256": "874972c064487b9da268b363965d9b359c3c5f8d10e75b6b522ccff0e501e5f5",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Sidebar",
+          "Collapsible Sidebar",
+          "Nested Menu Items",
+          "Multiple Groups",
+          "With Badges and Suffixes",
+          "Right-Side Placement",
+          "Context Menus",
+          "Custom Width and Styling",
+          "Interactive Header with Popup Menu",
+          "Footer with User Information",
+          "Responsive Sidebar",
+          "Theming",
+          "Examples",
+          "File Explorer Sidebar",
+          "Admin Dashboard Sidebar",
+          "Settings Sidebar"
+        ]
+      }
     },
     {
       "name": "StatusBar",
@@ -1056,7 +3936,40 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "left/center/right slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "density/theme variants",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "accessible status",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/status-bar.md",
+        "sha256": "1921d50b3f85f198ab95142534e15aeaa323c4a27bc31003f3b539dfd72ee92b",
+        "headings": [
+          "Import",
+          "Regions",
+          "Usage",
+          "Labels",
+          "Buttons",
+          "Separators and custom elements",
+          "Custom styling",
+          "API Reference",
+          "StatusBar",
+          "Notes"
+        ]
+      }
     },
     {
       "name": "Tabs",
@@ -1072,23 +3985,106 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "controlled selected tab",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "roving keyboard focus",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "tab/panel semantic relationship",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/tabs.md",
+        "sha256": "b5c2b26f626f733a8b35454e28f3e4d08ac65bfda9c1afb148092efeaaf643c3",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Tabs",
+          "Tab Variants",
+          "Tab Sizes",
+          "Tabs with Icons",
+          "Tabs with Prefix and Suffix",
+          "Disabled Tabs",
+          "Dynamic Tabs",
+          "Tabs with Menu",
+          "Maximum Tab Width",
+          "Scrollable Tabs",
+          "Individual Tab Configuration",
+          "API Reference",
+          "TabBar",
+          "TabBar Variants",
+          "Tab",
+          "TabVariant",
+          "Styling",
+          "Advanced Examples",
+          "Custom Tab Content",
+          "Tabs with State Management",
+          "Tabs with Close Buttons",
+          "Notes"
+        ]
+      }
     },
     {
       "name": "Theme",
       "reference_url": "https://gpui-kit.com/component/theme/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_components.h",
+      "sample": "gallery/main.c",
+      "tests": [
+        "tests/unit/test_components.c"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Four runtime token structs tested; system integration, comprehensive tokens and reduced motion pending."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "runtime light/dark and tokens",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "per-component overrides/density",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "system preference/high contrast/reduced motion",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/theme.md",
+        "sha256": "38b0a00db40456d2d75befff9737af34c44c78d7291201402266a32038ca9dd8",
+        "headings": [
+          "Gradient Backgrounds",
+          "Theme Registry"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "TitleBar",
@@ -1104,7 +4100,55 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "window controls and host chrome",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "drag/maximize integration",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "platform semantics/theme",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/title-bar.md",
+        "sha256": "cbcbe58b2b41bfe3212f6da60ffb4231c0bda10d5f7e40aa9ed53954d095c8d3",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Title Bar",
+          "Title Bar with Custom Content",
+          "Title Bar with Menu Bar",
+          "Title Bar with Window Controls (Linux only)",
+          "Styled Title Bar",
+          "Title Bar Options for Window",
+          "Platform Differences",
+          "macOS",
+          "Windows",
+          "Linux",
+          "API Reference",
+          "TitleBar",
+          "Window Configuration",
+          "Title Bar Element (Internal)",
+          "Constants",
+          "Examples",
+          "Application Title Bar",
+          "Title Bar with Breadcrumbs",
+          "Custom Themed Title Bar",
+          "Title Bar with Status",
+          "Minimal Title Bar",
+          "Title Bar with Search",
+          "Notes"
+        ]
+      }
     },
     {
       "name": "Toolbar",
@@ -1120,7 +4164,42 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "left/center/right slots",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard group navigation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "size/theme variants",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/toolbar.md",
+        "sha256": "cabeb830cd112f8f43f566089b6b409da9906c944b099e12f02765ee7c94559c",
+        "headings": [
+          "Import",
+          "Composition",
+          "Usage",
+          "Commands",
+          "Sizes",
+          "Labels and custom elements",
+          "Custom styling",
+          "Groups",
+          "Keyboard",
+          "API Reference",
+          "Toolbar",
+          "Notes"
+        ]
+      }
     },
     {
       "name": "Tree",
@@ -1136,23 +4215,128 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "hierarchical model/expand/selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard parent/child navigation",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "virtualization and tree semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/tree.md",
+        "sha256": "3e854eb3fe2caf2dcbb8194d10fd5585ec0f5bba28c2f9402a04359ff105cbef",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Tree",
+          "File Tree with Icons",
+          "Dynamic Tree Loading",
+          "Tree with Selection Handling",
+          "Disabled Items",
+          "Programmatic Tree Control",
+          "API Reference",
+          "TreeState",
+          "TreeItem",
+          "TreeEntry",
+          "tree() Function",
+          "Examples",
+          "Lazy Loading Tree",
+          "Search and Filter",
+          "Multi-Select Tree",
+          "Keyboard Navigation"
+        ]
+      }
     },
     {
       "name": "VirtualList",
       "reference_url": "https://gpui-kit.com/component/virtual-list/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_virtual_create",
+        "cui_virtual_rebuild",
+        "cui_virtual_viewport",
+        "cui_virtual_capture_anchor",
+        "cui_virtual_restore_anchor"
       ],
-      "owner": "unassigned",
-      "last_verified_commit": null
+      "public_header": "include/cui/cui_virtual.h",
+      "sample": "examples/unstyled/main.c",
+      "tests": [
+        "tests/unit/test_virtual.c",
+        "tests/unit/test_base.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "linux_x11": "tested_partial",
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Retained keyed variable-height Fenwick model tested including anchor restoration. No styled scroll/focus/navigation widget yet."
+      ],
+      "owner": "integrator",
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "variable-height efficient offsets",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "stable keyed incremental items",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "viewport overscan and scroll restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "1K/10K/100K benchmark",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/virtual-list.md",
+        "sha256": "da01c5ccad3e85f89ec489505274d2f61c12f44f74a41926cf3e09ee431a37b5",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Vertical Virtual List",
+          "Horizontal Virtual List",
+          "Variable Item Sizes",
+          "Table-like Layout with Multiple Columns",
+          "Scroll Handling",
+          "Basic Scroll Control",
+          "Programmatic Scrolling",
+          "Both Axis Scrolling",
+          "Performance Optimization",
+          "Efficient Item Rendering",
+          "Memory Management",
+          "Variable Heights with Caching",
+          "Examples",
+          "File Explorer with Virtual Scrolling",
+          "Chat Messages with Auto-scroll",
+          "Data Grid with Fixed Headers",
+          "Best Practices",
+          "Performance Tips"
+        ]
+      },
+      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "evidence": [
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+      ]
     },
     {
       "name": "Chart",
@@ -1168,7 +4352,72 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "line/bar/area/pie/candlestick series",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "axes/scales/ticks/legend",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "hover and accessible data",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "theme and headless models",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/chart.md",
+        "sha256": "9b9eef2ad5f4054125cba0bc9d22638c34ae7ed31c4accb3f9aef6e7b5ee7b4f",
+        "headings": [
+          "Import",
+          "Chart Types",
+          "LineChart",
+          "BarChart",
+          "AreaChart",
+          "PieChart",
+          "RadarChart",
+          "CandlestickChart",
+          "SankeyChart",
+          "Hover and Tooltips",
+          "Tooltip Content",
+          "Identity",
+          "Turning it off",
+          "Motion",
+          "Appear",
+          "Caching",
+          "Custom Plots",
+          "Data Structures",
+          "Example Data Types",
+          "Chart Configuration",
+          "Container Setup",
+          "Theme Integration",
+          "API Reference",
+          "Examples",
+          "Sales Dashboard",
+          "Multi-Series Time Chart",
+          "Financial Chart",
+          "Customization Options",
+          "Color Schemes",
+          "Responsive Design",
+          "Grid and Axis Styling",
+          "Performance Considerations",
+          "Large Datasets",
+          "Memory Optimization",
+          "Integration Examples",
+          "With State Management",
+          "Real-time Updates"
+        ]
+      }
     },
     {
       "name": "Command",
@@ -1184,7 +4433,46 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "fuzzy filtering and action model",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "keyboard navigation and focus restore",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "shortcut contexts and dismissal",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/command.md",
+        "sha256": "52e4b461d60e2723b127f786a6a04bab75a2700867fefee83125e01c39d8477c",
+        "headings": [
+          "Import",
+          "Composition",
+          "Usage",
+          "Inline",
+          "Quick Actions Without Search",
+          "In a Dialog",
+          "Callbacks and Actions",
+          "Dynamic Entries",
+          "Searching",
+          "Custom Rows and Virtualization",
+          "Command",
+          "CommandItem",
+          "CommandGroup",
+          "CommandState",
+          "Keyboard Shortcuts",
+          "Best Practices"
+        ]
+      }
     },
     {
       "name": "DataTable",
@@ -1200,7 +4488,61 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "column models/sort/resize/pinning",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "cell/row selection keyboard and mouse",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "row virtualization/remote callbacks",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "header/footer/table semantics",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/data-table.md",
+        "sha256": "76e6978bab29888ba115074523c2b30fb045d2ea9d1535494a7d0dc9c55444c1",
+        "headings": [
+          "Key Features",
+          "Import",
+          "Usage",
+          "Basic Table",
+          "Column Configuration",
+          "Virtual Scrolling for Large Datasets",
+          "Sorting Implementation",
+          "ContextMenu",
+          "Cell Rendering",
+          "Selection Modes",
+          "Reading and Writing the Selection",
+          "Column Resizing and Moving",
+          "Infinite Loading / Pagination",
+          "Table Styling",
+          "Examples",
+          "Financial Data Table",
+          "User Management Table",
+          "Cell Selection",
+          "Keyboard Shortcuts",
+          "Row Selection Mode (default)",
+          "Cell Selection Mode",
+          "API Reference",
+          "Core Types",
+          "Column Types",
+          "Methods",
+          "Events"
+        ]
+      }
     },
     {
       "name": "Plot",
@@ -1216,7 +4558,51 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "linear/log/category/time scales",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "axes/ticks/series/legend",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "zoom/hover/selection",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "headless geometry and themed output",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/plot.md",
+        "sha256": "536b085c8fa0283ba34ec2b663bef7df76c71a1f4d90a94f4852f17e6c2c14b3",
+        "headings": [
+          "Import",
+          "Scales",
+          "ScaleLinear",
+          "ScaleBand",
+          "ScalePoint",
+          "ScaleOrdinal",
+          "Shapes",
+          "Bar",
+          "Line",
+          "Area",
+          "Pie & Arc",
+          "Stack",
+          "Components",
+          "PlotAxis",
+          "Examples",
+          "Custom Bar Chart Implementation"
+        ]
+      }
     },
     {
       "name": "Table",
@@ -1232,7 +4618,44 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "semantic row/column/header/footer",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "selection/sorting/resizing",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "themed cells and keyboard behavior",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/table.md",
+        "sha256": "3828d53ff940e6df90bf9e85e9066326bc0fe4a1ecd9a41ffad0896cc5af6a32",
+        "headings": [
+          "Import",
+          "Usage",
+          "Basic Table",
+          "With Footer",
+          "Column Widths",
+          "Text Alignment",
+          "Without Border (via Styled)",
+          "Custom Styling",
+          "Sub-components",
+          "API Reference",
+          "Table",
+          "TableHead / TableCell",
+          "TableHeader / TableBody / TableFooter / TableRow / TableCaption",
+          "Table vs DataTable"
+        ]
+      }
     },
     {
       "name": "TextView",
@@ -1248,7 +4671,52 @@
         "Full documented behavior pending implementation and audit."
       ],
       "owner": "unassigned",
-      "last_verified_commit": null
+      "last_verified_commit": null,
+      "features": [
+        {
+          "name": "safe Markdown/HTML subset parser",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "Unicode text selection and links",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "inline code/lists/tables",
+          "status": "not_started",
+          "evidence": []
+        },
+        {
+          "name": "no script execution and parser fuzzing",
+          "status": "not_started",
+          "evidence": []
+        }
+      ],
+      "upstream_doc": {
+        "path": "website/component/text-view.md",
+        "sha256": "b5761b43b0d4627ce205183ccdad304ae70e66fc76b88c61f521e3c31e167c5c",
+        "headings": [
+          "Import",
+          "Usage",
+          "Markdown",
+          "HTML",
+          "Inside a colored surface",
+          "Clamp to a number of lines",
+          "Fade in streamed text",
+          "Highlight ranges",
+          "Scroll to a range",
+          "Touch Selection",
+          "Link Click Handling",
+          "Images",
+          "Markdown Plugins",
+          "MarkdownNode",
+          "Block Plugins",
+          "YAML Frontmatter",
+          "Code Block Actions"
+        ]
+      }
     }
   ]
 }

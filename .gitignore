@@ -1,4 +1,5 @@
 build*/
-.impeccable/
+.impeccable/*
+!.impeccable/design.json
 *.ppm
 *.bmp

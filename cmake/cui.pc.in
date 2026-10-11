@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: cui
+Description: Experimental portable C11 Clay-based UI core and controls
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lcui @CUI_PC_MATH@
+Cflags: -I${includedir}

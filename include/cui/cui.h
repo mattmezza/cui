@@ -10,114 +10,114 @@ extern "C" {
 #define CUI_VERSION "0.1.0-dev"
 typedef uint64_t cui_id;
 typedef struct {
-  const char *data;
-  size_t length;
+    const char *data;
+    size_t length;
 } cui_str;
 typedef struct {
-  float x, y, w, h;
+    float x, y, w, h;
 } cui_rect;
 typedef struct {
-  uint8_t r, g, b, a;
+    uint8_t r, g, b, a;
 } cui_color;
 typedef struct cui_context cui_context;
 typedef enum {
-  CUI_OK,
-  CUI_ERROR_CAPACITY,
-  CUI_ERROR_DUPLICATE_ID,
-  CUI_ERROR_LIFECYCLE,
-  CUI_ERROR_LAYOUT
+    CUI_OK,
+    CUI_ERROR_CAPACITY,
+    CUI_ERROR_DUPLICATE_ID,
+    CUI_ERROR_LIFECYCLE,
+    CUI_ERROR_LAYOUT
 } cui_error;
 typedef enum {
-  CUI_EVENT_POINTER_MOVE,
-  CUI_EVENT_POINTER_DOWN,
-  CUI_EVENT_POINTER_UP,
-  CUI_EVENT_KEY_DOWN,
-  CUI_EVENT_KEY_UP,
-  CUI_EVENT_TEXT,
-  CUI_EVENT_SCROLL,
-  CUI_EVENT_CANCEL
+    CUI_EVENT_POINTER_MOVE,
+    CUI_EVENT_POINTER_DOWN,
+    CUI_EVENT_POINTER_UP,
+    CUI_EVENT_KEY_DOWN,
+    CUI_EVENT_KEY_UP,
+    CUI_EVENT_TEXT,
+    CUI_EVENT_SCROLL,
+    CUI_EVENT_CANCEL
 } cui_event_type;
 typedef enum {
-  CUI_KEY_NONE,
-  CUI_KEY_TAB,
-  CUI_KEY_ENTER,
-  CUI_KEY_SPACE,
-  CUI_KEY_ESCAPE,
-  CUI_KEY_LEFT,
-  CUI_KEY_RIGHT,
-  CUI_KEY_UP,
-  CUI_KEY_DOWN,
-  CUI_KEY_HOME,
-  CUI_KEY_END,
-  CUI_KEY_BACKSPACE,
-  CUI_KEY_DELETE,
-  CUI_KEY_A
+    CUI_KEY_NONE,
+    CUI_KEY_TAB,
+    CUI_KEY_ENTER,
+    CUI_KEY_SPACE,
+    CUI_KEY_ESCAPE,
+    CUI_KEY_LEFT,
+    CUI_KEY_RIGHT,
+    CUI_KEY_UP,
+    CUI_KEY_DOWN,
+    CUI_KEY_HOME,
+    CUI_KEY_END,
+    CUI_KEY_BACKSPACE,
+    CUI_KEY_DELETE,
+    CUI_KEY_A
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
 typedef struct {
-  cui_event_type type;
-  float x, y, dx, dy;
-  cui_key key;
-  unsigned modifiers;
-  bool repeat;
-  char text[64];
+    cui_event_type type;
+    float x, y, dx, dy;
+    cui_key key;
+    unsigned modifiers;
+    bool repeat;
+    char text[64];
 } cui_event;
 typedef enum {
-  CUI_ROLE_NONE,
-  CUI_ROLE_BUTTON,
-  CUI_ROLE_CHECKBOX,
-  CUI_ROLE_SWITCH,
-  CUI_ROLE_RADIO,
-  CUI_ROLE_SLIDER,
-  CUI_ROLE_TEXTBOX,
-  CUI_ROLE_LABEL,
-  CUI_ROLE_TAB
+    CUI_ROLE_NONE,
+    CUI_ROLE_BUTTON,
+    CUI_ROLE_CHECKBOX,
+    CUI_ROLE_SWITCH,
+    CUI_ROLE_RADIO,
+    CUI_ROLE_SLIDER,
+    CUI_ROLE_TEXTBOX,
+    CUI_ROLE_LABEL,
+    CUI_ROLE_TAB
 } cui_role;
 typedef struct {
-  cui_id id;
-  cui_role role;
-  cui_rect bounds;
-  cui_str name;
-  bool disabled, checked, focused;
-  float value;
+    cui_id id;
+    cui_role role;
+    cui_rect bounds;
+    cui_str name;
+    bool disabled, checked, focused;
+    float value;
 } cui_semantic;
 typedef struct {
-  bool hovered, pressed, focused, focus_visible, activated;
+    bool hovered, pressed, focused, focus_visible, activated;
 } cui_interaction;
 typedef struct {
-  float width, height, padding, gap, radius;
-  bool row, clip;
-  cui_color background, border;
-  float border_width;
+    float width, height, padding, gap, radius;
+    bool row, clip;
+    cui_color background, border;
+    float border_width;
 } cui_box;
 typedef enum {
-  CUI_DRAW_RECT,
-  CUI_DRAW_BORDER,
-  CUI_DRAW_TEXT,
-  CUI_DRAW_CLIP_PUSH,
-  CUI_DRAW_CLIP_POP
+    CUI_DRAW_RECT,
+    CUI_DRAW_BORDER,
+    CUI_DRAW_TEXT,
+    CUI_DRAW_CLIP_PUSH,
+    CUI_DRAW_CLIP_POP
 } cui_draw_type;
 typedef struct {
-  cui_draw_type type;
-  cui_rect bounds;
-  cui_color color;
-  float radius, stroke, font_size;
-  cui_str text;
+    cui_draw_type type;
+    cui_rect bounds;
+    cui_color color;
+    float radius, stroke, font_size;
+    cui_str text;
 } cui_draw_command;
 typedef struct {
-  const cui_draw_command *commands;
-  size_t count;
-  float width, height;
+    const cui_draw_command *commands;
+    size_t count;
+    float width, height;
 } cui_draw_list;
 typedef struct {
-  float width, height;
+    float width, height;
 } cui_size;
 typedef cui_size (*cui_measure_fn)(void *user, cui_str text, float font_size);
 typedef struct {
-  float width, height;
-  size_t max_elements, max_commands, frame_bytes;
-  cui_measure_fn measure;
-  void *measure_user;
+    float width, height;
+    size_t max_elements, max_commands, frame_bytes;
+    cui_measure_fn measure;
+    void *measure_user;
 } cui_config;
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
@@ -131,9 +131,8 @@ void cui_pop_id(cui_context *ui);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 void cui_end_box(cui_context *ui);
 void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
-cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role,
-                             cui_str name, bool disabled, bool checked,
-                             float value);
+cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
+                             bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */
 void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value);
 /* Target resolved in input order against previous frame regions. */

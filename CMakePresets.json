@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {"name":"native","generator":"Ninja","binaryDir":"${sourceDir}/build","cacheVariables":{"CMAKE_BUILD_TYPE":"Debug"}},
+    {"name":"headless","inherits":"native","binaryDir":"${sourceDir}/build-headless","cacheVariables":{"CUI_BUILD_NATIVE":"OFF"}},
+    {"name":"sanitize","inherits":"native","binaryDir":"${sourceDir}/build-sanitize","cacheVariables":{"CUI_SANITIZE":"ON"}},
+    {"name":"release","inherits":"native","binaryDir":"${sourceDir}/build-release","cacheVariables":{"CMAKE_BUILD_TYPE":"Release"}}
+  ],
+  "buildPresets": [{"name":"native","configurePreset":"native"},{"name":"headless","configurePreset":"headless"},{"name":"sanitize","configurePreset":"sanitize"},{"name":"release","configurePreset":"release"}],
+  "testPresets": [{"name":"native","configurePreset":"native","output":{"outputOnFailure":true}},{"name":"headless","configurePreset":"headless","output":{"outputOnFailure":true}},{"name":"sanitize","configurePreset":"sanitize","output":{"outputOnFailure":true}}]
+}

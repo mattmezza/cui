@@ -1,0 +1,46 @@
+name: CUI build and evidence
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF
+      - run: cmake --build build --config Debug
+      - run: ctest --test-dir build -C Debug --output-on-failure
+  linux-native:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libfreetype-dev libharfbuzz-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb
+      - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure
+      - name: X11 compatibility smoke (software forced; GPU unverified)
+        run: xvfb-run -a env SDL_RENDER_DRIVER=software ./build/cui_gallery --smoke 3
+  distribution-and-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install clang-format==23.1.2
+      - run: python scripts/format.py --check
+      - run: python scripts/check_manifest.py
+      - run: python scripts/check_licenses.py
+      - run: python scripts/amalgamate.py --check

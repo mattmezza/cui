@@ -20,5 +20,15 @@ int main(void){
  cui_rect b=cui_bounds(ui,3);assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_POINTER_DOWN,.x=b.x+5,.y=b.y+5}));assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_POINTER_UP,.x=b.x+5,.y=b.y+5}));scene(ui,&themes[0]);assert(checked);
  size_t count;const cui_semantic *s=cui_semantics(ui,&count);assert(count==3);assert(s[1].role==CUI_ROLE_CHECKBOX&&s[1].checked);assert(s[2].disabled&&s[2].role==CUI_ROLE_SWITCH);
  assert(themes[0].radius!=themes[3].radius&&themes[0].primary.b!=themes[3].primary.b);
- cui_destroy(ui);return 0;
+ char buffer[64]="Ada";cui_edit *edit=cui_edit_create((cui_edit_config){.buffer=buffer,.capacity=sizeof(buffer),.history_bytes=1024,.max_history_steps=16});assert(edit);
+ assert(cui_begin_frame(ui,640,480,.016f));cui_input_result ir=cui_input(ui,44,&themes[0],cui_string("Name"),edit,false);assert(!ir.changed&&!ir.submitted&&ir.error==CUI_EDIT_OK);cui_end_frame(ui);
+ cui_focus(ui,44);assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_KEY_DOWN,.key=CUI_KEY_A,.modifiers=CUI_MOD_CTRL}));
+ assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_TEXT,.text="Eva"}));
+ assert(cui_begin_frame(ui,640,480,.016f));ir=cui_input(ui,44,&themes[0],cui_string("Name"),edit,false);assert(ir.changed&&ir.error==CUI_EDIT_OK);cui_end_frame(ui);assert(cui_edit_get_text(edit).length==3&&buffer[0]=='E');
+ s=cui_semantics(ui,&count);assert(count==1&&s[0].role==CUI_ROLE_TEXTBOX&&s[0].value==3);
+ assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_KEY_DOWN,.key=CUI_KEY_ENTER}));
+ assert(cui_begin_frame(ui,640,480,.016f));ir=cui_input(ui,44,&themes[0],cui_string("Name"),edit,false);assert(ir.submitted&&!ir.changed);cui_end_frame(ui);
+ assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_TEXT,.text="!"}));
+ assert(cui_begin_frame(ui,640,480,.016f));ir=cui_input(ui,44,&themes[0],cui_string("Name"),edit,true);assert(!ir.changed);cui_end_frame(ui);assert(cui_edit_get_text(edit).length==3);
+ cui_edit_destroy(edit);cui_destroy(ui);return 0;
 }

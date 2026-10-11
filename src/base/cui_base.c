@@ -57,3 +57,18 @@ bool cui_base_slider(cui_context *ui,cui_id id,cui_str name,float *value,float m
  }
  *value=next;cui_update_semantic(ui,id,false,next);return old!=next;
 }
+
+cui_input_result cui_base_input(cui_context *ui,cui_id id,cui_str name,cui_edit *edit,bool disabled){
+ cui_input_result result={.error=CUI_EDIT_OK};
+ if(!edit){result.error=CUI_EDIT_INVALID_ARGUMENT;return result;}
+ cui_edit_state before=cui_edit_get_state(edit);
+ cui_interact(ui,id,CUI_ROLE_TEXTBOX,name,disabled,false,(float)before.length);
+ result.error=cui_edit_apply_events(edit,ui,id,disabled);
+ cui_edit_state after=cui_edit_get_state(edit);
+ result.changed=before.revision!=after.revision;
+ if(!disabled&&!after.multiline){
+  size_t n=0;const cui_event *events=cui_frame_events(ui,&n);
+  for(size_t i=0;i<n;i++)if(cui_event_target(ui,i)==id&&events[i].type==CUI_EVENT_KEY_DOWN&&events[i].key==CUI_KEY_ENTER&&!events[i].repeat)result.submitted=true;
+ }
+ cui_update_semantic(ui,id,false,(float)after.length);return result;
+}

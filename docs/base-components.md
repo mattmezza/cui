@@ -37,3 +37,15 @@ or integrated calendar widget is claimed.
 `examples/unstyled` shows custom visuals consuming base checkbox state;
 `examples/styled_settings` submits a complete settings form to the draw list.
 The interactive gallery supplies the actual platform and renderer loop.
+
+The Input wrapper composes `cui_base_input` with the scalar UTF-8 editor model.
+Create an editor over your own fixed NUL-terminated buffer and retain its
+handle across frames. Input reports text changes, single-line Enter submission,
+and rejected edits. Selection movement alone does not report a text change.
+Arrow/Home/End, selection extension, and backspace/delete are supplied
+by the base editor event helper. Undo/redo are exposed as editor functions;
+keyboard shortcuts are not currently mapped. Disabled input rejects changes. The styled
+wrapper paints a named text field and focus border; it currently has no pixel
+caret or selection highlight, pointer-to-caret positioning, grapheme movement,
+IME, clipboard adapter, or text scrolling. It is partial Input functionality,
+not a complete native editor.

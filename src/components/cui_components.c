@@ -59,3 +59,15 @@ bool cui_slider(cui_context *ui,cui_id id,const cui_theme *t,cui_str name,float 
 void cui_separator(cui_context *ui,cui_id id,const cui_theme *t,float width){
  cui_begin_box(ui,id,(cui_box){.width=width!=0?width:160,.height=1,.background=t->border});cui_end_box(ui);
 }
+
+cui_input_result cui_input(cui_context *ui,cui_id id,const cui_theme *t,cui_str name,cui_edit *edit,bool disabled){
+ cui_input_result result=cui_base_input(ui,id,name,edit,disabled);
+ cui_box b=cui_components_control(t,disabled,false);b.width=280;b.height=0;b.row=false;
+ if(result.error!=CUI_EDIT_OK)b.border=t->danger;
+ cui_components_focus(ui,id,t,&b);cui_begin_box(ui,id,b);
+ cui_text(ui,name,t->font_size*.8f,t->muted);
+ cui_str text=edit?cui_edit_get_text(edit):cui_string("");
+ if(!text.length)text=cui_string(" ");
+ cui_text(ui,text,t->font_size,disabled?t->muted:t->text);
+ cui_end_box(ui);return result;
+}

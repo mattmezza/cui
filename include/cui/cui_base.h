@@ -2,6 +2,7 @@
 #ifndef CUI_BASE_H
 #define CUI_BASE_H
 #include "cui.h"
+#include "cui_edit.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,6 +16,9 @@ bool cui_base_radio(cui_context *,cui_id,cui_str,int *value,int option,bool disa
 typedef enum { CUI_CHECK_UNCHECKED,CUI_CHECK_CHECKED,CUI_CHECK_MIXED } cui_check_state;
 bool cui_base_check(cui_context *,cui_id,cui_str,cui_check_state *,bool disabled);
 bool cui_base_slider(cui_context *,cui_id,cui_str,float *value,float minimum,float maximum,float step,bool disabled);
+typedef struct { bool changed,submitted; cui_edit_result error; } cui_input_result;
+/* Text is owned by the editor; changed concerns text, not cursor movement. */
+cui_input_result cui_base_input(cui_context *,cui_id,cui_str,cui_edit *,bool disabled);
 /* Standalone allocation-free layout models. */
 typedef enum { CUI_POPUP_BELOW,CUI_POPUP_ABOVE,CUI_POPUP_RIGHT,CUI_POPUP_LEFT } cui_popup_side;
 typedef struct { cui_rect bounds; cui_popup_side side; bool flipped; } cui_popup_result;

@@ -55,6 +55,16 @@ static void test_clipped_hit_and_arena(void) {
 }
 
 
+static void test_creation_overflow(void) {
+    assert(!cui_create((cui_config){.max_elements=1000001}));
+    assert(!cui_create((cui_config){.max_elements=SIZE_MAX}));
+    assert(!cui_create((cui_config){.max_commands=SIZE_MAX}));
+    assert(!cui_create((cui_config){.frame_bytes=SIZE_MAX}));
+    /* Rejected configurations must leave an existing Clay context usable. */
+    cui_context *ui=make();begin(ui);
+    assert(!cui_create((cui_config){.max_elements=SIZE_MAX}));
+    control(ui,1,false);cui_end_frame(ui);assert(cui_last_error(ui)==CUI_OK);cui_destroy(ui);
+}
 static void test_numeric_id_text_domains(void) {
     cui_context *ui=make();
     for(size_t frame=0;frame<3;frame++){
@@ -71,4 +81,4 @@ static void test_numeric_id_text_domains(void) {
     cui_destroy(ui);
 }
 
-int main(void) { test_input();test_strings_and_draw();test_contexts_errors();test_clipped_hit_and_arena();test_numeric_id_text_domains();puts("core tests passed");return 0; }
+int main(void) { test_input();test_strings_and_draw();test_contexts_errors();test_clipped_hit_and_arena();test_numeric_id_text_domains();test_creation_overflow();puts("core tests passed");return 0; }

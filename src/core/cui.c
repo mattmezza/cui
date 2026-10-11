@@ -55,7 +55,15 @@ cui_context *cui_create(cui_config config) {
     if(!config.max_elements)config.max_elements=4096;
     if(!config.max_commands)config.max_commands=8192;
     if(!config.frame_bytes)config.frame_bytes=262144;
-    if(config.max_elements>(size_t)(INT32_MAX/8) || config.max_commands>SIZE_MAX/sizeof(cui_draw_command)){free(ui);return NULL;}
+    /* Clay reports arena sizes through uint32_t, so retain a conservative
+       supported element ceiling before its sizing or any allocations. */
+    if(config.max_elements>1000000 ||
+       config.max_commands>SIZE_MAX/sizeof(cui_draw_command) ||
+       config.max_elements>SIZE_MAX/sizeof(cui_semantic) ||
+       config.max_elements>SIZE_MAX/sizeof(cui_id) ||
+       config.max_elements>SIZE_MAX/sizeof(box_node) ||
+       config.max_elements>SIZE_MAX/sizeof(size_t) ||
+       config.max_elements>SIZE_MAX/sizeof(cui_rect)){free(ui);return NULL;}
     ui->config=config; ui->dirty=true;
     ui->commands=calloc(config.max_commands,sizeof(*ui->commands));
     ui->semantics=calloc(config.max_elements,sizeof(*ui->semantics));

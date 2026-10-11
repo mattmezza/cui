@@ -1,51 +1,53 @@
 Test project /home/matteo/dev/cui/build
       Start  1: bootstrap
- 1/23 Test  #1: bootstrap ........................   Passed    0.01 sec
+ 1/24 Test  #1: bootstrap ........................   Passed    0.00 sec
       Start  2: core
- 2/23 Test  #2: core .............................   Passed    0.00 sec
+ 2/24 Test  #2: core .............................   Passed    0.00 sec
       Start  3: base
- 3/23 Test  #3: base .............................   Passed    0.01 sec
+ 3/24 Test  #3: base .............................   Passed    0.00 sec
       Start  4: components
- 4/23 Test  #4: components .......................   Passed    0.00 sec
+ 4/24 Test  #4: components .......................   Passed    0.00 sec
       Start  5: render
- 5/23 Test  #5: render ...........................   Passed    0.01 sec
+ 5/24 Test  #5: render ...........................   Passed    0.01 sec
       Start  6: edit
- 6/23 Test  #6: edit .............................   Passed    0.01 sec
+ 6/24 Test  #6: edit .............................   Passed    0.01 sec
       Start  7: overlay
- 7/23 Test  #7: overlay ..........................   Passed    0.00 sec
+ 7/24 Test  #7: overlay ..........................   Passed    0.00 sec
       Start  8: virtual
- 8/23 Test  #8: virtual ..........................   Passed    0.06 sec
+ 8/24 Test  #8: virtual ..........................   Passed    0.07 sec
       Start  9: dock
- 9/23 Test  #9: dock .............................   Passed    0.28 sec
-      Start 10: example_unstyled
-10/23 Test #10: example_unstyled .................   Passed    0.00 sec
-      Start 11: example_styled_settings
-11/23 Test #11: example_styled_settings ..........   Passed    0.00 sec
-      Start 12: manifest
-12/23 Test #12: manifest .........................   Passed    0.14 sec
-      Start 13: licenses
-13/23 Test #13: licenses .........................   Passed    0.14 sec
-      Start 14: distribution
-14/23 Test #14: distribution .....................   Passed    0.18 sec
-      Start 15: cpp_embedding
-15/23 Test #15: cpp_embedding ....................   Passed    0.00 sec
-      Start 16: distribution_single
-16/23 Test #16: distribution_single ..............   Passed    0.00 sec
-      Start 17: distribution_multi
-17/23 Test #17: distribution_multi ...............   Passed    0.00 sec
-      Start 18: sdl3_services
-18/23 Test #18: sdl3_services ....................   Passed    0.74 sec
-      Start 19: gpu_rendering
-19/23 Test #19: gpu_rendering ....................   Passed    1.55 sec
-      Start 20: gallery_layout
-20/23 Test #20: gallery_layout ...................   Passed    0.01 sec
-      Start 21: gallery_capture
-21/23 Test #21: gallery_capture ..................   Passed    0.12 sec
-      Start 22: implementation_embedding
-22/23 Test #22: implementation_embedding .........   Passed    0.00 sec
-      Start 23: sokol_rendering
-23/23 Test #23: sokol_rendering ..................   Passed    0.26 sec
+ 9/24 Test  #9: dock .............................   Passed    0.25 sec
+      Start 10: plot
+10/24 Test #10: plot .............................   Passed    0.01 sec
+      Start 11: example_unstyled
+11/24 Test #11: example_unstyled .................   Passed    0.00 sec
+      Start 12: example_styled_settings
+12/24 Test #12: example_styled_settings ..........   Passed    0.00 sec
+      Start 13: manifest
+13/24 Test #13: manifest .........................   Passed    0.14 sec
+      Start 14: licenses
+14/24 Test #14: licenses .........................   Passed    0.15 sec
+      Start 15: distribution
+15/24 Test #15: distribution .....................   Passed    0.18 sec
+      Start 16: cpp_embedding
+16/24 Test #16: cpp_embedding ....................   Passed    0.00 sec
+      Start 17: distribution_single
+17/24 Test #17: distribution_single ..............   Passed    0.00 sec
+      Start 18: distribution_multi
+18/24 Test #18: distribution_multi ...............   Passed    0.00 sec
+      Start 19: sdl3_services
+19/24 Test #19: sdl3_services ....................   Passed    0.74 sec
+      Start 20: gpu_rendering
+20/24 Test #20: gpu_rendering ....................   Passed    1.53 sec
+      Start 21: gallery_layout
+21/24 Test #21: gallery_layout ...................   Passed    0.01 sec
+      Start 22: gallery_capture
+22/24 Test #22: gallery_capture ..................   Passed    0.12 sec
+      Start 23: implementation_embedding
+23/24 Test #23: implementation_embedding .........   Passed    0.00 sec
+      Start 24: sokol_rendering
+24/24 Test #24: sokol_rendering ..................   Passed    0.23 sec
 
-100% tests passed out of 23
+100% tests passed out of 24
 
-Total Test time (real) =   3.55 sec
+Total Test time (real) =   3.51 sec

@@ -1,6 +1,8 @@
 #define CUI_IMPLEMENTATION
 #include "cui.h"
 #ifdef CUI_DISTRIBUTION_CONTROLS
+#define CUI_PLOT_IMPLEMENTATION
+#include "cui_plot.h"
 #define CUI_DOCK_IMPLEMENTATION
 #include "cui_dock.h"
 #define CUI_OVERLAY_IMPLEMENTATION

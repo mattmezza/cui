@@ -3,7 +3,7 @@
 import argparse,difflib,re
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-MODULES={"cui": ["src/core/cui.c"],"cui_dock": ["src/base/cui_dock.c"],"cui_virtual": ["src/base/cui_virtual.c"],"cui_overlay": ["src/base/cui_overlay.c"],"cui_edit": ["src/base/cui_edit.c"],"cui_base": ["src/base/cui_base.c","src/base/cui_models.c"],"cui_theme": ["src/theme/cui_theme.c"],"cui_components": ["src/components/cui_components.c"]}
+MODULES={"cui_plot": ["src/base/cui_plot.c"],"cui": ["src/core/cui.c"],"cui_dock": ["src/base/cui_dock.c"],"cui_virtual": ["src/base/cui_virtual.c"],"cui_overlay": ["src/base/cui_overlay.c"],"cui_edit": ["src/base/cui_edit.c"],"cui_base": ["src/base/cui_base.c","src/base/cui_models.c"],"cui_theme": ["src/theme/cui_theme.c"],"cui_components": ["src/components/cui_components.c"]}
 def generate(name,sources):
     declaration=(ROOT/"include/cui"/(name+".h")).read_text(encoding="utf-8")
     declaration=re.sub(r'#include "cui/([^"\n]+)"',r'#include "\1"',declaration)

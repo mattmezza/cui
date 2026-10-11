@@ -4578,16 +4578,27 @@
       "name": "Plot",
       "reference_url": "https://gpui-kit.com/component/plot/",
       "category": "advanced",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_plot_map",
+        "cui_plot_inverse",
+        "cui_plot_ticks",
+        "cui_plot_zoom",
+        "cui_plot_project_line",
+        "cui_plot_project_bar"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_plot.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_plot.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Allocation-free linear/log scales, inverse mapping, ticks, pan/anchored zoom and clipped line/bar geometry tested. Band/ordinal/category/time scales, retained series, axes/labels/legend, missing-data segmentation, stacks, hover/selection, styled output and chart accessibility pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -4632,7 +4643,8 @@
           "Examples",
           "Custom Bar Chart Implementation"
         ]
-      }
+      },
+      "last_tested_commit": "ccc1a7f8e0e834c19182fdda293dd818995fc524"
     },
     {
       "name": "Table",

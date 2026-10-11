@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+libdir=${prefix}/lib
+includedir=${prefix}/include
+Name: @CUI_ADAPTER_NAME@
+Description: @CUI_ADAPTER_DESCRIPTION@
+Version: @PROJECT_VERSION@
+Requires: @CUI_ADAPTER_REQUIRES@
+Requires.private: @CUI_ADAPTER_PRIVATE@
+Libs: -L${libdir} -l@CUI_ADAPTER_LIBRARY@
+Cflags: -I${includedir}

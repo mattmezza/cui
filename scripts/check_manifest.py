@@ -3,8 +3,8 @@
 import json,re
 from pathlib import Path
 r=Path(__file__).resolve().parents[1]
-text=(r/'initial-prompt.md').read_text();names=re.findall(r'^\d+\. (.+)$',text,re.M);start=names.index('Accordion');expected=names[start:start+78]
-m=json.loads((r/'docs/gpui-parity.json').read_text());entries=m['components'];actual=[e['name'] for e in entries]
+text=(r/'initial-prompt.md').read_text(encoding="utf-8");names=re.findall(r'^\d+\. (.+)$',text,re.M);start=names.index('Accordion');expected=names[start:start+78]
+m=json.loads((r/'docs/gpui-parity.json').read_text(encoding="utf-8"));entries=m['components'];actual=[e['name'] for e in entries]
 assert len(actual)==78 and len(set(actual))==78 and set(actual)==set(expected),'catalog mismatch'
 required={'name','reference_url','category','base_behavior','public_header','sample','tests','status','platforms','limitations','owner','last_verified_commit'}
 for e in entries:

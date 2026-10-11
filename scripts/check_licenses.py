@@ -2,7 +2,7 @@
 import json,hashlib
 from pathlib import Path
 r=Path(__file__).resolve().parents[1]
-m=json.loads((r/'third_party/dependencies.json').read_text())
+m=json.loads((r/'third_party/dependencies.json').read_text(encoding="utf-8"))
 for e in m:
     for p,h in e.get('sha256',{}).items():
         assert hashlib.sha256((r/p).read_bytes()).hexdigest()==h,p

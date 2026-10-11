@@ -13,5 +13,5 @@ with tempfile.TemporaryDirectory() as d:
   for i in range(0,len(data),16):parts.append('    '+','.join(str(x) for x in data[i:i+16])+',')
   parts.append('};')
 contents='\n'.join(parts)+'\n';path=root/'backends/sdl_gpu/shaders/generated.h'
-if a.check:raise SystemExit(contents!=path.read_text())
-path.write_text(contents)
+if a.check:raise SystemExit(contents!=path.read_text(encoding="utf-8"))
+path.write_text(contents, encoding="utf-8", newline="\n")

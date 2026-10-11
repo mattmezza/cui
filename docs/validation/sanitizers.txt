@@ -1,45 +1,47 @@
 Test project /home/matteo/dev/cui/build-sanitize
       Start  1: bootstrap
- 1/20 Test  #1: bootstrap ........................   Passed    0.02 sec
+ 1/21 Test  #1: bootstrap ........................   Passed    0.02 sec
       Start  2: core
- 2/20 Test  #2: core .............................   Passed    0.03 sec
+ 2/21 Test  #2: core .............................   Passed    0.03 sec
       Start  3: base
- 3/20 Test  #3: base .............................   Passed    0.03 sec
+ 3/21 Test  #3: base .............................   Passed    0.02 sec
       Start  4: components
- 4/20 Test  #4: components .......................   Passed    0.02 sec
+ 4/21 Test  #4: components .......................   Passed    0.03 sec
       Start  5: render
- 5/20 Test  #5: render ...........................   Passed    0.03 sec
+ 5/21 Test  #5: render ...........................   Passed    0.03 sec
       Start  6: edit
- 6/20 Test  #6: edit .............................   Passed    0.03 sec
+ 6/21 Test  #6: edit .............................   Passed    0.05 sec
       Start  7: overlay
- 7/20 Test  #7: overlay ..........................   Passed    0.02 sec
+ 7/21 Test  #7: overlay ..........................   Passed    0.03 sec
       Start  8: virtual
- 8/20 Test  #8: virtual ..........................   Passed    0.09 sec
-      Start  9: example_unstyled
- 9/20 Test  #9: example_unstyled .................   Passed    0.03 sec
-      Start 10: example_styled_settings
-10/20 Test #10: example_styled_settings ..........   Passed    0.03 sec
-      Start 11: manifest
-11/20 Test #11: manifest .........................   Passed    0.15 sec
-      Start 12: licenses
-12/20 Test #12: licenses .........................   Passed    0.14 sec
-      Start 13: distribution
-13/20 Test #13: distribution .....................   Passed    0.18 sec
-      Start 14: cpp_embedding
-14/20 Test #14: cpp_embedding ....................   Passed    0.02 sec
-      Start 15: distribution_single
-15/20 Test #15: distribution_single ..............   Passed    0.02 sec
-      Start 16: distribution_multi
-16/20 Test #16: distribution_multi ...............   Passed    0.02 sec
-      Start 17: sdl3_services
-17/20 Test #17: sdl3_services ....................   Passed    0.77 sec
-      Start 18: gallery_layout
-18/20 Test #18: gallery_layout ...................   Passed    0.04 sec
-      Start 19: gallery_capture
-19/20 Test #19: gallery_capture ..................   Passed    0.43 sec
-      Start 20: implementation_embedding
-20/20 Test #20: implementation_embedding .........   Passed    0.03 sec
+ 8/21 Test  #8: virtual ..........................   Passed    0.09 sec
+      Start  9: dock
+ 9/21 Test  #9: dock .............................   Passed    0.82 sec
+      Start 10: example_unstyled
+10/21 Test #10: example_unstyled .................   Passed    0.02 sec
+      Start 11: example_styled_settings
+11/21 Test #11: example_styled_settings ..........   Passed    0.02 sec
+      Start 12: manifest
+12/21 Test #12: manifest .........................   Passed    0.13 sec
+      Start 13: licenses
+13/21 Test #13: licenses .........................   Passed    0.14 sec
+      Start 14: distribution
+14/21 Test #14: distribution .....................   Passed    0.19 sec
+      Start 15: cpp_embedding
+15/21 Test #15: cpp_embedding ....................   Passed    0.03 sec
+      Start 16: distribution_single
+16/21 Test #16: distribution_single ..............   Passed    0.02 sec
+      Start 17: distribution_multi
+17/21 Test #17: distribution_multi ...............   Passed    0.02 sec
+      Start 18: sdl3_services
+18/21 Test #18: sdl3_services ....................   Passed    0.78 sec
+      Start 19: gallery_layout
+19/21 Test #19: gallery_layout ...................   Passed    0.05 sec
+      Start 20: gallery_capture
+20/21 Test #20: gallery_capture ..................   Passed    0.42 sec
+      Start 21: implementation_embedding
+21/21 Test #21: implementation_embedding .........   Passed    0.03 sec
 
-100% tests passed out of 20
+100% tests passed out of 21
 
-Total Test time (real) =   2.15 sec
+Total Test time (real) =   3.00 sec

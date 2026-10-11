@@ -4,7 +4,7 @@ import collections,json,subprocess
 from pathlib import Path
 r=Path(__file__).resolve().parents[1]
 def git(*args):return subprocess.check_output(['git',*args],cwd=r,text=True).strip()
-m=json.loads((r/'docs/gpui-parity.json').read_text())['components'];counts=collections.Counter(e['status'] for e in m)
+m=json.loads((r/'docs/gpui-parity.json').read_text(encoding="utf-8"))['components'];counts=collections.Counter(e['status'] for e in m)
 sha=git('rev-parse','HEAD');branch=git('branch','--show-current')
 lines=['# Nightly report — live development checkpoint','',f'Repository: https://github.com/mattmezza/cui. Branch `{branch}`. Evidence/source commit before this report update: `{sha}`. Sources are on the safe integration branch; see push/CI notes below.','',
 '## Working architecture','',
@@ -34,5 +34,5 @@ lines=['# Nightly report — live development checkpoint','',f'Repository: https
 for e in m:
  if e['status']!='verified':lines.append(f"| {e['name']} | {e['status']} | {'; '.join(e['limitations']).replace('|','/')} |")
 lines += ['','## Publishing/CI checkpoint','','Safe branch pushes are performed with ordinary Git; no force push/history rewrite. This report records the evidence commit above. Integrator updates publishing/CI observations in swarm-status.md and PLATFORM_MATRIX.md after each push.']
-(r/'docs/NIGHTLY_REPORT.md').write_text('\n'.join(lines)+'\n')
+(r/'docs/NIGHTLY_REPORT.md').write_text('\n'.join(lines)+'\n', encoding='utf-8', newline='\n')
 print('Updated nightly report:',sha,dict(counts))

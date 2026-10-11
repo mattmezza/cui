@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.png binary
+*.bmp binary
+*.ppm binary
+*.spv binary
+*.wasm binary

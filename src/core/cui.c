@@ -111,7 +111,16 @@ bool cui_begin_frame(cui_context *ui,float w,float h,float dt) {
     ui->semantic_count=ui->id_count=ui->element_count=ui->scope_count=ui->depth=ui->string_used=0;ui->count=0;
     select_context(ui);Clay_SetLayoutDimensions((Clay_Dimensions){w,h});Clay_BeginLayout();ui->config.width=w;ui->config.height=h;ui->dt=dt;ui->in_frame=true;ui->dirty=false;return true;
 }
-static uint32_t folded(cui_id id) { uint32_t x=(uint32_t)id^(uint32_t)(id>>32);return x?x:1; }
+static uint32_t folded(cui_id id) {
+    /* Avalanche in a CUI domain: Clay auto IDs combine parent ID + child
+       ordinal, so consecutive raw public IDs can alias auto text IDs. */
+    uint64_t x=id^UINT64_C(0x4355492d454c454d);
+    x=(x^(x>>30))*UINT64_C(0xbf58476d1ce4e5b9);
+    x=(x^(x>>27))*UINT64_C(0x94d049bb133111eb);
+    x^=x>>31;
+    uint32_t out=(uint32_t)x^(uint32_t)(x>>32);
+    return out?out:1;
+}
 static Clay_SizingAxis axis(float n) {
     if(n>0)return (Clay_SizingAxis){.size={.minMax={n,n}},.type=CLAY__SIZING_TYPE_FIXED};
     return (Clay_SizingAxis){.size={.minMax={0,0}},.type=n<0?CLAY__SIZING_TYPE_GROW:CLAY__SIZING_TYPE_FIT};

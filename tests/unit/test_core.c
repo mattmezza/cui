@@ -54,4 +54,21 @@ static void test_clipped_hit_and_arena(void) {
     ui=make();begin(ui);for(size_t i=0;i<258;i++)cui_begin_box(ui,(cui_id)(i+1),(cui_box){.width=10,.height=10});for(size_t i=0;i<258;i++)cui_end_box(ui);cui_end_frame(ui);assert(cui_last_error(ui)==CUI_ERROR_CAPACITY);cui_clear_error(ui);begin(ui);control(ui,1,false);cui_end_frame(ui);assert(cui_last_error(ui)==CUI_OK);cui_destroy(ui);
 }
 
-int main(void) { test_input();test_strings_and_draw();test_contexts_errors();test_clipped_hit_and_arena();puts("core tests passed");return 0; }
+
+static void test_numeric_id_text_domains(void) {
+    cui_context *ui=make();
+    for(size_t frame=0;frame<3;frame++){
+        begin(ui);
+        for(cui_id id=1;id<=8;id++){
+            cui_begin_box(ui,id,(cui_box){.width=100,.height=20});
+            if((id%2)==0){cui_begin_box(ui,100+id,(cui_box){.width=10,.height=10});cui_end_box(ui);}
+            cui_text(ui,cui_string("OFF"),10,(cui_color){0,0,0,255});
+            cui_interact(ui,id,CUI_ROLE_SWITCH,cui_string("switch"),false,false,0);
+            cui_end_box(ui);
+        }
+        cui_end_frame(ui);assert(cui_last_error(ui)==CUI_OK);
+    }
+    cui_destroy(ui);
+}
+
+int main(void) { test_input();test_strings_and_draw();test_contexts_errors();test_clipped_hit_and_arena();test_numeric_id_text_domains();puts("core tests passed");return 0; }

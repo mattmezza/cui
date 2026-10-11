@@ -41,6 +41,10 @@ void cui_begin_box(cui_context *ui,cui_id id,cui_box box);
 void cui_end_box(cui_context *ui);
 void cui_text(cui_context *ui,cui_str text,float font_size,cui_color color);
 cui_interaction cui_interact(cui_context *ui,cui_id id,cui_role role,cui_str name,bool disabled,bool checked,float value);
+/* Update the controlled value of a semantic already submitted this frame. */
+void cui_update_semantic(cui_context *ui,cui_id id,bool checked,float value);
+/* Target resolved in input order against previous frame regions. */
+cui_id cui_event_target(cui_context *ui,size_t index);
 const cui_semantic *cui_semantics(cui_context *ui,size_t *count);
 cui_rect cui_bounds(cui_context *ui,cui_id id);
 cui_id cui_focused(cui_context *ui);

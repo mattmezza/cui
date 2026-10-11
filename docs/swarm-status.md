@@ -1,9 +1,11 @@
 # Live checkpoint
 
-Branch build/initial-framework. Last integrated evidence commit a294579bd8e78048e47c4beaba5acf0fe0a02012.
+Repository https://github.com/mattmezza/cui. Integration branch `build/initial-framework`; source/evidence commit `2e6917097e86999be73a1b35ea14ee3e326b489d` pushed successfully. Existing public repository visibility preserved. No force pushes.
 
-{'not_started': 61, 'scaffolded': 0, 'implemented': 4, 'tested': 13, 'verified': 0}
+Catalog: {'not_started': 59, 'implemented': 4, 'tested': 15}. All78 families remain in scope; no full family is verified. See gpui-parity.json and NIGHTLY_REPORT.md for exact limitations.
 
-GCC C11 strict warnings build; 15 portable/native-services tests passed before focus-scope integration; subsequent combined tests underway. ASan/UBSan earlier13/13 passed. Real Linux Xorg SDL_Renderer OpenGL and SDL_GPU Vulkan/Intel Graphics runtime smoke and actual frame readbacks. No full component verified.
+Local evidence after plot/dock/Sokol integration: GCC/native24/24 tests, ASan/UBSan22/22, portable Clang19/19. Independent Sokol actual Xorg pixel/cache tests also passed ASan/UBSan with leak detection. C++/Zig consumers run; WASI compilation established and runtime runner underway. Exact saved logs under validation/.
 
-Workers: core retained virtualization and focus scopes; gallery bounded responsive correction; integrator CI/distribution/GPUI feature backlog. Clang via Zig compiled core but Zig linker crashed with CMake dependency-file flag; retrying documented CMake flag workaround. Native bridges, bidi/fallback/graphemes, full styled compound widgets and nonLinux runtime coverage pending.
+CI runs38185600059 and38185635693: Ubuntu portable, Linux GCC/Clang native sanitizer suites, formatting/distribution/license gates passed. Latest run includes real Sokol readback under Xvfb (driver reported; no hardware inference). macOS dock roundtrip failed; precision issue reproduced locally and fix in progress. Windows script encoding fixes retesting, runner still active. Earlier MSVC behavior suites passed but encoding/hash script gates failed. No native Windows/macOS GUI validation.
+
+Workers: core fixing locale-safe correctly-rounded dock numeric restore; controls adding optional actual WASI runtime verification. Graphics work integrated. Native accessibility, IME/graphemes/bidi/fallback, styled compound widgets and broad platform coverage pending. No privileged installs or user actions needed on current host.

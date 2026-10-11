@@ -139,6 +139,44 @@ static void test_serialization_rejection(void) {
            CUI_DOCK_OK);
     cui_dock_destroy(d);
 }
+static void test_decimal_precision_roundtrip(void) {
+    const double ratios[] = {0.1,
+                             0.2,
+                             0.3,
+                             1.0 / 3.0,
+                             0.12345678901234567,
+                             1e-200,
+                             DBL_MIN,
+                             DBL_TRUE_MIN,
+                             nextafter(0.1, 0.0),
+                             nextafter(0.1, 1.0),
+                             nextafter(1.0, 0.0)};
+    const double minima[] = {0.0,     0.1,          123.45678901234567, 1e-300,
+                             DBL_MIN, DBL_TRUE_MIN, nextafter(1e9, 0.0)};
+    cui_dock *d = make();
+    cui_dock_node original = cui_dock_root(d), second;
+    assert(cui_dock_insert(d, original, 1, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(d, original, CUI_DOCK_SPLIT_HORIZONTAL, 0.5, 2, false, &second) ==
+           CUI_DOCK_OK);
+    for (size_t i = 0; i < sizeof(ratios) / sizeof(*ratios); i++) {
+        assert(cui_dock_set_ratio(d, cui_dock_root(d), ratios[i]) == CUI_DOCK_OK);
+        assert(cui_dock_panel_find(d, 2, &second, NULL));
+        double minimum = minima[i % (sizeof(minima) / sizeof(*minima))];
+        assert(cui_dock_set_minimum(d, second, minimum, minimum) == CUI_DOCK_OK);
+        char before[8192], after[8192];
+        serialize(d, before, sizeof(before));
+        assert(cui_dock_restore(d, dock_test_string(before)) == CUI_DOCK_OK);
+        serialize(d, after, sizeof(after));
+        assert(!strcmp(before, after));
+        cui_dock_node_info info;
+        assert(cui_dock_node_get(d, cui_dock_root(d), &info));
+        assert(info.ratio == ratios[i]);
+        assert(cui_dock_panel_find(d, 2, &second, NULL));
+        assert(cui_dock_node_get(d, second, &info));
+        assert(info.min_width == minimum && info.min_height == minimum);
+    }
+    cui_dock_destroy(d);
+}
 static unsigned rng = 11;
 static unsigned random_number(void) {
     rng = rng * 1664525u + 1013904223u;
@@ -262,6 +300,7 @@ static void test_random_mutations(void) {
 int main(void) {
     test_nested_geometry_move();
     test_serialization_rejection();
+    test_decimal_precision_roundtrip();
     test_random_mutations();
     puts("dock tests passed");
     return 0;

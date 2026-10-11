@@ -30,11 +30,40 @@ static int scalar(void) { return 1; }
 static int copy_string(void) { return 1; }
 static int hash(void) { return 1; }
 static int color(void) { return 1; }
+typedef struct {
+  int value;
+} snapshot;
+typedef struct {
+  int value;
+} key_slot;
+static int decode(void) { return 1; }
+static int accepted(void) { return 1; }
+static int boundary(void) { return 1; }
+static int save_state(void) { return 1; }
+static int record(void) { return 1; }
+static int previous(void) { return 1; }
+static int next(void) { return 1; }
+static int replace(void) { return 1; }
+static int erase(void) { return 1; }
+static int restore(void) { return 1; }
+static int mix(void) { return 1; }
+static int lookup(void) { return 1; }
+static int add_key(void) { return 1; }
+static int extent(void) { return 1; }
+static int clamp_scroll(void) { return 1; }
+#include "../../src/base/cui_edit.c"
+#include "../../src/base/cui_virtual.c"
 #include "../../src/core/cui.c"
 #ifdef CLAY_IMPLEMENTATION
 #error Core leaked CLAY_IMPLEMENTATION
 #endif
 int main(void) {
+  snapshot app_snapshot = {1};
+  key_slot app_slot = {1};
+  assert(app_snapshot.value + app_slot.value == 2);
+  assert(decode() && accepted() && boundary() && save_state() && record() &&
+         previous() && next() && replace() && erase() && restore() && mix() &&
+         lookup() && add_key() && extent() && clamp_scroll());
   box_node b = {1};
   focus_scope s = {1};
   assert(b.value + s.value + STACK_MAX + EVENT_MAX == 20);
@@ -52,5 +81,17 @@ int main(void) {
   cui_end_frame(ui);
   assert(cui_last_error(ui) == CUI_OK);
   cui_destroy(ui);
+  char buffer[32] = "";
+  cui_edit *editor = cui_edit_create(
+      (cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+  assert(editor);
+  assert(cui_edit_insert(editor, cui_string("safe")) == CUI_EDIT_OK);
+  cui_edit_destroy(editor);
+  cui_virtual_list *list = cui_virtual_create((cui_virtual_config){4, 10});
+  assert(list);
+  uint64_t keys[] = {1, 2};
+  assert(cui_virtual_rebuild(list, keys, NULL, 2) == CUI_VIRTUAL_OK);
+  assert(cui_virtual_total(list) == 20);
+  cui_virtual_destroy(list);
   return 0;
 }

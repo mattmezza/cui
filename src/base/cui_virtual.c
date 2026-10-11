@@ -7,21 +7,23 @@
 typedef struct {
   uint64_t key;
   size_t index_plus_one;
-} key_slot;
+} cui_virtual_private_key_slot;
 struct cui_virtual_list {
   size_t capacity, count, map_capacity, memory_bytes;
   double default_height, total;
   uint64_t *keys, *next_keys;
   double *heights, *next_heights, *tree;
-  key_slot *map, *next_map;
+  cui_virtual_private_key_slot *map, *next_map;
 };
-static uint64_t mix(uint64_t x) {
+static uint64_t cui_virtual_private_mix(uint64_t x) {
   x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
   x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
   return x ^ (x >> 31);
 }
-static size_t lookup(const key_slot *map, size_t capacity, uint64_t key) {
-  size_t i = (size_t)mix(key) & (capacity - 1);
+static size_t
+cui_virtual_private_lookup(const cui_virtual_private_key_slot *map,
+                           size_t capacity, uint64_t key) {
+  size_t i = (size_t)cui_virtual_private_mix(key) & (capacity - 1);
   while (map[i].index_plus_one) {
     if (map[i].key == key)
       return map[i].index_plus_one - 1;
@@ -29,15 +31,16 @@ static size_t lookup(const key_slot *map, size_t capacity, uint64_t key) {
   }
   return SIZE_MAX;
 }
-static bool add_key(key_slot *map, size_t capacity, uint64_t key,
-                    size_t index) {
-  size_t i = (size_t)mix(key) & (capacity - 1);
+static bool cui_virtual_private_add_key(cui_virtual_private_key_slot *map,
+                                        size_t capacity, uint64_t key,
+                                        size_t index) {
+  size_t i = (size_t)cui_virtual_private_mix(key) & (capacity - 1);
   while (map[i].index_plus_one) {
     if (map[i].key == key)
       return false;
     i = (i + 1) & (capacity - 1);
   }
-  map[i] = (key_slot){key, index + 1};
+  map[i] = (cui_virtual_private_key_slot){key, index + 1};
   return true;
 }
 cui_virtual_list *cui_virtual_create(cui_virtual_config c) {
@@ -54,7 +57,7 @@ cui_virtual_list *cui_virtual_create(cui_virtual_config c) {
       return NULL;
     m *= 2;
   }
-  if (m > (size_t)PTRDIFF_MAX / sizeof(key_slot))
+  if (m > (size_t)PTRDIFF_MAX / sizeof(cui_virtual_private_key_slot))
     return NULL;
   /* Bound the combined allocation sum, not only each product. */
   size_t bytes = sizeof(cui_virtual_list), part;
@@ -68,9 +71,9 @@ cui_virtual_list *cui_virtual_create(cui_virtual_config c) {
   if (part > SIZE_MAX - bytes)
     return NULL;
   bytes += part;
-  if (m > SIZE_MAX / (2 * sizeof(key_slot)))
+  if (m > SIZE_MAX / (2 * sizeof(cui_virtual_private_key_slot)))
     return NULL;
-  part = m * 2 * sizeof(key_slot);
+  part = m * 2 * sizeof(cui_virtual_private_key_slot);
   if (part > SIZE_MAX - bytes)
     return NULL;
   bytes += part;
@@ -117,9 +120,9 @@ cui_virtual_result cui_virtual_rebuild(cui_virtual_list *v,
   memset(v->next_map, 0, v->map_capacity * sizeof(*v->next_map));
   long double total = 0;
   for (size_t i = 0; i < count; i++) {
-    if (!add_key(v->next_map, v->map_capacity, keys[i], i))
+    if (!cui_virtual_private_add_key(v->next_map, v->map_capacity, keys[i], i))
       return CUI_VIRTUAL_DUPLICATE_KEY;
-    size_t old = lookup(v->map, v->map_capacity, keys[i]);
+    size_t old = cui_virtual_private_lookup(v->map, v->map_capacity, keys[i]);
     double h = heights           ? heights[i]
                : old == SIZE_MAX ? v->default_height
                                  : v->heights[old];
@@ -137,7 +140,7 @@ cui_virtual_result cui_virtual_rebuild(cui_virtual_list *v,
   double *h = v->heights;
   v->heights = v->next_heights;
   v->next_heights = h;
-  key_slot *map = v->map;
+  cui_virtual_private_key_slot *map = v->map;
   v->map = v->next_map;
   v->next_map = map;
   v->count = count;
@@ -164,7 +167,7 @@ bool cui_virtual_key(const cui_virtual_list *v, size_t i, uint64_t *key) {
 bool cui_virtual_index(const cui_virtual_list *v, uint64_t key, size_t *index) {
   if (!v || !index)
     return false;
-  size_t i = lookup(v->map, v->map_capacity, key);
+  size_t i = cui_virtual_private_lookup(v->map, v->map_capacity, key);
   if (i == SIZE_MAX)
     return false;
   *index = i;
@@ -231,19 +234,21 @@ cui_virtual_result cui_virtual_set_key_height(cui_virtual_list *v, uint64_t key,
     return CUI_VIRTUAL_NOT_FOUND;
   return cui_virtual_set_height(v, i, height);
 }
-static double extent(double x) { return isfinite(x) && x > 0 ? x : 0; }
-static double clamp_scroll(const cui_virtual_list *v, double scroll,
-                           double viewport) {
-  double max = v ? fmax(0, v->total - extent(viewport)) : 0;
-  scroll = extent(scroll);
+static double cui_virtual_private_extent(double x) {
+  return isfinite(x) && x > 0 ? x : 0;
+}
+static double cui_virtual_private_clamp_scroll(const cui_virtual_list *v,
+                                               double scroll, double viewport) {
+  double max = v ? fmax(0, v->total - cui_virtual_private_extent(viewport)) : 0;
+  scroll = cui_virtual_private_extent(scroll);
   return fmin(scroll, max);
 }
 cui_virtual_view cui_virtual_viewport(const cui_virtual_list *v, double scroll,
                                       double viewport, size_t overscan) {
   if (!v)
     return (cui_virtual_view){0};
-  viewport = extent(viewport);
-  scroll = clamp_scroll(v, scroll, viewport);
+  viewport = cui_virtual_private_extent(viewport);
+  scroll = cui_virtual_private_clamp_scroll(v, scroll, viewport);
   size_t begin = cui_virtual_lower_bound(v, scroll), end = begin;
   if (viewport > 0) {
     double edge = fmin(v->total, scroll + viewport);
@@ -264,7 +269,7 @@ cui_virtual_anchor cui_virtual_capture_anchor(const cui_virtual_list *v,
                                               double scroll) {
   if (!v || !v->count)
     return (cui_virtual_anchor){0};
-  scroll = fmin(extent(scroll), v->total);
+  scroll = fmin(cui_virtual_private_extent(scroll), v->total);
   size_t i = cui_virtual_lower_bound(v, scroll);
   if (i == v->count)
     i--;
@@ -279,7 +284,7 @@ double cui_virtual_restore_anchor(const cui_virtual_list *v,
   size_t i;
   if (!cui_virtual_index(v, a.key, &i))
     i = a.fallback_index < v->count ? a.fallback_index : v->count - 1;
-  double scroll =
-      cui_virtual_offset(v, i) + fmin(extent(a.within), v->heights[i]);
-  return clamp_scroll(v, scroll, viewport);
+  double scroll = cui_virtual_offset(v, i) +
+                  fmin(cui_virtual_private_extent(a.within), v->heights[i]);
+  return cui_virtual_private_clamp_scroll(v, scroll, viewport);
 }

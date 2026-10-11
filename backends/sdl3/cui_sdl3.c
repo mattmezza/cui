@@ -48,7 +48,7 @@ static void glyph(void *user,int x,int y,int w,int h,int pitch,const unsigned ch
     SDL_Texture *t=SDL_CreateTextureFromSurface(s->renderer,surface);SDL_DestroySurface(surface);if(!t)return;
     SDL_SetTextureBlendMode(t,SDL_BLENDMODE_BLEND);SDL_FRect r={(float)x,(float)y,(float)w,(float)h};SDL_RenderTexture(s->renderer,t,NULL,&r);SDL_DestroyTexture(t);
 }
-bool cui_sdl3_render(cui_sdl3 *s,const cui_draw_list *list,cui_color clear){
+bool cui_sdl3_render_capture(cui_sdl3 *s,const cui_draw_list *list,cui_color clear,const char *path){
     if(!s||!list)return false;
     SDL_SetRenderClipRect(s->renderer,NULL);SDL_SetRenderDrawColor(s->renderer,clear.r,clear.g,clear.b,clear.a);if(!SDL_RenderClear(s->renderer))return false;
     SDL_Rect stack[64],clip={0,0,(int)ceilf(list->width),(int)ceilf(list->height)};size_t depth=0;
@@ -58,8 +58,11 @@ bool cui_sdl3_render(cui_sdl3 *s,const cui_draw_list *list,cui_color clear){
     case CUI_DRAW_CLIP_PUSH:{if(depth==64)return false;stack[depth++]=clip;SDL_Rect next={(int)floorf(c->bounds.x),(int)floorf(c->bounds.y),(int)ceilf(c->bounds.w),(int)ceilf(c->bounds.h)};if(!SDL_GetRectIntersection(&clip,&next,&clip))clip=(SDL_Rect){0,0,0,0};SDL_SetRenderClipRect(s->renderer,&clip);break;}
     case CUI_DRAW_CLIP_POP:if(!depth)return false;clip=stack[--depth];SDL_SetRenderClipRect(s->renderer,depth?&clip:NULL);break;
     default:return false;}}
-    return !depth && SDL_RenderPresent(s->renderer);
+    if(depth)return false;
+    if(path && !cui_sdl3_save_bmp(s,path))return false;
+    return SDL_RenderPresent(s->renderer);
 }
+bool cui_sdl3_render(cui_sdl3 *s,const cui_draw_list *list,cui_color clear){return cui_sdl3_render_capture(s,list,clear,NULL);}
 bool cui_sdl3_save_bmp(cui_sdl3 *s,const char *path){SDL_Surface *surface=SDL_RenderReadPixels(s->renderer,NULL);if(!surface)return false;bool ok=SDL_SaveBMP(surface,path);SDL_DestroySurface(surface);return ok;}
 const char *cui_sdl3_driver(cui_sdl3 *s){return s?SDL_GetRendererName(s->renderer):"unavailable";}
 const char *cui_sdl3_video_driver(void){return SDL_GetCurrentVideoDriver();}

@@ -10,6 +10,8 @@ void cui_sdl3_destroy(cui_sdl3 *backend);
 bool cui_sdl3_poll(cui_sdl3 *backend,cui_context *ui);
 void cui_sdl3_size(cui_sdl3 *backend,float *width,float *height);
 bool cui_sdl3_render(cui_sdl3 *backend,const cui_draw_list *list,cui_color clear);
+/* Capture before presenting, when the framebuffer contents are defined. */
+bool cui_sdl3_render_capture(cui_sdl3 *backend,const cui_draw_list *list,cui_color clear,const char *path);
 bool cui_sdl3_save_bmp(cui_sdl3 *backend,const char *path);
 const char *cui_sdl3_driver(cui_sdl3 *backend);
 const char *cui_sdl3_video_driver(void);

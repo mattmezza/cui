@@ -1,0 +1,141 @@
+/* SPDX-License-Identifier: MIT */
+#include "cui/cui_components.h"
+#include "cui/cui_software.h"
+#include "cui/cui_sdl3.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+typedef struct { bool dark,contrast,disabled,checked,notifications; int section,choice,clicks; float volume; } gallery_state;
+static cui_id id(cui_context *ui,const char *key){return cui_id_from(ui,key);}
+static void label(cui_context *ui,const cui_theme *t,const char *s){cui_label(ui,t,cui_string(s));}
+static void heading(cui_context *ui,const cui_theme *t,const char *s){cui_text(ui,cui_string(s),24,t->text);}
+static void box(cui_context *ui,const char *key,float width,float height,bool row,float pad,float gap,cui_color bg){cui_begin_box(ui,id(ui,key),(cui_box){.width=width,.height=height,.row=row,.padding=pad,.gap=gap,.background=bg});}
+static cui_draw_list frame(cui_context *ui,gallery_state *s,float w,float h){
+    gallery_state before=*s;
+    cui_theme t=s->contrast?cui_theme_high_contrast():s->dark?cui_theme_dark():cui_theme_light();
+    cui_begin_frame(ui,w,h,0.016f);
+    box(ui,"root",w,h,false,0,0,t.background);
+    box(ui,"toolbar",-1,84,true,24,32,t.surface);
+    heading(ui,&t,"CUI / component workbench");
+    cui_badge(ui,id(ui,"version"),&t,cui_string("Early alpha"));
+    cui_end_box(ui);
+    box(ui,"workspace",-1,-1,true,24,32,t.background);
+    if(w>=800){
+        box(ui,"navigation",210,-1,false,0,10,(cui_color){0});
+        cui_text(ui,cui_string("Explore"),18,t.text);
+        if(cui_button(ui,id(ui,"nav_controls"),&t,cui_string("Controls"),false))s->section=0;
+        if(cui_button(ui,id(ui,"nav_selection"),&t,cui_string("Selection & values"),false))s->section=1;
+        if(cui_button(ui,id(ui,"nav_about"),&t,cui_string("About this build"),false))s->section=2;
+        cui_separator(ui,id(ui,"nav_separator"),&t,210);
+        cui_text(ui,cui_string("Appearance"),18,t.text);
+        cui_switch(ui,id(ui,"dark"),&t,cui_string("Dark theme"),&s->dark,false);
+        cui_checkbox(ui,id(ui,"contrast"),&t,cui_string("High contrast"),&s->contrast,false);
+        cui_checkbox(ui,id(ui,"disabled"),&t,cui_string("Disable examples"),&s->disabled,false);
+        cui_text(ui,cui_string("Tab / Shift+Tab: focus"),12,t.muted);
+        cui_text(ui,cui_string("Enter / Space: activate"),12,t.muted);
+        cui_text(ui,cui_string("Arrows: adjust values"),12,t.muted);
+        cui_end_box(ui);
+    }
+    box(ui,"content",-1,-1,false,0,18,(cui_color){0});
+    if(w<800){
+        cui_switch(ui,id(ui,"dark"),&t,cui_string("Dark theme"),&s->dark,false);
+        box(ui,"compact_navigation",-1,0,true,0,10,(cui_color){0});
+        if(cui_button(ui,id(ui,"nav_controls"),&t,cui_string("Controls"),false))s->section=0;
+        if(cui_button(ui,id(ui,"nav_selection"),&t,cui_string("Values"),false))s->section=1;
+        if(cui_button(ui,id(ui,"nav_about"),&t,cui_string("About"),false))s->section=2;
+        cui_end_box(ui);
+    }
+    if(s->section==0){
+        heading(ui,&t,"Everyday controls");
+        label(ui,&t,"Real pointer and keyboard behavior, built on unstyled CUI Base.");
+        cui_separator(ui,id(ui,"main_separator"),&t,-1);
+        cui_text(ui,cui_string("Actions"),18,t.text);
+        box(ui,"actions",-1,0,true,0,12,(cui_color){0});
+        if(cui_button(ui,id(ui,"action"),&t,cui_string("Run action"),s->disabled))s->clicks++;
+        cui_button(ui,id(ui,"disabled_action"),&t,cui_string("Unavailable"),true);
+        cui_toggle(ui,id(ui,"toggle"),&t,cui_string("Pinned"),&s->checked,s->disabled);
+        cui_end_box(ui);
+        char result[80];snprintf(result,sizeof(result),"Action activated %d time%s",s->clicks,s->clicks==1?"":"s");label(ui,&t,result);
+        cui_text(ui,cui_string("Preferences"),18,t.text);
+        cui_checkbox(ui,id(ui,"check"),&t,cui_string("Keep this workspace open"),&s->checked,s->disabled);
+        cui_switch(ui,id(ui,"notify"),&t,cui_string("Desktop notifications"),&s->notifications,s->disabled);
+        cui_checkbox(ui,id(ui,"disabled_check"),&t,cui_string("Managed by administrator"),&s->checked,true);
+        cui_text(ui,cui_string("One shared value links the checkbox and pin toggle."),13,t.muted);
+    }else if(s->section==1){
+        heading(ui,&t,"Selection & values");
+        label(ui,&t,"Controlled values remain in the application, independent of the theme.");
+        cui_separator(ui,id(ui,"selection_separator"),&t,-1);
+        cui_text(ui,cui_string("Update channel"),18,t.text);
+        cui_radio(ui,id(ui,"stable"),&t,cui_string("Stable releases"),&s->choice,0,s->disabled);
+        cui_radio(ui,id(ui,"preview"),&t,cui_string("Preview releases"),&s->choice,1,s->disabled);
+        cui_radio(ui,id(ui,"nightly"),&t,cui_string("Nightly builds"),&s->choice,2,s->disabled);
+        cui_text(ui,cui_string("Volume"),18,t.text);
+        cui_slider(ui,id(ui,"volume"),&t,cui_string("Volume"),&s->volume,0,100,5,s->disabled);
+        char value[64];snprintf(value,sizeof(value),"%.0f / 100",s->volume);label(ui,&t,value);
+        cui_progress(ui,id(ui,"progress"),&t,s->volume/100,280);
+        cui_badge(ui,id(ui,"channel"),&t,cui_string(s->choice==0?"Stable":s->choice==1?"Preview":"Nightly"));
+    }else{
+        heading(ui,&t,"Small core. Honest scope.");
+        label(ui,&t,"C11 public APIs / Clay layout / independent renderer adapters");
+        cui_separator(ui,id(ui,"about_separator"),&t,-1);
+        label(ui,&t,"This gallery demonstrates the implemented vertical slice.");
+        label(ui,&t,"The complete 78-component target is tracked in the repository manifest.");
+        label(ui,&t,"International text uses FreeType rasterization and HarfBuzz shaping.");
+        label(ui,&t,"Native accessibility bridges and SDL_GPU remain separate adapter work.");
+        cui_text(ui,cui_string("Shaping sample: caf\xc3\xa9 / \xce\x95\xce\xbb\xce\xbb\xce\xb7\xce\xbd\xce\xb9\xce\xba\xce\xac"),18,t.text);
+    }
+    cui_end_box(ui);cui_end_box(ui);
+    box(ui,"footer",-1,44,true,12,16,t.surface);
+    cui_text(ui,cui_string("CUI 0.1 / state and semantics are independent of painted pixels"),12,t.muted);
+    cui_end_box(ui);cui_end_box(ui);
+    cui_draw_list result=cui_end_frame(ui);
+    if(before.dark!=s->dark || before.contrast!=s->contrast || before.disabled!=s->disabled || before.section!=s->section || before.clicks!=s->clicks || before.checked!=s->checked || before.notifications!=s->notifications || before.choice!=s->choice || before.volume!=s->volume)cui_invalidate(ui);
+    return result;
+}
+static const char *font_path(const char *requested){
+    if(requested)return requested;
+    const char *env=getenv("CUI_FONT_PATH");if(env && *env)return env;
+    const char *paths[]={"/usr/share/fonts/noto/NotoSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","/usr/share/fonts/TTF/DejaVuSans.ttf","/System/Library/Fonts/Supplemental/Arial.ttf","C:/Windows/Fonts/segoeui.ttf"};
+    for(size_t i=0;i<sizeof(paths)/sizeof(paths[0]);i++){FILE *f=fopen(paths[i],"rb");if(f){fclose(f);return paths[i];}}
+    return NULL;
+}
+int main(int argc,char **argv){
+    bool headless=false,dark=false;unsigned smoke=0;const char *capture=NULL,*requested_font=NULL;
+    for(int i=1;i<argc;i++){
+        if(!strcmp(argv[i],"--headless"))headless=true;
+        else if(!strcmp(argv[i],"--dark"))dark=true;
+        else if(!strcmp(argv[i],"--smoke") && i+1<argc)smoke=(unsigned)strtoul(argv[++i],NULL,10);
+        else if(!strcmp(argv[i],"--screenshot") && i+1<argc)capture=argv[++i];
+        else if(!strcmp(argv[i],"--font") && i+1<argc)requested_font=argv[++i];
+        else {fprintf(stderr,"Usage: %s [--headless] [--dark] [--smoke N] [--screenshot FILE] [--font FILE]\n",argv[0]);return 2;}
+    }
+    cui_font *font=cui_font_open(font_path(requested_font));
+    if(!font){fprintf(stderr,"No usable font. Pass --font FILE or set CUI_FONT_PATH.\n");return 1;}
+    cui_context *ui=cui_create((cui_config){.width=1100,.height=740,.measure=cui_font_measure,.measure_user=font});
+    if(!ui){cui_font_close(font);return 1;}
+    gallery_state state={.dark=dark,.notifications=true,.volume=65};
+    bool ok=true;
+    if(headless){
+        cui_software *r=cui_software_create(1100,740,font);cui_draw_list list=frame(ui,&state,1100,740);
+        ok=r && cui_software_render(r,&list,dark?cui_theme_dark().background:cui_theme_light().background);
+        if(ok && capture)ok=cui_software_save_ppm(r,capture);
+        printf("renderer=CUI software; frame commands=%zu; capture=%s\n",list.count,capture?capture:"none");cui_software_destroy(r);
+    }else{
+        cui_sdl3 *s=cui_sdl3_create("CUI / component workbench",1100,740,font);
+        if(!s){fprintf(stderr,"SDL3: %s\n",cui_sdl3_error());ok=false;}
+        else{
+            printf("video=%s; renderer=%s; SDL_Renderer compatibility adapter\n",cui_sdl3_video_driver(),cui_sdl3_driver(s));
+            unsigned frames=0;
+            while(cui_sdl3_poll(s,ui)){
+                if(cui_needs_redraw(ui) || frames==0 || smoke){float w,h;cui_sdl3_size(s,&w,&h);cui_draw_list list=frame(ui,&state,w,h);cui_theme t=state.contrast?cui_theme_high_contrast():state.dark?cui_theme_dark():cui_theme_light();
+                    const char *shot=capture && smoke && frames+1>=smoke?capture:NULL;
+                    if(!cui_sdl3_render_capture(s,&list,t.background,shot)){fprintf(stderr,"Render: %s\n",cui_sdl3_error());ok=false;break;}
+                    frames++;if(smoke && frames>=smoke)break;
+                }else cui_sdl3_wait(8);
+            }
+            cui_sdl3_destroy(s);
+        }
+    }
+    if(cui_last_error(ui)!=CUI_OK){fprintf(stderr,"Core error: %d\n",cui_last_error(ui));ok=false;}
+    cui_destroy(ui);cui_font_close(font);return ok?0:1;
+}

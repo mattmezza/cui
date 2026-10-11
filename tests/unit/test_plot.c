@@ -46,7 +46,30 @@ int main(void) {
     log = (cui_plot_scale){CUI_PLOT_LOG10, 1, 1000, 0, 300, false};
     assert(cui_plot_ticks(&log, 4, ticks, 1024, &count) == CUI_PLOT_OK && count == 4);
     assert(ticks[0] == 1 && ticks[1] == 10 && ticks[2] == 100 && ticks[3] == 1000);
-    /* Deterministic numeric properties over varying scale direction and viewport. */
+    /* Endpoint transforms may land on either side of an integer exponent;
+       exact decades remain inclusive, but genuinely excluded powers do not. */
+    const double decade_domains[][2] = {{10, 1000}, {.1, 100}, {.01, 10}, {1e-300, 1e300}};
+    const size_t decade_counts[] = {3, 4, 4, 7};
+    for (size_t i = 0; i < sizeof(decade_counts) / sizeof(decade_counts[0]); i++) {
+        cui_plot_scale boundary = {CUI_PLOT_LOG10, decade_domains[i][0], decade_domains[i][1], 0, 1,
+                                   false};
+        assert(cui_plot_ticks(&boundary, decade_counts[i], ticks, 1024, &count) == CUI_PLOT_OK &&
+               count == decade_counts[i]);
+        assert(ticks[0] == boundary.domain_min && ticks[count - 1] == boundary.domain_max);
+    }
+    cui_plot_scale excluded = {CUI_PLOT_LOG10, nextafter(10, INFINITY), nextafter(1000, 0), 0, 1,
+                               false};
+    assert(cui_plot_ticks(&excluded, 3, ticks, 1024, &count) == CUI_PLOT_OK && count == 1 &&
+           ticks[0] == 100);
+    excluded = (cui_plot_scale){CUI_PLOT_LOG10, 10.000001, 999.999999, 0, 1, false};
+    assert(cui_plot_ticks(&excluded, 3, ticks, 1024, &count) == CUI_PLOT_OK && count == 1 &&
+           ticks[0] == 100);
+    cui_plot_scale decimal = {CUI_PLOT_LINEAR, .1, .3, 0, 1, false};
+    assert(cui_plot_ticks(&decimal, 3, ticks, 1024, &count) == CUI_PLOT_OK && count > 0);
+    for (size_t i = 0; i < count; i++)
+        assert(ticks[i] >= decimal.domain_min && ticks[i] <= decimal.domain_max);
+    /* Deterministic numeric properties over varying scale direction and viewport.
+     */
     for (unsigned i = 0; i < 1500; ++i) {
         double a = random_unit() * 2000 - 1000;
         double span = 1 + random_unit() * 10000;
@@ -69,7 +92,8 @@ int main(void) {
                 assert(ticks[j] > ticks[j - 1]);
         }
     }
-    /* All finite IEEE double domain magnitudes, including overflow-width spans. */
+    /* All finite IEEE double domain magnitudes, including overflow-width spans.
+     */
     cui_plot_scale huge = {CUI_PLOT_LINEAR, -DBL_MAX, DBL_MAX, -DBL_MAX, DBL_MAX, false};
     assert(cui_plot_map(&huge, 0, &pixel) == CUI_PLOT_OK && pixel == 0);
     assert(cui_plot_inverse(&huge, 0, &value) == CUI_PLOT_OK && value == 0);

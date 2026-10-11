@@ -30,6 +30,12 @@ bounded by the smallest positive double; steps near large domain offsets are
 bounded by representable spacing to prevent duplicate ticks. Log ticks can
 use fractional powers of ten. Nice domains round outward in transformed
 space, saturating at finite double limits while retaining original endpoints.
+Nice-step threshold decisions allow a few long-double arithmetic ulps so a
+libm rounding difference does not promote an exact unit step to two. Tick
+generation inspects neighboring transformed grid indices and applies strict
+final comparisons in the original double domain. Exact power-of-ten endpoints
+remain inclusive; excluded endpoints are not pulled into range by a broad
+relative epsilon or endpoint snapping.
 
 Tick generation uses bounded temporary storage for at most 1024 values and
 never allocates. Pass `NULL, 0` to query required capacity. Insufficient capacity

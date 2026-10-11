@@ -3,7 +3,31 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
 static const unsigned char *pixel(cui_software *r,int x,int y){unsigned w;cui_software_pixels(r,&w,NULL);return cui_software_pixels(r,NULL,NULL)+((size_t)y*w+(unsigned)x)*4;}
+#ifdef CUI_HAS_TEXT
+typedef struct { unsigned glyphs,coverage; } glyph_stats;
+static void glyph_count(void *user,int x,int y,int w,int h,int pitch,const unsigned char *data){
+    glyph_stats *s=user;(void)x;(void)y;if(!data)return;s->glyphs++;
+    for(int j=0;j<h;j++)for(int i=0;i<w;i++)s->coverage+=data[j*pitch+i]!=0;
+}
+static void test_text(void){
+    const char *requested=getenv("CUI_TEST_FONT");
+    const char *paths[]={requested,"/usr/share/fonts/noto/NotoSans-Regular.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","/usr/share/fonts/TTF/DejaVuSans.ttf"};
+    cui_font *font=NULL;
+    for(size_t i=0;i<sizeof(paths)/sizeof(paths[0]) && !font;i++)if(paths[i])font=cui_font_open(paths[i]);
+    if(!font){puts("text raster test skipped: set CUI_TEST_FONT to a font file");return;}
+    const char *text="office caf\xc3\xa9";cui_str str={text,strlen(text)};
+    cui_size size=cui_font_measure(font,str,18);assert(size.width>40 && size.height>18);
+    cui_size double_size=cui_font_measure(font,str,36);assert(double_size.width>size.width*1.8f);
+    glyph_stats stats={0};assert(cui_font_draw(font,str,18,0,0,glyph_count,&stats));assert(stats.glyphs>0 && stats.coverage>0);
+    const char rtl[]={ '\xd8','\xb3','\xd9','\x84','\xd8','\xa7','\xd9','\x85' };
+    stats=(glyph_stats){0};assert(cui_font_draw(font,(cui_str){rtl,sizeof(rtl)},20,0,0,glyph_count,&stats));assert(stats.glyphs>0);
+    assert(cui_font_measure(font,str,NAN).width==0);assert(!cui_font_draw(font,str,18,INFINITY,0,glyph_count,&stats));
+    cui_font_close(font);puts("HarfBuzz multilingual shaping and FreeType coverage passed");
+}
+#endif
 int main(void){
     cui_software *r=cui_software_create(16,16,NULL);assert(r);
     cui_draw_command commands[]={
@@ -24,7 +48,13 @@ int main(void){
     commands[0]=(cui_draw_command){.type=CUI_DRAW_RECT,.bounds={0,0,1,1},.color={100,40,20,128}};
     assert(cui_software_render(r,&list,(cui_color){0,0,0,0}));assert(pixel(r,0,0)[0]==100 && pixel(r,0,0)[3]==128);
     commands[0].type=CUI_DRAW_CLIP_POP;assert(!cui_software_render(r,&list,(cui_color){0}));
+    commands[0]=(cui_draw_command){.type=CUI_DRAW_RECT,.bounds={1e30f,1e30f,10,10}};assert(cui_software_render(r,&list,(cui_color){0}));
+    commands[0].bounds.x=NAN;assert(!cui_software_render(r,&list,(cui_color){0}));
     assert(!cui_software_resize(r,0,16));assert(cui_software_resize(r,8,8));
     unsigned w,h;cui_software_pixels(r,&w,&h);assert(w==8 && h==8);
-    cui_software_destroy(r);puts("software renderer geometry, nested clipping and straight alpha passed");return 0;
+    cui_software_destroy(r);puts("software renderer geometry, nested clipping and straight alpha passed");
+#ifdef CUI_HAS_TEXT
+    test_text();
+#endif
+    return 0;
 }

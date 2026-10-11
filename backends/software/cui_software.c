@@ -30,7 +30,9 @@ static bool inside(cui_rect b,float rad,float x,float y) {
     return (x-cx)*(x-cx)+(y-cy)*(y-cy)<=rad*rad;
 }
 static void rectangle(cui_software *r,const cui_draw_command *c) {
-    cui_rect area=intersect(c->bounds,r->clip);int x0=(int)floorf(area.x),y0=(int)floorf(area.y),x1=(int)ceilf(area.x+area.w),y1=(int)ceilf(area.y+area.h);
+    cui_rect area=intersect(c->bounds,r->clip);
+    if(area.w<=0 || area.h<=0)return;
+    int x0=(int)floorf(area.x),y0=(int)floorf(area.y),x1=(int)ceilf(area.x+area.w),y1=(int)ceilf(area.y+area.h);
     cui_rect inner={c->bounds.x+c->stroke,c->bounds.y+c->stroke,c->bounds.w-2*c->stroke,c->bounds.h-2*c->stroke};
     for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++)if(inside(c->bounds,c->radius,x+0.5f,y+0.5f) && (c->type!=CUI_DRAW_BORDER || !inside(inner,fmaxf(0,c->radius-c->stroke),x+0.5f,y+0.5f)))blend(r,x,y,c->color);
 }
@@ -53,7 +55,9 @@ bool cui_software_render(cui_software *r,const cui_draw_list *list,cui_color cle
         case CUI_DRAW_CLIP_POP:if(!depth)return false;r->clip=stack[--depth];break;
         case CUI_DRAW_TEXT:
 #ifdef CUI_HAS_TEXT
-            r->ink=c->color;if(r->font && !cui_font_draw(r->font,c->text,c->font_size,c->bounds.x,c->bounds.y,glyph,r))return false;
+            r->ink=c->color;if(!r->font || !cui_font_draw(r->font,c->text,c->font_size,c->bounds.x,c->bounds.y,glyph,r))return false;
+#else
+            return false;
 #endif
             break;
         default:return false;
@@ -74,6 +78,6 @@ static bool render(void *r,const cui_draw_list *list,cui_color clear){return cui
 static void destroy(void *r){cui_software_destroy(r);}
 cui_renderer cui_software_interface(cui_software *r){return(cui_renderer){r,"CUI deterministic software",CUI_RENDER_ROUNDED|CUI_RENDER_CLIP
 #ifdef CUI_HAS_TEXT
-    |CUI_RENDER_TEXT
+    |(r && r->font?CUI_RENDER_TEXT:0)
 #endif
     ,render,destroy};}

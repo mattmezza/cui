@@ -3,6 +3,9 @@
 #define CUI_SDL3_H
 #include "cui_renderer.h"
 #include "cui_text.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 typedef struct cui_sdl3 cui_sdl3;
 /* Optional SDL3 adapter; all operations must run on the main thread. */
 cui_sdl3 *cui_sdl3_create(const char *title,int width,int height,cui_font *font);
@@ -18,4 +21,7 @@ const char *cui_sdl3_video_driver(void);
 const char *cui_sdl3_error(void);
 void cui_sdl3_wait(unsigned milliseconds);
 cui_renderer cui_sdl3_interface(cui_sdl3 *backend);
+#ifdef __cplusplus
+}
+#endif
 #endif

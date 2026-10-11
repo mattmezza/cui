@@ -49,12 +49,14 @@ static void glyph(void *user,int x,int y,int w,int h,int pitch,const unsigned ch
     SDL_SetTextureBlendMode(t,SDL_BLENDMODE_BLEND);SDL_FRect r={(float)x,(float)y,(float)w,(float)h};SDL_RenderTexture(s->renderer,t,NULL,&r);SDL_DestroyTexture(t);
 }
 bool cui_sdl3_render_capture(cui_sdl3 *s,const cui_draw_list *list,cui_color clear,const char *path){
-    if(!s||!list)return false;
+    if(!s||!list || (!list->commands && list->count) || !isfinite(list->width) || !isfinite(list->height) || list->width<0 || list->height<0 || list->width>16384 || list->height>16384)return false;
     SDL_SetRenderClipRect(s->renderer,NULL);SDL_SetRenderDrawColor(s->renderer,clear.r,clear.g,clear.b,clear.a);if(!SDL_RenderClear(s->renderer))return false;
     SDL_Rect stack[64],clip={0,0,(int)ceilf(list->width),(int)ceilf(list->height)};size_t depth=0;
-    for(size_t i=0;i<list->count;i++){const cui_draw_command *c=&list->commands[i];switch(c->type){
+    for(size_t i=0;i<list->count;i++){const cui_draw_command *c=&list->commands[i];
+    if(!isfinite(c->bounds.x)||!isfinite(c->bounds.y)||!isfinite(c->bounds.w)||!isfinite(c->bounds.h)||!isfinite(c->radius)||!isfinite(c->stroke)||fabsf(c->bounds.x)>1e6f||fabsf(c->bounds.y)>1e6f||fabsf(c->bounds.w)>16384||fabsf(c->bounds.h)>16384)return false;
+    switch(c->type){
     case CUI_DRAW_RECT:case CUI_DRAW_BORDER:if(!rect(s,c))return false;break;
-    case CUI_DRAW_TEXT:s->ink=c->color;if(s->font && !cui_font_draw(s->font,c->text,c->font_size,c->bounds.x,c->bounds.y,glyph,s))return false;break;
+    case CUI_DRAW_TEXT:s->ink=c->color;if(!s->font || !cui_font_draw(s->font,c->text,c->font_size,c->bounds.x,c->bounds.y,glyph,s))return false;break;
     case CUI_DRAW_CLIP_PUSH:{if(depth==64)return false;stack[depth++]=clip;SDL_Rect next={(int)floorf(c->bounds.x),(int)floorf(c->bounds.y),(int)ceilf(c->bounds.w),(int)ceilf(c->bounds.h)};if(!SDL_GetRectIntersection(&clip,&next,&clip))clip=(SDL_Rect){0,0,0,0};SDL_SetRenderClipRect(s->renderer,&clip);break;}
     case CUI_DRAW_CLIP_POP:if(!depth)return false;clip=stack[--depth];SDL_SetRenderClipRect(s->renderer,depth?&clip:NULL);break;
     default:return false;}}
@@ -70,4 +72,4 @@ const char *cui_sdl3_error(void){return SDL_GetError();}
 void cui_sdl3_wait(unsigned ms){SDL_Delay(ms);}
 static bool render(void *s,const cui_draw_list *l,cui_color c){return cui_sdl3_render(s,l,c);}
 static void destroy(void *s){cui_sdl3_destroy(s);}
-cui_renderer cui_sdl3_interface(cui_sdl3 *s){const char *name=cui_sdl3_driver(s);return(cui_renderer){s,name,CUI_RENDER_TEXT|CUI_RENDER_ROUNDED|CUI_RENDER_CLIP|(strcmp(name,"software")?CUI_RENDER_ACCELERATED:0),render,destroy};}
+cui_renderer cui_sdl3_interface(cui_sdl3 *s){const char *name=cui_sdl3_driver(s);return(cui_renderer){s,name,(s && s->font?CUI_RENDER_TEXT:0)|CUI_RENDER_ROUNDED|CUI_RENDER_CLIP|(s && strcmp(name,"software")?CUI_RENDER_ACCELERATED:0),render,destroy};}

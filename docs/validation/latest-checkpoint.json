@@ -1,8 +1,8 @@
 {
-  "source": "bb4d462",
+  "source": "a5d5f23",
   "published_source": "d552763b35a9efd915a59834c70688d81d982bba",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public d552763 is deployed and passed the full HTTPS 74-story suite. Local Chart motion, Sankey, TextView actions and Speech reduced-motion updates pass native75, sanitizers73 and WASI65. An intermittent Command second-Escape issue in repeated worker browser runs remains under investigation. Full 78-entry parity remains unfinished.",
+  "summary": "Local 75-story WASM gallery passes full Chromium interactions and quality checks, including the native-regression-backed Command separator ID fix and real TextView story. Published site remains d552763 with74 stories pending deployment. Full78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -13,18 +13,18 @@
     },
     {
       "name": "native",
-      "source": "bb4d462",
+      "source": "db79e1e",
       "passed": 75,
       "total": 75,
-      "log": "native-bb4d462.txt"
+      "log": "native-db79e1e.txt"
     },
     {
       "name": "browser",
-      "source": "d972c06",
-      "passed": 74,
-      "total": 74,
+      "source": "a5d5f23",
+      "passed": 75,
+      "total": 75,
       "palettes": 38,
-      "log": "browser-d972c06.txt"
+      "log": "browser-a5d5f23.txt"
     },
     {
       "name": "sanitizers",

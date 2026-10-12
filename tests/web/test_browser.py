@@ -1351,7 +1351,7 @@ def main():
             assert group_input.count() == 1
             def inline_group_bounds():
                 return page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
-                    return [['https://',7],['Workspace address',6],['.example.com',7],['Open address',1]]
+                    return [['https://',9],['Workspace address',6],['.example.com',9],['Open address',1]]
                     .map(([name,role])=>{const i=Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
                         .find(i=>e.gallery_semantic(i,0)===role&&d.decode(new Uint8Array(
                             e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);

@@ -1,0 +1,1 @@
+cui-semantic-ancestry-media-before: tests/unit/test_media.c:437: group_scene: Assertion `semantics[i].role != CUI_ROLE_SCROLLBAR' failed.

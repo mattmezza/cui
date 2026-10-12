@@ -66,6 +66,54 @@ static void test_text(void) {
     cui_font_close(font);
     puts("HarfBuzz multilingual shaping and FreeType coverage passed");
 }
+static void test_styled_font_faces(void) {
+    const char *regular = "/usr/share/fonts/noto/NotoSans-Regular.ttf";
+    const char *bold = "/usr/share/fonts/noto/NotoSans-Bold.ttf";
+    const char *mono = "/usr/share/fonts/liberation/LiberationMono-Regular.ttf";
+    cui_font *font = cui_font_open(regular);
+    if (!font) {
+        puts("styled font test skipped: packaged Noto Sans unavailable");
+        return;
+    }
+    cui_text_style strong = {.weight = CUI_TEXT_WEIGHT_BOLD};
+    cui_text_style code = {.monospace = true};
+    cui_str sample = cui_string("WiiW");
+    cui_size normal = cui_font_measure(font, sample, 24);
+    assert(cui_font_measure_styled(font, sample, 24, strong).width == normal.width);
+    assert(cui_font_measure_styled(font, sample, 24, code).width == normal.width);
+    cui_font *bold_face = cui_font_open(bold), *mono_face = cui_font_open(mono);
+    if (bold_face && mono_face) {
+        assert(cui_font_set_style(font, strong, bold_face));
+        assert(cui_font_set_style(font, code, mono_face));
+        cui_size bold_size = cui_font_measure_styled(font, sample, 24, strong);
+        cui_size mono_size = cui_font_measure_styled(font, sample, 24, code);
+        assert(bold_size.width > 0 && mono_size.width > 0 && bold_size.width != normal.width &&
+               mono_size.width != normal.width);
+        glyph_stats stats = {0};
+        assert(cui_font_draw_styled(font, sample, 24, strong, 0, 0, glyph_count, &stats));
+        assert(stats.glyphs == 4 && stats.coverage > 0);
+        stats = (glyph_stats){0};
+        assert(cui_font_draw_styled(font, sample, 24, code, 0, 0, glyph_count, &stats));
+        assert(stats.glyphs == 4 && stats.coverage > 0);
+        assert(!cui_font_set_style(font, (cui_text_style){0}, bold_face));
+        assert(!cui_font_set_style(font, strong, font));
+        assert(cui_font_measure_styled(font, sample, 24, strong).width == bold_size.width);
+        assert(cui_font_set_style(font, strong, NULL));
+        assert(cui_font_measure_styled(font, sample, 24, strong).width == normal.width);
+        assert(cui_font_register_style(font, strong, bold));
+        assert(cui_font_measure_styled(font, sample, 24, strong).width == bold_size.width);
+        assert(!cui_font_register_style(font, strong, "/cui-test/nonexistent/font.ttf"));
+        assert(cui_font_measure_styled(font, sample, 24, strong).width == bold_size.width);
+        assert(cui_font_register_style(font, strong, bold));
+        assert(cui_font_measure_styled(font, sample, 24, strong).width == bold_size.width);
+    }
+    assert(
+        cui_font_measure_styled(font, sample, 24, (cui_text_style){.weight = (cui_text_weight)99})
+            .width == 0);
+    cui_font_close(font);
+    cui_font_close(bold_face);
+    cui_font_close(mono_face);
+}
 #endif
 static void asymmetric_shapes(void) {
     cui_software *r = cui_software_create(64, 64, NULL);
@@ -154,6 +202,9 @@ static void test_bitmap_pixels(void) {
     cui_software_destroy(r);
 }
 int main(void) {
+#ifdef CUI_HAS_TEXT
+    test_styled_font_faces();
+#endif
     test_bitmap_pixels();
     test_underlay_pixels();
     asymmetric_shapes();

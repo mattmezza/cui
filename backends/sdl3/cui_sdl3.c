@@ -428,8 +428,8 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
             s->ink = c->color;
             s->glyph_ok = true;
             if (!s->font ||
-                !cui_font_draw(s->font, c->text, c->font_size, c->bounds.x, c->bounds.y, glyph,
-                               s) ||
+                !cui_font_draw_styled(s->font, c->text, c->font_size, c->text_style, c->bounds.x,
+                                      c->bounds.y, glyph, s) ||
                 !s->glyph_ok)
                 return false;
             break;

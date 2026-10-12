@@ -243,11 +243,22 @@ typedef enum {
     CUI_DRAW_CLIP_POP,
     CUI_DRAW_IMAGE
 } cui_draw_type;
+typedef enum {
+    CUI_TEXT_WEIGHT_NORMAL,
+    CUI_TEXT_WEIGHT_MEDIUM,
+    CUI_TEXT_WEIGHT_SEMIBOLD,
+    CUI_TEXT_WEIGHT_BOLD
+} cui_text_weight;
+typedef struct {
+    cui_text_weight weight;
+    bool italic, monospace;
+} cui_text_style;
 typedef struct {
     cui_draw_type type;
     cui_rect bounds;
     cui_color color;
     float radius, stroke, font_size;
+    cui_text_style text_style;
     cui_str text;
     cui_corner_radii corner_radii;
     cui_border_edges border_edges;
@@ -263,10 +274,13 @@ typedef struct {
     float width, height;
 } cui_size;
 typedef cui_size (*cui_measure_fn)(void *user, cui_str text, float font_size);
+typedef cui_size (*cui_measure_styled_fn)(void *user, cui_str text, float font_size,
+                                          cui_text_style style);
 typedef struct {
     float width, height;
     size_t max_elements, max_commands, frame_bytes;
     cui_measure_fn measure;
+    cui_measure_styled_fn measure_styled; /* Preferred for regular and styled text. */
     void *measure_user;
     /* Context resources: zero selects 128 slots and 1 MiB of payload storage.
      * Nested allocations owned by payloads require their own explicit limits. */
@@ -310,8 +324,13 @@ void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
 /* Explicit logical line height; zero selects the measured natural line height. */
 void cui_text_with_line_height(cui_context *, cui_str, float font_size, cui_color,
                                float line_height);
+void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_height,
+                 cui_text_style);
 /* Uses the same configured font measurement as layout; no frame allocation. */
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
+cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);
+/* Call after changing a host font registry or styled measurement policy. */
+void cui_text_metrics_changed(cui_context *);
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */

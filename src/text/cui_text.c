@@ -11,7 +11,18 @@ struct cui_font {
     FT_Library library;
     FT_Face face;
     hb_font_t *shaper;
+    struct cui_font *variants[4][2][2];
+    bool owns_variant[4][2][2];
 };
+static bool valid_style(cui_text_style style) {
+    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
+}
+static cui_font *selected(cui_font *font, cui_text_style style) {
+    if (!font || !valid_style(style))
+        return NULL;
+    cui_font *variant = font->variants[style.weight][style.italic][style.monospace];
+    return variant ? variant : font;
+}
 cui_font *cui_font_open(const char *path) {
     cui_font *f = calloc(1, sizeof(*f));
     if (!f)
@@ -30,6 +41,11 @@ cui_font *cui_font_open(const char *path) {
 void cui_font_close(cui_font *f) {
     if (!f)
         return;
+    for (size_t weight = 0; weight < 4; weight++)
+        for (size_t italic = 0; italic < 2; italic++)
+            for (size_t mono = 0; mono < 2; mono++)
+                if (f->owns_variant[weight][italic][mono])
+                    cui_font_close(f->variants[weight][italic][mono]);
     if (f->shaper)
         hb_font_destroy(f->shaper);
     if (f->face)
@@ -37,6 +53,36 @@ void cui_font_close(cui_font *f) {
     if (f->library)
         FT_Done_FreeType(f->library);
     free(f);
+}
+bool cui_font_set_style(cui_font *font, cui_text_style style, cui_font *variant) {
+    if (!font || !valid_style(style) ||
+        (style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic && !style.monospace) ||
+        font == variant)
+        return false;
+    cui_font **slot = &font->variants[style.weight][style.italic][style.monospace];
+    bool *owned = &font->owns_variant[style.weight][style.italic][style.monospace];
+    if (*slot == variant)
+        return true;
+    if (*owned)
+        cui_font_close(*slot);
+    *slot = variant;
+    *owned = false;
+    return true;
+}
+bool cui_font_register_style(cui_font *font, cui_text_style style, const char *path) {
+    if (!font || !valid_style(style) ||
+        (style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic && !style.monospace) || !path)
+        return false;
+    cui_font *variant = cui_font_open(path);
+    if (!variant)
+        return false;
+    cui_font **slot = &font->variants[style.weight][style.italic][style.monospace];
+    bool *owned = &font->owns_variant[style.weight][style.italic][style.monospace];
+    if (*owned)
+        cui_font_close(*slot);
+    *slot = variant;
+    *owned = true;
+    return true;
 }
 static hb_buffer_t *shape(cui_font *f, cui_str s, float size) {
     if (!f || !isfinite(size) || size <= 0 || size > 4096 || s.length > INT_MAX ||
@@ -51,9 +97,9 @@ static hb_buffer_t *shape(cui_font *f, cui_str s, float size) {
     hb_shape(f->shaper, b, NULL, 0);
     return b;
 }
-cui_size cui_font_measure(void *font, cui_str s, float size) {
+cui_size cui_font_measure_styled(void *font, cui_str s, float size, cui_text_style style) {
     cui_size result = {0, 0};
-    cui_font *f = font;
+    cui_font *f = selected(font, style);
     hb_buffer_t *b = shape(f, s, size);
     if (!b)
         return result;
@@ -66,10 +112,14 @@ cui_size cui_font_measure(void *font, cui_str s, float size) {
     hb_buffer_destroy(b);
     return result;
 }
-bool cui_font_draw(cui_font *f, cui_str s, float size, float x, float y, cui_glyph_fn emit,
-                   void *user) {
+cui_size cui_font_measure(void *font, cui_str s, float size) {
+    return cui_font_measure_styled(font, s, size, (cui_text_style){0});
+}
+bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style style, float x,
+                          float y, cui_glyph_fn emit, void *user) {
     if (!isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f)
         return false;
+    cui_font *f = selected(font, style);
     hb_buffer_t *b = shape(f, s, size);
     if (!b || !emit) {
         if (b)
@@ -101,4 +151,8 @@ bool cui_font_draw(cui_font *f, cui_str s, float size, float x, float y, cui_gly
     }
     hb_buffer_destroy(b);
     return ok;
+}
+bool cui_font_draw(cui_font *f, cui_str s, float size, float x, float y, cui_glyph_fn emit,
+                   void *user) {
+    return cui_font_draw_styled(f, s, size, (cui_text_style){0}, x, y, emit, user);
 }

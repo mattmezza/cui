@@ -19,6 +19,56 @@ static cui_interaction control(cui_context *ui, cui_id id, bool disabled) {
 static void begin(cui_context *ui) {
     assert(cui_begin_frame(ui, 300, 200, 0.016f));
 }
+static cui_size styled_measure(void *user, cui_str text, float size, cui_text_style style) {
+    float scale = *(float *)user;
+    return (cui_size){text.length *
+                          (10 + 3 * style.weight + 2 * style.italic + 7 * style.monospace) * scale,
+                      size + style.weight};
+}
+static void test_styled_text_pipeline(void) {
+    float scale = 1;
+    cui_context *ui = cui_create((cui_config){
+        .width = 300, .height = 200, .measure_styled = styled_measure, .measure_user = &scale});
+    assert(ui);
+    cui_text_style bold = {.weight = CUI_TEXT_WEIGHT_BOLD};
+    cui_text_style mono = {.monospace = true, .italic = true};
+    assert(cui_measure_text_ex(ui, cui_string("abc"), 14, bold).width == 57);
+    assert(cui_measure_text_ex(ui, cui_string("abc"), 14, mono).width == 57);
+    assert(cui_measure_text(ui, cui_string("abc"), 14).width == 30);
+    assert(cui_measure_text_ex(ui, cui_string("abc"), 14,
+                               (cui_text_style){.weight = (cui_text_weight)99})
+               .width == 0);
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_text_ex(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255}, 30, bold);
+    cui_text_ex(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255}, 0, mono);
+    cui_text(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255});
+    cui_draw_list draw = cui_end_frame(ui);
+    size_t seen = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_draw_command c = draw.commands[i];
+            if (seen == 0)
+                assert(c.text_style.weight == CUI_TEXT_WEIGHT_BOLD && c.bounds.w == 57 &&
+                       c.bounds.y > 0);
+            else if (seen == 1)
+                assert(c.text_style.monospace && c.text_style.italic && c.bounds.w == 57);
+            else
+                assert(c.text_style.weight == CUI_TEXT_WEIGHT_NORMAL && !c.text_style.italic &&
+                       !c.text_style.monospace && c.bounds.w == 30);
+            seen++;
+        }
+    assert(seen == 3 && cui_last_error(ui) == CUI_OK);
+    scale = 2;
+    cui_text_metrics_changed(ui);
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_text_ex(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255}, 0, bold);
+    draw = cui_end_frame(ui);
+    bool doubled = false;
+    for (size_t i = 0; i < draw.count; i++)
+        doubled |= draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].bounds.w == 114;
+    assert(doubled && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void queue(cui_context *ui, cui_event_type type, float x, float y, cui_key key,
                   unsigned mods) {
     assert(cui_queue_event(
@@ -2041,6 +2091,7 @@ static void test_bitmap_underlay(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    test_styled_text_pipeline();
     test_bitmap_underlay();
     test_context_resources();
     test_scoped_focus_and_consumption();

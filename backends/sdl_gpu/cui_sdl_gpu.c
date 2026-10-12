@@ -355,8 +355,8 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
         } break;
         case CUI_DRAW_TEXT:
             r->ink = c->color;
-            if (!r->font ||
-                !cui_font_draw(r->font, c->text, c->font_size, c->bounds.x, c->bounds.y, glyph, r))
+            if (!r->font || !cui_font_draw_styled(r->font, c->text, c->font_size, c->text_style,
+                                                  c->bounds.x, c->bounds.y, glyph, r))
                 return false;
             break;
         case CUI_DRAW_CLIP_PUSH: {

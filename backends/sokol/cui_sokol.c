@@ -551,8 +551,9 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
         case CUI_DRAW_TEXT:
 #ifdef CUI_HAS_TEXT
             r->ink = c->color;
-            if (!r->config.font || !cui_font_draw(r->config.font, c->text, c->font_size,
-                                                  c->bounds.x, c->bounds.y, glyph, r))
+            if (!r->config.font ||
+                !cui_font_draw_styled(r->config.font, c->text, c->font_size, c->text_style,
+                                      c->bounds.x, c->bounds.y, glyph, r))
                 return fail(r, "CUI Sokol font shaping failed");
 #else
             return fail(r, "CUI Sokol text support is disabled");

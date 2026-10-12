@@ -51,6 +51,7 @@ typedef struct {
 } cui_core_bounds_track;
 typedef struct {
     float size, line_height;
+    cui_text_style style;
 } cui_core_text_style;
 typedef struct {
     cui_id owner, namespace_id;
@@ -131,23 +132,40 @@ static bool cui_core_active(cui_context *ui) {
     cui_core_select_context(ui);
     return true;
 }
-cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
-    if (!ui || (!text.data && text.length) || !isfinite(size) || size <= 0)
+static bool cui_core_text_style_valid(cui_text_style style) {
+    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
+}
+cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text_style style) {
+    if (!ui || (!text.data && text.length) || !isfinite(size) || size <= 0 ||
+        !cui_core_text_style_valid(style))
         return (cui_size){0};
     size = fminf(size, 65535);
-    cui_size result = ui->config.measure ? ui->config.measure(ui->config.measure_user, text, size)
-                                         : (cui_size){text.length * size * .6f, size * 1.3f};
+    cui_size result = ui->config.measure_styled
+                          ? ui->config.measure_styled(ui->config.measure_user, text, size, style)
+                      : ui->config.measure ? ui->config.measure(ui->config.measure_user, text, size)
+                                           : (cui_size){text.length * size * .6f, size * 1.3f};
     if (!isfinite(result.width) || !isfinite(result.height) || result.width < 0 ||
         result.height < 0)
         return (cui_size){0};
     return result;
 }
+cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
+    return cui_measure_text_ex(ui, text, size, (cui_text_style){0});
+}
+void cui_text_metrics_changed(cui_context *ui) {
+    if (!ui || ui->in_frame)
+        return;
+    cui_core_select_context(ui);
+    Clay_ResetMeasureTextCache();
+    cui_invalidate(ui);
+}
 static Clay_Dimensions cui_core_measure(Clay_StringSlice s, Clay_TextElementConfig *c, void *u) {
     cui_context *ui = u;
     cui_core_text_style style = c->fontId && c->fontId <= ui->text_style_count
                                     ? ui->text_styles[c->fontId - 1]
-                                    : (cui_core_text_style){c->fontSize, 0};
-    cui_size z = cui_measure_text(ui, (cui_str){s.chars, (size_t)s.length}, style.size);
+                                    : (cui_core_text_style){c->fontSize, 0, {0}};
+    cui_size z =
+        cui_measure_text_ex(ui, (cui_str){s.chars, (size_t)s.length}, style.size, style.style);
     return (Clay_Dimensions){z.width, style.line_height > 0 ? style.line_height : z.height};
 }
 
@@ -950,20 +968,26 @@ static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
     ui->string_used += s.length + 1;
     return (cui_str){p, s.length};
 }
-static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_height) {
+static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_height,
+                                       cui_text_style style) {
     for (size_t i = 0; i < ui->text_style_count; i++)
-        if (ui->text_styles[i].size == size && ui->text_styles[i].line_height == line_height)
+        if (ui->text_styles[i].size == size && ui->text_styles[i].line_height == line_height &&
+            ui->text_styles[i].style.weight == style.weight &&
+            ui->text_styles[i].style.italic == style.italic &&
+            ui->text_styles[i].style.monospace == style.monospace)
             return (uint16_t)(i + 1);
     if (ui->text_style_count == ui->text_style_capacity) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
         return 0;
     }
-    ui->text_styles[ui->text_style_count++] = (cui_core_text_style){size, line_height};
+    ui->text_styles[ui->text_style_count++] = (cui_core_text_style){size, line_height, style};
     return (uint16_t)ui->text_style_count;
 }
-void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
-                               float line_height) {
+void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                 cui_text_style text_style) {
     if (!cui_core_active(ui))
+        return;
+    if (!cui_core_text_style_valid(text_style))
         return;
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
         return;
@@ -973,9 +997,10 @@ void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color
     }
     size = isfinite(size) ? fminf(65535, fmaxf(0, size)) : 0;
     line_height = isfinite(line_height) ? fminf(65535, fmaxf(0, line_height)) : 0;
-    bool fractional = size != floorf(size) || line_height != floorf(line_height);
-    uint16_t style = fractional ? cui_core_text_style_id(ui, size, line_height) : 0;
-    if (fractional && !style)
+    bool special = size != floorf(size) || line_height != floorf(line_height) ||
+                   text_style.weight || text_style.italic || text_style.monospace;
+    uint16_t style = special ? cui_core_text_style_id(ui, size, line_height, text_style) : 0;
+    if (special && !style)
         return;
     ui->element_count++;
     t = cui_core_copy_string(ui, t);
@@ -988,6 +1013,10 @@ void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color
                                  .fontId = style,
                                  .lineHeight = style ? 0 : cui_core_scalar(line_height),
                                  .textColor = {c.r, c.g, c.b, c.a}});
+}
+void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
+                               float line_height) {
+    cui_text_ex(ui, t, size, c, line_height, (cui_text_style){0});
 }
 void cui_text(cui_context *ui, cui_str text, float size, cui_color color) {
     cui_text_with_line_height(ui, text, size, color, 0);
@@ -1226,8 +1255,9 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             if (c->renderData.text.fontId && c->renderData.text.fontId <= ui->text_style_count) {
                 cui_core_text_style style = ui->text_styles[c->renderData.text.fontId - 1];
                 d.font_size = style.size;
+                d.text_style = style.style;
                 if (style.line_height > 0) {
-                    float natural = cui_measure_text(ui, d.text, style.size).height;
+                    float natural = cui_measure_text_ex(ui, d.text, style.size, style.style).height;
                     d.bounds.y += (style.line_height - natural) * .5f;
                 }
             }

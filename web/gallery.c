@@ -19,6 +19,7 @@
 #include "cui/cui_status.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
+#include "cui/cui_toolbar.h"
 #include "cui/cui_virtual.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,40 @@ static cui_resizable_slot resizable_slots[2];
 static cui_resizable_state resizable_state;
 static int icon_choice, icon_size = CUI_ICON_MEDIUM, icon_rotate, icon_color, icon_loaded = -1;
 static cui_icon_state icon_state;
+static int toolbar_size = CUI_TOOLBAR_MEDIUM, toolbar_grouped = 1, toolbar_show_input = 1;
+static bool toolbar_disabled;
+static unsigned toolbar_activations[4];
+static char toolbar_query_buffer[64] = "find";
+static cui_edit *toolbar_query;
+static cui_input_state toolbar_query_state;
+static void toolbar_activate(void *user) {
+    (*(unsigned *)user)++;
+}
+static void toolbar_query_render(cui_context *context, const cui_theme *theme,
+                                 const cui_toolbar_presentation *presentation, void *user) {
+    (void)presentation;
+    (void)user;
+    cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme, cui_string("Find"),
+                 toolbar_query, &toolbar_query_state,
+                 (cui_input_options){.width = 112,
+                                     .placeholder = cui_string("Find"),
+                                     .disabled = toolbar_disabled});
+}
+static void toolbar_group_render(cui_context *context, const cui_theme *theme,
+                                 const cui_toolbar_presentation *presentation, void *user) {
+    cui_toolbar_command *commands = user;
+    cui_toolbar_item items[2] = {{.id = cui_id_from(context, "toolbar-bold-wrap"),
+                                  .sized = true,
+                                  .render = cui_toolbar_command_render,
+                                  .user = &commands[0]},
+                                 {.id = cui_id_from(context, "toolbar-italic-wrap"),
+                                  .sized = true,
+                                  .render = cui_toolbar_command_render,
+                                  .user = &commands[1]}};
+    cui_toolbar_group(context, cui_id_from(context, "toolbar-format-group"), theme, items, 2,
+                      (cui_toolbar_options){.size = presentation->metrics.size,
+                                            .label = cui_string("Formatting")});
+}
 static void resizable_content(cui_context *context, void *user) {
     cui_label(context, &current_theme, cui_string((uintptr_t)user == 0 ? "Explorer" : "Editor"));
 }
@@ -514,6 +549,10 @@ int gallery_init(void) {
     if (ui)
         return 1;
     cui_icon_state_init(&icon_state);
+    toolbar_query = cui_edit_create((cui_edit_config){.buffer = toolbar_query_buffer,
+                                                      .capacity = sizeof(toolbar_query_buffer)});
+    if (!toolbar_query)
+        return 0;
     if (!cui_resizable_state_init(&resizable_state, resizable_slots, 2))
         return 0;
     ui = cui_create((cui_config){.width = 720,
@@ -783,6 +822,44 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         cui_icon(ui, cui_id_from(ui, "icon-preview"), &t, &icon_state, options);
         cui_label(ui, &t, cui_string(names[icon_choice]));
+        break;
+    }
+    case 68: {
+        toolbar_disabled = disabled != 0;
+        const char *labels[] = {"Save", "Undo", "Bold", "Italic"};
+        cui_toolbar_command commands[4];
+        for (unsigned i = 0; i < 4; i++)
+            commands[i] = (cui_toolbar_command){.id = cui_id_from(ui, labels[i]),
+                                                .label = cui_string(labels[i]),
+                                                .disabled = toolbar_disabled,
+                                                .on_activate = toolbar_activate,
+                                                .activate_user = &toolbar_activations[i]};
+        cui_toolbar_item items[5];
+        size_t count = 0;
+        for (unsigned i = 0; i < 2; i++)
+            items[count++] =
+                (cui_toolbar_item){.id = cui_id_from(ui, i ? "undo-wrap" : "save-wrap"),
+                                   .sized = true,
+                                   .render = cui_toolbar_command_render,
+                                   .user = &commands[i]};
+        if (toolbar_grouped) {
+            items[count++] =
+                (cui_toolbar_item){.render = toolbar_group_render, .user = &commands[2]};
+        } else {
+            for (unsigned i = 2; i < 4; i++)
+                items[count++] =
+                    (cui_toolbar_item){.id = cui_id_from(ui, i == 2 ? "bold-wrap" : "italic-wrap"),
+                                       .sized = true,
+                                       .render = cui_toolbar_command_render,
+                                       .user = &commands[i]};
+        }
+        if (toolbar_show_input)
+            items[count++] = (cui_toolbar_item){.render = toolbar_query_render};
+        cui_toolbar(ui, cui_id_from(ui, "toolbar-preview"), &t, items, count,
+                    (cui_toolbar_options){.size = (cui_toolbar_size)toolbar_size,
+                                          .custom_size = 20,
+                                          .label = cui_string("Editing toolbar"),
+                                          .disabled = disabled != 0});
         break;
     }
     case 0: {
@@ -2054,6 +2131,18 @@ float gallery_icon_stats(unsigned field) {
     default:
         return 0;
     }
+}
+void gallery_toolbar_options(int size, int grouped, int show_input) {
+    toolbar_size =
+        size >= CUI_TOOLBAR_SMALL && size <= CUI_TOOLBAR_CUSTOM ? size : CUI_TOOLBAR_MEDIUM;
+    toolbar_grouped = grouped != 0;
+    toolbar_show_input = show_input != 0;
+}
+unsigned gallery_toolbar_activations(unsigned index) {
+    return index < 4 ? toolbar_activations[index] : 0;
+}
+unsigned gallery_toolbar_cursor(void) {
+    return toolbar_query ? (unsigned)cui_edit_get_state(toolbar_query).cursor : 0;
 }
 unsigned gallery_count(void) {
     return (unsigned)draw.count;

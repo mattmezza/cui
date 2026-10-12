@@ -213,6 +213,44 @@ def main():
             control_change('icon-rotate', True)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) > 24
             assert page.locator('#accessible [role=img]').count() == 0
+            page.evaluate('location.hash="Toolbar"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Toolbar"')
+            toolbar = page.locator('#accessible [role=toolbar][aria-label="Editing toolbar"]')
+            assert toolbar.get_attribute('aria-orientation') == 'horizontal'
+            assert page.locator('#accessible [role=group][aria-label="Formatting"]').count() == 1
+            assert all(semantic_index(name, 1) is not None for name in ('Save', 'Undo', 'Bold', 'Italic'))
+            bar = semantic_index('Editing toolbar', 39)
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', bar)-48) < 1
+            saved = page.evaluate('cuiGallery.exports.gallery_toolbar_activations(0)')
+            click_semantic('Save', 1)
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_toolbar_activations(0)===n+1', arg=saved)
+            page.keyboard.press('ArrowRight')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=semantic_index('Undo', 1))
+            control_change('toolbar-input', False)
+            assert semantic_index('Find', 6) is None
+            click_semantic('Italic', 1)
+            page.keyboard.press('ArrowRight')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=semantic_index('Save', 1))
+            control_change('toolbar-grouped', False)
+            assert page.locator('#accessible [role=group][aria-label="Formatting"]').count() == 0
+            assert semantic_index('Bold', 1) is not None
+            control_change('toolbar-size', '0')
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-32) < 1
+            control_change('toolbar-size', '1')
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-28) < 1
+            control_change('toolbar-size', '4')
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-48) < 1
+            control_change('toolbar-size', '2')
+            control_change('toolbar-input', True)
+            click_semantic('Find', 6)
+            page.keyboard.press('Home')
+            page.wait_for_function('cuiGallery.exports.gallery_toolbar_cursor()===0')
+            page.keyboard.press('ArrowRight')
+            page.wait_for_function('cuiGallery.exports.gallery_toolbar_cursor()===1')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', semantic_index('Find', 6)) == 1
+            control_change('disabled', True)
+            assert page.locator('#accessible [role=button][aria-label="Save"]').is_disabled()
+            control_change('disabled', False)
             page.evaluate('location.hash="Notification"')
             page.wait_for_function('cuiGallery.renderedComponent==="Notification"')
             control_change('notification-autohide', False)
@@ -1552,7 +1590,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 66 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 67 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

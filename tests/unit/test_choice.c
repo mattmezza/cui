@@ -2023,6 +2023,33 @@ static void test_tab_drag_reorder(void) {
         cui_destroy(ui);
     }
 }
+static cui_size counting_tab_measure(void *user, cui_str text, float font_size) {
+    unsigned *calls = user;
+    (*calls)++;
+    return (cui_size){.width = (float)text.length * 10, .height = font_size};
+}
+static void test_long_tab_label_measurement(void) {
+    unsigned calls = 0;
+    cui_context *ui = cui_create((cui_config){
+        .width = 640, .height = 480, .measure = counting_tab_measure, .measure_user = &calls});
+    assert(ui);
+    char label[4096];
+    memset(label, 'a', sizeof(label));
+    cui_choice_item entry = {10, {label, sizeof(label)}, false};
+    cui_id value = 10;
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_tabs(ui, 1, &theme, &entry, 1, &value, (cui_tabs_options){.max_width = 100}, NULL, NULL);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && cui_bounds(ui, 10).w == 100);
+    assert(calls < 64); /* Long labels do not remeasure each shorter prefix. */
+    bool marker = false;
+    for (size_t i = 0; i < draw.count; i++)
+        marker |= draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 3 &&
+                  memcmp(draw.commands[i].text.data, "\xe2\x80\xa6", 3) == 0;
+    assert(marker);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -2051,6 +2078,7 @@ int main(void) {
     test_tab_scrolling();
     test_tab_overflow_menu();
     test_tab_drag_reorder();
+    test_long_tab_label_measurement();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

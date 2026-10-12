@@ -12,13 +12,25 @@ static void cui_choice_ellipsized_text(cui_context *ui, cui_str label, float fon
     float marker_width = cui_measure_text(ui, ellipsis, font_size).width;
     if (marker_width > width)
         return;
-    size_t bytes = label.length;
-    while (bytes &&
-           cui_measure_text(ui, (cui_str){label.data, bytes}, font_size).width + marker_width >
-               width) {
-        bytes--;
-        while (bytes && ((unsigned char)label.data[bytes] & 0xc0) == 0x80)
-            bytes--;
+    size_t bytes = 0, upper = label.length;
+    while (bytes < upper) {
+        size_t middle = bytes + (upper - bytes + 1) / 2;
+        while (middle < label.length && middle &&
+               ((unsigned char)label.data[middle] & 0xc0) == 0x80)
+            middle--;
+        if (middle <= bytes) {
+            middle = bytes + 1;
+            while (middle < label.length && ((unsigned char)label.data[middle] & 0xc0) == 0x80)
+                middle++;
+        }
+        if (cui_measure_text(ui, (cui_str){label.data, middle}, font_size).width + marker_width <=
+            width)
+            bytes = middle;
+        else {
+            upper = middle - 1;
+            while (upper && ((unsigned char)label.data[upper] & 0xc0) == 0x80)
+                upper--;
+        }
     }
     cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 0});
     if (bytes)

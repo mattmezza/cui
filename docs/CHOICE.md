@@ -449,3 +449,9 @@ follow the same ownership. Per-corner/per-edge core primitives carry this shape
 through renderer adapters. As upstream does, these half-specific corner rules
 also apply when a half is omitted. Draw-list tests inspect all corners and border
 edges across all five variants, three sizes and four supplied themes.
+
+Built-in tab ellipsis finds a fitting codepoint prefix with binary search rather
+than remeasuring every shorter prefix. A 4096-byte label test instruments the
+configured font measurer and asserts fewer than 64 total measurement calls while
+verifying the capped width and rendered ellipsis. Width search assumes monotonic
+prefix advances; advanced grapheme/bidi truncation remains a text-layer gap.

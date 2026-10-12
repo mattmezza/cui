@@ -462,9 +462,7 @@ it uses a low-opacity variant-colored surface, stronger hover/selected surfaces,
 variant-colored text/border and muted disabled styling. The existing OUTLINE
 variant remains available for the neutral outline. Tests cover the fourth size
 across all theme/variant pairs, plus real hover/action activation and selected/
-disabled outline surfaces. Upstream warning/success/info and link/text/default/
-custom Button styles remain missing from the split facade; warning/success/info
-also lack corresponding semantic colors in the current public theme.
+disabled outline surfaces. All named upstream Button variants are now exposed.
 
 `action_selected` preserves an inner action button's selected appearance and
 surfaces both halves, combined with outer `selected`. `action_outline` preserves
@@ -510,14 +508,16 @@ themes, filled/outline labels and actual action/menu activation across eight
 variants and four sizes.
 
 Default, Link, Text and Custom Dropdown variants complete the named presentation
-choices. Default uses theme surface/text/border, Link uses theme primary with a
+choices. Default uses its configurable theme Button palette, Link uses its
+normal/hover/active theme Link colors with a
 measured underline, and Text uses a transparent background with a slightly faded
 resting label. Link/Text stay transparent on hover and selection. Custom accepts
 portable `color`, `foreground`, `hover` and `active` colors shared by both halves;
-selection and held pointer/Space capture use active, and orthogonal outline uses the custom color with the same
-translucent state levels as intent outlines. A custom content callback owns its
+selection and held pointer/Space capture use active. Custom normal uses color
+with .8 opacity; hover and active use the corresponding supplied colors, including
+when outlined. A custom content callback owns its
 label decoration; built-in Link labels and the menu indicator are underlined.
-Exact upstream default/link token palettes and custom shadows remain unfinished.
+Custom shadows and rich gradient backgrounds remain unfinished.
 
 Link refines both halves to the Link semantic role while retaining the split
 action and menu activation contract. Custom active color survives held capture
@@ -553,3 +553,18 @@ Re-entering an already open submenu trigger preserves its child scroll window
 and active row instead of rebuilding that level. This also retains deeper open
 paths; changing to another parent or scrolling a parent still closes/replaces
 the affected child. A pointer test verifies re-entry after child wheel scrolling.
+
+Dropdown now consumes `theme.buttons` independently configurable filled and
+outlined normal/hover/active backgrounds, foregrounds and borders for each
+intent and Default. OUTLINE selects the Default outline palette. Default and
+outlined buttons draw borders; filled intents follow the reference borderless
+appearance. Link uses its three theme foreground tokens; Text uses .9/1/.7
+foreground opacity for normal/hover/active. Ghost pair hover/menu-held idle
+surface uses half-opacity accent while the hovered half uses full accent, and
+selected uses the secondary active surface. Disabled styles derive opacity from
+the normal tokens, and loading preserves normal color with .8 opacity while
+blocking action activation. Arbitrarily distinct palette tests prove that hover,
+held active, selected, outlined and disabled states use the configured values
+without deriving their RGB colors from another state. Custom outline border
+currently changes alpha without reproducing upstream Oklab white mixing; rich
+backgrounds and custom shadow painting remain explicit gaps.

@@ -1492,8 +1492,8 @@ static void test_dropdown_button(void) {
                 }
                 if (variant != CUI_DROPDOWN_BUTTON_LINK && variant != CUI_DROPDOWN_BUTTON_TEXT)
                     assert(left_shape && right_shape);
-                if (variant != CUI_DROPDOWN_BUTTON_GHOST && variant != CUI_DROPDOWN_BUTTON_LINK &&
-                    variant != CUI_DROPDOWN_BUTTON_TEXT)
+                if (variant == CUI_DROPDOWN_BUTTON_OUTLINE ||
+                    variant == CUI_DROPDOWN_BUTTON_DEFAULT)
                     assert(left_border && right_border);
                 size_t count = 0;
                 const cui_semantic *semantics = cui_semantics(ui, &count);
@@ -1587,15 +1587,19 @@ static void test_dropdown_inheritance_and_ghost_pair(void) {
             ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = bounds.x + 2, .y = bounds.y + 2}));
         dropdown_scene(ui, &state, &action, &theme, options);
         assert(dropdown_surface(ui, 2001).a && dropdown_surface(ui, 2002).a);
-        assert(same_color(dropdown_surface(ui, id == 2001 ? 2002 : 2001), theme.surface));
+        cui_color idle = theme.accent;
+        idle.a /= 2;
+        assert(same_color(dropdown_surface(ui, id == 2001 ? 2002 : 2001), idle));
     }
     click(ui, 2002);
     dropdown_scene(ui, &state, &action, &theme, options);
     assert(state.overlay.open);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
     dropdown_scene(ui, &state, &action, &theme, options);
-    assert(same_color(dropdown_surface(ui, 2001), theme.surface));
-    assert(same_color(dropdown_surface(ui, 2002), theme.surface));
+    cui_color held = theme.accent;
+    held.a /= 2;
+    assert(same_color(dropdown_surface(ui, 2001), held));
+    assert(same_color(dropdown_surface(ui, 2002), held));
     key(ui, CUI_KEY_ESCAPE);
     dropdown_scene(ui, &state, &action, &theme, options);
     assert(!state.overlay.open && dropdown_surface(ui, 2001).a == 0 &&
@@ -2080,7 +2084,7 @@ static void test_dropdown_colored_outline(void) {
             assert(cui_queue_event(
                 ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
             dropdown_scene(ui, &state, &action, &themes[t], options);
-            assert(dropdown_surface(ui, 2001).a == 26 && dropdown_surface(ui, 2002).a == 26);
+            assert(dropdown_surface(ui, 2001).a == 25 && dropdown_surface(ui, 2002).a == 25);
             cui_color expected = variants[v] == CUI_DROPDOWN_BUTTON_PRIMARY   ? themes[t].primary
                                  : variants[v] == CUI_DROPDOWN_BUTTON_DANGER  ? themes[t].danger
                                  : variants[v] == CUI_DROPDOWN_BUTTON_WARNING ? themes[t].warning
@@ -2117,7 +2121,7 @@ static void test_dropdown_colored_outline(void) {
                 ui,
                 (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = bounds.x + 2, .y = bounds.y + 2}));
             dropdown_scene(ui, &state, &action, &themes[t], options);
-            assert(dropdown_surface(ui, 2001).a == 51 && dropdown_surface(ui, 2002).a == 26);
+            assert(dropdown_surface(ui, 2001).a == 51 && dropdown_surface(ui, 2002).a == 25);
             options.selected = true;
             dropdown_scene(ui, &state, &action, &themes[t], options);
             assert(dropdown_surface(ui, 2001).a == 102 && dropdown_surface(ui, 2002).a == 102);
@@ -2125,7 +2129,7 @@ static void test_dropdown_colored_outline(void) {
             assert(dropdown_scene(ui, &state, &action, &themes[t], options).action_activated);
             options.disabled = true;
             dropdown_scene(ui, &state, &action, &themes[t], options);
-            assert(dropdown_surface(ui, 2001).a == 51 && dropdown_surface(ui, 2002).a == 51);
+            assert(dropdown_surface(ui, 2001).a == 12 && dropdown_surface(ui, 2002).a == 12);
             cui_destroy(ui);
         }
 }
@@ -2142,8 +2146,10 @@ static void test_dropdown_inner_button_presentation(void) {
         .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
     dropdown_scene(ui, &state, &action, &theme, options);
-    assert(same_color(dropdown_surface(ui, 2001), theme.primary));
-    assert(same_color(dropdown_surface(ui, 2002), theme.primary));
+    assert(
+        same_color(dropdown_surface(ui, 2001), theme.buttons[CUI_THEME_BUTTON_SECONDARY].active));
+    assert(
+        same_color(dropdown_surface(ui, 2002), theme.buttons[CUI_THEME_BUTTON_SECONDARY].active));
     size_t count;
     const cui_semantic *semantics = cui_semantics(ui, &count);
     for (size_t i = 0; i < count; i++)
@@ -2154,7 +2160,7 @@ static void test_dropdown_inner_button_presentation(void) {
     options.variant = CUI_DROPDOWN_BUTTON_DANGER;
     options.action_outline = true;
     dropdown_scene(ui, &state, &action, &theme, options);
-    assert(dropdown_surface(ui, 2001).a == 26);
+    assert(dropdown_surface(ui, 2001).a == 25);
     assert(same_color(dropdown_surface(ui, 2002), theme.danger));
     bool action_color = false, trigger_color = false;
     for (size_t i = 0; i < dropdown_draw.count; i++) {
@@ -2162,12 +2168,12 @@ static void test_dropdown_inner_button_presentation(void) {
         if (command.type != CUI_DRAW_TEXT)
             continue;
         action_color |= command.text.length == 4 && same_color(command.color, theme.danger);
-        trigger_color |= command.text.length == 1 && same_color(command.color, theme.on_primary);
+        trigger_color |= command.text.length == 1 && same_color(command.color, theme.on_danger);
     }
     assert(action_color && trigger_color);
     options.outline = true;
     dropdown_scene(ui, &state, &action, &theme, options);
-    assert(dropdown_surface(ui, 2001).a == 26 && dropdown_surface(ui, 2002).a == 26);
+    assert(dropdown_surface(ui, 2001).a == 25 && dropdown_surface(ui, 2002).a == 25);
     click(ui, 2002);
     dropdown_scene(ui, &state, &action, &theme, options);
     assert(state.overlay.open);
@@ -2356,6 +2362,8 @@ static void test_dropdown_presentation_variants(void) {
             cui_color expected = v == CUI_DROPDOWN_BUTTON_CUSTOM    ? options.custom.color
                                  : v == CUI_DROPDOWN_BUTTON_DEFAULT ? themes[t].surface
                                                                     : (cui_color){0};
+            if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
+                expected.a = (uint8_t)(expected.a * .8f);
             if (transparent)
                 assert(dropdown_surface(ui, 2001).a == 0);
             else
@@ -2418,7 +2426,7 @@ static void test_dropdown_presentation_variants(void) {
             options.outline = true;
             dropdown_scene(ui, &state, &action, &themes[t], options);
             if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
-                assert(dropdown_surface(ui, 2001).a == 102);
+                assert(dropdown_surface(ui, 2001).a == options.custom.active.a);
             cui_destroy(ui);
         }
 }
@@ -2576,7 +2584,63 @@ static void test_menu_pointer_drag_scroll(void) {
     menu_drag_enabled = false;
     cui_destroy(ui);
 }
+static void test_dropdown_configurable_palettes(void) {
+    const cui_dropdown_button_variant variants[] = {
+        CUI_DROPDOWN_BUTTON_DEFAULT, CUI_DROPDOWN_BUTTON_PRIMARY, CUI_DROPDOWN_BUTTON_SECONDARY,
+        CUI_DROPDOWN_BUTTON_DANGER,  CUI_DROPDOWN_BUTTON_WARNING, CUI_DROPDOWN_BUTTON_SUCCESS,
+        CUI_DROPDOWN_BUTTON_INFO};
+    for (size_t kind = 0; kind < CUI_THEME_BUTTON_COUNT; kind++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        cui_theme_button_colors colors = {
+            {11, 12, 13, 255}, {21, 22, 23, 255},   {31, 32, 33, 255}, {111, 112, 113, 255},
+            {41, 42, 43, 111}, {51, 52, 53, 122},   {61, 62, 63, 133}, {71, 72, 73, 255},
+            {81, 82, 83, 255}, {121, 122, 123, 255}};
+        theme.buttons[kind] = colors;
+        cui_menu_tree_state state;
+        cui_menu_tree_init(&state, 2200);
+        cui_id action = 0;
+        cui_dropdown_button_options options = {
+            .variant = variants[kind],
+            .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+        assert(
+            cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(same_color(dropdown_surface(ui, 2001), colors.normal));
+        cui_rect bounds = cui_bounds(ui, 2001);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = bounds.x + 2, .y = bounds.y + 2}));
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(same_color(dropdown_surface(ui, 2001), colors.hover));
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = bounds.x + 2, .y = bounds.y + 2}));
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(same_color(dropdown_surface(ui, 2001), colors.active));
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+        assert(
+            cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
+        options.outline = true;
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(same_color(dropdown_surface(ui, 2001), colors.outline_normal));
+        bool label = false;
+        for (size_t i = 0; i < dropdown_draw.count; i++)
+            label |= dropdown_draw.commands[i].type == CUI_DRAW_TEXT &&
+                     dropdown_draw.commands[i].text.length == 4 &&
+                     same_color(dropdown_draw.commands[i].color, colors.outline_foreground);
+        assert(label);
+        options.selected = true;
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(same_color(dropdown_surface(ui, 2001), colors.outline_active));
+        options.disabled = true;
+        dropdown_scene(ui, &state, &action, &theme, options);
+        colors.outline_normal.a /= 2;
+        assert(same_color(dropdown_surface(ui, 2001), colors.outline_normal));
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_dropdown_configurable_palettes();
     test_hierarchical_menu_scroll();
     test_menu_pointer_drag_scroll();
     test_dropdown_presentation_variants();

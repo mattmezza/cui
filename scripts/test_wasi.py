@@ -29,6 +29,8 @@ SOURCES = (
     "src/components/cui_components.c",
     "src/base/cui_table.c",
     "src/components/cui_table.c",
+    "src/base/cui_message.c",
+    "src/components/cui_message.c",
     "src/base/cui_status.c",
     "src/components/cui_status.c",
     "src/base/cui_otp.c",
@@ -53,7 +55,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -175,6 +177,7 @@ def main() -> int:
         targets += [("input_base_only", ["tests/unit/test_input.c", "src/core/cui.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_INPUT_BASE_ONLY=1"])]
         targets += [("table_base_only", ["tests/unit/test_table.c", "src/core/cui.c", "src/base/cui_table.c", "src/base/cui_scroll.c"], False, ["-DCUI_TABLE_BASE_ONLY=1"])]
         targets += [("scroll_base_only", ["tests/unit/test_scroll.c", "src/core/cui.c", "src/base/cui_scroll.c"], False, ["-DCUI_SCROLL_BASE_ONLY=1"])]
+        targets += [("message_base_only", ["tests/unit/test_message.c", "src/base/cui_message.c", "src/base/cui_virtual.c", "src/base/cui_scroll.c", "src/core/cui.c"], False, ["-DCUI_MESSAGE_BASE_ONLY=1"])]
         targets += [("status_base_only", ["tests/unit/test_status.c", "src/base/cui_status.c"], False, ["-DCUI_STATUS_BASE_ONLY=1"])]
         targets += [("otp_base_only", ["tests/unit/test_otp.c", "src/core/cui.c", "src/base/cui_edit.c", "src/base/cui_otp.c"], False, ["-DCUI_OTP_BASE_ONLY=1"])]
         targets += [("form_base_only", ["tests/unit/test_form.c", "src/core/cui.c", "src/base/cui_form.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_FORM_BASE_ONLY=1"])]

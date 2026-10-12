@@ -136,6 +136,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_STATUS_IMPLEMENTATION
 #endif
 #include "cui_status.h"
+#ifndef CUI_MESSAGE_IMPLEMENTATION
+#define CUI_MESSAGE_IMPLEMENTATION
+#endif
+#include "cui_message.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

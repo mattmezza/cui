@@ -3,6 +3,7 @@
 #define CUI_MESSAGE_H
 #include "cui_content.h"
 #include "cui_scroll.h"
+#include "cui_virtual.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

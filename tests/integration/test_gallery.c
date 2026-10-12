@@ -2,11 +2,17 @@
 #include "../../gallery/main.c"
 #undef main
 #include <assert.h>
+#include <math.h>
 int main(void) {
-    cui_font *font = cui_font_open(font_path(NULL));
+    const char *path = font_path(NULL);
+    cui_font *font = cui_font_open(path);
     assert(font);
-    cui_context *ui = cui_create((cui_config){
-        .width = 680, .height = 740, .measure = cui_font_measure, .measure_user = font});
+    register_matching_font_styles(font, path);
+    cui_context *ui = cui_create((cui_config){.width = 680,
+                                              .height = 740,
+                                              .measure = cui_font_measure,
+                                              .measure_styled = cui_font_measure_styled,
+                                              .measure_user = font});
     assert(ui);
     char text[128] = "Workspace";
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = text, .capacity = sizeof(text)});
@@ -29,6 +35,20 @@ int main(void) {
                     cui_rect b = list.commands[i].bounds;
                     assert(b.x >= 0 && b.y >= 0 && b.x + b.w <= 680.1f && b.y + b.h <= 740.1f);
                 }
+            bool styled_heading = false;
+            for (size_t i = 0; i < list.count; i++) {
+                cui_draw_command command = list.commands[i];
+                if (command.type == CUI_DRAW_TEXT &&
+                    command.text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD &&
+                    command.text.length == strlen("CUI / component workbench") &&
+                    !memcmp(command.text.data, "CUI / component workbench", command.text.length)) {
+                    cui_size measured = cui_font_measure_styled(
+                        font, command.text, command.font_size, command.text_style);
+                    assert(fabsf(command.bounds.w - measured.width) < .1f);
+                    styled_heading = true;
+                }
+            }
+            assert(styled_heading);
         }
     }
     cui_focus(ui, id(ui, "volume"));

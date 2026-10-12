@@ -1,0 +1,9 @@
+# Styled text and font faces
+
+`cui_text_ex` and `cui_measure_text_ex` take `cui_text_style`: Normal, Medium, Semibold or Bold weight, plus independent italic and monospace flags. `cui_text_ex` also accepts an optional logical line height. The older `cui_text`, `cui_text_with_line_height` and `cui_measure_text` APIs use regular text. The style travels through Clay measurement and the draw list to the software, SDL3, SDL_GPU and Sokol renderers.
+
+Set `cui_config.measure_styled = cui_font_measure_styled` and `measure_user = font` when creating a context with a native `cui_font`. The renderer must use the same font object. The legacy `measure` callback remains available; if `measure_styled` is absent, layout uses that callback for every style. When no face is registered for a requested style, both native measurement and drawing use the regular face. CUI does not synthesize bold, italic or monospace glyphs from a regular face.
+
+Use `cui_font_register_style(font, style, path)` to open an actual variant owned by the regular font. A failed path leaves the previous registration intact; replacing a variant or closing the regular font releases the owned face. `cui_font_set_style(font, style, variant)` borrows a face opened by the caller. Keep borrowed faces alive through every frame that uses them, then close them separately. Call `cui_text_metrics_changed(ui)` between frames after changing registrations so Clay remeasures cached text.
+
+The gallery registers Noto Sans Medium, Semibold, Bold and Italic plus Noto Sans Mono only when the selected regular font is the known Noto Sans path. A custom `--font` or `CUI_FONT_PATH` retains its chosen family and uses regular fallback until the application registers matching variants. The renderer swap demos configure styled measurement with their selected font; they do not assume matching variant paths for custom fonts.

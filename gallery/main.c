@@ -19,7 +19,8 @@ static void label(cui_context *ui, const cui_theme *t, const char *s) {
     cui_label(ui, t, cui_string(s));
 }
 static void heading(cui_context *ui, const cui_theme *t, const char *s) {
-    cui_text(ui, cui_string(s), 24, t->text);
+    cui_text_ex(ui, cui_string(s), 24, t->text, 0,
+                (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD});
 }
 static void box(cui_context *ui, const char *key, float width, float height, bool row, float pad,
                 float gap, cui_color bg) {
@@ -219,6 +220,22 @@ static const char *font_path(const char *requested) {
     }
     return NULL;
 }
+static void register_matching_font_styles(cui_font *font, const char *path) {
+    /* Only use variants of the actual selected family. A custom --font or
+     * CUI_FONT_PATH keeps regular fallback unless it names this known face. */
+    if (!font || !path || strcmp(path, "/usr/share/fonts/noto/NotoSans-Regular.ttf"))
+        return;
+    (void)cui_font_register_style(font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_MEDIUM},
+                                  "/usr/share/fonts/noto/NotoSans-Medium.ttf");
+    (void)cui_font_register_style(font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD},
+                                  "/usr/share/fonts/noto/NotoSans-SemiBold.ttf");
+    (void)cui_font_register_style(font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD},
+                                  "/usr/share/fonts/noto/NotoSans-Bold.ttf");
+    (void)cui_font_register_style(font, (cui_text_style){.italic = true},
+                                  "/usr/share/fonts/noto/NotoSans-Italic.ttf");
+    (void)cui_font_register_style(font, (cui_text_style){.monospace = true},
+                                  "/usr/share/fonts/noto/NotoSansMono-Regular.ttf");
+}
 int main(int argc, char **argv) {
     bool headless = false, dark = false;
     unsigned smoke = 0, width = 1100, height = 740;
@@ -271,14 +288,17 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
-    cui_font *font = cui_font_open(font_path(requested_font));
+    const char *selected_font = font_path(requested_font);
+    cui_font *font = cui_font_open(selected_font);
     if (!font) {
         fprintf(stderr, "No usable font. Pass --font FILE or set CUI_FONT_PATH.\n");
         return 1;
     }
+    register_matching_font_styles(font, selected_font);
     cui_context *ui = cui_create((cui_config){.width = (float)width,
                                               .height = (float)height,
                                               .measure = cui_font_measure,
+                                              .measure_styled = cui_font_measure_styled,
                                               .measure_user = font});
     if (!ui) {
         cui_font_close(font);

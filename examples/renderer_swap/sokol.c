@@ -127,6 +127,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Text disabled: pass --font or set CUI_FONT_PATH.\n");
     } else {
         config.measure = cui_font_measure;
+        config.measure_styled = cui_font_measure_styled;
         config.measure_user = font;
     }
 #endif

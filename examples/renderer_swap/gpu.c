@@ -80,8 +80,11 @@ int main(int argc, char **argv) {
     gpu = cui_sdl_gpu_create(device, window, font);
     if (!gpu)
         goto cleanup;
-    ui = cui_create((cui_config){
-        .width = 720, .height = 480, .measure = cui_font_measure, .measure_user = font});
+    ui = cui_create((cui_config){.width = 720,
+                                 .height = 480,
+                                 .measure = cui_font_measure,
+                                 .measure_styled = cui_font_measure_styled,
+                                 .measure_user = font});
     if (!ui)
         goto cleanup;
     printf("SDL_GPU backend=%s video=%s\n", cui_sdl_gpu_driver(gpu), SDL_GetCurrentVideoDriver());

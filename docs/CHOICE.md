@@ -448,10 +448,20 @@ the trigger omits its left border, avoiding a doubled seam. Focus border widths
 follow the same ownership. Per-corner/per-edge core primitives carry this shape
 through renderer adapters. As upstream does, these half-specific corner rules
 also apply when a half is omitted. Draw-list tests inspect all corners and border
-edges across all five variants, three sizes and four supplied themes.
+edges across all five variants, four sizes and four supplied themes.
 
 Built-in tab ellipsis finds a fitting codepoint prefix with binary search rather
 than remeasuring every shorter prefix. A 4096-byte label test instruments the
 configured font measurer and asserts fewer than 64 total measurement calls while
 verifying the capped width and rendered ellipsis. Width search assumes monotonic
 prefix advances; advanced grapheme/bidi truncation remains a text-layer gap.
+
+DropdownButton also supports `CUI_DROPDOWN_BUTTON_XSMALL` at 0.625 of theme
+control metrics. `outline` is independent of primary, secondary or danger style:
+it uses a low-opacity variant-colored surface, stronger hover/selected surfaces,
+variant-colored text/border and muted disabled styling. The existing OUTLINE
+variant remains available for the neutral outline. Tests cover the fourth size
+across all theme/variant pairs, plus real hover/action activation and selected/
+disabled outline surfaces. Upstream warning/success/info and link/text/default/
+custom Button styles remain missing from the split facade; warning/success/info
+also lack corresponding semantic colors in the current public theme.

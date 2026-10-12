@@ -247,7 +247,8 @@ typedef enum {
 typedef enum {
     CUI_DROPDOWN_BUTTON_MEDIUM,
     CUI_DROPDOWN_BUTTON_SMALL,
-    CUI_DROPDOWN_BUTTON_LARGE
+    CUI_DROPDOWN_BUTTON_LARGE,
+    CUI_DROPDOWN_BUTTON_XSMALL
 } cui_dropdown_button_size;
 typedef enum {
     CUI_DROPDOWN_ANCHOR_TOP_RIGHT,
@@ -257,7 +258,8 @@ typedef enum {
 } cui_dropdown_button_anchor;
 typedef struct {
     bool disabled, action_disabled, action_loading, selected;
-    float width; /* action-half width: zero fits contents; negative grows */
+    bool outline; /* orthogonal to primary/secondary/danger variant */
+    float width;  /* action-half width: zero fits contents; negative grows */
     cui_dropdown_button_variant variant;
     cui_dropdown_button_size size;
     cui_str leading, trailing;

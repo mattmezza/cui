@@ -915,7 +915,8 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
 static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_theme *theme,
                                        cui_dropdown_button_options options, bool trigger,
                                        bool disabled, bool pair_surfaced) {
-    float scale = options.size == CUI_DROPDOWN_BUTTON_SMALL   ? .8f
+    float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
+                  : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
                   : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
                                                               : 1;
     cui_box box = {.height = theme->control_height * scale,
@@ -943,6 +944,15 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     }
     if (options.selected && options.variant != CUI_DROPDOWN_BUTTON_DANGER)
         box.background = theme->primary;
+    bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
+                           options.variant != CUI_DROPDOWN_BUTTON_OUTLINE;
+    if (colored_outline) {
+        box.background = options.variant == CUI_DROPDOWN_BUTTON_DANGER    ? theme->danger
+                         : options.variant == CUI_DROPDOWN_BUTTON_PRIMARY ? theme->primary
+                                                                          : theme->border;
+        box.border = box.background;
+        box.background.a = options.selected ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
+    }
     if (!disabled && cui_hovered(ui, id)) {
         if (!box.background.a)
             box.background = theme->surface;
@@ -950,8 +960,12 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         box.background.g = (uint8_t)(box.background.g * .9f);
         box.background.b = (uint8_t)(box.background.b * .9f);
     }
-    if (disabled && box.background.a)
-        box.background = theme->surface;
+    if (disabled && box.background.a) {
+        if (colored_outline)
+            box.background.a /= 2;
+        else
+            box.background = theme->surface;
+    }
     if (cui_focused(ui) == id) {
         box.border = theme->focus;
         box.border_width = 2;
@@ -1001,12 +1015,18 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                           options.selected
                                       ? theme->on_primary
                                       : theme->text;
+    if (options.outline) {
+        action_foreground = options.variant == CUI_DROPDOWN_BUTTON_PRIMARY  ? theme->primary
+                            : options.variant == CUI_DROPDOWN_BUTTON_DANGER ? theme->danger
+                                                                            : theme->text;
+    }
     cui_color trigger_foreground = action_foreground;
     if (action_disabled)
         action_foreground = theme->muted;
     if (all_disabled)
         trigger_foreground = theme->muted;
-    float scale = options.size == CUI_DROPDOWN_BUTTON_SMALL   ? .8f
+    float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
+                  : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
                   : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
                                                               : 1;
     cui_begin_box(ui, container, (cui_box){.row = true, .gap = 0});

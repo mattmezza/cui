@@ -87,6 +87,8 @@ static void dropdown_label(cui_context *ui, void *user) {
                  d;
     cui_theme_button_colors colors = theme->buttons[CUI_THEME_BUTTON_DEFAULT];
     cui_color foreground = content->disabled ? theme->muted : colors.outline_foreground;
+    cui_color caret = foreground;
+    caret.a = (uint8_t)lroundf(caret.a * .75f);
     cui_text_with_line_height(ui, content->label, font, foreground, font * 1.25f);
     cui_begin_box(ui, 0,
                   (cui_box){.width = (content->size == CUI_CONTROL_XSMALL ||
@@ -101,7 +103,7 @@ static void dropdown_label(cui_context *ui, void *user) {
                                    : content->size == CUI_CONTROL_SMALL ? CUI_ICON_SMALL
                                                                         : CUI_ICON_MEDIUM,
                            .custom_color = true,
-                           .color = foreground});
+                           .color = caret});
 }
 static bool dropdown(settings_frame *f, const cui_setting_item *item, cui_id id,
                      cui_settings_render_options render) {

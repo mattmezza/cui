@@ -373,11 +373,15 @@ static void test_dropdown_menu_and_reset_tooltip(void) {
     cui_rect button = cui_bounds(ui, trigger);
     assert(button.h == 32 && button.w < 128); /* Source intrinsic outline trigger. */
     bool outline = false, caret = false;
+    cui_theme theme = cui_theme_light();
+    cui_color caret_color = theme.buttons[CUI_THEME_BUTTON_DEFAULT].outline_foreground;
+    caret_color.a = (uint8_t)lroundf(caret_color.a * .75f);
     for (size_t i = 0; i < drawing.count; i++) {
         cui_draw_command command = drawing.commands[i];
         outline |= command.type == CUI_DRAW_BORDER && fabsf(command.bounds.x - button.x) < .01f &&
                    fabsf(command.bounds.w - button.w) < .01f;
-        caret |= command.type == CUI_DRAW_IMAGE;
+        caret |= command.type == CUI_DRAW_IMAGE && command.bitmap.custom_tint &&
+                 memcmp(&command.bitmap.tint, &caret_color, sizeof caret_color) == 0;
     }
     assert(outline && caret);
     click_settings(ui, trigger);

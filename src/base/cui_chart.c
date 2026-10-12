@@ -932,6 +932,8 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
 }
 static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
                                    size_t layers, double padding);
+static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
+                                                cui_chart_sankey_node *nodes, size_t layers);
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sankey_node *out,
                                         size_t capacity) {
     if (!o || o->kind != CUI_CHART_SANKEY || !o->data || !o->count || o->count > 256 ||
@@ -1062,8 +1064,51 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
             }
     }
     cui_chart_sankey_relax(o, nodes, layers, padding);
+    cui_chart_sankey_center_and_stagger(o, nodes, layers);
     memcpy(out, nodes, o->count * sizeof(*out));
     return CUI_PLOT_OK;
+}
+static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
+                                                cui_chart_sankey_node *nodes, size_t layers) {
+    double top = 8 + o->sankey_margins.top;
+    double bottom = o->height - 8 - o->sankey_margins.bottom;
+    double lo[256], hi[256], height[256] = {0};
+    size_t count[256] = {0}, single[256] = {0};
+    for (size_t layer = 0; layer < layers; layer++) {
+        lo[layer] = DBL_MAX;
+        hi[layer] = -DBL_MAX;
+    }
+    for (size_t i = 0; i < o->count; i++) {
+        size_t layer = nodes[i].layer;
+        lo[layer] = fmin(lo[layer], nodes[i].y0);
+        hi[layer] = fmax(hi[layer], nodes[i].y1);
+        count[layer]++;
+        single[layer] = i;
+    }
+    for (size_t layer = 0; layer < layers; layer++) {
+        double shift = hi[layer] > lo[layer] ? (top + bottom - lo[layer] - hi[layer]) / 2 : 0;
+        for (size_t i = 0; i < o->count; i++)
+            if (nodes[i].layer == layer) {
+                nodes[i].y0 += (float)shift;
+                nodes[i].y1 += (float)shift;
+            }
+        if (count[layer] == 1)
+            height[layer] = nodes[single[layer]].y1 - nodes[single[layer]].y0;
+    }
+    size_t run = 0;
+    for (size_t layer = 1; layer < layers; layer++) {
+        if (count[layer] == 1 && count[layer - 1] == 1 &&
+            fabs(height[layer] - height[layer - 1]) < 1e-3) {
+            run++;
+            if (run % 2) {
+                double slack = fmax(0, bottom - top - height[layer]);
+                double shift = fmin(height[layer] * .15, slack / 2);
+                nodes[single[layer]].y0 += (float)shift;
+                nodes[single[layer]].y1 += (float)shift;
+            }
+        } else
+            run = 0;
+    }
 }
 static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count, size_t layer,
                                      double padding, double top, double bottom) {

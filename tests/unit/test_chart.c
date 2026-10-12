@@ -245,6 +245,12 @@ int main(void) {
     cui_chart_sankey_node nodes[4];
     assert(cui_chart_sankey_layout(&flow_options, nodes, 3) == CUI_PLOT_CAPACITY);
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    double first_center = (nodes[0].y0 + nodes[0].y1) / 2;
+    double second_center = (nodes[1].y0 + nodes[1].y1) / 2;
+    assert(fabs(first_center - 48) < .01 && second_center > first_center + .5);
+    double last_column_center =
+        (fmin(nodes[2].y0, nodes[3].y0) + fmax(nodes[2].y1, nodes[3].y1)) / 2;
+    assert(fabs(last_column_center - 48) < .01);
     float no_margin_left = nodes[0].x0, no_margin_right = nodes[3].x0;
     flow_options.sankey_margins = (cui_chart_sankey_margins){20, 20, 40, 4};
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);

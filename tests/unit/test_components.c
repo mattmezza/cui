@@ -36,8 +36,8 @@ static void test_button_options(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
     for (size_t theme = 0; theme < 4; theme++)
-        for (int variant = CUI_BUTTON_PRIMARY; variant <= CUI_BUTTON_LINK; variant++)
-            for (int size = CUI_CONTROL_MEDIUM; size <= CUI_CONTROL_LARGE; size++) {
+        for (int variant = CUI_BUTTON_PRIMARY; variant <= CUI_BUTTON_INFO; variant++)
+            for (int size = CUI_CONTROL_MEDIUM; size <= CUI_CONTROL_XSMALL; size++) {
                 assert(cui_begin_frame(ui, 400, 200, .016f));
                 cui_button_ex(ui, 123, &themes[theme], cui_string("Action"),
                               (cui_button_options){.variant = (cui_button_variant)variant,
@@ -50,7 +50,8 @@ static void test_button_options(void) {
                 const cui_semantic *nodes = cui_semantics(ui, &count);
                 assert(count == 1 && nodes[0].role == CUI_ROLE_BUTTON);
                 assert(!nodes[0].disabled && nodes[0].name.length == 6);
-                float scale = size == CUI_CONTROL_SMALL   ? .8f
+                float scale = size == CUI_CONTROL_XSMALL  ? .65f
+                              : size == CUI_CONTROL_SMALL ? .8f
                               : size == CUI_CONTROL_LARGE ? 1.2f
                                                           : 1;
                 assert(fabsf(nodes[0].bounds.h - themes[theme].control_height * scale) < .001f);
@@ -69,7 +70,7 @@ static void test_button_options(void) {
     assert(calls == 1);
     size_t count;
     const cui_semantic *nodes = cui_semantics(ui, &count);
-    assert(nodes[0].checked && nodes[0].value == 1 && nodes[0].name.length == 17);
+    assert(!nodes[0].checked && nodes[0].value == 0 && nodes[0].name.length == 17);
     cui_focus(ui, 123);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     assert(cui_begin_frame(ui, 400, 200, .016f));
@@ -91,6 +92,55 @@ static void test_button_options(void) {
     cui_destroy(ui);
 }
 
+static void test_button_intent_outlines(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    cui_button_variant variants[] = {CUI_BUTTON_DANGER, CUI_BUTTON_WARNING, CUI_BUTTON_SUCCESS,
+                                     CUI_BUTTON_INFO};
+    for (size_t t = 0; t < 4; t++)
+        for (size_t v = 0; v < 4; v++) {
+            cui_context *ui = cui_create((cui_config){.width = 300, .height = 200});
+            assert(ui);
+            cui_theme theme = themes[t];
+            cui_color colors[] = {theme.danger, theme.warning, theme.success, theme.info};
+            cui_button_options o = {.variant = variants[v], .outline = true, .width = 160};
+            assert(cui_begin_frame(ui, 300, 200, .016f));
+            assert(!cui_button_ex(ui, 18, &theme, cui_string("Intent"), o));
+            cui_draw_list list = cui_end_frame(ui);
+            bool text = false, border = false;
+            for (size_t n = 0; n < list.count; n++) {
+                const cui_draw_command *d = &list.commands[n];
+                if (d->type == CUI_DRAW_TEXT) {
+                    assert(memcmp(&d->color, &colors[v], sizeof(cui_color)) == 0);
+                    text = true;
+                }
+                if (d->type == CUI_DRAW_BORDER) {
+                    assert(memcmp(&d->color, &colors[v], sizeof(cui_color)) == 0);
+                    border = true;
+                }
+            }
+            assert(text && border);
+            cui_rect r = cui_bounds(ui, 18);
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = r.x + 10, .y = r.y + 10}));
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = r.x + 10, .y = r.y + 10}));
+            assert(cui_begin_frame(ui, 300, 200, .016f));
+            assert(cui_button_ex(ui, 18, &theme, cui_string("Intent"), o));
+            cui_end_frame(ui);
+            o.disabled = true;
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+            assert(cui_begin_frame(ui, 300, 200, .016f));
+            assert(!cui_button_ex(ui, 18, &theme, cui_string("Intent"), o));
+            cui_end_frame(ui);
+            size_t count;
+            const cui_semantic *sem = cui_semantics(ui, &count);
+            assert(count == 1 && sem[0].disabled && !sem[0].checked);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_destroy(ui);
+        }
+}
 static double theme_luminance(cui_color c) {
     double channels[] = {c.r / 255.0, c.g / 255.0, c.b / 255.0};
     for (size_t i = 0; i < 3; i++)
@@ -118,6 +168,7 @@ static void test_semantic_theme_contrast(void) {
 }
 int main(void) {
     test_semantic_theme_contrast();
+    test_button_intent_outlines();
     test_button_options();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

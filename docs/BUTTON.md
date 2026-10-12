@@ -25,3 +25,16 @@ Headless tests exercise all six variants, three sizes and four themes, measured
 bounds, adornments, content callbacks, semantic names/selected state and keyboard
 suppression while loading. SVG icons, custom palettes and animation are separate
 pending capabilities; a text adornment does not implement the Icon catalog family.
+
+Buttons additionally support warning, success, and info intent variants and
+extra-small density (`CUI_CONTROL_XSMALL`). The `outline` flag combines with an
+intent to use its theme color for the border and label on the surface background.
+The original standalone `CUI_BUTTON_OUTLINE` remains available. Semantic intent
+foreground tokens are used for filled labels, including `on_danger`.
+
+`selected` controls presentation only, matching the frozen reference. It no
+longer mislabels an ordinary push button as checked; use the separate toggle
+control for toggle semantics. Full upstream button parity, including independent
+explicit toggle metadata and richer icon/tooltip/animation options, is still
+under audit. Tests exercise all variants/densities across four themes plus
+colored-outline painting, pointer activation and disabled keyboard suppression.

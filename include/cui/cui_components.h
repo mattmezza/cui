@@ -22,9 +22,17 @@ typedef enum {
     CUI_BUTTON_OUTLINE,
     CUI_BUTTON_GHOST,
     CUI_BUTTON_DANGER,
-    CUI_BUTTON_LINK
+    CUI_BUTTON_LINK,
+    CUI_BUTTON_WARNING,
+    CUI_BUTTON_SUCCESS,
+    CUI_BUTTON_INFO
 } cui_button_variant;
-typedef enum { CUI_CONTROL_MEDIUM, CUI_CONTROL_SMALL, CUI_CONTROL_LARGE } cui_control_size;
+typedef enum {
+    CUI_CONTROL_MEDIUM,
+    CUI_CONTROL_SMALL,
+    CUI_CONTROL_LARGE,
+    CUI_CONTROL_XSMALL
+} cui_control_size;
 typedef void (*cui_button_content_fn)(cui_context *, void *user);
 typedef struct {
     cui_button_variant variant;
@@ -34,6 +42,7 @@ typedef struct {
     cui_str leading, trailing;
     cui_button_content_fn content; /* Optional arbitrary child content instead of label. */
     void *content_user;
+    bool outline; /* Orthogonal colored outline; selected is presentation only. */
 } cui_button_options;
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);

@@ -23,9 +23,17 @@ typedef enum {
     CUI_BUTTON_OUTLINE,
     CUI_BUTTON_GHOST,
     CUI_BUTTON_DANGER,
-    CUI_BUTTON_LINK
+    CUI_BUTTON_LINK,
+    CUI_BUTTON_WARNING,
+    CUI_BUTTON_SUCCESS,
+    CUI_BUTTON_INFO
 } cui_button_variant;
-typedef enum { CUI_CONTROL_MEDIUM, CUI_CONTROL_SMALL, CUI_CONTROL_LARGE } cui_control_size;
+typedef enum {
+    CUI_CONTROL_MEDIUM,
+    CUI_CONTROL_SMALL,
+    CUI_CONTROL_LARGE,
+    CUI_CONTROL_XSMALL
+} cui_control_size;
 typedef void (*cui_button_content_fn)(cui_context *, void *user);
 typedef struct {
     cui_button_variant variant;
@@ -35,6 +43,7 @@ typedef struct {
     cui_str leading, trailing;
     cui_button_content_fn content; /* Optional arbitrary child content instead of label. */
     void *content_user;
+    bool outline; /* Orthogonal colored outline; selected is presentation only. */
 } cui_button_options;
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
@@ -151,7 +160,8 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     bool disabled = options.disabled || options.loading;
     cui_interaction state = cui_base_button(ui, id, name, disabled);
     cui_box b = cui_components_control(t, disabled, false);
-    float scale = options.size == CUI_CONTROL_SMALL   ? .8f
+    float scale = options.size == CUI_CONTROL_XSMALL  ? .65f
+                  : options.size == CUI_CONTROL_SMALL ? .8f
                   : options.size == CUI_CONTROL_LARGE ? 1.2f
                                                       : 1;
     b.height *= scale;
@@ -176,16 +186,42 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         break;
     case CUI_BUTTON_DANGER:
         b.background = t->danger;
-        foreground = t->background;
+        foreground = t->on_danger;
+        break;
+    case CUI_BUTTON_WARNING:
+        b.background = t->warning;
+        foreground = t->on_warning;
+        break;
+    case CUI_BUTTON_SUCCESS:
+        b.background = t->success;
+        foreground = t->on_success;
+        break;
+    case CUI_BUTTON_INFO:
+        b.background = t->info;
+        foreground = t->on_info;
         break;
     default:
         b.background = t->primary;
         foreground = t->on_primary;
         break;
     }
-    if (options.selected && options.variant != CUI_BUTTON_DANGER) {
+    if (options.selected && options.variant != CUI_BUTTON_DANGER &&
+        options.variant != CUI_BUTTON_WARNING && options.variant != CUI_BUTTON_SUCCESS &&
+        options.variant != CUI_BUTTON_INFO) {
         b.background = t->primary;
         foreground = t->on_primary;
+    }
+    if (options.outline && options.variant != CUI_BUTTON_GHOST &&
+        options.variant != CUI_BUTTON_LINK) {
+        cui_color intent = options.variant == CUI_BUTTON_PRIMARY   ? t->primary
+                           : options.variant == CUI_BUTTON_DANGER  ? t->danger
+                           : options.variant == CUI_BUTTON_WARNING ? t->warning
+                           : options.variant == CUI_BUTTON_SUCCESS ? t->success
+                           : options.variant == CUI_BUTTON_INFO    ? t->info
+                                                                   : t->text;
+        b.background = t->surface;
+        b.border = intent;
+        foreground = intent;
     }
     if (!disabled && (state.hovered || state.pressed)) {
         if (b.background.a == 0)
@@ -198,7 +234,8 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     if (disabled && b.background.a)
         b.background = t->surface;
     cui_components_focus(ui, id, t, &b);
-    cui_update_semantic(ui, id, options.selected, options.selected);
+    /* Selected paint is distinct from an accessibility toggle state. */
+    cui_update_semantic(ui, id, false, 0);
     if (options.loading)
         cui_set_semantic_details(
             ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});

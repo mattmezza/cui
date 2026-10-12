@@ -1,37 +1,36 @@
 {
-  "source": "2af3f39",
+  "source": "25b84dc",
   "published_source": "ff475e69fea087ae1dcf95b55eac54c02e4216d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Releaseff475e6 is fully HTTPS78 verified; seven deployed assets including WASM match its Pages artifact byte-for-byte. Its portable source2af3f39 provides automatic Chart label measurement/source axes, atomic standalone Markdown/HTML image layout and dimensions, and Questionnaire answer descriptions/positions. Native77, ASan75, WASI67, browser78, quality and strict web build pass. Full78-entry feature parity remains incomplete. A subsequent isolated core/Attachment semantic ancestry fixfb4464b passes native75 and focused sanitizers2, with failing-before regressions, but is not yet integrated.",
+  "summary": "Portable source 25b84dc and gallery 94503eb pass native 77, sanitizers 75, WASI 67, all 78 browser stories, quality checks and strict web build. Adds acyclic semantic ancestry, Questionnaire groups and custom slots, Chart geometry and rendering fixes, and atomic image selection behavior. Published ff475e6 remains verified; this integration is awaiting publication. Full 78-entry feature parity remains incomplete.",
   "checks": [
     {
       "name": "native",
-      "source": "2af3f39",
+      "source": "25b84dc",
       "passed": 77,
       "total": 77,
-      "log": "native-2af3f39.txt"
+      "log": "native-25b84dc.txt"
     },
     {
       "name": "sanitizers",
-      "source": "2af3f39",
+      "source": "25b84dc",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-2af3f39.txt"
+      "log": "sanitizers-25b84dc.txt"
     },
     {
       "name": "WASI",
-      "source": "2af3f39",
+      "source": "25b84dc",
       "passed": 67,
       "total": 67,
-      "log": "wasi-2af3f39.txt"
+      "log": "wasi-25b84dc.txt"
     },
     {
       "name": "browser",
-      "source": "2af3f39",
+      "source": "94503eb",
       "passed": 78,
       "total": 78,
-      "log": "browser-2af3f39.txt",
-      "palettes": 38
+      "log": "browser-94503eb.txt"
     }
   ],
   "previous_deployment": {
@@ -139,5 +138,6 @@
       "total": 75,
       "log": "sanitizers-882a5af.txt"
     }
-  ]
+  ],
+  "web_source": "94503eb"
 }

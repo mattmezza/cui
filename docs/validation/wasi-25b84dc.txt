@@ -1,0 +1,85 @@
+CUI source revision: 25b84dc19c89b40171f166fb43e6c7d337133303
+Portable source SHA256: c97c0f941b00d0f66f7a32a0cbda458b699b99d02fdcbbff2e548f1bfc5e106b
+Tracked source modifications: none
+Target: wasm32-wasi (WASI Preview 1), Zig 0.16.0, wasmtime 49.0.0
+Optional adapters disabled: SDL, GPU, FreeType, HarfBuzz; no browser host tested.
+Per-suite instruction budget: 30,000,000,000
+Assertions enabled. Virtual clock() compatibility uses wall time; benchmarks not invoked.
+PASS bootstrap (0.33s)
+core tests passed
+PASS core (3.51s)
+PASS base (0.38s)
+PASS components (1.98s)
+software renderer geometry, nested clipping and straight alpha passed
+PASS render (0.40s)
+edit tests passed
+PASS edit (0.44s)
+PASS overlay (0.44s)
+virtual tests passed
+PASS virtual (0.23s)
+dock tests passed
+PASS dock (0.86s)
+PASS plot (0.18s)
+PASS content (0.69s)
+PASS disclosure (1.00s)
+PASS choice (11.95s)
+PASS numeric (0.47s)
+PASS picker (0.52s)
+PASS tree (0.83s)
+PASS input (0.85s)
+PASS table (0.42s)
+PASS scroll (0.41s)
+PASS surface (1.18s)
+PASS form (0.72s)
+PASS otp (0.49s)
+PASS status (1.26s)
+PASS message (0.67s)
+PASS media (0.86s)
+PASS description (0.32s)
+PASS chrome (0.37s)
+PASS resizable (0.40s)
+PASS icon (0.65s)
+PASS toolbar (0.35s)
+PASS sidebar (0.37s)
+PASS textarea (0.35s)
+PASS settings (0.79s)
+PASS carousel (1.16s)
+PASS command (0.63s)
+PASS root (0.39s)
+PASS text_view (3.45s)
+PASS chart (2.12s)
+PASS speech (0.39s)
+questionnaire tests passed
+PASS questionnaire (0.18s)
+questionnaire styled tests passed
+PASS questionnaire_styled (0.40s)
+PASS speech_base_only (0.17s)
+PASS chart_base_only (2.20s)
+PASS text_view_base_only (3.09s)
+PASS root_base_only (6.20s)
+PASS command_base_only (0.17s)
+PASS carousel_base_only (0.16s)
+PASS sidebar_base_only (7.01s)
+PASS numeric_base_only (7.17s)
+PASS picker_base_only (6.21s)
+PASS tree_base_only (5.80s)
+PASS input_base_only (5.25s)
+PASS table_base_only (8.52s)
+PASS scroll_base_only (7.39s)
+PASS toolbar_base_only (5.07s)
+PASS resizable_base_only (5.06s)
+PASS media_base_only (0.32s)
+PASS message_base_only (4.89s)
+PASS status_base_only (0.17s)
+PASS otp_base_only (5.21s)
+PASS form_base_only (4.93s)
+PASS surface_base_only (5.28s)
+PASS implementation_embedding (5.46s)
+unstyled frame 0: 3 commands, checked=0
+unstyled frame 1: 3 commands, checked=1
+PASS example_unstyled (0.29s)
+settings: 36 draw commands
+PASS example_styled_settings (0.47s)
+PASS distribution_single (26.66s)
+PASS distribution_multi (26.93s)
+WASI runtime suites: 67/67 passed

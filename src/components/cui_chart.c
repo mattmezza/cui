@@ -238,6 +238,51 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             }
         }
     }
+    if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) {
+        bool active = !o->noninteractive && state->hovered < o->count;
+        bool instant = o->reduced_motion || cui_reduced_motion(ui);
+        float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
+        float dt = cui_frame_delta(ui);
+        if (!isfinite(dt) || dt < 0)
+            dt = 0;
+        if (dt == 0 && active && state->emphasis_focus == 0)
+            dt = 1.f / 60;
+        dt = fminf(dt, .25f);
+        state->emphasis_focus =
+            instant ? (active ? 1 : 0)
+                    : fmaxf(0, fminf(1, state->emphasis_focus + (active ? dt : -dt) / duration));
+        if (o->kind == CUI_CHART_BAR && active) {
+            float target;
+            if (cui_chart_bar_band_center(o, state->hovered, &target) == CUI_PLOT_OK) {
+                if (!state->emphasis_started || instant) {
+                    state->emphasis_center = target;
+                    state->emphasis_velocity = 0;
+                    state->emphasis_started = true;
+                } else
+                    cui_chart_hover_spring(&state->emphasis_center, &state->emphasis_velocity,
+                                           target, dt, duration);
+            }
+        }
+        bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
+        if (o->kind == CUI_CHART_PIE)
+            for (size_t i = 0; i < o->count && i < 256; i++) {
+                float target = active && state->hovered == i ? 1 : 0;
+                if (instant) {
+                    state->pie_lift[i] = target;
+                    state->pie_lift_velocity[i] = 0;
+                } else
+                    cui_chart_hover_spring(&state->pie_lift[i], &state->pie_lift_velocity[i],
+                                           target, dt, duration);
+                moving |= fabsf(state->pie_lift[i] - target) > .001f ||
+                          fabsf(state->pie_lift_velocity[i]) > .001f;
+            }
+        if (!active && state->emphasis_focus == 0)
+            state->emphasis_started = false;
+        if (!instant && moving)
+            cui_invalidate(ui);
+        if (cui_chart_render(state, o) != CUI_PLOT_OK)
+            return false;
+    }
     cui_begin_box(
         ui, id,
         (cui_box){

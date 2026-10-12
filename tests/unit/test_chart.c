@@ -260,6 +260,20 @@ int main(void) {
     flow_options.count = 4;
     flow_options.links = flow_links;
     flow_options.link_count = 3;
+    flow_options.data_revision = 7;
+    cui_chart_state emphasis_state = {.pixels = pixels, .byte_capacity = sizeof pixels};
+    assert(cui_chart_render(&emphasis_state, &flow_options) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    uint64_t flow_revision = emphasis_state.revision;
+    emphasis_state.hovered = 2;
+    emphasis_state.emphasis_focus = 1;
+    assert(cui_chart_render(&emphasis_state, &flow_options) == CUI_PLOT_OK);
+    assert(emphasis_state.revision == flow_revision + 1 &&
+           memcmp(saved, pixels, sizeof pixels) != 0);
+    flow_revision = emphasis_state.revision;
+    assert(cui_chart_render(&emphasis_state, &flow_options) == CUI_PLOT_OK);
+    assert(emphasis_state.revision == flow_revision);
+    flow_options.data_revision = 0;
     cui_chart_sankey_node nodes[4];
     assert(cui_chart_sankey_layout(&flow_options, nodes, 3) == CUI_PLOT_CAPACITY);
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
@@ -472,6 +486,22 @@ int main(void) {
     options.extra_series_count = 0;
     options.kind = CUI_CHART_BAR;
     options.bar_alignment = CUI_CHART_BAR_BOTTOM;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    state.hovered = 0;
+    state.emphasis_focus = 1;
+    assert(cui_chart_bar_band_center(&options, 0, &state.emphasis_center) == CUI_PLOT_OK);
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    cui_plot_rect dimmed_bar;
+    assert(cui_chart_bar_bounds(&options, 1, &dimmed_bar) == CUI_PLOT_OK);
+    size_t dimmed_pixel = ((size_t)((dimmed_bar.y_min + dimmed_bar.y_max) / 2) * options.width +
+                           (size_t)((dimmed_bar.x_min + dimmed_bar.x_max) / 2)) *
+                          4;
+    assert(pixels[dimmed_pixel] != saved[dimmed_pixel] ||
+           pixels[dimmed_pixel + 1] != saved[dimmed_pixel + 1]);
+    state.emphasis_focus = 0;
+    state.hovered = SIZE_MAX;
     cui_plot_rect first_bar, second_bar;
     assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
     assert(cui_chart_bar_bounds(&options, 1, &second_bar) == CUI_PLOT_OK);
@@ -848,6 +878,21 @@ int main(void) {
             per_bar_color |= draw.commands[i].color.g == 211;
         }
     assert(formatted && per_bar_color);
+    cui_plot_rect hovered_bar;
+    assert(cui_chart_bar_bounds(&options, 1, &hovered_bar) == CUI_PLOT_OK);
+    options.reduced_motion = true;
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                        .x = state.bounds.x + (hovered_bar.x_min + hovered_bar.x_max) / 2 *
+                                                  options.logical_width / options.width,
+                        .y = state.bounds.y + (hovered_bar.y_min + hovered_bar.y_max) / 2 *
+                                                  options.logical_height / options.height}));
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    (void)cui_end_frame(ui);
+    assert(state.hovered == 1 && state.emphasis_focus == 1);
+    options.reduced_motion = false;
     options.bar_label_format = format_wide_tick;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);

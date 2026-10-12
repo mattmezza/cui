@@ -216,6 +216,9 @@ typedef struct {
     float hover_x, hover_y[8], hover_vx, hover_vy[8]; /* private pointer spring */
     size_t hover_visual_index;
     bool hover_visual_started;
+    float emphasis_focus, emphasis_center, emphasis_velocity;
+    bool emphasis_started;
+    float pie_lift[256], pie_lift_velocity[256]; /* bounded source per-slice spring */
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {

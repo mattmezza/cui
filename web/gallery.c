@@ -40,6 +40,8 @@ __attribute__((import_module("host"), import_name("measure"))) extern float
 host_measure(const char *, size_t, float);
 __attribute__((import_module("host"), import_name("measure_styled"))) extern float
 host_measure_styled(const char *, size_t, float, int, int, int);
+__attribute__((import_module("host"), import_name("font_metrics"))) extern int
+host_font_metrics(float, int, int, int, float *);
 #else
 static float host_measure(const char *s, size_t n, float size) {
     (void)s;
@@ -51,6 +53,14 @@ static float host_measure_styled(const char *s, size_t n, float size, int weight
     (void)italic;
     (void)monospace;
     return host_measure(s, n, size);
+}
+static int host_font_metrics(float size, int weight, int italic, int monospace, float *out) {
+    (void)size;
+    (void)weight;
+    (void)italic;
+    (void)monospace;
+    (void)out;
+    return 0;
 }
 #endif
 static cui_context *ui;
@@ -1135,6 +1145,30 @@ static cui_size measure_styled(void *user, cui_str text, float size, cui_text_st
                                           style.monospace),
                       size * 1.25f};
 }
+static bool measure_font_metrics(void *user, float size, cui_text_style style,
+                                 cui_font_metrics *out) {
+    (void)user;
+    float metrics[3];
+    if (!host_font_metrics(size, style.weight, style.italic, style.monospace, metrics))
+        return false;
+    *out = (cui_font_metrics){metrics[0], metrics[1], metrics[2]};
+    return true;
+}
+int gallery_font_metrics(float size, int weight, int italic, int monospace, float *out) {
+    if (!out)
+        return 0;
+    cui_font_metrics metrics;
+    if (!cui_measure_font_metrics(ui, size,
+                                  (cui_text_style){.weight = (cui_text_weight)weight,
+                                                   .italic = italic != 0,
+                                                   .monospace = monospace != 0},
+                                  &metrics))
+        return 0;
+    out[0] = metrics.ascent;
+    out[1] = metrics.descent;
+    out[2] = metrics.line_height;
+    return 1;
+}
 static void gallery_text_view_link(cui_str url, const cui_event *event, void *user) {
     (void)url;
     (void)event;
@@ -1280,7 +1314,8 @@ int gallery_init(void) {
                                  .max_commands = 2048,
                                  .frame_bytes = 65536,
                                  .measure = measure,
-                                 .measure_styled = measure_styled});
+                                 .measure_styled = measure_styled,
+                                 .font_metrics = measure_font_metrics});
     edit = cui_edit_create((cui_edit_config){.buffer = input_buffer,
                                              .capacity = sizeof(input_buffer),
                                              .history_bytes = 8192,

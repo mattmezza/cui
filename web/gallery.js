@@ -7,16 +7,19 @@ function canvasFont(size,weight=0,italic=false,monospace=false){
  const family=monospace?'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace':'system-ui';
  return `${italic?'italic ':''}${[400,500,600,700][weight]||400} ${size}px ${family}`;
 }
+function canvasFontMetrics(size,weight=0,italic=false,monospace=false){
+ if(!Number.isFinite(size)||size<=0)return null;
+ ctx.font=canvasFont(size,weight,italic,monospace);
+ const metrics=ctx.measureText('');
+ const ascent=metrics.fontBoundingBoxAscent,descent=metrics.fontBoundingBoxDescent,lineHeight=size*1.25;
+ if(!Number.isFinite(ascent)||!Number.isFinite(descent)||!Number.isFinite(lineHeight)||ascent<0||descent<0||ascent+descent<=0||lineHeight<=0)return null;
+ return [ascent,descent,lineHeight];
+}
 function textBaselineOffset(size,weight=0,italic=false,monospace=false){
  const key=`${size}:${weight}:${Number(italic)}:${Number(monospace)}`;
- let offset=textBaselineOffsets.get(key);
- if(offset!==undefined)return offset;
- ctx.font=canvasFont(size,weight,italic,monospace);ctx.textBaseline='alphabetic';
- const metrics=ctx.measureText('Hg');
- const ascent=Number.isFinite(metrics.fontBoundingBoxAscent)?metrics.fontBoundingBoxAscent:metrics.actualBoundingBoxAscent||size*.8;
- const descent=Number.isFinite(metrics.fontBoundingBoxDescent)?metrics.fontBoundingBoxDescent:metrics.actualBoundingBoxDescent||size*.2;
- // CUI already moves explicit line-height commands into their natural text line box.
- offset=(size*1.25-ascent-descent)/2+ascent;
+ if(textBaselineOffsets.has(key))return textBaselineOffsets.get(key);
+ const metrics=canvasFontMetrics(size,weight,italic,monospace);
+ const offset=metrics?(metrics[2]-metrics[0]-metrics[1])/2+metrics[0]:null;
  textBaselineOffsets.set(key,offset);return offset;
 }
 const bitmapCache=new Map();let bitmapCacheBytes=0;
@@ -247,7 +250,7 @@ function render(){
   if(type===3){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();clips++;continue;}
   if(type===4){if(clips){ctx.restore();clips--;}continue;}
   ctx.fillStyle=ctx.strokeStyle=`rgba(${f(5)},${f(6)},${f(7)},${f(8)/255})`;
-  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24);ctx.font=canvasFont(size,weight,italic,monospace);ctx.textBaseline='alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+textBaselineOffset(size,weight,italic,monospace));}
+  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24);ctx.font=canvasFont(size,weight,italic,monospace);const baseline=textBaselineOffset(size,weight,italic,monospace);ctx.textBaseline=baseline===null?'top':'alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+(baseline??0));}
   else if(w>0&&h>0){
    const radii=(f(12)?[f(13),f(14),f(16),f(15)]:[f(9),f(9),f(9),f(9)]).map(r=>Math.min(Math.max(0,r),Math.min(w,h)/2));
    if(type===5){paintBitmap(i,x,y,w,h,radii);continue;}
@@ -542,7 +545,7 @@ $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>docu
 try{
  const [response,data,docs,presets]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json()),fetch('./docs.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch documentation');return r.json();}),fetch('./themes.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch themes');return r.json();})]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;documents=docs;themes=presets;
  const module=await WebAssembly.compile(await response.arrayBuffer());
- const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=canvasFont(size);return ctx.measureText(stringAt(ptr,len)).width;},measure_styled:(ptr,len,size,weight,italic,monospace)=>{ctx.font=canvasFont(size,weight,!!italic,!!monospace);return ctx.measureText(stringAt(ptr,len)).width;}}};
+ const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=canvasFont(size);return ctx.measureText(stringAt(ptr,len)).width;},measure_styled:(ptr,len,size,weight,italic,monospace)=>{ctx.font=canvasFont(size,weight,!!italic,!!monospace);return ctx.measureText(stringAt(ptr,len)).width;},font_metrics:(size,weight,italic,monospace,pointer)=>{const metrics=canvasFontMetrics(size,weight,!!italic,!!monospace);if(!metrics)return 0;new Float32Array(wasm.memory.buffer,pointer,3).set(metrics);return 1;}}};
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();if(!wasm.gallery_init())throw Error('CUI initialization failed');
  let saved;try{saved=localStorage.getItem('cui.theme');}catch{}themeChoice=saved==='system'||saved==='high-contrast'||themes.some(theme=>theme.id===saved)?saved:'system';buildPaletteMenu();syncTheme();
  window.cuiGallery={exports:wasm,stories,catalog,documents,themes,render,get themeChoice(){return themeChoice;}};$('home-story-count').textContent=String(Object.keys(stories).length);route();

@@ -236,7 +236,7 @@ def main():
             assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
             control_change('theme', '1')
             assert page.locator('body.dark').count() == 1
-            page.evaluate('''()=>{window.styledTextFonts={};const original=CanvasRenderingContext2D.prototype.fillText;window.restoreFillText=()=>{CanvasRenderingContext2D.prototype.fillText=original};CanvasRenderingContext2D.prototype.fillText=function(value,...args){if(['Semibold heading','Italic emphasis','Monospace code'].includes(value))window.styledTextFonts[value]=this.font;return original.call(this,value,...args)}}''')
+            page.evaluate('''()=>{window.styledTextFonts={};window.styledTextPaint={};const original=CanvasRenderingContext2D.prototype.fillText;window.restoreFillText=()=>{CanvasRenderingContext2D.prototype.fillText=original};CanvasRenderingContext2D.prototype.fillText=function(value,...args){if(['Semibold heading','Italic emphasis','Monospace code'].includes(value)){window.styledTextFonts[value]=this.font;window.styledTextPaint[value]={y:args[1],baseline:this.textBaseline};}return original.call(this,value,...args)}}''')
             page.evaluate('location.hash="Theme"')
             page.wait_for_function('cuiGallery.renderedComponent==="Theme"')
             page.wait_for_function('Object.keys(window.styledTextFonts).length===3')
@@ -249,6 +249,33 @@ def main():
             assert styled == [[2,0,0],[0,1,0],[0,0,1]], styled
             widths = page.evaluate('''(fonts)=>{const e=cuiGallery.exports,ctx=document.querySelector('canvas').getContext('2d');return Object.entries(fonts).map(([label,font])=>{const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===label);ctx.font=font;return [label,e.gallery_command(i,3),ctx.measureText(label).width]})}''', fonts)
             assert all(abs(bounds_width-measured_width)<2 for _,bounds_width,measured_width in widths), widths
+            font_metrics = page.evaluate('''()=>{
+                const e=cuiGallery.exports,ctx=document.querySelector('canvas').getContext('2d');
+                const pointer=e.malloc(12),out=new Float32Array(e.memory.buffer,pointer,3),results=[];
+                for(const label of ['Semibold heading','Italic emphasis','Monospace code']){
+                    const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===label);
+                    const size=e.gallery_command(i,11),weight=e.gallery_command(i,22),italic=e.gallery_command(i,23),monospace=e.gallery_command(i,24);
+                    out.set([37,41,43]);const available=e.gallery_font_metrics(size,weight,italic,monospace,pointer);
+                    ctx.font=window.styledTextFonts[label];const browser=ctx.measureText('');
+                    results.push({label,available,metrics:Array.from(out),browser:[browser.fontBoundingBoxAscent,browser.fontBoundingBoxDescent,size*1.25],commandY:e.gallery_command(i,2),paint:window.styledTextPaint[label]});
+                }
+                const invalid=[];
+                for(const [size,weight] of [[0,0],[-14,0],[NaN,0],[14,99]]){
+                    out.set([37,41,43]);invalid.push([e.gallery_font_metrics(size,weight,0,0,pointer),Array.from(out)]);
+                }
+                const original=CanvasRenderingContext2D.prototype.measureText;
+                CanvasRenderingContext2D.prototype.measureText=function(text){const value=original.call(this,text);return {width:value.width};};
+                out.set([37,41,43]);invalid.push([e.gallery_font_metrics(14,0,0,0,pointer),Array.from(out)]);
+                CanvasRenderingContext2D.prototype.measureText=original;
+                e.free(pointer);return {results,invalid};
+            }''')
+            for result in font_metrics['results']:
+                assert result['available'] == 1, result
+                assert all(abs(a-b)<0.05 for a,b in zip(result['metrics'],result['browser'])), result
+                ascent,descent,line_height = result['metrics']
+                expected_y = result['commandY'] + (line_height-ascent-descent)/2 + ascent
+                assert result['paint']['baseline'] == 'alphabetic' and abs(result['paint']['y']-expected_y)<0.05, result
+            assert all(available == 0 and values == [37,41,43] for available,values in font_metrics['invalid']), font_metrics['invalid']
             shape = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===0&&e.gallery_command(i,5)===29&&e.gallery_command(i,6)===100;})')
             assert shape is not None
             assert page.evaluate('(i)=>Array.from({length:5},(_,j)=>cuiGallery.exports.gallery_command(i,12+j))', shape) == [1,24,0,0,18]

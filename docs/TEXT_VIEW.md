@@ -211,7 +211,7 @@ reserve horizontal space among text runs and wrap at object boundaries. Default
 inline height is 75% of the logical line height, with loaded aspect ratio or a
 square unloaded slot, matching the frozen source. Selection maps each slot to
 the entire image source syntax, and Source copy preserves that syntax. Title tooltips,
-explicit image dimensions and custom object renderers remain unimplemented. Standalone image blocks still retain their earlier alt-text ranges.
+standalone-image dimensions and custom object renderers remain unimplemented. Standalone image blocks still retain their earlier alt-text ranges.
 
 Tables following existing list content retain parent membership and paint in the
 16px continuation column. Column sizing, horizontal viewport clipping and footer
@@ -253,6 +253,19 @@ this delimiter parser is not a complete CommonMark grammar.
 Images inside HTML paragraph, heading and table-cell containers now share the
 atomic inline flow with neighboring styled text. Linked HTML images also use the
 ordinary link callback. Missing `src` images inside these containers are skipped.
-Bare root HTML images retain legacy standalone blocks; explicit dimensions and
-HTML source-range/copy support remain unfinished. HTML container tracking is bounded
+Bare root HTML images retain legacy standalone blocks; their explicit dimensions
+and HTML source-range/copy support remain unfinished. HTML container tracking is bounded
 and does not replace a repairing HTML5 tree parser.
+
+Inline HTML image dimensions support finite nonnegative numbers, `px`, and `%`,
+with width/height attributes taking precedence over matching CSS declarations.
+Percentages use the logical line height as their base, matching frozen
+`inline_flow.rs`, rather than viewport width. A single loaded dimension preserves
+intrinsic aspect ratio; an unloaded width-only image uses the line height, and an
+unloaded height-only image uses a square. Both dimensions are independent when
+specified. Invalid declarations fall back to valid CSS or default dimensions.
+Numeric tokens are bounded to 64 bytes, exponents to ±38, and dimensions to
+10,000,000 logical pixels. Zero-sized images retain their selection slot and paint
+no bitmap. Caller-provided NaN/negative/nonfinite dimensions are rejected before
+layout mutation. Tall image rows retain their logical origin separately from shifted
+text bounds, so aligned table cells move all runs together.

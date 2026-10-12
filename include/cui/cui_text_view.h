@@ -51,6 +51,10 @@ typedef struct {
     float born;
 } cui_text_view_mapping;
 typedef struct {
+    float value;
+    bool specified, relative;
+} cui_text_view_image_length;
+typedef struct {
     cui_text_view_range text, source, link;
     size_t block;
     unsigned flags;
@@ -58,6 +62,7 @@ typedef struct {
     cui_bitmap image;
     bool image_ready;
     cui_rect image_bounds;
+    cui_text_view_image_length image_width, image_height;
 } cui_text_view_span;
 typedef enum {
     CUI_TEXT_VIEW_ALIGN_LEFT,
@@ -87,6 +92,7 @@ typedef struct {
     cui_rect bounds;
     float font_size, line_height;
     unsigned flags;
+    float line_top;
 } cui_text_view_glyph;
 typedef struct {
     cui_text_view_range range;

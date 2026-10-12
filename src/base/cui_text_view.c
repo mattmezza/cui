@@ -1037,6 +1037,92 @@ static cui_text_view_range cui_text_view_attribute(cui_str input, size_t a, size
     }
     return (cui_text_view_range){0};
 }
+static cui_text_view_image_length cui_text_view_image_length_parse(cui_str input,
+                                                                   cui_text_view_range r) {
+    cui_text_view_image_length result = {0};
+    size_t a = r.begin, b = r.end;
+    while (a < b && (input.data[a] == ' ' || input.data[a] == '\t'))
+        ++a;
+    while (b > a && (input.data[b - 1] == ' ' || input.data[b - 1] == '\t'))
+        --b;
+    if (b - a > 64 || a == b)
+        return result;
+    if (input.data[b - 1] == '%') {
+        result.relative = true;
+        --b;
+    } else if (b - a >= 2 && input.data[b - 2] == 'p' && input.data[b - 1] == 'x')
+        b -= 2;
+    if (a < b && input.data[a] == '+')
+        ++a;
+    double value = 0, fraction = .1;
+    bool digit = false, dot = false;
+    for (; a < b; ++a) {
+        char c = input.data[a];
+        if (c == '.' && !dot) {
+            dot = true;
+            continue;
+        }
+        if (c < '0' || c > '9')
+            break;
+        digit = true;
+        if (dot) {
+            value += (c - '0') * fraction;
+            fraction *= .1;
+        } else
+            value = value * 10 + c - '0';
+    }
+    if (!digit)
+        return (cui_text_view_image_length){0};
+    if (a < b && (input.data[a] == 'e' || input.data[a] == 'E')) {
+        ++a;
+        bool negative = a < b && input.data[a] == '-';
+        if (a < b && (input.data[a] == '+' || input.data[a] == '-'))
+            ++a;
+        unsigned exponent = 0;
+        size_t first = a;
+        while (a < b && input.data[a] >= '0' && input.data[a] <= '9') {
+            exponent = exponent * 10 + (unsigned)(input.data[a++] - '0');
+            if (exponent > 38)
+                return (cui_text_view_image_length){0};
+        }
+        if (a == first)
+            return (cui_text_view_image_length){0};
+        value *= pow(10, negative ? -(double)exponent : (double)exponent);
+    }
+    if (a != b || !isfinite(value) || value > 10000000)
+        return (cui_text_view_image_length){0};
+    result.value = (float)(result.relative ? value * .01 : value);
+    result.specified = true;
+    return result;
+}
+static cui_text_view_image_length cui_text_view_html_image_length(cui_str input, size_t a, size_t b,
+                                                                  const char *name) {
+    cui_text_view_image_length attribute =
+        cui_text_view_image_length_parse(input, cui_text_view_attribute(input, a, b, name));
+    if (attribute.specified)
+        return attribute;
+    cui_text_view_range style = cui_text_view_attribute(input, a, b, "style");
+    cui_text_view_image_length result = {0};
+    for (size_t start = style.begin; start < style.end;) {
+        size_t end = cui_text_view_find(input, start, style.end, ";", 1);
+        if (end == SIZE_MAX)
+            end = style.end;
+        size_t colon = cui_text_view_find(input, start, end, ":", 1);
+        if (colon != SIZE_MAX) {
+            size_t key = start, key_end = colon;
+            while (key < key_end && (input.data[key] == ' ' || input.data[key] == '\t'))
+                ++key;
+            while (key_end > key &&
+                   (input.data[key_end - 1] == ' ' || input.data[key_end - 1] == '\t'))
+                --key_end;
+            if (cui_text_view_name((cui_str){input.data + key, key_end - key}, name))
+                result =
+                    cui_text_view_image_length_parse(input, (cui_text_view_range){colon + 1, end});
+        }
+        start = end + (end < style.end);
+    }
+    return result;
+}
 static void cui_text_view_html_style(unsigned *flags, unsigned *depth, unsigned flag,
                                      bool closing) {
     if (closing) {
@@ -1143,6 +1229,10 @@ static void cui_text_view_html(cui_text_view_parser *p) {
                                            flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
                         p->last.resource = src;
                         p->last.alt = cui_text_view_attribute(p->input, name_end, end, "alt");
+                        p->last.image_width =
+                            cui_text_view_html_image_length(p->input, name_end, end, "width");
+                        p->last.image_height =
+                            cui_text_view_html_image_length(p->input, name_end, end, "height");
                         if (p->write && !p->error)
                             p->state->workspace.spans[p->spans - 1] = p->last;
                     }
@@ -1670,11 +1760,23 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         float size =
             flags & CUI_TEXT_VIEW_CODE && b->kind != CUI_TEXT_VIEW_CODE_BLOCK ? font * .875f : font;
         if (r->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
-            float h = fmaxf(1, line * .75f);
             float ratio = r->image_ready && r->image.width && r->image.height
                               ? (float)r->image.width / r->image.height
                               : 1;
-            float w = fmaxf(1, h * ratio);
+            cui_text_view_image_length width = r->image_width, height = r->image_height;
+            if ((width.specified && (!isfinite(width.value) || width.value < 0)) ||
+                (height.specified && (!isfinite(height.value) || height.value < 0)))
+                return false;
+            float h =
+                height.specified ? height.value * (height.relative ? line : 1)
+                : width.specified
+                    ? (r->image_ready ? width.value * (width.relative ? line : 1) / ratio : line)
+                    : fmaxf(1, line * .75f);
+            float w = width.specified    ? width.value * (width.relative ? line : 1)
+                      : height.specified ? h * (r->image_ready ? ratio : 1)
+                                         : fmaxf(1, h * ratio);
+            if (!isfinite(h) || h < 0 || h > 10000000)
+                return false;
             if (!isfinite(w) || w > 10000000 || s->glyph_count >= s->workspace.glyph_capacity)
                 return false;
             if (cursor_x > 0 && cursor_x + w > available &&
@@ -1703,7 +1805,8 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 .bounds = {x + left + cursor_x, y + padding + cursor_y, w, line},
                 .font_size = size,
                 .line_height = line,
-                .flags = flags};
+                .flags = flags,
+                .line_top = y + padding + cursor_y};
             cursor_x += w;
             continue;
         }
@@ -1783,7 +1886,8 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 .bounds = {x + left + cursor_x, y + padding + cursor_y, advance, line},
                 .font_size = size,
                 .line_height = line,
-                .flags = flags};
+                .flags = flags,
+                .line_top = y + padding + cursor_y};
             cursor_x += advance;
             measured = m.width;
             i += n;
@@ -1793,7 +1897,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         for (size_t first = first_glyph; first < s->glyph_count;) {
             size_t last = first + 1;
             while (last < s->glyph_count &&
-                   s->workspace.glyphs[last].bounds.y == s->workspace.glyphs[first].bounds.y)
+                   s->workspace.glyphs[last].line_top == s->workspace.glyphs[first].line_top)
                 ++last;
             cui_rect tail = s->workspace.glyphs[last - 1].bounds;
             float extra = fmaxf(0, available - (tail.x + tail.w - x - left));
@@ -1931,6 +2035,16 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;
+    for (size_t i = 0; i < s->span_count; ++i) {
+        cui_text_view_span *span = &s->workspace.spans[i];
+        if (!(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        cui_text_view_image_length lengths[] = {span->image_width, span->image_height};
+        for (size_t j = 0; j < 2; ++j)
+            if (lengths[j].specified && (!isfinite(lengths[j].value) || lengths[j].value < 0 ||
+                                         lengths[j].value > 10000000))
+                return CUI_TEXT_VIEW_INVALID;
+    }
     s->glyph_count = 0;
     float y = 0;
     size_t table_first = 0;

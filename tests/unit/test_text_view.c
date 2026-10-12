@@ -140,6 +140,61 @@ static void test_linked_image_model(void) {
            CUI_TEXT_VIEW_OK);
     assert(f.spans[0].link.end - f.spans[0].link.begin == strlen("https://x.test/a(b)"));
 }
+static void test_html_image_dimensions(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    cui_text_view_layout_options o = {.width = 200,
+                                      .font_size = 14,
+                                      .line_height = 20,
+                                      .font_metrics_available = true,
+                                      .body_metrics = {8, 2, 10}};
+    assert(cui_text_view_set_text(
+               &f.state, text("<p>a<img src='asset' width='20' height='40'>b<br>next</p>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[1].image_bounds.w == 20 && f.spans[1].image_bounds.h == 40 &&
+           f.spans[1].image_bounds.y == 0 && f.glyphs[0].bounds.y == 10 &&
+           f.glyphs[2].bounds.y == 10 && f.glyphs[3].bounds.y == 40 && f.blocks[0].bounds.h == 60);
+    assert(cui_text_view_set_text(&f.state, text("<p><img src='asset' width='60'></p>")) ==
+           CUI_TEXT_VIEW_OK);
+    f.spans[0].image_ready = true;
+    f.spans[0].image = (cui_bitmap){.width = 2, .height = 1};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].image_bounds.w == 60 && f.spans[0].image_bounds.h == 30);
+    f.spans[0].image_ready = false;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].image_bounds.w == 60 && f.spans[0].image_bounds.h == 20);
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("<p><img src='asset' width='20' style='width:40px;height:50%'></p>")) ==
+        CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].image_bounds.w == 20 && f.spans[0].image_bounds.h == 10);
+    assert(cui_text_view_set_text(&f.state, text("<p><img src='asset' width='invalid' height='-2' "
+                                                 "style='width:12px;height:2e1'></p>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].image_bounds.w == 12 && f.spans[0].image_bounds.h == 20);
+    size_t count = f.state.glyph_count;
+    f.spans[0].image_width.value = NAN;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_INVALID &&
+           f.state.glyph_count == count);
+    assert(cui_text_view_set_text(&f.state, text("<p><img src='asset' width='NaN' height='1e39' "
+                                                 "style='width:-1;height:inf'></p>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(!f.spans[0].image_width.specified && !f.spans[0].image_height.specified);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK &&
+           f.spans[0].image_bounds.w == 15);
+    assert(cui_text_view_set_text(&f.state, text("<table><tr><td>a<img src='asset' width='20' "
+                                                 "height='40'>b<br>next</td></tr></table>")) ==
+           CUI_TEXT_VIEW_OK);
+    f.blocks[0].alignment = CUI_TEXT_VIEW_ALIGN_CENTER;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[1].bounds.x - f.glyphs[0].bounds.x == 7 &&
+           f.glyphs[2].bounds.x - f.glyphs[1].bounds.x == 20 &&
+           f.spans[1].image_bounds.x == f.glyphs[1].bounds.x &&
+           f.glyphs[0].line_top == f.glyphs[1].line_top);
+}
 static void test_html_inline_image_model(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -1175,6 +1230,38 @@ static void test_html_inline_image_paint(void) {
                                            .y = y}));
     frame(ui, &f, o);
     assert(image_link_clicks == before + 1);
+    cui_destroy(ui);
+}
+static void test_html_sized_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(cui_text_view_set_text(
+               &f.state, text("<p>a<img src='asset' width='20' height='40'>b<br>next</p>")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_font_metrics metrics = {8, 2, 10};
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 512, .font_metrics = image_metrics, .measure_user = &metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    cui_draw_list d = frame(ui, &f, o);
+    bool bitmap = false, next = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *c = &d.commands[i];
+        if (c->type == CUI_DRAW_IMAGE)
+            bitmap = c->bounds.w == 20 && c->bounds.h == 40 && c->bounds.y == 0;
+        if (c->type == CUI_DRAW_TEXT && c->text.length == 4 && !memcmp(c->text.data, "next", 4))
+            next = c->bounds.y >= 40 && c->bounds.y < 42;
+    }
+    assert(bitmap && next);
+    assert(
+        cui_text_view_set_text(&f.state, text("<p>a<img src='asset' width='0' height='0'>b</p>")) ==
+        CUI_TEXT_VIEW_OK);
+    d = frame(ui, &f, o);
+    for (size_t i = 0; i < d.count; ++i)
+        assert(d.commands[i].type != CUI_DRAW_IMAGE);
+    assert(f.spans[1].image_bounds.w == 0 && f.spans[1].image_bounds.h == 0);
     cui_destroy(ui);
 }
 static unsigned heading_metric_calls;
@@ -2240,6 +2327,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_html_image_dimensions();
     test_html_inline_image_model();
     test_image_only_table_copy();
     test_linked_image_model();
@@ -2272,6 +2360,7 @@ int main(void) {
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
     test_linked_image_paint();
+    test_html_sized_image_paint();
     test_html_inline_image_paint();
     test_inline_image_heading_metrics();
     test_inline_image_paint();

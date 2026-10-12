@@ -512,7 +512,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x521e8438), r, style.selection);
         cui_begin_absolute_box(ui, leaf, (cui_box){.custom_opacity = true, .opacity = opacity}, r);
         if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
-            if (span->image_ready) {
+            if (span->image_ready && span->image_bounds.w > 0 && span->image_bounds.h > 0) {
                 cui_rect image = span->image_bounds;
                 image.x -= first->bounds.x;
                 image.y -= first->bounds.y;

@@ -132,7 +132,9 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
         if (cui_event_consumed(ui, i) && event.type == CUI_EVENT_POINTER_UP &&
             event.pointer_button == CUI_POINTER_PRIMARY)
             state->dragging = false;
-        if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
+        if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
+            (event.type == CUI_EVENT_KEY_DOWN &&
+             (event.ime_composing || event.prefer_character_input)))
             continue;
         if (options.delegate_home_end && event.type == CUI_EVENT_KEY_DOWN &&
             (event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))

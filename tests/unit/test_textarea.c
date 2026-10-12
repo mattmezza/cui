@@ -326,7 +326,44 @@ static void test_tab_indent_and_focus(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_composition_navigation(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    char buffer[64] = "ab\ncd";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[16];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 16));
+    cui_textarea_options options = {.width = 180, .rows = 3};
+    frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    assert(cui_edit_select(edit, 4, 4) == CUI_EDIT_OK);
+    frame(ui, edit, &state, options);
+    const cui_key keys[] = {CUI_KEY_UP,    CUI_KEY_DOWN,      CUI_KEY_HOME, CUI_KEY_END,
+                            CUI_KEY_ENTER, CUI_KEY_BACKSPACE, CUI_KEY_TAB};
+    for (unsigned flag = 0; flag < 2; flag++) {
+        cui_edit_state before = cui_edit_get_state(edit);
+        for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++)
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = keys[i],
+                                                   .ime_composing = flag == 0,
+                                                   .prefer_character_input = flag == 1}));
+        cui_textarea_result result = frame(ui, edit, &state, options);
+        cui_edit_state after = cui_edit_get_state(edit);
+        assert(result.error == CUI_TEXTAREA_OK && after.cursor == before.cursor &&
+               after.anchor == before.anchor && after.revision == before.revision &&
+               !strcmp(buffer, "ab\ncd") && cui_focused(ui) == 10);
+    }
+    text(ui, "é");
+    frame(ui, edit, &state, options);
+    assert(!strcmp(buffer, "ab\ncéd"));
+    key(ui, CUI_KEY_UP, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor < 3);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_composition_navigation();
     test_tab_indent_and_focus();
     test_submit_and_horizontal();
     test_metrics_and_layout();

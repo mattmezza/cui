@@ -2,6 +2,7 @@
 #include "cui/cui_base.h"
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 static cui_context *ui;
 static const cui_id id = 101;
 static bool checked, disabled;
@@ -89,7 +90,52 @@ static void editor_navigation_consumption(void) {
         cui_destroy(ctx);
     }
 }
+static void editor_composition_routing(void) {
+    for (unsigned mode = 0; mode < 3; mode++) {
+        cui_context *ctx = cui_create((cui_config){.width = 200, .height = 100});
+        char buffer[32] = "abcdef";
+        cui_edit *edit =
+            cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+        cui_input_behavior_state state = {0};
+        assert(ctx && edit && cui_begin_frame(ctx, 200, 100, 0));
+        cui_begin_box(ctx, 400, (cui_box){.width = 180, .height = 32});
+        cui_base_input_ex(ctx, 400, cui_string("Editor"), edit, &state,
+                          (cui_base_input_options){0});
+        cui_end_box(ctx);
+        cui_end_frame(ctx);
+        cui_focus(ctx, 400);
+        assert(cui_edit_select(edit, 2, 2) == CUI_EDIT_OK);
+        for (unsigned flag = 0; flag < 2; flag++) {
+            const cui_key keys[] = {CUI_KEY_LEFT, CUI_KEY_HOME, CUI_KEY_ENTER, CUI_KEY_V};
+            for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++)
+                assert(cui_queue_event(ctx, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                        .key = keys[i],
+                                                        .modifiers = CUI_MOD_CTRL,
+                                                        .ime_composing = flag == 0,
+                                                        .prefer_character_input = flag == 1}));
+            assert(cui_begin_frame(ctx, 200, 100, 0));
+            cui_begin_box(ctx, 400, (cui_box){.width = 180, .height = 32});
+            if (mode == 0) {
+                cui_interact(ctx, 400, CUI_ROLE_TEXTBOX, cui_string("Editor"), false, false, 0);
+                assert(cui_edit_apply_events(edit, ctx, 400, false) == CUI_EDIT_OK);
+            } else {
+                cui_input_result result =
+                    cui_base_input_ex(ctx, 400, cui_string("Editor"), edit, &state,
+                                      (cui_base_input_options){.readonly = mode == 2});
+                assert(result.error == CUI_EDIT_OK && !result.changed && !result.submitted);
+            }
+            assert(cui_edit_get_state(edit).cursor == 2 && !strcmp(buffer, "abcdef"));
+            for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++)
+                assert(!cui_event_consumed(ctx, i));
+            cui_end_box(ctx);
+            cui_end_frame(ctx);
+        }
+        cui_edit_destroy(edit);
+        cui_destroy(ctx);
+    }
+}
 int main(void) {
+    editor_composition_routing();
     editor_navigation_consumption();
     ui = cui_create((cui_config){.width = 400, .height = 200});
     assert(ui);

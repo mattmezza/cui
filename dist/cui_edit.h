@@ -474,6 +474,8 @@ cui_edit_result cui_edit_redo(cui_edit *e) {
 cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
+    if (v.type == CUI_EVENT_KEY_DOWN && (v.ime_composing || v.prefer_character_input))
+        return CUI_EDIT_OK;
     cui_edit_result r = CUI_EDIT_OK;
     if (v.type == CUI_EVENT_TEXT) {
         size_t n = 0;
@@ -539,7 +541,9 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
     const cui_event *events = cui_frame_events(ui, &count);
     cui_edit_result first = CUI_EDIT_OK;
     for (size_t i = 0; i < count; ++i) {
-        if (cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
+        if (cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
+            (events[i].type == CUI_EVENT_KEY_DOWN &&
+             (events[i].ime_composing || events[i].prefer_character_input)))
             continue;
         if (events[i].type == CUI_EVENT_KEY_DOWN &&
             (events[i].key == CUI_KEY_LEFT || events[i].key == CUI_KEY_RIGHT ||

@@ -275,7 +275,9 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
         cui_event event = events[i];
         if (event.type == CUI_EVENT_CANCEL)
             state->dragging = false;
-        if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
+        if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
+            (event.type == CUI_EVENT_KEY_DOWN &&
+             (event.ime_composing || event.prefer_character_input)))
             continue;
         cui_edit_state event_before = cui_edit_get_state(edit);
         cui_edit_result error = CUI_EDIT_OK;

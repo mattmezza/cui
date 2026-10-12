@@ -256,7 +256,36 @@ static void test_atomic_range(void) {
     assert(cui_edit_undo(e) == CUI_EDIT_OK && !strcmp(b, "reset"));
     cui_edit_destroy(e);
 }
+static void test_composition_keys(void) {
+    char buffer[64] = "ab\ncd";
+    cui_edit *edit = make(buffer, sizeof buffer, true, 10);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    cui_edit_state before = cui_edit_get_state(edit);
+    const cui_key keys[] = {CUI_KEY_LEFT,  CUI_KEY_RIGHT,     CUI_KEY_HOME,
+                            CUI_KEY_END,   CUI_KEY_BACKSPACE, CUI_KEY_DELETE,
+                            CUI_KEY_ENTER, CUI_KEY_A,         CUI_KEY_Z};
+    for (unsigned flag = 0; flag < 2; flag++)
+        for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++) {
+            assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                          .key = keys[i],
+                                                          .modifiers = CUI_MOD_CTRL,
+                                                          .ime_composing = flag == 0,
+                                                          .prefer_character_input = flag == 1}) ==
+                   CUI_EDIT_OK);
+            cui_edit_state after = cui_edit_get_state(edit);
+            assert(after.cursor == before.cursor && after.anchor == before.anchor &&
+                   after.revision == before.revision && !strcmp(buffer, "ab\ncd"));
+        }
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_TEXT, .text = "é"}) ==
+           CUI_EDIT_OK);
+    assert(!strcmp(buffer, "aéb\ncd"));
+    assert(cui_edit_apply_event(
+               edit, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_LEFT}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 1);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_composition_keys();
     test_atomic_range();
     test_atomic_indent();
     test_unicode();

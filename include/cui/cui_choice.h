@@ -200,6 +200,7 @@ typedef struct {
     cui_list_state levels[CUI_MENU_DEPTH_MAX];
     cui_id path[CUI_MENU_DEPTH_MAX - 1];
     cui_rect panels[CUI_MENU_DEPTH_MAX];
+    size_t visible_rows[CUI_MENU_DEPTH_MAX]; /* previous painted window per level */
     size_t depth;
     bool depth_limit;
     float row_height, padding; /* previous painted metrics for pointer hover */

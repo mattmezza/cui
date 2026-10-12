@@ -2422,7 +2422,96 @@ static void test_dropdown_presentation_variants(void) {
             cui_destroy(ui);
         }
 }
+static cui_menu_entry scrolling_menu[12], scrolling_child[12];
+static bool scrolling_menu_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *action,
+                                 bool disabled) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    bool result = cui_menu_tree(
+        ui, 3000, &theme, cui_string("Scrollable"), scrolling_menu, 12, action, state,
+        (cui_menu_tree_options){
+            .popup = {
+                .viewport = {0, 0, 640, 200}, .width = 180, .dt = .016f, .disabled = disabled}});
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void menu_wheel(cui_context *ui, cui_rect panel, float dy) {
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = panel.x + 5, .y = panel.y + 15, .dy = dy}));
+}
+static void test_hierarchical_menu_scroll(void) {
+    for (size_t i = 0; i < 12; i++) {
+        scrolling_menu[i] = (cui_menu_entry){.id = 3100 + i, .label = {"Root", 4}};
+        scrolling_child[i] = (cui_menu_entry){.id = 3200 + i, .label = {"Child", 5}};
+    }
+    scrolling_menu[0].kind = CUI_MENU_SUBMENU;
+    scrolling_menu[0].children = scrolling_child;
+    scrolling_menu[0].child_count = 12;
+    scrolling_menu[2].disabled = true;
+    scrolling_child[2].kind = CUI_MENU_SEPARATOR;
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 3300);
+    cui_id action = 0;
+    scrolling_menu_scene(ui, &state, &action, false);
+    click(ui, 3000);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.depth == 1 && state.visible_rows[0] == 4);
+    key(ui, CUI_KEY_RIGHT);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.depth == 2);
+    menu_wheel(ui, state.panels[1], -.5f);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[1].first_visible == 0);
+    menu_wheel(ui, state.panels[1], -1.5f);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[1].first_visible == 2 && state.levels[0].first_visible == 0);
+    assert(state.levels[1].active == 3203 && cui_focused(ui) == 3203);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    bool range = false;
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == (3100 ^ UINT64_C(0x4b64d23e91a738c1)))
+            range = semantics[i].details.scrollable && semantics[i].details.scroll_y == 84 &&
+                    semantics[i].details.scroll_max_y == 336;
+    assert(range);
+    menu_wheel(ui, state.panels[0], -2);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.depth == 1 && state.levels[0].first_visible == 2);
+    assert(state.levels[0].active == 3103 && cui_focused(ui) == 3103);
+    key(ui, CUI_KEY_END);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[0].first_visible == 8 && cui_focused(ui) == 3111);
+    key(ui, CUI_KEY_HOME);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[0].first_visible == 0 && cui_focused(ui) == 3100);
+    menu_wheel(ui, state.panels[0], -1000);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[0].first_visible == 8);
+    menu_wheel(ui, state.panels[0], 1000);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[0].first_visible == 0);
+    cui_rect row = cui_bounds(ui, 3101);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = row.x + 3, .y = row.y + 3}));
+    menu_wheel(ui, state.panels[0], -3);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = row.x + 3, .y = row.y + 3}));
+    assert(!scrolling_menu_scene(ui, &state, &action, false) && action == 0);
+    assert(state.overlay.open && state.levels[0].first_visible == 3);
+    assert(
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 600, .y = 450, .dy = -2}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[0].first_visible == 3);
+    menu_wheel(ui, state.panels[0], -2);
+    scrolling_menu_scene(ui, &state, &action, true);
+    assert(!state.overlay.open && !state.depth);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_hierarchical_menu_scroll();
     test_dropdown_presentation_variants();
     test_lists_and_popups();
     test_combobox();

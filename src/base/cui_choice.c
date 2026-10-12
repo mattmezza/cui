@@ -961,6 +961,60 @@ void cui_base_menu_entry(cui_context *ui, const cui_menu_entry *entry, bool disa
                                                : 0,
                                .description = entry->shortcut});
 }
+static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries, size_t count,
+                                  cui_menu_tree_state *state, size_t level, cui_id target,
+                                  cui_event event) {
+    cui_id scope =
+        level ? state->path[level - 1] ^ UINT64_C(0x4b64d23e91a738c1) : state->overlay.id;
+    cui_rect bounds = state->panels[level];
+    size_t rows = state->visible_rows[level];
+    if (event.type != CUI_EVENT_SCROLL || target != scope || !isfinite(event.dy) || !rows ||
+        count <= rows || event.x < bounds.x || event.x >= bounds.x + bounds.w ||
+        event.y < bounds.y || event.y >= bounds.y + bounds.h ||
+        !cui_pointer_scope_allowed(ui, state->overlay.id))
+        return false;
+    cui_list_state *cursor = &state->levels[level];
+    size_t maximum = count - rows;
+    if (cursor->first_visible > maximum)
+        cursor->first_visible = maximum;
+    float amount = cursor->scroll_remainder - event.dy;
+    if (!isfinite(amount))
+        amount = event.dy > 0 ? -(float)count : (float)count;
+    float whole = truncf(amount);
+    cursor->scroll_remainder = amount - whole;
+    size_t before = cursor->first_visible;
+    if (whole < 0)
+        cursor->first_visible = -whole >= (float)before ? 0 : before - (size_t)-whole;
+    else {
+        size_t remaining = maximum - before;
+        cursor->first_visible += whole >= (float)remaining ? remaining : (size_t)whole;
+    }
+    if (before == cursor->first_visible)
+        return false;
+    bool focused = false, active_visible = false;
+    for (size_t i = 0; i < count; i++) {
+        focused |= cui_focused(ui) == entries[i].id;
+        active_visible |= i >= cursor->first_visible && i < cursor->first_visible + rows &&
+                          entries[i].id == cursor->active &&
+                          !cui_menu_entry_is_disabled(&entries[i]);
+    }
+    if (!active_visible) {
+        cursor->active = 0;
+        for (size_t i = cursor->first_visible; i < cursor->first_visible + rows; i++)
+            if (!cui_menu_entry_is_disabled(&entries[i])) {
+                cursor->active = entries[i].id;
+                break;
+            }
+        if (focused)
+            cui_focus(ui, cursor->active);
+    }
+    if (state->depth > level + 1) {
+        state->depth = level + 1;
+        cui_focus(ui, cursor->active);
+    }
+    cui_invalidate(ui);
+    return true;
+}
 bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui_menu_entry *items,
                         size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
                         float dt, bool keep_open_checks) {
@@ -1030,10 +1084,21 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         }
     }
     size_t event_count = 0, logical_level = state->depth - 1;
-    bool redirected = false, activated_any = false;
+    bool redirected = false, activated_any = false, pointer_window_changed = false;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count; e++) {
         cui_id target = cui_event_target(ui, e);
+        if (events[e].type == CUI_EVENT_SCROLL) {
+            for (size_t level = 0; level < state->depth; level++)
+                if (cui_menu_scroll_event(ui, menus[level], counts[level], state, level, target,
+                                          events[e])) {
+                    pointer_window_changed = true;
+                    logical_level = level;
+                    redirected = true;
+                    break;
+                }
+            continue;
+        }
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE) {
             size_t escape_level = state->depth;
             if (target == state->overlay.id)
@@ -1102,7 +1167,8 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
             logical_level = level;
             redirected = true;
         }
-        bool activation = cui_event_activation(ui, e) != 0;
+        bool activation = cui_event_activation(ui, e) != 0 &&
+                          !(pointer_window_changed && events[e].type == CUI_EVENT_POINTER_UP);
         if (events[e].type == CUI_EVENT_KEY_UP && entry->id != cui_event_activation(ui, e))
             activation = false;
         bool open_child =

@@ -525,3 +525,16 @@ across frames and reverts after release/cancellation; pressed colored outlines
 use the selected alpha level. Tests verify roles, pointer cancellation and Space
 release activation in all themes. Link decoration reserves each half ID XOR
 `0xc8134e39119b750d` and `0xc8134e39119b751d` for its label group/underline.
+
+Hierarchical Menu now routes wheel scrolling to the semantic menu scope under
+its pointer, including independently scrollable child popups. Fractional wheel
+steps accumulate per level; row windows clamp at both ends and expose pixel
+scroll offsets/ranges. If the active row leaves the window, the first enabled
+visible row becomes active and retains menu focus. Scrolling a parent closes
+its child panels, avoiding anchors to removed rows. Keyboard traversal still
+reveals the active row; wheel-then-release batches cannot activate stale rows.
+Tests cover child/root routing, disabled/separator skipping, clamp/fractional
+movement, Home/End reveal, outside/disabled input and stale-release suppression.
+Pointer drag/touch inertia and a visible Menu scrollbar remain gaps. The frozen
+source's submenu hover-out grace handling itself has a TODO; no full Menu parity
+is claimed.

@@ -832,8 +832,10 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
     if (rows > 4096)
         rows = 4096;
-    if (cursor->first_visible >= count)
-        cursor->first_visible = 0;
+    state->visible_rows[level] = rows;
+    size_t maximum = count > rows ? count - rows : 0;
+    if (cursor->first_visible > maximum)
+        cursor->first_visible = maximum;
     size_t active = count;
     for (size_t i = 0; i < count; i++)
         if (entries[i].id == cursor->active)
@@ -878,10 +880,14 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                .radius = theme->radius},
                      placement.bounds, (int16_t)(100 + level));
     cui_interact(ui, scope, CUI_ROLE_MENU, name, false, false, 0);
-    cui_set_semantic_details(ui, scope,
-                             (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
-                                                    .labelled_by = level ? state->path[level - 1]
-                                                                         : state->overlay.trigger});
+    cui_set_semantic_details(
+        ui, scope,
+        (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
+                               .labelled_by =
+                                   level ? state->path[level - 1] : state->overlay.trigger,
+                               .scrollable = count > rows,
+                               .scroll_y = cursor->first_visible * theme->control_height,
+                               .scroll_max_y = maximum * theme->control_height});
     size_t begin = cursor->first_visible, end = rows > count - begin ? count : begin + rows;
     for (size_t i = begin; i < end; i++) {
         const cui_menu_entry *entry = &entries[i];
@@ -944,7 +950,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         for (size_t i = 0; i < count; i++)
             if (entries[i].id == state->path[level])
                 parent = i;
-        if (parent < count) {
+        if (parent >= begin && parent < end) {
             cui_rect child_anchor = {placement.bounds.x,
                                      placement.bounds.y + theme->padding +
                                          (float)(parent - begin) * theme->control_height,

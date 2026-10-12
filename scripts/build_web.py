@@ -9,6 +9,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ['src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
            'src/base/cui_overlay.c', 'src/base/cui_virtual.c', 'src/base/cui_dock.c', 'src/base/cui_plot.c', 'src/base/cui_edit.c',
+           'src/base/cui_numeric.c', 'src/components/cui_numeric.c',
            'src/base/cui_content.c', 'src/components/cui_content.c',
            'src/base/cui_disclosure.c', 'src/components/cui_disclosure.c',
            'src/base/cui_choice.c', 'src/components/cui_choice.c',

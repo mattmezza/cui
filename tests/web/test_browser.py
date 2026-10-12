@@ -63,6 +63,27 @@ def main():
                 page.wait_for_timeout(50)
                 assert page.locator('#preview-card').is_visible()
                 assert 'draw commands' in page.locator('#preview-note').inner_text()
+            for name, initial, key, expected in [('NumberInput', 42, 'ArrowUp', 43), ('Rating', 3, 'ArrowRight', 3.5)]:
+                page.evaluate('(name)=>location.hash=name', name)
+                page.wait_for_function('(name)=>document.querySelector("#name").textContent===name', arg=name)
+                page.wait_for_timeout(80)
+                assert page.evaluate('cuiGallery.exports.gallery_semantic(0,8)') == initial
+                canvas.focus()
+                page.keyboard.press('Tab')
+                page.keyboard.press(key)
+                page.wait_for_function('(expected)=>cuiGallery.exports.gallery_semantic(0,8)===expected', arg=expected)
+            page.evaluate('location.hash="Combobox"')
+            page.wait_for_function('document.querySelector("#name").textContent==="Combobox"')
+            page.wait_for_timeout(80)
+            canvas.focus()
+            page.keyboard.press('Tab')
+            page.keyboard.type('Ban')
+            page.wait_for_function('cuiGallery.exports.gallery_modal() === 1')
+            texts = 'Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{let e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)));})'
+            page.wait_for_function(texts + '.some(s=>s.includes("1 matching options"))')
+            page.keyboard.press('ArrowDown')
+            page.keyboard.press('Enter')
+            page.wait_for_function('cuiGallery.exports.gallery_modal() === 0')
             for name in ['Select', 'Menu']:
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name', arg=name)
@@ -154,10 +175,22 @@ def main():
             page.wait_for_function('document.querySelector("#name").textContent==="Button"')
             page.wait_for_timeout(100)
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            overflow = []
+            for name in page.evaluate('Object.keys(cuiGallery.stories)'):
+                page.evaluate('(name)=>location.hash=name', name)
+                page.wait_for_function('(name)=>document.querySelector("#name").textContent===name', arg=name)
+                page.wait_for_timeout(40)
+                bad = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{const e=cuiGallery.exports;return [e.gallery_command(i,0),e.gallery_command(i,1),e.gallery_command(i,2),e.gallery_command(i,3),e.gallery_command(i,4)];}).filter(c=>c[0]===2&&(c[1]<0||c[2]<0||c[1]+c[3]>document.querySelector("canvas").clientWidth+1||c[2]+c[4]>261))')
+                if bad:
+                    overflow.append((name, bad))
+            assert not overflow, overflow
+            page.evaluate('location.hash="Button"')
+            page.wait_for_function('document.querySelector("#name").textContent==="Button"')
+            page.wait_for_timeout(50)
             page.screenshot(path=str(root / 'browser-mobile.png'))
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 32 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 37 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

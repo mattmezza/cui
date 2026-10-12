@@ -4,6 +4,7 @@
 #include "cui/cui_content.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
+#include "cui/cui_numeric.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_virtual.h"
 #include <stdio.h>
@@ -36,10 +37,18 @@ static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
 static bool redraw;
 static float host_seconds, host_dt = 1.0f / 60;
 static bool reduced_motion;
-static cui_choice_popup select_popup, menu_popup;
+static cui_choice_popup select_popup, menu_popup, combo_popup;
+static cui_edit *query;
+static char query_buffer[128];
+static cui_id combo_selection;
 static cui_list_state list_state;
 static cui_id list_selection, select_selection, menu_action;
 static int menu_invocations, previous_story = -1;
+static char number_buffer[128] = "42";
+static cui_number_state number_state;
+static double number = 42;
+static size_t page_number = 3, current_step;
+static float rating = 3;
 static cui_id dock_serial = 3;
 static void panel(cui_context *context, size_t index, void *user) {
     (void)user;
@@ -80,9 +89,18 @@ int gallery_init(void) {
         cui_dock_insert(dock, cui_dock_root(dock), 1, 0);
         cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
     }
+    number_state.edit = cui_edit_create((cui_edit_config){.buffer = number_buffer,
+                                                          .capacity = sizeof(number_buffer),
+                                                          .history_bytes = 2048,
+                                                          .max_history_steps = 16});
     cui_choice_popup_init(&select_popup, cui_id_from(ui, "select-popup"));
+    query = cui_edit_create((cui_edit_config){.buffer = query_buffer,
+                                              .capacity = sizeof(query_buffer),
+                                              .history_bytes = 2048,
+                                              .max_history_steps = 16});
+    cui_choice_popup_init(&combo_popup, cui_id_from(ui, "combo-popup"));
     cui_choice_popup_init(&menu_popup, cui_id_from(ui, "menu-popup"));
-    return ui && edit && dock && rebuilt == CUI_VIRTUAL_OK;
+    return ui && edit && dock && query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat) {
     if (ui)
@@ -113,6 +131,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     if (previous_story != story) {
         cui_overlay_close(ui, &select_popup.overlay);
         cui_overlay_close(ui, &menu_popup.overlay);
+        cui_overlay_close(ui, &combo_popup.overlay);
         previous_story = story;
     }
     redraw = false;
@@ -379,6 +398,61 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         break;
     }
+    case 33: {
+        cui_number_input(ui, cui_id_from(ui, "number"), &t, cui_string("Quantity"), &number_state,
+                         &number,
+                         (cui_number_options){.minimum = 0,
+                                              .maximum = 100,
+                                              .step = 1,
+                                              .has_minimum = true,
+                                              .has_maximum = true,
+                                              .disabled = disabled,
+                                              .width = width > 360 ? 280 : width - 48});
+        char text[64];
+        snprintf(text, sizeof(text), "Controlled value: %.2f", number);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 34: {
+        cui_pagination(ui, cui_id_from(ui, "pagination"), &t, &page_number, 20, true, disabled);
+        char text[64];
+        snprintf(text, sizeof(text), "Page %zu of 20", page_number);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 35:
+        cui_rating(ui, cui_id_from(ui, "rating"), &t, cui_string("Rate your experience"), &rating,
+                   (cui_rating_options){.maximum = 5,
+                                        .half_steps = true,
+                                        .clearable = true,
+                                        .disabled = disabled,
+                                        .width = width > 360 ? 280 : width - 128});
+        break;
+    case 36: {
+        cui_step steps[3] = {{cui_string("Details"), cui_string(""), CUI_STEP_COMPLETE, false},
+                             {cui_string("Review"), cui_string(""), CUI_STEP_ACTIVE, false},
+                             {cui_string("Finish"), cui_string(""), CUI_STEP_PENDING, false}};
+        cui_stepper(ui, cui_id_from(ui, "stepper"), &t, steps, 3, &current_step, true, disabled);
+        break;
+    }
+    case 37: {
+        cui_choice_item items[4] = {{cui_id_from(ui, "combo-a"), cui_string("Apple"), false},
+                                    {cui_id_from(ui, "combo-b"), cui_string("Apricot"), false},
+                                    {cui_id_from(ui, "combo-c"), cui_string("Banana"), false},
+                                    {cui_id_from(ui, "combo-d"), cui_string("Unavailable"), true}},
+                        filtered[4];
+        cui_combobox_result result =
+            cui_combobox(ui, cui_id_from(ui, "combobox"), &t, cui_string("Find a fruit"), query,
+                         items, 4, filtered, 4, &combo_selection, &combo_popup,
+                         (cui_choice_popup_options){.disabled = disabled,
+                                                    .viewport = {0, 0, width, height},
+                                                    .width = width > 360 ? 280 : width - 48,
+                                                    .dt = host_dt});
+        char text[64];
+        snprintf(text, sizeof(text), "%zu matching options", result.matching_count);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
     default:
         cui_label(ui, &t, cui_string("This component has no browser story yet."));
         break;
@@ -491,5 +565,5 @@ void gallery_time(float seconds, float dt, int reduced) {
 }
 
 int gallery_modal(void) {
-    return select_popup.overlay.open || menu_popup.overlay.open;
+    return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open;
 }

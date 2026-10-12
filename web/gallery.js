@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Calendar']);
 const snippets = {
  Button:'if (cui_button(ui, id, &theme,\n    cui_string("Run action"), false)) {\n    run_action();\n}',
@@ -21,6 +21,11 @@ const snippets = {
  Dock:'cui_dock_split(dock, tab,\n    CUI_DOCK_SPLIT_HORIZONTAL, 0.5,\n    new_panel_key, false, &new_tab);',
  Plot:'cui_plot_zoom(&scale, 1.5, anchor_pixel);\ncui_plot_ticks(&scale, 5, ticks, 32, &count);',
  Calendar:'date = cui_date_add_months(date, 1);\nint days = cui_date_days_in_month(\n    date.year, date.month);',
+ Combobox:'cui_combobox(ui, id, &theme, label, query,\n    items, 4, scratch, 4, &selection,\n    &popup, options);',
+ NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, options);',
+ Pagination:'cui_pagination(ui, id, &theme,\n    &page, total_pages, true, false);',
+ Rating:'cui_rating(ui, id, &theme, label,\n    &rating, options);',
+ Stepper:'cui_stepper(ui, id, &theme, steps, 3,\n    &current_step, true, false);',
  List:'cui_list(ui, id, &theme, items, 3,\n    &selection, &state, options);',
  Select:'cui_select(ui, id, &theme, label, placeholder,\n    items, 3, &selection, &popup, options);',
  Menu:'if (cui_menu(ui, id, &theme, label,\n    items, 3, &action, &popup, options)) {\n    dispatch(action);\n}',
@@ -120,7 +125,7 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
   if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
  if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
- if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor')){
+ if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox')){
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
 });

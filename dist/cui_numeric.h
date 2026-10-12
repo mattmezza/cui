@@ -624,6 +624,8 @@ static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme
     cui_begin_box(ui, id,
                   (cui_box){.height = t->control_height,
                             .padding = t->padding,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
                             .radius = t->radius,
                             .background = disabled ? t->surface : t->primary,
                             .border = cui_focused(ui) == id ? t->focus : t->border,
@@ -794,6 +796,46 @@ bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page
     cui_end_box(ui);
     return changed;
 }
+typedef struct {
+    cui_icon_state outline, fill;
+    bool initialized;
+} cui_rating_icons;
+static void cui_rating_icons_collect(void *payload) {
+    cui_rating_icons *icons = payload;
+    cui_icon_state_collect(&icons->outline);
+    cui_icon_state_collect(&icons->fill);
+}
+static void cui_rating_icons_destroy(void *payload) {
+    cui_rating_icons *icons = payload;
+    cui_icon_state_destroy(&icons->outline);
+    cui_icon_state_destroy(&icons->fill);
+}
+static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id, float size) {
+    cui_rating_icons *icons = cui_resource_get(ui, id, UINT64_C(0x929f4a4758cf0103), sizeof(*icons),
+                                               cui_rating_icons_collect, cui_rating_icons_destroy);
+    if (!icons)
+        return NULL;
+    if (!icons->initialized) {
+        cui_icon_state_init(&icons->outline);
+        cui_icon_state_init(&icons->fill);
+        icons->initialized = true;
+        const char *outline = "<svg width='24' height='24' viewBox='0 0 24 24' "
+                              "xmlns='http://www.w3.org/2000/svg'><path d='M12 2 L15 8.2 L22 9.2 "
+                              "L17 14 L18.2 21 L12 17.7 L5.8 21 L7 14 L2 9.2 L9 8.2 Z' fill='none' "
+                              "stroke='white' stroke-width='1.6' stroke-linejoin='round'/></svg>";
+        const char *fill =
+            "<svg width='24' height='24' viewBox='0 0 24 24' "
+            "xmlns='http://www.w3.org/2000/svg'><path d='M12 2 L15 8.2 L22 9.2 L17 14 L18.2 21 L12 "
+            "17.7 L5.8 21 L7 14 L2 9.2 L9 8.2 Z' fill='white'/></svg>";
+        if (!cui_icon_set_data(&icons->outline, cui_string(outline)) ||
+            !cui_icon_set_data(&icons->fill, cui_string(fill)))
+            return NULL;
+    }
+    if (cui_icon_prepare(&icons->outline, size, size, cui_icon_identity()) != CUI_ICON_OK ||
+        cui_icon_prepare(&icons->fill, size, size, cui_icon_identity()) != CUI_ICON_OK)
+        return NULL;
+    return icons;
+}
 bool cui_rating(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
                 cui_rating_options o) {
     if (!t || !value)
@@ -812,11 +854,40 @@ bool cui_rating(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
                             .gap = t->gap,
                             .radius = t->radius,
                             .background = t->surface});
+    float side = fminf(slot, fminf(t->control_height, t->font_size * 1.3f));
+    cui_rating_icons *icons = side > 0 ? cui_rating_icons_get(ui, id, side) : NULL;
+    cui_color color = o.disabled ? t->muted : t->primary;
     for (unsigned i = 0; i < maximum; ++i) {
         cui_begin_box(ui, cui_numeric_part_id(id, 10 + i),
-                      (cui_box){.width = slot, .height = t->control_height});
-        const char *star = *value >= (float)i + 1 ? "★" : *value > (float)i ? "◐" : "☆";
-        cui_text(ui, cui_string(star), t->font_size * 1.3f, o.disabled ? t->muted : t->primary);
+                      (cui_box){.width = slot,
+                                .height = t->control_height,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
+        cui_begin_box(ui, 0, (cui_box){.width = side, .height = side});
+        if (icons) {
+            cui_bitmap outline = cui_icon_state_bitmap(&icons->outline);
+            cui_bitmap fill = cui_icon_state_bitmap(&icons->fill);
+            cui_set_bitmap_underlay(
+                ui, (cui_underlay_layout){.bounds = {0, 0, side, side}},
+                (cui_bitmap_paint){
+                    .bitmap = outline, .opacity = 1, .custom_tint = true, .tint = color},
+                (cui_corner_radii){0});
+            float fraction = fmaxf(0, fminf(1, *value - (float)i));
+            if (fraction > 0) {
+                cui_begin_absolute_box(ui, 0, (cui_box){0},
+                                       (cui_rect){0, 0, side * fraction, side});
+                cui_paint_bitmap(
+                    ui, 0,
+                    (cui_bitmap_paint){.bitmap = fill,
+                                       .source = {0, 0, fill.width * fraction, fill.height},
+                                       .opacity = 1,
+                                       .custom_tint = true,
+                                       .tint = color},
+                    (cui_box){.width = side * fraction, .height = side});
+                cui_end_box(ui);
+            }
+        }
+        cui_end_box(ui);
         cui_end_box(ui);
     }
     cui_end_box(ui);

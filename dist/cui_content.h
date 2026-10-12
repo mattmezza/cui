@@ -300,7 +300,8 @@ void cui_avatar(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
                   (cui_box){.width = size,
                             .height = size,
                             .radius = size / 2,
-                            .padding = size * .2f,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
                             .background = t->primary,
                             .border = t->border,
                             .border_width = 1});
@@ -487,9 +488,15 @@ static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme 
         cui_content_positive(o.height, card ? 120 : t->font_size * 1.5f + t->padding * 2);
     cui_popup_result placement =
         cui_popup_place(anchor, (cui_size){width, height}, o.viewport, o.side, o.gap);
+    float padding =
+        card ? t->padding
+             : fminf(t->padding,
+                     fmaxf(0, (height - cui_measure_text(ui, name, t->font_size).height) / 2));
     cui_begin_portal(ui, id,
-                     (cui_box){.padding = t->padding,
+                     (cui_box){.padding = padding,
                                .gap = t->gap,
+                               .align_x = card ? CUI_ALIGN_START : CUI_ALIGN_CENTER,
+                               .align_y = card ? CUI_ALIGN_START : CUI_ALIGN_CENTER,
                                .radius = t->radius,
                                .background = t->surface,
                                .border = t->border,

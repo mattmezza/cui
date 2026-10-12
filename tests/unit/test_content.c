@@ -125,8 +125,13 @@ static void hover_panels(void) {
         bool visible = false;
         for (size_t i = 0; i < list.count; ++i) {
             const cui_draw_command *c = &list.commands[i];
-            if (c->type == CUI_DRAW_TEXT && c->bounds.y >= 40)
+            if (c->type == CUI_DRAW_TEXT && c->bounds.y >= 40) {
                 visible = true;
+                if (!card) {
+                    assert(fabsf(c->bounds.x + c->bounds.w / 2 - panel.x - panel.w / 2) < .01f);
+                    assert(fabsf(c->bounds.y + c->bounds.h / 2 - panel.y - panel.h / 2) < .01f);
+                }
+            }
         }
         assert(visible);
         size_t n;
@@ -170,8 +175,12 @@ int main(void) {
         bool initials = false, skeleton = false, vertical = false, outline = false;
         for (size_t j = 0; j < list.count; ++j) {
             const cui_draw_command *c = &list.commands[j];
-            if (c->type == CUI_DRAW_TEXT && c->text.length == 2 && !memcmp(c->text.data, "AL", 2))
+            if (c->type == CUI_DRAW_TEXT && c->text.length == 2 && !memcmp(c->text.data, "AL", 2)) {
                 initials = true;
+                cui_rect avatar = cui_bounds(ui, 3);
+                assert(fabsf(c->bounds.x + c->bounds.w / 2 - avatar.x - avatar.w / 2) < .01f);
+                assert(fabsf(c->bounds.y + c->bounds.h / 2 - avatar.y - avatar.h / 2) < .01f);
+            }
             if (c->type == CUI_DRAW_RECT && c->bounds.w == 120 && c->bounds.h == 16 &&
                 c->color.a == themes[i].border.a)
                 skeleton = true;

@@ -733,13 +733,8 @@ static const unsigned char image_story_pixels[80] = {
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0};
-static const unsigned char image_story_blue[80] = {
-    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0,
-    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0,
-    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0,
-    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0};
-static const cui_image_frame image_frames[2] = {{image_story_pixels, 4, 4, 20, 1, .5},
-                                                {image_story_blue, 4, 4, 20, 2, .5}};
+#include "gallery_image.inc"
+static const cui_image_frame image_frames[] = {{gallery_lake_pixels, 256, 144, 1024, 1, 0}};
 static cui_image_state image_state, attachment_images[6];
 static cui_attachment_state attachment_states[6];
 static cui_attachment_group_state attachment_group_state;
@@ -755,7 +750,7 @@ static cui_image_load gallery_image_loader(void *user, cui_image_source source) 
                                       : source.identity == 3 ? CUI_IMAGE_FAILED
                                                              : CUI_IMAGE_READY,
                             .frames = image_frames,
-                            .count = 2};
+                            .count = 1};
 }
 static void gallery_image_placeholder(cui_context *context, cui_id id, void *user, float width,
                                       float height) {
@@ -2445,7 +2440,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_marker_child children[] = {
             {.kind = CUI_MARKER_ICON, .width = 16, .render = marker_icon_content},
             {.kind = CUI_MARKER_TEXT, .text = cui_string("Synchronizing workspace")},
-            {.kind = CUI_MARKER_CONTENT, .width = 52, .render = marker_content}};
+            {.kind = CUI_MARKER_CONTENT,
+             .width = cui_measure_text(ui, cui_string("3 tasks"), t.font_size).width,
+             .render = marker_content}};
         size_t first = marker_icon ? 0 : 1;
         cui_id id = cui_id_from(ui, "workspace-marker");
         cui_marker_options options = {.variant = (cui_marker_variant)marker_variant,

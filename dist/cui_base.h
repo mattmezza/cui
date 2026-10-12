@@ -127,6 +127,8 @@ bool cui_base_radio(cui_context *ui, cui_id id, cui_str name, int *value, int op
     if (disabled || !s.activated || *value == option)
         return false;
     *value = option;
+    /* Earlier siblings may already have painted the old controlled value. */
+    cui_invalidate(ui);
     cui_update_semantic(ui, id, true, (float)option);
     return true;
 }

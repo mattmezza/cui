@@ -481,9 +481,41 @@ static void number_sizes_and_icons(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_NUMERIC_BASE_ONLY
+static void rating_star_graphics(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    cui_theme theme = cui_theme_light();
+    float value = 2.5f;
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    cui_rating(ui, 102, &theme, cui_string("Rating"), &value,
+               (cui_rating_options){.half_steps = true});
+    cui_draw_list list = cui_end_frame(ui);
+    unsigned images = 0, half = 0;
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *c = &list.commands[i];
+        assert(c->type != CUI_DRAW_TEXT);
+        if (c->type != CUI_DRAW_IMAGE)
+            continue;
+        images++;
+        assert(cui_bitmap_valid(c->bitmap.bitmap));
+        assert(c->bounds.h > 15 && c->bounds.h < 25);
+        if (c->bitmap.source.w > 0 && c->bitmap.source.w < c->bitmap.bitmap.width) {
+            half++;
+            assert(fabsf(c->bitmap.source.w * 2 - c->bitmap.bitmap.width) < .01f);
+            assert(fabsf(c->bounds.w * 2 - c->bounds.h) < .01f);
+        } else
+            assert(fabsf(c->bounds.w - c->bounds.h) < .01f);
+    }
+    assert(images == 8 && half == 1);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+#endif
+
 int main(void) {
 #ifndef CUI_NUMERIC_BASE_ONLY
     number_sizes_and_icons();
+    rating_star_graphics();
 #endif
     decimal_locale();
     models();

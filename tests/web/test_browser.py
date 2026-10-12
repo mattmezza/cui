@@ -1074,17 +1074,18 @@ def main():
             page.wait_for_function('cuiGallery.renderedComponent==="Image"&&cuiGallery.exports.gallery_image_stats(1)===1')
             image_command = lambda: page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_command(i,0)===5)')
             assert image_command() is not None
-            page.wait_for_function('cuiGallery.exports.gallery_image_stats(3)===1', timeout=2000)
-            assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap_revision(i,0)', image_command()) == 2
+            assert page.evaluate('cuiGallery.exports.gallery_image_stats(3)') == 0
+            assert page.evaluate('(i)=>[0,1].map(n=>cuiGallery.exports.gallery_bitmap(i,n))', image_command()) == [256,144]
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap_revision(i,0)', image_command()) == 1
             page.emulate_media(reduced_motion='reduce')
             control_change('image-state', '1')
             page.wait_for_function('cuiGallery.exports.gallery_image_stats(1)===0')
             control_change('image-state', '0')
             page.wait_for_function('()=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return e.gallery_image_stats(1)===1&&e.gallery_image_stats(3)===0&&i!==undefined&&e.gallery_bitmap_revision(i,0)===1;}')
-            image_width = page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', image_command())
+            image_height = page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,4)', image_command())
             control_change('image-fit', '1')
-            page.wait_for_function('(w)=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return e.gallery_command(i,3)>w;}', arg=image_width)
-            assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap(i,6)', image_command()) < 4
+            page.wait_for_function('(w)=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return e.gallery_command(i,4)>w;}', arg=image_height)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap(i,5)', image_command()) < 256
             for fit in ('2','3','4','0'):
                 control_change('image-fit', fit)
                 page.wait_for_function('cuiGallery.exports.gallery_error()===0')
@@ -2092,6 +2093,8 @@ def main():
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===2).every(i=>!/[()*]/.test(new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))))')
             click_semantic('Priority', 4)
             page.wait_for_function('document.querySelector(`#accessible [role=radio][aria-label=Priority]`).getAttribute("aria-checked")==="true"')
+            page.wait_for_function('document.querySelector(`#accessible [role=radio][aria-label=Standard]`).getAttribute("aria-checked")==="false"')
+            assert page.locator('#accessible [role=radio][aria-checked=true]').count() == 1
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).includes(5)')
             assert page.locator('#accessible [role=radio][aria-label=Priority]').get_attribute('aria-required') == 'true'
             assert page.locator('#accessible [role=radio][aria-label=Priority]').get_attribute('aria-invalid') == 'true'

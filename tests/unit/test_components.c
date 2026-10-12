@@ -401,6 +401,44 @@ static void test_radio_geometry(void) {
     cui_destroy(ui);
 }
 
+static void test_radio_shared_redraw(void) {
+    cui_context *ui = cui_create((cui_config){.width = 300, .height = 200});
+    cui_theme theme = cui_theme_light();
+    int value = 0;
+    for (unsigned frame = 0; frame < 3; frame++) {
+        if (frame == 1) {
+            cui_focus(ui, 102);
+            /* Stabilize focus first, so activation itself must invalidate. */
+        }
+        assert(cui_begin_frame(ui, 300, 200, .016f));
+        cui_begin_box(ui, 100, (cui_box){.gap = 8});
+        cui_radio(ui, 101, &theme, cui_string("First"), &value, 0, false);
+        cui_radio(ui, 102, &theme, cui_string("Second"), &value, 1, false);
+        cui_end_box(ui);
+        cui_end_frame(ui);
+    }
+    assert(!cui_needs_redraw(ui));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_begin_box(ui, 100, (cui_box){.gap = 8});
+    cui_radio(ui, 101, &theme, cui_string("First"), &value, 0, false);
+    assert(cui_radio(ui, 102, &theme, cui_string("Second"), &value, 1, false));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(value == 1 && cui_needs_redraw(ui));
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_begin_box(ui, 100, (cui_box){.gap = 8});
+    cui_radio(ui, 101, &theme, cui_string("First"), &value, 0, false);
+    cui_radio(ui, 102, &theme, cui_string("Second"), &value, 1, false);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    assert(count == 2 && !semantics[0].checked && semantics[1].checked);
+    assert(!cui_needs_redraw(ui));
+    cui_destroy(ui);
+}
+
 static cui_draw_list switch_frame(cui_context *ui, cui_theme *t, bool *value,
                                   cui_switch_state *state, cui_switch_options o) {
     assert(cui_begin_frame(ui, 400, 200, .016f));
@@ -846,6 +884,7 @@ int main(void) {
     test_switch();
     test_checkbox_geometry();
     test_radio_geometry();
+    test_radio_shared_redraw();
     test_semantic_theme_contrast();
     test_button_intent_outlines();
     test_button_palette_overrides();

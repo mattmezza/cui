@@ -58,6 +58,7 @@ def main():
         '-I', str(ROOT / 'include'), '-I', str(ROOT / 'third_party/clay'),
         *[str(ROOT / s) for s in SOURCES], '-lm', '-Wl,-z,stack-size=8388608',
         *[f'-Wl,--export={s}' for s in EXPORTS], '-o', str(out / 'gallery.wasm')], check=True)
+    shutil.copytree(ROOT / 'web/assets', out / 'assets', dirs_exist_ok=True)
     for name in ['index.html', 'gallery.css']:
         shutil.copyfile(ROOT / 'web' / name, out / name)
     wasm_version = hashlib.sha256((out / 'gallery.wasm').read_bytes()).hexdigest()[:16]

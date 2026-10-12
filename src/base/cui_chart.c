@@ -930,7 +930,10 @@ cui_plot_result cui_chart_radar_vertex(const cui_chart_options *o, size_t dimens
     if (max <= 0 || radius <= 0)
         return CUI_PLOT_EMPTY;
     double value = cui_chart_series_value(o, series, dimension);
-    double r = fmin(8192, radius * fmax(0, value) / max);
+    double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
+    if (!isfinite(progress) || progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    double r = fmin(8192, radius * fmax(0, value) / max * progress);
     double angle = -CUI_CHART_PI / 2 + 2 * CUI_CHART_PI * dimension / o->count;
     double px = o->width / 2.0 + r * cos(angle);
     double py = o->height / 2.0 + r * sin(angle);

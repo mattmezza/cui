@@ -421,6 +421,16 @@ int main(void) {
     assert(fabsf(radar_x - 64) < .01f && radar_y > 0 && radar_y < 48);
     assert(cui_chart_radar_vertex(&options, 0, 1, &radar_x, &radar_y) == CUI_PLOT_OK);
     assert(fabsf(radar_x - 64) < .01f && radar_y > 0 && radar_y < 48);
+    float full_radar_y = radar_y;
+    options.reveal_enabled = true;
+    options.reveal_progress = .5;
+    assert(cui_chart_radar_vertex(&options, 0, 1, &radar_x, &radar_y) == CUI_PLOT_OK);
+    assert(fabsf(radar_y - (48 + full_radar_y) / 2) < .01f);
+    options.reduced_motion = true;
+    assert(cui_chart_radar_vertex(&options, 0, 1, &radar_x, &radar_y) == CUI_PLOT_OK);
+    assert(fabsf(radar_y - full_radar_y) < .01f);
+    options.reduced_motion = false;
+    options.reveal_enabled = false;
     assert(cui_chart_radar_vertex(&options, 0, 9, &radar_x, &radar_y) == CUI_PLOT_INVALID);
     assert(cui_chart_hit_test(&options, 32, 1).valid);
     assert(!cui_chart_hit_test(&options, 1, 1).valid);

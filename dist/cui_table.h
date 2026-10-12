@@ -25,6 +25,8 @@ typedef struct {
     bool sortable, resizable, movable, disabled, fixed_left;
     cui_table_align align;
 } cui_table_column;
+/* Reference defaults; zero-initialized structs remain supported. */
+cui_table_column cui_table_column_default(cui_id key, cui_str label);
 typedef enum {
     CUI_TABLE_SORT_DEFAULT,
     CUI_TABLE_SORT_ASCENDING,
@@ -117,6 +119,7 @@ typedef struct {
     void *render_userdata;
     cui_table_selection_mode selection_mode;
 } cui_table_options;
+cui_table_options cui_table_options_default(void);
 typedef struct {
     bool selection_changed, sort_changed, columns_changed;
     bool visible_rows_changed, visible_columns_changed, load_more, context_requested;
@@ -204,6 +207,18 @@ struct cui_table_model {
     cui_id *keys[2];
     size_t *indices[2];
 };
+cui_table_column cui_table_column_default(cui_id key, cui_str label) {
+    return (cui_table_column){.key = key,
+                              .label = label,
+                              .width = 100,
+                              .minimum = 20,
+                              .resizable = true,
+                              .movable = true};
+}
+cui_table_options cui_table_options_default(void) {
+    return (cui_table_options){
+        .bordered = true, .scrollbars = true, .selection_mode = CUI_TABLE_SELECT_ROW};
+}
 static uint64_t mix(uint64_t x) {
     x ^= x >> 30;
     x *= UINT64_C(0xbf58476d1ce4e5b9);
@@ -857,6 +872,19 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         }
         if (was_drag)
             activation = 0;
+        if (ev[e].type == CUI_EVENT_KEY_DOWN && ev[e].key == CUI_KEY_ESCAPE) {
+            bool owned = target == id || target == cui_table_body_id(id) ||
+                         target == cui_table_row_header_id(id, s->cursor_row) ||
+                         target == cui_table_cell_id(id, s->cursor_row, s->cursor_column) ||
+                         target == cui_table_header_id(id, s->header_cursor);
+            if (owned) {
+                out.selection_changed |= s->row != 0 || s->column != 0 || s->selection_count != 0;
+                s->row = s->column = s->anchor_row = s->anchor_column = 0;
+                s->selection_count = 0;
+                s->resizing = 0;
+                continue;
+            }
+        }
         if (row_header_event(ui, id, m, s, o, &ev[e], target, activation, &previous, &reveal, &out))
             continue;
         bool header = false, hit = false;
@@ -995,10 +1023,15 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                             nc = n;
                     }
                     if (ev[e].key == CUI_KEY_HOME || ev[e].key == CUI_KEY_END) {
-                        for (size_t p = 0; p < m->count; p++) {
-                            size_t n = ev[e].key == CUI_KEY_HOME ? p : m->count - 1 - p;
-                            if (!m->rows[n].disabled) {
-                                nr = n;
+                        bool by_column = o.selection_mode != CUI_TABLE_SELECT_ROW;
+                        size_t length = by_column ? m->columns : m->count;
+                        for (size_t p = 0; p < length; p++) {
+                            size_t n = ev[e].key == CUI_KEY_HOME ? p : length - 1 - p;
+                            if (by_column ? !m->cols[n].disabled : !m->rows[n].disabled) {
+                                if (by_column)
+                                    nc = n;
+                                else
+                                    nr = n;
                                 break;
                             }
                         }

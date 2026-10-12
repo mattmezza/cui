@@ -141,12 +141,24 @@ typedef struct {
 } cui_interaction;
 typedef enum { CUI_ALIGN_START, CUI_ALIGN_CENTER, CUI_ALIGN_END } cui_align;
 typedef struct {
+    float top_left, top_right, bottom_left, bottom_right;
+} cui_corner_radii;
+typedef struct {
+    float left, right, top, bottom;
+} cui_border_edges;
+typedef struct {
     float width, height, padding, gap, radius;
     bool row, clip;
     cui_color background, border;
     float border_width;
     cui_align align_x, align_y;
     float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges;
+    /* Flags preserve zero corners/edges. Radii are clamped to half the shorter
+     * side by adapters; border widths use the same integer layout units as
+     * border_width. Negative/nonfinite box values normalize to zero. */
+    bool custom_corners, custom_border_edges;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,
@@ -161,6 +173,9 @@ typedef struct {
     cui_color color;
     float radius, stroke, font_size;
     cui_str text;
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges;
+    bool custom_corners, custom_border_edges;
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;
@@ -208,6 +223,13 @@ cui_id cui_event_target(cui_context *ui, size_t index);
 cui_id cui_event_activation(cui_context *ui, size_t index);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
+/* Register one current-layout bounds result per ID for this frame. The retained
+ * pointer must remain valid through cui_end_frame, which writes the computed
+ * rectangle (zero if absent) and invalidates only when its fields change.
+ * Repeating the same ID/pointer is idempotent; conflicting IDs/pointers fail
+ * with DUPLICATE_ID. Registrations are bounded by max_elements. Null arguments
+ * or zero IDs return false. Call only between begin_frame and end_frame. */
+bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained);
 /* Previous-frame clipped region, excluding higher interactive layers/modal scopes. */
 bool cui_hovered(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);
@@ -5331,6 +5353,10 @@ typedef struct {
     size_t parent;
     bool modal, active;
 } cui_core_focus_scope;
+typedef struct {
+    cui_id id;
+    cui_rect *retained;
+} cui_core_bounds_track;
 struct cui_context {
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
         previous_focus_scopes[CUI_CORE_STACK_MAX];
@@ -5339,10 +5365,13 @@ struct cui_context {
     size_t *semantic_scopes, *previous_semantic_scopes;
     Clay_Context *clay;
     void *arena;
+    Clay__ScrollContainerDataInternal *clip_containers;
     cui_config config;
     cui_draw_command *commands;
     size_t count;
     cui_core_box_node *nodes;
+    cui_core_bounds_track *bounds_tracks;
+    size_t bounds_track_count;
     size_t *semantic_nodes;
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
     cui_rect *previous_hits;
@@ -5430,7 +5459,9 @@ cui_context *cui_create(cui_config config) {
         config.max_elements > SIZE_MAX / sizeof(cui_id) ||
         config.max_elements > SIZE_MAX / sizeof(cui_core_box_node) ||
         config.max_elements > SIZE_MAX / sizeof(size_t) ||
-        config.max_elements > SIZE_MAX / sizeof(cui_rect)) {
+        config.max_elements > SIZE_MAX / sizeof(cui_rect) ||
+        config.max_elements > SIZE_MAX / sizeof(cui_core_bounds_track) ||
+        config.max_elements > SIZE_MAX / sizeof(Clay__ScrollContainerDataInternal)) {
         free(ui);
         return NULL;
     }
@@ -5446,18 +5477,23 @@ cui_context *cui_create(cui_config config) {
     ui->previous_semantic_scopes =
         calloc(config.max_elements, sizeof(*ui->previous_semantic_scopes));
     ui->strings = malloc(config.frame_bytes);
+    ui->clip_containers = calloc(config.max_elements, sizeof(*ui->clip_containers));
     ui->nodes = calloc(config.max_elements, sizeof(*ui->nodes));
+    ui->bounds_tracks = calloc(config.max_elements, sizeof(*ui->bounds_tracks));
     ui->semantic_nodes = calloc(config.max_elements, sizeof(*ui->semantic_nodes));
     ui->previous_hits = calloc(config.max_elements, sizeof(*ui->previous_hits));
     ui->previous_layers = calloc(config.max_elements, sizeof(*ui->previous_layers));
     Clay_Context *saved = Clay_GetCurrentContext();
     Clay_SetCurrentContext(NULL);
-    Clay_SetMaxElementCount((int32_t)(config.max_elements + 32));
+    /* Clay's ID map retains the prior layout until EndLayout retires old IDs.
+     * Reserve both generations while CUI's own limits bound current elements. */
+    Clay_SetMaxElementCount((int32_t)(config.max_elements * 2 + 32));
     size_t n = Clay_MinMemorySize();
     ui->arena = malloc(n);
     if (!ui->commands || !ui->semantics || !ui->previous || !ui->ids || !ui->activations ||
         !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings || !ui->nodes ||
-        !ui->semantic_nodes || !ui->previous_hits || !ui->previous_layers || !ui->arena) {
+        !ui->semantic_nodes || !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers ||
+        !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -5465,8 +5501,14 @@ cui_context *cui_create(cui_config config) {
     ui->clay = Clay_Initialize(Clay_CreateArenaWithCapacityAndMemory(n, ui->arena),
                                (Clay_Dimensions){config.width, config.height},
                                (Clay_ErrorHandler){cui_core_clay_error, ui});
-    if (ui->clay)
+    if (ui->clay) {
+        /* The pinned Clay version defaults to only 100 scroll/clip containers.
+         * Replace its private array with bounded context-owned storage so clip
+         * capacity obeys CUI's configured element budget. */
+        ui->clay->scrollContainerDatas = (Clay__ScrollContainerDataInternalArray){
+            .capacity = (int32_t)config.max_elements, .internalArray = ui->clip_containers};
         Clay_SetMeasureTextFunction(cui_core_measure, ui);
+    }
     Clay_SetCurrentContext(saved);
     if (!ui->clay || ui->error) {
         cui_destroy(ui);
@@ -5482,6 +5524,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->semantic_scopes);
     free(ui->previous_semantic_scopes);
     free(ui->nodes);
+    free(ui->bounds_tracks);
     free(ui->semantic_nodes);
     free(ui->previous_hits);
     free(ui->previous_layers);
@@ -5491,6 +5534,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->ids);
     free(ui->activations);
     free(ui->strings);
+    free(ui->clip_containers);
     free(ui->arena);
     free(ui);
 }
@@ -5707,6 +5751,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
     }
     ui->node_count = 0;
+    ui->bounds_track_count = 0;
     ui->overflow_depth = 0;
     ui->focus_depth = ui->focus_scope_count = 0;
     ui->top_modal = SIZE_MAX;
@@ -5715,6 +5760,13 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->count = 0;
     cui_core_select_context(ui);
     Clay_SetLayoutDimensions((Clay_Dimensions){w, h});
+    /* Clay retains clipping containers between layouts. Reap absent IDs before
+     * its ephemeral element storage is reset; CUI owns scrolling through box
+     * child offsets, so do not feed Clay wheel deltas or enable drag momentum. */
+    Clay_UpdateScrollContainers(false, (Clay_Vector2){0, 0}, 0);
+    /* CUI does not retain Clay scroll positions. Start registrations afresh so
+     * changing every clipped ID cannot temporarily consume two frames' budget. */
+    ui->clay->scrollContainerDatas.length = 0;
     Clay_BeginLayout();
     ui->config.width = w;
     ui->config.height = h;
@@ -5779,6 +5831,18 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
+    cui_corner_radii cr = b.custom_corners
+                              ? b.corner_radii
+                              : (cui_corner_radii){b.radius, b.radius, b.radius, b.radius};
+    float *radii[] = {&cr.top_left, &cr.top_right, &cr.bottom_left, &cr.bottom_right};
+    for (size_t i = 0; i < 4; i++)
+        *radii[i] = isfinite(*radii[i]) ? fmaxf(0, *radii[i]) : 0;
+    Clay_BorderWidth edges = b.custom_border_edges
+                                 ? (Clay_BorderWidth){cui_core_scalar(b.border_edges.left),
+                                                      cui_core_scalar(b.border_edges.right),
+                                                      cui_core_scalar(b.border_edges.top),
+                                                      cui_core_scalar(b.border_edges.bottom), 0}
+                                 : (Clay_BorderWidth){bw, bw, bw, bw, 0};
     Clay__ConfigureOpenElement((Clay_ElementDeclaration){
         .layout = {.sizing = {cui_core_axis(b.width), cui_core_axis(b.height)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
@@ -5791,7 +5855,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                                          : CLAY_ALIGN_Y_TOP},
                    .layoutDirection = b.row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM},
         .backgroundColor = {b.background.r, b.background.g, b.background.b, b.background.a},
-        .cornerRadius = CLAY_CORNER_RADIUS(b.radius),
+        .cornerRadius = {cr.top_left, cr.top_right, cr.bottom_left, cr.bottom_right},
         .floating = {.offset = portal ? (Clay_Vector2){portal->x, portal->y} : (Clay_Vector2){0},
                      .zIndex = layer,
                      .attachTo = portal ? CLAY_ATTACH_TO_ROOT : CLAY_ATTACH_TO_NONE,
@@ -5800,8 +5864,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                  .vertical = b.clip,
                  .childOffset = {isfinite(b.offset_x) ? b.offset_x : 0,
                                  isfinite(b.offset_y) ? b.offset_y : 0}},
-        .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a},
-                   .width = {bw, bw, bw, bw, 0}}});
+        .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
     cui_core_begin_box(ui, id, b, NULL, 0);
@@ -5911,6 +5974,25 @@ cui_rect cui_bounds(cui_context *ui, cui_id id) {
     Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = cui_core_folded(id)});
     return (cui_rect){d.boundingBox.x, d.boundingBox.y, d.boundingBox.width, d.boundingBox.height};
 }
+bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
+    if (!ui || !id || !retained || !cui_core_active(ui))
+        return false;
+    for (size_t i = 0; i < ui->bounds_track_count; i++) {
+        cui_core_bounds_track track = ui->bounds_tracks[i];
+        if (track.id == id && track.retained == retained)
+            return true;
+        if (track.id == id || track.retained == retained) {
+            cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
+            return false;
+        }
+    }
+    if (ui->bounds_track_count == ui->config.max_elements) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    ui->bounds_tracks[ui->bounds_track_count++] = (cui_core_bounds_track){id, retained};
+    return true;
+}
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value) {
     cui_interaction out = {0};
@@ -5985,12 +6067,25 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.type = CUI_DRAW_RECT;
             d.color = cui_core_color(c->renderData.rectangle.backgroundColor);
             d.radius = c->renderData.rectangle.cornerRadius.topLeft;
+            d.corner_radii = (cui_corner_radii){c->renderData.rectangle.cornerRadius.topLeft,
+                                                c->renderData.rectangle.cornerRadius.topRight,
+                                                c->renderData.rectangle.cornerRadius.bottomLeft,
+                                                c->renderData.rectangle.cornerRadius.bottomRight};
+            d.custom_corners = true;
             break;
         case CLAY_RENDER_COMMAND_TYPE_BORDER:
             d.type = CUI_DRAW_BORDER;
             d.color = cui_core_color(c->renderData.border.color);
             d.radius = c->renderData.border.cornerRadius.topLeft;
             d.stroke = c->renderData.border.width.left;
+            d.corner_radii = (cui_corner_radii){c->renderData.border.cornerRadius.topLeft,
+                                                c->renderData.border.cornerRadius.topRight,
+                                                c->renderData.border.cornerRadius.bottomLeft,
+                                                c->renderData.border.cornerRadius.bottomRight};
+            d.border_edges = (cui_border_edges){
+                c->renderData.border.width.left, c->renderData.border.width.right,
+                c->renderData.border.width.top, c->renderData.border.width.bottom};
+            d.custom_corners = d.custom_border_edges = true;
             break;
         case CLAY_RENDER_COMMAND_TYPE_TEXT:
             d.type = CUI_DRAW_TEXT;
@@ -6014,6 +6109,24 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             break;
         }
         ui->commands[ui->count++] = d;
+    }
+    for (size_t i = 0; i < ui->bounds_track_count; i++) {
+        cui_core_bounds_track track = ui->bounds_tracks[i];
+        uint32_t folded = cui_core_folded(track.id);
+        cui_rect bounds = {0};
+        for (size_t n = 0; n < ui->node_count; n++) {
+            if (ui->nodes[n].clay_id == folded) {
+                Clay_ElementData data = Clay_GetElementData((Clay_ElementId){.id = folded});
+                bounds = (cui_rect){data.boundingBox.x, data.boundingBox.y, data.boundingBox.width,
+                                    data.boundingBox.height};
+                break;
+            }
+        }
+        cui_rect previous = *track.retained;
+        if (previous.x != bounds.x || previous.y != bounds.y || previous.w != bounds.w ||
+            previous.h != bounds.h)
+            ui->dirty = true;
+        *track.retained = bounds;
     }
     bool retained = false, captured = false, space = false;
     for (size_t i = 0; i < ui->semantic_count; i++) {

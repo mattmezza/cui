@@ -5,6 +5,7 @@
 #include "cui_choice.h"
 #include "cui_content.h"
 #include "cui_disclosure.h"
+#include "cui_form.h"
 #include "cui_numeric.h"
 #include "cui_picker.h"
 #include "cui_scroll.h"

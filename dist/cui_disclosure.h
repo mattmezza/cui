@@ -14,9 +14,22 @@ typedef struct {
     cui_str label;
     bool disabled;
 } cui_disclosure_item;
+/* Custom title/icon body; trigger semantics and activation remain item-owned. */
+typedef void (*cui_disclosure_header_fn)(cui_context *, const cui_disclosure_item *, size_t index,
+                                         bool expanded, void *user);
 typedef struct {
     bool multiple, collapsible, disabled, bordered;
+    cui_disclosure_header_fn render_header;
+    void *header_user;
+    const cui_box *trigger_boxes, *panel_boxes; /* optional per-item full box styles */
+    size_t style_count; /* available entries in either nonnull style array */
 } cui_accordion_options;
+typedef struct {
+    bool disabled, borderless;
+    cui_disclosure_header_fn render_header;
+    void *header_user;
+    const cui_box *trigger_box, *panel_box; /* optional full box styles */
+} cui_collapsible_options;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
 /* Base submits semantic triggers without layout or painting. */
 bool cui_base_collapsible(cui_context *, cui_id, cui_str, bool *open, bool disabled);
@@ -24,6 +37,8 @@ bool cui_base_accordion(cui_context *, const cui_disclosure_item *, size_t count
                         cui_accordion_options);
 /* Styled components render panels synchronously only while expanded. Size and
  * colors come from the supplied theme; callbacks can compose arbitrary CUI. */
+bool cui_collapsible_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *open,
+                        cui_collapsible_options, cui_disclosure_panel_fn, void *);
 bool cui_collapsible(cui_context *, cui_id, const cui_theme *, cui_str, bool *open, bool disabled,
                      cui_disclosure_panel_fn, void *);
 bool cui_accordion(cui_context *, cui_id container, const cui_theme *, const cui_disclosure_item *,
@@ -133,7 +148,10 @@ bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_
 /* SPDX-License-Identifier: MIT */
 
 static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *theme,
-                                   cui_str label, bool open, bool disabled, bool bordered) {
+                                   cui_str label, bool open, bool disabled, bool bordered,
+                                   const cui_disclosure_item *item, size_t index,
+                                   cui_disclosure_header_fn render, void *user,
+                                   const cui_box *style) {
     cui_box box = {.height = theme->control_height,
                    .padding = theme->padding,
                    .gap = theme->gap,
@@ -142,34 +160,53 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
                    .background = theme->surface,
                    .border = theme->border,
                    .border_width = bordered ? 1 : 0};
+    if (style)
+        box = *style;
     if (cui_focused(ui) == id) {
         box.border = theme->focus;
         box.border_width = 2;
     }
     cui_begin_box(ui, id, box);
-    cui_text(ui, cui_string(open ? "-" : "+"), theme->font_size,
-             disabled ? theme->muted : theme->primary);
-    cui_text(ui, label, theme->font_size, disabled ? theme->muted : theme->text);
+    if (render) {
+        cui_disclosure_item effective = *item;
+        effective.disabled = disabled;
+        render(ui, &effective, index, open, user);
+    } else {
+        cui_text(ui, cui_string(open ? "-" : "+"), theme->font_size,
+                 disabled ? theme->muted : theme->primary);
+        cui_text(ui, label, theme->font_size, disabled ? theme->muted : theme->text);
+    }
     cui_end_box(ui);
 }
-bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
-                     bool disabled, cui_disclosure_panel_fn panel, void *user) {
+bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                        bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
+                        void *user) {
     if (!theme || !open)
         return false;
-    bool changed = cui_base_collapsible(ui, id, label, open, disabled);
+    bool changed = cui_base_collapsible(ui, id, label, open, options.disabled);
     cui_begin_box(ui, id ^ UINT64_C(0xb7c1c9d453922783), (cui_box){.gap = theme->gap});
-    cui_disclosure_trigger(ui, id, theme, label, *open, disabled, true);
+    cui_disclosure_item item = {.id = id, .label = label, .disabled = options.disabled};
+    cui_disclosure_trigger(ui, id, theme, label, *open, options.disabled, !options.borderless,
+                           &item, 0, options.render_header, options.header_user,
+                           options.trigger_box);
     if (*open && panel) {
         cui_id panel_id = id ^ UINT64_C(0x1d8f322539deca61);
         cui_interact(ui, panel_id, CUI_ROLE_GROUP, label, false, false, 0);
         cui_set_semantic_details(ui, panel_id, (cui_semantic_details){.labelled_by = id});
-        cui_begin_box(ui, id ^ UINT64_C(0x1d8f322539deca61),
-                      (cui_box){.padding = theme->padding, .gap = theme->gap});
+        cui_box panel_box = options.panel_box
+                                ? *options.panel_box
+                                : (cui_box){.padding = theme->padding, .gap = theme->gap};
+        cui_begin_box(ui, id ^ UINT64_C(0x1d8f322539deca61), panel_box);
         panel(ui, 0, user);
         cui_end_box(ui);
     }
     cui_end_box(ui);
     return changed;
+}
+bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
+                     bool disabled, cui_disclosure_panel_fn panel, void *user) {
+    return cui_collapsible_ex(ui, id, theme, label, open,
+                              (cui_collapsible_options){.disabled = disabled}, panel, user);
 }
 bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
                    const cui_disclosure_item *items, size_t count, bool *open,
@@ -182,8 +219,10 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
                              (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL});
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     for (size_t i = 0; i < count; ++i) {
-        cui_disclosure_trigger(ui, items[i].id, theme, items[i].label, open[i],
-                               options.disabled || items[i].disabled, options.bordered);
+        cui_disclosure_trigger(
+            ui, items[i].id, theme, items[i].label, open[i], options.disabled || items[i].disabled,
+            options.bordered, &items[i], i, options.render_header, options.header_user,
+            options.trigger_boxes && i < options.style_count ? &options.trigger_boxes[i] : NULL);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.expanded = open[i],
@@ -195,8 +234,10 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
             cui_set_semantic_details(
                 ui, panel_id,
                 (cui_semantic_details){.labelled_by = items[i].id, .parent = container});
-            cui_begin_box(ui, items[i].id ^ UINT64_C(0x1d8f322539deca61),
-                          (cui_box){.padding = theme->padding, .gap = theme->gap});
+            cui_box panel_box = options.panel_boxes && i < options.style_count
+                                    ? options.panel_boxes[i]
+                                    : (cui_box){.padding = theme->padding, .gap = theme->gap};
+            cui_begin_box(ui, items[i].id ^ UINT64_C(0x1d8f322539deca61), panel_box);
             panel(ui, i, user);
             cui_end_box(ui);
         }

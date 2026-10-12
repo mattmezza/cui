@@ -4,6 +4,7 @@
 #define CUI_CHOICE_H
 #include "cui.h"
 #include "cui_base.h"
+#include "cui_content.h"
 #include "cui_edit.h"
 #include "cui_overlay.h"
 #include "cui_theme.h"
@@ -28,12 +29,29 @@ typedef enum {
     CUI_TAB_SEGMENTED
 } cui_tab_variant;
 typedef struct {
+    cui_id candidate, before, moved;
+    float start_x, start_y;
+    bool active, requested, drop_valid;
+} cui_tab_drag_state;
+typedef struct cui_tab_overflow cui_tab_overflow;
+typedef struct {
+    float offset, maximum;
+    cui_rect viewport;
+    cui_id receiving_id;
+    bool changed;
+} cui_tab_scroll_state;
+typedef struct {
     bool vertical, disabled, manual_activation;
     cui_tab_variant variant;
     cui_choice_render_fn render; /* optional tab body, preserving the label semantics */
     void *render_user;
     cui_choice_content_fn prefix, suffix;
     void *content_user;
+    float max_width;              /* zero unconstrained; built-in labels ellipsize to fit */
+    cui_tab_scroll_state *scroll; /* optional application-owned bounded viewport */
+    float bar_extent;             /* scroll viewport width, or height for vertical tabs */
+    cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
+    cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -89,6 +107,7 @@ typedef struct {
     cui_popup_side side;         /* preferred anchor side; defaults below */
     cui_choice_render_fn render; /* optional fixed-height option body */
     void *render_user;
+    bool align_end; /* align popup right edge with anchor right edge */
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */
@@ -183,6 +202,16 @@ typedef struct {
     cui_choice_popup_options popup;
     bool keep_open_checks, checks_on_right;
 } cui_menu_tree_options;
+struct cui_tab_overflow {
+    cui_menu_tree_state menu;
+    cui_menu_entry *entries; /* caller-owned scratch descriptors; capacity >= tab count */
+    size_t capacity;
+    cui_id trigger;
+    cui_menu_tree_options options;
+    bool visible;
+};
+void cui_tab_overflow_init(cui_tab_overflow *, cui_id popup, cui_id trigger,
+                           cui_menu_entry *entries, size_t capacity);
 void cui_menu_tree_init(cui_menu_tree_state *, cui_id popup);
 /* Ordered reducer before painting. Descriptors and pointed-to check/radio values
  * are borrowed; IDs must be globally unique throughout the tree. */
@@ -206,7 +235,8 @@ bool cui_base_context_menu(cui_context *, cui_id target, const cui_menu_entry *,
 bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str name,
                       const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                       cui_menu_tree_options);
-/* Split action and menu trigger. The explicit IDs remain independently
+/* Split action and menu trigger. Zero action/trigger IDs omit that half in the
+ * base function; both zero is invalid. The explicit IDs remain independently
  * focusable; container is paint-only in the styled function. */
 typedef enum {
     CUI_DROPDOWN_BUTTON_PRIMARY,
@@ -218,10 +248,19 @@ typedef enum {
 typedef enum {
     CUI_DROPDOWN_BUTTON_MEDIUM,
     CUI_DROPDOWN_BUTTON_SMALL,
-    CUI_DROPDOWN_BUTTON_LARGE
+    CUI_DROPDOWN_BUTTON_LARGE,
+    CUI_DROPDOWN_BUTTON_XSMALL
 } cui_dropdown_button_size;
+typedef enum {
+    CUI_DROPDOWN_ANCHOR_TOP_RIGHT,
+    CUI_DROPDOWN_ANCHOR_TOP_LEFT,
+    CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT,
+    CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT
+} cui_dropdown_button_anchor;
 typedef struct {
     bool disabled, action_disabled, action_loading, selected;
+    bool outline;                         /* orthogonal to primary/secondary/danger variant */
+    bool action_selected, action_outline; /* preserve inner button presentation */
     float width; /* action-half width: zero fits contents; negative grows */
     cui_dropdown_button_variant variant;
     cui_dropdown_button_size size;
@@ -229,6 +268,19 @@ typedef struct {
     cui_choice_content_fn content;
     void *content_user;
     cui_menu_tree_options menu;
+    /* When an outer property is unset, inherit the action button's property
+     * for both halves. Zero-initialized options keep the existing defaults. */
+    bool inherit_action_variant, inherit_action_size;
+    bool hide_action, hide_menu;       /* at least one half must remain visible */
+    cui_dropdown_button_anchor anchor; /* popup corner; default top right */
+    cui_dropdown_button_variant action_variant;
+    cui_dropdown_button_size action_size;
+    /* Optional action tooltip composition; ID must be globally unique and state
+     * persists across frames. Its trigger is always the action-half ID. */
+    cui_id tooltip_id;
+    cui_str tooltip;
+    cui_hover_state *tooltip_state;
+    cui_hover_options tooltip_options;
 } cui_dropdown_button_options;
 typedef struct {
     bool action_activated, menu_activated;
@@ -278,11 +330,180 @@ static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, si
     }
     return count;
 }
+void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger,
+                           cui_menu_entry *entries, size_t capacity) {
+    if (!state)
+        return;
+    *state = (cui_tab_overflow){.entries = entries, .capacity = capacity, .trigger = trigger};
+    cui_menu_tree_init(&state->menu, popup);
+}
+static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, size_t count,
+                               cui_tabs_options options, cui_event event, cui_id target) {
+    cui_tab_drag_state *drag = options.drag;
+    if (!drag ||
+        (event.type == CUI_EVENT_POINTER_UP && event.pointer_button != CUI_POINTER_PRIMARY))
+        return false;
+    if (event.type == CUI_EVENT_CANCEL ||
+        (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE)) {
+        drag->candidate = 0;
+        drag->active = false;
+        return false;
+    }
+    if (event.type == CUI_EVENT_POINTER_DOWN && event.pointer_button == CUI_POINTER_PRIMARY) {
+        drag->candidate = 0;
+        drag->active = false;
+        for (size_t i = 0; i < count; i++)
+            if (items[i].id == target && !items[i].disabled) {
+                drag->candidate = target;
+                drag->start_x = event.x;
+                drag->start_y = event.y;
+                break;
+            }
+        return false;
+    }
+    if (!drag->candidate ||
+        (event.type != CUI_EVENT_POINTER_MOVE && event.type != CUI_EVENT_POINTER_UP))
+        return false;
+    if (target != drag->candidate || !isfinite(event.x) || !isfinite(event.y)) {
+        drag->candidate = 0;
+        drag->active = false;
+        return false;
+    }
+    if (fabsf(event.x - drag->start_x) >= 4 || fabsf(event.y - drag->start_y) >= 4)
+        drag->active = true;
+    if (!drag->active) {
+        if (event.type == CUI_EVENT_POINTER_UP)
+            drag->candidate = 0;
+        return false;
+    }
+    bool inside = true;
+    if (options.scroll) {
+        cui_rect bounds = options.scroll->viewport;
+        inside = event.x >= bounds.x && event.x < bounds.x + bounds.w && event.y >= bounds.y &&
+                 event.y < bounds.y + bounds.h;
+    }
+    bool found = false;
+    drag->before = 0;
+    for (size_t i = 0; i < count && inside; i++) {
+        cui_rect bounds = cui_bounds(ui, items[i].id);
+        if (event.x < bounds.x || event.x >= bounds.x + bounds.w || event.y < bounds.y ||
+            event.y >= bounds.y + bounds.h)
+            continue;
+        found = true;
+        bool after = options.vertical ? event.y >= bounds.y + bounds.h * .5f
+                                      : event.x >= bounds.x + bounds.w * .5f;
+        size_t insertion = i + (after ? 1 : 0);
+        if (insertion < count && items[insertion].id == drag->candidate)
+            insertion++;
+        drag->before = insertion < count ? items[insertion].id : 0;
+        break;
+    }
+    drag->drop_valid = found;
+    if (event.type == CUI_EVENT_POINTER_UP) {
+        size_t source = count;
+        for (size_t i = 0; i < count; i++)
+            if (items[i].id == drag->candidate)
+                source = i;
+        cui_id next = source + 1 < count ? items[source + 1].id : 0;
+        if (found && drag->before != drag->candidate && drag->before != next) {
+            drag->moved = drag->candidate;
+            drag->requested = true;
+        }
+        drag->candidate = 0;
+        drag->active = false;
+    }
+    cui_invalidate(ui);
+    return true;
+}
 bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_tabs_options options) {
+    if (!count && options.overflow) {
+        options.overflow->visible = false;
+        if (options.overflow->menu.overlay.open)
+            cui_overlay_close(ui, &options.overflow->menu.overlay);
+        options.overflow->menu.depth = 0;
+    }
+    if (options.drag) {
+        options.drag->requested = false;
+        bool present = false;
+        for (size_t i = 0; items && i < count; i++)
+            present |= items[i].id == options.drag->candidate && !items[i].disabled;
+        if (options.disabled || !present) {
+            options.drag->candidate = 0;
+            options.drag->active = false;
+        }
+    }
     if (!items || !selected || !count)
         return false;
+    if (options.scroll) {
+        cui_tab_scroll_state *scroll = options.scroll;
+        scroll->changed = false;
+        if (!isfinite(scroll->maximum) || scroll->maximum < 0)
+            scroll->maximum = 0;
+        if (!isfinite(scroll->offset) || scroll->offset < 0)
+            scroll->offset = 0;
+        if (scroll->offset > scroll->maximum)
+            scroll->offset = scroll->maximum;
+        size_t n = 0;
+        const cui_event *events = cui_frame_events(ui, &n);
+        for (size_t e = 0; e < n && !options.disabled; e++) {
+            cui_event event = events[e];
+            cui_id target = cui_event_target(ui, e);
+            bool eligible = scroll->receiving_id && target == scroll->receiving_id;
+            for (size_t i = 0; i < count; i++)
+                eligible |= target == items[i].id;
+            cui_rect bounds = scroll->viewport;
+            if (event.type != CUI_EVENT_SCROLL || !eligible || bounds.w <= 0 || bounds.h <= 0 ||
+                event.x < bounds.x || event.x >= bounds.x + bounds.w || event.y < bounds.y ||
+                event.y >= bounds.y + bounds.h)
+                continue;
+            float delta = options.vertical ? event.dy : event.dx;
+            if (!isfinite(delta))
+                continue;
+            float before = scroll->offset;
+            float after = before - delta * 32;
+            if (!isfinite(after))
+                after = delta < 0 ? scroll->maximum : 0;
+            scroll->offset = fminf(scroll->maximum, fmaxf(0, after));
+            scroll->changed |= before != scroll->offset;
+        }
+        if (scroll->changed)
+            cui_invalidate(ui);
+    }
+    if (options.scroll && options.scroll->changed && options.drag) {
+        options.drag->candidate = 0;
+        options.drag->active = false;
+        options.drag->drop_valid = false;
+    }
     cui_id old = *selected;
+    if (options.overflow) {
+        cui_tab_overflow *overflow = options.overflow;
+        overflow->visible = options.scroll && options.scroll->maximum > 0 && overflow->trigger &&
+                            overflow->menu.overlay.id && overflow->entries &&
+                            overflow->capacity >= count;
+        if (!overflow->visible) {
+            if (overflow->menu.overlay.open)
+                cui_overlay_close(ui, &overflow->menu.overlay);
+            overflow->menu.depth = 0;
+        } else {
+            for (size_t i = 0; i < count; i++)
+                overflow->entries[i] =
+                    (cui_menu_entry){.id = items[i].id ^ UINT64_C(0x8322717be8bd65e1),
+                                     .label = items[i].label,
+                                     .disabled = items[i].disabled,
+                                     .kind = CUI_MENU_ACTION};
+            cui_id action = 0;
+            if (cui_base_menu_tree(ui, overflow->trigger, cui_string("All tabs"), overflow->entries,
+                                   count, &action, &overflow->menu,
+                                   options.disabled || overflow->options.popup.disabled,
+                                   overflow->options.popup.dt, false)) {
+                for (size_t i = 0; i < count; i++)
+                    if (overflow->entries[i].id == action)
+                        *selected = items[i].id;
+            }
+        }
+    }
+
     for (size_t i = 0; i < count; ++i) {
         cui_interact(ui, items[i].id, CUI_ROLE_TAB, items[i].label,
                      options.disabled || items[i].disabled, *selected == items[i].id, (float)i);
@@ -290,6 +511,16 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (options.scroll && options.scroll->changed &&
+            (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_POINTER_UP)) {
+            if (options.drag) {
+                options.drag->candidate = 0;
+                options.drag->active = false;
+            }
+            continue;
+        }
+        if (cui_tab_drag_event(ui, items, count, options, events[e], cui_event_target(ui, e)))
+            continue;
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
             cursor = count;
         size_t from = count;
@@ -1233,18 +1464,27 @@ cui_dropdown_button_result cui_base_dropdown_button(
     const cui_menu_entry *items, size_t count, cui_id *menu_action, cui_menu_tree_state *state,
     bool disabled, bool action_disabled, bool action_loading, float dt, bool keep_open_checks) {
     cui_dropdown_button_result result = {0};
-    if (!ui || !action_id || !trigger_id || action_id == trigger_id || !menu_action || !state ||
+    if (!ui || (!action_id && !trigger_id) || action_id == trigger_id || !menu_action || !state ||
         (!items && count))
         return result;
-    result.action_activated =
-        cui_base_button(ui, action_id, action_name, disabled || action_disabled || action_loading)
-            .activated;
-    if (action_loading)
+    if (action_id)
+        result.action_activated = cui_base_button(ui, action_id, action_name,
+                                                  disabled || action_disabled || action_loading)
+                                      .activated;
+    if (action_id && action_loading)
         cui_set_semantic_details(
             ui, action_id,
             (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
-    result.menu_activated = cui_base_menu_tree(ui, trigger_id, menu_name, items, count, menu_action,
-                                               state, disabled, dt, keep_open_checks);
+    if (trigger_id)
+        result.menu_activated =
+            cui_base_menu_tree(ui, trigger_id, menu_name, items, count, menu_action, state,
+                               disabled, dt, keep_open_checks);
+    else if (state->overlay.open) {
+        cui_overlay_close(ui, &state->overlay);
+        state->depth = 0;
+    }
+    if (trigger_id)
+        cui_update_semantic(ui, trigger_id, false, 0);
     return result;
 }
 
@@ -1254,9 +1494,45 @@ cui_dropdown_button_result cui_base_dropdown_button(
 
 
 #include <math.h>
+static void cui_choice_menu_level(cui_context *, const cui_theme *, const cui_menu_entry *, size_t,
+                                  cui_menu_tree_state *, size_t, cui_rect, cui_menu_tree_options,
+                                  cui_str);
+static void cui_choice_ellipsized_text(cui_context *ui, cui_str label, float font_size,
+                                       cui_color color, float width) {
+    cui_str ellipsis = cui_string("\xe2\x80\xa6");
+    float marker_width = cui_measure_text(ui, ellipsis, font_size).width;
+    if (marker_width > width)
+        return;
+    size_t bytes = 0, upper = label.length;
+    while (bytes < upper) {
+        size_t middle = bytes + (upper - bytes + 1) / 2;
+        while (middle < label.length && middle &&
+               ((unsigned char)label.data[middle] & 0xc0) == 0x80)
+            middle--;
+        if (middle <= bytes) {
+            middle = bytes + 1;
+            while (middle < label.length && ((unsigned char)label.data[middle] & 0xc0) == 0x80)
+                middle++;
+        }
+        if (cui_measure_text(ui, (cui_str){label.data, middle}, font_size).width + marker_width <=
+            width)
+            bytes = middle;
+        else {
+            upper = middle - 1;
+            while (upper && ((unsigned char)label.data[upper] & 0xc0) == 0x80)
+                upper--;
+        }
+    }
+    cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 0});
+    if (bytes)
+        cui_text(ui, (cui_str){label.data, bytes}, font_size, color);
+    cui_text(ui, ellipsis, font_size, color);
+    cui_end_box(ui);
+}
 static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                                bool selected, bool disabled, cui_tab_variant variant,
-                               cui_choice_render_fn render, size_t index, void *render_user) {
+                               cui_choice_render_fn render, size_t index, void *render_user,
+                               float max_width) {
     cui_box box = {.height = theme->control_height,
                    .padding = theme->padding,
                    .radius = theme->radius,
@@ -1282,6 +1558,13 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
         box.border = theme->focus;
         box.border_width = 2;
     }
+    bool ellipsized =
+        !render && isfinite(max_width) && max_width > 0 &&
+        cui_measure_text(ui, item->label, theme->font_size).width + 2 * theme->padding > max_width;
+    if (ellipsized) {
+        box.width = max_width;
+        box.clip = true;
+    }
     cui_begin_box(ui, item->id, box);
     if (variant == CUI_TAB_UNDERLINE)
         cui_begin_box(ui, 0,
@@ -1289,12 +1572,17 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
                                 .padding = theme->padding});
     if (render)
         render(ui, item, index, render_user);
-    else
-        cui_text(ui, item->label, theme->font_size,
-                 disabled ? theme->muted
-                 : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
-                     ? theme->on_primary
-                     : theme->text);
+    else {
+        cui_color color = disabled ? theme->muted
+                          : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
+                              ? theme->on_primary
+                              : theme->text;
+        if (ellipsized)
+            cui_choice_ellipsized_text(ui, item->label, theme->font_size, color,
+                                       fmaxf(0, max_width - 2 * theme->padding));
+        else
+            cui_text(ui, item->label, theme->font_size, color);
+    }
     if (variant == CUI_TAB_UNDERLINE) {
         cui_end_box(ui);
         cui_begin_box(ui, 0,
@@ -1307,13 +1595,34 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
 }
 static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                             bool selected, bool disabled, cui_tab_variant variant) {
-    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL);
+    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0);
 }
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
               cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
     if (!theme || !items || !selected)
         return false;
+    cui_id viewport_id = container ^ UINT64_C(0x739b1b53a6cef421);
+    bool scrollable = options.scroll && isfinite(options.bar_extent) && options.bar_extent > 0;
+    if (scrollable) {
+        options.scroll->receiving_id = viewport_id;
+        options.scroll->viewport = cui_bounds(ui, viewport_id);
+        float content = count > 1 ? (float)(count - 1) * theme->gap : 0;
+        for (size_t i = 0; i < count; i++) {
+            float extent = options.vertical ? theme->control_height
+                           : options.render
+                               ? cui_bounds(ui, items[i].id).w
+                               : cui_measure_text(ui, items[i].label, theme->font_size).width +
+                                     2 * theme->padding;
+            if (!options.vertical && !options.render && options.max_width > 0 &&
+                extent > options.max_width)
+                extent = options.max_width;
+            if (isfinite(extent) && extent > 0)
+                content += extent;
+        }
+        options.scroll->maximum = fmaxf(0, content - options.bar_extent);
+    } else
+        options.scroll = NULL;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
@@ -1326,11 +1635,33 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                   (cui_box){.row = !options.vertical, .gap = theme->gap});
     if (options.prefix)
         options.prefix(ui, options.content_user);
+    if (scrollable) {
+        cui_interact(ui, viewport_id, CUI_ROLE_GROUP, cui_string("Tab viewport"), options.disabled,
+                     false, 0);
+        cui_set_tab_stop(ui, viewport_id, false);
+        cui_set_semantic_details(
+            ui, viewport_id,
+            (cui_semantic_details){.parent = list_id,
+                                   .scrollable = true,
+                                   .scroll_x = options.vertical ? 0 : options.scroll->offset,
+                                   .scroll_y = options.vertical ? options.scroll->offset : 0,
+                                   .scroll_max_x = options.vertical ? 0 : options.scroll->maximum,
+                                   .scroll_max_y = options.vertical ? options.scroll->maximum : 0});
+        cui_begin_box(
+            ui, viewport_id,
+            (cui_box){.row = !options.vertical,
+                      .gap = theme->gap,
+                      .clip = true,
+                      .width = options.vertical ? 0 : options.bar_extent,
+                      .height = options.vertical ? options.bar_extent : theme->control_height,
+                      .offset_x = options.vertical ? 0 : -options.scroll->offset,
+                      .offset_y = options.vertical ? -options.scroll->offset : 0});
+    }
     size_t active = count;
     for (size_t i = 0; i < count; ++i) {
         cui_choice_draw_ex(ui, &items[i], theme, items[i].id == *selected,
                            options.disabled || items[i].disabled, options.variant, options.render,
-                           i, options.render_user);
+                           i, options.render_user, options.max_width);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.selected = items[i].id == *selected,
@@ -1339,8 +1670,49 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         if (items[i].id == *selected && !items[i].disabled)
             active = i;
     }
+    if (options.drag && options.drag->active && options.drag->drop_valid) {
+        cui_rect bounds = {0};
+        if (options.drag->before)
+            bounds = cui_bounds(ui, options.drag->before);
+        else if (count) {
+            bounds = cui_bounds(ui, items[count - 1].id);
+            if (options.vertical)
+                bounds.y += bounds.h;
+            else
+                bounds.x += bounds.w;
+        }
+        bool visible = bounds.w > 0 && bounds.h > 0;
+        if (scrollable) {
+            cui_rect viewport = options.scroll->viewport;
+            visible &= bounds.x >= viewport.x && bounds.x <= viewport.x + viewport.w &&
+                       bounds.y >= viewport.y && bounds.y <= viewport.y + viewport.h;
+        }
+        if (visible) {
+            cui_rect marker = options.vertical ? (cui_rect){bounds.x, bounds.y, bounds.w, 2}
+                                               : (cui_rect){bounds.x, bounds.y, 2, bounds.h};
+            cui_begin_portal(ui, container ^ UINT64_C(0x5df27b10b325643e),
+                             (cui_box){.background = theme->primary}, marker, 90);
+            cui_end_box(ui);
+        }
+    }
+    if (scrollable)
+        cui_end_box(ui);
     if (options.suffix)
         options.suffix(ui, options.content_user);
+    if (options.overflow && options.overflow->visible) {
+        cui_tab_overflow *overflow = options.overflow;
+        cui_choice_item trigger = {.id = overflow->trigger, .label = {"v", 1}};
+        cui_choice_draw(ui, &trigger, theme, overflow->menu.overlay.open,
+                        options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT);
+        cui_set_semantic_details(ui, overflow->trigger, (cui_semantic_details){.parent = list_id});
+        overflow->menu.row_height = theme->control_height;
+        overflow->menu.padding = theme->padding;
+        if (overflow->menu.overlay.open)
+            cui_choice_menu_level(ui, theme, overflow->entries, count, &overflow->menu, 0,
+                                  cui_bounds(ui, overflow->trigger), overflow->options,
+                                  cui_string("All tabs"));
+    }
+
     cui_end_box(ui);
     if (active != count && panel) {
         cui_id panel_id = items[active].id ^ UINT64_C(0x691a17db80e22f45);
@@ -1884,6 +2256,16 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     cui_popup_result placement = cui_popup_place(
         anchor, (cui_size){width, height}, options.popup.viewport,
         level ? CUI_POPUP_RIGHT : options.popup.side, !level && state->contextual ? 0 : 4);
+    if (!level && options.popup.align_end &&
+        (options.popup.side == CUI_POPUP_BELOW || options.popup.side == CUI_POPUP_ABOVE)) {
+        float x = anchor.x + anchor.w - placement.bounds.w;
+        float max_x = options.popup.viewport.x + options.popup.viewport.w - placement.bounds.w;
+        if (x > max_x)
+            x = max_x;
+        if (x < options.popup.viewport.x)
+            x = options.popup.viewport.x;
+        placement.bounds.x = x;
+    }
     state->panels[level] = placement.bounds;
     if (!level)
         cui_overlay_set_bounds(&state->overlay, placement.bounds);
@@ -2023,8 +2405,9 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
 
 static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_theme *theme,
                                        cui_dropdown_button_options options, bool trigger,
-                                       bool disabled) {
-    float scale = options.size == CUI_DROPDOWN_BUTTON_SMALL   ? .8f
+                                       bool disabled, bool pair_surfaced) {
+    float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
+                  : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
                   : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
                                                               : 1;
     cui_box box = {.height = theme->control_height * scale,
@@ -2045,10 +2428,22 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         box.background.a = 0;
     else if (options.variant == CUI_DROPDOWN_BUTTON_DANGER)
         box.background = theme->danger;
-    if (options.variant == CUI_DROPDOWN_BUTTON_GHOST)
+    if (options.variant == CUI_DROPDOWN_BUTTON_GHOST) {
         box.border_width = 0;
+        if (pair_surfaced && !disabled)
+            box.background = theme->surface;
+    }
     if (options.selected && options.variant != CUI_DROPDOWN_BUTTON_DANGER)
         box.background = theme->primary;
+    bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
+                           options.variant != CUI_DROPDOWN_BUTTON_OUTLINE;
+    if (colored_outline) {
+        box.background = options.variant == CUI_DROPDOWN_BUTTON_DANGER    ? theme->danger
+                         : options.variant == CUI_DROPDOWN_BUTTON_PRIMARY ? theme->primary
+                                                                          : theme->border;
+        box.border = box.background;
+        box.background.a = options.selected ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
+    }
     if (!disabled && cui_hovered(ui, id)) {
         if (!box.background.a)
             box.background = theme->surface;
@@ -2056,12 +2451,25 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         box.background.g = (uint8_t)(box.background.g * .9f);
         box.background.b = (uint8_t)(box.background.b * .9f);
     }
-    if (disabled && box.background.a)
-        box.background = theme->surface;
+    if (disabled && box.background.a) {
+        if (colored_outline)
+            box.background.a /= 2;
+        else
+            box.background = theme->surface;
+    }
     if (cui_focused(ui) == id) {
         box.border = theme->focus;
         box.border_width = 2;
     }
+    box.custom_corners = true;
+    box.corner_radii =
+        trigger ? (cui_corner_radii){.top_right = theme->radius, .bottom_right = theme->radius}
+                : (cui_corner_radii){.top_left = theme->radius, .bottom_left = theme->radius};
+    box.custom_border_edges = true;
+    box.border_edges = (cui_border_edges){.left = trigger ? 0 : box.border_width,
+                                          .right = box.border_width,
+                                          .top = box.border_width,
+                                          .bottom = box.border_width};
     return box;
 }
 
@@ -2073,57 +2481,92 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                                cui_dropdown_button_options options) {
     cui_dropdown_button_result result = {0};
     if (!ui || !theme || !state || !state->overlay.id || !menu_action || (!items && count) ||
-        !container || !action_id || !trigger_id || action_id == trigger_id ||
-        container == action_id || container == trigger_id || !isfinite(theme->control_height) ||
-        theme->control_height <= 0 || !isfinite(theme->padding) || theme->padding < 0 ||
-        !isfinite(options.width))
+        !container || (options.hide_action && options.hide_menu) ||
+        (!options.hide_action && !action_id) || (!options.hide_menu && !trigger_id) ||
+        action_id == trigger_id || container == action_id || container == trigger_id ||
+        !isfinite(theme->control_height) || theme->control_height <= 0 ||
+        !isfinite(theme->padding) || theme->padding < 0 || !isfinite(options.width))
         return result;
+    if (options.inherit_action_variant)
+        options.variant = options.action_variant;
+    if (options.inherit_action_size)
+        options.size = options.action_size;
+    options.selected = options.selected || (!options.hide_action && options.action_selected);
     result = cui_base_dropdown_button(
-        ui, action_id, trigger_id, action_name, menu_name, items, count, menu_action, state,
+        ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
+        menu_name, items, count, menu_action, state,
         options.disabled || options.menu.popup.disabled, options.action_disabled,
         options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks);
     bool all_disabled = options.disabled || options.menu.popup.disabled;
     bool action_disabled = all_disabled || options.action_disabled || options.action_loading;
+    bool pair_surfaced = state->overlay.open ||
+                         (!options.hide_action && cui_hovered(ui, action_id)) ||
+                         (!options.hide_menu && cui_hovered(ui, trigger_id));
     cui_color action_foreground = options.variant == CUI_DROPDOWN_BUTTON_PRIMARY ||
                                           options.variant == CUI_DROPDOWN_BUTTON_DANGER ||
                                           options.selected
                                       ? theme->on_primary
                                       : theme->text;
     cui_color trigger_foreground = action_foreground;
+    if (options.outline || options.action_outline) {
+        action_foreground = options.variant == CUI_DROPDOWN_BUTTON_PRIMARY  ? theme->primary
+                            : options.variant == CUI_DROPDOWN_BUTTON_DANGER ? theme->danger
+                                                                            : theme->text;
+        if (options.outline)
+            trigger_foreground = action_foreground;
+    }
     if (action_disabled)
         action_foreground = theme->muted;
     if (all_disabled)
         trigger_foreground = theme->muted;
-    float scale = options.size == CUI_DROPDOWN_BUTTON_SMALL   ? .8f
+    float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
+                  : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
                   : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
                                                               : 1;
     cui_begin_box(ui, container, (cui_box){.row = true, .gap = 0});
-    cui_box action_box =
-        cui_dropdown_button_box(ui, action_id, theme, options, false, action_disabled);
-    cui_begin_box(ui, action_id, action_box);
-    if (options.action_loading)
-        cui_text(ui, cui_string("..."), theme->font_size * scale, action_foreground);
-    else {
-        if (options.leading.length)
-            cui_text(ui, options.leading, theme->font_size * scale, action_foreground);
-        if (options.content)
-            options.content(ui, options.content_user);
-        else
-            cui_text(ui, action_name, theme->font_size * scale, action_foreground);
-        if (options.trailing.length)
-            cui_text(ui, options.trailing, theme->font_size * scale, action_foreground);
+    if (!options.hide_action) {
+        cui_dropdown_button_options action_options = options;
+        action_options.outline = options.outline || options.action_outline;
+        cui_box action_box = cui_dropdown_button_box(ui, action_id, theme, action_options, false,
+                                                     action_disabled, pair_surfaced);
+        cui_begin_box(ui, action_id, action_box);
+        if (options.action_loading)
+            cui_text(ui, cui_string("..."), theme->font_size * scale, action_foreground);
+        else {
+            if (options.leading.length)
+                cui_text(ui, options.leading, theme->font_size * scale, action_foreground);
+            if (options.content)
+                options.content(ui, options.content_user);
+            else
+                cui_text(ui, action_name, theme->font_size * scale, action_foreground);
+            if (options.trailing.length)
+                cui_text(ui, options.trailing, theme->font_size * scale, action_foreground);
+        }
+        cui_end_box(ui);
+    }
+    if (!options.hide_menu) {
+        cui_box trigger_box = cui_dropdown_button_box(ui, trigger_id, theme, options, true,
+                                                      all_disabled, pair_surfaced);
+        cui_begin_box(ui, trigger_id, trigger_box);
+        cui_text(ui, cui_string("v"), theme->font_size * scale, trigger_foreground);
+        cui_end_box(ui);
     }
     cui_end_box(ui);
-    cui_box trigger_box =
-        cui_dropdown_button_box(ui, trigger_id, theme, options, true, all_disabled);
-    cui_begin_box(ui, trigger_id, trigger_box);
-    cui_text(ui, cui_string("v"), theme->font_size * scale, trigger_foreground);
-    cui_end_box(ui);
-    cui_end_box(ui);
-    cui_update_semantic(ui, action_id, options.selected, options.selected);
-    cui_update_semantic(ui, trigger_id, options.selected, options.selected);
     state->row_height = theme->control_height;
     state->padding = theme->padding;
+    if (options.tooltip_id && options.tooltip_state) {
+        cui_hover_options tooltip = options.tooltip_options;
+        tooltip.trigger = action_id;
+        tooltip.disabled =
+            tooltip.disabled || action_disabled || options.hide_action || state->overlay.open;
+        cui_tooltip(ui, options.tooltip_id, theme, options.tooltip_state, options.tooltip, tooltip);
+    }
+    options.menu.popup.side = options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT ||
+                                      options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT
+                                  ? CUI_POPUP_ABOVE
+                                  : CUI_POPUP_BELOW;
+    options.menu.popup.align_end = options.anchor == CUI_DROPDOWN_ANCHOR_TOP_RIGHT ||
+                                   options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT;
     if (state->overlay.open)
         cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger_id),
                               options.menu, menu_name);

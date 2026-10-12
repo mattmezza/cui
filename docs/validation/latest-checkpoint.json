@@ -1,8 +1,8 @@
 {
-  "source": "ceb6f72",
+  "source": "e1c2b5b",
   "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public 1b453ab retains verified 38-theme picker and 70 stories. Local Command and Root modules pass native69/69, sanitizers67/67 and WASI59/59 including pure-base tests. Root plugin ordering, lifecycle and Sheet-aware notifications are tested. Browser72 revalidation is running after Textarea Tab/history fixes and Carousel moving/settled navigation coverage. All78entries retained:4notstarted,4implementedpartial,70testedpartial,0verified. Full parity unfinished.",
+  "summary": "Local release: 72 actual WASM stories passed full Chromium, including Settings checked menus, Carousel moving/settled navigation and Textarea Tab/Undo/Redo/ShiftTab. Twenty additional worker rapid Carousel wrap cycles passed; one earlier intermittent failure remains unexplained. Native69/69, sanitizers67/67, WASI59/59 pass Command/Root integration. Public remains1b453ab with70stories and38themes pending this release. All78entries retained:4notstarted,4implementedpartial,70testedpartial,0verified. Full parity unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -20,11 +20,11 @@
     },
     {
       "name": "browser",
-      "source": "e96fa1a",
-      "passed": 70,
-      "total": 70,
-      "log": "browser-e96fa1a.txt",
-      "palettes": 38
+      "source": "e1c2b5b",
+      "passed": 72,
+      "total": 72,
+      "palettes": 38,
+      "log": "browser-e1c2b5b.txt"
     },
     {
       "name": "sanitizers",

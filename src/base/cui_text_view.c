@@ -290,6 +290,12 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *s,
     output[required] = 0;
     return CUI_TEXT_VIEW_OK;
 }
+static bool cui_text_view_name(cui_str, const char *);
+static bool cui_text_view_html_space(char);
+static size_t cui_text_view_html_tag_end(cui_str, size_t, size_t);
+static cui_text_view_range cui_text_view_attribute(cui_str, size_t, size_t, const char *);
+static cui_text_view_image_length cui_text_view_html_image_length(cui_str, size_t, size_t,
+                                                                  const char *);
 static bool cui_text_view_link_syntax(cui_str input, size_t opening, size_t end, size_t *label_end,
                                       size_t *destination_end) {
     if (opening >= end || input.data[opening] != '[')
@@ -380,6 +386,33 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
         }
         if (c == '&' && cui_text_view_entity(p, &a, b, flags, link))
             continue;
+        if (c == '<') {
+            size_t end = cui_text_view_html_tag_end(p->input, a, b);
+            if (end != SIZE_MAX) {
+                size_t name_end = a + 1;
+                while (name_end < end && !cui_text_view_html_space(p->input.data[name_end]) &&
+                       p->input.data[name_end] != '/')
+                    ++name_end;
+                if (cui_text_view_name((cui_str){p->input.data + a + 1, name_end - a - 1}, "img")) {
+                    cui_text_view_range src =
+                        cui_text_view_attribute(p->input, name_end, end, "src");
+                    if (src.begin || src.end) {
+                        cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, end + 1},
+                                           flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
+                        p->last.resource = src;
+                        p->last.alt = cui_text_view_attribute(p->input, name_end, end, "alt");
+                        p->last.image_width =
+                            cui_text_view_html_image_length(p->input, name_end, end, "width");
+                        p->last.image_height =
+                            cui_text_view_html_image_length(p->input, name_end, end, "height");
+                        if (p->write && !p->error)
+                            p->state->workspace.spans[p->spans - 1] = p->last;
+                    }
+                    a = end + 1;
+                    continue;
+                }
+            }
+        }
         if (c == '`') {
             size_t close = cui_text_view_find(p->input, a + 1, b, "`", 1);
             if (close != SIZE_MAX) {

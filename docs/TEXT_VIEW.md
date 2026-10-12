@@ -246,8 +246,9 @@ Bounded balanced brackets and parentheses recognize linked Markdown images and
 parenthesized destinations. Quoted titles and angle-delimited destinations no
 longer become part of the host image URI. A linked image uses its alt source as
 its link label, activates the host link callback through ordinary capture, and
-Source copy preserves its enclosing link. Title tooltip presentation remains absent;
-this delimiter parser is not a complete CommonMark grammar.
+Source copy preserves its enclosing link. The frozen renderer itself ignores the image title (`image_element` takes `_title`),
+so no image-title tooltip is required. This delimiter parser is not a complete
+CommonMark grammar.
 
 Images inside HTML paragraph, heading and table-cell containers now share the
 atomic inline flow with neighboring styled text. Linked HTML images also use the
@@ -274,3 +275,9 @@ default sizing rather than alt-text ranges or unscaled intrinsic pixels. Bare ro
 HTML images retain separate paragraph boundaries and accept the same explicit
 dimensions as paragraph images. Missing root `src` images are skipped. HTML tag
 boundaries respect quoted `>` characters and HTML attribute whitespace.
+
+HTML `<img>` tags embedded in Markdown use the same atomic run model, decoded
+URI, explicit dimensions, baseline and enclosing Markdown link behavior. This
+includes the frozen linked HTML image after a soft newline regression. Missing
+`src` tags are skipped. Other embedded HTML tags and multiline HTML grammar remain
+outside this targeted inline-image handling.

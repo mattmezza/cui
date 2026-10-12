@@ -195,6 +195,32 @@ static void test_html_image_dimensions(void) {
            f.spans[1].image_bounds.x == f.glyphs[1].bounds.x &&
            f.glyphs[0].line_top == f.glyphs[1].line_top);
 }
+static void test_markdown_html_image_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source =
+        "Hi\n[<img src='asset' alt='image' width='20' height='40'>](https://x.test) after";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && !strcmp(f.rendered, "Hi   after\n"));
+    cui_text_view_span *image = NULL;
+    for (size_t i = 0; i < f.state.span_count; ++i)
+        if (f.spans[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+            image = &f.spans[i];
+    assert(image && image->resource.end - image->resource.begin == 5 &&
+           image->image_width.value == 20 && image->image_height.value == 40);
+    assert(cui_text_view_select(&f.state, image->text.begin, image->text.end));
+    cui_text_view_range selected;
+    assert(cui_text_view_selected_source_range(&f.state, &selected) &&
+           source[selected.begin] == '<' && source[selected.end - 1] == '>');
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(
+        !strcmp(output, "[<img src='asset' alt='image' width='20' height='40'>](https://x.test)"));
+    assert(cui_text_view_set_text(&f.state, text("a<img alt='missing'>b")) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.rendered, "ab\n"));
+}
 static void test_root_html_image_object(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -1251,6 +1277,47 @@ static void test_linked_image_paint(void) {
                                            .y = y}));
     frame(ui, &f, o);
     assert(image_link_clicks == 1);
+    cui_destroy(ui);
+}
+static void test_markdown_html_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("Hi\n[<img src='asset' alt='image' width='20' "
+                                                 "height='40'>](https://x.test) after")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_font_metrics metrics = {8, 2, 10};
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 512, .font_metrics = image_metrics, .measure_user = &metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    o.on_link = image_link_clicked;
+    cui_draw_list draw = frame(ui, &f, o);
+    bool bitmap = false;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE)
+            bitmap = draw.commands[i].bounds.w == 20 && draw.commands[i].bounds.h == 40;
+    assert(bitmap && f.state.block_count == 1);
+    size_t image = 0;
+    while (image < f.state.glyph_count && !(f.glyphs[image].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+        ++image;
+    assert(image < f.state.glyph_count);
+    frame(ui, &f, o);
+    float x = f.state.viewport.x + f.glyphs[image].bounds.x + 5;
+    float y = f.state.viewport.y + f.glyphs[image].bounds.y + 5;
+    unsigned before = image_link_clicks;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(image_link_clicks == before + 1);
     cui_destroy(ui);
 }
 static void test_html_inline_image_paint(void) {
@@ -2400,6 +2467,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_markdown_html_image_model();
     test_root_html_image_object();
     test_html_image_dimensions();
     test_html_inline_image_model();
@@ -2435,6 +2503,7 @@ int main(void) {
     test_styled_selection();
     test_standalone_markdown_object();
     test_linked_image_paint();
+    test_markdown_html_image_paint();
     test_html_sized_image_paint();
     test_html_inline_image_paint();
     test_inline_image_heading_metrics();

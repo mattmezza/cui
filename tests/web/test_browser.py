@@ -373,6 +373,17 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)!==cuiGallery.exports.gallery_input_selection(1)')
             page.keyboard.type('Q')
             page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)===cuiGallery.exports.gallery_input_selection(1)')
+            page.locator('#input-mode').select_option('1')
+            page.wait_for_function('document.querySelector("#accessible [role=textbox]")?.getAttribute("aria-readonly")==="true"')
+            length = page.evaluate('cuiGallery.exports.gallery_input_selection(2)')
+            canvas.focus()
+            page.keyboard.type('R')
+            page.wait_for_timeout(50)
+            assert page.evaluate('cuiGallery.exports.gallery_input_selection(2)') == length
+            page.locator('#input-mode').select_option('2')
+            page.wait_for_function('document.querySelector("#accessible [role=textbox]")?.getAttribute("aria-invalid")==="true"')
+            assert page.locator('#accessible [role=textbox]').get_attribute('aria-required') == 'true'
+            assert page.locator('#accessible [role=textbox]').get_attribute('aria-readonly') == 'false'
             page.evaluate('location.hash="Chart"')
             page.wait_for_function('document.querySelector("#name").textContent==="Chart" && cuiGallery.renderedComponent==="Chart"')
             assert page.locator('#pending').is_visible()

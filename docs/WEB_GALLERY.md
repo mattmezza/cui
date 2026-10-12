@@ -30,7 +30,7 @@ The Clipboard story bridges actual CUI buttons to navigator.clipboard and report
 
 The minimal WASI host grants no filesystem or environment access. WebAssembly exports expose draw and semantic scalar accessors instead of relying on C structure offsets or leaking platform types into the public CUI API. The shader/native GPU adapters are not linked into this Canvas host.
 
-Input demonstrates the styled single-line editor with pointer caret placement, drag selection, horizontal scrolling and keyboard undo/redo. Tree demonstrates retained expansion, selection, keyboard traversal and typeahead over borrowed preorder nodes.
+Input includes editable, read-only and required/invalid state controls. It demonstrates the styled single-line editor with pointer caret placement, drag selection, horizontal scrolling and keyboard undo/redo. Tree demonstrates retained expansion, selection, keyboard traversal and typeahead over borrowed preorder nodes.
 
 Scrollable renders actual clipped translated content and interactive horizontal/vertical scrollbars. DataTable renders a virtual window over 1,000 keyed rows, with selection, sort requests, column resize and reorder, and two-axis wheel scrolling; sort requests are displayed without pretending that caller data was reordered. Table demonstrates the stateless composition API.
 

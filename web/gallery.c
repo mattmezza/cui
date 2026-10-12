@@ -77,6 +77,7 @@ static float slider = 40;
 static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
 static cui_input_state input_state;
+static int input_mode;
 static cui_scroll_state scroll_state;
 static cui_table_model *table;
 static cui_table_state table_state;
@@ -274,9 +275,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                    disabled);
         break;
     case 6:
-        cui_input_ex(
-            ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit, &input_state,
-            (cui_input_options){.disabled = disabled, .width = width > 360 ? 280 : width - 48});
+        cui_input_ex(ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit,
+                     &input_state,
+                     (cui_input_options){.disabled = disabled,
+                                         .readonly = input_mode == 1,
+                                         .required = input_mode == 2,
+                                         .invalid = input_mode == 2,
+                                         .width = width > 360 ? 280 : width - 48});
         break;
     case 7:
         cui_label(ui, &t, cui_string("A useful label, rendered by CUI."));
@@ -891,6 +896,20 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.row_count;
     case 25:
         return s->details.column_count;
+    case 26:
+        return s->details.readonly;
+    case 27:
+        return s->details.required;
+    case 28:
+        return s->details.invalid;
+    case 29:
+        return s->details.multiline;
+    case 30:
+        return s->details.level;
+    case 31:
+        return s->details.pos_in_set;
+    case 32:
+        return s->details.set_size;
     default:
         return 0;
     }
@@ -901,9 +920,12 @@ const char *gallery_semantic_name(unsigned i) {
 unsigned gallery_semantic_length(unsigned i) {
     return i < semantic_count ? (unsigned)semantics[i].name.length : 0;
 }
+void gallery_input_mode(int mode) {
+    input_mode = mode;
+}
 unsigned gallery_input_selection(unsigned field) {
     cui_edit_state state = cui_edit_get_state(edit);
-    return (unsigned)(field == 0 ? state.anchor : state.cursor);
+    return (unsigned)(field == 0 ? state.anchor : field == 2 ? state.length : state.cursor);
 }
 int gallery_clicks(void) {
     return clicks;

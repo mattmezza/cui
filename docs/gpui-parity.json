@@ -3894,32 +3894,44 @@
       "name": "DescriptionList",
       "reference_url": "https://gpui-kit.com/component/description-list/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "stateless span grouping and proportional flex fractions"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_description.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_description.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Headless layout and passive semantics tested across sizes/themes; browser/native visual audit pending. Outer clipping is rectangular; independent cell clipping, inherited rich typography and Text values remain partial."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "key/value composition",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_description.c"
+          ]
         },
         {
           "name": "responsive layout",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_description.c"
+          ]
         },
         {
           "name": "list semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_description.c"
+          ]
         }
       ],
       "upstream_doc": {

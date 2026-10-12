@@ -4,6 +4,7 @@
 #include "cui_base.h"
 #include "cui_choice.h"
 #include "cui_content.h"
+#include "cui_description.h"
 #include "cui_disclosure.h"
 #include "cui_form.h"
 #include "cui_numeric.h"

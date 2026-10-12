@@ -42,6 +42,7 @@ typedef struct {
     cui_color switch_background, switch_thumb;
     cui_color popover_foreground, list_hover, list_active, selection;
     bool list_active_highlight;
+    cui_color description_list_label, description_list_label_foreground;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -126,6 +127,10 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
                                 (uint8_t)((9u * t.background.b + t.primary.b) / 10u), 51};
     t.selection = cui_theme_opacity(t.primary, .3f);
     t.list_active_highlight = true;
+    t.description_list_label = (cui_color){(uint8_t)((4u * t.background.r + t.border.r) / 5u),
+                                           (uint8_t)((4u * t.background.g + t.border.g) / 5u),
+                                           (uint8_t)((4u * t.background.b + t.border.b) / 5u), 255};
+    t.description_list_label_foreground = t.muted;
     t.spring_move =
         (cui_spring_settings){.response = .28f, .damping = .85f, .epsilon = .1f, .travel = true};
     return t;

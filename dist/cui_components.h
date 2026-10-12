@@ -5,6 +5,7 @@
 #include "cui_base.h"
 #include "cui_choice.h"
 #include "cui_content.h"
+#include "cui_description.h"
 #include "cui_disclosure.h"
 #include "cui_form.h"
 #include "cui_numeric.h"
@@ -227,6 +228,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_MEDIA_IMPLEMENTATION
 #endif
 #include "cui_media.h"
+#ifndef CUI_DESCRIPTION_IMPLEMENTATION
+#define CUI_DESCRIPTION_IMPLEMENTATION
+#endif
+#include "cui_description.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

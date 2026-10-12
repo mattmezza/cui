@@ -742,6 +742,17 @@ int main(void) {
     assert(cui_chart_value_domain(&options, &lo, &hi) && lo == 90 && hi == 112);
     assert(cui_chart_candle_bounds(&options, 0, &first_candle) == CUI_PLOT_OK);
     assert(cui_chart_candle_bounds(&options, 1, &second_candle) == CUI_PLOT_OK);
+    double candle_average = options.width / 3.0;
+    double candle_outer = candle_average * .2;
+    double candle_band = fmin(30, candle_average * .6);
+    double candle_step = (options.width - 2 * candle_outer) / 3 * 1.2;
+    assert(fabs(first_candle.wick.x_min - (candle_outer + candle_band / 2)) < .01 &&
+           fabs(second_candle.wick.x_min - (candle_outer + candle_band / 2 + candle_step)) < .01);
+    assert(cui_chart_hit_test(&options, 1, 1).valid &&
+           !cui_chart_hit_test(&options, 1, options.logical_height - 1).valid);
+    options.hide_x_axis = true;
+    assert(cui_chart_hit_test(&options, 1, options.logical_height - 1).valid);
+    options.hide_x_axis = false;
     assert(first_candle.bullish && !second_candle.bullish);
     assert(first_candle.wick.y_min > 12 && first_candle.wick.y_max < 76);
     assert(first_candle.body.x_max - first_candle.body.x_min > 14);

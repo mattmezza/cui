@@ -232,6 +232,8 @@ static void cui_chart_guide(cui_chart_state *s, const cui_chart_options *o, doub
     }
 }
 static double cui_chart_plot_left(const cui_chart_options *o) {
+    if (o->kind == CUI_CHART_CANDLESTICK)
+        return 0;
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)
         return o->show_y_axis && !o->y_axis_inside
                    ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 32)
@@ -244,11 +246,15 @@ static double cui_chart_plot_left(const cui_chart_options *o) {
                : 24;
 }
 static double cui_chart_plot_right(const cui_chart_options *o, double left) {
+    if (o->kind == CUI_CHART_CANDLESTICK)
+        return o->width;
     return o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA
                ? o->width - left
                : (o->width > 36 ? o->width - 12 : left);
 }
 static double cui_chart_plot_bottom(const cui_chart_options *o) {
+    if (o->kind == CUI_CHART_CANDLESTICK)
+        return o->height - (o->hide_x_axis ? 0 : 20);
     bool horizontal_bar = o->kind == CUI_CHART_BAR && (o->bar_alignment == CUI_CHART_BAR_LEFT ||
                                                        o->bar_alignment == CUI_CHART_BAR_RIGHT);
     double gap = horizontal_bar && o->show_y_axis && !o->y_axis_inside ? 32 : 20;
@@ -446,7 +452,7 @@ cui_plot_result cui_chart_candle_bounds(const cui_chart_options *o, size_t index
     if (!isfinite(lo) || !isfinite(hi) || lo >= hi)
         return CUI_PLOT_OVERFLOW;
     double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
-    double top = 12, bottom = o->height > 32 ? o->height - 20 : 12;
+    double top = 10, bottom = cui_chart_plot_bottom(o);
     if (right <= left || bottom <= top)
         return CUI_PLOT_EMPTY;
     size_t slots = o->point_count ? o->point_count : o->count;
@@ -663,7 +669,8 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
         top = o->custom_y_padding ? o->y_padding_top : 10;
         bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
-    }
+    } else if (o->kind == CUI_CHART_CANDLESTICK)
+        top = 10;
     if (right <= left || bottom <= top)
         return;
     double lo, hi;
@@ -1817,7 +1824,8 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
         return hit;
     } else {
         double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
-        double top = 12, bottom = cui_chart_plot_bottom(o);
+        double top = o->kind == CUI_CHART_CANDLESTICK ? 0 : 12;
+        double bottom = cui_chart_plot_bottom(o);
         if (x < left || x > right || y < top || y > bottom || right <= left)
             return hit;
         size_t n = o->point_count ? o->point_count : o->count;

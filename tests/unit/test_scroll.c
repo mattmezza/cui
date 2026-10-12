@@ -323,11 +323,54 @@ static void horizontal_mask_edges(void) {
     assert(!cui_event_consumed(ui, 0));
     cui_destroy(ui);
 }
+static void gesture_filter(void) {
+    cui_scroll_gesture state = {0};
+    cui_event e = {.type = CUI_EVENT_SCROLL, .dx = -40, .dy = -10, .scroll_precise = true};
+    assert(cui_scroll_gesture_filter(&state, &e, 1));
+    assert(e.dx == -40 && e.dy == 0);
+    e.dx = -10;
+    e.dy = -15;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.01));
+    assert(e.dx == -10 && e.dy == 0);
+    e.dx = -10;
+    e.dy = -25;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.02));
+    assert(e.dx == -10 && e.dy == -25 && !state.locked);
+    e.dx = -40;
+    e.dy = -10;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.03));
+    assert(e.dy == -10); /* Released gestures do not relock without a boundary. */
+    assert(cui_scroll_gesture_filter(&state, &e, 1.07));
+    assert(e.dy == 0 && state.locked);
+    e.scroll_phase = CUI_SCROLL_PHASE_ENDED;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.08));
+    assert(!state.has_last);
+    e.scroll_phase = CUI_SCROLL_PHASE_MOVED;
+    e.dx = -3;
+    e.dy = -3;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.09));
+    assert(e.dx == 0 && e.dy == -3); /* Ties are vertical. */
+    e.dx = -5;
+    e.dy = -1;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.10));
+    assert(e.dx == 0); /* Sub6px jitter cannot unlock. */
+    e.scroll_phase = CUI_SCROLL_PHASE_CANCELLED;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.11) && !state.has_last);
+    e.scroll_phase = CUI_SCROLL_PHASE_NONE;
+    e.scroll_precise = false;
+    e.dx = -40;
+    e.dy = -10;
+    assert(cui_scroll_gesture_filter(&state, &e, 1.12));
+    assert(e.dx == -40 && e.dy == -10 && !state.has_last);
+    assert(!cui_scroll_gesture_filter(&state, &e, NAN));
+    assert(e.dx == -40 && e.dy == -10 && !state.has_last);
+}
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+    gesture_filter();
     horizontal_mask_edges();
     hidden_tracks();
     deferred_scroll();

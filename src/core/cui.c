@@ -1868,3 +1868,40 @@ bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
     ui->dirty = true;
     return true;
 }
+
+bool cui_scroll_gesture_filter(cui_scroll_gesture *state, cui_event *event, double now) {
+    if (!state || !event || event->type != CUI_EVENT_SCROLL || !isfinite(now) ||
+        !isfinite(event->dx) || !isfinite(event->dy) ||
+        event->scroll_phase < CUI_SCROLL_PHASE_NONE ||
+        event->scroll_phase > CUI_SCROLL_PHASE_CANCELLED)
+        return false;
+    if (!event->scroll_precise || event->scroll_phase == CUI_SCROLL_PHASE_ENDED ||
+        event->scroll_phase == CUI_SCROLL_PHASE_CANCELLED) {
+        *state = (cui_scroll_gesture){0};
+        return true;
+    }
+    float x = fabsf(event->dx), y = fabsf(event->dy);
+    if (x == 0 && y == 0) {
+        if (event->scroll_phase == CUI_SCROLL_PHASE_STARTED)
+            *state = (cui_scroll_gesture){0};
+        return true;
+    }
+    bool fresh = event->scroll_phase == CUI_SCROLL_PHASE_STARTED || !state->has_last ||
+                 now < state->last_time || now - state->last_time >= .028;
+    if (fresh) {
+        state->locked = true;
+        state->horizontal = x > y;
+    } else if (fmaxf(x, y) >= 6 &&
+               (state->horizontal ? y > x && y >= x * 1.9f : x > y && x >= y * 1.9f)) {
+        state->locked = false;
+    }
+    state->last_time = now;
+    state->has_last = true;
+    if (state->locked) {
+        if (state->horizontal)
+            event->dy = 0;
+        else
+            event->dx = 0;
+    }
+    return true;
+}

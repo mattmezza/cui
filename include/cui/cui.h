@@ -85,6 +85,16 @@ typedef struct {
     bool scroll_precise;
     cui_scroll_phase scroll_phase;
 } cui_event;
+/* Caller-owned gesture filter. Clock is monotonic seconds; no allocation.
+ * Precise gestures lock their initial dominant axis, release on strong turns,
+ * and reset after28ms silence or explicit end/cancel. Line wheels are unchanged.
+ * Invalid input leaves both state and event unchanged. */
+typedef struct {
+    double last_time;
+    bool has_last, locked, horizontal;
+} cui_scroll_gesture;
+bool cui_scroll_gesture_filter(cui_scroll_gesture *, cui_event *, double now);
+
 typedef enum {
     CUI_ROLE_NONE,
     CUI_ROLE_BUTTON,

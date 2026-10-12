@@ -86,6 +86,16 @@ typedef struct {
     bool scroll_precise;
     cui_scroll_phase scroll_phase;
 } cui_event;
+/* Caller-owned gesture filter. Clock is monotonic seconds; no allocation.
+ * Precise gestures lock their initial dominant axis, release on strong turns,
+ * and reset after28ms silence or explicit end/cancel. Line wheels are unchanged.
+ * Invalid input leaves both state and event unchanged. */
+typedef struct {
+    double last_time;
+    bool has_last, locked, horizontal;
+} cui_scroll_gesture;
+bool cui_scroll_gesture_filter(cui_scroll_gesture *, cui_event *, double now);
+
 typedef enum {
     CUI_ROLE_NONE,
     CUI_ROLE_BUTTON,
@@ -7357,6 +7367,43 @@ bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
             ui->top_modal = i;
     cui_focus_restore(ui, trigger);
     ui->dirty = true;
+    return true;
+}
+
+bool cui_scroll_gesture_filter(cui_scroll_gesture *state, cui_event *event, double now) {
+    if (!state || !event || event->type != CUI_EVENT_SCROLL || !isfinite(now) ||
+        !isfinite(event->dx) || !isfinite(event->dy) ||
+        event->scroll_phase < CUI_SCROLL_PHASE_NONE ||
+        event->scroll_phase > CUI_SCROLL_PHASE_CANCELLED)
+        return false;
+    if (!event->scroll_precise || event->scroll_phase == CUI_SCROLL_PHASE_ENDED ||
+        event->scroll_phase == CUI_SCROLL_PHASE_CANCELLED) {
+        *state = (cui_scroll_gesture){0};
+        return true;
+    }
+    float x = fabsf(event->dx), y = fabsf(event->dy);
+    if (x == 0 && y == 0) {
+        if (event->scroll_phase == CUI_SCROLL_PHASE_STARTED)
+            *state = (cui_scroll_gesture){0};
+        return true;
+    }
+    bool fresh = event->scroll_phase == CUI_SCROLL_PHASE_STARTED || !state->has_last ||
+                 now < state->last_time || now - state->last_time >= .028;
+    if (fresh) {
+        state->locked = true;
+        state->horizontal = x > y;
+    } else if (fmaxf(x, y) >= 6 &&
+               (state->horizontal ? y > x && y >= x * 1.9f : x > y && x >= y * 1.9f)) {
+        state->locked = false;
+    }
+    state->last_time = now;
+    state->has_last = true;
+    if (state->locked) {
+        if (state->horizontal)
+            event->dy = 0;
+        else
+            event->dx = 0;
+    }
     return true;
 }
 

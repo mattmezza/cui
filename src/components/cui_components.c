@@ -44,6 +44,11 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     b.padding = 0;
     b.gap = 0;
     b.width = isfinite(options.width) ? options.width : 0;
+    if (options.icon_only) {
+        horizontal_padding = 0;
+        if (!b.width)
+            b.width = b.height;
+    }
     b.align_x = CUI_ALIGN_CENTER;
     b.align_y = CUI_ALIGN_CENTER;
     cui_theme_button_kind kind = options.variant == CUI_BUTTON_SECONDARY
@@ -114,11 +119,20 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                                                            : CUI_ICON_MEDIUM,
                                .custom_color = true,
                                .color = foreground});
+    else if (options.icon.length)
+        (void)cui_icon_named(
+            ui, id ^ UINT64_C(0x7185e28e9fb974db), t, options.icon,
+            (cui_icon_options){.size = options.size == CUI_CONTROL_XSMALL  ? CUI_ICON_XSMALL
+                                       : options.size == CUI_CONTROL_SMALL ? CUI_ICON_SMALL
+                                       : options.size == CUI_CONTROL_LARGE ? CUI_ICON_LARGE
+                                                                           : CUI_ICON_MEDIUM,
+                               .custom_color = true,
+                               .color = foreground});
     else if (options.leading.length)
         cui_text_with_line_height(ui, options.leading, font, foreground, font * 1.25f);
     if (options.content)
         options.content(ui, options.content_user);
-    else
+    else if (!options.icon_only)
         cui_text_with_line_height(ui, name, font, foreground, font * 1.25f);
     if (options.trailing.length)
         cui_text_with_line_height(ui, options.trailing, font, foreground, font * 1.25f);

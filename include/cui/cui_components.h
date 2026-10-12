@@ -47,6 +47,8 @@ typedef struct {
     bool disabled, loading, selected;
     float width; /* zero fits contents; negative grows within parent */
     cui_str leading, trailing;
+    cui_str icon;                  /* Catalog name/path; theme.icon_loader may replace its SVG. */
+    bool icon_only;                /* Keep name for accessibility; render a square icon button. */
     cui_button_content_fn content; /* Optional arbitrary child content instead of label. */
     void *content_user;
     bool outline; /* Orthogonal colored outline; selected is presentation only. */

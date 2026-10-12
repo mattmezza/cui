@@ -43,6 +43,41 @@ static void custom_button(cui_context *ui, void *user) {
     (*calls)++;
     cui_text(ui, cui_string("Custom content"), 12, (cui_color){255, 255, 255, 255});
 }
+static void test_icon_button(void) {
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
+    cui_theme theme = cui_theme_light();
+    assert(ui && cui_begin_frame(ui, 200, 100, 0));
+    cui_button_ex(ui, 99, &theme, cui_string("Close"),
+                  (cui_button_options){.size = CUI_CONTROL_SMALL,
+                                       .variant = CUI_BUTTON_GHOST,
+                                       .icon = {"close", 5},
+                                       .icon_only = true});
+    cui_draw_list draw = cui_end_frame(ui);
+    cui_rect bounds = cui_bounds(ui, 99);
+    assert(bounds.w == 24 && bounds.h == 24);
+    unsigned images = 0;
+    for (size_t i = 0; i < draw.count; ++i) {
+        assert(draw.commands[i].type != CUI_DRAW_TEXT);
+        if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+            cui_rect icon = draw.commands[i].bounds;
+            assert(icon.w == 14 && icon.h == 14);
+            assert(fabsf(icon.x + 7 - bounds.x - 12) < .01f);
+            assert(fabsf(icon.y + 7 - bounds.y - 12) < .01f);
+            images++;
+        }
+    }
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    assert(images == 1 && count == 1 && nodes[0].name.length == 5);
+    cui_focus(ui, 99);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_begin_frame(ui, 200, 100, 0));
+    assert(cui_button_ex(
+        ui, 99, &theme, cui_string("Close"),
+        (cui_button_options){.size = CUI_CONTROL_SMALL, .icon = {"close", 5}, .icon_only = true}));
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 static void test_button_options(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     assert(ui);
@@ -692,6 +727,7 @@ int main(void) {
     test_semantic_theme_contrast();
     test_button_intent_outlines();
     test_button_palette_overrides();
+    test_icon_button();
     test_button_options();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

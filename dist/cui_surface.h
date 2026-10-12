@@ -409,7 +409,10 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_end_box(ui);
     if (!o.hide_close && (s->kind != CUI_SURFACE_ALERT || o.show_alert_close))
         cui_button_ex(ui, cui_surface_part_id(s->overlay.id, 1), t, cui_string("Close"),
-                      (cui_button_options){.variant = CUI_BUTTON_GHOST, .size = CUI_CONTROL_SMALL});
+                      (cui_button_options){.variant = CUI_BUTTON_GHOST,
+                                           .size = CUI_CONTROL_SMALL,
+                                           .icon = {"close", 5},
+                                           .icon_only = true});
     cui_end_box(ui);
     if (description.length)
         cui_text(ui, description, t->font_size, t->muted);

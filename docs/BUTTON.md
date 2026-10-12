@@ -15,6 +15,13 @@ These metrics scale with `theme.font_size / 16`; the legacy generic
 Text uses a 1.25 line height and the content row is centered vertically without
 vertical padding reducing the available label space.
 
+Set `.icon = cui_string("close")` to add a real SVG icon. With `.icon_only = true`,
+the button is square and hides the visible label while retaining `name` for
+accessibility. For example, a Small close button uses a 24px target and a 14px
+icon. Dialog and sheet close controls use this path. The theme's `icon_loader`
+can replace that artwork; custom content callbacks remain available for other
+compositions.
+
 ```c
 if (cui_button_ex(ui, save_id, &theme, cui_string("Save changes"),
     (cui_button_options){.variant = CUI_BUTTON_OUTLINE,

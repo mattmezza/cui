@@ -1,0 +1,10 @@
+Installed 4 packages in 18ms
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+
+MATCH gallery.wasm daf9b8fcde4f015510c0fe9dd5763b75c956c41f3b400ddc3fa2768c0dc7afc8
+MATCH gallery.js 96f69f82e3cc7fee07cfbaf451036bf9b9d5ee405cbc45b2a5ee99bae2e6c675
+MATCH gallery.css fc7989381ed627cb5698655e006d8d4d5fd936bff667f60e0c2b4becba8179f2
+MATCH index.html 3307b3edf92b594f0ebbe6cb0f8c77c47efca370576842b9b74cb8c4b7d25eaa
+MATCH catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+MATCH themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+MATCH docs.json 0113bc91eaa1945a95c86de6db4ceda914b37fb78f6f897d43e42e945cf70eda

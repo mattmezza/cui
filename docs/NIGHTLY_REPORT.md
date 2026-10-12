@@ -292,3 +292,7 @@ The Chart/TextView/Questionnaire batch from portable source75ef24f is now integr
 ### Verified publication5608e51 and next release2af3f39
 
 Pages38295715735 and CI38295715752 succeeded. Full HTTPS78 behavior passes for5608e51; WASM, JS, CSS, HTML, catalog, themes and docs match its Pages artifact byte-for-byte. The next automatic-axis/atomic-image/Questionnaire-semantics batch2af3f39 is now integrated after native77, sanitizers75, WASI67, browser78, quality and web-build gates passed. Its publication remains pending; full78-entry feature parity is still incomplete.
+
+### Verified public releaseff475e6
+
+Pages38296393361 and CI38296393398 succeeded. Full HTTPS78 behavior passes; seven deployed assets including WASM match the artifact byte-for-byte. This is now the latest verified release. Isolatedfb4464b fixes unpainted-control semantic ancestry and Attachment hidden scrollbar semantics, with two failing-before regressions, native75 and targeted sanitizer2 passes. The gallery hierarchy update and further Chart/TextView parity work remain active; all78 entries remain in scope and no full feature parity is claimed.

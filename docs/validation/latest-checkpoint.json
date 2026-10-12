@@ -1,8 +1,8 @@
 {
   "source": "2af3f39",
-  "published_source": "5608e51d99b55c95b52d1c5b2c2f2ecfec7643c0",
+  "published_source": "ff475e69fea087ae1dcf95b55eac54c02e4216d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Release5608e51 is fully HTTPS78 verified and seven deployed assets including WASM match the Pages artifact byte-for-byte. Next candidate2af3f39 adds automatic Chart label measurement/source axes, atomic standalone Markdown/HTML image layout and dimensions, and Questionnaire answer descriptions/positions. Native77, ASan75, WASI67, browser78, quality and strict web build all pass. Next publication pending; full feature parity remains incomplete.",
+  "summary": "Releaseff475e6 is fully HTTPS78 verified; seven deployed assets including WASM match its Pages artifact byte-for-byte. Its portable source2af3f39 provides automatic Chart label measurement/source axes, atomic standalone Markdown/HTML image layout and dimensions, and Questionnaire answer descriptions/positions. Native77, ASan75, WASI67, browser78, quality and strict web build pass. Full78-entry feature parity remains incomplete. A subsequent isolated core/Attachment semantic ancestry fixfb4464b passes native75 and focused sanitizers2, with failing-before regressions, but is not yet integrated.",
   "checks": [
     {
       "name": "native",
@@ -43,12 +43,12 @@
     "reason": "Physical click helper failed elementFromPoint for first Start over after Skip completion. Investigating stale semantic index across awaited scrolling and viewport visibility. Public04e044e remains HTTPS78 verified.",
     "log": "pages-failure-1edb47d.txt"
   },
-  "published_evidence": "published-5608e51.txt",
+  "published_evidence": "published-ff475e6.txt",
   "deployment": {
-    "source": "5608e51d99b55c95b52d1c5b2c2f2ecfec7643c0",
+    "source": "ff475e69fea087ae1dcf95b55eac54c02e4216d1",
     "status": "success",
-    "pages_run": 38295715735,
-    "ci_run": 38295715752
+    "pages_run": 38296393361,
+    "ci_run": 38296393398
   },
   "targeted_checks": [
     {

@@ -359,6 +359,9 @@ void cui_pop_id(cui_context *ui);
 /* Paint one rectangle below children of the current open box, clipped to it.
  * Coordinates are relative to the box's current-frame origin; last call wins. */
 bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
+/* Paint an outside border band without affecting layout or filling its interior.
+ * Uses current-frame box bounds and ancestor clipping. Zero width clears it. */
+bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
 typedef struct {
     cui_rect bounds;
     cui_align horizontal, vertical;

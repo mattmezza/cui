@@ -1106,6 +1106,68 @@ static void test_pointer_only_container(void) {
     cui_destroy(ui);
 }
 
+static void test_outside_outline(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 32, .max_commands = 32});
+    assert(ui && !cui_set_outline(ui, 3, (cui_color){0}, (cui_corner_radii){0}));
+    for (int frame = 0; frame < 2; frame++) {
+        float width = frame ? 120 : 80;
+        assert(cui_begin_frame(ui, 200, 100, .016f));
+        cui_begin_box(ui, 90,
+                      (cui_box){.width = 200,
+                                .height = 100,
+                                .clip = true,
+                                .padding = 10,
+                                .custom_opacity = true,
+                                .opacity = .5f});
+        cui_begin_box(ui, 91,
+                      (cui_box){.width = width, .height = 30, .background = {10, 20, 30, 100}});
+        assert(
+            cui_set_outline(ui, 3, (cui_color){40, 50, 60, 200}, (cui_corner_radii){1, 2, 3, 4}));
+        assert(!cui_set_outline(ui, -1, (cui_color){0}, (cui_corner_radii){0}));
+        if (frame)
+            assert(cui_set_underlay(ui, (cui_rect){2, 2, 4, 4}, (cui_color){70, 80, 90, 255},
+                                    (cui_corner_radii){0}));
+        cui_end_box(ui);
+        cui_begin_box(ui, 92, (cui_box){.width = 20, .height = 10});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        cui_rect card = cui_bounds(ui, 91), sibling = cui_bounds(ui, 92);
+        assert(card.w == width && card.h == 30 && sibling.y == card.y + card.h);
+        bool found = false, fill = false, underlay = false;
+        int clips = 0;
+        for (size_t i = 0; i < list.count; i++) {
+            const cui_draw_command *d = &list.commands[i];
+            if (d->type == CUI_DRAW_CLIP_PUSH)
+                clips++;
+            if (d->type == CUI_DRAW_CLIP_POP)
+                clips--;
+            if (d->type == CUI_DRAW_BORDER && d->color.r == 40) {
+                assert(clips == 1 && d->color.a == 100 && d->stroke == 3);
+                assert(d->bounds.x == card.x - 3 && d->bounds.y == card.y - 3);
+                assert(d->bounds.w == width + 6 && d->bounds.h == 36);
+                assert(d->corner_radii.top_left == 4 && d->corner_radii.bottom_right == 7);
+                found = true;
+            }
+            if (d->type == CUI_DRAW_RECT && d->color.r == 10) {
+                assert(d->color.a == 50 && d->bounds.w == width);
+                fill = true;
+            }
+            if (d->type == CUI_DRAW_RECT && d->color.r == 70)
+                underlay = true;
+        }
+        assert(found && fill && underlay == (frame != 0) && clips == 0);
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+    ui = cui_create((cui_config){.max_elements = 16, .max_commands = 1});
+    assert(ui && cui_begin_frame(ui, 100, 100, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 50, .height = 20, .background = {1, 2, 3, 255}});
+    assert(cui_set_outline(ui, 3, (cui_color){4, 5, 6, 255}, (cui_corner_radii){0}));
+    cui_end_box(ui);
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_destroy(ui);
+}
 static void test_underlay_order_and_layout(void) {
     cui_context *ui = make();
     assert(!cui_set_underlay(ui, (cui_rect){0, 0, 20, 10}, (cui_color){0}, (cui_corner_radii){0}));
@@ -2407,6 +2469,7 @@ int main(void) {
     test_focusable_container();
     test_nonfocusable_proxy_button();
     test_pointer_only_container();
+    test_outside_outline();
     test_underlay_order_and_layout();
     test_underlay_capacity_and_hidden();
     test_table_semantic_roles();

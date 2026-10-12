@@ -360,6 +360,9 @@ void cui_pop_id(cui_context *ui);
 /* Paint one rectangle below children of the current open box, clipped to it.
  * Coordinates are relative to the box's current-frame origin; last call wins. */
 bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
+/* Paint an outside border band without affecting layout or filling its interior.
+ * Uses current-frame box bounds and ancestor clipping. Zero width clears it. */
+bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
 typedef struct {
     cui_rect bounds;
     cui_align horizontal, vertical;
@@ -5594,7 +5597,10 @@ typedef struct {
     float opacity;
     uint32_t paint_root;
     cui_bitmap_paint bitmap;
-    bool bitmap_underlay;
+    bool bitmap_underlay, has_underlay;
+    float outline_width;
+    cui_color outline_color;
+    cui_corner_radii outline_radii;
     cui_rect underlay_bounds;
     cui_underlay_layout underlay_layout;
     cui_color underlay_color;
@@ -6469,6 +6475,19 @@ bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_bo
     cui_end_box(ui);
     return ok;
 }
+bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
+    if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
+        !isfinite(width) || width < 0 || !isfinite(radii.top_left) || !isfinite(radii.top_right) ||
+        !isfinite(radii.bottom_left) || !isfinite(radii.bottom_right) || radii.top_left < 0 ||
+        radii.top_right < 0 || radii.bottom_left < 0 || radii.bottom_right < 0)
+        return false;
+    cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    node->outline_width = width;
+    node->outline_color = color;
+    node->outline_radii = radii;
+    Clay__GetOpenLayoutElement()->config.custom.customData = node;
+    return true;
+}
 bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color color,
                          cui_corner_radii radii) {
     cui_rect bounds = layout.bounds;
@@ -6482,6 +6501,7 @@ bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color 
         radii.bottom_left < 0 || radii.bottom_right < 0)
         return false;
     cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    node->has_underlay = true;
     node->bitmap_underlay = false;
     node->underlay_bounds = bounds;
     node->underlay_layout = layout;
@@ -6813,11 +6833,27 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             const cui_core_box_node *node = c->renderData.custom.customData;
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
             background.a = (uint8_t)(background.a * opacity);
-            size_t needed = 3 + (background.a ? 1 : 0);
+            size_t needed = (node->has_underlay ? 3 : 0) + (background.a ? 1 : 0) +
+                            (node->outline_width > 0 ? 1 : 0);
             if (needed > ui->config.max_commands - ui->count) {
                 cui_core_fail(ui, CUI_ERROR_CAPACITY);
                 ui->count = 0;
                 goto cui_core_commands_done;
+            }
+            if (node->outline_width > 0) {
+                float w = node->outline_width;
+                cui_color color = node->outline_color;
+                color.a = (uint8_t)(color.a * opacity);
+                cui_corner_radii r = node->outline_radii;
+                ui->commands[ui->count++] =
+                    (cui_draw_command){.type = CUI_DRAW_BORDER,
+                                       .bounds = {d.bounds.x - w, d.bounds.y - w,
+                                                  d.bounds.w + 2 * w, d.bounds.h + 2 * w},
+                                       .color = color,
+                                       .stroke = w,
+                                       .custom_corners = true,
+                                       .corner_radii = {r.top_left + w, r.top_right + w,
+                                                        r.bottom_left + w, r.bottom_right + w}};
             }
             if (background.a) {
                 Clay_CornerRadius radius = c->renderData.custom.cornerRadius;
@@ -6829,6 +6865,8 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                        .corner_radii = {radius.topLeft, radius.topRight,
                                                         radius.bottomLeft, radius.bottomRight}};
             }
+            if (!node->has_underlay)
+                continue;
             ui->commands[ui->count++] =
                 (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds};
             cui_underlay_layout layout = node->underlay_layout;

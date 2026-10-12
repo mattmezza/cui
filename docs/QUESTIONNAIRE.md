@@ -55,3 +55,5 @@ The core `cui_semantic_parent` query exposes the completed frame's nearest seman
 Default shortcut badges paint the theme background independently of selected/hovered card fills; disabled cards halve the entire badge opacity. Draw-list regressions cover all 38 preset palettes and all four sizes.
 
 `cui_questionnaire_choice_position` returns the one-based position and total among enabled choices without allocating. Disabled/unknown choices or invalid arguments leave both required outputs unchanged. Styled radio/checkbox answers publish this position together with their definition description; runtime disabled changes recompute the enabled set. This semantic coverage does not imply a verified native screen-reader bridge.
+
+Focused answer cards now tint their existing border with the focus token and paint the pinned source’s 3px, half-opacity outside band. The band preserves translucent card interiors and does not alter card or sibling layout. `theme.hide_focus_ring` suppresses the band while retaining the focused border. Headless draw tests cover all 38 palettes and all four sizes; this does not complete root keyboard routing or platform accessibility.

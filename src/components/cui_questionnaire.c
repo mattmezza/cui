@@ -171,12 +171,19 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
                             .gap = 0,
                             .radius = card_radius,
                             .border_width = 1,
-                            .border = invalid    ? t->danger
-                                      : selected ? cui_questionnaire_opacity(t->primary, .4f)
-                                                 : t->input,
+                            .border = view.focused ? t->focus
+                                      : invalid    ? t->danger
+                                      : selected   ? cui_questionnaire_opacity(t->primary, .4f)
+                                                   : t->input,
                             .background = card_background,
                             .custom_opacity = disabled,
                             .opacity = .5f});
+    if (view.focused && !t->hide_focus_ring) {
+        cui_color ring = t->focus;
+        ring.a = 127;
+        (void)cui_set_outline(
+            ui, 3, ring, (cui_corner_radii){card_radius, card_radius, card_radius, card_radius});
+    }
     /* Side spacers supply independent horizontal padding and the card's minimum
      * height without centering the indicator against multi-line descriptions. */
     cui_begin_box(

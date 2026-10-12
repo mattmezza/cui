@@ -242,6 +242,35 @@ static void source_card_styles(void) {
             fill = t.muted_background;
             fill.a = (uint8_t)(fill.a * .5f + .5f);
             card_paint(ui, list, fill, border, radius, font, &t, size, o.disabled);
+            cui_rect before_focus = cui_bounds(ui, 12);
+            cui_focus(ui, 12);
+            list = card_frame(ui, &s, &t, o);
+            cui_rect after_focus = cui_bounds(ui, 12);
+            assert(before_focus.w == after_focus.w && before_focus.h == after_focus.h);
+            card_paint(ui, list, fill, t.focus, radius, font, &t, size, false);
+            bool ring_found = false;
+            for (size_t n = 0; n < list.count; n++) {
+                const cui_draw_command *draw = &list.commands[n];
+                if (draw->type == CUI_DRAW_BORDER && draw->stroke == 3 &&
+                    draw->bounds.w == after_focus.w + 6) {
+                    assert(draw->bounds.x == after_focus.x - 3 &&
+                           draw->bounds.y == after_focus.y - 3 &&
+                           draw->bounds.h == after_focus.h + 6);
+                    cui_color ring = t.focus;
+                    ring.a = 127;
+                    assert(same_color(draw->color, ring));
+                    assert(draw->corner_radii.top_left == radius + 3);
+                    ring_found = true;
+                }
+            }
+            assert(ring_found);
+            t.hide_focus_ring = true;
+            list = card_frame(ui, &s, &t, o);
+            card_paint(ui, list, fill, t.focus, radius, font, &t, size, false);
+            for (size_t n = 0; n < list.count; n++)
+                assert(list.commands[n].type != CUI_DRAW_BORDER || list.commands[n].stroke != 3);
+            t.hide_focus_ring = false;
+            cui_focus(ui, 0);
             o.disabled = true;
             list = card_frame(ui, &s, &t, o);
             fill = t.muted_background;

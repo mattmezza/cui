@@ -1059,7 +1059,8 @@ static void test_custom_tabs(void) {
                      last = cui_bounds(ui, 30), suffix = cui_bounds(ui, 701);
             assert(prefix.x + prefix.w <= first.x + .01f && last.x + last.w <= suffix.x + .01f);
             cui_rect bar = cui_bounds(ui, 1 ^ UINT64_C(0xcda0312561f50cab));
-            assert(bar.h == prefix.h && fabsf(first.y - bar.y - (bar.h - first.h) * .5f) < .01f);
+            assert(bar.h >= prefix.h && fabsf(prefix.y - bar.y - (bar.h - prefix.h) * .5f) < .01f &&
+                   fabsf(first.y - bar.y - (bar.h - first.h) * .5f) < .01f);
             size_t count = 0;
             const cui_semantic *semantics = cui_semantics(ui, &count);
             bool named = false, disabled = false;
@@ -2739,10 +2740,10 @@ static void tab_part_suffix(cui_context *ui, const cui_choice_item *item, size_t
                             void *user) {
     (void)user;
     cui_theme theme = cui_theme_light();
-    theme.control_height = 14;
-    theme.padding = 2;
     theme.font_size = 10;
-    tab_slot_action |= cui_button(ui, 9200 + index, &theme, cui_string("x"), item->disabled);
+    tab_slot_action |=
+        cui_button_ex(ui, 9200 + index, &theme, cui_string("x"),
+                      (cui_button_options){.size = CUI_CONTROL_XSMALL, .disabled = item->disabled});
 }
 static void tab_part_icon(cui_context *ui, const cui_choice_item *item, size_t index, void *user) {
     (void)item;

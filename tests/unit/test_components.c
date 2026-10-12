@@ -65,15 +65,26 @@ static void test_button_options(void) {
                        nodes[0].role ==
                            (variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON));
                 assert(!nodes[0].disabled && nodes[0].name.length == 6);
-                float scale = size == CUI_CONTROL_XSMALL  ? .65f
-                              : size == CUI_CONTROL_SMALL ? .8f
-                              : size == CUI_CONTROL_LARGE ? 1.2f
-                                                          : 1;
-                assert(fabsf(nodes[0].bounds.h - themes[theme].control_height * scale) < .001f);
+                float density = themes[theme].font_size / 16;
+                float height = (size == CUI_CONTROL_XSMALL  ? 20
+                                : size == CUI_CONTROL_SMALL ? 24
+                                                            : 32) *
+                               density;
+                assert(fabsf(nodes[0].bounds.h - height) < .001f);
                 assert(nodes[0].bounds.w == 180);
                 unsigned text = 0;
                 for (size_t i = 0; i < list.count; i++)
-                    text += list.commands[i].type == CUI_DRAW_TEXT;
+                    if (list.commands[i].type == CUI_DRAW_TEXT) {
+                        const cui_draw_command *command = &list.commands[i];
+                        float natural =
+                            cui_measure_text(ui, command->text, command->font_size).height;
+                        float center = command->bounds.y + natural * .5f;
+                        assert(fabsf(center - (nodes[0].bounds.y + height * .5f)) < .6f);
+                        assert(command->bounds.x >= nodes[0].bounds.x);
+                        assert(command->bounds.x + command->bounds.w <=
+                               nodes[0].bounds.x + nodes[0].bounds.w);
+                        text++;
+                    }
                 assert(text == 3 && cui_last_error(ui) == CUI_OK);
             }
     unsigned calls = 0;

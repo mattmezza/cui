@@ -282,12 +282,22 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     if (options.variant == CUI_BUTTON_LINK)
         (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
     cui_box b = cui_components_control(t, disabled, false);
-    float scale = options.size == CUI_CONTROL_XSMALL  ? .65f
-                  : options.size == CUI_CONTROL_SMALL ? .8f
-                  : options.size == CUI_CONTROL_LARGE ? 1.2f
-                                                      : 1;
-    b.height *= scale;
-    b.padding *= scale;
+    float density = isfinite(t->font_size) && t->font_size > 0 ? t->font_size / 16 : 1;
+    float font = (options.size == CUI_CONTROL_XSMALL  ? 12
+                  : options.size == CUI_CONTROL_LARGE ? 16
+                                                      : 14) *
+                 density;
+    float horizontal_padding = (options.size == CUI_CONTROL_XSMALL  ? 4
+                                : options.size == CUI_CONTROL_SMALL ? 8
+                                : options.size == CUI_CONTROL_LARGE ? 12
+                                                                    : 10) *
+                               density;
+    b.height = (options.size == CUI_CONTROL_XSMALL  ? 20
+                : options.size == CUI_CONTROL_SMALL ? 24
+                                                    : 32) *
+               density;
+    b.padding = 0;
+    b.gap = 0;
     b.width = isfinite(options.width) ? options.width : 0;
     b.align_x = CUI_ALIGN_CENTER;
     b.align_y = CUI_ALIGN_CENTER;
@@ -338,6 +348,17 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         cui_set_semantic_details(
             ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
     cui_begin_box(ui, id, b);
+    cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
+    cui_end_box(ui);
+    cui_begin_box(
+        ui, 0,
+        (cui_box){
+            .row = true,
+            .align_x = CUI_ALIGN_CENTER,
+            .align_y = CUI_ALIGN_CENTER,
+            .gap =
+                (options.size == CUI_CONTROL_XSMALL || options.size == CUI_CONTROL_SMALL ? 4 : 8) *
+                density});
     foreground = disabled ? t->muted : foreground;
     if (options.loading)
         (void)cui_icon_spinner(
@@ -349,13 +370,16 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                .custom_color = true,
                                .color = foreground});
     else if (options.leading.length)
-        cui_text(ui, options.leading, t->font_size * scale, foreground);
+        cui_text_with_line_height(ui, options.leading, font, foreground, font * 1.25f);
     if (options.content)
         options.content(ui, options.content_user);
     else
-        cui_text(ui, name, t->font_size * scale, foreground);
+        cui_text_with_line_height(ui, name, font, foreground, font * 1.25f);
     if (options.trailing.length)
-        cui_text(ui, options.trailing, t->font_size * scale, foreground);
+        cui_text_with_line_height(ui, options.trailing, font, foreground, font * 1.25f);
+    cui_end_box(ui);
+    cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
+    cui_end_box(ui);
     cui_end_box(ui);
     return state.activated;
 }

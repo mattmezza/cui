@@ -350,6 +350,18 @@ static cui_id cui_core_hit(cui_context *ui, float x, float y) {
         }
     return hit;
 }
+cui_cursor cui_pointer_cursor(cui_context *ui) {
+    if (!ui)
+        return CUI_CURSOR_DEFAULT;
+    cui_id id = ui->capture ? ui->capture : cui_core_hit(ui, ui->pointer_x, ui->pointer_y);
+    for (size_t i = 0; i < ui->previous_count; i++) {
+        const cui_semantic *s = &ui->previous[i];
+        if (s->id == id && !s->disabled && cui_core_previous_allowed(ui, i) &&
+            s->details.cursor >= CUI_CURSOR_DEFAULT && s->details.cursor <= CUI_CURSOR_NOT_ALLOWED)
+            return s->details.cursor;
+    }
+    return CUI_CURSOR_DEFAULT;
+}
 static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
     cui_id hit = 0;
     int16_t layer = INT16_MIN, blocking_layer = INT16_MIN;

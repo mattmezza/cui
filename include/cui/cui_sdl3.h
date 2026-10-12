@@ -16,6 +16,9 @@ typedef struct {
 cui_sdl3 *cui_sdl3_create(const char *title, int width, int height, cui_font *font);
 void cui_sdl3_destroy(cui_sdl3 *backend);
 bool cui_sdl3_poll(cui_sdl3 *backend, cui_context *ui);
+/* Apply after end_frame for immediate feedback. poll also applies the previous
+ * frame hint. Returns false if the host driver does not support system cursors. */
+bool cui_sdl3_set_cursor(cui_sdl3 *backend, cui_cursor cursor);
 void cui_sdl3_size(cui_sdl3 *backend, float *width, float *height);
 bool cui_sdl3_render(cui_sdl3 *backend, const cui_draw_list *list, cui_color clear);
 /* Capture before presenting, when the framebuffer contents are defined. */

@@ -1485,7 +1485,8 @@ static void absolute_scene(cui_context *ui, bool overlay) {
     cui_begin_absolute_box(ui, 802, (cui_box){.background = {255, 0, 0, 255}},
                            (cui_rect){95, 10, 9, 40});
     cui_interact(ui, 802, CUI_ROLE_SEPARATOR, cui_string("Resize"), false, false, 50);
-    cui_set_semantic_details(ui, 802, (cui_semantic_details){.focusable = true});
+    cui_set_semantic_details(
+        ui, 802, (cui_semantic_details){.focusable = true, .cursor = CUI_CURSOR_RESIZE_HORIZONTAL});
     cui_end_box(ui);
     cui_begin_box(ui, 803, (cui_box){.width = 100, .height = 40});
     cui_end_box(ui);
@@ -1519,18 +1520,21 @@ static void test_absolute_boxes(void) {
     queue(ui, CUI_EVENT_POINTER_UP, 102, 20, 0, 0);
     begin(ui);
     assert(cui_event_target(ui, 0) == 0); /* Clipped tail is not interactive. */
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_DEFAULT);
     absolute_scene(ui, false);
     cui_end_frame(ui);
     queue(ui, CUI_EVENT_POINTER_DOWN, 97, 20, 0, 0);
     queue(ui, CUI_EVENT_POINTER_UP, 97, 20, 0, 0);
     begin(ui);
     assert(cui_event_target(ui, 0) == 802 && cui_focused(ui) == 802);
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_RESIZE_HORIZONTAL);
     absolute_scene(ui, true);
     cui_end_frame(ui);
     queue(ui, CUI_EVENT_POINTER_DOWN, 97, 20, 0, 0);
     queue(ui, CUI_EVENT_POINTER_UP, 97, 20, 0, 0);
     begin(ui);
     assert(cui_event_target(ui, 0) == 804); /* Parent layer stays below portals. */
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_DEFAULT);
     absolute_scene(ui, true);
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);

@@ -137,6 +137,21 @@ int main(int argc, char **argv) {
     assert(!platform.clipboard_set(platform.user, (cui_str){"a\0b", 3}));
     cui_context *ui = cui_create((cui_config){.width = 320, .height = 160});
     assert(ui);
+    assert(!cui_sdl3_set_cursor(NULL, CUI_CURSOR_DEFAULT));
+    assert(!cui_sdl3_set_cursor(s, (cui_cursor)999));
+    if (strcmp(SDL_GetCurrentVideoDriver(), "dummy") != 0) {
+        for (int cursor = CUI_CURSOR_DEFAULT; cursor <= CUI_CURSOR_NOT_ALLOWED; cursor++) {
+            assert(cui_sdl3_set_cursor(s, (cui_cursor)cursor));
+            assert(SDL_GetCursor());
+        }
+        assert(cui_sdl3_set_cursor(s, CUI_CURSOR_DEFAULT));
+        SDL_Cursor *first = SDL_GetCursor();
+        assert(cui_sdl3_set_cursor(s, CUI_CURSOR_RESIZE_HORIZONTAL));
+        assert(SDL_GetCursor() != first);
+        assert(cui_sdl3_set_cursor(s, CUI_CURSOR_DEFAULT) && SDL_GetCursor() == first);
+    } else {
+        assert(!cui_sdl3_set_cursor(s, CUI_CURSOR_RESIZE_HORIZONTAL));
+    }
     SDL_Event event = {0};
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.key = SDLK_TAB;

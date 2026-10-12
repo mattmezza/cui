@@ -32,6 +32,7 @@ struct cui_sdl3 {
     size_t glyph_bytes;
     uint64_t clock, hits, misses;
     char *clipboard;
+    SDL_Cursor *cursors[CUI_CURSOR_NOT_ALLOWED + 1];
 };
 cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
@@ -63,6 +64,8 @@ void cui_sdl3_destroy(cui_sdl3 *s) {
     }
     for (size_t i = 0; i < BITMAP_SLOTS; i++)
         SDL_DestroyTexture(s->bitmaps[i].texture);
+    for (size_t i = 0; i <= CUI_CURSOR_NOT_ALLOWED; i++)
+        SDL_DestroyCursor(s->cursors[i]);
     SDL_free(s->clipboard);
     SDL_DestroyRenderer(s->renderer);
     SDL_DestroyWindow(s->window);
@@ -115,7 +118,21 @@ static cui_key key(SDL_Keycode k) {
         return CUI_KEY_NONE;
     }
 }
+bool cui_sdl3_set_cursor(cui_sdl3 *s, cui_cursor cursor) {
+    static const SDL_SystemCursor kinds[] = {
+        SDL_SYSTEM_CURSOR_DEFAULT,    SDL_SYSTEM_CURSOR_POINTER,   SDL_SYSTEM_CURSOR_TEXT,
+        SDL_SYSTEM_CURSOR_EW_RESIZE,  SDL_SYSTEM_CURSOR_NS_RESIZE, SDL_SYSTEM_CURSOR_MOVE,
+        SDL_SYSTEM_CURSOR_NOT_ALLOWED};
+    if (!s || cursor < CUI_CURSOR_DEFAULT || cursor > CUI_CURSOR_NOT_ALLOWED)
+        return false;
+    if (!s->cursors[cursor])
+        s->cursors[cursor] = SDL_CreateSystemCursor(kinds[cursor]);
+    return s->cursors[cursor] && SDL_SetCursor(s->cursors[cursor]);
+}
 bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
+    if (!s || !ui)
+        return false;
+    (void)cui_sdl3_set_cursor(s, cui_pointer_cursor(ui));
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         cui_event v = {0};

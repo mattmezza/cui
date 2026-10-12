@@ -117,3 +117,11 @@ Set `semantic_details.focusable` to opt a passive container (for example a Log v
  parent's layer, so overlapping resize handles stay beneath higher portals.
  It requires an open parent and is balanced with `cui_end_box` even on invalid
  bounds. `CUI_ROLE_SEPARATOR` is passive unless semantic details opt into focus.
+
+Semantic `details.cursor` is a portable pointer hint. `cui_pointer_cursor` returns
+ the captured control's hint while dragging, otherwise the topmost enabled hit
+ in the completed frame, respecting ancestor clips and modal ownership. Hosts
+ apply it after `cui_end_frame`; unsupported hosts may retain their default.
+ The SDL3 host exposes `cui_sdl3_set_cursor` and also applies the last completed
+ frame's hint during polling. System cursors are cached and released with the
+ adapter; headless drivers report unsupported without failing event dispatch.

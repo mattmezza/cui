@@ -123,6 +123,15 @@ typedef enum {
     CUI_ORIENTATION_HORIZONTAL,
     CUI_ORIENTATION_VERTICAL
 } cui_orientation;
+typedef enum {
+    CUI_CURSOR_DEFAULT,
+    CUI_CURSOR_POINTER,
+    CUI_CURSOR_TEXT,
+    CUI_CURSOR_RESIZE_HORIZONTAL,
+    CUI_CURSOR_RESIZE_VERTICAL,
+    CUI_CURSOR_MOVE,
+    CUI_CURSOR_NOT_ALLOWED
+} cui_cursor;
 typedef struct {
     bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy,
         scrollable;
@@ -141,6 +150,7 @@ typedef struct {
     bool focusable;
     /* Primary pointer activation without opting into focus or keyboard activation. */
     bool pointer_activatable;
+    cui_cursor cursor;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -299,6 +309,9 @@ cui_rect cui_bounds(cui_context *ui, cui_id id);
 bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained);
 /* Previous-frame clipped region, excluding higher interactive layers/modal scopes. */
 bool cui_hovered(cui_context *ui, cui_id id);
+/* Cursor of the captured or topmost hovered enabled semantic from the completed
+ * frame. Hosts apply this after end_frame; clipping and modal scopes apply. */
+cui_cursor cui_pointer_cursor(cui_context *ui);
 /* Current primary-pointer or Space capture; submit behavior before querying. */
 bool cui_pressed(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);
@@ -5738,6 +5751,18 @@ static cui_id cui_core_hit(cui_context *ui, float x, float y) {
             layer = ui->previous_layers[i];
         }
     return hit;
+}
+cui_cursor cui_pointer_cursor(cui_context *ui) {
+    if (!ui)
+        return CUI_CURSOR_DEFAULT;
+    cui_id id = ui->capture ? ui->capture : cui_core_hit(ui, ui->pointer_x, ui->pointer_y);
+    for (size_t i = 0; i < ui->previous_count; i++) {
+        const cui_semantic *s = &ui->previous[i];
+        if (s->id == id && !s->disabled && cui_core_previous_allowed(ui, i) &&
+            s->details.cursor >= CUI_CURSOR_DEFAULT && s->details.cursor <= CUI_CURSOR_NOT_ALLOWED)
+            return s->details.cursor;
+    }
+    return CUI_CURSOR_DEFAULT;
 }
 static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
     cui_id hit = 0;

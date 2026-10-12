@@ -1120,6 +1120,28 @@ int main(void) {
             candle_swatch = true;
         }
     assert(ohlc[0] && ohlc[1] && ohlc[2] && ohlc[3] && candle_swatch && neutral_value);
+    cui_chart_candle_geometry first_hover_candle, next_hover_candle;
+    assert(cui_chart_candle_bounds(&options, 0, &first_hover_candle) == CUI_PLOT_OK);
+    assert(cui_chart_candle_bounds(&options, 1, &next_hover_candle) == CUI_PLOT_OK);
+    bool candle_hover_band = false;
+    float expected_band = (float)((first_hover_candle.body.x_max - first_hover_candle.body.x_min) /
+                                  .8f * options.logical_width / options.width);
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT &&
+            fabsf(draw.commands[i].bounds.w - expected_band) < .01f &&
+            fabsf(draw.commands[i].bounds.h -
+                  (options.logical_height - 20 * options.logical_height / options.height)) < .01f &&
+            draw.commands[i].color.r == options.foreground.r && draw.commands[i].color.a > 0 &&
+            draw.commands[i].color.a < 30)
+            candle_hover_band = true;
+    assert(candle_hover_band && fabs(state.emphasis_center - first_hover_candle.wick.x_min) < .01);
+    state.hovered = 1;
+    assert(cui_begin_frame(ui, 256, 256, .01f));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    (void)cui_end_frame(ui);
+    assert(state.emphasis_center > first_hover_candle.wick.x_min &&
+           state.emphasis_center < next_hover_candle.wick.x_min);
+    state.hovered = 0;
     size_t tooltip_calls = 0;
     options.tooltip_content = custom_tooltip;
     options.tooltip_user = &tooltip_calls;

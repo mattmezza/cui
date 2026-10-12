@@ -450,6 +450,43 @@ static void test_semantic_details_and_roving(void) {
     cui_destroy(ui);
 }
 
+static void test_scope_dismissal(void) {
+    cui_context *ui = make();
+    begin(ui);
+    modal_frame(ui, true);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 4);
+    begin(ui);
+    control(ui, 1, false);
+    assert(cui_begin_focus_scope(ui, 100, true));
+    control(ui, 2, false);
+    assert(cui_begin_focus_scope(ui, 200, true));
+    /* Register behavior, then dismiss before painting the closed popup. */
+    cui_interact(ui, 4, CUI_ROLE_BUTTON, cui_string("popup item"), false, false, 0);
+    assert(cui_dismiss_focus_scope(ui, 200, 2));
+    assert(!cui_dismiss_focus_scope(ui, 200, 2));
+    cui_interact(ui, 40, CUI_ROLE_BUTTON, cui_string("suppressed"), false, false, 0);
+    cui_end_focus_scope(ui);
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 2);
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    assert(count == 2 && nodes[0].id == 1 && nodes[1].id == 2);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ESCAPE, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 100);
+    control(ui, 1, false);
+    assert(cui_begin_focus_scope(ui, 100, true));
+    cui_interact(ui, 2, CUI_ROLE_BUTTON, cui_string("popup item"), false, false, 0);
+    assert(cui_dismiss_focus_scope(ui, 100, 1));
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 1);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_input();
     test_strings_and_draw();
@@ -459,6 +496,7 @@ int main(void) {
     test_creation_overflow();
     test_focus_scopes();
     test_portals();
+    test_scope_dismissal();
     test_semantic_details_and_roving();
     puts("core tests passed");
     return 0;

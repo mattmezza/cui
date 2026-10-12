@@ -3,6 +3,9 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
+#include "cui_choice.h"
+#include "cui_content.h"
+#include "cui_disclosure.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +34,18 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_THEME_IMPLEMENTATION
 #endif
 #include "cui_theme.h"
+#ifndef CUI_CONTENT_IMPLEMENTATION
+#define CUI_CONTENT_IMPLEMENTATION
+#endif
+#include "cui_content.h"
+#ifndef CUI_DISCLOSURE_IMPLEMENTATION
+#define CUI_DISCLOSURE_IMPLEMENTATION
+#endif
+#include "cui_disclosure.h"
+#ifndef CUI_CHOICE_IMPLEMENTATION
+#define CUI_CHOICE_IMPLEMENTATION
+#endif
+#include "cui_choice.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

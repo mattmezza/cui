@@ -175,6 +175,9 @@ cui_id cui_focused(cui_context *ui);
 void cui_focus(cui_context *ui, cui_id id);
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal);
 void cui_end_focus_scope(cui_context *ui);
+/* Withdraw current scope descendants before painting a closing popup. Paired
+ * begin/end remain required. Restores a previous-frame enabled trigger, if any. */
+bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);
 bool cui_focus_restore(cui_context *ui, cui_id trigger);
 const cui_event *cui_frame_events(cui_context *ui, size_t *count);
 cui_error cui_last_error(cui_context *ui);
@@ -5284,7 +5287,7 @@ typedef struct {
 typedef struct {
     cui_id id;
     size_t parent;
-    bool modal;
+    bool modal, active;
 } cui_core_focus_scope;
 struct cui_context {
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
@@ -5570,14 +5573,19 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
-            size_t scope = ui->previous_focus_scope_count - 1;
+            size_t scope = ui->previous_focus_scope_count;
+            while (scope && !ui->previous_focus_scopes[scope - 1].active)
+                scope--;
+            if (scope)
+                scope--;
             for (size_t j = 0; j < ui->previous_count; j++)
                 if (ui->previous[j].id == ui->focus &&
                     ui->previous_semantic_scopes[j] != SIZE_MAX) {
                     scope = ui->previous_semantic_scopes[j];
                     break;
                 }
-            ui->event_targets[i] = ui->previous_focus_scopes[scope].id;
+            if (scope < ui->previous_focus_scope_count && ui->previous_focus_scopes[scope].active)
+                ui->event_targets[i] = ui->previous_focus_scopes[scope].id;
         }
         if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_DOWN ||
             e.type == CUI_EVENT_POINTER_UP) {
@@ -5813,6 +5821,8 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
         return out;
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
         return out;
+    if (ui->focus_depth && !ui->focus_scopes[ui->focus_stack[ui->focus_depth - 1]].active)
+        return out;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {
             cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
@@ -6044,7 +6054,7 @@ bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {
         }
     size_t n = ui->focus_scope_count++;
     ui->focus_scopes[n] = (cui_core_focus_scope){
-        id, ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX, modal};
+        id, ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX, modal, true};
     ui->focus_stack[ui->focus_depth++] = n;
     if (modal)
         ui->top_modal = n;
@@ -6106,6 +6116,37 @@ bool cui_hovered(cui_context *ui, cui_id id) {
             return true;
         }
     return false;
+}
+
+bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
+    if (!cui_core_active(ui))
+        return false;
+    size_t dismissed = SIZE_MAX;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (ui->focus_scopes[i].id == scope && ui->focus_scopes[i].active)
+            dismissed = i;
+    if (dismissed == SIZE_MAX)
+        return false;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (cui_core_scope_contains(ui->focus_scopes, i, dismissed))
+            ui->focus_scopes[i].active = false;
+    size_t retained = 0;
+    for (size_t i = 0; i < ui->semantic_count; i++) {
+        if (cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], dismissed))
+            continue;
+        ui->semantics[retained] = ui->semantics[i];
+        ui->semantic_scopes[retained] = ui->semantic_scopes[i];
+        ui->semantic_nodes[retained] = ui->semantic_nodes[i];
+        retained++;
+    }
+    ui->semantic_count = retained;
+    ui->top_modal = SIZE_MAX;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (ui->focus_scopes[i].active && ui->focus_scopes[i].modal)
+            ui->top_modal = i;
+    cui_focus_restore(ui, trigger);
+    ui->dirty = true;
+    return true;
 }
 
 #endif

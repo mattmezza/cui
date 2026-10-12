@@ -27,9 +27,15 @@ SOURCES = (
     "src/base/cui_plot.c",
     "src/theme/cui_theme.c",
     "src/components/cui_components.c",
+    "src/base/cui_content.c",
+    "src/components/cui_content.c",
+    "src/base/cui_disclosure.c",
+    "src/components/cui_disclosure.c",
+    "src/base/cui_choice.c",
+    "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:

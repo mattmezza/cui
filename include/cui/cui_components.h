@@ -2,6 +2,9 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
+#include "cui_choice.h"
+#include "cui_content.h"
+#include "cui_disclosure.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {

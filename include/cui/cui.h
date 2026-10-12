@@ -174,6 +174,9 @@ cui_id cui_focused(cui_context *ui);
 void cui_focus(cui_context *ui, cui_id id);
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal);
 void cui_end_focus_scope(cui_context *ui);
+/* Withdraw current scope descendants before painting a closing popup. Paired
+ * begin/end remain required. Restores a previous-frame enabled trigger, if any. */
+bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);
 bool cui_focus_restore(cui_context *ui, cui_id trigger);
 const cui_event *cui_frame_events(cui_context *ui, size_t *count);
 cui_error cui_last_error(cui_context *ui);

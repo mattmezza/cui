@@ -12,6 +12,14 @@ int main(void) {
 #ifdef CUI_DISTRIBUTION_CONTROLS
     cui_theme theme = cui_theme_light();
     cui_button(ui, cui_id_from(ui, "button"), &theme, cui_string("Vendored button"), false);
+    cui_kbd(ui, cui_id_from(ui, "shortcut"), &theme, cui_string("Ctrl+K"));
+    bool open = false;
+    cui_collapsible(ui, cui_id_from(ui, "disclosure"), &theme, cui_string("More"), &open, false,
+                    NULL, NULL);
+    cui_choice_item item = {cui_id_from(ui, "tab"), cui_string("Tab"), false};
+    cui_id selected = item.id;
+    cui_tabs(ui, cui_id_from(ui, "tabs"), &theme, &item, 1, &selected, (cui_tabs_options){0}, NULL,
+             NULL);
 #else
     cui_text(ui, cui_string("Standalone C11 header"), 14, (cui_color){255, 255, 255, 255});
 #endif

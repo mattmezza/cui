@@ -2,14 +2,14 @@
   "source": "55f78c3",
   "published_source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published77-story gallery remains verified at3aecd89. Main adds persistent precise gesture ownership, unwrapped styled text, source-aligned Sankey link relaxation, Chart hover/fills, and nested TextView lists. Native77/77 and ASan/UBSan75/75 pass at55f78c3; WASI and updated local browser gates are running. All78 manifest entries remain partial; full parity is unfinished.",
+  "summary": "Main portable source55f78c3 passed native77, sanitizers75, WASI67 and the full77-story Chromium suite. The Questionnaire78 browser story is now integrated and awaiting combined validation. Published3aecd89 remains verified77 stories. All78 manifest entries remain partial; full parity is unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "50ffcc4",
+      "source": "55f78c3",
       "passed": 67,
       "total": 67,
-      "log": "wasi-50ffcc4.txt"
+      "log": "wasi-55f78c3.txt"
     },
     {
       "name": "native",
@@ -20,11 +20,11 @@
     },
     {
       "name": "browser",
-      "source": "0df7626",
+      "source": "55f78c3",
       "passed": 77,
       "total": 77,
       "palettes": 38,
-      "log": "browser-0df7626.txt"
+      "log": "browser-55f78c3.txt"
     },
     {
       "name": "sanitizers",

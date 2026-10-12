@@ -3522,7 +3522,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Retained answers, validation, delayed confirmation and initial composable graphical parts have targeted tests. Automatic root keyboard capture, shortcuts, cross-item focus transfer, custom slots, exact styling, localization, full accessibility and browser story remain unfinished; see docs/QUESTIONNAIRE.md."
+        "Retained answers, validation, delayed confirmation and initial composable graphical parts have targeted tests. Automatic root keyboard capture, shortcuts, cross-item focus transfer, custom slots, exact styling, localization and full accessibility remain unfinished. The real browser story covers validation, delayed navigation, freeform submission, reset, disabled state and four sizes; see docs/QUESTIONNAIRE.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

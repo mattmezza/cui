@@ -1,6 +1,6 @@
 # Questionnaire source audit
 
-Questionnaire is registered in the main library and distribution. Its gallery story and full source parity remain unfinished. The retained model and initial composable styled parts are implemented; this is not full parity. Reference commit: `87d10ae5e1299d1be18670a37570c5402f952e34`, `crates/base/src/questionnaire/{types,state,keyboard,control}.rs` and `crates/component/src/questionnaire/components.rs`.
+Questionnaire is registered in the main library and distribution. Its interactive gallery story is implemented; full source parity remains unfinished. The retained model and initial composable styled parts are implemented; this is not full parity. Reference commit: `87d10ae5e1299d1be18670a37570c5402f952e34`, `crates/base/src/questionnaire/{types,state,keyboard,control}.rs` and `crates/component/src/questionnaire/components.rs`.
 
 ## State and answers
 
@@ -28,10 +28,12 @@ Port source behavioral cases for schema rejection, silent setters, draft preserv
 
 The portable retained model tests cover schema errors, disabled answer restoration, effective-answer change detection, input drafts, capacity/UTF-8 atomicity, optional skip validation, delayed/reduced-motion confirmation, and completion-before-submit ordering. Styled tests exercise all four card sizes, pointer activation and updated checkbox semantics, minimum card height, error/action visibility, Skip completion, actual text editing into a freeform answer, and disabled input suppression. Standalone strict C11 and ASan/UBSan checks pass; the existing branch CTest suite passes73/73.
 
-Remaining work includes root keyboard capture and focus choreography, complete composable item/choices/action containers, custom indicator/content/shortcut slots, localization hooks, exact selected/hover/focus colors and source radius refinements, root shortcut routing and cross-item focus transfer, comprehensive keyboard tests, WASI tests, and the real browser story. Existing styled code is a development checkpoint, not evidence that these gaps are complete.
+Remaining work includes root keyboard capture and focus choreography, complete composable item/choices/action containers, custom indicator/content/shortcut slots, localization hooks, exact selected/hover/focus colors and source radius refinements, root shortcut routing and cross-item focus transfer, comprehensive keyboard coverage and platform accessibility integration. Existing styled code is a development checkpoint, not evidence that these gaps are complete.
 
 Input Enter confirmation and radio Left/Right wrapping now have native and sanitizer tests, including disabled-choice skipping, repeat suppression, event consumption, and no delayed confirmation from arrow selection. The explicit radio key helper must be called before choice rendering; full root keyboard routing remains unfinished.
 
 The root now owns a nonmodal focus scope. The explicit answer-key helper traverses enabled choices and an empty input with Up/Down, wraps in schema order, selects radios without confirming, and preserves cursor movement for nonempty drafts. Call it inside the root before answer parts. Native and sanitizer tests cover the choice/input boundary. Automatic root capture and initially focused-answer restoration remain unfinished.
 
 The explicit confirm-key helper supports Enter on a focused filled choice/input and a host-selected Ctrl/Meta+Enter modifier. Modified submission owns and cancels the core activation token even when validation fails, preventing accidental radio selection. The native regression verifies this fallback failure and successful confirmation; sanitizer and existing73CTest gates pass.
+
+The browser story now exercises required validation, delayed radio navigation, optional Skip, typed freeform submission, reset, disabled controls and all four sizes. The integrated library passes 77 native and 75 sanitizer suites. Gallery coverage does not establish complete keyboard, styling, accessibility or composition parity.

@@ -3358,6 +3358,17 @@ static size_t selection_images(cui_draw_list draw) {
     }
     return count;
 }
+static bool row_fill(cui_context *ui, cui_draw_list draw, cui_id id, cui_color color) {
+    cui_rect bounds = cui_bounds(ui, id);
+    for (size_t i = 0; i < draw.count; i++) {
+        cui_draw_command command = draw.commands[i];
+        if (command.type == CUI_DRAW_RECT && command.bounds.x == bounds.x &&
+            command.bounds.y == bounds.y && command.bounds.w == bounds.w &&
+            command.bounds.h == bounds.h && same_color(command.color, color))
+            return true;
+    }
+    return false;
+}
 static void test_menu_check_glyphs(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
@@ -3383,6 +3394,18 @@ static void test_menu_check_glyphs(void) {
     click(ui, 2);
     cui_draw_list draw = selection_menu_scene(ui, &state, entries, &action, false);
     assert(state.overlay.open && selection_images(draw) == 2);
+    assert(row_fill(ui, draw, 51, cui_theme_light().accent));
+    bool active_check = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE &&
+            draw.commands[i].bounds.y < cui_bounds(ui, 51).y + cui_bounds(ui, 51).h) {
+            active_check = true;
+            assert(same_color(draw.commands[i].bitmap.tint, cui_theme_light().accent_foreground));
+        }
+    assert(active_check);
+    key(ui, CUI_KEY_DOWN);
+    draw = selection_menu_scene(ui, &state, entries, &action, false);
+    assert(row_fill(ui, draw, 52, cui_theme_light().accent));
     float label_x = -1;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT &&
@@ -3458,6 +3481,22 @@ static void test_choice_trailing_checks(void) {
             click(ui, 2);
             draw = choice_indicator_scene(ui, mode, &popup, query, &selected, chosen);
             assert(popup.overlay.open);
+            assert(row_fill(ui, draw, 10, cui_theme_light().accent));
+            bool active_label = false;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 3 &&
+                    !memcmp(draw.commands[i].text.data, "One", 3) &&
+                    draw.commands[i].bounds.x ==
+                        cui_bounds(ui, 10 ^ UINT64_C(0x9e3f5d2a91bca002)).x &&
+                    draw.commands[i].bounds.y >= cui_bounds(ui, 10).y &&
+                    draw.commands[i].bounds.y < cui_bounds(ui, 10).y + cui_bounds(ui, 10).h) {
+                    active_label = true;
+                    assert(same_color(draw.commands[i].color, cui_theme_light().text));
+                }
+            assert(active_label);
+            key(ui, CUI_KEY_DOWN);
+            draw = choice_indicator_scene(ui, mode, &popup, query, &selected, chosen);
+            assert(popup.list.active == 20 && row_fill(ui, draw, 20, cui_theme_light().accent));
         }
         size_t checks = 0;
         for (size_t i = 0; i < draw.count; i++) {

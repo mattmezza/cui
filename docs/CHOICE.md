@@ -709,8 +709,13 @@ Headless tests route check/radio toggles and disabled clicks, inspect left/right
 placement, icon precedence and tints, and verify selection/check bounds and
 activation in all five List/Select/Combobox modes. Shared glyph pixel rendering
 is covered by the core/component/backend owner; Choice tests inspect IMAGE
-commands and routing. Row palette and full density defaults remain separate
-source-parity work.
+commands and routing. Popup menus use accent/accent_foreground for enabled
+active or hovered rows; disabled rows suppress that highlight. Select and
+Combobox rows use accent for the active cursor while retaining the normal text
+foreground, and unselected enabled hover uses accent at 70% alpha. Other rows
+leave their background transparent. Routed keyboard tests inspect row fills
+and check/text tints. Ordinary List independent palette tokens, popover
+foreground, and full row density defaults remain separate source-parity work.
 
 Default and Underline bars paint their full-width one-pixel baseline as an
 anchored underlay, after the bar background and before tab children. Its width

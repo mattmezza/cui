@@ -34,6 +34,7 @@ typedef struct {
     void *render_user;
     cui_choice_content_fn prefix, suffix;
     void *content_user;
+    float max_width; /* zero unconstrained; built-in labels ellipsize to fit */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

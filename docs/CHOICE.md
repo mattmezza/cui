@@ -375,3 +375,13 @@ an open split menu suppress it. State remains application-owned. Tests cover
 real hover delay, painted tooltip text, Escape, keyboard focus and loading/menu
 suppression. This reuses the Tooltip component rather than introducing a second
 hover state machine.
+
+## Tab label width
+
+`max_width` caps long built-in tab labels and appends a measured Unicode ellipsis.
+Short labels keep their natural width. Label prefixes end at UTF-8 codepoint
+boundaries, and the semantic name keeps the full original label. The five tab
+variants share this behavior. Custom `render` callbacks own their body layout and
+are not truncated, so nested close buttons retain their composition contract.
+Tabs still lack built-in overflow menus, scrolling and drag reordering. UTF-8
+truncation preserves codepoints but does not promise grapheme-cluster boundaries.

@@ -3,9 +3,30 @@
 #include "cui/cui_base.h"
 #include "cui/cui_components.h"
 #include <math.h>
+static void cui_choice_ellipsized_text(cui_context *ui, cui_str label, float font_size,
+                                       cui_color color, float width) {
+    cui_str ellipsis = cui_string("\xe2\x80\xa6");
+    float marker_width = cui_measure_text(ui, ellipsis, font_size).width;
+    if (marker_width > width)
+        return;
+    size_t bytes = label.length;
+    while (bytes &&
+           cui_measure_text(ui, (cui_str){label.data, bytes}, font_size).width + marker_width >
+               width) {
+        bytes--;
+        while (bytes && ((unsigned char)label.data[bytes] & 0xc0) == 0x80)
+            bytes--;
+    }
+    cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 0});
+    if (bytes)
+        cui_text(ui, (cui_str){label.data, bytes}, font_size, color);
+    cui_text(ui, ellipsis, font_size, color);
+    cui_end_box(ui);
+}
 static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                                bool selected, bool disabled, cui_tab_variant variant,
-                               cui_choice_render_fn render, size_t index, void *render_user) {
+                               cui_choice_render_fn render, size_t index, void *render_user,
+                               float max_width) {
     cui_box box = {.height = theme->control_height,
                    .padding = theme->padding,
                    .radius = theme->radius,
@@ -31,6 +52,13 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
         box.border = theme->focus;
         box.border_width = 2;
     }
+    bool ellipsized =
+        !render && isfinite(max_width) && max_width > 0 &&
+        cui_measure_text(ui, item->label, theme->font_size).width + 2 * theme->padding > max_width;
+    if (ellipsized) {
+        box.width = max_width;
+        box.clip = true;
+    }
     cui_begin_box(ui, item->id, box);
     if (variant == CUI_TAB_UNDERLINE)
         cui_begin_box(ui, 0,
@@ -38,12 +66,17 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
                                 .padding = theme->padding});
     if (render)
         render(ui, item, index, render_user);
-    else
-        cui_text(ui, item->label, theme->font_size,
-                 disabled ? theme->muted
-                 : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
-                     ? theme->on_primary
-                     : theme->text);
+    else {
+        cui_color color = disabled ? theme->muted
+                          : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
+                              ? theme->on_primary
+                              : theme->text;
+        if (ellipsized)
+            cui_choice_ellipsized_text(ui, item->label, theme->font_size, color,
+                                       fmaxf(0, max_width - 2 * theme->padding));
+        else
+            cui_text(ui, item->label, theme->font_size, color);
+    }
     if (variant == CUI_TAB_UNDERLINE) {
         cui_end_box(ui);
         cui_begin_box(ui, 0,
@@ -56,7 +89,7 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
 }
 static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                             bool selected, bool disabled, cui_tab_variant variant) {
-    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL);
+    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0);
 }
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
@@ -79,7 +112,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     for (size_t i = 0; i < count; ++i) {
         cui_choice_draw_ex(ui, &items[i], theme, items[i].id == *selected,
                            options.disabled || items[i].disabled, options.variant, options.render,
-                           i, options.render_user);
+                           i, options.render_user, options.max_width);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.selected = items[i].id == *selected,

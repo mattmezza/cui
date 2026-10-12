@@ -1693,6 +1693,48 @@ static void test_dropdown_action_tooltip(void) {
     assert(state.overlay.open && !tooltip.open);
     cui_destroy(ui);
 }
+static void test_tab_max_width(void) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {
+        {10, {"A", 1}, false}, {20, {"A long \xc3\xa9\xc3\xa9\xc3\xa9 tab label", 23}, false}};
+    for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_id value = 10;
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        cui_tabs(ui, 1, &theme, entries, 2, &value,
+                 (cui_tabs_options){.variant = (cui_tab_variant)variant, .max_width = 100}, NULL,
+                 NULL);
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        assert(cui_bounds(ui, 10).w < 100 && cui_bounds(ui, 20).w == 100);
+        bool marker = false, full = false;
+        for (size_t i = 0; i < draw.count; i++) {
+            cui_draw_command command = draw.commands[i];
+            if (command.type != CUI_DRAW_TEXT)
+                continue;
+            marker |= command.text.length == 3 && memcmp(command.text.data, "\xe2\x80\xa6", 3) == 0;
+            full |= command.text.length == entries[1].label.length;
+            if (command.text.length > 1 && command.text.data[0] == 'A')
+                assert(command.text.data[command.text.length - 1] != (char)0xc3);
+        }
+        assert(marker && !full);
+        size_t count;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        bool named = false;
+        for (size_t i = 0; i < count; i++)
+            named |= semantics[i].id == 20 && semantics[i].name.length == entries[1].label.length;
+        assert(named);
+        click(ui, 20);
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        assert(cui_tabs(ui, 1, &theme, entries, 2, &value,
+                        (cui_tabs_options){.variant = (cui_tab_variant)variant, .max_width = 100},
+                        NULL, NULL));
+        cui_end_frame(ui);
+        assert(value == 20);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1717,6 +1759,7 @@ int main(void) {
     test_dropdown_optional_halves();
     test_dropdown_anchor_corners();
     test_dropdown_action_tooltip();
+    test_tab_max_width();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

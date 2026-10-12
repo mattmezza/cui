@@ -32,7 +32,8 @@ enum {
     CUI_TEXT_VIEW_STRIKE = 8u,
     CUI_TEXT_VIEW_MARK = 16u,
     CUI_TEXT_VIEW_MEDIUM = 32u,
-    CUI_TEXT_VIEW_SEMIBOLD = 64u
+    CUI_TEXT_VIEW_SEMIBOLD = 64u,
+    CUI_TEXT_VIEW_INLINE_IMAGE = 128u
 };
 typedef enum {
     CUI_TEXT_VIEW_PARAGRAPH,
@@ -53,6 +54,10 @@ typedef struct {
     cui_text_view_range text, source, link;
     size_t block;
     unsigned flags;
+    cui_text_view_range resource, alt;
+    cui_bitmap image;
+    bool image_ready;
+    cui_rect image_bounds;
 } cui_text_view_span;
 typedef enum {
     CUI_TEXT_VIEW_ALIGN_LEFT,

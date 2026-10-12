@@ -82,7 +82,8 @@ static void cui_text_view_emit(cui_text_view_parser *p, cui_str text, cui_text_v
     }
     bool mapped = source.begin != SIZE_MAX;
     if (mapped && text.length) {
-        bool same = p->spans && p->last.block == p->block && p->last.flags == flags &&
+        bool same = !(flags & CUI_TEXT_VIEW_INLINE_IMAGE) && p->spans &&
+                    p->last.block == p->block && p->last.flags == flags &&
                     p->last.link.begin == link.begin && p->last.link.end == link.end &&
                     p->last.text.end == p->text;
         if (!same) {
@@ -325,7 +326,12 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
             size_t last =
                 close == SIZE_MAX ? SIZE_MAX : cui_text_view_find(p->input, close + 2, b, ")", 1);
             if (last != SIZE_MAX) {
-                cui_text_view_inline(p, a + 2, close, flags, link, depth + 1);
+                cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, last + 1},
+                                   flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
+                p->last.resource = (cui_text_view_range){close + 2, last};
+                p->last.alt = (cui_text_view_range){a + 2, close};
+                if (p->write && !p->error)
+                    p->state->workspace.spans[p->spans - 1] = p->last;
                 a = last + 1;
                 continue;
             }
@@ -1516,6 +1522,39 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         unsigned flags = r->flags | cui_text_view_block_flags(b);
         float size =
             flags & CUI_TEXT_VIEW_CODE && b->kind != CUI_TEXT_VIEW_CODE_BLOCK ? font * .875f : font;
+        if (r->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            float h = fmaxf(1, line * .75f);
+            float ratio = r->image_ready && r->image.width && r->image.height
+                              ? (float)r->image.width / r->image.height
+                              : 1;
+            float w = fmaxf(1, h * ratio);
+            if (!isfinite(w) || w > 10000000 || s->glyph_count >= s->workspace.glyph_capacity)
+                return false;
+            if (cursor_x > 0 && cursor_x + w > available &&
+                !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                  o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
+                cursor_x = 0;
+                cursor_y += line;
+            }
+            float top = 0;
+            if (o.font_metrics_available) {
+                float baseline = (line - o.body_metrics.ascent - o.body_metrics.descent) * .5f +
+                                 o.body_metrics.ascent;
+                float image_baseline = fminf(h, fmaxf(0, h * .5f + baseline - line * .5f));
+                top = fmaxf(baseline, image_baseline) - image_baseline;
+            }
+            r->image_bounds = (cui_rect){x + left + cursor_x, y + padding + cursor_y + top, w, h};
+            s->workspace.glyphs[s->glyph_count++] = (cui_text_view_glyph){
+                .text = r->text,
+                .span = span,
+                .block = index,
+                .bounds = {x + left + cursor_x, y + padding + cursor_y, w, line},
+                .font_size = size,
+                .line_height = line,
+                .flags = flags};
+            cursor_x += w;
+            continue;
+        }
         size_t segment = r->text.begin;
         float measured = 0;
         for (size_t i = r->text.begin; i < r->text.end;) {
@@ -1931,6 +1970,11 @@ static void cui_text_view_copy_inline(const cui_text_view_state *s, cui_text_vie
         size_t a = span->text.begin > r.begin ? span->text.begin : r.begin;
         size_t b = span->text.end < r.end ? span->text.end : r.end;
         cui_str t = {s->workspace.rendered + a, b - a};
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            cui_text_view_copy_write(w, (cui_str){s->workspace.source + span->source.begin,
+                                                  span->source.end - span->source.begin});
+            continue;
+        }
         bool link = span->link.end > span->link.begin;
         unsigned flags = span->flags, ticks = 0;
         if (link)

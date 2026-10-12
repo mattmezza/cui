@@ -206,8 +206,13 @@ The body baseline is `(line_height - ascent - descent) / 2 + ascent`. Ready stan
 images use this formula and retain a separate logical row extent for list prefixes
 and following blocks. Pure layout accepts validated optional body metrics. Without
 a valid provider, images retain top alignment; no size-derived baseline is synthesized.
-Mixed image/text wrapping, inline image object selection, titles/links and explicit
-image attributes also remain outside the standalone block representation.
+Mixed Markdown images now occupy atomic one-byte span slots. Their host bitmaps
+reserve horizontal space among text runs and wrap at object boundaries. Default
+inline height is 75% of the logical line height, with loaded aspect ratio or a
+square unloaded slot, matching the frozen source. Selection maps each slot to
+the entire image source syntax, and Source copy preserves that syntax. Titles,
+explicit image dimensions, HTML inline objects and custom object renderers remain
+unimplemented. Standalone image blocks still retain their earlier alt-text ranges.
 
 Tables following existing list content retain parent membership and paint in the
 16px continuation column. Column sizing, horizontal viewport clipping and footer
@@ -222,7 +227,7 @@ The separate marker column stays outside the horizontal mask and does not move
 when the table scrolls; table-body snapshots preserve its scroll offset when
 appending rows.
 
-Mixed inline image syntax currently preserves its formatted alt text and surrounding
-paragraph text without turning the image URI into a link. Only an image occupying
-the complete line becomes a host-rendered standalone image. This passive alt
-fallback prevents text loss while mixed inline object flow remains unfinished.
+Inline image slots use a single space byte in the rendered selection coordinate
+space; Plain copy includes that slot, while Source copy writes the original image
+syntax. No unloaded bitmap is fabricated. Removing the host loader restores a
+compact square slot without discarding surrounding text or retaining stale pixels.

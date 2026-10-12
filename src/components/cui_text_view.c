@@ -505,11 +505,25 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (selected)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x521e8438), r, style.selection);
         cui_begin_absolute_box(ui, leaf, (cui_box){.custom_opacity = true, .opacity = opacity}, r);
-        cui_text_line(ui,
-                      cui_text_view_slice(cui_text_view_rendered_text(s),
-                                          (cui_text_view_range){first->text.begin, last->text.end}),
-                      first->font_size, color, first->line_height,
-                      cui_text_view_text_style(first->flags));
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            if (span->image_ready) {
+                cui_rect image = span->image_bounds;
+                image.x -= first->bounds.x;
+                image.y -= first->bounds.y;
+                cui_begin_absolute_box(ui, leaf ^ UINT64_C(0x696d616765000000), (cui_box){0},
+                                       image);
+                cui_paint_bitmap(ui, leaf ^ UINT64_C(0x6269746d61700000),
+                                 (cui_bitmap_paint){.bitmap = span->image, .opacity = 1},
+                                 (cui_box){.width = image.w, .height = image.h});
+                cui_end_box(ui);
+            }
+        } else
+            cui_text_line(
+                ui,
+                cui_text_view_slice(cui_text_view_rendered_text(s),
+                                    (cui_text_view_range){first->text.begin, last->text.end}),
+                first->font_size, color, first->line_height,
+                cui_text_view_text_style(first->flags));
         if (is_link)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x756e646572000000),
                                (cui_rect){0, r.h - 2, r.w, 1}, color);
@@ -662,6 +676,20 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 o.image((cui_str){resource, length}, &bitmap, o.image_user);
             b->image = bitmap;
         }
+    for (size_t i = 0; i < s->span_count; ++i) {
+        cui_text_view_span *span = &s->workspace.spans[i];
+        if (!(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        cui_bitmap bitmap = {0};
+        size_t length;
+        span->image_ready =
+            o.image &&
+            cui_text_view_decode_resource(s, span->resource, resource, sizeof resource, &length) ==
+                CUI_TEXT_VIEW_OK &&
+            o.image((cui_str){resource, length}, &bitmap, o.image_user) && bitmap.pixels &&
+            bitmap.width && bitmap.height && bitmap.stride / 4 >= bitmap.width;
+        span->image = bitmap;
+    }
     cui_font_metrics body_metrics = {0};
     bool font_metrics_available =
         cui_measure_font_metrics(ui, style.font_size, (cui_text_style){0}, &body_metrics);

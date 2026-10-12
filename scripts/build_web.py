@@ -10,6 +10,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ['src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
            'src/base/cui_overlay.c', 'src/base/cui_virtual.c', 'src/base/cui_dock.c', 'src/base/cui_plot.c', 'src/base/cui_edit.c',
+           'src/base/cui_scroll.c', 'src/components/cui_scroll.c',
+           'src/base/cui_table.c', 'src/components/cui_table.c',
            'src/base/cui_tree.c', 'src/components/cui_tree.c',
            'src/base/cui_picker.c', 'src/components/cui_picker.c',
            'src/base/cui_numeric.c', 'src/components/cui_numeric.c',
@@ -17,7 +19,7 @@ SOURCES = ['src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
            'src/base/cui_disclosure.c', 'src/components/cui_disclosure.c',
            'src/base/cui_choice.c', 'src/components/cui_choice.c',
            'src/theme/cui_theme.c', 'src/components/cui_components.c', 'web/gallery.c']
-EXPORTS = ['gallery_init', 'gallery_input_selection', 'gallery_event', 'gallery_text', 'gallery_focus', 'gallery_frame',
+EXPORTS = ['gallery_init', 'gallery_scroll', 'gallery_input_selection', 'gallery_event', 'gallery_text', 'gallery_focus', 'gallery_frame',
            'gallery_clipboard_request', 'gallery_clipboard_result', 'gallery_selection_mode', 'gallery_density', 'gallery_modal', 'gallery_time', 'gallery_redraw', 'gallery_count', 'gallery_command', 'gallery_command_text', 'gallery_command_length',
            'gallery_semantic_id', 'gallery_semantic_parent', 'gallery_semantic_controls', 'gallery_semantic_labelled_by',
            'gallery_semantic_count', 'gallery_semantic', 'gallery_semantic_name',

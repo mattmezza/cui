@@ -75,7 +75,7 @@ def main():
                 assert page.locator('#preview-card').is_visible()
                 assert 'draw commands' in page.locator('#preview-note').inner_text()
             def semantic_index(name):
-                return page.evaluate('(name)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', name)
+                return page.evaluate('(name)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)!==27&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', name)
             def click_semantic(name):
                 index = semantic_index(name)
                 assert index is not None, name
@@ -83,6 +83,41 @@ def main():
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.evaluate('location.hash="Scrollable"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Scrollable"')
+            assert page.locator('#accessible [role=scrollbar]').count() == 2
+            canvas.scroll_into_view_if_needed()
+            rectangle = canvas.bounding_box()
+            page.mouse.move(rectangle['x']+100,rectangle['y']+100)
+            page.mouse.wheel(0,160)
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===32&&cuiGallery.exports.gallery_semantic(i,8)>0)')
+            click_semantic('Vertical scroll')
+            page.keyboard.press('End')
+            index = semantic_index('Vertical scroll')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===cuiGallery.exports.gallery_semantic(i,13)', arg=index)
+            page.keyboard.press('Home')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===0', arg=index)
+            page.evaluate('location.hash="DataTable"')
+            page.wait_for_function('cuiGallery.renderedComponent==="DataTable"')
+            assert page.locator('#accessible [role=grid]').get_attribute('aria-rowcount') == '1000'
+            assert 0 < page.locator('#accessible [role=gridcell]').count() < 40
+            click_semantic('File 0001')
+            page.keyboard.press('ArrowDown')
+            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 0002"')
+            page.keyboard.press('End')
+            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 1000"')
+            page.keyboard.press('Home')
+            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 0001"')
+            click_semantic('Name')
+            page.wait_for_function('document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")==="ascending"')
+            page.keyboard.press('ArrowRight')
+            page.keyboard.press('Enter')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).some(e=>e.getAttribute("aria-label")==="Status"&&e.getAttribute("aria-sort")==="ascending")')
+            canvas.scroll_into_view_if_needed()
+            rectangle = canvas.bounding_box()
+            page.mouse.move(rectangle['x']+100,rectangle['y']+140)
+            page.mouse.wheel(0,160)
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,17)&&cuiGallery.exports.gallery_semantic(i,19)>0)')
             page.evaluate('location.hash="Tree"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tree"')
             assert page.locator('#accessible [role=treeitem]').count() == 5
@@ -323,7 +358,20 @@ def main():
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
                 page.wait_for_timeout(40)
-                bad = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{const e=cuiGallery.exports;return [e.gallery_command(i,0),e.gallery_command(i,1),e.gallery_command(i,2),e.gallery_command(i,3),e.gallery_command(i,4)];}).filter(c=>c[0]===2&&(c[1]<0||c[2]<0||c[1]+c[3]>document.querySelector("canvas").clientWidth+1||c[2]+c[4]>document.querySelector("canvas").clientHeight+1))')
+                bad = page.evaluate("""()=>{
+                    const e=cuiGallery.exports,canvas=document.querySelector('canvas'),clips=[],bad=[];
+                    const intersect=(a,b)=>[Math.max(a[0],b[0]),Math.max(a[1],b[1]),Math.min(a[2],b[2]),Math.min(a[3],b[3])];
+                    for(let i=0;i<e.gallery_count();i++){
+                        const type=e.gallery_command(i,0),x=e.gallery_command(i,1),y=e.gallery_command(i,2),w=e.gallery_command(i,3),h=e.gallery_command(i,4),rect=[x,y,x+w,y+h];
+                        if(type===3){clips.push(clips.length?intersect(rect,clips.at(-1)):rect);continue;}
+                        if(type===4){clips.pop();continue;}
+                        if(type!==2)continue;
+                        const visible=clips.length?intersect(rect,clips.at(-1)):rect;
+                        if(visible[2]<=visible[0]||visible[3]<=visible[1])continue;
+                        if(visible[0]<-1||visible[1]<-1||visible[2]>canvas.clientWidth+1||visible[3]>canvas.clientHeight+1)bad.push(visible);
+                    }
+                    return bad;
+                }""")
                 if bad:
                     overflow.append((name, bad))
             assert not overflow, overflow
@@ -336,7 +384,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 43 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 46 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

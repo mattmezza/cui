@@ -8,6 +8,8 @@
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_virtual.h"
+#include "cui/cui_scroll.h"
+#include "cui/cui_table.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -72,6 +74,18 @@ static float slider = 40;
 static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
 static cui_input_state input_state;
+static cui_scroll_state scroll_state;
+static cui_table_model *table;
+static cui_table_state table_state;
+static cui_table_row table_rows[1000];
+static cui_table_column table_columns[3];
+static char table_names[1000][24], table_sizes[1000][24];
+static cui_str table_label(void *user, size_t row, cui_id column) {
+    (void)user;
+    if (row >= 1000)
+        return cui_string("");
+    return cui_string(column == 101 ? table_names[row] : column == 102 ? "Ready" : table_sizes[row]);
+}
 static cui_tree_model *tree;
 static cui_tree_state tree_state;
 static cui_id tree_selected;
@@ -107,6 +121,20 @@ int gallery_init(void) {
         cui_dock_insert(dock, cui_dock_root(dock), 1, 0);
         cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
     }
+    table = cui_table_create(1000);
+    for (size_t i = 0; i < 1000; i++) {
+        snprintf(table_names[i], sizeof(table_names[i]), "File %04zu", i + 1);
+        snprintf(table_sizes[i], sizeof(table_sizes[i]), "%zu KB", i + 1);
+        table_rows[i] = (cui_table_row){.key = i + 1, .label = cui_string(table_names[i])};
+    }
+    const char *column_names[] = {"Name", "Status", "Size"};
+    for (size_t i = 0; i < 3; i++)
+        table_columns[i] = (cui_table_column){.key = 101 + i,
+                                              .label = cui_string(column_names[i]),
+                                              .width = 150, .minimum = 80, .maximum = 300,
+                                              .sortable = true, .resizable = true, .movable = true};
+    if (!table || cui_table_bind(table, table_rows, 1000, table_columns, 3) != CUI_TABLE_OK)
+        return 0;
     tree = cui_tree_create(6);
     const char *tree_labels[6] = {"Workspace", "src", "core.c", "base.c", "docs", "README.md"};
     const unsigned tree_depths[6] = {0, 1, 2, 2, 1, 2};
@@ -141,6 +169,10 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
                                         .modifiers = mods,
                                         .repeat = repeat != 0,
                                         .pointer_button = (cui_pointer_button)button});
+}
+void gallery_scroll(float x, float y, float dx, float dy) {
+    if (ui)
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dx = dx, .dy = dy});
 }
 void gallery_text(const char *text, size_t length) {
     cui_event event = {.type = CUI_EVENT_TEXT};
@@ -426,6 +458,59 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string(text));
         break;
     }
+    case 44: {
+        cui_scroll_options options = {.width = width - 48, .height = 192,
+                                       .content_width = 500, .content_height = 640,
+                                       .horizontal = true, .vertical = true,
+                                       .disabled = disabled, .wheel_step = 32, .gap = 12};
+        if (cui_scrollable_begin(ui, cui_id_from(ui, "scrollable"), &t, &scroll_state, options)) {
+            for (size_t i = 0; i < 16; i++) {
+                char text[32];
+                snprintf(text, sizeof(text), "Scrollable item %zu", i + 1);
+                cui_label(ui, &t, cui_string(text));
+            }
+            cui_scrollable_end(ui, cui_id_from(ui, "scrollable"), &t, &scroll_state, options);
+        }
+        break;
+    }
+    case 45: {
+        cui_table_result result = cui_data_table(
+            ui, cui_id_from(ui, "data-table"), &t, table, &table_state,
+            (cui_table_options){.width = width - 48, .height = 224, .row_height = 32,
+                                .header_height = 32, .disabled = disabled, .striped = true,
+                                .bordered = true, .selection_mode = CUI_TABLE_SELECT_CELL},
+            table_label, NULL, NULL);
+        char text[72];
+        snprintf(text, sizeof(text), "1,000 rows / visible %zu-%zu / sort %d",
+                 result.rows.begin + 1, result.rows.end, (int)table_state.sort);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 46: {
+        float cell_width = (width - 48) / 3;
+        cui_id table_id = cui_id_from(ui, "composition-table");
+        cui_table_begin(ui, table_id, &t, width - 48);
+        for (size_t r = 0; r < 4; r++) {
+            cui_id row_id = table_id + r + 1;
+            cui_table_begin_row(ui, row_id, &t, 40, r == 0);
+            cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = table_id});
+            for (size_t c = 0; c < 3; c++) {
+                cui_id cell_id = table_id + 100 + r * 3 + c;
+                cui_table_begin_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT);
+                const char *headers[] = {"Name", "Status", "Size"};
+                cui_str label = r == 0 ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
+                cui_set_semantic_details(ui, cell_id, (cui_semantic_details){.parent = row_id,
+                                                                           .row_index = (unsigned)r,
+                                                                           .column_index = (unsigned)c + 1,
+                                                                           .description = label});
+                cui_label(ui, &t, label);
+                cui_table_end(ui);
+            }
+            cui_table_end(ui);
+        }
+        cui_table_end(ui);
+        break;
+    }
     case 43: {
         cui_tree(ui, cui_id_from(ui, "tree"), &t, tree, &tree_state, &tree_selected,
                  (cui_tree_options){.disabled = disabled, .width = width - 48,
@@ -704,6 +789,24 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.multiselectable;
     case 16:
         return s->details.orientation;
+    case 17:
+        return s->details.scrollable;
+    case 18:
+        return s->details.scroll_x;
+    case 19:
+        return s->details.scroll_y;
+    case 20:
+        return s->details.scroll_max_x;
+    case 21:
+        return s->details.scroll_max_y;
+    case 22:
+        return s->details.row_index;
+    case 23:
+        return s->details.column_index;
+    case 24:
+        return s->details.row_count;
+    case 25:
+        return s->details.column_count;
     default:
         return 0;
     }

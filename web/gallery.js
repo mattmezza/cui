@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -12,6 +12,9 @@ const snippets = {
  Radio:'cui_radio(ui, id, &theme,\n    cui_string("Priority"),\n    &selection, 1, false);',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
  Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.width = 280});',
+ Scrollable:'if (cui_scrollable_begin(ui, id, &theme,\n    &state, options)) {\n    draw_content(ui);\n    cui_scrollable_end(ui, id, &theme, &state, options);\n}',
+ DataTable:'cui_data_table(ui, id, &theme, model,\n    &state, options, cell_label, draw_cell, user);',
+ Table:'cui_table_begin(ui, id, &theme, width);\n/* Compose rows and cells; end each begin. */\ncui_table_end(ui);',
  Tree:'cui_tree(ui, id, &theme, model, &state,\n    &selection, options);',
  Label:'cui_label(ui, &theme,\n    cui_string("A useful label"));',
  Badge:'cui_badge(ui, id, &theme,\n    cui_string("In review"));',
@@ -58,7 +61,7 @@ function wasiImports(){
 function requestFrame(){if(framePending||!wasm)return;framePending=true;requestAnimationFrame(()=>{framePending=false;try{render();}catch(e){fatal(e);}});}
 function render(){
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_density(Number($('density').value));
@@ -90,17 +93,19 @@ async function clipboardAction(action){
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 const semanticNodes = new Map();
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio'];
-const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25];
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar'];
+const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
  for(let i=0;i<wasm.gallery_semantic_count();i++){
   const f=n=>wasm.gallery_semantic(i,n),role=roles[f(0)];if(!role||role==='text')continue;
   const id=`cui-semantic-${wasm.gallery_semantic_id(i)}`;seen.add(id);
   let el=semanticNodes.get(id);
-  if(!el){el=document.createElement(interactiveRoles.includes(f(0))&&role!=='treeitem'?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
+  if(!el){el=document.createElement(interactiveRoles.includes(f(0))&&!['treeitem','columnheader'].includes(role)?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
   el.setAttribute('role',role);
   const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
+  el.setAttribute('aria-label',name);
+  if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
   if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{e.stopPropagation();wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
   else el.setAttribute('aria-label',name);
   if(['checkbox','switch','radio','menuitemcheckbox','menuitemradio'].includes(role))el.setAttribute('aria-checked',String(Boolean(f(6))));
@@ -109,7 +114,10 @@ function syncSemantics(){
   if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(8)+1));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
   if(role==='tab'||role==='option'||role==='treeitem')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
-  if(role==='slider'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
+  for(const [field,attribute] of [[22,'aria-rowindex'],[23,'aria-colindex'],[24,'aria-rowcount'],[25,'aria-colcount']]){if(f(field))el.setAttribute(attribute,String(f(field)));else el.removeAttribute(attribute);}
+  if(role==='gridcell'||role==='columnheader'||role==='row')el.setAttribute('aria-selected',String(Boolean(f(11))));
+  if(role==='columnheader')el.setAttribute('aria-sort',f(8)===1?'ascending':f(8)===2?'descending':'none');
+  if(role==='slider'||role==='scrollbar'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }
@@ -147,11 +155,17 @@ function selectComponent(){
  $('selection-mode').hidden=!['List','Select','Combobox'].includes(selected.name);$('selection-mode').value='0';
  $('disabled').checked=false;document.body.classList.remove('menu-open');navigation();requestFrame();
 }
-const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,a:13,A:13,z:14,Z:14,y:15,Y:15,c:16,C:16,x:17,X:17,v:18,V:18};
+const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,a:13,A:13,z:14,Z:14,y:15,Y:15,c:16,C:16,x:17,X:17,v:18,V:18,PageUp:19,PageDown:20};
 function mods(e){return(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);}
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const rect=canvas.getBoundingClientRect();if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);}wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,e.button===2?1:e.button===1?2:0);requestFrame();
 });
+canvas.addEventListener('wheel',e=>{
+ if(!wasm)return;const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
+ const scale=e.deltaMode===1?32:e.deltaMode===2?canvas.clientHeight:1,dx=e.deltaX*scale,dy=e.deltaY*scale;
+ const consumes=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>{const f=n=>wasm.gallery_semantic(i,n);if(!f(17)||f(5)||x<f(1)||y<f(2)||x>=f(1)+f(3)||y>=f(2)+f(4))return false;return(dx>0&&f(18)<f(20))||(dx<0&&f(18)>0)||(dy>0&&f(19)<f(21))||(dy<0&&f(19)>0);});
+ if(consumes){e.preventDefault();wasm.gallery_scroll(x,y,-dx/32,-dy/32);requestFrame();}
+},{passive:false});
 canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0);requestFrame();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('pointercancel',()=>{wasm?.gallery_event(7,0,0,0,0,0);requestFrame();});

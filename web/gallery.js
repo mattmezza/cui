@@ -159,6 +159,7 @@ function render(){
   }
  }
  while(clips-- >0)ctx.restore();
+ canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed'][wasm.gallery_cursor()]||'default';
  syncSemantics();
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
@@ -176,7 +177,7 @@ async function clipboardAction(action){
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 const semanticNodes = new Map();
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar'];
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar','separator'];
 const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
@@ -203,6 +204,7 @@ function syncSemantics(){
   if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));if(f(31))el.setAttribute('aria-posinset',String(f(31)));if(f(32))el.setAttribute('aria-setsize',String(f(32)));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
   if(role==='tab'||role==='option'||role==='treeitem')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
+  if(role==='separator'&&f(13)>f(12)){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   for(const [field,attribute] of [[22,'aria-rowindex'],[23,'aria-colindex'],[24,'aria-rowcount'],[25,'aria-colcount']]){if(f(field)||(field>=24&&['grid','table'].includes(role)))el.setAttribute(attribute,String(f(field)));else el.removeAttribute(attribute);}
   if(role==='gridcell'||role==='columnheader'||role==='row'||role==='rowheader')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(role==='columnheader')el.setAttribute('aria-sort',f(8)===1?'ascending':f(8)===2?'descending':'none');

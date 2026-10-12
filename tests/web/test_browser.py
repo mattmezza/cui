@@ -243,14 +243,10 @@ def main():
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_message_actions()===n+1', arg=actions)
             def message_text_x(text):
                 return page.evaluate('(text)=>{const e=cuiGallery.exports;let i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===text);return e.gallery_command(i,1);}', text)
-            page.locator('#message-avatar').uncheck()
-            frame = page.evaluate('cuiGallery.frame')
-            page.locator('#message-inset').select_option('2')
-            page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+            control_change('message-avatar', False)
+            control_change('message-inset', '2')
             start_x = message_text_x('Alex Morgan')
-            frame = page.evaluate('cuiGallery.frame')
-            page.locator('#message-inset').select_option('1')
-            page.wait_for_function('({start,frame})=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Alex Morgan");return cuiGallery.frame>frame&&Math.abs(e.gallery_command(i,1)-start-12)<.2;}', arg={'start': start_x, 'frame': frame})
+            control_change('message-inset', '1')
             assert abs(message_text_x('Alex Morgan')-start_x-12) < .2
             frame = page.evaluate('cuiGallery.frame')
             page.locator('#message-alignment').select_option('1')
@@ -1343,6 +1339,8 @@ def main():
             page.evaluate('location.hash="Toggle"')
             page.wait_for_function('cuiGallery.renderedComponent==="Toggle"')
             assert page.locator('#accessible [role=toolbar][aria-label="Formatting options"]').count() == 1
+            assert page.locator('#accessible [role=toolbar][aria-label="Formatting options"]').get_attribute('aria-orientation') == 'horizontal'
+            assert page.evaluate('()=>document.querySelector("canvas").style.cursor===["default","pointer","text","ew-resize","ns-resize","move","not-allowed"][cuiGallery.exports.gallery_cursor()]')
             assert page.locator('#accessible button[aria-label="Bold"]').get_attribute('aria-pressed') == 'true'
             click_semantic('Pin this item', 1)
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Pin this item"]`).getAttribute("aria-pressed")==="true"')

@@ -1900,6 +1900,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
 int gallery_error(void) {
     return ui ? cui_last_error(ui) : CUI_ERROR_LIFECYCLE;
 }
+int gallery_cursor(void) {
+    return (int)cui_pointer_cursor(ui);
+}
 unsigned gallery_count(void) {
     return (unsigned)draw.count;
 }

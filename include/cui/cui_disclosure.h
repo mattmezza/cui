@@ -23,10 +23,14 @@ typedef struct {
     float progress, velocity;
     bool initialized;
 } cui_disclosure_motion;
-/* Critically damped, reversible reveal; initial state and reduced motion snap.
- * dt is seconds; response is settling seconds (zero defaults to .2). */
+/* Reversible reveal; initial state and reduced motion snap.
+ * Legacy step uses critical damping; response is natural-period seconds
+ * (zero defaults to .2). Styled components use theme.spring_control by default. */
 void cui_disclosure_motion_step(cui_disclosure_motion *, bool open, float dt, float response,
                                 bool reduced_motion);
+/* Explicit theme spring policy; response zero or travel false snaps. */
+void cui_disclosure_motion_step_ex(cui_disclosure_motion *, bool open, float dt,
+                                   cui_spring_settings, bool reduced_motion);
 typedef struct {
     bool multiple, collapsible, disabled, bordered;
     cui_disclosure_header_fn render_header;

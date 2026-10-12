@@ -44,7 +44,7 @@ are diagnosed by the core rather than silently reused.
 clicks, Enter and Space, disabled triggers, single/multiple expansion, required
 expansion, keyboard traversal, and removal of focused hidden content. Portable
 C11 and renderer-independent draw lists are supported; OS accessibility is not
-claimed. Compared with GPUI Kit 0.7.1, theme-specific spring tokens and a demonstrated native/browser gallery remain unfinished.
+claimed. Compared with GPUI Kit 0.7.1, a demonstrated native/browser gallery remain unfinished.
 Immediate mount/unmount behavior is implemented. Full family parity is not yet
 verified.
 
@@ -71,8 +71,8 @@ and colors, fallback styles beyond the array and pointer toggling in both APIs.
 Opt into measured reveal with a zero-initialized `cui_disclosure_motion` kept in
 application state. Collapsible accepts its pointer; Accordion accepts an array
 and `motion_count`, with later panels retaining immediate mount/unmount. Set
-`dt` to elapsed seconds and optional `response` to settling seconds (default .2).
-A reversible critically damped spring drives a clipped viewport from zero to the
+`dt` to elapsed seconds; optional positive `response` overrides the theme spring
+natural period in seconds. A reversible theme-configured spring drives a clipped viewport from zero to the
 full measured panel height. Initial state snaps; `reduced_motion` also snaps.
 Invalid/nonpositive dt leaves progress unchanged. Measurement updates at end_frame,
 so changed content sizes affect the viewport on the following frame. The motion
@@ -91,5 +91,12 @@ immediately; the return value still reports only controlled state changes.
 Headless tests exercise actual pointer/keyboard expansion, measured initial hidden
 content, intermediate height, reversal, closing paint with immediate focus/event
 withdrawal, dynamic content size, reduced motion and bounded Accordion storage.
-This implements measured reveal, while upstream theme-specific spring tuning is
-not yet reproduced.
+Styled panels use `theme.spring_control` response/damping/epsilon/travel. Natural
+frequency is TAU/response, as in the reference. A zero response or false travel
+snaps even at zero dt. Damping below one may overshoot; the retained spring value
+keeps that trajectory while reveal height clamps to zero/full height. Settings
+with invalid response/damping/epsilon use safe defaults. Tests compare differently
+configured response/damping, preserve underdamped overshoot, and verify theme
+travel/zero-response snap through actual trigger clicks. The public `_step_ex`
+accepts the same portable policy; the original `_step` keeps critical damping and
+its legacy .2-second default response. A demonstrated gallery remains unfinished.

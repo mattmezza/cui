@@ -1,13 +1,19 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_disclosure.h"
 #include <math.h>
-void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float dt, float response,
-                                bool reduced_motion) {
+void cui_disclosure_motion_step_ex(cui_disclosure_motion *motion, bool open, float dt,
+                                   cui_spring_settings settings, bool reduced_motion) {
     if (!motion)
         return;
     float target = open ? 1 : 0;
-    if (!motion->initialized || reduced_motion || !isfinite(motion->progress) ||
-        !isfinite(motion->velocity)) {
+    if (!isfinite(settings.response) || settings.response < 0)
+        settings.response = .18f;
+    if (!isfinite(settings.damping) || settings.damping < 0)
+        settings.damping = 1;
+    if (!isfinite(settings.epsilon) || settings.epsilon <= 0)
+        settings.epsilon = .001f;
+    if (!motion->initialized || reduced_motion || !settings.travel || settings.response == 0 ||
+        !isfinite(motion->progress) || !isfinite(motion->velocity)) {
         motion->progress = target;
         motion->velocity = 0;
         motion->initialized = true;
@@ -15,19 +21,43 @@ void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float 
     }
     if (!isfinite(dt) || dt <= 0)
         return;
-    if (!isfinite(response) || response <= 0)
-        response = .2f;
-    float omega = 6 / fmaxf(response, .001f);
-    float displacement = motion->progress - target;
-    float sum = motion->velocity + omega * displacement;
-    float decay = expf(-omega * fminf(dt, 10));
-    motion->progress = target + (displacement + sum * fminf(dt, 10)) * decay;
-    motion->velocity = (motion->velocity - omega * sum * fminf(dt, 10)) * decay;
-    motion->progress = fminf(1, fmaxf(0, motion->progress));
-    if (fabsf(motion->progress - target) < .001f && fabsf(motion->velocity) < .01f) {
+    double omega = 6.28318530717958647692 / settings.response;
+    double damping = settings.damping, displacement = motion->progress - target;
+    double velocity = motion->velocity, time = dt, next, speed;
+    if (fabs(damping - 1) < .0001) {
+        double sum = velocity + omega * displacement, decay = exp(-omega * time);
+        next = (displacement + sum * time) * decay;
+        speed = (velocity - omega * sum * time) * decay;
+    } else if (damping < 1) {
+        double frequency = omega * sqrt(1 - damping * damping);
+        double decay = exp(-damping * omega * time);
+        double sine = sin(frequency * time), cosine = cos(frequency * time);
+        next = decay * (displacement * cosine +
+                        (velocity + damping * omega * displacement) / frequency * sine);
+        speed = decay *
+                (velocity * cosine -
+                 (damping * omega * velocity + omega * omega * displacement) / frequency * sine);
+    } else {
+        double factor = damping + sqrt(damping * damping - 1);
+        double slow = -omega / factor, fast = -omega * factor;
+        double first = (velocity - fast * displacement) / (slow - fast);
+        double second = displacement - first;
+        next = first * exp(slow * time) + second * exp(fast * time);
+        speed = slow * first * exp(slow * time) + fast * second * exp(fast * time);
+    }
+    motion->progress = (float)(target + next);
+    motion->velocity = (float)speed;
+    if (fabs(next) < settings.epsilon && fabs(speed) < settings.epsilon) {
         motion->progress = target;
         motion->velocity = 0;
     }
+}
+void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float dt, float response,
+                                bool reduced_motion) {
+    if (!isfinite(response) || response <= 0)
+        response = .2f;
+    cui_disclosure_motion_step_ex(motion, open, dt, (cui_spring_settings){response, 1, .001f, true},
+                                  reduced_motion);
 }
 
 bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled) {

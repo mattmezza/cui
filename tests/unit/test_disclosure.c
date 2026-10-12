@@ -2,6 +2,7 @@
 #include "cui/cui_components.h"
 #include "cui/cui_disclosure.h"
 #include <assert.h>
+#include <math.h>
 static cui_disclosure_item items[] = {
     {10, {"One", 3}, false}, {20, {"Two", 3}, true}, {30, {"Three", 5}, false}};
 static bool opened[3];
@@ -140,6 +141,7 @@ static void test_disclosure_box_overrides(void) {
     cui_destroy(ui);
 }
 static float animated_height = 60;
+static cui_spring_settings animated_spring = {.18f, 1, .001f, true};
 static bool animated_activated;
 static void animated_panel(cui_context *ui, size_t index, void *user) {
     (void)index;
@@ -154,10 +156,11 @@ static cui_draw_list animated_scene(cui_context *ui, bool *open, cui_disclosure_
                                     bool reduced, float dt) {
     assert(cui_begin_frame(ui, 640, 480, dt));
     cui_theme theme = cui_theme_light();
-    cui_collapsible_ex(ui, 800, &theme, cui_string("Animated"), open,
-                       (cui_collapsible_options){
-                           .motion = motion, .dt = dt, .response = .2f, .reduced_motion = reduced},
-                       animated_panel, NULL);
+    theme.spring_control = animated_spring;
+    cui_collapsible_ex(
+        ui, 800, &theme, cui_string("Animated"), open,
+        (cui_collapsible_options){.motion = motion, .dt = dt, .reduced_motion = reduced},
+        animated_panel, NULL);
     cui_draw_list draw = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
     return draw;
@@ -256,8 +259,55 @@ static void test_accordion_reveal_storage(void) {
     assert(motion[0].progress == 0);
     cui_destroy(ui);
 }
+static void test_configured_disclosure_springs(void) {
+    cui_disclosure_motion fast = {0}, slow = {0}, under = {0}, over = {0};
+    cui_spring_settings settings = {
+        .response = .2f, .damping = 1, .epsilon = .001f, .travel = true};
+    cui_disclosure_motion_step_ex(&fast, false, .016f, settings, false);
+    slow = under = over = fast;
+    cui_disclosure_motion_step_ex(&fast, true, .05f, settings, false);
+    settings.response = .8f;
+    cui_disclosure_motion_step_ex(&slow, true, .05f, settings, false);
+    assert(fast.progress > slow.progress && slow.progress > 0);
+    settings.response = .2f;
+    settings.damping = 2;
+    cui_disclosure_motion_step_ex(&over, true, .05f, settings, false);
+    assert(over.progress < fast.progress && over.progress > 0);
+    settings.damping = .2f;
+    bool overshot = false;
+    for (int i = 0; i < 12; i++) {
+        cui_disclosure_motion_step_ex(&under, true, .016f, settings, false);
+        overshot |= under.progress > 1;
+    }
+    assert(overshot);
+    settings.travel = false;
+    cui_disclosure_motion_step_ex(&under, false, 0, settings, false);
+    assert(under.progress == 0 && under.velocity == 0);
+    settings.travel = true;
+    settings.response = 0;
+    cui_disclosure_motion_step_ex(&under, true, 0, settings, false);
+    assert(under.progress == 1 && under.velocity == 0);
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_disclosure_motion motion = {0};
+    bool open = false;
+    animated_spring =
+        (cui_spring_settings){.response = .18f, .damping = 1, .epsilon = .001f, .travel = false};
+    animated_scene(ui, &open, &motion, false, .016f);
+    click(ui, 800);
+    animated_scene(ui, &open, &motion, false, .016f);
+    assert(open && motion.progress == 1);
+    animated_spring.travel = true;
+    animated_spring.response = 0;
+    click(ui, 800);
+    animated_scene(ui, &open, &motion, false, .016f);
+    assert(!open && motion.progress == 0);
+    animated_spring = (cui_spring_settings){.18f, 1, .001f, true};
+    cui_destroy(ui);
+}
 int main(void) {
     test_measured_reveal();
+    test_configured_disclosure_springs();
     test_accordion_reveal_storage();
     test_custom_disclosure_headers();
     test_disclosure_box_overrides();

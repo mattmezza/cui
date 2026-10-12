@@ -1,0 +1,22 @@
+build	Exercise component behavior in Chromium	﻿2026-10-12T12:26:50.8718624Z ##[group]Run uv run tests/web/test_browser.py
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8719006Z ^[[36;1muv run tests/web/test_browser.py^[[0m
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8776554Z shell: /usr/bin/bash -e {0}
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8776776Z env:
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8776995Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8777350Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8777862Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8778156Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8778448Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8778742Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.8779005Z ##[endgroup]
+build	Exercise component behavior in Chromium	2026-10-12T12:26:50.9662042Z Installed 4 packages in 9ms
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7479400Z Traceback (most recent call last):
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7487677Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 1324, in <module>
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7488434Z     main()
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7488886Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 766, in main
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7489397Z     click_semantic('Export options', 1)
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7489939Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 126, in click_semantic
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7490471Z     assert index is not None, name
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7490767Z            ^^^^^^^^^^^^^^^^^
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7491045Z AssertionError: Export options
+build	Exercise component behavior in Chromium	2026-10-12T12:27:18.7767618Z ##[error]Process completed with exit code 1.

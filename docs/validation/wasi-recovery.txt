@@ -1,0 +1,58 @@
+CUI source revision: af972d72c047377cbd0c5b3b515cd0a9f48b719c
+Portable source SHA256: aec90f7a013799d71469bb09c847130b9664fd3f6f89d9666582fecf37c15f0c
+Tracked source modifications: none
+Target: wasm32-wasi (WASI Preview 1), Zig 0.16.0, wasmtime 49.0.0
+Optional adapters disabled: SDL, GPU, FreeType, HarfBuzz; no browser host tested.
+Per-suite instruction budget: 30,000,000,000
+Assertions enabled. Virtual clock() compatibility uses wall time; benchmarks not invoked.
+PASS bootstrap (0.34s)
+core tests passed
+PASS core (1.51s)
+PASS base (0.39s)
+PASS components (0.72s)
+software renderer geometry, nested clipping and straight alpha passed
+PASS render (0.47s)
+edit tests passed
+PASS edit (0.54s)
+PASS overlay (0.32s)
+virtual tests passed
+PASS virtual (0.18s)
+dock tests passed
+PASS dock (0.84s)
+PASS plot (0.16s)
+PASS content (0.44s)
+PASS disclosure (0.60s)
+PASS choice (6.54s)
+PASS numeric (0.70s)
+PASS picker (0.90s)
+PASS tree (0.77s)
+PASS input (0.53s)
+PASS table (1.00s)
+PASS scroll (0.39s)
+PASS surface (1.15s)
+PASS form (0.61s)
+PASS otp (0.68s)
+PASS status (1.26s)
+PASS message (0.59s)
+PASS media (0.78s)
+PASS numeric_base_only (4.50s)
+PASS picker_base_only (4.38s)
+PASS tree_base_only (4.39s)
+PASS input_base_only (4.44s)
+PASS table_base_only (4.38s)
+PASS scroll_base_only (4.36s)
+PASS media_base_only (0.33s)
+PASS message_base_only (4.32s)
+PASS status_base_only (0.40s)
+PASS otp_base_only (4.42s)
+PASS form_base_only (5.70s)
+PASS surface_base_only (4.50s)
+PASS implementation_embedding (6.10s)
+unstyled frame 0: 3 commands, checked=0
+unstyled frame 1: 3 commands, checked=1
+PASS example_unstyled (0.34s)
+settings: 37 draw commands
+PASS example_styled_settings (0.37s)
+PASS distribution_single (15.10s)
+PASS distribution_multi (15.49s)
+WASI runtime suites: 42/42 passed

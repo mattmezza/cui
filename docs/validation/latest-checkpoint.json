@@ -1,43 +1,42 @@
 {
-  "source": "b640c26492aa058fca03c064f3a93d692a1af180",
+  "source": "996e356",
   "published_source": "edea48411392b0f0069f7b035bc32f07bb42f4b4",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Source b640c26 passes native51/51, ASan/UBSan49/49, WASI42/42 and Chromium60-story gates. Real Checkbox/Radio glyphs and all native bitmap adapters, system-theme default/live changes, Message/MessageScroller and Image/Attachment headless modules are integrated. Public edea484 remains57 stories until this deployment succeeds. All78 entries retained;16 not started,4 implemented partial,58 tested partial,zero verified. Full parity remains unfinished.",
+  "summary": "Recovery source 996e356 passes native51/51, sanitizers49/49, WASI42/42 and Chromium60 stories. Includes graphical Checkbox/Radio/Switch and Choice checks, automatic system theme, and deterministic Dropdown browser frame readiness. Public remains edea484 pending deployment. All78 entries retained; full parity unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "1c52388",
+      "source": "af972d7",
       "passed": 51,
       "total": 51,
-      "log": "gcc-60.txt"
+      "log": "native-recovery.txt"
     },
     {
       "name": "sanitizers",
-      "source": "1c52388",
+      "source": "af972d7",
       "passed": 49,
       "total": 49,
-      "log": "asan-60.txt"
+      "log": "asan-recovery.txt"
     },
     {
       "name": "WASI",
-      "source": "1c52388",
+      "source": "af972d7",
       "passed": 42,
       "total": 42,
-      "log": "wasi-60.txt"
+      "log": "wasi-recovery.txt"
     },
     {
       "name": "browser",
-      "source": "5910467",
+      "source": "996e356",
       "stories": 60,
       "catalog_entries": 78,
-      "log": "browser-60.txt",
-      "note": "Behavioral browser gate preceded formatting-only web/gallery.c normalization; final artifact is checked again by Pages CI."
+      "log": "browser-recovery.txt"
     }
   ],
   "previous_deployment": {
-    "source": "a96fd34",
+    "source": "157961a",
     "status": "failed",
-    "reason": "Dialog readiness race in browser test; deterministic repair integrated",
-    "log": "pages-a96fd34-failure.txt"
+    "reason": "Dropdown browser test read stale frame after changing options; natural-frame readiness repair integrated",
+    "log": "pages-157961a-failure.txt"
   }
 }

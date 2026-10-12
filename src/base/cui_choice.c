@@ -127,3 +127,183 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
         cui_update_semantic(ui, items[i].id, selected[i], selected[i]);
     return changed;
 }
+
+static unsigned char cui_choice_lower(unsigned char c) {
+    return c >= 'A' && c <= 'Z' ? (unsigned char)(c + ('a' - 'A')) : c;
+}
+static bool cui_choice_prefix(cui_str label, const char *prefix, size_t length) {
+    if (!label.data || label.length < length)
+        return false;
+    for (size_t i = 0; i < length; ++i)
+        if (cui_choice_lower((unsigned char)label.data[i]) !=
+            cui_choice_lower((unsigned char)prefix[i]))
+            return false;
+    return true;
+}
+void cui_choice_popup_init(cui_choice_popup *state, cui_id popup_id) {
+    if (!state)
+        return;
+    *state = (cui_choice_popup){0};
+    cui_overlay_init(&state->overlay, popup_id, true);
+}
+bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
+                   cui_list_state *state, cui_list_options options) {
+    if (!items || !selected || !state || !count)
+        return false;
+    bool activated = false;
+    if (state->search_length >= sizeof(state->search))
+        state->search_length = 0;
+    if (options.dt > 0 && options.dt < 60)
+        state->search_time += options.dt;
+    if (state->search_time > .75f)
+        state->search_length = 0;
+    size_t event_count = 0;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        size_t target = count, from = count;
+        for (size_t i = 0; i < count; ++i) {
+            if (items[i].id == cui_event_target(ui, e))
+                target = i;
+            if (items[i].id == state->active)
+                from = i;
+        }
+        if (target == count || items[target].disabled)
+            continue;
+        if (from == count || items[from].disabled)
+            from = target;
+        if (events[e].type == CUI_EVENT_KEY_DOWN) {
+            size_t next = cui_choice_navigate(items, count, from, events[e].key, true);
+            if (next != count) {
+                state->active = items[next].id;
+                cui_focus(ui, state->active);
+                state->search_length = 0;
+            }
+        } else if (events[e].type == CUI_EVENT_TEXT) {
+            size_t len = 0;
+            while (len < sizeof(events[e].text) && events[e].text[len])
+                ++len;
+            if (!len || len >= sizeof(events[e].text))
+                continue;
+            if (len > sizeof(state->search) - 1 - state->search_length)
+                state->search_length = 0;
+            if (len > sizeof(state->search) - 1)
+                continue;
+            bool cycle = len == 1 && state->search_length == 1 &&
+                         cui_choice_lower((unsigned char)events[e].text[0]) ==
+                             cui_choice_lower((unsigned char)state->search[0]);
+            if (!cycle) {
+                for (size_t i = 0; i < len; ++i)
+                    state->search[state->search_length++] = events[e].text[i];
+            }
+            state->search_time = 0;
+            for (size_t n = 0; n < count; ++n) {
+                size_t i = (from + 1 + n) % count;
+                if (!items[i].disabled &&
+                    cui_choice_prefix(items[i].label, state->search, state->search_length)) {
+                    state->active = items[i].id;
+                    cui_focus(ui, state->active);
+                    break;
+                }
+            }
+        }
+    }
+    size_t begin = options.visible_count ? options.visible_begin : 0;
+    if (begin >= count)
+        begin = count - 1;
+    size_t length = options.visible_count ? options.visible_count : count;
+    if (length > count - begin)
+        length = count - begin;
+    if (options.visible_count) {
+        for (size_t i = 0; i < count; ++i)
+            if (items[i].id == state->active && !items[i].disabled) {
+                if (i < begin)
+                    begin = i;
+                else if (i >= begin + length)
+                    begin = i + 1 - length;
+            }
+    }
+    state->first_visible = begin;
+    bool pointer_moved = false;
+    for (size_t e = 0; e < event_count; ++e)
+        if (events[e].type == CUI_EVENT_POINTER_MOVE)
+            pointer_moved = true;
+    for (size_t i = begin; i < begin + length; ++i) {
+        cui_interaction interaction = cui_interact(
+            ui, items[i].id, options.menu ? CUI_ROLE_MENUITEM : CUI_ROLE_OPTION, items[i].label,
+            options.disabled || items[i].disabled, *selected == items[i].id, (float)i);
+        if (!options.disabled && !items[i].disabled && interaction.hovered && pointer_moved)
+            state->active = items[i].id;
+        if (!options.disabled && !items[i].disabled && interaction.activated) {
+            *selected = state->active = items[i].id;
+            activated = true;
+        }
+    }
+    size_t stop = count;
+    for (size_t i = begin; i < begin + length; ++i)
+        if (!items[i].disabled && items[i].id == state->active)
+            stop = i;
+    if (stop == count)
+        for (size_t i = begin; i < begin + length; ++i)
+            if (!items[i].disabled) {
+                stop = i;
+                state->active = items[i].id;
+                break;
+            }
+    for (size_t i = begin; i < begin + length; ++i) {
+        cui_update_semantic(ui, items[i].id, *selected == items[i].id, (float)i);
+        cui_set_semantic_details(ui, items[i].id,
+                                 (cui_semantic_details){.selected = *selected == items[i].id});
+        cui_set_tab_stop(ui, items[i].id, i == stop);
+    }
+    return activated;
+}
+
+void cui_base_choice_popup_trigger(cui_context *ui, cui_id trigger, cui_str name, bool disabled,
+                                   const cui_choice_item *items, size_t count, cui_id selected,
+                                   cui_choice_popup *state) {
+    if (!state || !state->overlay.id)
+        return;
+    cui_overlay_update(ui, &state->overlay);
+    if (disabled && state->overlay.open)
+        cui_overlay_close(ui, &state->overlay);
+    bool activated =
+        cui_interact(ui, trigger, CUI_ROLE_BUTTON, name, disabled, state->overlay.open, 0)
+            .activated;
+    bool arrow = false, reverse = false;
+    size_t event_count = 0;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    for (size_t e = 0; e < event_count; e++)
+        if (cui_event_target(ui, e) == trigger && events[e].type == CUI_EVENT_KEY_DOWN &&
+            (events[e].key == CUI_KEY_DOWN || events[e].key == CUI_KEY_UP)) {
+            arrow = true;
+            reverse = events[e].key == CUI_KEY_UP;
+        }
+    if (!disabled && (activated || arrow)) {
+        if (state->overlay.open && activated)
+            cui_overlay_close(ui, &state->overlay);
+        else if (!state->overlay.open) {
+            cui_overlay_open(ui, &state->overlay, trigger);
+            state->list.search_length = 0;
+            state->list.search_time = 0;
+            state->list.active = 0;
+            if (items) {
+                for (size_t i = 0; i < count; i++)
+                    if (!items[i].disabled && items[i].id == selected)
+                        state->list.active = selected;
+                if (!state->list.active)
+                    for (size_t n = 0; n < count; n++) {
+                        size_t i = reverse ? count - 1 - n : n;
+                        if (!items[i].disabled) {
+                            state->list.active = items[i].id;
+                            break;
+                        }
+                    }
+            }
+            cui_focus(ui, state->list.active);
+        }
+    }
+    cui_update_semantic(ui, trigger, state->overlay.open, 0);
+    cui_set_semantic_details(
+        ui, trigger,
+        (cui_semantic_details){.expanded = state->overlay.open, .controls = state->overlay.id});
+}

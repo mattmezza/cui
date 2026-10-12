@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "cui/cui_base.h"
+#include <math.h>
 static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                             bool selected, bool disabled, cui_tab_variant variant) {
     cui_box box = {.height = theme->control_height,
@@ -98,4 +100,138 @@ bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
                         CUI_TAB_DEFAULT);
     cui_end_box(ui);
     return changed;
+}
+
+static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_theme *theme,
+                                  const cui_choice_item *items, size_t count, cui_id *selected,
+                                  cui_list_state *state, cui_list_options options) {
+
+    cui_interact(ui, container, options.menu ? CUI_ROLE_MENU : CUI_ROLE_LISTBOX, cui_string(""),
+                 options.disabled, false, 0);
+    cui_begin_box(ui, container, (cui_box){.gap = 0});
+    size_t begin = options.visible_count ? state->first_visible : 0;
+    size_t length = options.visible_count ? options.visible_count : count;
+    if (begin > count)
+        begin = count;
+    if (length > count - begin)
+        length = count - begin;
+    for (size_t i = begin; i < begin + length; i++) {
+        cui_box box = {.height = theme->control_height,
+                       .width = -1,
+                       .padding = theme->padding,
+                       .background = state->active == items[i].id ? theme->primary : theme->surface,
+                       .border = cui_focused(ui) == items[i].id ? theme->focus : theme->surface,
+                       .border_width = cui_focused(ui) == items[i].id ? 1 : 0};
+        cui_begin_box(ui, items[i].id, box);
+        cui_text(ui, items[i].label, theme->font_size,
+                 options.disabled || items[i].disabled ? theme->muted
+                 : state->active == items[i].id        ? theme->on_primary
+                                                       : theme->text);
+        cui_end_box(ui);
+        cui_set_semantic_details(
+            ui, items[i].id,
+            (cui_semantic_details){.selected = *selected == items[i].id, .parent = container});
+    }
+    cui_end_box(ui);
+}
+bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
+              const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
+              cui_list_options options) {
+    if (!theme || !items || !selected || !state)
+        return false;
+    bool activated = cui_base_list(ui, items, count, selected, state, options);
+    cui_choice_paint_list(ui, container, theme, items, count, selected, state, options);
+    return activated;
+}
+
+static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_theme *theme,
+                                    cui_str name, cui_str placeholder, const cui_choice_item *items,
+                                    size_t count, cui_id *selected, cui_choice_popup *state,
+                                    cui_choice_popup_options options, bool menu) {
+    if (!theme || !selected || !state || !state->overlay.id || (!items && count) ||
+        !isfinite(options.viewport.x) || !isfinite(options.viewport.y) ||
+        !isfinite(options.viewport.w) || !isfinite(options.viewport.h) || options.viewport.w <= 0 ||
+        options.viewport.h <= 0 || !isfinite(theme->control_height) || theme->control_height <= 0 ||
+        !isfinite(theme->padding) || theme->padding < 0 || theme->padding > options.viewport.h / 2)
+        return false;
+    cui_base_choice_popup_trigger(ui, trigger, name, options.disabled, items, count, *selected,
+                                  state);
+    cui_str display = menu ? name : placeholder;
+    if (!menu)
+        for (size_t i = 0; i < count; i++)
+            if (items[i].id == *selected)
+                display = items[i].label;
+    cui_set_semantic_details(ui, trigger,
+                             (cui_semantic_details){.expanded = state->overlay.open,
+                                                    .controls = state->overlay.id,
+                                                    .description = display});
+    cui_choice_item trigger_item = {trigger, display, options.disabled};
+    cui_choice_draw(ui, &trigger_item, theme, false, options.disabled, CUI_TAB_DEFAULT);
+    if (!state->overlay.open)
+        return false;
+    float width = options.width > 0 && isfinite(options.width) ? options.width : 240;
+    if (width > options.viewport.w)
+        width = options.viewport.w;
+    float available = options.viewport.h - 2 * theme->padding - 8;
+    size_t rows = count;
+    if (available / theme->control_height < (float)rows) {
+        rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
+    }
+    if (rows > 4096)
+        rows = 4096;
+    float height = 2 * theme->padding + (rows ? rows : 1) * theme->control_height;
+    cui_popup_result placement = cui_popup_place(cui_bounds(ui, trigger), (cui_size){width, height},
+                                                 options.viewport, CUI_POPUP_BELOW, 4);
+    cui_overlay_set_bounds(&state->overlay, placement.bounds);
+    if (!cui_overlay_begin(ui, &state->overlay))
+        return false;
+    cui_list_options list_options = {.disabled = options.disabled,
+                                     .menu = menu,
+                                     .dt = options.dt,
+                                     .visible_begin = state->list.first_visible,
+                                     .visible_count = rows};
+    cui_id old = *selected;
+    bool activated =
+        count ? cui_base_list(ui, items, count, selected, &state->list, list_options) : false;
+    if (activated) {
+        cui_id scope = state->overlay.id;
+        cui_overlay_close(ui, &state->overlay);
+        cui_dismiss_focus_scope(ui, scope, trigger);
+        cui_overlay_end(ui);
+        cui_update_semantic(ui, trigger, false, 0);
+        cui_set_semantic_details(ui, trigger,
+                                 (cui_semantic_details){.controls = scope, .description = display});
+        return menu || old != *selected;
+    }
+    cui_begin_portal(ui, state->overlay.id,
+                     (cui_box){.padding = theme->padding,
+                               .clip = true,
+                               .background = theme->surface,
+                               .border = theme->border,
+                               .border_width = 1,
+                               .radius = theme->radius},
+                     placement.bounds, 100);
+    cui_interact(ui, state->overlay.id, menu ? CUI_ROLE_MENU : CUI_ROLE_LISTBOX, name, false, false,
+                 0);
+    cui_set_semantic_details(ui, state->overlay.id, (cui_semantic_details){.labelled_by = trigger});
+    if (count)
+        cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, items,
+                              count, selected, &state->list, list_options);
+    else
+        cui_text(ui, cui_string("No options"), theme->font_size, theme->muted);
+    cui_end_box(ui);
+    cui_overlay_end(ui);
+    return false;
+}
+bool cui_select(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
+                cui_str placeholder, const cui_choice_item *items, size_t count, cui_id *selected,
+                cui_choice_popup *state, cui_choice_popup_options options) {
+    return cui_choice_popup_render(ui, trigger, theme, name, placeholder, items, count, selected,
+                                   state, options, false);
+}
+bool cui_menu(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
+              const cui_choice_item *items, size_t count, cui_id *action, cui_choice_popup *state,
+              cui_choice_popup_options options) {
+    return cui_choice_popup_render(ui, trigger, theme, name, name, items, count, action, state,
+                                   options, true);
 }

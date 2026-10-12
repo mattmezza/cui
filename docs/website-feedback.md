@@ -19,7 +19,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] ColorPicker: screen eyedropper through an explicit host capability.
 - [x] Combobox and Select: options span the field width. — 76c36ba passes native75, sanitizers75, WASI67 and Chromium78; popup-width regression fails old code. Publication pending.
 - [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.
-- [ ] Input Group: constrain the field so addons stay on the same row.
+- [x] Input Group: constrain the field so addons stay on the same row. — 87721c1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks all four sizes; browser checks 390px/1280px inline layout and block-mode opt-in. Publication pending.
 - [ ] Textarea: word/vertical navigation is implemented/tested in the navigation batch; repeated Down/content visibility remains under investigation.
 - [ ] Dock: a visible, interactive docking demonstration and instructions.
 - [ ] Resizable: divider drag resizes panes correctly.

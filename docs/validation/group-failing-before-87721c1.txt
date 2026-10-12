@@ -1,0 +1,3 @@
+Portable source: 87721c1. Browser test role correction: 15a8570.
+Scope: InputGroup shared sizing/frame, inline default and explicit block gallery mode.
+test_form: /home/matteo/.cache/cui-worktrees/input-group-presentation/tests/unit/test_form.c:210: inline_group_geometry: Assertion `fabsf(group.h - heights[size]) < .01f && fabsf(field.h - heights[size]) < .01f' failed.

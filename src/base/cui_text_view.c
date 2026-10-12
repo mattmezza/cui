@@ -1458,6 +1458,11 @@ static bool cui_text_view_prepare_list_prefix(cui_text_view_block *b, float font
     }
     return true;
 }
+static bool cui_text_view_metrics_valid(cui_font_metrics m) {
+    return isfinite(m.ascent) && isfinite(m.descent) && isfinite(m.line_height) && m.ascent >= 0 &&
+           m.descent >= 0 && m.line_height > 0 && m.line_height <= 10000000 &&
+           m.ascent + m.descent > 0 && m.ascent + m.descent <= 10000000;
+}
 static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, float x, float y,
                                        float width, cui_text_view_layout_options o,
                                        cui_text_view_measure_fn measure, void *user) {
@@ -1472,6 +1477,13 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
           padding = b->kind == CUI_TEXT_VIEW_CODE_BLOCK   ? 12
                     : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 4
                                                           : 0;
+    if (o.font_metrics) {
+        cui_font_metrics metrics = {0};
+        o.font_metrics_available =
+            o.font_metrics(o.font_metrics_user, font, cui_text_view_block_flags(b), &metrics) &&
+            cui_text_view_metrics_valid(metrics);
+        o.body_metrics = metrics;
+    }
     float left = b->kind == CUI_TEXT_VIEW_QUOTE            ? 12
                  : b->kind == CUI_TEXT_VIEW_TABLE_CELL     ? 8
                  : (b->list_item || b->list_repeat_marker) ? 20
@@ -1750,13 +1762,7 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         o.table_actions_height < 0 || o.table_actions_height > 10000000 ||
         o.table_mode < CUI_TEXT_VIEW_TABLE_WRAP || o.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
         return CUI_TEXT_VIEW_INVALID;
-    if (o.font_metrics_available &&
-        (!isfinite(o.body_metrics.ascent) || !isfinite(o.body_metrics.descent) ||
-         !isfinite(o.body_metrics.line_height) || o.body_metrics.ascent < 0 ||
-         o.body_metrics.descent < 0 || o.body_metrics.line_height <= 0 ||
-         o.body_metrics.line_height > 10000000 ||
-         o.body_metrics.ascent + o.body_metrics.descent <= 0 ||
-         o.body_metrics.ascent + o.body_metrics.descent > 10000000))
+    if (o.font_metrics_available && !cui_text_view_metrics_valid(o.body_metrics))
         return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;

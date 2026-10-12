@@ -1000,6 +1000,48 @@ static void test_inline_image_paint(void) {
            f.glyphs[0].bounds.y == f.glyphs[2].bounds.y && !strcmp(f.rendered, "a b\n"));
     cui_destroy(ui);
 }
+static unsigned heading_metric_calls;
+static bool heading_image_metrics(void *user, float size, cui_text_style style,
+                                  cui_font_metrics *out) {
+    (void)user;
+    assert(size == 21 && style.weight == CUI_TEXT_WEIGHT_SEMIBOLD);
+    ++heading_metric_calls;
+    *out = (cui_font_metrics){17, 4, 21};
+    return true;
+}
+static bool invalid_image_loaded(cui_str uri, cui_bitmap *out, void *user) {
+    assert(image_loaded(uri, out, user));
+    out->stride = 0;
+    return true;
+}
+static void test_inline_image_heading_metrics(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("## a![alt](asset)b")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui =
+        cui_create((cui_config){.max_elements = 512, .font_metrics = heading_image_metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    cui_draw_list d = frame(ui, &f, o);
+    bool bitmap = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *c = &d.commands[i];
+        if (c->type == CUI_DRAW_IMAGE) {
+            bitmap = true;
+            assert(c->bounds.h == 22.5f && c->bounds.w == 45 &&
+                   c->bounds.y == f.state.viewport.y + 3.75f);
+        }
+    }
+    assert(bitmap && heading_metric_calls > 0);
+    o.image = invalid_image_loaded;
+    d = frame(ui, &f, o);
+    assert(!f.spans[1].image_ready && f.spans[1].image_bounds.w == 22.5f);
+    for (size_t i = 0; i < d.count; ++i)
+        assert(d.commands[i].type != CUI_DRAW_IMAGE);
+    cui_destroy(ui);
+}
 static void test_image_metric_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -2049,6 +2091,7 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_inline_image_heading_metrics();
     test_inline_image_paint();
     test_image_metric_paint();
     test_links_and_images();

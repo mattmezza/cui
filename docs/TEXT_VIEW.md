@@ -231,3 +231,10 @@ Inline image slots use a single space byte in the rendered selection coordinate
 space; Plain copy includes that slot, while Source copy writes the original image
 syntax. No unloaded bitmap is fabricated. Removing the host loader restores a
 compact square slot without discarding surrounding text or retaining stale pixels.
+
+Layout may provide a font-metrics callback keyed by each block's actual font size
+and style flags. The styled component uses the core provider, so a semibold heading
+image uses heading metrics rather than regular body metrics. The callback supersedes
+fixed body metrics and may decline measurement; unavailable or invalid callback
+metrics use top alignment. Host bitmap validity follows the shared core contract,
+and invalid loader output becomes an unloaded slot instead of a malformed draw.

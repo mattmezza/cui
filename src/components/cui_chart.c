@@ -736,8 +736,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     } else {
                         x = band_center * w / o->width;
                         box_x = x - box_width / 2;
-                        float top = 12 * h / o->height;
-                        float bottom = (o->height > 32 ? o->height - 20 : 12) * h / o->height;
+                        float top = (o->bar_alignment == CUI_CHART_BAR_TOP
+                                         ? (o->hide_x_axis ? 0 : 20)
+                                         : (o->show_bar_values ? 12 : 10)) *
+                                    h / o->height;
+                        float bottom = (o->bar_alignment == CUI_CHART_BAR_TOP
+                                            ? o->height - (o->show_bar_values ? 12 : 10)
+                                            : o->height - (o->hide_x_axis ? 0 : 20)) *
+                                       h / o->height;
                         float baseline = o->bar_alignment == CUI_CHART_BAR_BOTTOM
                                              ? bottom - (bottom - top) * fraction
                                              : top + (bottom - top) * fraction;
@@ -771,7 +777,18 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             double bottom = point_chart ? o->height - (o->hide_x_axis ? 0 : 20) -
                                               (o->custom_y_padding ? o->y_padding_bottom : 0)
                                         : (o->height > 32 ? o->height - 20 : 12);
-            cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
+            if (o->kind == CUI_CHART_BAR) {
+                bool top_aligned = o->bar_alignment == CUI_CHART_BAR_TOP;
+                top = horizontal_bar ? 0
+                      : top_aligned  ? (o->hide_x_axis ? 0 : 20)
+                                     : (o->show_bar_values ? 12 : 10);
+                bottom = horizontal_bar ? o->height - (o->show_y_axis && !o->y_axis_inside ? 32 : 0)
+                         : top_aligned  ? o->height - (o->show_bar_values ? 12 : 10)
+                                        : o->height - (o->hide_x_axis ? 0 : 20);
+            }
+            bool top_bar = o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_TOP;
+            cui_plot_scale scale = {CUI_PLOT_LINEAR,        lo,  hi, top_bar ? top : bottom,
+                                    top_bar ? bottom : top, true};
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;

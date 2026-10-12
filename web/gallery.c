@@ -10,6 +10,7 @@
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_scroll.h"
+#include "cui/cui_status.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
 #include "cui/cui_virtual.h"
@@ -88,6 +89,27 @@ static char otp_buffer[32];
 static int otp_completions, otp_groups = 2;
 static double next_wake;
 static bool otp_masked;
+static int tag_variant, tag_color = CUI_STATUS_COLOR_BLUE;
+static bool tag_outline, tag_pill;
+static int marker_variant, marker_loading, marker_alignment;
+static bool marker_icon;
+static cui_marker_state marker_state;
+static void marker_content(cui_context *context, cui_id id, void *user, float font, cui_color color,
+                           float opacity) {
+    (void)id;
+    (void)user;
+    color.a = (uint8_t)(color.a * opacity);
+    cui_text(context, cui_string("3 tasks"), font, color);
+}
+static void marker_icon_content(cui_context *context, cui_id id, void *user, float font,
+                                cui_color color, float opacity) {
+    (void)user;
+    (void)font;
+    color.a = (uint8_t)(color.a * opacity);
+    cui_begin_box(context, id,
+                  (cui_box){.width = 10, .height = 10, .radius = 5, .background = color});
+    cui_end_box(context);
+}
 static char group_buffer[128] = "cui";
 static cui_edit *group_edit;
 static cui_input_group_state group_state;
@@ -408,6 +430,59 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 56: {
+        cui_tag_options options = {.variant = (cui_tag_variant)tag_variant,
+                                   .size = compact_density ? CUI_STATUS_SMALL : CUI_STATUS_MEDIUM,
+                                   .outline = tag_outline,
+                                   .pill = tag_pill,
+                                   .background = {29, 100, 220, 255},
+                                   .foreground = {255, 255, 255, 255},
+                                   .border = {19, 70, 150, 255}};
+        cui_tag_named_palette((cui_status_color)tag_color,
+                              t.background.r + t.background.g + t.background.b < 384,
+                              &options.palette);
+        cui_tag(ui, cui_id_from(ui, "workspace-tag"), &t, cui_string("Workspace"), options);
+        cui_tag(ui, cui_id_from(ui, "reviewed-tag"), &t, cui_string("Reviewed"),
+                (cui_tag_options){.variant = CUI_TAG_SUCCESS, .outline = true});
+        cui_tag_style style;
+        cui_id rich_id = cui_id_from(ui, "rich-tag");
+        if (cui_begin_tag(ui, rich_id, &t, options, &style)) {
+            cui_begin_box(
+                ui, 0,
+                (cui_box){.width = 6, .height = 6, .radius = 3, .background = style.foreground});
+            cui_end_box(ui);
+            cui_text(ui, cui_string("  Rich content"), style.font_size, style.foreground);
+            cui_end_tag(ui, rich_id, &style);
+        }
+        break;
+    }
+    case 57: {
+        cui_marker_child children[] = {
+            {.kind = CUI_MARKER_ICON, .width = 16, .render = marker_icon_content},
+            {.kind = CUI_MARKER_TEXT, .text = cui_string("Synchronizing workspace")},
+            {.kind = CUI_MARKER_CONTENT, .width = 52, .render = marker_content}};
+        size_t first = marker_icon ? 0 : 1;
+        cui_id id = cui_id_from(ui, "workspace-marker");
+        cui_marker_options options = {.variant = (cui_marker_variant)marker_variant,
+                                      .alignment = (cui_marker_alignment)marker_alignment,
+                                      .loading_style = marker_loading == 2 ? CUI_MARKER_SHIMMER
+                                                                           : CUI_MARKER_SPINNER,
+                                      .loading = marker_loading != 0,
+                                      .reduced_motion = reduced_motion,
+                                      .role = CUI_ROLE_STATUS,
+                                      .name = cui_string("Workspace synchronization"),
+                                      .width = width - 48,
+                                      .now_seconds = host_seconds,
+                                      .duration = 2,
+                                      .shimmer_spread = .3f};
+        cui_marker_plan plan;
+        if (cui_base_marker(options, children + first, 3 - first, &plan))
+            next_wake = plan.next_wake_seconds;
+        cui_marker(ui, id, &t, &marker_state, children + first, 3 - first, options);
+        cui_set_semantic_details(ui, id, (cui_semantic_details){.busy = marker_loading != 0});
+        cui_label(ui, &t, cui_string("Typed text, rich content and optional icon."));
+        break;
+    }
     case 55: {
         cui_label(ui, &t, cui_string("Enter a six-digit verification code."));
         otp_state.masked = otp_masked;
@@ -1383,6 +1458,18 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_tag_options(int variant, int color, int outline, int pill) {
+    tag_variant = variant >= 0 && variant <= CUI_TAG_PALETTE ? variant : 0;
+    tag_color = color >= 0 && color <= CUI_STATUS_COLOR_ROSE ? color : CUI_STATUS_COLOR_BLUE;
+    tag_outline = outline != 0;
+    tag_pill = pill != 0;
+}
+void gallery_marker_options(int variant, int loading, int alignment, int icon) {
+    marker_variant = variant >= 0 && variant <= CUI_MARKER_BORDER ? variant : 0;
+    marker_loading = loading >= 0 && loading <= 2 ? loading : 0;
+    marker_alignment = alignment >= 0 && alignment <= CUI_MARKER_ALIGN_END ? alignment : 0;
+    marker_icon = icon != 0;
 }
 void gallery_otp_options(int groups, int masked) {
     otp_groups = groups >= 1 && groups <= 3 ? groups : 2;

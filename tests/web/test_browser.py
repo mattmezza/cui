@@ -97,6 +97,57 @@ def main():
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.locator('#theme').select_option('0')
+            page.evaluate('location.hash="Tag"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Tag"')
+            page.mouse.move(0,0)
+            tag_index = semantic_index('Workspace', 7)
+            assert tag_index is not None
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,9)', tag_index) == -1
+            assert page.locator('#accessible button[aria-label="Workspace"]').count() == 0
+            assert page.locator('#tag-color option').count() == 21
+            tag_draw = """({index,kind})=>{const e=cuiGallery.exports;for(let i=0;i<e.gallery_count();i++){if(e.gallery_command(i,0)!==kind)continue;if([1,2,3,4].every(f=>Math.abs(e.gallery_command(i,f)-e.gallery_semantic(index,f))<.01))return {rgba:[5,6,7,8].map(f=>e.gallery_command(i,f)),radius:e.gallery_command(i,13),height:e.gallery_command(i,4)};}return null;}"""
+            page.locator('#tag-variant').select_option('7')
+            page.wait_for_function('args=>('+tag_draw+')(args)?.rgba.join(",")==="239,246,255,255"', arg={'index':tag_index,'kind':0})
+            tag_bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', tag_index)
+            rect = canvas.bounding_box()
+            page.mouse.move(rect['x']+tag_bounds[0]+tag_bounds[2]/2,rect['y']+tag_bounds[1]+tag_bounds[3]/2)
+            page.wait_for_function('args=>('+tag_draw+')(args)?.rgba[3]===229', arg={'index':tag_index,'kind':0})
+            page.mouse.move(0,0)
+            page.locator('#tag-outline').check()
+            page.wait_for_function('args=>('+tag_draw+')(args)===null', arg={'index':tag_index,'kind':0})
+            assert page.evaluate(tag_draw, {'index':tag_index,'kind':1})['rgba'] == [191,219,254,255]
+            page.locator('#tag-outline').uncheck()
+            page.locator('#tag-pill').check()
+            page.wait_for_function('args=>{const c=('+tag_draw+')(args);return c&&c.radius>=c.height/2;}', arg={'index':tag_index,'kind':0})
+            page.locator('#theme').select_option('1')
+            page.wait_for_function('args=>('+tag_draw+')(args)?.rgba.join(",")==="23,37,84,127"', arg={'index':tag_index,'kind':0})
+            page.locator('#theme').select_option('0')
+            page.evaluate('location.hash="Marker"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Marker"')
+            assert page.locator('#accessible [role=status][aria-label="Workspace synchronization"]').count() == 1
+            marker_lines = '()=>Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===0&&cuiGallery.exports.gallery_command(i,4)===1&&cuiGallery.exports.gallery_command(i,3)>20).length'
+            page.locator('#marker-variant').select_option('1')
+            page.wait_for_function('('+marker_lines+')()===2')
+            page.locator('#marker-alignment').select_option('1')
+            page.wait_for_function('('+marker_lines+')()===1')
+            page.locator('#marker-variant').select_option('2')
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>{let e=cuiGallery.exports;return e.gallery_command(i,0)===1&&e.gallery_command(i,17)===1&&e.gallery_command(i,21)===1&&[18,19,20].every(f=>e.gallery_command(i,f)===0);})')
+            page.locator('#marker-loading').select_option('1')
+            page.wait_for_function('document.querySelector(`#accessible [role=status][aria-label="Loading"]`)!==null')
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
+            page.locator('#marker-icon').check()
+            page.wait_for_function('document.querySelector(`#accessible [role=status][aria-label="Loading"]`)===null&&cuiGallery.exports.gallery_next_wake()===0')
+            page.locator('#marker-loading').select_option('2')
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===3)')
+            page.emulate_media(reduced_motion='reduce')
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
+            frame = page.evaluate('cuiGallery.frame')
+            page.wait_for_timeout(100)
+            assert page.evaluate('cuiGallery.frame') == frame
+            page.emulate_media(reduced_motion='no-preference')
+            page.locator('#marker-loading').select_option('0')
             page.evaluate('location.hash="OtpInput"')
             page.wait_for_function('cuiGallery.renderedComponent==="OtpInput"')
             otp = page.locator('#accessible [role=textbox][aria-label="Verification code"]')
@@ -812,7 +863,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 54 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 56 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

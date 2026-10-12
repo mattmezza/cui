@@ -1053,11 +1053,13 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
     draw = cui_end_frame(ui);
     bool ohlc[4] = {0};
+    static const char *ohlc_labels[] = {"Open", "High", "Low", "Close"};
     for (size_t i = 0; i < draw.count; i++)
-        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length >= 3) {
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
             const char *label = draw.commands[i].text.data;
             for (size_t row = 0; row < 4; row++)
-                if (label[0] == "OHLC"[row] && label[1] == ':' && label[2] == ' ')
+                if (draw.commands[i].text.length == strlen(ohlc_labels[row]) &&
+                    memcmp(label, ohlc_labels[row], draw.commands[i].text.length) == 0)
                     ohlc[row] = true;
         }
     assert(ohlc[0] && ohlc[1] && ohlc[2] && ohlc[3]);
@@ -1075,7 +1077,7 @@ int main(void) {
             cui_str label = draw.commands[i].text;
             if (label.length == 6 && memcmp(label.data, "Custom", 6) == 0)
                 custom = true;
-            if (label.length >= 3 && label.data[0] == 'O' && label.data[1] == ':')
+            if (label.length == 4 && memcmp(label.data, "Open", 4) == 0)
                 default_ohlc = true;
         }
     assert(tooltip_calls == 1 && custom && !default_ohlc);
@@ -1095,19 +1097,29 @@ int main(void) {
     options.tooltip_title = tooltip_title_override;
     options.tooltip_value = tooltip_value_override;
     options.tooltip_value_color = tooltip_color_override;
+    options.foreground = (cui_color){20, 30, 40, 255};
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
     draw = cui_end_frame(ui);
     bool overridden_title = false, overridden_value = false;
+    float open_x = NAN, value_x = NAN;
+    bool row_swatch = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT) {
             cui_str label = draw.commands[i].text;
             overridden_title |= label.length == 5 && memcmp(label.data, "Price", 5) == 0 &&
                                 draw.commands[i].text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD;
-            overridden_value |= label.length == 4 && memcmp(label.data, "O: V", 4) == 0 &&
+            overridden_value |= label.length == 1 && memcmp(label.data, "V", 1) == 0 &&
                                 draw.commands[i].color.g == 210;
-        }
-    assert(overridden_title && overridden_value);
+            if (label.length == 4 && memcmp(label.data, "Open", 4) == 0)
+                open_x = draw.commands[i].bounds.x;
+            if (label.length == 1 && label.data[0] == 'V')
+                value_x = draw.commands[i].bounds.x;
+        } else if (draw.commands[i].type == CUI_DRAW_RECT &&
+                   fabsf(draw.commands[i].bounds.w - 8) < .01f &&
+                   fabsf(draw.commands[i].bounds.h - 8) < .01f)
+            row_swatch = true;
+    assert(overridden_title && overridden_value && row_swatch && open_x < value_x);
     options.tooltip_title = NULL;
     options.tooltip_value = NULL;
     options.tooltip_value_color = NULL;

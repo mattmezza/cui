@@ -830,10 +830,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         char row_text[8][52] = {{0}};
         size_t row_length[8] = {0}, row_count = 0;
         cui_color row_color[8] = {{0}};
+        cui_str row_label[8] = {{0}};
+        cui_color row_swatch[8] = {{0}};
         float tooltip_width = 150;
         if (!o->tooltip_content) {
             title = o->tooltip_title ? o->tooltip_title(datum, tooltip_index, o->tooltip_user)
                                      : datum->label;
+            if (!o->tooltip_title && o->kind == CUI_CHART_PIE)
+                title = (cui_str){0};
+            if (!o->tooltip_title && o->kind == CUI_CHART_SANKEY && !o->sankey_show_labels)
+                title = (cui_str){0};
             if (title.data && title.length)
                 tooltip_width =
                     fmaxf(tooltip_width,
@@ -864,19 +870,23 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                  o->format_user);
                 if (!formatted.length)
                     continue;
+                memcpy(row_text[row_count], formatted.data, formatted.length);
+                row_length[row_count] = formatted.length;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
-                    static const char prefix[] = "OHLC";
-                    row_text[row_count][0] = prefix[series];
-                    row_text[row_count][1] = ':';
-                    row_text[row_count][2] = ' ';
-                    size_t length = formatted.length < sizeof row_text[0] - 3
-                                        ? formatted.length
-                                        : sizeof row_text[0] - 3;
-                    memcpy(row_text[row_count] + 3, formatted.data, length);
-                    row_length[row_count] = length + 3;
+                    static const cui_str candle_labels[] = {
+                        {"Open", 4}, {"High", 4}, {"Low", 3}, {"Close", 5}};
+                    row_label[row_count] = candle_labels[series];
+                    row_swatch[row_count] = datum->close > datum->open ? o->bullish : o->bearish;
+                } else if (o->kind == CUI_CHART_PIE) {
+                    row_label[row_count] = datum->label;
+                    row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
+                } else if (o->kind == CUI_CHART_SANKEY) {
+                    row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
                 } else {
-                    memcpy(row_text[row_count], formatted.data, formatted.length);
-                    row_length[row_count] = formatted.length;
+                    row_label[row_count] = series ? o->extra_series[series - 1].name : name;
+                    row_swatch[row_count] = series && o->extra_series[series - 1].color.a
+                                                ? o->extra_series[series - 1].color
+                                                : o->series[series % 8];
                 }
                 row_color[row_count] = o->foreground;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
@@ -887,11 +897,13 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 if (o->tooltip_value_color)
                     row_color[row_count] = o->tooltip_value_color(datum, tooltip_index, series,
                                                                   number, o->tooltip_user);
-                tooltip_width = fmaxf(
-                    tooltip_width,
+                if (!row_swatch[row_count].a)
+                    row_swatch[row_count] = o->foreground;
+                float label_width = cui_measure_text(ui, row_label[row_count], 11).width;
+                float value_width =
                     cui_measure_text(ui, (cui_str){row_text[row_count], row_length[row_count]}, 11)
-                            .width +
-                        16);
+                        .width;
+                tooltip_width = fmaxf(tooltip_width, 16 + 8 + 6 + label_width + 12 + value_width);
                 row_count++;
             }
         }
@@ -941,12 +953,34 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 row_y += 18;
             }
             for (size_t series = 0; series < row_count; series++) {
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x44a55e948c7f0000) + series),
+                                       (cui_box){.width = 8,
+                                                 .height = 8,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .radius = 4,
+                                                 .background = row_swatch[series]},
+                                       (cui_rect){8, row_y + 3, 8, 8});
+                cui_end_box(ui);
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
-                                       (cui_box){.width = tooltip_width - 16,
+                                       (cui_box){.width = tooltip_width - 24,
                                                  .height = 16,
                                                  .fixed_width = true,
                                                  .fixed_height = true},
-                                       (cui_rect){8, row_y, tooltip_width - 16, 16});
+                                       (cui_rect){22, row_y, tooltip_width - 30, 16});
+                cui_color muted = o->foreground;
+                muted.a = (unsigned char)(muted.a * .7f);
+                cui_text(ui, row_label[series], 11, muted);
+                cui_end_box(ui);
+                float value_width =
+                    cui_measure_text(ui, (cui_str){row_text[series], row_length[series]}, 11).width;
+                cui_begin_absolute_box(
+                    ui, id ^ (UINT64_C(0x23d40cb791a60000) + series),
+                    (cui_box){.width = value_width,
+                              .height = 16,
+                              .fixed_width = true,
+                              .fixed_height = true},
+                    (cui_rect){tooltip_width - 8 - value_width, row_y, value_width, 16});
                 cui_text(ui, (cui_str){row_text[series], row_length[series]}, 11,
                          row_color[series]);
                 cui_end_box(ui);

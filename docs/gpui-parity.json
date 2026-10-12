@@ -5887,35 +5887,56 @@
       "name": "TextView",
       "reference_url": "https://gpui-kit.com/component/text-view/",
       "category": "advanced",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_text_view_init",
+        "cui_text_view_select",
+        "cui_text_view_range_for_source"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_text_view.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_text_view.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Bounded Markdown/HTML subset, styled Unicode selection, links, tables, images, streaming fade and reveal are tested. Complete parser semantics, source-copy reconstruction, plugins, shared touch/window selection, BiDi and adaptive tables remain unfinished; see docs/TEXT_VIEW.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "safe Markdown/HTML subset parser",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_text_view.c"
+          ]
         },
         {
           "name": "Unicode text selection and links",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_text_view.c"
+          ]
         },
         {
           "name": "inline code/lists/tables",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_text_view.c"
+          ]
         },
         {
           "name": "no script execution and parser fuzzing",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_text_view.c"
+          ]
+        },
+        {
+          "name": "complete source parser, plugins, shared selection and typography parity",
           "status": "not_started",
           "evidence": []
         }

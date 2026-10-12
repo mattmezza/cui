@@ -137,3 +137,11 @@ source prefix helper. Ordinary markers reserve their full measured prefix width;
 they do not impose a synthetic minimum or extra gap. Task indicators retain their
 separate 14px box plus 6px gap. Prefix bytes live in the caller block workspace so
 draw-command text remains valid through renderer completion.
+
+Horizontal table routing currently uses Scroll's dominant axis per wheel event.
+The source native mask additionally retains the starting axis within a precise
+scroll gesture and consumes horizontal wheel input at an edge or without overflow;
+those two mask refinements remain pending shared Scroll support. The frozen source
+itself disables persistent gesture locking on WASM. Ordinary vertical chaining is
+preserved. These remaining differences do not affect the implemented geometry,
+clipping, translated links or source-copy behavior.

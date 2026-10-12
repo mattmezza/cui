@@ -17,6 +17,7 @@
 #include "cui/cui_otp.h"
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
+#include "cui/cui_questionnaire.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_root.h"
 #include "cui/cui_scroll.h"
@@ -121,6 +122,56 @@ static cui_chart_state chart_state;
 static int chart_kind, chart_curve, chart_dots, chart_labels, chart_animate;
 static cui_plot_result chart_result;
 static unsigned chart_revision = 1;
+static cui_questionnaire_state questionnaire_state;
+static cui_questionnaire_item_runtime questionnaire_runtime[2];
+static cui_questionnaire_choice_runtime questionnaire_choice_runtime[3];
+static char questionnaire_text[768];
+static char questionnaire_input_buffer[128];
+static cui_edit *questionnaire_edit;
+static cui_questionnaire_input_state questionnaire_input_view;
+static unsigned questionnaire_events[4];
+static int questionnaire_size, questionnaire_numbers;
+static const cui_questionnaire_choice questionnaire_choices[] = {
+    {.value = {"build", 5},
+     .label = {"Build a native app", 18},
+     .description = {"Portable desktop UI", 19}},
+    {.value = {"explore", 7},
+     .label = {"Explore components", 18},
+     .description = {"Browse the CUI catalog", 22}},
+    {.value = {"prototype", 9},
+     .label = {"Prototype a screen", 18},
+     .description = {"Try a focused example", 21}}};
+static cui_questionnaire_item questionnaire_items[2];
+static void gallery_questionnaire_event(const cui_questionnaire_state *state,
+                                        cui_questionnaire_event event, void *user) {
+    (void)state;
+    (void)user;
+    if ((unsigned)event.kind < 4)
+        questionnaire_events[event.kind]++;
+    redraw = true;
+}
+void gallery_questionnaire_options(int size, int numbers) {
+    questionnaire_size = size >= 0 && size <= 3 ? size : 0;
+    questionnaire_numbers = numbers != 0;
+}
+float gallery_questionnaire_stats(int field) {
+    return field == 0    ? (float)questionnaire_state.current
+           : field == 1  ? (float)questionnaire_state.complete
+           : field == 2  ? (float)questionnaire_state.pending_confirm
+           : field == 3  ? (float)questionnaire_events[CUI_QUESTIONNAIRE_CURRENT_CHANGED]
+           : field == 4  ? (float)questionnaire_events[CUI_QUESTIONNAIRE_ANSWER_CHANGED]
+           : field == 5  ? (float)questionnaire_events[CUI_QUESTIONNAIRE_COMPLETED]
+           : field == 6  ? (float)questionnaire_events[CUI_QUESTIONNAIRE_SUBMIT]
+           : field == 7  ? (float)cui_questionnaire_item_error(&questionnaire_state,
+                                                               questionnaire_state.current)
+                               .kind
+           : field == 8  ? (float)cui_questionnaire_choice_selected(&questionnaire_state, 0, 0)
+           : field == 9  ? (float)cui_questionnaire_choice_selected(&questionnaire_state, 0, 1)
+           : field == 10 ? (float)cui_questionnaire_choice_selected(&questionnaire_state, 0, 2)
+           : field == 11 ? (float)cui_questionnaire_item_status(&questionnaire_state, 1)
+           : field == 12 ? (float)cui_questionnaire_freeform(&questionnaire_state, 1).length
+                         : 0;
+}
 static cui_speech_state speech_state;
 static char speech_transcript[512];
 static cui_speech_message speech_messages[48];
@@ -1175,6 +1226,34 @@ int gallery_init(void) {
                                .close = gallery_speech_close_input},
             gallery_speech_event, NULL))
         return 0;
+    questionnaire_edit = cui_edit_create((cui_edit_config){
+        .buffer = questionnaire_input_buffer, .capacity = sizeof(questionnaire_input_buffer)});
+    if (!questionnaire_edit)
+        return 0;
+    questionnaire_items[0] =
+        (cui_questionnaire_item){.name = cui_string("goal"),
+                                 .label = cui_string("What would you like to do?"),
+                                 .description = cui_string("Choose one direction to get started."),
+                                 .required = true,
+                                 .choices = questionnaire_choices,
+                                 .choice_count = 3};
+    questionnaire_items[1] = (cui_questionnaire_item){
+        .name = cui_string("details"),
+        .label = cui_string("Anything else we should know?"),
+        .description = cui_string("Add a note or skip this optional question."),
+        .input = questionnaire_edit,
+        .input_label = cui_string("Your note")};
+    if (cui_questionnaire_init(
+            &questionnaire_state, questionnaire_items, 2,
+            (cui_questionnaire_workspace){.items = questionnaire_runtime,
+                                          .item_capacity = 2,
+                                          .choices = questionnaire_choice_runtime,
+                                          .choice_capacity = 3,
+                                          .text = questionnaire_text,
+                                          .text_capacity = sizeof(questionnaire_text),
+                                          .max_answer_bytes = 120},
+            gallery_questionnaire_event, NULL) != CUI_QUESTIONNAIRE_OK)
+        return 0;
     chart_state.pixels = chart_pixels;
     chart_state.byte_capacity = sizeof(chart_pixels);
     chart_state.hovered = SIZE_MAX;
@@ -1906,6 +1985,62 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_end_box(ui);
         cui_str spoken = cui_speech_transcript(&speech_state);
         cui_label(ui, &t, spoken.length ? spoken : cui_string("Transcript is empty"));
+        break;
+    }
+    case 79: {
+        cui_questionnaire_options options = {.size = (cui_questionnaire_size)questionnaire_size,
+                                             .width = width > 520 ? 480 : width - 40,
+                                             .disabled = disabled,
+                                             .numeric_shortcuts = questionnaire_numbers != 0};
+        cui_id root_id = cui_id_from(ui, "questionnaire-root");
+        size_t item = questionnaire_state.current;
+        if (cui_questionnaire_begin(ui, root_id, &t, &questionnaire_state, options)) {
+            cui_questionnaire_progress(ui, cui_id_from(ui, "questionnaire-progress"), &t,
+                                       &questionnaire_state, options);
+            cui_questionnaire_heading(ui, cui_id_from(ui, "questionnaire-heading"), &t,
+                                      &questionnaire_state, item, options);
+            cui_id choice_ids[3] = {cui_id_from(ui, "questionnaire-build"),
+                                    cui_id_from(ui, "questionnaire-explore"),
+                                    cui_id_from(ui, "questionnaire-prototype")};
+            cui_id input_id = cui_id_from(ui, "questionnaire-input");
+            size_t count = questionnaire_items[item].choice_count;
+            (void)cui_questionnaire_confirm_keys(ui, root_id, &questionnaire_state, choice_ids,
+                                                 count, input_id, CUI_MOD_CTRL);
+            (void)cui_questionnaire_radio_keys(ui, &questionnaire_state, choice_ids, count);
+            (void)cui_questionnaire_answer_keys(ui, root_id, &questionnaire_state, choice_ids,
+                                                count, input_id);
+            for (size_t choice = 0; choice < count; choice++)
+                (void)cui_questionnaire_choice_control(ui, choice_ids[choice], &t,
+                                                       &questionnaire_state, item, choice, options);
+            if (questionnaire_items[item].input)
+                (void)cui_questionnaire_input_control(ui, input_id, &t, &questionnaire_state, item,
+                                                      &questionnaire_input_view, NULL, options);
+            cui_questionnaire_error_control(ui, cui_id_from(ui, "questionnaire-error"), &t,
+                                            &questionnaire_state, item, options);
+            cui_begin_box(ui, cui_id_from(ui, "questionnaire-actions"),
+                          (cui_box){.row = true, .gap = 8});
+            (void)cui_questionnaire_action_control(
+                ui, cui_id_from(ui, "questionnaire-previous"), &t, &questionnaire_state,
+                CUI_QUESTIONNAIRE_PREVIOUS, (cui_str){0}, options);
+            (void)cui_questionnaire_action_control(ui, cui_id_from(ui, "questionnaire-skip"), &t,
+                                                   &questionnaire_state, CUI_QUESTIONNAIRE_SKIP,
+                                                   (cui_str){0}, options);
+            (void)cui_questionnaire_action_control(ui, cui_id_from(ui, "questionnaire-next"), &t,
+                                                   &questionnaire_state, CUI_QUESTIONNAIRE_NEXT,
+                                                   (cui_str){0}, options);
+            (void)cui_questionnaire_action_control(ui, cui_id_from(ui, "questionnaire-finish"), &t,
+                                                   &questionnaire_state, CUI_QUESTIONNAIRE_FINISH,
+                                                   (cui_str){0}, options);
+            cui_end_box(ui);
+            cui_questionnaire_end(ui);
+        }
+        if (cui_button_ex(ui, cui_id_from(ui, "questionnaire-reset"), &t, cui_string("Start over"),
+                          (cui_button_options){.disabled = disabled})) {
+            (void)cui_questionnaire_reset(&questionnaire_state);
+            redraw = true;
+        }
+        if (questionnaire_state.complete)
+            cui_label(ui, &t, cui_string("Responses submitted"));
         break;
     }
     case 0: {

@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 77
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 78
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -2068,8 +2068,50 @@ def main():
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-readonly') == 'false'
             page.evaluate('location.hash="Questionnaire"')
             page.wait_for_function('document.querySelector("#name").textContent==="Questionnaire" && cuiGallery.renderedComponent==="Questionnaire"')
-            assert page.locator('#pending').is_visible()
-            assert not page.locator('#preview-card').is_visible()
+            assert page.locator('#preview-card').is_visible()
+            assert not page.locator('#pending').is_visible()
+            wait_semantic('Question 1 of 2', 21)
+            click_semantic('Next', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(7)===1')
+            wait_semantic('This question is required', 18)
+            click_semantic('Build a native app', 4)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===1')
+            assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(8)') == 1
+            wait_semantic('Question 2 of 2', 21)
+            click_semantic('Submit', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(7)===2')
+            click_semantic('Skip', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(1)===1&&cuiGallery.exports.gallery_questionnaire_stats(6)===1')
+            assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(5)') == 1
+            assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(11)') == 2
+            click_semantic('Start over', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===0&&cuiGallery.exports.gallery_questionnaire_stats(1)===0')
+            control_change('questionnaire-size', '3')
+            xs = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Explore components', 4))
+            control_change('questionnaire-size', '2')
+            large = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Explore components', 4))
+            assert large > xs, (xs, large)
+            control_change('questionnaire-numbers', True)
+            assert page.locator('#questionnaire-numbers').is_checked()
+            canvas.focus()
+            page.keyboard.press('Tab')
+            page.keyboard.press('ArrowRight')
+            assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(2)') == 0
+            click_semantic('Explore components', 4)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===1')
+            wait_semantic('Your note', 6)
+            click_semantic('Your note', 6)
+            page.wait_for_function('(index)=>cuiGallery.exports.gallery_semantic(index,7)===1', arg=semantic_index('Your note', 6))
+            page.keyboard.type('Portable app')
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(12)===12')
+            click_semantic('Submit', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(1)===1&&cuiGallery.exports.gallery_questionnaire_stats(6)===2')
+            assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(11)') == 1
+            click_semantic('Start over', 1)
+            control_change('disabled', True)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,5)', semantic_index('Build a native app', 4)) == 1
+            control_change('disabled', False)
+            page.screenshot(path='/tmp/cui-web-questionnaire.png')
             page.locator('#search').fill('button')
             assert 0 < page.locator('#catalog a').count() < 78
             page.locator('#search').fill('')
@@ -2125,7 +2167,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 77 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

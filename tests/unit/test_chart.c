@@ -941,6 +941,26 @@ int main(void) {
     assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
                                                     &value_end_gap) == CUI_PLOT_OK);
     assert(value_end_gap > 8);
+    cui_chart_options styled_auto = measured_bar, styled_manual = measured_bar;
+    styled_auto.custom_horizontal_bar_gutters = false;
+    styled_manual.bar_category_gutter = category_gap;
+    styled_manual.bar_value_end_gutter = value_end_gap;
+    unsigned char auto_pixels[512 * 96 * 4], manual_pixels[sizeof auto_pixels];
+    cui_chart_state auto_chart = {
+        .pixels = auto_pixels, .byte_capacity = sizeof auto_pixels, .hovered = SIZE_MAX};
+    cui_chart_state manual_chart = {
+        .pixels = manual_pixels, .byte_capacity = sizeof manual_pixels, .hovered = SIZE_MAX};
+    assert(cui_chart_render(&manual_chart, &styled_manual) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 640, 160, 0));
+    assert(cui_chart(ui, 901, &auto_chart, &styled_auto, (cui_str){"Measured bar", 12}));
+    (void)cui_end_frame(ui);
+    assert(auto_chart.revision == 1);
+    assert(memcmp(auto_pixels, manual_pixels, sizeof auto_pixels) == 0);
+    cui_chart_state animated_chart = {
+        .pixels = auto_pixels, .byte_capacity = sizeof auto_pixels, .hovered = SIZE_MAX};
+    styled_auto.disable_appear = true;
+    assert(cui_chart_render_animated(ui, &animated_chart, &styled_auto) == CUI_PLOT_OK);
+    assert(memcmp(auto_pixels, manual_pixels, sizeof auto_pixels) == 0);
     float old_category = category_gap, old_end = value_end_gap;
     points[1].value = NAN;
     assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,

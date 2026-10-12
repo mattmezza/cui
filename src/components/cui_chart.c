@@ -296,6 +296,15 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
         options->appear_duration < 0)
         return CUI_PLOT_INVALID;
     cui_chart_options frame = *options;
+    if (frame.kind == CUI_CHART_BAR &&
+        (frame.bar_alignment == CUI_CHART_BAR_LEFT || frame.bar_alignment == CUI_CHART_BAR_RIGHT) &&
+        !frame.custom_horizontal_bar_gutters) {
+        cui_plot_result measured = cui_chart_measure_horizontal_bar_gutters(
+            ui, &frame, &frame.bar_category_gutter, &frame.bar_value_end_gutter);
+        if (measured != CUI_PLOT_OK)
+            return measured;
+        frame.custom_horizontal_bar_gutters = true;
+    }
     bool restart = !state->appear_started || state->active_appear_key != options->appear_key;
     double now = cui_frame_time(ui);
     double started = restart ? now : state->appear_started_at;
@@ -328,6 +337,18 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         o->width > 4096 || o->height > 4096 || !o->width || !o->height ||
         o->point_count > 1000000 || state->byte_capacity < (size_t)o->width * o->height * 4)
         return false;
+    cui_chart_options measured_options;
+    if (o->kind == CUI_CHART_BAR &&
+        (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT) &&
+        !o->custom_horizontal_bar_gutters) {
+        measured_options = *o;
+        if (cui_chart_measure_horizontal_bar_gutters(ui, o, &measured_options.bar_category_gutter,
+                                                     &measured_options.bar_value_end_gutter) !=
+            CUI_PLOT_OK)
+            return false;
+        measured_options.custom_horizontal_bar_gutters = true;
+        o = &measured_options;
+    }
     float w = o->logical_width > 0 ? o->logical_width : (float)o->width;
     float h = o->logical_height > 0 ? o->logical_height : (float)o->height;
     cui_interact(ui, id, CUI_ROLE_IMAGE, name, false, false, 0);

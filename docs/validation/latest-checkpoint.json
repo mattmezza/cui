@@ -1,37 +1,37 @@
 {
-  "source": "bfb9f4f",
-  "published_source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
+  "source": "882a5af",
+  "published_source": "04e044e3bef7084e1ea64b3f8a74061fdf3f950c",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Release repair waits for the rendered validation alert before clicking Skip; physical-click reproduction confirmed the old test could click shifted Start over. Full Chromium78, native77, ASan/UBSan75, WASI67 and quality gates pass for bfb9f4f. Updated78-story release is ready for publication; published3aecd89 remains verified77 stories until hosted deployment and HTTPS checks pass. Full feature parity remains unfinished.",
+  "summary": "Published04e044e passes full HTTPS78-story verification. Current882a5af adds tested Questionnaire card styles, scoped shortcuts and browser composition, Chart tooltip/hover fidelity, and TextView list structure/paint-ID fixes. Native77, ASan/UBSan75, WASI67, localChromium78 and quality gates pass. Full feature parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "bfb9f4f",
+      "source": "882a5af",
       "passed": 67,
       "total": 67,
-      "log": "wasi-bfb9f4f.txt"
+      "log": "wasi-882a5af.txt"
     },
     {
       "name": "native",
-      "source": "bfb9f4f",
+      "source": "882a5af",
       "passed": 77,
       "total": 77,
-      "log": "native-bfb9f4f.txt"
+      "log": "native-882a5af.txt"
     },
     {
       "name": "browser",
-      "source": "bfb9f4f",
+      "source": "882a5af",
       "passed": 78,
       "total": 78,
       "palettes": 38,
-      "log": "browser-bfb9f4f.txt"
+      "log": "browser-882a5af.txt"
     },
     {
       "name": "sanitizers",
-      "source": "bfb9f4f",
+      "source": "882a5af",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-bfb9f4f.txt"
+      "log": "sanitizers-882a5af.txt"
     }
   ],
   "previous_deployment": {
@@ -43,12 +43,12 @@
     "framework_ci_status": "success",
     "log": "pages-failure-5ced994.txt"
   },
-  "published_evidence": "published-3aecd89.txt",
+  "published_evidence": "published-04e044e.txt",
   "deployment": {
-    "source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
+    "source": "04e044e3bef7084e1ea64b3f8a74061fdf3f950c",
     "status": "success",
-    "pages_run": 38284537052,
-    "ci_run": 38284537054
+    "pages_run": 38288922387,
+    "ci_run": 38288922427
   },
   "targeted_checks": [
     {

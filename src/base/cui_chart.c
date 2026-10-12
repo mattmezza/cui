@@ -949,6 +949,6 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
     hit.valid = true;
     hit.hovered = index;
     hit.label = o->data[index].label;
-    hit.value = o->data[index].value;
+    hit.value = o->kind == CUI_CHART_CANDLESTICK ? o->data[index].close : o->data[index].value;
     return hit;
 }

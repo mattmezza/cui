@@ -244,7 +244,9 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     options.candle_body_ratio = 0;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
-    assert(cui_chart_hit_test(&options, (float)(first_candle.wick.x_min / 2), 18).valid);
+    cui_chart_hit candle_hit =
+        cui_chart_hit_test(&options, (float)(first_candle.wick.x_min / 2), 18);
+    assert(candle_hit.valid && candle_hit.hovered == 0 && candle_hit.value == 105);
     options.kind = CUI_CHART_PIE;
     options.pie_outer_radius = 12;
     options.inner_radius = 0;
@@ -339,6 +341,22 @@ int main(void) {
             draw.commands[i].text.data[0] == 'Q')
             formatted = true;
     assert(formatted);
+    options.kind = CUI_CHART_CANDLESTICK;
+    options.tooltip_format = NULL;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    draw = cui_end_frame(ui);
+    bool ohlc[4] = {0};
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length >= 3) {
+            const char *label = draw.commands[i].text.data;
+            for (size_t row = 0; row < 4; row++)
+                if (label[0] == "OHLC"[row] && label[1] == ':' && label[2] == ' ')
+                    ohlc[row] = true;
+        }
+    assert(ohlc[0] && ohlc[1] && ohlc[2] && ohlc[3]);
     cui_destroy(ui);
 #endif
     points[0].value = -DBL_MAX;

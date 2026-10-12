@@ -17,6 +17,14 @@ static bool green_pixel(const unsigned char *pixels, size_t count) {
             return true;
     return false;
 }
+static cui_color chart_bar_pattern(const cui_chart_datum *datum, size_t index, cui_plot_rect bar,
+                                   cui_plot_rect chart, float x, float y, void *user) {
+    size_t *calls = user;
+    assert(datum && index < 3 && x >= bar.x_min && x < bar.x_max && y >= bar.y_min &&
+           y < bar.y_max && chart.x_max == 128 && chart.y_max == 96);
+    (*calls)++;
+    return ((int)x & 1) ? (cui_color){0, 240, 0, 255} : (cui_color){0, 0, 0, 0};
+}
 #ifndef CUI_CHART_BASE_ONLY
 static size_t format_q(double value, char *buffer, size_t capacity, void *user) {
     (void)value;
@@ -259,10 +267,24 @@ int main(void) {
             blue_end = true;
     }
     assert(red_end && blue_end);
+    size_t fill_calls = 0;
+    options.bar_fill_pixel = chart_bar_pattern;
+    options.bar_fill_user = &fill_calls;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(fill_calls > 10 && green_pixel(pixels, options.width * options.height));
+    options.bar_fill_pixel = NULL;
+    options.bar_fill_user = NULL;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     memcpy(saved, pixels, sizeof pixels);
     options.bar_corner_radius = 6;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    memcpy(saved, pixels, sizeof pixels);
+    options.custom_bar_corners = true;
+    options.bar_corner_radii[0] = 6;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    options.custom_bar_corners = false;
     options.reveal_enabled = true;
     options.reveal_progress = 0;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
@@ -281,6 +303,9 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     options.bar_corner_radius = 0;
+    options.bar_corner_radii[0] = -1;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
+    options.bar_corner_radii[0] = 0;
     options.hide_grid = false;
     options.hide_axes = false;
     options.kind = CUI_CHART_CANDLESTICK;

@@ -50,6 +50,9 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         return CUI_PLOT_INVALID;
     if (s->byte_capacity < (size_t)o->width * o->height * 4)
         return CUI_PLOT_CAPACITY;
+    for (size_t i = 0; i < 4; i++)
+        if (!isfinite(o->bar_corner_radii[i]) || o->bar_corner_radii[i] < 0)
+            return CUI_PLOT_INVALID;
     for (size_t i = 0; i < o->count; i++) {
         const cui_chart_datum *d = &o->data[i];
         if (!cui_chart_valid_str(d->label) || !isfinite(d->value))
@@ -435,8 +438,7 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
         bounds.y_min = fmin(start, reveal_end);
         bounds.y_max = fmax(start, reveal_end);
     }
-    double radius = fmin(o->bar_corner_radius, fmin((bounds.x_max - bounds.x_min) / 2,
-                                                    (bounds.y_max - bounds.y_min) / 2));
+    double max_radius = fmin((bounds.x_max - bounds.x_min) / 2, (bounds.y_max - bounds.y_min) / 2);
     int x0 = (int)fmax(0, floor(bounds.x_min)), x1 = (int)fmin(o->width, ceil(bounds.x_max));
     int y0 = (int)fmax(0, floor(bounds.y_min)), y1 = (int)fmin(o->height, ceil(bounds.y_max));
     for (int y = y0; y < y1; y++)
@@ -444,6 +446,11 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
             double px = x + .5, py = y + .5;
             if (px < bounds.x_min || px >= bounds.x_max || py < bounds.y_min || py >= bounds.y_max)
                 continue;
+            size_t corner = py < (bounds.y_min + bounds.y_max) / 2
+                                ? (px < (bounds.x_min + bounds.x_max) / 2 ? 0 : 1)
+                                : (px < (bounds.x_min + bounds.x_max) / 2 ? 3 : 2);
+            double radius = fmin(max_radius, o->custom_bar_corners ? o->bar_corner_radii[corner]
+                                                                   : o->bar_corner_radius);
             if (radius > 0) {
                 double cx = fmax(bounds.x_min + radius, fmin(bounds.x_max - radius, px));
                 double cy = fmax(bounds.y_min + radius, fmin(bounds.y_max - radius, py));
@@ -456,6 +463,10 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
                 double t = end != start ? (coordinate - start) / (end - start) : 0;
                 color = cui_chart_blend_color(o->bar_gradient_start, o->bar_gradient_end, t);
             }
+            if (o->bar_fill_pixel)
+                color = o->bar_fill_pixel(&o->data[index], index, bounds,
+                                          (cui_plot_rect){0, 0, o->width, o->height}, (float)px,
+                                          (float)py, o->bar_fill_user);
             cui_chart_pixel(s, o, x, y, color);
         }
 }
@@ -984,12 +995,19 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->bar_ratio));
     h = cui_chart_mix(h, cui_chart_bits(o->candle_body_ratio));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_corner_radius));
+    h = cui_chart_mix(h, o->custom_bar_corners);
+    for (size_t i = 0; i < 4; i++)
+        h = cui_chart_mix(h, cui_chart_bits(o->bar_corner_radii[i]));
     h = cui_chart_mix(h, o->reveal_enabled);
     h = cui_chart_mix(h, o->reduced_motion);
     h = cui_chart_mix(h, cui_chart_bits(o->reveal_progress));
     const unsigned char *gradient = (const unsigned char *)&o->bar_gradient_start;
     for (size_t i = 0; i < 2 * sizeof(cui_color); i++)
         h = cui_chart_mix(h, gradient[i]);
+    const unsigned char *fill_callback = (const unsigned char *)&o->bar_fill_pixel;
+    for (size_t i = 0; i < sizeof(o->bar_fill_pixel); i++)
+        h = cui_chart_mix(h, fill_callback[i]);
+    h = cui_chart_mix(h, (uintptr_t)o->bar_fill_user);
     h = cui_chart_mix(h, cui_chart_bits(o->bar_padding_inner));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_padding_outer));
     h = cui_chart_mix(h, cui_chart_bits(o->max_bar_width));

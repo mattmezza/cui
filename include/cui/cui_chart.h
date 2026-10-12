@@ -62,6 +62,8 @@ typedef struct {
     cui_color color;
 } cui_chart_series;
 typedef size_t (*cui_chart_format_fn)(double value, char *buffer, size_t capacity, void *user);
+typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index, cui_plot_rect bar,
+                                           cui_plot_rect chart, float x, float y, void *user);
 typedef struct {
     cui_chart_kind kind;
     const cui_chart_datum *data;
@@ -94,7 +96,11 @@ typedef struct {
     float max_bar_width, min_bar_length;            /* zero means source 30px/no stub */
     float candle_body_ratio;                        /* zero selects source 0.8 */
     cui_color bar_gradient_start, bar_gradient_end; /* both set for base-to-tip fill */
-    float bar_corner_radius;                        /* uniform pixel radius */
+    cui_chart_bar_fill_fn bar_fill_pixel; /* optional chart-aware pattern/gradient override */
+    void *bar_fill_user;
+    float bar_corner_radius; /* uniform pixel radius */
+    bool custom_bar_corners;
+    float bar_corner_radii[4]; /* top-left, top-right, bottom-right, bottom-left */
     bool reveal_enabled, reduced_motion;
     float reveal_progress; /* host animation progress 0..1; reduced motion paints fully */
     bool show_bar_values;

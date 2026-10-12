@@ -219,7 +219,15 @@ typedef struct {
     bool hover_visual_started;
     float emphasis_focus, emphasis_center, emphasis_velocity;
     bool emphasis_started;
+    size_t emphasis_visual_index;                /* last hovered mark during exit fade */
     float pie_lift[256], pie_lift_velocity[256]; /* bounded source per-slice spring */
+    float tooltip_cursor_x, tooltip_cursor_y;    /* last valid plot-relative pointer */
+    bool tooltip_cursor_valid;
+    float tooltip_phase, tooltip_focus; /* source 120ms enter/exit easing */
+    float tooltip_from;
+    bool tooltip_active, tooltip_started;
+    size_t tooltip_visual_index; /* retained while fading out */
+    double tooltip_visual_value;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {
@@ -1796,8 +1804,8 @@ static void cui_chart_sankey(cui_chart_state *s, const cui_chart_options *o,
         cui_color source_color = cui_chart_palette(o, source);
         cui_color target_color = cui_chart_palette(o, target);
         double opacity = o->custom_sankey_link_opacity ? o->sankey_link_opacity : .3;
-        if (!o->noninteractive && s->emphasis_focus > 0 && s->hovered < o->count &&
-            source != s->hovered && target != s->hovered)
+        if (!o->noninteractive && s->emphasis_focus > 0 && s->emphasis_visual_index < o->count &&
+            source != s->emphasis_visual_index && target != s->emphasis_visual_index)
             opacity *= 1 - .7 * fmin(1, s->emphasis_focus);
         for (int x = (int)ceil(x0); x < (int)x1; x++) {
             double t = (x - x0) / (x1 - x0), smooth = t * t * (3 - 2 * t),
@@ -1932,6 +1940,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     if (!o->noninteractive &&
         (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY)) {
         h = cui_chart_mix(h, s->hovered);
+        h = cui_chart_mix(h, s->emphasis_visual_index);
         h = cui_chart_mix(h, cui_chart_bits(s->emphasis_focus));
         h = cui_chart_mix(h, cui_chart_bits(s->emphasis_center));
         if (o->kind == CUI_CHART_PIE)
@@ -1964,6 +1973,13 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->emphasis_center = 0;
         s->emphasis_velocity = 0;
         s->emphasis_started = false;
+        s->emphasis_visual_index = SIZE_MAX;
+        s->tooltip_cursor_valid = false;
+        s->tooltip_phase = s->tooltip_focus = 0;
+        s->tooltip_from = 0;
+        s->tooltip_active = s->tooltip_started = false;
+        s->tooltip_visual_index = SIZE_MAX;
+        s->tooltip_visual_value = 0;
         memset(s->pie_lift, 0, sizeof s->pie_lift);
         memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }
@@ -2144,6 +2160,22 @@ static void cui_chart_hover_spring(float *position, float *velocity, float targe
         *position = target;
         *velocity = 0;
     }
+}
+static float cui_chart_hover_ease(float progress, bool entering) {
+    progress = fmaxf(0, fminf(1, progress));
+    float x1 = entering ? .16f : .4f, y1 = entering ? 1.f : 0.f;
+    float x2 = entering ? .3f : 1.f, y2 = 1.f;
+    float lo = 0, hi = 1;
+    for (unsigned i = 0; i < 20; i++) {
+        float t = (lo + hi) / 2, inv = 1 - t;
+        float x = 3 * inv * inv * t * x1 + 3 * inv * t * t * x2 + t * t * t;
+        if (x < progress)
+            lo = t;
+        else
+            hi = t;
+    }
+    float t = (lo + hi) / 2, inv = 1 - t;
+    return 3 * inv * inv * t * y1 + 3 * inv * t * t * y2 + t * t * t;
 }
 static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
                                          const cui_chart_sankey_node *node, size_t index,
@@ -2351,11 +2383,51 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                        events[i].y - state->bounds.y);
                 state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
                 state->hovered_value = hit.valid ? hit.value : 0;
+                if (hit.valid) {
+                    state->tooltip_cursor_x = events[i].x - state->bounds.x;
+                    state->tooltip_cursor_y = events[i].y - state->bounds.y;
+                    state->tooltip_cursor_valid = true;
+                }
             }
         }
     }
+    {
+        bool active = !o->noninteractive && state->hovered < o->count;
+        bool instant = o->reduced_motion || cui_reduced_motion(ui);
+        if (active) {
+            state->tooltip_visual_index = state->hovered;
+            state->tooltip_visual_value = state->hovered_value;
+        }
+        float dt = cui_frame_delta(ui);
+        if (!isfinite(dt) || dt < 0)
+            dt = 0;
+        if (dt == 0 && active && state->tooltip_phase == 0)
+            dt = 1.f / 60;
+        float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
+        if (!state->tooltip_started || state->tooltip_active != active) {
+            state->tooltip_from = state->tooltip_focus;
+            state->tooltip_phase = 0;
+            state->tooltip_active = active;
+            state->tooltip_started = true;
+        }
+        if (instant) {
+            state->tooltip_phase = 1;
+            state->tooltip_focus = active ? 1 : 0;
+        } else {
+            state->tooltip_phase = fminf(1, state->tooltip_phase + dt / duration);
+            float eased = cui_chart_hover_ease(state->tooltip_phase, active);
+            state->tooltip_focus =
+                state->tooltip_from + ((active ? 1.f : 0.f) - state->tooltip_from) * eased;
+        }
+        if (!active && state->tooltip_focus <= 0)
+            state->tooltip_visual_index = SIZE_MAX;
+        if (!instant && state->tooltip_phase < 1)
+            cui_invalidate(ui);
+    }
     if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) {
         bool active = !o->noninteractive && state->hovered < o->count;
+        if (active)
+            state->emphasis_visual_index = state->hovered;
         bool instant = o->reduced_motion || cui_reduced_motion(ui);
         float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
         float dt = cui_frame_delta(ui);
@@ -2396,6 +2468,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             }
         if (!active && state->emphasis_focus == 0)
             state->emphasis_started = false;
+        if (!active && state->emphasis_focus == 0)
+            state->emphasis_visual_index = SIZE_MAX;
         if (!instant && moving)
             cui_invalidate(ui);
         cui_chart_options frame = *o;
@@ -2417,6 +2491,34 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     bool ok = cui_paint_bitmap(
         ui, id ^ UINT64_C(0x381c6b293497e8a1), paint,
         (cui_box){.width = w, .height = h, .fixed_width = true, .fixed_height = true});
+    if (o->kind == CUI_CHART_BAR && !o->noninteractive && state->emphasis_focus > 0 &&
+        state->emphasis_visual_index < o->count) {
+        cui_plot_rect bar;
+        if (cui_chart_bar_bounds(o, state->emphasis_visual_index, &bar) == CUI_PLOT_OK) {
+            bool horizontal =
+                o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
+            float thickness = horizontal ? (bar.y_max - bar.y_min) * h / o->height
+                                         : (bar.x_max - bar.x_min) * w / o->width;
+            float band_x = horizontal ? 24 * w / o->width
+                                      : state->emphasis_center * w / o->width - thickness / 2;
+            float band_y = horizontal ? state->emphasis_center * h / o->height - thickness / 2
+                                      : 12 * h / o->height;
+            float band_w = horizontal ? (o->width - 36) * w / o->width : thickness;
+            float band_h = horizontal ? thickness : (o->height - 32) * h / o->height;
+            cui_color band = o->foreground.a ? o->foreground : (cui_color){32, 32, 32, 255};
+            band.a = (unsigned char)lroundf(band.a * .08f * state->emphasis_focus);
+            if (band.a && band_w > 0 && band_h > 0) {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x9c97c1765a400001),
+                                       (cui_box){.width = band_w,
+                                                 .height = band_h,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = band},
+                                       (cui_rect){band_x, band_y, band_w, band_h});
+                cui_end_box(ui);
+            }
+        }
+    }
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
         bool active = !o->noninteractive && state->hovered < o->count;
         float target_x = 0, target_y[8] = {0}, pixel_x, pixel_y;
@@ -2821,11 +2923,21 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             for (size_t i = 0; i < o->count; i++) {
                 if (!labels[i].visible || !color.a)
                     continue;
-                cui_begin_absolute_box(
-                    ui, id ^ (UINT64_C(0xa6a9f030b2543000) + i),
-                    (cui_box){.width = 64, .height = 12, .fixed_width = true, .fixed_height = true},
-                    (cui_rect){labels[i].text_x * w / o->width, labels[i].text_y * h / o->height,
-                               64, 12});
+                cui_size measured = cui_measure_text(ui, labels[i].text, 10);
+                float label_width = fmaxf(1, fminf(w, measured.width));
+                float label_height = fmaxf(12, measured.height);
+                float anchor_x = labels[i].anchor_x * w / o->width;
+                float anchor_y = labels[i].anchor_y * h / o->height;
+                float label_x = labels[i].right ? anchor_x + 4 : anchor_x - 4 - label_width;
+                float label_y = anchor_y - label_height / 2;
+                label_x = fmaxf(0, fminf(w - label_width, label_x));
+                label_y = fmaxf(0, fminf(h - label_height, label_y));
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0xa6a9f030b2543000) + i),
+                                       (cui_box){.width = label_width,
+                                                 .height = label_height,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){label_x, label_y, label_width, label_height});
                 cui_text(ui, labels[i].text, 10, color);
                 cui_end_box(ui);
             }
@@ -2846,41 +2958,39 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_text(ui, label, 10, color);
             cui_end_box(ui);
         }
-    if (!o->noninteractive && state->hovered < o->count) {
-        if (o->tooltip_content) {
-            o->tooltip_content(ui, id, state->hovered, &o->data[state->hovered], o->tooltip_user);
-        } else {
-            const cui_chart_datum *datum = &o->data[state->hovered];
-            cui_str title = o->tooltip_title
-                                ? o->tooltip_title(datum, state->hovered, o->tooltip_user)
-                                : datum->label;
-            if (title.length && title.data) {
-                cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
-                                       (cui_box){.width = 72,
-                                                 .height = 14,
-                                                 .fixed_width = true,
-                                                 .fixed_height = true,
-                                                 .background = o->background},
-                                       (cui_rect){w > 74 ? w - 74 : 0, 2, 72, 14});
-                cui_text(ui, title, 11, o->foreground);
-                cui_end_box(ui);
-            }
+    if (!o->noninteractive && state->tooltip_visual_index < o->count && state->tooltip_focus > 0) {
+        size_t tooltip_index = state->tooltip_visual_index;
+        const cui_chart_datum *datum = &o->data[tooltip_index];
+        cui_str title = {0};
+        char row_text[8][52] = {{0}};
+        size_t row_length[8] = {0}, row_count = 0;
+        cui_color row_color[8] = {{0}};
+        float tooltip_width = 150;
+        if (!o->tooltip_content) {
+            title = o->tooltip_title ? o->tooltip_title(datum, tooltip_index, o->tooltip_user)
+                                     : datum->label;
+            if (title.data && title.length)
+                tooltip_width =
+                    fmaxf(tooltip_width,
+                          cui_measure_text_ex(ui, title, 11,
+                                              (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD})
+                                  .width +
+                              16);
             size_t rows = o->kind == CUI_CHART_CANDLESTICK ? 4 : o->extra_series_count + 1;
             for (size_t series = 0; series < rows; series++) {
-                double number = state->hovered_value;
+                double number =
+                    o->kind == CUI_CHART_SANKEY ? state->tooltip_visual_value : datum->value;
                 if (o->kind != CUI_CHART_CANDLESTICK && series)
-                    number = o->extra_series[series - 1].values[state->hovered];
-                if (o->kind == CUI_CHART_CANDLESTICK) {
-                    const cui_chart_datum *d = &o->data[state->hovered];
-                    number = series == 0   ? d->open
-                             : series == 1 ? d->high
-                             : series == 2 ? d->low
-                                           : d->close;
-                }
+                    number = o->extra_series[series - 1].values[tooltip_index];
+                if (o->kind == CUI_CHART_CANDLESTICK)
+                    number = series == 0   ? datum->open
+                             : series == 1 ? datum->high
+                             : series == 2 ? datum->low
+                                           : datum->close;
                 char value[48];
                 cui_str formatted;
                 if (o->tooltip_value) {
-                    size_t written = o->tooltip_value(datum, state->hovered, series, number, value,
+                    size_t written = o->tooltip_value(datum, tooltip_index, series, number, value,
                                                       sizeof value, o->tooltip_user);
                     formatted =
                         (cui_str){value, written < sizeof value ? written : sizeof value - 1};
@@ -2889,40 +2999,88 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                  o->format_user);
                 if (!formatted.length)
                     continue;
-                char row[52];
-                cui_str label = formatted;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
                     static const char prefix[] = "OHLC";
-                    row[0] = prefix[series];
-                    row[1] = ':';
-                    row[2] = ' ';
-                    size_t length =
-                        formatted.length < sizeof row - 3 ? formatted.length : sizeof row - 3;
-                    memcpy(row + 3, formatted.data, length);
-                    label = (cui_str){row, length + 3};
+                    row_text[row_count][0] = prefix[series];
+                    row_text[row_count][1] = ':';
+                    row_text[row_count][2] = ' ';
+                    size_t length = formatted.length < sizeof row_text[0] - 3
+                                        ? formatted.length
+                                        : sizeof row_text[0] - 3;
+                    memcpy(row_text[row_count] + 3, formatted.data, length);
+                    row_length[row_count] = length + 3;
+                } else {
+                    memcpy(row_text[row_count], formatted.data, formatted.length);
+                    row_length[row_count] = formatted.length;
                 }
-                cui_begin_absolute_box(
-                    ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
-                    (cui_box){.width = 72,
-                              .height = 16,
-                              .fixed_width = true,
-                              .fixed_height = true,
-                              .background = o->background},
-                    (cui_rect){w > 74 ? w - 74 : 0, 16 + 16 * (float)series, 72, 16});
-                cui_color text_color = o->foreground;
+                row_color[row_count] = o->foreground;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
-                    const cui_chart_datum *d = &o->data[state->hovered];
-                    cui_color direction = d->close > d->open ? o->bullish : o->bearish;
+                    cui_color direction = datum->close > datum->open ? o->bullish : o->bearish;
                     if (direction.a)
-                        text_color = direction;
+                        row_color[row_count] = direction;
                 }
                 if (o->tooltip_value_color)
-                    text_color = o->tooltip_value_color(datum, state->hovered, series, number,
-                                                        o->tooltip_user);
-                cui_text(ui, label, 11, text_color);
-                cui_end_box(ui);
+                    row_color[row_count] = o->tooltip_value_color(datum, tooltip_index, series,
+                                                                  number, o->tooltip_user);
+                tooltip_width = fmaxf(
+                    tooltip_width,
+                    cui_measure_text(ui, (cui_str){row_text[row_count], row_length[row_count]}, 11)
+                            .width +
+                        16);
+                row_count++;
             }
         }
+        float tooltip_height =
+            o->tooltip_content ? 64
+                               : 16 + (title.length && title.data ? 18 : 0) + 16 * (float)row_count;
+        float cursor_x = state->tooltip_cursor_valid ? state->tooltip_cursor_x : 0;
+        float cursor_y = state->tooltip_cursor_valid ? state->tooltip_cursor_y : 0;
+        float tooltip_x = cursor_x < w / 2 ? cursor_x + 8 : cursor_x - 8 - tooltip_width;
+        float tooltip_y = cursor_y < h / 2 ? cursor_y + 8 : cursor_y - 8 - tooltip_height;
+        cui_begin_portal(ui, id ^ UINT64_C(0xd8a736411cb50000),
+                         (cui_box){.width = tooltip_width,
+                                   .height = tooltip_height,
+                                   .fixed_width = true,
+                                   .fixed_height = true,
+                                   .radius = 4,
+                                   .background = o->background,
+                                   .border = o->grid,
+                                   .border_width = 1,
+                                   .opacity = state->tooltip_focus,
+                                   .custom_opacity = true},
+                         (cui_rect){state->bounds.x + tooltip_x, state->bounds.y + tooltip_y,
+                                    tooltip_width, tooltip_height},
+                         120);
+        if (o->tooltip_content)
+            o->tooltip_content(ui, id, tooltip_index, datum, o->tooltip_user);
+        else {
+            float row_y = 8;
+            if (title.length && title.data) {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
+                                       (cui_box){.width = tooltip_width - 16,
+                                                 .height = 14,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){8, row_y, tooltip_width - 16, 14});
+                cui_text_ex(ui, title, 11, o->foreground, 0,
+                            (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD});
+                cui_end_box(ui);
+                row_y += 18;
+            }
+            for (size_t series = 0; series < row_count; series++) {
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
+                                       (cui_box){.width = tooltip_width - 16,
+                                                 .height = 16,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){8, row_y, tooltip_width - 16, 16});
+                cui_text(ui, (cui_str){row_text[series], row_length[series]}, 11,
+                         row_color[series]);
+                cui_end_box(ui);
+                row_y += 16;
+            }
+        }
+        cui_end_box(ui);
     }
     cui_end_box(ui);
     return ok;

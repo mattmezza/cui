@@ -423,14 +423,35 @@ static cui_color cui_status_notification_color(cui_color c, float alpha) {
 }
 static cui_theme cui_status_notification_theme(const cui_theme *t, float alpha) {
     cui_theme copy = *t;
-    copy.background = cui_status_notification_color(copy.background, alpha);
-    copy.surface = cui_status_notification_color(copy.surface, alpha);
-    copy.popover = cui_status_notification_color(copy.popover, alpha);
-    copy.text = cui_status_notification_color(copy.text, alpha);
-    copy.muted = cui_status_notification_color(copy.muted, alpha);
-    copy.border = cui_status_notification_color(copy.border, alpha);
-    copy.primary = cui_status_notification_color(copy.primary, alpha);
-    copy.on_primary = cui_status_notification_color(copy.on_primary, alpha);
+    cui_color *colors[] = {&copy.background,
+                           &copy.surface,
+                           &copy.popover,
+                           &copy.text,
+                           &copy.muted,
+                           &copy.border,
+                           &copy.primary,
+                           &copy.on_primary,
+                           &copy.secondary,
+                           &copy.secondary_foreground,
+                           &copy.accent,
+                           &copy.accent_foreground,
+                           &copy.link,
+                           &copy.link_hover,
+                           &copy.link_active,
+                           &copy.input,
+                           &copy.input_background};
+    for (size_t i = 0; i < sizeof(colors) / sizeof(colors[0]); i++)
+        *colors[i] = cui_status_notification_color(*colors[i], alpha);
+    for (size_t i = 0; i < CUI_THEME_BUTTON_COUNT; i++) {
+        cui_theme_button_colors *p = &copy.buttons[i];
+        cui_color *palette[] = {&p->normal,         &p->hover,
+                                &p->active,         &p->foreground,
+                                &p->outline_normal, &p->outline_hover,
+                                &p->outline_active, &p->border,
+                                &p->outline_border, &p->outline_foreground};
+        for (size_t j = 0; j < sizeof(palette) / sizeof(palette[0]); j++)
+            *palette[j] = cui_status_notification_color(*palette[j], alpha);
+    }
     return copy;
 }
 static float cui_status_notification_ease(float phase) {

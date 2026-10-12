@@ -323,6 +323,41 @@ static void notification_theme_tokens(void) {
     cui_destroy(ui);
 }
 
+static void notification_action_fades(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_notification_entry entries[1];
+    cui_notification_state state;
+    assert(cui_notification_init(&state, entries, 1, cui_notification_settings_default(),
+                                 (cui_notification_host){0}));
+    cui_notification n = cui_notification_default();
+    n.id.key = 1;
+    n.message = cui_string("Entering");
+    n.action_label = cui_string("Act");
+    n.height = 80;
+    n.autohide = false;
+    assert(cui_notification_push(&state, n, 0));
+    cui_theme theme = cui_theme_light();
+    theme.buttons[CUI_THEME_BUTTON_PRIMARY].foreground = (cui_color){19, 99, 199, 255};
+    for (int frame = 0; frame < 3; frame++) {
+        assert(cui_begin_frame(ui, 600, 400, .016f));
+        cui_notifications(ui, 900, &theme, &state, (cui_rect){0, 0, 600, 400}, frame * .1);
+        cui_draw_list list = cui_end_frame(ui);
+        if (frame == 2) {
+            bool found = false;
+            for (size_t i = 0; i < list.count; i++)
+                if (list.commands[i].type == CUI_DRAW_TEXT && list.commands[i].text.length == 3 &&
+                    memcmp(list.commands[i].text.data, "Act", 3) == 0) {
+                    cui_color c = list.commands[i].color;
+                    assert(c.r == 19 && c.g == 99 && c.b == 199 && c.a > 0 && c.a < 255);
+                    found = true;
+                }
+            assert(found);
+        }
+    }
+    cui_destroy(ui);
+}
+
 static void notification_autoheight(void) {
     cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
     assert(ui);
@@ -595,6 +630,7 @@ int main(void) {
     notification_interactions();
     notification_autoheight();
     notification_theme_tokens();
+    notification_action_fades();
     notification_motion();
 #endif
 #ifdef CUI_STATUS_BASE_ONLY

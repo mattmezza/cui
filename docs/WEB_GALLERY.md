@@ -100,4 +100,4 @@ Speech is a deterministic provider demonstration. Caller-owned callbacks feed re
 
 Questionnaire composes the retained two-step model with graphical radio choices, optional freeform input, validation, Skip/Next/Previous/Submit actions, progress and four source sizes. Its browser story exercises real CUI pointer events and state changes. Automatic root shortcut routing, cross-item focus transfer, custom slots, localization and exact source styling remain incomplete; see [QUESTIONNAIRE.md](QUESTIONNAIRE.md).
 
-The browser host forwards all ASCII letter and digit key identities to CUI alongside text events, preserving the original special-key values. Questionnaire currently renders alphabetic or numeric shortcut hints; activation routing is pending in the C component. Its progress semantic currently reports a fractional value with a two-step maximum, which needs a C-side value-range correction.
+The browser host forwards all ASCII letter and digit key identities to CUI alongside text events, preserving the original special-key values. Questionnaire currently renders alphabetic or numeric shortcut hints; activation routing is pending in the C component.

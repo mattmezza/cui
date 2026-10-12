@@ -728,3 +728,13 @@ and bottom position resolve from the same frame's final bar bounds. Selected
 Underline edges and animated indicators therefore paint over the baseline.
 Headless tests change prefix width and height on consecutive frames and verify
 immediate baseline resizing, bottom anchoring and paint order.
+
+ToggleGroup's existing convenience API retains its exclusive/multiple,
+allow_empty and vertical keyboard policy, and paints each item through the
+shared Toggle renderer. It registers item semantics only once. Its default
+Medium item geometry is now the source Toggle 32px height and 14px text, with
+ghost accent styling, rather than the old ordinary Button theme geometry.
+The richer ToggleGroup_ex API provides independent size, variant, segmented
+styling and controlled requests. Routed tests cover rejected empty selection,
+exclusive changes, allowed clearing, same-batch navigation/activation and
+whole-group disablement through the convenience API.

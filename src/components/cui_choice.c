@@ -706,8 +706,8 @@ bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
                                                                : CUI_ORIENTATION_HORIZONTAL});
     cui_begin_box(ui, container, (cui_box){.row = !options.vertical, .gap = theme->gap});
     for (size_t i = 0; i < count; ++i)
-        cui_choice_draw(ui, &items[i], theme, selected[i], options.disabled || items[i].disabled,
-                        CUI_TAB_DEFAULT);
+        cui_toggle_paint(ui, items[i].id, theme, items[i].label, selected[i],
+                         (cui_toggle_options){.disabled = options.disabled || items[i].disabled});
     cui_end_box(ui);
     return changed;
 }

@@ -3424,6 +3424,26 @@ static void test_list_source_palette(void) {
             assert(same_color(draw.commands[i].color, theme.muted));
     cui_destroy(ui);
 }
+static void test_toggle_group_shared_renderer(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    bool values[] = {true, false, false};
+    toggles(ui, values, (cui_toggle_group_options){0});
+    assert(cui_bounds(ui, 10).h == 32);
+    click(ui, 10);
+    assert(!toggles(ui, values, (cui_toggle_group_options){0}) && values[0]);
+    click(ui, 30);
+    assert(toggles(ui, values, (cui_toggle_group_options){0}) && !values[0] && values[2]);
+    click(ui, 30);
+    assert(toggles(ui, values, (cui_toggle_group_options){.allow_empty = true}) && !values[2]);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_RIGHT);
+    key(ui, CUI_KEY_ENTER);
+    assert(toggles(ui, values, (cui_toggle_group_options){0}) && values[2]);
+    click(ui, 10);
+    assert(!toggles(ui, values, (cui_toggle_group_options){.disabled = true}) && values[2]);
+    cui_destroy(ui);
+}
 static void test_menu_check_glyphs(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
@@ -3646,6 +3666,7 @@ static void test_tab_current_frame_baseline(void) {
 }
 int main(void) {
     test_list_source_palette();
+    test_toggle_group_shared_renderer();
     test_tab_current_frame_baseline();
     test_choice_trailing_checks();
     test_menu_check_glyphs();

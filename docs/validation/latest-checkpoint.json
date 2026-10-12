@@ -1,8 +1,8 @@
 {
-  "source": "71f6695",
+  "source": "e5b414b",
   "published_source": "611631b70491e69614d3fc55eb9aa40e1ccf9776",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public611631b:73real WASM stories and matching styled Canvas fonts, verified by fullHTTPS Chromium suite. FurtherChart/TextView fidelity changes and portableSpeech are integrated locally; integrationgatesrunning. Full78-entry parity remainsunfinished.",
+  "summary": "Public 611631b is verified over HTTPS with 73 real WASM stories and styled fonts. Local Speech provider lifecycle and controls plus Chart/TextView fidelity updates pass 75 native tests. Sanitizer and WASI gates are running; platform speech capture remains unfinished. Full 78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -13,10 +13,10 @@
     },
     {
       "name": "native",
-      "source": "71f6695",
-      "passed": 73,
-      "total": 73,
-      "log": "native-71f6695.txt"
+      "source": "e5b414b",
+      "passed": 75,
+      "total": 75,
+      "log": "native-e5b414b.txt"
     },
     {
       "name": "browser",

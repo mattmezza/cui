@@ -507,5 +507,14 @@ the theme intent and corresponding on-intent tokens. Danger uses `on_danger`.
 Orthogonal outline uses each intent color for the label/border and translucent
 background; selected intent buttons retain their intent. Tests cover all four
 themes, filled/outline labels and actual action/menu activation across eight
-variants and four sizes. Link/text/default/custom Button presentation remains a
-separate reference gap.
+variants and four sizes.
+
+Default, Link, Text and Custom Dropdown variants complete the named presentation
+choices. Default uses theme surface/text/border, Link uses theme primary with a
+measured underline, and Text uses a transparent background with a slightly faded
+resting label. Link/Text stay transparent on hover and selection. Custom accepts
+portable `color`, `foreground`, `hover` and `active` colors shared by both halves;
+selected uses active, and orthogonal outline uses the custom color with the same
+translucent state levels as intent outlines. A custom content callback owns its
+label decoration; built-in Link labels and the menu indicator are underlined.
+Exact upstream default/link token palettes and custom shadows remain unfinished.

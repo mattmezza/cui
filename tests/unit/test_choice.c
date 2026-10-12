@@ -1424,7 +1424,7 @@ static void test_dropdown_button(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
     for (size_t t = 0; t < 4; t++)
-        for (int variant = CUI_DROPDOWN_BUTTON_PRIMARY; variant <= CUI_DROPDOWN_BUTTON_INFO;
+        for (int variant = CUI_DROPDOWN_BUTTON_PRIMARY; variant <= CUI_DROPDOWN_BUTTON_CUSTOM;
              variant++)
             for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_XSMALL;
                  size++) {
@@ -1438,6 +1438,10 @@ static void test_dropdown_button(void) {
                     .selected = true,
                     .width = 120,
                     .variant = (cui_dropdown_button_variant)variant,
+                    .custom = {{20, 30, 40, 255},
+                               {200, 210, 220, 255},
+                               {50, 60, 70, 255},
+                               {80, 90, 100, 255}},
                     .size = (cui_dropdown_button_size)size,
                     .leading = {"[", 1},
                     .trailing = {"]", 1},
@@ -1486,8 +1490,10 @@ static void test_dropdown_button(void) {
                             command.border_edges.right == 1 && command.border_edges.top == 1 &&
                             command.border_edges.bottom == 1;
                 }
-                assert(left_shape && right_shape);
-                if (variant != CUI_DROPDOWN_BUTTON_GHOST)
+                if (variant != CUI_DROPDOWN_BUTTON_LINK && variant != CUI_DROPDOWN_BUTTON_TEXT)
+                    assert(left_shape && right_shape);
+                if (variant != CUI_DROPDOWN_BUTTON_GHOST && variant != CUI_DROPDOWN_BUTTON_LINK &&
+                    variant != CUI_DROPDOWN_BUTTON_TEXT)
                     assert(left_border && right_border);
                 size_t count = 0;
                 const cui_semantic *semantics = cui_semantics(ui, &count);
@@ -2324,7 +2330,69 @@ static void test_tab_scrollbars(void) {
         cui_destroy(ui);
     }
 }
+static void test_dropdown_presentation_variants(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t t = 0; t < 4; t++)
+        for (int v = CUI_DROPDOWN_BUTTON_DEFAULT; v <= CUI_DROPDOWN_BUTTON_CUSTOM; v++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            assert(ui);
+            cui_menu_tree_state state;
+            cui_menu_tree_init(&state, 2200);
+            cui_id action = 0;
+            cui_dropdown_button_options options = {
+                .variant = (cui_dropdown_button_variant)v,
+                .custom = {{20, 30, 40, 255},
+                           {200, 210, 220, 255},
+                           {50, 60, 70, 255},
+                           {80, 90, 100, 255}},
+                .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
+            dropdown_scene(ui, &state, &action, &themes[t], options);
+            bool transparent = v == CUI_DROPDOWN_BUTTON_LINK || v == CUI_DROPDOWN_BUTTON_TEXT;
+            cui_color expected = v == CUI_DROPDOWN_BUTTON_CUSTOM    ? options.custom.color
+                                 : v == CUI_DROPDOWN_BUTTON_DEFAULT ? themes[t].surface
+                                                                    : (cui_color){0};
+            if (transparent)
+                assert(dropdown_surface(ui, 2001).a == 0);
+            else
+                assert(same_color(dropdown_surface(ui, 2001), expected));
+            if (v == CUI_DROPDOWN_BUTTON_LINK) {
+                cui_rect line = cui_bounds(ui, 2001 ^ UINT64_C(0xc8134e39119b751d));
+                assert(line.h == 1 && line.w > 0);
+            }
+            cui_rect bounds = cui_bounds(ui, 2001);
+            assert(cui_queue_event(
+                ui,
+                (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = bounds.x + 2, .y = bounds.y + 2}));
+            dropdown_scene(ui, &state, &action, &themes[t], options);
+            if (transparent)
+                assert(dropdown_surface(ui, 2001).a == 0);
+            if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.hover));
+            options.selected = true;
+            dropdown_scene(ui, &state, &action, &themes[t], options);
+            if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.active));
+            cui_focus(ui, 2001);
+            key(ui, CUI_KEY_ENTER);
+            assert(dropdown_scene(ui, &state, &action, &themes[t], options).action_activated);
+            options.disabled = true;
+            key(ui, CUI_KEY_ENTER);
+            assert(!dropdown_scene(ui, &state, &action, &themes[t], options).action_activated);
+            if (transparent)
+                assert(dropdown_surface(ui, 2001).a == 0);
+            options.disabled = false;
+            options.outline = true;
+            dropdown_scene(ui, &state, &action, &themes[t], options);
+            if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
+                assert(dropdown_surface(ui, 2001).a == 102);
+            cui_destroy(ui);
+        }
+}
 int main(void) {
+    test_dropdown_presentation_variants();
     test_lists_and_popups();
     test_combobox();
     test_combobox_text_enter_order();

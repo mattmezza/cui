@@ -2011,6 +2011,15 @@ static void test_tab_drag_reorder(void) {
         assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 600, .y = 450}));
         tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
         assert(!drag.requested && !drag.active);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = first.x + 2, .y = first.y + 2}));
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = first.x + 10, .y = first.y + 10}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(drag.active);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(!drag.active && !drag.candidate && !drag.requested);
         cui_destroy(ui);
     }
 }

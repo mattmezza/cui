@@ -37,7 +37,8 @@ static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, si
     if (!drag ||
         (event.type == CUI_EVENT_POINTER_UP && event.pointer_button != CUI_POINTER_PRIMARY))
         return false;
-    if (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE) {
+    if (event.type == CUI_EVENT_CANCEL ||
+        (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE)) {
         drag->candidate = 0;
         drag->active = false;
         return false;

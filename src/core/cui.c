@@ -609,7 +609,10 @@ static Clay_SizingAxis cui_core_axis(float n) {
     return (Clay_SizingAxis){.size = {.minMax = {0, 0}},
                              .type = n < 0 ? CLAY__SIZING_TYPE_GROW : CLAY__SIZING_TYPE_FIT};
 }
-static Clay_SizingAxis cui_core_box_axis(float n, bool fixed, float maximum) {
+static Clay_SizingAxis cui_core_box_axis(float n, bool fixed, float maximum, bool percent) {
+    if (percent)
+        return (Clay_SizingAxis){.size = {.percent = isfinite(n) ? fminf(1, fmaxf(0, n)) : 0},
+                                 .type = CLAY__SIZING_TYPE_PERCENT};
     if (!fixed) {
         Clay_SizingAxis axis = cui_core_axis(n);
         if (isfinite(maximum) && maximum > 0) {
@@ -697,8 +700,10 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                  : (Clay_BorderWidth){bw, bw, bw, bw, 0};
     Clay__ConfigureOpenElement((Clay_ElementDeclaration){
         .userData = layout_only ? (void *)ui : &ui->nodes[ui->node_count - 1],
-        .layout = {.sizing = {cui_core_box_axis(b.width, b.fixed_width, b.max_width),
-                              cui_core_box_axis(b.height, b.fixed_height, b.max_height)},
+        .layout = {.sizing = {cui_core_box_axis(b.width, b.fixed_width, b.max_width,
+                                                b.width_percent),
+                              cui_core_box_axis(b.height, b.fixed_height, b.max_height,
+                                                b.height_percent)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
                    .childGap = cui_core_scalar(b.gap),
                    .childAlignment = {.x = b.align_x == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER
@@ -794,6 +799,7 @@ void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, 
     }
     box.width = bounds.w;
     box.height = bounds.h;
+    box.width_percent = box.height_percent = false;
     cui_core_begin_box(ui, id, box, &bounds, layer, false);
 }
 void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bounds) {
@@ -810,6 +816,7 @@ void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bo
     box.height = bounds.h;
     box.fixed_width = bounds.w >= 0;
     box.fixed_height = bounds.h >= 0;
+    box.width_percent = box.height_percent = false;
     cui_core_begin_box(ui, id, box, &bounds, 0, true);
 }
 void cui_end_box(cui_context *ui) {

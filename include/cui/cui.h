@@ -197,6 +197,9 @@ typedef struct {
      * Finite values clamp to0..1; nonfinite values normalize to0. */
     float opacity;
     bool custom_opacity;
+    /* Interpret the corresponding dimension as a fraction of the parent inner extent in0..1.
+     * Fraction flags take precedence over fixed flags and max caps. */
+    bool width_percent, height_percent;
 } cui_box;
 /* Borrowed straight-alpha RGBA8 pixels, valid through renderer completion.
  * Increment revision whenever pixels change; stride includes row padding. */

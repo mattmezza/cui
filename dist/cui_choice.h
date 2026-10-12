@@ -136,6 +136,19 @@ typedef struct {
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
 typedef void (*cui_choice_confirm_fn)(cui_id item, bool secondary, void *user);
 typedef void (*cui_choice_cancel_fn)(void *user);
+typedef enum {
+    CUI_LIST_MEDIUM,
+    CUI_LIST_SMALL,
+    CUI_LIST_LARGE,
+    CUI_LIST_XSMALL,
+    CUI_LIST_CUSTOM
+} cui_list_size;
+typedef struct {
+    float height, font_size, line_height, padding_x, padding_y, gap;
+    float check_size, check_width, density;
+} cui_list_metrics;
+cui_list_metrics cui_list_default_metrics(float density);
+cui_list_metrics cui_searchable_list_size_metrics(cui_list_size, float custom_size, float density);
 typedef struct {
     bool disabled, menu;
     float dt;
@@ -152,6 +165,8 @@ typedef struct {
     cui_choice_cancel_fn on_cancel;   /* Escape, independent of selection change */
     unsigned secondary_modifiers;     /* zero uses CTRL|META; caller selects host policy */
     bool track_secondary;             /* highlight secondary presses without confirming */
+    float density; /* zero derives theme.font_size/16; ordinary List has no size variant */
+    float height;  /* positive fixed row override; zero uses source natural text plus padding */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -169,6 +184,11 @@ typedef struct {
     cui_choice_render_fn render; /* optional fixed-height option body */
     void *render_user;
     bool align_end; /* align popup right edge with anchor right edge */
+    cui_list_size size;
+    float custom_size; /* CUI_LIST_CUSTOM logical font basis; font = size*0.875 */
+    float density;     /* zero derives theme.font_size/16 */
+    float row_height;  /* positive fixed row override; zero uses source natural height */
+    float max_height;  /* positive popup cap; default source 20rem = 320*density */
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */
@@ -2701,10 +2721,62 @@ bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
     return changed;
 }
 
+cui_list_metrics cui_list_default_metrics(float density) {
+    if (!isfinite(density) || density <= 0)
+        density = 1;
+    return (cui_list_metrics){.height = (16 * 1.618034f + 8) * density,
+                              .font_size = 16 * density,
+                              .line_height = 16 * 1.618034f * density,
+                              .padding_x = 12 * density,
+                              .padding_y = 4 * density,
+                              .gap = 4 * density,
+                              .check_size = 14 * density,
+                              .check_width = 20 * density,
+                              .density = density};
+}
+cui_list_metrics cui_searchable_list_size_metrics(cui_list_size size, float custom_size,
+                                                  float density) {
+    if (!isfinite(density) || density <= 0)
+        density = 1;
+    float font = size == CUI_LIST_XSMALL ? 12 : size == CUI_LIST_LARGE ? 16 : 14;
+    if (size == CUI_LIST_CUSTOM && isfinite(custom_size) && custom_size > 0)
+        font = custom_size * .875f;
+    float padding_x = size == CUI_LIST_XSMALL   ? 1
+                      : size == CUI_LIST_LARGE  ? 9
+                      : size == CUI_LIST_MEDIUM ? 7
+                                                : 5;
+    float padding_y = size == CUI_LIST_SMALL ? 2 : size == CUI_LIST_LARGE ? 8 : 4;
+    return (cui_list_metrics){.height = (font * 1.618034f + 2 * padding_y) * density,
+                              .font_size = font * density,
+                              .line_height = font * 1.618034f * density,
+                              .padding_x = padding_x * density,
+                              .padding_y = padding_y * density,
+                              .gap = 4 * density,
+                              .check_size = 12 * density,
+                              .check_width = 12 * density,
+                              .density = density};
+}
+static cui_list_metrics cui_choice_list_metrics(const cui_theme *theme, cui_list_options options) {
+    cui_list_metrics metrics = cui_list_default_metrics(
+        isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16);
+    if (isfinite(options.height) && options.height > 0)
+        metrics.height = options.height;
+    return metrics;
+}
+static cui_list_metrics cui_choice_search_metrics(const cui_theme *theme,
+                                                  cui_choice_popup_options options) {
+    cui_list_metrics metrics = cui_searchable_list_size_metrics(
+        options.size, options.custom_size,
+        isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16);
+    if (isfinite(options.row_height) && options.row_height > 0)
+        metrics.height = options.row_height;
+    return metrics;
+}
 static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_theme *theme,
                                   const cui_choice_item *items, size_t count, cui_id *selected,
                                   cui_list_state *state, cui_list_options options,
-                                  const bool *multiple_selected, bool searchable) {
+                                  const bool *multiple_selected, bool searchable,
+                                  const cui_list_metrics *metrics) {
 
     cui_interact(ui, container, options.menu ? CUI_ROLE_MENU : CUI_ROLE_LISTBOX, cui_string(""),
                  options.disabled, false, 0);
@@ -2713,10 +2785,10 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
         (cui_semantic_details){.multiselectable = multiple_selected != NULL,
                                .orientation = CUI_ORIENTATION_VERTICAL,
                                .scrollable = options.visible_count && count > options.visible_count,
-                               .scroll_y = state->first_visible * theme->control_height,
+                               .scroll_y = state->first_visible * metrics->height,
                                .scroll_max_y =
                                    options.visible_count && count > options.visible_count
-                                       ? (count - options.visible_count) * theme->control_height
+                                       ? (count - options.visible_count) * metrics->height
                                        : 0});
     cui_begin_box(ui, container, (cui_box){.gap = 0});
     size_t begin = options.visible_count ? state->first_visible : 0;
@@ -2746,12 +2818,13 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                     background.a = (uint8_t)lroundf(background.a * .7f);
             }
         }
-        cui_box box = {.height = theme->control_height,
+        cui_box box = {.height = metrics->height,
                        .width = -1,
-                       .padding = theme->padding,
+                       .padding = 0,
                        .row = true,
                        .align_y = CUI_ALIGN_CENTER,
-                       .gap = theme->gap,
+                       .gap = 0,
+                       .radius = searchable ? theme->radius : 0,
                        .background = background,
                        .border = !searchable && !options.menu && !disabled &&
                                          state->secondary_active == items[i].id
@@ -2760,35 +2833,38 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                        .border_width = !searchable && !options.menu && !disabled &&
                                                state->secondary_active == items[i].id
                                            ? 1
-                                       : cui_focused(ui) == items[i].id ? 1
-                                                                        : 0};
+                                           : 0};
         cui_begin_box(ui, items[i].id, box);
+        cui_begin_box(ui, 0, (cui_box){.width = metrics->padding_x});
+        cui_end_box(ui);
         cui_begin_box(ui, items[i].id ^ UINT64_C(0x9e3f5d2a91bca002),
                       (cui_box){.width = -1, .clip = true});
         if (options.render)
             options.render(ui, &items[i], i, options.render_user);
         else
-            cui_text(ui, items[i].label, theme->font_size,
-                     disabled                                       ? theme->muted
-                     : searchable                                   ? theme->text
-                     : active && options.menu                       ? theme->accent_foreground
-                     : options.menu && cui_hovered(ui, items[i].id) ? theme->accent_foreground
-                                                                    : theme->text);
+            cui_text_with_line_height(ui, items[i].label, metrics->font_size,
+                                      disabled                 ? theme->muted
+                                      : searchable             ? theme->text
+                                      : active && options.menu ? theme->accent_foreground
+                                      : options.menu && cui_hovered(ui, items[i].id)
+                                          ? theme->accent_foreground
+                                          : theme->text,
+                                      metrics->line_height);
         cui_end_box(ui);
         if (searchable || multiple_selected) {
-            float density = theme->font_size / 16;
-            if (!isfinite(density) || density <= 0)
-                density = 1;
-            float size = (searchable ? 12 : 14) * density;
+            cui_begin_box(ui, 0, (cui_box){.width = metrics->gap});
+            cui_end_box(ui);
             cui_begin_box(ui, items[i].id ^ UINT64_C(0x4b705ad687e1a963),
-                          (cui_box){.width = (searchable ? 12 : 20) * density,
-                                    .height = size,
+                          (cui_box){.width = metrics->check_width,
+                                    .height = metrics->check_size,
                                     .align_x = CUI_ALIGN_CENTER,
                                     .align_y = CUI_ALIGN_CENTER});
             if (checked)
-                cui_checkmark(ui, size, searchable ? theme->text : theme->muted);
+                cui_checkmark(ui, metrics->check_size, searchable ? theme->text : theme->muted);
             cui_end_box(ui);
         }
+        cui_begin_box(ui, 0, (cui_box){.width = metrics->padding_x});
+        cui_end_box(ui);
         cui_end_box(ui);
         cui_update_semantic(ui, items[i].id, checked, (float)i);
         cui_set_semantic_details(ui, items[i].id,
@@ -2801,11 +2877,12 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
               cui_list_options options) {
     if (!theme || (!items && count) || !selected || !state)
         return false;
+    cui_list_metrics metrics = cui_choice_list_metrics(theme, options);
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;
     bool activated = cui_base_list(ui, items, count, selected, state, options);
-    cui_choice_paint_list(ui, container, theme, items, count, selected, state, options, NULL,
-                          false);
+    cui_choice_paint_list(ui, container, theme, items, count, selected, state, options, NULL, false,
+                          &metrics);
     return activated;
 }
 
@@ -2834,10 +2911,18 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
     cui_choice_draw(ui, &trigger_item, theme, false, options.disabled, CUI_TAB_DEFAULT);
     if (!state->overlay.open)
         return false;
+    cui_list_metrics metrics = cui_choice_search_metrics(theme, options);
+    cui_theme row_theme = *theme;
+    row_theme.control_height = metrics.height;
+    row_theme.padding = 4 * metrics.density;
+    theme = &row_theme;
     float width = options.width > 0 && isfinite(options.width) ? options.width : 240;
     if (width > options.viewport.w)
         width = options.viewport.w;
-    float available = options.viewport.h - 2 * theme->padding - 8;
+    float max_height = isfinite(options.max_height) && options.max_height > 0
+                           ? options.max_height
+                           : 320 * metrics.density;
+    float available = fminf(options.viewport.h - 8, max_height) - 2 * theme->padding;
     size_t rows = count;
     if (available / theme->control_height < (float)rows) {
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
@@ -2894,7 +2979,7 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                    count > rows ? (count - rows) * theme->control_height : 0});
     if (count)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, items,
-                              count, selected, &state->list, list_options, NULL, !menu);
+                              count, selected, &state->list, list_options, NULL, !menu, &metrics);
     else
         cui_text(ui, cui_string("No options"), theme->font_size, theme->muted);
     cui_end_box(ui);
@@ -2947,11 +3032,19 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     cui_str text = cui_edit_get_text(query);
     if (!state->overlay.open)
         return result;
+    cui_list_metrics metrics = cui_choice_search_metrics(theme, options);
+    cui_theme row_theme = *theme;
+    row_theme.control_height = metrics.height;
+    row_theme.padding = 4 * metrics.density;
+    theme = &row_theme;
     size_t matched = result.matching_count;
     float width = options.width > 0 && isfinite(options.width) ? options.width : 280;
     if (width > options.viewport.w)
         width = options.viewport.w;
-    float available = options.viewport.h - 2 * theme->padding - 8;
+    float max_height = isfinite(options.max_height) && options.max_height > 0
+                           ? options.max_height
+                           : 320 * metrics.density;
+    float available = fminf(options.viewport.h - 8, max_height) - 2 * theme->padding;
     size_t rows = matched;
     if (available / theme->control_height < (float)rows)
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
@@ -3003,7 +3096,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
                                    matched > rows ? (matched - rows) * theme->control_height : 0});
     if (matched)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, filtered,
-                              matched, selected, &state->list, list_options, NULL, true);
+                              matched, selected, &state->list, list_options, NULL, true, &metrics);
     else
         cui_text(ui, cui_string("No matches"), theme->font_size, theme->muted);
     cui_end_box(ui);
@@ -3016,12 +3109,13 @@ bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
                     cui_list_state *state, cui_list_options options) {
     if (!theme || !items || !selected || !state)
         return false;
+    cui_list_metrics metrics = cui_choice_list_metrics(theme, options);
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;
     bool activated = cui_base_list_multi(ui, items, count, selected, state, options);
     cui_id action = 0;
     cui_choice_paint_list(ui, container, theme, items, count, &action, state, options, selected,
-                          false);
+                          false, &metrics);
     return activated;
 }
 static bool cui_choice_chips(cui_context *ui, cui_id input, const cui_theme *theme,
@@ -3074,10 +3168,18 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
     cui_end_box(ui);
     if (!state->overlay.open)
         return changed;
+    cui_list_metrics metrics = cui_choice_search_metrics(theme, options);
+    cui_theme row_theme = *theme;
+    row_theme.control_height = metrics.height;
+    row_theme.padding = 4 * metrics.density;
+    theme = &row_theme;
     float width = options.width > 0 && isfinite(options.width) ? options.width : 240;
     if (width > options.viewport.w)
         width = options.viewport.w;
-    float available = options.viewport.h - 2 * theme->padding - 8;
+    float max_height = isfinite(options.max_height) && options.max_height > 0
+                           ? options.max_height
+                           : 320 * metrics.density;
+    float available = fminf(options.viewport.h - 8, max_height) - 2 * theme->padding;
     size_t rows = count;
     if (available / theme->control_height < (float)rows)
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
@@ -3123,7 +3225,7 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
     cui_id action = 0;
     if (count)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, items,
-                              count, &action, &state->list, list_options, selected, true);
+                              count, &action, &state->list, list_options, selected, true, &metrics);
     else
         cui_text(ui, cui_string("No options"), theme->font_size, theme->muted);
     cui_end_box(ui);
@@ -3156,11 +3258,19 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     result.changed |= cui_choice_chips(ui, input, theme, items, count, selected, options.disabled);
     if (!state->overlay.open)
         return result;
+    cui_list_metrics metrics = cui_choice_search_metrics(theme, options);
+    cui_theme row_theme = *theme;
+    row_theme.control_height = metrics.height;
+    row_theme.padding = 4 * metrics.density;
+    theme = &row_theme;
     size_t matched = result.matching_count;
     float width = options.width > 0 && isfinite(options.width) ? options.width : 280;
     if (width > options.viewport.w)
         width = options.viewport.w;
-    float available = options.viewport.h - 2 * theme->padding - 8;
+    float max_height = isfinite(options.max_height) && options.max_height > 0
+                           ? options.max_height
+                           : 320 * metrics.density;
+    float available = fminf(options.viewport.h - 8, max_height) - 2 * theme->padding;
     size_t rows = matched;
     if (available / theme->control_height < (float)rows)
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
@@ -3214,8 +3324,8 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     cui_id action = 0;
     if (matched)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, filtered,
-                              matched, &action, &state->list, list_options, filtered_selected,
-                              true);
+                              matched, &action, &state->list, list_options, filtered_selected, true,
+                              &metrics);
     else
         cui_text(ui, cui_string("No matches"), theme->font_size, theme->muted);
     cui_end_box(ui);

@@ -145,3 +145,9 @@ is registered before that box. Higher layers win, then floating-root paint order
 then child layout order. Ancestor clips and paint-time inert/layout-only state
 apply to that matched node. Semantics without a matching box retain their
 registration-parent fallback. Focus-scope ownership remains behavior-owned.
+
+`cui_box.width_percent` and `height_percent` interpret the corresponding dimension
+as a fraction of the current parent's inner extent. Fractions clamp to0..1 and
+take precedence over fixed flags and max caps. This resolves proportional rows
+on the first frame and after resize, without previous-frame measurements.
+Absolute/portal bounds retain their explicit dimension semantics.

@@ -1696,7 +1696,32 @@ static void test_layout_hit_order(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_percentage_dimensions(void) {
+    cui_context *ui = make();
+    for (unsigned frame = 0; frame < 2; frame++) {
+        float width = frame ? 300 : 200;
+        begin(ui);
+        cui_begin_box(ui, 960,
+                      (cui_box){.width = width, .height = 100, .padding = 10, .row = true});
+        cui_begin_box(
+            ui, 961,
+            (cui_box){.width = .25f, .height = .5f, .width_percent = true, .height_percent = true});
+        cui_end_box(ui);
+        cui_begin_box(
+            ui, 962,
+            (cui_box){.width = .75f, .height = 1, .width_percent = true, .height_percent = true});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_frame(ui);
+        cui_rect a = cui_bounds(ui, 961), b = cui_bounds(ui, 962);
+        assert(a.x == 10 && a.y == 10 && a.w == (width - 20) * .25f && a.h == 40);
+        assert(b.x == 10 + a.w && b.w == (width - 20) * .75f && b.h == 80);
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    test_percentage_dimensions();
     test_layout_hit_order();
     test_fractional_text_metrics();
     test_inherited_opacity();

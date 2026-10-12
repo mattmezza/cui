@@ -2,8 +2,8 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39};
-const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Calendar','Focus Trap']);
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42};
+const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
  Checkbox:'cui_checkbox(ui, id, &theme,\n    cui_string("Receive updates"),\n    &checked, false);',
@@ -20,7 +20,10 @@ const snippets = {
  VirtualList:'cui_virtual_view view = cui_virtual_viewport(\n    list, scroll, viewport_height, 1);',
  Dock:'cui_dock_split(dock, tab,\n    CUI_DOCK_SPLIT_HORIZONTAL, 0.5,\n    new_panel_key, false, &new_tab);',
  Plot:'cui_plot_zoom(&scale, 1.5, anchor_pixel);\ncui_plot_ticks(&scale, 5, ticks, 32, &count);',
- Calendar:'date = cui_date_add_months(date, 1);\nint days = cui_date_days_in_month(\n    date.year, date.month);',
+ Calendar:'cui_calendar(ui, id, &theme, &state,\n    &selection, options);',
+ DatePicker:'cui_date_picker(ui, id, &theme, label,\n    &state, &selection, options);',
+ ColorPicker:'cui_color_picker(ui, id, &theme,\n    &state, &color, options);',
+ TimeField:'cui_time_field(ui, id, &theme, label,\n    &state, &time, options);',
  Combobox:'cui_combobox(ui, id, &theme, label, query,\n    items, 4, scratch, 4, &selection,\n    &popup, options);',
  NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, options);',
  Pagination:'cui_pagination(ui, id, &theme,\n    &page, total_pages, true, false);',
@@ -54,8 +57,11 @@ function wasiImports(){
 function requestFrame(){if(framePending||!wasm)return;framePending=true;requestAnimationFrame(()=>{framePending=false;try{render();}catch(e){fatal(e);}});}
 function render(){
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:260,dpr=Math.min(devicePixelRatio||1,3);
+ canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
+ wasm.gallery_density(Number($('density').value));
+ wasm.gallery_selection_mode(Number($('selection-mode').value));
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(reducedMotion.matches));lastTime=now;
  if(!wasm.gallery_frame(stories[selected.name],Number($('theme').value),Number($('disabled').checked),width,height))throw Error('CUI layout failed');
  let clips=0;
@@ -71,6 +77,7 @@ function render(){
  }
  while(clips-- >0)ctx.restore();
  syncSemantics();
+ window.cuiGallery.renderedComponent=selected.name;window.cuiGallery.frame=(window.cuiGallery.frame||0)+1;
  const clipboard=wasm.gallery_clipboard_request();if(clipboard)void clipboardAction(clipboard);
  if(wasm.gallery_redraw())requestFrame();
  $('preview-note').textContent=`${modelStories.has(selected.name)?'Partial base model · ':''}${wasm.gallery_count()} draw commands · ${wasm.gallery_semantic_count()} semantic nodes · Mouse, Tab, Enter / Space and arrow keys`;
@@ -81,20 +88,35 @@ async function clipboardAction(action){
  catch {okay=0;text='';}
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
+const semanticNodes = new Map();
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio'];
+const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25];
 function syncSemantics(){
- const root=$('accessible');root.replaceChildren();
+ const root=$('accessible'),seen=new Set(),entries=[];
  for(let i=0;i<wasm.gallery_semantic_count();i++){
-  const f=n=>wasm.gallery_semantic(i,n),role=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem'][f(0)];
-  if(!role || ![1,2,3,4,5,6,8,14,16,23].includes(f(0)))continue;
-  const el=document.createElement('button');el.type='button';el.tabIndex=-1;el.textContent=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));el.setAttribute('role',role);el.disabled=Boolean(f(5));
-  if(['checkbox','switch','radio'].includes(role))el.setAttribute('aria-checked',String(Boolean(f(6))));
-  if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');
-  if(role==='slider'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
-  if(f(14))el.setAttribute('aria-busy','true');
+  const f=n=>wasm.gallery_semantic(i,n),role=roles[f(0)];if(!role||role==='text')continue;
+  const id=`cui-semantic-${wasm.gallery_semantic_id(i)}`;seen.add(id);
+  let el=semanticNodes.get(id);
+  if(!el){el=document.createElement(interactiveRoles.includes(f(0))?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
+  el.setAttribute('role',role);
+  const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
+  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=()=>{wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
+  else el.setAttribute('aria-label',name);
+  if(['checkbox','switch','radio','menuitemcheckbox','menuitemradio'].includes(role))el.setAttribute('aria-checked',String(Boolean(f(6))));
+  el.setAttribute('aria-busy',String(Boolean(f(14))));
+  if(['listbox','tree'].includes(role))el.setAttribute('aria-multiselectable',String(Boolean(f(15))));
   if(role==='tab'||role==='option')el.setAttribute('aria-selected',String(Boolean(f(11))));
-  if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));
-  el.onclick=()=>{wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};
-  root.append(el);
+  if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
+  if(role==='slider'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
+  if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
+  entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
+ }
+ for(const [id,el] of semanticNodes)if(!seen.has(id)){el.remove();semanticNodes.delete(id);}
+ for(const {el,parent,controls,labelledBy} of entries){
+  const container=seen.has(parent)?semanticNodes.get(parent):root;
+  if(el.parentElement!==container)container.append(el);
+  if(seen.has(controls))el.setAttribute('aria-controls',controls);else el.removeAttribute('aria-controls');
+  if(seen.has(labelledBy))el.setAttribute('aria-labelledby',labelledBy);else el.removeAttribute('aria-labelledby');
  }
 }
 function navigation(){
@@ -109,38 +131,45 @@ function selectComponent(){
  let name='Button';try{name=decodeURIComponent(location.hash.slice(1))||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
  document.title=`${selected.name} · CUI`; $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
  const live=selected.name in stories;
+ window.cuiGallery.renderedComponent=live?'':selected.name;
  if(modelStories.has(selected.name))$('status').textContent+=' / base model'; $('preview-card').hidden=!live; $('pending').hidden=live;
  $('description').textContent=live?`Explore ${selected.name.toLowerCase()} through the same CUI core, base behavior and theme used by native applications.`:`${selected.name} is part of the complete GPUI Kit 0.7.1 comparison catalog.`;
  if(modelStories.has(selected.name))$('description').textContent='Interactive demonstration of the implemented base model. The complete styled component remains pending.';
  $('pending-message').textContent=selected.status==='not_started'?'Implementation and browser story are pending. This entry stays visible to preserve the complete component scope.':'Repository implementation exists for part of this entry. A browser story is pending; see implementation scope and source for details.';
  $('snippet').textContent=snippets[selected.name]||(live?`/* See the public ${selected.public_header || 'component'} API. */`:'/* No complete styled browser example yet. */');
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
+ $('reference').href=selected.reference_url;
+ $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
  $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental. IME composition and a complete platform accessibility bridge remain pending.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
+ $('selection-mode').hidden=!['List','Select','Combobox'].includes(selected.name);$('selection-mode').value='0';
  $('disabled').checked=false;document.body.classList.remove('menu-open');navigation();requestFrame();
 }
 const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,a:13,A:13};
 function mods(e){return(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);}
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
- if(!wasm)return;const rect=canvas.getBoundingClientRect();if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);}wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0);requestFrame();
+ if(!wasm)return;const rect=canvas.getBoundingClientRect();if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);}wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,e.button===2?1:e.button===1?2:0);requestFrame();
 });
 canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0);requestFrame();});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('pointercancel',()=>{wasm?.gallery_event(7,0,0,0,0,0);requestFrame();});
 canvas.addEventListener('blur',()=>{wasm?.gallery_event(7,0,0,0,0,0);requestFrame();});
 for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const key=keys[e.key]||0;
  if(e.key==='Tab'){
-  const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&[1,2,3,4,5,6,8,14,16,23].includes(wasm.gallery_semantic(i,0)));
+  const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&interactiveRoles.includes(wasm.gallery_semantic(i,0)));
   const focused=enabled.findIndex(i=>wasm.gallery_semantic(i,7));
   if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
  if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
- if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox')){
+ if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField')){
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
 });
 reducedMotion.addEventListener('change',requestFrame);
 $('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog)selectComponent();});
 $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',$('theme').value==='1');document.body.classList.toggle('contrast',$('theme').value==='2');requestFrame();});
+$('selection-mode').addEventListener('change',requestFrame);
+$('density').addEventListener('change',requestFrame);
 $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
 try{
  const [response,data]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json())]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;

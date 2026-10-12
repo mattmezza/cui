@@ -5,6 +5,7 @@
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
 #include "cui/cui_numeric.h"
+#include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_virtual.h"
 #include <stdio.h>
@@ -33,10 +34,18 @@ static cui_virtual_list *virtual_list;
 static float scroll_percent;
 static cui_dock *dock;
 static cui_date date = {2026, 10, 12};
+static cui_calendar_state calendar;
+static cui_date_selection date_selection = {{2026, 10, 12}, {0}};
+static cui_date_picker_state date_picker;
+static cui_time time_value = {9, 30, 0};
+static cui_time_state time_state;
+static bool multiple_mode, multi_selected[4];
+static cui_color chosen_color = {35, 102, 80, 255};
+static cui_color_state color_state;
 static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
 static bool redraw;
 static float host_seconds, host_dt = 1.0f / 60;
-static bool reduced_motion;
+static bool reduced_motion, compact_density;
 static cui_overlay trap;
 static int clipboard_request;
 static char clipboard_status[128] = "Clipboard access requires a secure browser context.";
@@ -96,6 +105,8 @@ int gallery_init(void) {
                                                           .capacity = sizeof(number_buffer),
                                                           .history_bytes = 2048,
                                                           .max_history_steps = 16});
+    cui_calendar_init(&calendar, date);
+    cui_date_picker_init(&date_picker, cui_id_from(ui, "date-popup"), date);
     cui_overlay_init(&trap, cui_id_from(ui, "focus-trap"), true);
     cui_choice_popup_init(&select_popup, cui_id_from(ui, "select-popup"));
     query = cui_edit_create((cui_edit_config){.buffer = query_buffer,
@@ -106,14 +117,15 @@ int gallery_init(void) {
     cui_choice_popup_init(&menu_popup, cui_id_from(ui, "menu-popup"));
     return ui && edit && dock && query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
-void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat) {
+void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
     if (ui)
         cui_queue_event(ui, (cui_event){.type = (cui_event_type)type,
                                         .x = x,
                                         .y = y,
                                         .key = (cui_key)key,
                                         .modifiers = mods,
-                                        .repeat = repeat != 0});
+                                        .repeat = repeat != 0,
+                                        .pointer_button = (cui_pointer_button)button});
 }
 void gallery_text(const char *text, size_t length) {
     cui_event event = {.type = CUI_EVENT_TEXT};
@@ -132,10 +144,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     cui_theme t = theme == 1   ? cui_theme_dark()
                   : theme == 2 ? cui_theme_high_contrast()
                                : cui_theme_light();
+    if (compact_density) {
+        t.font_size *= .875f;
+        t.control_height *= .8f;
+        t.padding *= .7f;
+        t.gap *= .75f;
+    }
     if (previous_story != story) {
         cui_overlay_close(ui, &select_popup.overlay);
         cui_overlay_close(ui, &menu_popup.overlay);
         cui_overlay_close(ui, &combo_popup.overlay);
+        cui_overlay_close(ui, &date_picker.overlay);
         cui_overlay_close(ui, &trap);
         previous_story = story;
     }
@@ -380,16 +399,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 29: {
-        cui_label(ui, &t, cui_string("Base model: Gregorian date arithmetic"));
-        cui_begin_box(ui, cui_id_from(ui, "date-actions"), (cui_box){.row = true, .gap = 8});
-        if (cui_button(ui, cui_id_from(ui, "prev-month"), &t, cui_string("Previous"), disabled))
-            date = cui_date_add_months(date, -1);
-        if (cui_button(ui, cui_id_from(ui, "next-month"), &t, cui_string("Next"), disabled))
-            date = cui_date_add_months(date, 1);
-        cui_end_box(ui);
-        char text[128];
-        snprintf(text, sizeof(text), "%04d-%02d-%02d; %d days in month", date.year, date.month,
-                 date.day, cui_date_days_in_month(date.year, date.month));
+        cui_calendar(ui, cui_id_from(ui, "calendar"), &t, &calendar, &date_selection,
+                     (cui_calendar_options){.disabled = disabled,
+                                            .first_weekday = 1,
+                                            .cell_size = width > 360 ? 32 : 28});
+        char text[64];
+        snprintf(text, sizeof(text), "Selected: %04d-%02d-%02d", date_selection.start.year,
+                 date_selection.start.month, date_selection.start.day);
         cui_label(ui, &t, cui_string(text));
         break;
     }
@@ -403,9 +419,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                             .viewport = {0, 0, width, height},
                                             .width = width > 360 ? 280 : width - 48,
                                             .dt = host_dt};
-        if (story == 30)
+        if (story == 30 && multiple_mode)
+            cui_list_multi(ui, cui_id_from(ui, "list"), &t, items, 3, multi_selected, &list_state,
+                           (cui_list_options){.disabled = disabled, .dt = host_dt});
+        else if (story == 30)
             cui_list(ui, cui_id_from(ui, "list"), &t, items, 3, &list_selection, &list_state,
                      (cui_list_options){.disabled = disabled, .dt = host_dt});
+        else if (story == 31 && multiple_mode)
+            cui_select_multi(ui, cui_id_from(ui, "select"), &t, cui_string("Delivery"),
+                             cui_string("Select services"), items, 3, multi_selected, &select_popup,
+                             options);
         else if (story == 31)
             cui_select(ui, cui_id_from(ui, "select"), &t, cui_string("Delivery"),
                        cui_string("Select a service"), items, 3, &select_selection, &select_popup,
@@ -463,13 +486,20 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                     {cui_id_from(ui, "combo-c"), cui_string("Banana"), false},
                                     {cui_id_from(ui, "combo-d"), cui_string("Unavailable"), true}},
                         filtered[4];
-        cui_combobox_result result =
-            cui_combobox(ui, cui_id_from(ui, "combobox"), &t, cui_string("Find a fruit"), query,
-                         items, 4, filtered, 4, &combo_selection, &combo_popup,
-                         (cui_choice_popup_options){.disabled = disabled,
-                                                    .viewport = {0, 0, width, height},
-                                                    .width = width > 360 ? 280 : width - 48,
-                                                    .dt = host_dt});
+        cui_combobox_result result;
+        cui_choice_popup_options options = {.disabled = disabled,
+                                            .viewport = {0, 0, width, height},
+                                            .width = width > 360 ? 280 : width - 48,
+                                            .dt = host_dt};
+        if (multiple_mode) {
+            bool filtered_selected[4];
+            result = cui_combobox_multi(
+                ui, cui_id_from(ui, "combobox"), &t, cui_string("Find fruits"), query, items, 4,
+                filtered, filtered_selected, 4, multi_selected, &combo_popup, options);
+        } else
+            result =
+                cui_combobox(ui, cui_id_from(ui, "combobox"), &t, cui_string("Find a fruit"), query,
+                             items, 4, filtered, 4, &combo_selection, &combo_popup, options);
         char text[64];
         snprintf(text, sizeof(text), "%zu matching options", result.matching_count);
         cui_label(ui, &t, cui_string(text));
@@ -529,6 +559,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         if (shortened)
             memcpy(preview + length, "...", 4);
         cui_label(ui, &t, cui_string(preview));
+        break;
+    }
+    case 40:
+        cui_date_picker(ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
+                        &date_selection,
+                        (cui_date_picker_options){.calendar = {.first_weekday = 1, .cell_size = 28},
+                                                  .viewport = {0, 0, width, height},
+                                                  .disabled = disabled,
+                                                  .width = width > 360 ? 280 : width - 48});
+        break;
+    case 41: {
+        cui_time_field(ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_state,
+                       &time_value, (cui_time_options){.seconds = true, .disabled = disabled});
+        char text[32];
+        cui_time_format(time_value, true, text, sizeof(text));
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 42: {
+        const cui_color palette[] = {
+            {35, 102, 80, 255}, {88, 101, 242, 255}, {227, 134, 49, 255}, {221, 71, 82, 255}};
+        cui_color_picker(ui, cui_id_from(ui, "color-picker"), &t, &color_state, &chosen_color,
+                         (cui_color_picker_options){.alpha = true,
+                                                    .disabled = disabled,
+                                                    .width = width > 360 ? 280 : width - 68,
+                                                    .palette = palette,
+                                                    .palette_count = 4});
         break;
     }
     default:
@@ -650,7 +707,7 @@ void gallery_time(float seconds, float dt, int reduced) {
 
 int gallery_modal(void) {
     return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open ||
-           trap.open;
+           trap.open || date_picker.overlay.open;
 }
 
 int gallery_clipboard_request(void) {
@@ -671,4 +728,29 @@ void gallery_clipboard_result(int okay, const char *text, size_t length) {
     }
     memcpy(clipboard_status, text, length);
     clipboard_status[length] = 0;
+}
+
+void gallery_density(int compact) {
+    compact_density = compact != 0;
+}
+
+void gallery_selection_mode(int multiple) {
+    if (multiple_mode != (multiple != 0)) {
+        cui_overlay_close(ui, &select_popup.overlay);
+        cui_overlay_close(ui, &combo_popup.overlay);
+    }
+    multiple_mode = multiple != 0;
+}
+
+uint64_t gallery_semantic_id(unsigned i) {
+    return i < semantic_count ? semantics[i].id : 0;
+}
+uint64_t gallery_semantic_parent(unsigned i) {
+    return i < semantic_count ? semantics[i].details.parent : 0;
+}
+uint64_t gallery_semantic_controls(unsigned i) {
+    return i < semantic_count ? semantics[i].details.controls : 0;
+}
+uint64_t gallery_semantic_labelled_by(unsigned i) {
+    return i < semantic_count ? semantics[i].details.labelled_by : 0;
 }

@@ -521,10 +521,27 @@ def main():
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
             page.keyboard.press('Escape')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
-            click_semantic('Edit preferences')
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            frame = page.evaluate('cuiGallery.frame')
+            page.evaluate('(()=>{window.__cuiHeldFrames=[];window.__cuiOriginalRAF=requestAnimationFrame;window.requestAnimationFrame=cb=>{__cuiHeldFrames.push(cb);return 0;};})()')
+            try:
+                click_semantic('Edit preferences')
+                rectangle = canvas.bounding_box()
+                page.mouse.click(rectangle['x']+4, rectangle['y']+rectangle['height']-4)
+                assert page.evaluate('__cuiHeldFrames.length') > 0
+                assert page.evaluate('cuiGallery.exports.gallery_surface_open(0)') == 0
+                assert page.evaluate('cuiGallery.frame') == frame
+            finally:
+                page.evaluate('(()=>{window.requestAnimationFrame=__cuiOriginalRAF;for(const cb of __cuiHeldFrames)requestAnimationFrame(cb);delete window.__cuiOriginalRAF;delete window.__cuiHeldFrames;})()')
+            # Both clicks targeted the old layout. Dismiss the modal only after it is rendered.
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1&&document.querySelector(`#accessible [role=dialog][aria-modal=true]`)')
+            modal = semantic_index('Notification preferences', 17)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,3)>0&&cuiGallery.exports.gallery_semantic(i,4)>0', arg=modal)
+            assert page.evaluate('cuiGallery.exports.gallery_modal()') == 1
             rectangle = canvas.bounding_box()
             page.mouse.click(rectangle['x']+4, rectangle['y']+rectangle['height']-4)
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=semantic_index('Edit preferences', 1))
             page.evaluate('location.hash="AlertDialog"')
             page.wait_for_function('cuiGallery.renderedComponent==="AlertDialog"')
             click_semantic('Delete workspace')

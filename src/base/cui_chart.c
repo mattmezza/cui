@@ -215,12 +215,21 @@ static void cui_chart_guide(cui_chart_state *s, const cui_chart_options *o, doub
     }
 }
 static double cui_chart_plot_left(const cui_chart_options *o) {
+    if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)
+        return o->show_y_axis && !o->y_axis_inside
+                   ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 32)
+                   : 0;
     if (o->kind == CUI_CHART_BAR &&
         (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT))
         return 24;
     return o->show_y_axis && !o->y_axis_inside
                ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
                : 24;
+}
+static double cui_chart_plot_right(const cui_chart_options *o, double left) {
+    return o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA
+               ? o->width - left
+               : (o->width > 36 ? o->width - 12 : left);
 }
 static double cui_chart_plot_bottom(const cui_chart_options *o) {
     bool horizontal_bar = o->kind == CUI_CHART_BAR && (o->bar_alignment == CUI_CHART_BAR_LEFT ||
@@ -295,7 +304,7 @@ bool cui_chart_value_domain(const cui_chart_options *o, double *minimum, double 
 }
 static cui_plot_result cui_chart_bar_bounds_domain(const cui_chart_options *o, size_t index,
                                                    double lo, double hi, cui_plot_rect *output) {
-    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
     double top = 12, bottom = cui_chart_plot_bottom(o);
     if (right <= left || bottom <= top)
         return CUI_PLOT_EMPTY;
@@ -381,7 +390,7 @@ cui_plot_result cui_chart_candle_bounds(const cui_chart_options *o, size_t index
     cui_chart_domain(o, &lo, &hi);
     if (!isfinite(lo) || !isfinite(hi) || lo >= hi)
         return CUI_PLOT_OVERFLOW;
-    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
     double top = 12, bottom = o->height > 32 ? o->height - 20 : 12;
     if (right <= left || bottom <= top)
         return CUI_PLOT_EMPTY;
@@ -554,7 +563,7 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
         }
 }
 static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) {
-    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left, top = 12,
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left), top = 12,
            bottom = cui_chart_plot_bottom(o);
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
         top = o->custom_y_padding ? o->y_padding_top : 10;
@@ -1422,7 +1431,7 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
         hit.value = nodes[index].throughput;
         return hit;
     } else {
-        double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
+        double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
         double top = 12, bottom = cui_chart_plot_bottom(o);
         if (x < left || x > right || y < top || y > bottom || right <= left)
             return hit;

@@ -157,6 +157,15 @@ int main(void) {
     }
     options.data_revision = 0;
     options.kind = CUI_CHART_LINE;
+    assert(cui_chart_hit_test(&options, 0, 20).valid &&
+           cui_chart_hit_test(&options, 0, 20).hovered == 0);
+    assert(cui_chart_hit_test(&options, 63, 20).valid &&
+           cui_chart_hit_test(&options, 63, 20).hovered == 2);
+    options.show_y_axis = true;
+    assert(!cui_chart_hit_test(&options, 0, 20).valid);
+    assert(cui_chart_hit_test(&options, 16, 20).valid &&
+           cui_chart_hit_test(&options, 16, 20).hovered == 0);
+    options.show_y_axis = false;
     options.hide_grid = true;
     options.hide_axes = true;
     options.custom_y_padding = true;

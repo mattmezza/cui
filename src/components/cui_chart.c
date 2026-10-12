@@ -245,12 +245,17 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_str label = o->data[i].label;
             if (!label.length || !label.data)
                 continue;
-            float left = o->show_y_axis && !o->y_axis_inside
-                             ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
-                             : 24;
-            float x = slots > 1 ? (left + (o->width - 12 - left) * (float)i / (float)(slots - 1)) *
-                                      w / o->width
-                                : w / 2;
+            bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+            float left = point_chart ? (o->show_y_axis && !o->y_axis_inside
+                                            ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 32)
+                                            : 0)
+                                     : (o->show_y_axis && !o->y_axis_inside
+                                            ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
+                                            : 24);
+            float right = point_chart ? o->width - left : o->width - 12;
+            float x = slots > 1
+                          ? (left + (right - left) * (float)i / (float)(slots - 1)) * w / o->width
+                          : w / 2;
             float y = h - 14;
             if (o->kind == CUI_CHART_CANDLESTICK) {
                 cui_chart_candle_geometry candle;
@@ -303,7 +308,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 cui_str label =
                     cui_chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
                 float y = (float)(pixel_y * h / o->height);
-                float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 50;
+                float gutter =
+                    o->value_axis_gutter > 0
+                        ? o->value_axis_gutter
+                        : (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA ? 32 : 50);
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;
                 float label_width = o->y_axis_inside ? 48 : gutter - 4;
                 if (horizontal_bar) {

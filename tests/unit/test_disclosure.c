@@ -139,7 +139,126 @@ static void test_disclosure_box_overrides(void) {
     assert(!open);
     cui_destroy(ui);
 }
+static float animated_height = 60;
+static bool animated_activated;
+static void animated_panel(cui_context *ui, size_t index, void *user) {
+    (void)index;
+    (void)user;
+    cui_begin_box(ui, 801,
+                  (cui_box){.width = 120, .height = animated_height, .background = {3, 4, 5, 255}});
+    cui_interaction interaction = cui_base_button(ui, 801, cui_string("Body"), false);
+    animated_activated |= interaction.activated;
+    cui_end_box(ui);
+}
+static cui_draw_list animated_scene(cui_context *ui, bool *open, cui_disclosure_motion *motion,
+                                    bool reduced, float dt) {
+    assert(cui_begin_frame(ui, 640, 480, dt));
+    cui_theme theme = cui_theme_light();
+    cui_collapsible_ex(ui, 800, &theme, cui_string("Animated"), open,
+                       (cui_collapsible_options){
+                           .motion = motion, .dt = dt, .response = .2f, .reduced_motion = reduced},
+                       animated_panel, NULL);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static bool has_semantic(cui_context *ui, cui_id id) {
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == id)
+            return true;
+    return false;
+}
+static void test_measured_reveal(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    bool open = false;
+    cui_disclosure_motion motion = {0};
+    animated_height = 60;
+    animated_activated = false;
+    cui_draw_list draw = animated_scene(ui, &open, &motion, false, .016f);
+    assert(motion.progress == 0 && motion.measured.h >= 60);
+    assert(!has_semantic(ui, 801));
+    for (size_t i = 0; i < draw.count; i++)
+        assert(!(draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.r == 3 &&
+                 draw.commands[i].color.g == 4));
+    click(ui, 800);
+    animated_scene(ui, &open, &motion, false, .016f);
+    assert(open && motion.progress > 0 && motion.progress < 1);
+    cui_id viewport = 800 ^ UINT64_C(0x48aaf2a21d3ed09f);
+    assert(cui_bounds(ui, viewport).h > 0 && cui_bounds(ui, viewport).h < motion.measured.h);
+    for (int i = 0; i < 60; i++)
+        animated_scene(ui, &open, &motion, false, .016f);
+    assert(motion.progress == 1 && has_semantic(ui, 801));
+    cui_focus(ui, 801);
+    cui_rect body = cui_bounds(ui, 801);
+    open = false;
+    draw = animated_scene(ui, &open, &motion, false, .016f);
+    assert(motion.progress > 0 && motion.progress < 1);
+    assert(!has_semantic(ui, 801) && cui_focused(ui) == 0);
+    bool closing_paint = false;
+    for (size_t i = 0; i < draw.count; i++)
+        closing_paint |= draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.r == 3 &&
+                         draw.commands[i].color.g == 4;
+    assert(closing_paint);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = body.x + 2, .y = body.y + 2}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = body.x + 2, .y = body.y + 2}));
+    animated_scene(ui, &open, &motion, false, .016f);
+    assert(!animated_activated);
+    float before = motion.progress;
+    open = true;
+    for (int i = 0; i < 5; i++)
+        animated_scene(ui, &open, &motion, false, .016f);
+    assert(motion.progress > before && motion.progress < 1);
+    animated_height = 100;
+    animated_scene(ui, &open, &motion, true, .016f);
+    assert(motion.progress == 1 && motion.measured.h >= 100);
+    animated_scene(ui, &open, &motion, true, .016f);
+    assert(cui_bounds(ui, viewport).h == motion.measured.h);
+    open = false;
+    animated_scene(ui, &open, &motion, true, .016f);
+    assert(motion.progress == 0 && cui_bounds(ui, viewport).h == 0);
+    cui_destroy(ui);
+    cui_disclosure_motion pure = {0};
+    cui_disclosure_motion_step(&pure, false, .016f, 0, false);
+    cui_disclosure_motion_step(&pure, true, .05f, .2f, false);
+    before = pure.progress;
+    cui_disclosure_motion_step(&pure, true, -1, .2f, false);
+    assert(pure.progress == before);
+    cui_disclosure_motion_step(&pure, true, 100, .2f, false);
+    assert(pure.progress == 1 && pure.velocity == 0);
+}
+static void test_accordion_reveal_storage(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_disclosure_motion motion[1] = {{0}};
+    cui_accordion_options options = {
+        .collapsible = true, .motion = motion, .motion_count = 1, .dt = .016f};
+    for (size_t i = 0; i < 3; i++)
+        opened[i] = false;
+    scene(ui, options, &theme);
+    assert(panels == 1 && motion[0].measured.h > 0 && !has_semantic(ui, 100));
+    click(ui, 10);
+    assert(scene(ui, options, &theme));
+    assert(opened[0] && motion[0].progress > 0 && motion[0].progress < 1);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(scene(ui, options, &theme));
+    assert(!opened[0] && opened[2] && panels == 5);
+    assert(!has_semantic(ui, 100) && has_semantic(ui, 102));
+    options.reduced_motion = true;
+    scene(ui, options, &theme);
+    assert(motion[0].progress == 0);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_measured_reveal();
+    test_accordion_reveal_storage();
     test_custom_disclosure_headers();
     test_disclosure_box_overrides();
     for (size_t i = 0; i < 3; i++)

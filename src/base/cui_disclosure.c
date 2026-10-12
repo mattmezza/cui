@@ -1,5 +1,35 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_disclosure.h"
+#include <math.h>
+void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float dt, float response,
+                                bool reduced_motion) {
+    if (!motion)
+        return;
+    float target = open ? 1 : 0;
+    if (!motion->initialized || reduced_motion || !isfinite(motion->progress) ||
+        !isfinite(motion->velocity)) {
+        motion->progress = target;
+        motion->velocity = 0;
+        motion->initialized = true;
+        return;
+    }
+    if (!isfinite(dt) || dt <= 0)
+        return;
+    if (!isfinite(response) || response <= 0)
+        response = .2f;
+    float omega = 6 / fmaxf(response, .001f);
+    float displacement = motion->progress - target;
+    float sum = motion->velocity + omega * displacement;
+    float decay = expf(-omega * fminf(dt, 10));
+    motion->progress = target + (displacement + sum * fminf(dt, 10)) * decay;
+    motion->velocity = (motion->velocity - omega * sum * fminf(dt, 10)) * decay;
+    motion->progress = fminf(1, fmaxf(0, motion->progress));
+    if (fabsf(motion->progress - target) < .001f && fabsf(motion->velocity) < .01f) {
+        motion->progress = target;
+        motion->velocity = 0;
+    }
+}
+
 bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled) {
     if (!open)
         return false;

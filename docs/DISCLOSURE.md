@@ -44,7 +44,7 @@ are diagnosed by the core rather than silently reused.
 clicks, Enter and Space, disabled triggers, single/multiple expansion, required
 expansion, keyboard traversal, and removal of focused hidden content. Portable
 C11 and renderer-independent draw lists are supported; OS accessibility is not
-claimed. Compared with GPUI Kit 0.7.1, animated measured reveal and a demonstrated native/browser gallery remain unfinished.
+claimed. Compared with GPUI Kit 0.7.1, theme-specific spring tokens and a demonstrated native/browser gallery remain unfinished.
 Immediate mount/unmount behavior is implemented. Full family parity is not yet
 verified.
 
@@ -67,3 +67,29 @@ without replacing base activation or accessible names. Header focus still uses
 the theme focus color and border width; explicitly masked border edges remain
 a caller style decision. Tests assert distinct overridden header/panel bounds
 and colors, fallback styles beyond the array and pointer toggling in both APIs.
+
+Opt into measured reveal with a zero-initialized `cui_disclosure_motion` kept in
+application state. Collapsible accepts its pointer; Accordion accepts an array
+and `motion_count`, with later panels retaining immediate mount/unmount. Set
+`dt` to elapsed seconds and optional `response` to settling seconds (default .2).
+A reversible critically damped spring drives a clipped viewport from zero to the
+full measured panel height. Initial state snaps; `reduced_motion` also snaps.
+Invalid/nonpositive dt leaves progress unchanged. Measurement updates at end_frame,
+so changed content sizes affect the viewport on the following frame. The motion
+state and array must remain valid through end_frame and be dedicated to stable
+trigger IDs; reusing a state for another ID resets it.
+
+With motion enabled, panel callbacks also execute while collapsed to measure their
+full natural layout. They must submit UI rather than perform application side
+effects. Settled collapsed bodies use layout-only boxes: no paint, semantics,
+events or focus. Closing bodies keep painting inside the shrinking clip but
+become inert immediately when the controlled boolean becomes false. Pending
+animation and changed measurement invalidate the frame. Custom panel styles
+remain inside the reveal viewport. Header and controlled expanded semantics change
+immediately; the return value still reports only controlled state changes.
+
+Headless tests exercise actual pointer/keyboard expansion, measured initial hidden
+content, intermediate height, reversal, closing paint with immediate focus/event
+withdrawal, dynamic content size, reduced motion and bounded Accordion storage.
+This implements measured reveal, while upstream theme-specific spring tuning is
+not yet reproduced.

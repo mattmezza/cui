@@ -983,9 +983,38 @@ static void test_inert_painted_subtree(void) {
     cui_destroy(ui);
 }
 
+static void test_semantic_role_refinement(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_set_semantic_details(ui, 1,
+                             (cui_semantic_details){.description = cui_string("destination")});
+    assert(cui_set_semantic_role(ui, 1, CUI_ROLE_LINK));
+    assert(!cui_set_semantic_role(ui, 2, CUI_ROLE_LINK));
+    assert(!cui_set_semantic_role(ui, 1, (cui_role)999));
+    cui_end_frame(ui);
+    size_t n;
+    const cui_semantic *s = cui_semantics(ui, &n);
+    assert(n == 1 && s[0].role == CUI_ROLE_LINK && s[0].details.description.length == 11);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    assert(cui_set_semantic_role(ui, 1, CUI_ROLE_LINK));
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 1);
+    begin(ui);
+    control(ui, 1, true);
+    assert(cui_set_semantic_role(ui, 1, CUI_ROLE_LINK));
+    cui_end_frame(ui);
+    assert(!cui_focused(ui));
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
+    test_semantic_role_refinement();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

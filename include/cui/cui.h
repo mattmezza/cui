@@ -107,7 +107,8 @@ typedef enum {
     CUI_ROLE_SCROLLBAR,
     CUI_ROLE_ROWHEADER,
     CUI_ROLE_ROWGROUP,
-    CUI_ROLE_ALERTDIALOG
+    CUI_ROLE_ALERTDIALOG,
+    CUI_ROLE_LINK
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -220,6 +221,8 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
                              bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */
 void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value);
+/* Refine a submitted current-frame role without replacing its other metadata. */
+bool cui_set_semantic_role(cui_context *, cui_id, cui_role);
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details);
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled);
 /* Target resolved in input order against previous frame regions. */

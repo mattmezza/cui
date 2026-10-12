@@ -30,6 +30,8 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         return false;
     bool disabled = options.disabled || options.loading;
     cui_interaction state = cui_base_button(ui, id, name, disabled);
+    if (options.variant == CUI_BUTTON_LINK)
+        (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
     cui_box b = cui_components_control(t, disabled, false);
     float scale = options.size == CUI_CONTROL_XSMALL  ? .65f
                   : options.size == CUI_CONTROL_SMALL ? .8f

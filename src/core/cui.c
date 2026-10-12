@@ -238,6 +238,7 @@ static bool cui_core_focusable(const cui_semantic *s) {
         return false;
     switch (s->role) {
     case CUI_ROLE_BUTTON:
+    case CUI_ROLE_LINK:
     case CUI_ROLE_CHECKBOX:
     case CUI_ROLE_SWITCH:
     case CUI_ROLE_RADIO:
@@ -1028,6 +1029,17 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
     return false;
 }
 
+bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
+    if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
+        role > CUI_ROLE_LINK)
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            ui->semantics[i].role = role;
+            return true;
+        }
+    return false;
+}
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details) {
     if (!cui_core_active(ui))
         return;

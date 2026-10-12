@@ -48,7 +48,9 @@ static void test_button_options(void) {
                 cui_draw_list list = cui_end_frame(ui);
                 size_t count;
                 const cui_semantic *nodes = cui_semantics(ui, &count);
-                assert(count == 1 && nodes[0].role == CUI_ROLE_BUTTON);
+                assert(count == 1 &&
+                       nodes[0].role ==
+                           (variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON));
                 assert(!nodes[0].disabled && nodes[0].name.length == 6);
                 float scale = size == CUI_CONTROL_XSMALL  ? .65f
                               : size == CUI_CONTROL_SMALL ? .8f

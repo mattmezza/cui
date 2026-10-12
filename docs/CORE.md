@@ -71,3 +71,9 @@ routed events, focus requests and modal scope effects throughout the subtree,
 including portals. It supports visible exit animations without leaving closing
 controls interactive. `layout_only` implies inert behavior and also suppresses
 painting. A hidden/inert subtree cannot dismiss an enclosing active focus scope.
+
+`cui_set_semantic_role` refines an already-submitted current-frame semantic node
+without replacing its name, state, range, parent or description. It rejects
+missing IDs, out-of-range roles and calls from inert subtrees. `CUI_ROLE_LINK`
+is focusable and participates in existing pointer/keyboard activation; the
+application owns navigation, so no platform URL opener is implied.

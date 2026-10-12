@@ -53,6 +53,14 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
     t.popover = t.surface;
     t.secondary = secondary;
     t.radius_lg = t.radius == 0 ? 0 : t.radius + 2;
+    t.secondary_hover = cui_theme_scale(t.secondary, .9f);
+    t.tab_foreground = t.muted;
+    t.tab_active_foreground = t.text;
+    t.tab_active = t.surface;
+    t.tab_bar = t.background;
+    t.tab_bar_segmented = t.secondary;
+    t.spring_move =
+        (cui_spring_settings){.response = .28f, .damping = .85f, .epsilon = .1f, .travel = true};
     return t;
 }
 cui_theme cui_theme_light(void) {

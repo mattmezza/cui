@@ -28,3 +28,5 @@ state and the host supplies time/redraw scheduling.
 `popover` and `radius_lg` independently style notification surfaces. Built-in themes initialize popover to surface and the large radius to radius+2 (zero remains square); applications can override both without changing ordinary controls.
 
 The independent `secondary` background and `secondary_foreground` tokens style semantic secondary content such as Tag. Button palettes remain separately overridable.
+
+Tabs have independent `tab_foreground`, `tab_active_foreground`, `tab_active`, `tab_bar`, `tab_bar_segmented`, and `secondary_hover` colors. These do not follow later edits to Button palettes automatically. `spring_move` configures positional motion separately from `spring_control`, defaulting to response0.28seconds, damping0.85, epsilon0.1 and enabled travel.

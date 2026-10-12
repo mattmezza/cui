@@ -1424,7 +1424,7 @@ static void test_dropdown_button(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
     for (size_t t = 0; t < 4; t++)
-        for (int variant = CUI_DROPDOWN_BUTTON_PRIMARY; variant <= CUI_DROPDOWN_BUTTON_DANGER;
+        for (int variant = CUI_DROPDOWN_BUTTON_PRIMARY; variant <= CUI_DROPDOWN_BUTTON_INFO;
              variant++)
             for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_XSMALL;
                  size++) {
@@ -2056,9 +2056,10 @@ static void test_dropdown_colored_outline(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
     const cui_dropdown_button_variant variants[] = {
-        CUI_DROPDOWN_BUTTON_PRIMARY, CUI_DROPDOWN_BUTTON_SECONDARY, CUI_DROPDOWN_BUTTON_DANGER};
+        CUI_DROPDOWN_BUTTON_PRIMARY, CUI_DROPDOWN_BUTTON_SECONDARY, CUI_DROPDOWN_BUTTON_DANGER,
+        CUI_DROPDOWN_BUTTON_WARNING, CUI_DROPDOWN_BUTTON_SUCCESS,   CUI_DROPDOWN_BUTTON_INFO};
     for (size_t t = 0; t < 4; t++)
-        for (size_t v = 0; v < 3; v++) {
+        for (size_t v = 0; v < sizeof(variants) / sizeof(variants[0]); v++) {
             cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_menu_tree_state state;
@@ -2072,9 +2073,12 @@ static void test_dropdown_colored_outline(void) {
                 ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
             dropdown_scene(ui, &state, &action, &themes[t], options);
             assert(dropdown_surface(ui, 2001).a == 26 && dropdown_surface(ui, 2002).a == 26);
-            cui_color expected = variants[v] == CUI_DROPDOWN_BUTTON_PRIMARY  ? themes[t].primary
-                                 : variants[v] == CUI_DROPDOWN_BUTTON_DANGER ? themes[t].danger
-                                                                             : themes[t].text;
+            cui_color expected = variants[v] == CUI_DROPDOWN_BUTTON_PRIMARY   ? themes[t].primary
+                                 : variants[v] == CUI_DROPDOWN_BUTTON_DANGER  ? themes[t].danger
+                                 : variants[v] == CUI_DROPDOWN_BUTTON_WARNING ? themes[t].warning
+                                 : variants[v] == CUI_DROPDOWN_BUTTON_SUCCESS ? themes[t].success
+                                 : variants[v] == CUI_DROPDOWN_BUTTON_INFO    ? themes[t].info
+                                                                              : themes[t].text;
             bool foreground = false;
             for (size_t i = 0; i < dropdown_draw.count; i++) {
                 cui_draw_command command = dropdown_draw.commands[i];
@@ -2082,6 +2086,24 @@ static void test_dropdown_colored_outline(void) {
                               same_color(command.color, expected);
             }
             assert(foreground);
+            if (variants[v] >= CUI_DROPDOWN_BUTTON_DANGER) {
+                options.outline = false;
+                dropdown_scene(ui, &state, &action, &themes[t], options);
+                assert(same_color(dropdown_surface(ui, 2001), expected));
+                cui_color on = variants[v] == CUI_DROPDOWN_BUTTON_DANGER    ? themes[t].on_danger
+                               : variants[v] == CUI_DROPDOWN_BUTTON_WARNING ? themes[t].on_warning
+                               : variants[v] == CUI_DROPDOWN_BUTTON_SUCCESS ? themes[t].on_success
+                                                                            : themes[t].on_info;
+                bool filled_label = false;
+                for (size_t i = 0; i < dropdown_draw.count; i++) {
+                    cui_draw_command command = dropdown_draw.commands[i];
+                    filled_label |= command.type == CUI_DRAW_TEXT && command.text.length == 4 &&
+                                    same_color(command.color, on);
+                }
+                assert(filled_label);
+                options.outline = true;
+                dropdown_scene(ui, &state, &action, &themes[t], options);
+            }
             cui_rect bounds = cui_bounds(ui, 2001);
             assert(cui_queue_event(
                 ui,

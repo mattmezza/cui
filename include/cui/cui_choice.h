@@ -251,7 +251,10 @@ typedef enum {
     CUI_DROPDOWN_BUTTON_SECONDARY,
     CUI_DROPDOWN_BUTTON_OUTLINE,
     CUI_DROPDOWN_BUTTON_GHOST,
-    CUI_DROPDOWN_BUTTON_DANGER
+    CUI_DROPDOWN_BUTTON_DANGER,
+    CUI_DROPDOWN_BUTTON_WARNING,
+    CUI_DROPDOWN_BUTTON_SUCCESS,
+    CUI_DROPDOWN_BUTTON_INFO
 } cui_dropdown_button_variant;
 typedef enum {
     CUI_DROPDOWN_BUTTON_MEDIUM,
@@ -267,7 +270,7 @@ typedef enum {
 } cui_dropdown_button_anchor;
 typedef struct {
     bool disabled, action_disabled, action_loading, selected;
-    bool outline;                         /* orthogonal to primary/secondary/danger variant */
+    bool outline;                         /* orthogonal to filled color variants */
     bool action_selected, action_outline; /* preserve inner button presentation */
     float width; /* action-half width: zero fits contents; negative grows */
     cui_dropdown_button_variant variant;

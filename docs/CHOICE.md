@@ -501,3 +501,11 @@ Tests cover both axes, painted thumbs, primary capture/drag to the end, semantic
 ranges, keyboard paging, disabled input, wheel routing over the track, input
 cancellation and removal when the tabs fit. The track overlays the last six
 pixels of the tab viewport and first uses previous-frame viewport geometry.
+
+Dropdown Button also provides warning, success and info filled variants using
+the theme intent and corresponding on-intent tokens. Danger uses `on_danger`.
+Orthogonal outline uses each intent color for the label/border and translucent
+background; selected intent buttons retain their intent. Tests cover all four
+themes, filled/outline labels and actual action/menu activation across eight
+variants and four sizes. Link/text/default/custom Button presentation remains a
+separate reference gap.

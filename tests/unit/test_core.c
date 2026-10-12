@@ -1376,6 +1376,39 @@ static void test_box_maximum_axes(void) {
     cui_destroy(ui);
 }
 
+static void hover_scope_frame(cui_context *ui, bool overlay) {
+    assert(cui_begin_focus_scope(ui, 700, false));
+    control(ui, 701, false);
+    cui_begin_portal(ui, 702, (cui_box){0}, (cui_rect){120, 0, 30, 30}, 2);
+    cui_interact(ui, 702, CUI_ROLE_BUTTON, cui_string("remove"), false, false, 0);
+    cui_end_box(ui);
+    cui_end_focus_scope(ui);
+    if (overlay) {
+        cui_begin_portal(ui, 703, (cui_box){0}, (cui_rect){120, 0, 30, 30}, 3);
+        cui_interact(ui, 703, CUI_ROLE_BUTTON, cui_string("other"), false, false, 0);
+        cui_end_box(ui);
+    }
+}
+static void test_hover_scope(void) {
+    cui_context *ui = make();
+    begin(ui);
+    hover_scope_frame(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_MOVE, 125, 5, 0, 0);
+    begin(ui);
+    assert(cui_hover_within(ui, 700));
+    hover_scope_frame(ui, true);
+    cui_end_frame(ui);
+    begin(ui);
+    assert(!cui_hover_within(ui, 700));
+    hover_scope_frame(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_MOVE, 250, 150, 0, 0);
+    begin(ui);
+    assert(!cui_hover_within(ui, 700));
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 static void test_bitmap_leaf(void) {
     unsigned char pixels[24] = {255};
     cui_context *ui = make();
@@ -1405,6 +1438,7 @@ static void test_bitmap_leaf(void) {
 }
 int main(void) {
     test_bitmap_leaf();
+    test_hover_scope();
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
     test_semantic_role_refinement();

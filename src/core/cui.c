@@ -1231,6 +1231,33 @@ bool cui_focus_within(cui_context *ui, cui_id scope) {
     }
     return false;
 }
+bool cui_hover_within(cui_context *ui, cui_id scope) {
+    if (!ui || !scope || cui_core_inert(ui))
+        return false;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (ui->focus_scopes[i].id == scope && !ui->focus_scopes[i].active)
+            return false;
+    size_t hit = SIZE_MAX;
+    int16_t layer = INT16_MIN;
+    for (size_t i = 0; i < ui->previous_count; i++)
+        if (cui_core_previous_allowed(ui, i) && ui->previous_layers[i] >= layer &&
+            cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y)) {
+            hit = i;
+            layer = ui->previous_layers[i];
+        }
+    if (hit == SIZE_MAX)
+        return false;
+    size_t owner = ui->previous_semantic_scopes[hit];
+    while (owner < ui->previous_focus_scope_count) {
+        const cui_core_focus_scope *s = &ui->previous_focus_scopes[owner];
+        if (!s->active)
+            return false;
+        if (s->id == scope)
+            return true;
+        owner = s->parent;
+    }
+    return false;
+}
 bool cui_focus_restore(cui_context *ui, cui_id trigger) {
     if (!ui)
         return false;

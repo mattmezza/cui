@@ -295,6 +295,8 @@ bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);
 bool cui_focus_restore(cui_context *ui, cui_id trigger);
 /* Scope ancestry, using current submissions or the last completed frame. */
 bool cui_focus_within(cui_context *ui, cui_id scope);
+/* Hover follows focus-scope ownership, including explicitly scoped portals. */
+bool cui_hover_within(cui_context *ui, cui_id scope);
 const cui_event *cui_frame_events(cui_context *ui, size_t *count);
 cui_error cui_last_error(cui_context *ui);
 void cui_clear_error(cui_context *ui);
@@ -6596,6 +6598,33 @@ bool cui_focus_within(cui_context *ui, cui_id scope) {
                 }
                 return false;
             }
+    }
+    return false;
+}
+bool cui_hover_within(cui_context *ui, cui_id scope) {
+    if (!ui || !scope || cui_core_inert(ui))
+        return false;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (ui->focus_scopes[i].id == scope && !ui->focus_scopes[i].active)
+            return false;
+    size_t hit = SIZE_MAX;
+    int16_t layer = INT16_MIN;
+    for (size_t i = 0; i < ui->previous_count; i++)
+        if (cui_core_previous_allowed(ui, i) && ui->previous_layers[i] >= layer &&
+            cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y)) {
+            hit = i;
+            layer = ui->previous_layers[i];
+        }
+    if (hit == SIZE_MAX)
+        return false;
+    size_t owner = ui->previous_semantic_scopes[hit];
+    while (owner < ui->previous_focus_scope_count) {
+        const cui_core_focus_scope *s = &ui->previous_focus_scopes[owner];
+        if (!s->active)
+            return false;
+        if (s->id == scope)
+            return true;
+        owner = s->parent;
     }
     return false;
 }

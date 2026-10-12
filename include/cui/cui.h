@@ -294,6 +294,8 @@ bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);
 bool cui_focus_restore(cui_context *ui, cui_id trigger);
 /* Scope ancestry, using current submissions or the last completed frame. */
 bool cui_focus_within(cui_context *ui, cui_id scope);
+/* Hover follows focus-scope ownership, including explicitly scoped portals. */
+bool cui_hover_within(cui_context *ui, cui_id scope);
 const cui_event *cui_frame_events(cui_context *ui, size_t *count);
 cui_error cui_last_error(cui_context *ui);
 void cui_clear_error(cui_context *ui);

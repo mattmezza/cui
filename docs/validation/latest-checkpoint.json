@@ -1,8 +1,8 @@
 {
-  "source": "53be96f",
+  "source": "55f78c3",
   "published_source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published 77-story WASM gallery passed the full HTTPS Chromium suite, including scripted Speech provider lifecycle and waveform. Main additionally integrates Chart hover/fills/Sankey refinements and TextView table edge trapping/nested lists, validated by 77 native tests and quality gates. All 78 manifest entries remain partial; full parity is unfinished.",
+  "summary": "Published77-story gallery remains verified at3aecd89. Main adds persistent precise gesture ownership, unwrapped styled text, source-aligned Sankey link relaxation, Chart hover/fills, and nested TextView lists. Native77/77 and ASan/UBSan75/75 pass at55f78c3; WASI and updated local browser gates are running. All78 manifest entries remain partial; full parity is unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -13,10 +13,10 @@
     },
     {
       "name": "native",
-      "source": "9769858",
+      "source": "55f78c3",
       "passed": 77,
       "total": 77,
-      "log": "native-9769858.txt"
+      "log": "native-55f78c3.txt"
     },
     {
       "name": "browser",
@@ -28,10 +28,10 @@
     },
     {
       "name": "sanitizers",
-      "source": "50ffcc4",
+      "source": "55f78c3",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-50ffcc4.txt"
+      "log": "sanitizers-55f78c3.txt"
     }
   ],
   "previous_deployment": {

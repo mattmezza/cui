@@ -1049,11 +1049,48 @@ static void test_pressed_query(void) {
     cui_destroy(ui);
 }
 
+static void proxy_scene(cui_context *ui, cui_id target, bool disabled) {
+    control(ui, 1, false);
+    assert(cui_set_semantic_role(ui, 1, CUI_ROLE_GROUP));
+    cui_set_semantic_details(ui, 1, (cui_semantic_details){.focus_target = target});
+    control(ui, 2, disabled);
+}
+static void test_pointer_focus_proxy(void) {
+    cui_context *ui = make();
+    begin(ui);
+    proxy_scene(ui, 2, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, CUI_KEY_NONE, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, CUI_KEY_NONE, 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "abc"}));
+    begin(ui);
+    assert(cui_focused(ui) == 2 && cui_event_target(ui, 2) == 2);
+    assert(cui_event_target(ui, 0) == 1 && !cui_pressed(ui, 1) && !cui_event_activation(ui, 1));
+    proxy_scene(ui, 2, false);
+    cui_end_frame(ui);
+    begin(ui);
+    proxy_scene(ui, 2, true);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, CUI_KEY_NONE, 0);
+    begin(ui);
+    assert(!cui_focused(ui));
+    proxy_scene(ui, 999, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, CUI_KEY_NONE, 0);
+    begin(ui);
+    assert(!cui_focused(ui));
+    proxy_scene(ui, 999, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
     test_semantic_role_refinement();
     test_pressed_query();
+    test_pointer_focus_proxy();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

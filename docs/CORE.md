@@ -77,3 +77,10 @@ without replacing its name, state, range, parent or description. It rejects
 missing IDs, out-of-range roles and calls from inert subtrees. `CUI_ROLE_LINK`
 is focusable and participates in existing pointer/keyboard activation; the
 application owns navigation, so no platform URL opener is implied.
+
+Passive semantic nodes can set `details.focus_target` to a focusable control ID.
+A primary pointer down resolves that target before subsequent queued keyboard or
+text events are routed, including events in the same frame. Pointer events stay
+addressed to the passive node and do not capture/activate it or move the target's
+caret. Disabled, missing and modal-inaccessible targets are ignored. This supports
+input addons and labels without exposing them as extra buttons or Tab stops.

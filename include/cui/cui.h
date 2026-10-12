@@ -120,6 +120,8 @@ typedef struct {
         scrollable;
     cui_orientation orientation;
     cui_id controls, labelled_by, parent;
+    /* Passive label/addon pointer clicks focus this target before later queued keys. */
+    cui_id focus_target;
     cui_str description;
     float minimum, maximum;
     unsigned level, pos_in_set, set_size;

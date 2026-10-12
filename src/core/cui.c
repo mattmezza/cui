@@ -274,11 +274,23 @@ static bool cui_core_previous_allowed(cui_context *ui, size_t i) {
     return cui_core_scope_contains(ui->previous_focus_scopes, ui->previous_semantic_scopes[i],
                                    ui->previous_top_modal);
 }
+static cui_id cui_core_pointer_focus_target(cui_context *ui, size_t index) {
+    const cui_semantic *s = &ui->previous[index];
+    if (s->disabled)
+        return 0;
+    if (!s->details.focus_target)
+        return cui_core_focusable(s) ? s->id : 0;
+    for (size_t i = 0; i < ui->previous_count; i++)
+        if (ui->previous[i].id == s->details.focus_target && cui_core_focusable(&ui->previous[i]) &&
+            cui_core_previous_allowed(ui, i))
+            return ui->previous[i].id;
+    return 0;
+}
 static cui_id cui_core_hit(cui_context *ui, float x, float y) {
     cui_id hit = 0;
     int16_t layer = INT16_MIN;
     for (size_t i = 0; i < ui->previous_count; i++)
-        if (cui_core_focusable(&ui->previous[i]) && cui_core_previous_allowed(ui, i) &&
+        if (cui_core_pointer_focus_target(ui, i) && cui_core_previous_allowed(ui, i) &&
             cui_core_inside(ui->previous_hits[i], x, y) && ui->previous_layers[i] >= layer) {
             hit = ui->previous[i].id;
             layer = ui->previous_layers[i];
@@ -413,9 +425,15 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->pointer_y = e.y;
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
-            ui->capture = cui_core_hit(ui, e.x, e.y);
-            if (ui->capture || ui->previous_top_modal == SIZE_MAX)
-                ui->focus = ui->capture;
+            cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
+            for (size_t n = 0; n < ui->previous_count; n++)
+                if (ui->previous[n].id == hit) {
+                    target = cui_core_pointer_focus_target(ui, n);
+                    break;
+                }
+            ui->capture = target == hit ? hit : 0;
+            if (hit || ui->previous_top_modal == SIZE_MAX)
+                ui->focus = target;
             ui->focus_visible = false;
         } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
             if (ui->capture == cui_core_hit(ui, e.x, e.y))

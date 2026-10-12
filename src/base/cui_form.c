@@ -176,7 +176,8 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
     cui_set_semantic_details(ui, group,
                              (cui_semantic_details){.readonly = o.input.readonly,
                                                     .invalid = o.input.invalid,
-                                                    .controls = input});
+                                                    .controls = input,
+                                                    .focus_target = input});
     for (size_t i = 0; i < count; i++) {
         bool disabled = o.input.disabled || a[i].disabled || a[i].loading;
         if (a[i].kind == CUI_INPUT_GROUP_BUTTON) {
@@ -185,30 +186,13 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
                 result.activated_addon = a[i].id;
         } else
             (void)cui_interact(ui, a[i].id, CUI_ROLE_GROUP, a[i].label, disabled, false, 0);
-        cui_set_semantic_details(ui, a[i].id,
-                                 (cui_semantic_details){.parent = group, .busy = a[i].loading});
+        cui_set_semantic_details(
+            ui, a[i].id,
+            (cui_semantic_details){.parent = group,
+                                   .busy = a[i].loading,
+                                   .focus_target =
+                                       a[i].kind == CUI_INPUT_GROUP_BUTTON ? 0 : input});
     }
-    size_t n;
-    const cui_event *events = cui_frame_events(ui, &n);
-    if (!o.input.disabled)
-        for (size_t i = 0; i < n; i++) {
-            if (events[i].type != CUI_EVENT_POINTER_DOWN ||
-                events[i].pointer_button != CUI_POINTER_PRIMARY)
-                continue;
-            cui_id target = cui_event_target(ui, i);
-            bool focus = target == group || (!target && cui_hovered(ui, group));
-            for (size_t j = 0; j < count; j++)
-                focus |= target == a[j].id && a[j].kind != CUI_INPUT_GROUP_BUTTON && !a[j].disabled;
-            for (size_t j = 0; j < count; j++) {
-                cui_rect bounds = cui_bounds(ui, a[j].id);
-                if (a[j].kind == CUI_INPUT_GROUP_BUTTON && events[i].x >= bounds.x &&
-                    events[i].x < bounds.x + bounds.w && events[i].y >= bounds.y &&
-                    events[i].y < bounds.y + bounds.h)
-                    focus = false;
-            }
-            if (focus)
-                cui_focus(ui, input);
-        }
     cui_base_input_options behavior = o.input;
     cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
                                   state->scroll_x};

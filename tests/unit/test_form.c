@@ -242,12 +242,11 @@ static void input_groups(void) {
     assert(left.x + left.w <= input.x && input.x + input.w <= right.x && top.y + top.h <= input.y &&
            bottom.y >= input.y + input.h);
 #endif
+    /* Prefix focus and subsequent text must route in one queued frame. */
     click(ui, 110);
-    group_scene(ui, edit, &state, o, a, 4);
-    assert(cui_focused(ui) == 101);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "abc"}));
     assert(group_scene(ui, edit, &state, o, a, 4).input.changed &&
-           cui_edit_get_text(edit).length == 3);
+           cui_edit_get_text(edit).length == 3 && cui_focused(ui) == 101);
     click(ui, 111);
     assert(group_scene(ui, edit, &state, o, a, 4).activated_addon == 111 && cui_focused(ui) == 111);
     o.input.readonly = true;

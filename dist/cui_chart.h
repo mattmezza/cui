@@ -43,6 +43,18 @@ typedef struct {
     float source_y, target_y, source_width, target_width;
 } cui_chart_sankey_link_geometry;
 typedef struct {
+    float left, right, top, bottom;
+} cui_chart_sankey_margins;
+typedef struct {
+    cui_str text;
+    cui_color color; /* alpha zero uses chart foreground */
+    float font_size; /* zero uses source 10px */
+} cui_chart_sankey_label;
+/* At most 16 lines per node; return a count no larger than capacity. */
+typedef size_t (*cui_chart_sankey_labels_fn)(const cui_chart_datum *, size_t index,
+                                             double raw_throughput, cui_chart_sankey_label *out,
+                                             size_t capacity, void *user);
+typedef struct {
     cui_str text;
     float edge_x, edge_y, anchor_x, anchor_y, text_x, text_y;
     bool visible, right;
@@ -162,8 +174,11 @@ typedef struct {
     float sankey_link_opacity;       /* default 0.3 */
     float sankey_node_corner_radius; /* zero selects square nodes */
     bool sankey_show_labels, sankey_show_values;
-    float sankey_label_gap; /* zero selects source 6px */
-    float sankey_font_size; /* zero selects 12px */
+    float sankey_label_gap;                   /* zero selects source 6px */
+    float sankey_font_size;                   /* zero selects source 10px */
+    cui_chart_sankey_labels_fn sankey_labels; /* overrides simple value/name lines */
+    void *sankey_labels_user;
+    cui_chart_sankey_margins sankey_margins; /* measured before layout; zero preserves legacy */
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
@@ -198,6 +213,11 @@ cui_plot_result cui_chart_render_animated(cui_context *, cui_chart_state *,
 /* Measure source's max(32px, widest visible tick + 4px) before render; copy
  * result to options.value_axis_gutter for consistent paint and hit geometry. */
 float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options *);
+/* Measures source-style label margins using the host's text metrics. Call before
+ * render, assign the result to options.sankey_margins, then reuse those options
+ * for layout, hit testing, and styled painting. Output is unchanged on failure. */
+cui_plot_result cui_chart_measure_sankey_margins(cui_context *, const cui_chart_options *,
+                                                 cui_chart_sankey_margins *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,
@@ -256,6 +276,14 @@ static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *in
     return isfinite(*inner) && isfinite(*outer) && *inner >= 0 && *outer >= *inner &&
            *outer <= 8192;
 }
+static bool cui_chart_sankey_margins_valid(const cui_chart_options *o) {
+    cui_chart_sankey_margins m = o->sankey_margins;
+    double width = o->node_width > 0 ? o->node_width : 10;
+    return isfinite(m.left) && isfinite(m.right) && isfinite(m.top) && isfinite(m.bottom) &&
+           m.left >= 0 && m.right >= 0 && m.top >= 0 && m.bottom >= 0 &&
+           (double)m.left + m.right + width + 16 < o->width &&
+           (double)m.top + m.bottom + 16 < o->height;
+}
 static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_chart_options *o) {
     if (!s || !o || !s->pixels || !o->data || !o->count || o->count > CUI_CHART_MAX_ITEMS ||
         o->kind < CUI_CHART_LINE || o->kind > CUI_CHART_SANKEY || !o->width || !o->height ||
@@ -303,6 +331,8 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         return CUI_PLOT_INVALID;
     if (s->byte_capacity < (size_t)o->width * o->height * 4)
         return CUI_PLOT_CAPACITY;
+    if (o->kind == CUI_CHART_SANKEY && !cui_chart_sankey_margins_valid(o))
+        return CUI_PLOT_INVALID;
     for (size_t i = 0; i < 4; i++)
         if (!isfinite(o->bar_corner_radii[i]) || o->bar_corner_radii[i] < 0)
             return CUI_PLOT_INVALID;
@@ -1091,6 +1121,8 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         o->sankey_value_scale < CUI_CHART_SANKEY_LINEAR ||
         o->sankey_value_scale > CUI_CHART_SANKEY_SQRT || o->sankey_min_link_width < 0)
         return CUI_PLOT_INVALID;
+    if (!cui_chart_sankey_margins_valid(o))
+        return CUI_PLOT_INVALID;
     if (capacity < o->count)
         return CUI_PLOT_CAPACITY;
     cui_chart_sankey_node nodes[256] = {{0}};
@@ -1164,17 +1196,22 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
     }
     double width = o->node_width ? o->node_width : 10;
     double padding = o->node_padding ? o->node_padding : 16;
-    if (width >= o->width || o->height <= 16)
+    double plot_left = 8 + o->sankey_margins.left;
+    double plot_right = o->width - 8 - o->sankey_margins.right;
+    double plot_top = 8 + o->sankey_margins.top;
+    double plot_bottom = o->height - 8 - o->sankey_margins.bottom;
+    double plot_height = plot_bottom - plot_top;
+    if (width >= plot_right - plot_left || plot_height <= 0)
         return CUI_PLOT_INVALID;
     size_t max_count = 1;
     for (size_t l = 0; l < layers; l++)
         if (counts[l] > max_count)
             max_count = counts[l];
-    padding = fmin(padding, (o->height - 16.0) / (max_count > 1 ? max_count - 1 : 1));
+    padding = fmin(padding, plot_height / (max_count > 1 ? max_count - 1 : 1));
     long double ky = LDBL_MAX;
     for (size_t l = 0; l < layers; l++)
         if (sums[l] > 0) {
-            long double available = o->height - 16.0 - padding * (counts[l] - 1);
+            long double available = plot_height - padding * (counts[l] - 1);
             long double candidate = available / sums[l];
             if (candidate < ky)
                 ky = candidate;
@@ -1185,12 +1222,13 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         return CUI_PLOT_OVERFLOW;
     for (size_t l = 0; l < layers; l++) {
         long double total = sums[l] * ky + padding * (counts[l] ? counts[l] - 1 : 0);
-        long double y = (o->height - total) / 2;
+        long double y = plot_top + (plot_height - total) / 2;
         if (!isfinite(y) || y < -4096 || y > 4096)
             return CUI_PLOT_OVERFLOW;
         for (size_t i = 0; i < o->count; i++)
             if (nodes[i].layer == l) {
-                double x = 8 + (layers > 1 ? (o->width - 16.0 - width) * l / (layers - 1) : 0);
+                double x = plot_left +
+                           (layers > 1 ? (plot_right - plot_left - width) * l / (layers - 1) : 0);
                 nodes[i].x0 = (float)x;
                 nodes[i].x1 = (float)(x + width);
                 nodes[i].y0 = (float)y;
@@ -1273,7 +1311,8 @@ static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_
                         node->y1 += (float)delta;
                     }
                 }
-                cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8, o->height - 8);
+                cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8 + o->sankey_margins.top,
+                                         o->height - 8 - o->sankey_margins.bottom);
             }
     }
 }
@@ -1478,6 +1517,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->radar_outer_radius));
     h = cui_chart_mix(h, cui_chart_bits(o->node_width));
     h = cui_chart_mix(h, cui_chart_bits(o->node_padding));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.left));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.right));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.top));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.bottom));
     h = cui_chart_mix(h, o->reference_count);
     for (size_t i = 0; i < o->reference_count; i++)
         h = cui_chart_mix(h, cui_chart_bits(o->reference_values[i]));
@@ -1663,6 +1706,33 @@ static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
         length = capacity ? capacity - 1 : 0;
     return (cui_str){buffer, length};
 }
+static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
+                                         const cui_chart_sankey_node *node, size_t index,
+                                         cui_chart_sankey_label out[16], size_t *count,
+                                         char value_buffer[48]) {
+    size_t n = 0;
+    if (o->sankey_labels)
+        n = o->sankey_labels(&o->data[index], index, node->throughput, out, 16,
+                             o->sankey_labels_user);
+    else {
+        float font = o->sankey_font_size > 0 ? o->sankey_font_size : 10;
+        if (o->sankey_show_values) {
+            cui_str value = cui_chart_number(value_buffer, 48, node->throughput,
+                                             o->sankey_value_format, o->format_user);
+            out[n++] = (cui_chart_sankey_label){.text = value, .font_size = font};
+        }
+        if (o->sankey_show_labels && o->data[index].label.length)
+            out[n++] = (cui_chart_sankey_label){.text = o->data[index].label, .font_size = font};
+    }
+    if (n > 16)
+        return false;
+    for (size_t i = 0; i < n; i++)
+        if ((out[i].text.length && !out[i].text.data) || !isfinite(out[i].font_size) ||
+            out[i].font_size < 0)
+            return false;
+    *count = n;
+    return true;
+}
 float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_options *o) {
     if (!ui || !o || !o->show_y_axis || o->y_axis_inside || !o->data || !o->count ||
         o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_RADAR || o->kind == CUI_CHART_SANKEY)
@@ -1686,6 +1756,66 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
             gutter = fmaxf(gutter, measured.width + 4);
     }
     return gutter;
+}
+cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_chart_options *o,
+                                                 cui_chart_sankey_margins *out) {
+    if (!ui || !o || !out || o->kind != CUI_CHART_SANKEY || !o->width || !o->height ||
+        !isfinite(o->sankey_font_size) || o->sankey_font_size < 0 ||
+        !isfinite(o->sankey_label_gap) || o->sankey_label_gap < 0)
+        return CUI_PLOT_INVALID;
+    cui_chart_options plain = *o;
+    plain.sankey_margins = (cui_chart_sankey_margins){0};
+    cui_chart_sankey_node nodes[256];
+    cui_plot_result status = cui_chart_sankey_layout(&plain, nodes, 256);
+    if (status != CUI_PLOT_OK)
+        return status;
+    cui_chart_sankey_margins measured = {0};
+    if (!o->sankey_show_labels && !o->sankey_show_values && !o->sankey_labels) {
+        *out = measured;
+        return CUI_PLOT_OK;
+    }
+    size_t last_layer = 0;
+    for (size_t i = 0; i < o->count; i++)
+        if (nodes[i].layer > last_layer)
+            last_layer = nodes[i].layer;
+    float gap = o->sankey_label_gap > 0 ? o->sankey_label_gap : 6;
+    for (size_t i = 0; i < o->count; i++) {
+        cui_chart_sankey_label lines[16] = {0};
+        size_t line_count = 0;
+        char value_buffer[48];
+        if (!cui_chart_sankey_label_lines(o, &nodes[i], i, lines, &line_count, value_buffer))
+            return CUI_PLOT_INVALID;
+        if (!line_count)
+            continue;
+        float width = 0, block_height = 0;
+        for (size_t line = 0; line < line_count; line++) {
+            float size = lines[line].font_size > 0 ? lines[line].font_size : 10;
+            width = fmaxf(width, cui_measure_text(ui, lines[line].text, size).width);
+            block_height += size + 2;
+        }
+        if (!isfinite(width) || width < 0)
+            return CUI_PLOT_INVALID;
+        if (nodes[i].layer == 0)
+            measured.left = fmaxf(measured.left, width + gap);
+        else if (nodes[i].layer == last_layer)
+            measured.right = fmaxf(measured.right, width + gap);
+        else
+            measured.top = fmaxf(measured.top, block_height + 2);
+    }
+    measured.left = fminf(measured.left, o->width * .2f);
+    measured.right = fminf(measured.right, o->width * .2f);
+    measured.bottom = 2;
+    float vertical = measured.top + measured.bottom;
+    if (vertical > o->height * .6f) {
+        float scale = o->height * .6f / vertical;
+        measured.top *= scale;
+        measured.bottom *= scale;
+    }
+    plain.sankey_margins = measured;
+    if (cui_chart_sankey_layout(&plain, nodes, 256) != CUI_PLOT_OK)
+        return CUI_PLOT_INVALID;
+    *out = measured;
+    return CUI_PLOT_OK;
 }
 static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
     if (!o->x_tick_count) {
@@ -1896,62 +2026,55 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_end_box(ui);
         }
     }
-    if (o->kind == CUI_CHART_SANKEY && (o->sankey_show_labels || o->sankey_show_values)) {
+    if (o->kind == CUI_CHART_SANKEY &&
+        (o->sankey_show_labels || o->sankey_show_values || o->sankey_labels)) {
         cui_chart_sankey_node nodes[256];
         if (cui_chart_sankey_layout(o, nodes, 256) == CUI_PLOT_OK)
             for (size_t i = 0; i < o->count; i++) {
-                cui_str label = o->data[i].label;
+                cui_chart_sankey_label lines[16] = {0};
+                size_t line_count = 0;
+                char value_buffer[48];
+                if (!cui_chart_sankey_label_lines(o, &nodes[i], i, lines, &line_count,
+                                                  value_buffer) ||
+                    !line_count)
+                    continue;
                 float gap = o->sankey_label_gap > 0 ? o->sankey_label_gap : 6;
-                float size = o->sankey_font_size > 0 ? o->sankey_font_size : 12;
-                float line_height = size + 2;
                 bool first = nodes[i].layer == 0;
                 bool last = true;
                 for (size_t j = 0; j < o->count; j++)
                     if (nodes[j].layer > nodes[i].layer)
                         last = false;
-                unsigned lines = (o->sankey_show_labels && label.length && label.data) +
-                                 (unsigned)o->sankey_show_values;
-                float block_height = lines * line_height;
+                float block_height = 0, text_width = 0;
+                for (size_t line = 0; line < line_count; line++) {
+                    float font = lines[line].font_size > 0 ? lines[line].font_size : 10;
+                    block_height += font + 2;
+                    text_width =
+                        fmaxf(text_width, cui_measure_text(ui, lines[line].text, font).width);
+                }
+                text_width = fmaxf(1, fminf(w * .2f, text_width));
                 float center_y = (nodes[i].y0 + nodes[i].y1) * h / (2 * o->height);
                 float y = first || last
                               ? fmaxf(0, fminf(h - block_height, center_y - block_height / 2))
                               : nodes[i].y0 * h / o->height - block_height - 2;
-                char value[48];
-                cui_str formatted = cui_chart_number(value, sizeof value, nodes[i].throughput,
-                                                     o->sankey_value_format, o->format_user);
-                float label_width = o->sankey_show_labels && label.length && label.data
-                                        ? cui_measure_text(ui, label, size).width
-                                        : 0;
-                float value_width =
-                    o->sankey_show_values ? cui_measure_text(ui, formatted, size).width : 0;
-                float text_width = fmaxf(1, fminf(w * .2f, fmaxf(label_width, value_width)));
                 float node_left = nodes[i].x0 * w / o->width;
                 float node_right = nodes[i].x1 * w / o->width;
                 float x = first  ? fmaxf(0, node_left - gap - text_width)
                           : last ? fminf(w - text_width, node_right + gap)
                                  : fmaxf(0, fminf(w - text_width,
                                                   (node_left + node_right - text_width) / 2));
-                if (o->sankey_show_labels && label.length && label.data) {
-                    cui_begin_absolute_box(ui, id ^ (UINT64_C(0xe5374a8b09ef0000) + i),
+                for (size_t line = 0; line < line_count; line++) {
+                    float font = lines[line].font_size > 0 ? lines[line].font_size : 10;
+                    float line_height = font + 2;
+                    cui_begin_absolute_box(ui, id ^ (UINT64_C(0xe5374a8b09ef0000) + i * 16 + line),
                                            (cui_box){.width = text_width,
                                                      .height = line_height,
                                                      .fixed_width = true,
                                                      .fixed_height = true},
                                            (cui_rect){x, y, text_width, line_height});
-                    cui_text(ui, label, size, o->foreground);
+                    cui_text(ui, lines[line].text, font,
+                             lines[line].color.a ? lines[line].color : o->foreground);
                     cui_end_box(ui);
-                }
-                if (o->sankey_show_values) {
-                    cui_begin_absolute_box(
-                        ui, id ^ (UINT64_C(0x57bb8cf4e1b20000) + i),
-                        (cui_box){.width = text_width,
-                                  .height = line_height,
-                                  .fixed_width = true,
-                                  .fixed_height = true},
-                        (cui_rect){x, y + (o->sankey_show_labels && label.length ? line_height : 0),
-                                   text_width, line_height});
-                    cui_text(ui, formatted, size, o->foreground);
-                    cui_end_box(ui);
+                    y += line_height;
                 }
             }
     }

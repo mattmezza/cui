@@ -65,7 +65,7 @@ typedef struct {
     unsigned level, table, row, column, table_columns;
     cui_text_view_range list_marker;
     unsigned list_number;
-    char marker_text[12];
+    char marker_text[12], prefix_text[16];
     bool table_header, image_ready, task, checked;
     cui_text_view_alignment alignment;
     cui_bitmap image;
@@ -120,6 +120,12 @@ bool cui_text_view_init(cui_text_view_state *, cui_text_view_workspace, cui_text
 cui_text_view_error cui_text_view_set_text(cui_text_view_state *, cui_str);
 cui_str cui_text_view_source(const cui_text_view_state *);
 cui_str cui_text_view_rendered_text(const cui_text_view_state *);
+/* Decode a resource source range into a separate caller buffer. Supports the
+ * parser's entity subset and Markdown punctuation escapes; HTML keeps backslashes.
+ * Capacity failure reports required bytes excluding zero and leaves output intact. */
+cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *,
+                                                  cui_text_view_range source, char *output,
+                                                  size_t capacity, size_t *length);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
 cui_str cui_text_view_selected_text(const cui_text_view_state *);
 typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_view_copy_format;
@@ -173,6 +179,7 @@ typedef struct {
     cui_text_view_copy_format copy_format;
     char *copy_buffer;
     size_t copy_capacity;
+    /* Decoded URIs are borrowed only during each callback. Copy for deferred use. */
     void (*on_link)(cui_str url, const cui_event *, void *);
     bool (*open_url)(cui_str url, void *);
     void *link_user;
@@ -389,12 +396,12 @@ static unsigned cui_text_view_encode(unsigned c, char out[4]) {
     out[3] = (char)(0x80 | (c & 63));
     return 4;
 }
-static bool cui_text_view_entity(cui_text_view_parser *p, size_t *at, size_t end, unsigned flags,
-                                 cui_text_view_range link) {
-    size_t a = *at, b = cui_text_view_find(p->input, a, end, ";", 1);
+static bool cui_text_view_entity_value(cui_str input, size_t *at, size_t end, unsigned *value) {
+    size_t a = *at, limit = end - a > 17 ? a + 17 : end,
+           b = cui_text_view_find(input, a, limit, ";", 1);
     if (b == SIZE_MAX || b - a > 16)
         return false;
-    cui_str name = {p->input.data + a + 1, b - a - 1};
+    cui_str name = {input.data + a + 1, b - a - 1};
     unsigned c = 0;
     if (name.length == 3 && !memcmp(name.data, "amp", 3))
         c = '&';
@@ -430,11 +437,68 @@ static bool cui_text_view_entity(cui_text_view_parser *p, size_t *at, size_t end
     }
     if (!c || c > 0x10ffff || (c >= 0xd800 && c <= 0xdfff))
         return false;
-    char encoded[4];
-    unsigned n = cui_text_view_encode(c, encoded);
-    cui_text_view_emit(p, (cui_str){encoded, n}, (cui_text_view_range){a, b + 1}, flags, link);
+    *value = c;
     *at = b + 1;
     return true;
+}
+static bool cui_text_view_entity(cui_text_view_parser *p, size_t *at, size_t end, unsigned flags,
+                                 cui_text_view_range link) {
+    size_t begin = *at;
+    unsigned value;
+    if (!cui_text_view_entity_value(p->input, at, end, &value))
+        return false;
+    char encoded[4];
+    unsigned n = cui_text_view_encode(value, encoded);
+    cui_text_view_emit(p, (cui_str){encoded, n}, (cui_text_view_range){begin, *at}, flags, link);
+    return true;
+}
+cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *s,
+                                                  cui_text_view_range range, char *output,
+                                                  size_t capacity, size_t *length) {
+    if (!s || !length || (!output && capacity) ||
+        !cui_text_view_range_valid(cui_text_view_source(s), range))
+        return CUI_TEXT_VIEW_INVALID;
+    cui_str input = cui_text_view_source(s);
+    size_t required = 0;
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        size_t written = 0;
+        for (size_t at = range.begin; at < range.end;) {
+            size_t start = at, end = at;
+            unsigned value = 0;
+            char encoded[4];
+            const char *bytes;
+            size_t n;
+            if (s->format != CUI_TEXT_VIEW_PLAIN && input.data[at] == '&' &&
+                cui_text_view_entity_value(input, &end, range.end, &value)) {
+                n = cui_text_view_encode(value, encoded);
+                bytes = encoded;
+                at = end;
+            } else {
+                if (s->format == CUI_TEXT_VIEW_MARKDOWN && input.data[at] == '\\' &&
+                    at + 1 < range.end) {
+                    unsigned char ch = (unsigned char)input.data[at + 1];
+                    if ((ch >= 33 && ch <= 47) || (ch >= 58 && ch <= 64) ||
+                        (ch >= 91 && ch <= 96) || (ch >= 123 && ch <= 126))
+                        ++at;
+                }
+                start = at;
+                n = cui_text_view_scalar(input, at);
+                bytes = input.data + start;
+                at += n;
+            }
+            if (pass)
+                memcpy(output + written, bytes, n);
+            written += n;
+        }
+        if (!pass) {
+            required = written;
+            *length = required;
+            if (!output || capacity <= required)
+                return CUI_TEXT_VIEW_CAPACITY;
+        }
+    }
+    output[required] = 0;
+    return CUI_TEXT_VIEW_OK;
 }
 static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, unsigned flags,
                                  cui_text_view_range link, unsigned depth) {
@@ -1344,11 +1408,18 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                  : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
                  : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
                                                        : padding;
-    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level && !b->task) {
-        cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
+    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && !b->task) {
+        if (b->level) {
+            size_t length = strlen(b->marker_text);
+            memcpy(b->prefix_text, b->marker_text, length);
+            b->prefix_text[length] = ' ';
+            b->prefix_text[length + 1] = 0;
+        } else
+            memcpy(b->prefix_text, "\xe2\x80\xa2 ", 5);
+        cui_size marker = measure(user, (cui_str){b->prefix_text, strlen(b->prefix_text)}, font, 0);
         if (!isfinite(marker.width) || marker.width < 0 || marker.width > 10000000)
             return false;
-        left = fmaxf(left, marker.width + 8);
+        left = marker.width;
     }
     b->text_inset = left;
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
@@ -2188,7 +2259,8 @@ static void cui_text_view_link(cui_context *ui, cui_id id, cui_text_view_state *
                                cui_text_view_range uri, bool activated, cui_text_view_options o) {
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
-    cui_str url = cui_text_view_slice(cui_text_view_source(s), uri);
+    char decoded[CUI_TEXT_VIEW_BYTE_LIMIT];
+    cui_str url = {0};
     for (size_t i = 0; i < count; ++i) {
         if (cui_event_consumed(ui, i))
             continue;
@@ -2204,6 +2276,13 @@ static void cui_text_view_link(cui_context *ui, cui_id id, cui_text_view_state *
         }
         if (!click)
             continue;
+        if (!url.data) {
+            size_t length;
+            if (cui_text_view_decode_resource(s, uri, decoded, sizeof decoded, &length) !=
+                CUI_TEXT_VIEW_OK)
+                continue;
+            url = (cui_str){decoded, length};
+        }
         if (o.on_link) {
             o.on_link(url, e, o.link_user);
             (void)cui_consume_event(ui, i);
@@ -2279,13 +2358,10 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             }
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
-            cui_begin_absolute_box(
-                ui, part, (cui_box){0},
-                (cui_rect){r.x, r.y, fmaxf(16, b->text_inset - 8), style.line_height});
-            cui_text_ex(ui,
-                        b->level ? (cui_str){b->marker_text, strlen(b->marker_text)}
-                                 : (cui_str){"\xe2\x80\xa2", 3},
-                        style.font_size, style.foreground, style.line_height, (cui_text_style){0});
+            cui_begin_absolute_box(ui, part, (cui_box){0},
+                                   (cui_rect){r.x, r.y, b->text_inset, style.line_height});
+            cui_text_ex(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
+                        style.foreground, style.line_height, (cui_text_style){0});
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);
@@ -2534,13 +2610,17 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
     float content_width = o.scrollable ? fmaxf(1, width - 10) : width;
     s->stream_fade = o.stream_fade;
     s->reduced_motion = o.reduced_motion;
+    char resource[CUI_TEXT_VIEW_BYTE_LIMIT];
     for (size_t i = 0; i < s->block_count; ++i)
         if (s->workspace.blocks[i].kind == CUI_TEXT_VIEW_IMAGE) {
             cui_text_view_block *b = &s->workspace.blocks[i];
             cui_bitmap bitmap = {0};
+            size_t length;
             b->image_ready =
-                o.image && o.image(cui_text_view_slice(cui_text_view_source(s), b->resource),
-                                   &bitmap, o.image_user);
+                o.image &&
+                cui_text_view_decode_resource(s, b->resource, resource, sizeof resource, &length) ==
+                    CUI_TEXT_VIEW_OK &&
+                o.image((cui_str){resource, length}, &bitmap, o.image_user);
             b->image = bitmap;
         }
     if (cui_text_view_layout(

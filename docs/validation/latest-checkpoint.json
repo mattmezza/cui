@@ -1,37 +1,37 @@
 {
-  "source": "1c1322e",
-  "published_source": "bd462ec51af449f740c2ed19fe235fbe753bdf8a",
+  "source": "b219eee",
+  "published_source": "2bb4b6ee62e788a7c8247e81036abacf3f68fd38",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local native63/63, sanitizers61/61 and WASI53/53 pass. Sidebar, Textarea and Settings have tested partial implementations. All78 manifest entries retained:7notstarted,4implementedpartial,67testedpartial,0verified. All38 named palettes are implemented in C; grouped website picker is in progress. Homepage/docs/search/copy-code passed the root68-story Chromium gate; still local. Public bd462ec has68 WASM stories with source Button sizes, text alignment and SVG defaults. Its Pages deployment succeeded; native CI exposed a headless SDL decoration issue, fixed locally in080f543. Full parity unfinished.",
+  "summary": "Local picker release passes63/63 native and70/70 real Chromium stories, including all38 named CSS/C palette comparisons, keyboardselection, persistence, system changes and highcontrast. Shared palette button intent surfaces corrected from source defaults. Sidebar/Textarea stories added; Settings/Carousel/Input-size native followups queued. Public2bb4b6e homepage/docs/search/copy-code is verified with68stories; picker awaitsdeployment. All78entries retained:7notstarted,4implementedpartial,67testedpartial,0verified. Full parity unfinished.",
   "checks": [
-    {
-      "name": "native",
-      "source": "1c1322e",
-      "passed": 63,
-      "total": 63,
-      "log": "native-1c1322e.txt"
-    },
-    {
-      "name": "sanitizers",
-      "source": "1c1322e",
-      "passed": 61,
-      "total": 61,
-      "log": "asan-1c1322e.txt"
-    },
-    {
-      "name": "browser",
-      "source": "0e64d7e",
-      "test_source": "93d6706",
-      "passed": 68,
-      "total": 68,
-      "log": "browser-93d6706.txt"
-    },
     {
       "name": "WASI",
       "source": "1c1322e",
       "passed": 53,
       "total": 53,
       "log": "wasi-1c1322e.txt"
+    },
+    {
+      "name": "native",
+      "source": "b219eee",
+      "passed": 63,
+      "total": 63,
+      "log": "native-b219eee.txt"
+    },
+    {
+      "name": "browser",
+      "source": "b219eee",
+      "passed": 70,
+      "total": 70,
+      "palettes": 38,
+      "log": "browser-b219eee.txt"
+    },
+    {
+      "name": "sanitizers",
+      "source": "2190f5b",
+      "passed": 61,
+      "total": 61,
+      "log": "asan-2190f5b.txt"
     }
   ],
   "previous_deployment": {

@@ -42,6 +42,11 @@ SVGs. Define `CUI_ICON_ALL_ASSETS=1` when compiling the implementation to embed 
 catalog in `third_party/gpui_icons`; `--check` verifies reproducibility. Generated
 assets retain the Lucide ISC, Feather MIT and upstream Apache notices. The private
 NanoSVG parser/rasterizer is pinned and unmodified under its Zlib license.
+Its external symbols use a CUI prefix, so an application may link its own
+NanoSVG implementation in a separate translation unit. Implementation macros
+introduced by CUI are removed afterward. Including both implementations in the
+same translation unit is unsupported because their private types and static
+functions share names.
 
 ## Size, color and transforms
 

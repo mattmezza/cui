@@ -10,8 +10,24 @@
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #endif
+/* Keep the embedded SVG engine separate from an application NanoSVG copy. */
+#define nsvgParse cui_icon_private_nsvgParse
+#define nsvgParseFromFile cui_icon_private_nsvgParseFromFile
+#define nsvgDuplicatePath cui_icon_private_nsvgDuplicatePath
+#define nsvgDelete cui_icon_private_nsvgDelete
+#define nsvgCreateRasterizer cui_icon_private_nsvgCreateRasterizer
+#define nsvgDeleteRasterizer cui_icon_private_nsvgDeleteRasterizer
+#define nsvgRasterize cui_icon_private_nsvgRasterize
+#define nsvg__colors cui_icon_private_nsvg__colors
+#define nsvg__parseXML cui_icon_private_nsvg__parseXML
+#ifndef NANOSVG_IMPLEMENTATION
+#define CUI_ICON_UNDEF_NANOSVG_IMPLEMENTATION
 #define NANOSVG_IMPLEMENTATION
+#endif
+#ifndef NANOSVGRAST_IMPLEMENTATION
+#define CUI_ICON_UNDEF_NANOSVGRAST_IMPLEMENTATION
 #define NANOSVGRAST_IMPLEMENTATION
+#endif
 #include "../../third_party/nanosvg/nanosvg.h"
 #include "../../third_party/nanosvg/nanosvgrast.h"
 #if defined(__GNUC__)
@@ -424,3 +440,21 @@ cui_rect cui_icon_state_paint_bounds(const cui_icon_state *state) {
     const cui_icon_private *internal = state ? state->internal : NULL;
     return internal && internal->active ? internal->active->bounds : (cui_rect){0};
 }
+
+#undef nsvgParse
+#undef nsvgParseFromFile
+#undef nsvgDuplicatePath
+#undef nsvgDelete
+#undef nsvgCreateRasterizer
+#undef nsvgDeleteRasterizer
+#undef nsvgRasterize
+#undef nsvg__colors
+#undef nsvg__parseXML
+#ifdef CUI_ICON_UNDEF_NANOSVG_IMPLEMENTATION
+#undef NANOSVG_IMPLEMENTATION
+#undef CUI_ICON_UNDEF_NANOSVG_IMPLEMENTATION
+#endif
+#ifdef CUI_ICON_UNDEF_NANOSVGRAST_IMPLEMENTATION
+#undef NANOSVGRAST_IMPLEMENTATION
+#undef CUI_ICON_UNDEF_NANOSVGRAST_IMPLEMENTATION
+#endif

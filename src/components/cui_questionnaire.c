@@ -23,9 +23,56 @@ static cui_color cui_questionnaire_opacity(cui_color color, float opacity) {
     color.a = (uint8_t)(color.a * opacity + .5f);
     return color;
 }
+/* Match the source's bounded per-state scale publication without process globals. */
+#define CUI_QUESTIONNAIRE_TRACKED_SIZES 128
+typedef struct {
+    const cui_questionnaire_state *state;
+    cui_questionnaire_size size;
+} cui_questionnaire_size_entry;
+typedef struct {
+    size_t count;
+    cui_questionnaire_size_entry entries[CUI_QUESTIONNAIRE_TRACKED_SIZES];
+} cui_questionnaire_sizes;
+static cui_questionnaire_sizes *cui_questionnaire_size_table(cui_context *ui) {
+    return cui_resource_get(ui, UINT64_C(0x516e53697a657331), UINT64_C(0x516e53697a657332),
+                            sizeof(cui_questionnaire_sizes), NULL, NULL);
+}
+static bool cui_questionnaire_publish_size(cui_context *ui, const cui_questionnaire_state *s,
+                                           cui_questionnaire_size size) {
+    cui_questionnaire_sizes *sizes = cui_questionnaire_size_table(ui);
+    if (!sizes)
+        return false;
+    size_t i;
+    for (i = 0; i < sizes->count; i++)
+        if (sizes->entries[i].state == s)
+            break;
+    if (i == sizes->count) {
+        if (sizes->count == CUI_QUESTIONNAIRE_TRACKED_SIZES)
+            sizes->count = 0;
+        i = sizes->count++;
+    }
+    sizes->entries[i] = (cui_questionnaire_size_entry){s, size};
+    return true;
+}
+static cui_questionnaire_options cui_questionnaire_resolve_size(cui_context *ui,
+                                                                const cui_questionnaire_state *s,
+                                                                cui_questionnaire_options o) {
+    if (o.custom_size || o.size != CUI_QUESTIONNAIRE_MEDIUM)
+        return o;
+    cui_questionnaire_sizes *sizes = cui_questionnaire_size_table(ui);
+    if (sizes)
+        for (size_t i = 0; i < sizes->count; i++)
+            if (sizes->entries[i].state == s) {
+                o.size = sizes->entries[i].size;
+                break;
+            }
+    return o;
+}
 bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
                              cui_questionnaire_state *s, cui_questionnaire_options o) {
     if (!ui || !id || !theme || !s || !s->initialized)
+        return false;
+    if (!cui_questionnaire_publish_size(ui, s, o.size))
         return false;
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
     (void)cui_questionnaire_tick(s, cui_frame_time(ui));
@@ -61,6 +108,7 @@ bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_question
                                   size_t item, cui_questionnaire_options o) {
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     const cui_questionnaire_item *definition = &s->items[item];
     cui_interact(ui, id, CUI_ROLE_GROUP,
                  definition->label.length ? definition->label : definition->name, o.disabled, false,
@@ -76,6 +124,7 @@ bool cui_questionnaire_choices_begin(cui_context *ui, cui_id id, const cui_quest
                                      size_t item, cui_questionnaire_options o) {
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     cui_interact(ui, id, s->items[item].multiple ? CUI_ROLE_GROUP : CUI_ROLE_RADIOGROUP,
                  (cui_str){0}, o.disabled, false, 0);
     cui_begin_box(ui, id, (cui_box){.width = -1, .gap = cui_questionnaire_choices_gap(o.size)});
@@ -85,6 +134,7 @@ bool cui_questionnaire_actions_begin(cui_context *ui, cui_id id, const cui_quest
                                      cui_questionnaire_options o) {
     if (!ui || !id || !s || !s->initialized)
         return false;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     cui_begin_box(ui, id,
                   (cui_box){.width = -1,
                             .row = true,
@@ -99,6 +149,7 @@ void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
                                 const cui_questionnaire_state *s, cui_questionnaire_options o) {
     if (!ui || !id || !t || !s || !s->initialized)
         return;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     size_t position = cui_questionnaire_position(s), total = cui_questionnaire_total(s);
     size_t current = position == SIZE_MAX ? 0 : position + 1;
     char label[80];
@@ -119,6 +170,7 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
     if (!ui || !id || !t || !s || !s->initialized || item != s->current || item >= s->count ||
         choice >= s->items[item].choice_count)
         return false;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     const cui_questionnaire_item *d = &s->items[item];
     const cui_questionnaire_choice *c = &d->choices[choice];
     bool disabled = o.disabled || s->storage.items[item].disabled ||
@@ -272,6 +324,7 @@ void cui_questionnaire_heading(cui_context *ui, cui_id id, const cui_theme *t,
                                cui_questionnaire_options o) {
     if (!ui || !id || !t || !s || !s->initialized || item >= s->count || item != s->current)
         return;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     const cui_questionnaire_item *d = &s->items[item];
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
     cui_begin_box(ui, id, (cui_box){.width = -1, .gap = m.content_gap});
@@ -287,6 +340,7 @@ void cui_questionnaire_error_control(cui_context *ui, cui_id id, const cui_theme
                                      cui_questionnaire_options o) {
     if (!ui || !id || !t || !s || !s->initialized || item >= s->count || item != s->current)
         return;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     cui_questionnaire_error e = cui_questionnaire_item_error(s, item);
     if (e.kind == CUI_QUESTIONNAIRE_VALID)
         return;
@@ -304,6 +358,7 @@ bool cui_questionnaire_action_control(cui_context *ui, cui_id id, const cui_them
                                       cui_str label, cui_questionnaire_options o) {
     if (!ui || !id || !t || !s || !s->initialized || s->current >= s->count)
         return false;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     size_t position = cui_questionnaire_position(s), total = cui_questionnaire_total(s);
     bool visible = action == CUI_QUESTIONNAIRE_PREVIOUS ? position > 0
                    : action == CUI_QUESTIONNAIRE_SKIP   ? !s->items[s->current].required
@@ -343,6 +398,7 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
         return CUI_QUESTIONNAIRE_INVALID;
     if (item >= s->count)
         return CUI_QUESTIONNAIRE_UNKNOWN_ITEM;
+    o = cui_questionnaire_resolve_size(ui, s, o);
     const cui_questionnaire_item *d = &s->items[item];
     if (!d->input)
         return CUI_QUESTIONNAIRE_ANSWER_MISMATCH;

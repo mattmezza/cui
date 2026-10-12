@@ -1,0 +1,1 @@
+cui-questionnaire-before-inherit: tests/unit/test_questionnaire_styled.c:629: compare_size_draws: Assertion `x->type == y->type && x->font_size == y->font_size' failed.

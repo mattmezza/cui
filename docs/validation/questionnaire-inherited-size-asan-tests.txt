@@ -1,0 +1,7 @@
+Test project /tmp/cui-questionnaire-focus-ring/build-asan
+    Start 41: questionnaire_styled
+1/1 Test #41: questionnaire_styled .............   Passed    0.12 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =   0.13 sec

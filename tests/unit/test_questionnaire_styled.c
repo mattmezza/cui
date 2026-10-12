@@ -591,7 +591,134 @@ static void choice_accessibility(void) {
         cui_destroy(ui);
     }
 }
+static cui_draw_list size_frame(cui_context *ui, cui_questionnaire_state *s,
+                                cui_questionnaire_size root_size, cui_questionnaire_options parts,
+                                bool root) {
+    cui_theme t = cui_theme_light();
+    assert(cui_begin_frame(ui, 500, 700, .016f));
+    if (root)
+        assert(cui_questionnaire_begin(
+            ui, 100, &t, s, (cui_questionnaire_options){.size = root_size, .width = 400}));
+    else
+        cui_begin_box(ui, 100, (cui_box){.width = 400, .gap = 16});
+    cui_questionnaire_progress(ui, 101, &t, s, parts);
+    assert(cui_questionnaire_item_begin(ui, 102, s, 0, parts));
+    cui_questionnaire_heading(ui, 103, &t, s, 0, parts);
+    assert(cui_questionnaire_choices_begin(ui, 104, s, 0, parts));
+    (void)cui_questionnaire_choice_control(ui, 105, &t, s, 0, 0, parts);
+    cui_questionnaire_part_end(ui);
+    cui_questionnaire_input_state input = {0};
+    assert(cui_questionnaire_input_control(ui, 106, &t, s, 0, &input, NULL, parts) ==
+           CUI_QUESTIONNAIRE_OK);
+    cui_questionnaire_error_control(ui, 107, &t, s, 0, parts);
+    cui_questionnaire_part_end(ui);
+    assert(cui_questionnaire_actions_begin(ui, 108, s, parts));
+    (void)cui_questionnaire_action_control(ui, 109, &t, s, CUI_QUESTIONNAIRE_FINISH, (cui_str){0},
+                                           parts);
+    cui_questionnaire_part_end(ui);
+    if (root)
+        cui_questionnaire_end(ui);
+    else
+        cui_end_box(ui);
+    return cui_end_frame(ui);
+}
+static void compare_size_draws(cui_draw_list a, cui_draw_list b) {
+    assert(a.count == b.count);
+    for (size_t i = 0; i < a.count; i++) {
+        const cui_draw_command *x = &a.commands[i], *y = &b.commands[i];
+        assert(x->type == y->type && x->font_size == y->font_size);
+        if (x->bounds.x != y->bounds.x || x->bounds.y != y->bounds.y ||
+            x->bounds.w != y->bounds.w || x->bounds.h != y->bounds.h)
+            fprintf(stderr, "size draw %zu type %d: %g,%g,%g,%g vs %g,%g,%g,%g\n", i, x->type,
+                    x->bounds.x, x->bounds.y, x->bounds.w, x->bounds.h, y->bounds.x, y->bounds.y,
+                    y->bounds.w, y->bounds.h);
+        assert(x->bounds.x == y->bounds.x && x->bounds.y == y->bounds.y &&
+               x->bounds.w == y->bounds.w && x->bounds.h == y->bounds.h);
+    }
+}
+static void inherited_sizes(void) {
+    cui_context *a = cui_create((cui_config){.max_elements = 256});
+    cui_context *b = cui_create((cui_config){.max_elements = 256});
+    char edit_buffer[32] = {0};
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = edit_buffer, .capacity = sizeof edit_buffer});
+    assert(a && b && edit);
+    cui_questionnaire_choice choice = {.value = cui_string("choice"),
+                                       .description = cui_string("Choice description")};
+    cui_questionnaire_item item = {.name = cui_string("question"),
+                                   .required = true,
+                                   .description = cui_string("Question description"),
+                                   .choices = &choice,
+                                   .choice_count = 1,
+                                   .input = edit};
+    cui_questionnaire_item_runtime runtime;
+    cui_questionnaire_choice_runtime selected;
+    char text[128];
+    cui_questionnaire_state s = {0};
+    assert(cui_questionnaire_init(&s, &item, 1,
+                                  (cui_questionnaire_workspace){.items = &runtime,
+                                                                .item_capacity = 1,
+                                                                .choices = &selected,
+                                                                .choice_capacity = 1,
+                                                                .text = text,
+                                                                .text_capacity = sizeof text,
+                                                                .max_answer_bytes = 32},
+                                  NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    assert(!cui_questionnaire_validate_item(&s, 0));
+    for (int size = 0; size < 4; size++) {
+        cui_draw_list inherited =
+            size_frame(a, &s, (cui_questionnaire_size)size, (cui_questionnaire_options){0}, true);
+        cui_draw_list explicit = size_frame(
+            b, &s, (cui_questionnaire_size)size,
+            (cui_questionnaire_options){.size = (cui_questionnaire_size)size, .custom_size = true},
+            true);
+        compare_size_draws(inherited, explicit);
+    }
+    /* Explicit medium parts beat a large root, and context publication is isolated. */
+    cui_draw_list override = size_frame(
+        a, &s, CUI_QUESTIONNAIRE_LARGE,
+        (cui_questionnaire_options){.size = CUI_QUESTIONNAIRE_MEDIUM, .custom_size = true}, true);
+    cui_draw_list expected = size_frame(
+        b, &s, CUI_QUESTIONNAIRE_MEDIUM,
+        (cui_questionnaire_options){.size = CUI_QUESTIONNAIRE_MEDIUM, .custom_size = true}, true);
+    assert(override.count == expected.count);
+    for (size_t i = 0; i < override.count; i++)
+        assert(override.commands[i].font_size == expected.commands[i].font_size);
+    for (cui_id id = 103; id <= 109; id++) {
+        cui_rect x = cui_bounds(a, id), y = cui_bounds(b, id);
+        assert(x.w == y.w && x.h == y.h);
+    }
+    cui_destroy(a);
+    cui_destroy(b);
+    a = cui_create((cui_config){.max_elements = 256});
+    b = cui_create((cui_config){.max_elements = 256});
+    compare_size_draws(
+        size_frame(a, &s, CUI_QUESTIONNAIRE_MEDIUM, (cui_questionnaire_options){0}, false),
+        size_frame(b, &s, CUI_QUESTIONNAIRE_MEDIUM,
+                   (cui_questionnaire_options){.custom_size = true}, false));
+    /* The source clears its table when a 129th distinct questionnaire is published. */
+    (void)size_frame(a, &s, CUI_QUESTIONNAIRE_LARGE, (cui_questionnaire_options){0}, true);
+    cui_questionnaire_state empty[128] = {0};
+    cui_theme theme = cui_theme_light();
+    for (size_t i = 0; i < 128; i++) {
+        assert(cui_questionnaire_init(&empty[i], NULL, 0, (cui_questionnaire_workspace){0}, NULL,
+                                      NULL) == CUI_QUESTIONNAIRE_OK);
+        assert(cui_begin_frame(a, 500, 700, .016f));
+        assert(
+            cui_questionnaire_begin(a, 100, &theme, &empty[i],
+                                    (cui_questionnaire_options){.size = CUI_QUESTIONNAIRE_SMALL}));
+        cui_questionnaire_end(a);
+        cui_end_frame(a);
+    }
+    (void)size_frame(a, &s, CUI_QUESTIONNAIRE_MEDIUM, (cui_questionnaire_options){0}, false);
+    assert(cui_bounds(a, 105).h == cui_bounds(b, 105).h);
+    assert(cui_last_error(a) == CUI_OK && cui_last_error(b) == CUI_OK);
+    cui_destroy(a);
+    cui_destroy(b);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    inherited_sizes();
     choice_accessibility();
     composable_containers();
     custom_choice_slots();

@@ -172,6 +172,8 @@ typedef struct {
      * Card interaction, semantic label and inherited disabled opacity remain. */
     cui_questionnaire_choice_render_fn render_indicator, render_content, render_shortcut;
     void *render_user;
+    /* Non-medium sizes override the root; use custom_size for explicit Medium. */
+    bool custom_size;
 } cui_questionnaire_options;
 /* Composable containers. Item/choices begin returns false for inactive, unknown
  * or disabled items and opens nothing. Call part_end only after a true result.

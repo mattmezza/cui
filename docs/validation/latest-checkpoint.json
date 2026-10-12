@@ -1,8 +1,8 @@
 {
   "source": "71f6695",
-  "published_source": "ab46d9d558a776f1d220ccc3bd2e4e87fc994e18",
+  "published_source": "611631b70491e69614d3fc55eb9aa40e1ccf9776",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Chart and TextView are integrated as explicitly partial implementations. Native73, sanitizers71, WASI63 and browser73 all pass; Canvas styled text measurement/painting is verified. Public ab46d9d remains verified with73stories until the next deployment. Full78-entry parity remains unfinished.",
+  "summary": "Public611631b:73real WASM stories and matching styled Canvas fonts, verified by fullHTTPS Chromium suite. FurtherChart/TextView fidelity changes and portableSpeech are integrated locally; integrationgatesrunning. Full78-entry parity remainsunfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -40,12 +40,12 @@
     "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
     "run": 38273904793
   },
-  "published_evidence": "published-ab46d9d.txt",
+  "published_evidence": "published-611631b.txt",
   "deployment": {
-    "source": "ab46d9d558a776f1d220ccc3bd2e4e87fc994e18",
+    "source": "611631b70491e69614d3fc55eb9aa40e1ccf9776",
     "status": "success",
-    "pages_run": 38276297290,
-    "ci_run": 38276297328
+    "pages_run": 38277123604,
+    "ci_run": 38277123588
   },
   "targeted_checks": [
     {

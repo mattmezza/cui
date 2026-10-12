@@ -42,6 +42,7 @@ typedef struct {
     cui_color popover_foreground, list_hover, list_active, selection;
     bool list_active_highlight;
     cui_color description_list_label, description_list_label_foreground;
+    cui_color status_bar, status_bar_border;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

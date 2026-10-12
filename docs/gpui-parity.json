@@ -4388,31 +4388,41 @@
       "reference_url": "https://gpui-kit.com/component/resizable/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_resizable.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_resizable.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Browser/native audit pending. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native GPUI drag payload adapter."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "split geometry/min/max",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_resizable.c"
+          ]
         },
         {
           "name": "pointer drag and keyboard resize",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_resizable.c"
+          ]
         },
         {
           "name": "semantic separator and persistence",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_resizable.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4800,31 +4810,41 @@
       "reference_url": "https://gpui-kit.com/component/status-bar/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_chrome.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_chrome.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Pinned end regions, adaptive center alignment, themed spacing and callback composition tested headlessly. Independent region clipping, inherited rich font styles and full Styled refinement remain partial; browser/native audit pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "left/center/right slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chrome.c"
+          ]
         },
         {
           "name": "density/theme variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chrome.c"
+          ]
         },
         {
           "name": "accessible status",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chrome.c"
+          ]
         }
       ],
       "upstream_doc": {

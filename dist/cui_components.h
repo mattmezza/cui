@@ -4,6 +4,7 @@
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
 #include "cui_choice.h"
+#include "cui_chrome.h"
 #include "cui_content.h"
 #include "cui_description.h"
 #include "cui_disclosure.h"
@@ -11,6 +12,7 @@
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
+#include "cui_resizable.h"
 #include "cui_scroll.h"
 #include "cui_status.h"
 #include "cui_surface.h"
@@ -232,6 +234,14 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_DESCRIPTION_IMPLEMENTATION
 #endif
 #include "cui_description.h"
+#ifndef CUI_CHROME_IMPLEMENTATION
+#define CUI_CHROME_IMPLEMENTATION
+#endif
+#include "cui_chrome.h"
+#ifndef CUI_RESIZABLE_IMPLEMENTATION
+#define CUI_RESIZABLE_IMPLEMENTATION
+#endif
+#include "cui_resizable.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

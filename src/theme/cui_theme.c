@@ -72,6 +72,8 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
                                            (uint8_t)((4u * t.background.g + t.border.g) / 5u),
                                            (uint8_t)((4u * t.background.b + t.border.b) / 5u), 255};
     t.description_list_label_foreground = t.muted;
+    t.status_bar = t.background;
+    t.status_bar_border = t.border;
     t.spring_move =
         (cui_spring_settings){.response = .28f, .damping = .85f, .epsilon = .1f, .travel = true};
     return t;

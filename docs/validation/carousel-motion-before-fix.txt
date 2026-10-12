@@ -1,0 +1,1 @@
+test_carousel: /home/matteo/dev/cui/tests/unit/test_carousel.c:282: test_controls_during_motion: Assertion `!state.dragging && state.selected == 2' failed.

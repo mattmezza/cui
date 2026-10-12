@@ -2,7 +2,7 @@
   "source": "e1c2b5b",
   "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local release: 72 actual WASM stories passed full Chromium, including Settings checked menus, Carousel moving/settled navigation and Textarea Tab/Undo/Redo/ShiftTab. Twenty additional worker rapid Carousel wrap cycles passed; one earlier intermittent failure remains unexplained. Native69/69, sanitizers67/67, WASI59/59 pass Command/Root integration. Public remains1b453ab with70stories and38themes pending this release. All78entries retained:4notstarted,4implementedpartial,70testedpartial,0verified. Full parity unfinished.",
+  "summary": "Public remains1b453ab:70stories and38themes. Releasef063619 failed hostedCarousel navigation. Actualdrag-scoping bug reproduced andfixed18d3c6d; native69/69pass. Styledtext pipeline andnativeconsumer configuration also integrated locally. Browser/sanitizer/WASI release gates rerunning onf100df2. Full78-entry parity remainsunfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -35,10 +35,10 @@
     }
   ],
   "previous_deployment": {
-    "source": "dc63e71",
+    "source": "f063619",
     "status": "failed",
-    "reason": "Palette test observed a prior natural frame before selected WASM palette rendered; fixed by waiting for exact expected C RGBA as well as frame advancement.",
-    "run": 38269606486
+    "reason": "Carousel loop navigation failed in hosted Chromium. Root reproduced arrow clicks erroneously starting a slide drag; fixed in18d3c6d with a failing-before/passing-after headless regression. Browser revalidation running.",
+    "run": 38273904793
   },
   "published_evidence": "published-picker-1b453ab.txt",
   "deployment": {

@@ -1006,8 +1006,8 @@ static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_h
     ui->text_styles[ui->text_style_count++] = (cui_core_text_style){size, line_height, style};
     return (uint16_t)ui->text_style_count;
 }
-void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
-                 cui_text_style text_style) {
+static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                          cui_text_style text_style, bool nowrap) {
     if (!cui_core_active(ui))
         return;
     if (!cui_core_text_style_valid(text_style))
@@ -1033,9 +1033,18 @@ void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line
                                              : ui->depth ? &ui->nodes[ui->node_stack[ui->depth - 1]]
                                                          : NULL,
                                  .fontSize = cui_core_scalar(size),
+                                 .wrapMode = nowrap ? CLAY_TEXT_WRAP_NONE : CLAY_TEXT_WRAP_WORDS,
                                  .fontId = style,
                                  .lineHeight = style ? 0 : cui_core_scalar(line_height),
                                  .textColor = {c.r, c.g, c.b, c.a}});
+}
+void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                 cui_text_style style) {
+    cui_core_text(ui, t, size, c, line_height, style, false);
+}
+void cui_text_line(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                   cui_text_style style) {
+    cui_core_text(ui, t, size, c, line_height, style, true);
 }
 void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
                                float line_height) {

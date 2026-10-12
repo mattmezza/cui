@@ -341,6 +341,10 @@ void cui_text_with_line_height(cui_context *, cui_str, float font_size, cui_colo
                                float line_height);
 void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_height,
                  cui_text_style);
+/* Unwrapped text for caller-laid-out lines. Overflows narrow boxes; use a
+ * clipping ancestor when needed. Same style and line-height rules as text_ex. */
+void cui_text_line(cui_context *, cui_str, float font_size, cui_color, float line_height,
+                   cui_text_style);
 /* Uses the same configured font measurement as layout; no frame allocation. */
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);
@@ -6508,8 +6512,8 @@ static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_h
     ui->text_styles[ui->text_style_count++] = (cui_core_text_style){size, line_height, style};
     return (uint16_t)ui->text_style_count;
 }
-void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
-                 cui_text_style text_style) {
+static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                          cui_text_style text_style, bool nowrap) {
     if (!cui_core_active(ui))
         return;
     if (!cui_core_text_style_valid(text_style))
@@ -6535,9 +6539,18 @@ void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line
                                              : ui->depth ? &ui->nodes[ui->node_stack[ui->depth - 1]]
                                                          : NULL,
                                  .fontSize = cui_core_scalar(size),
+                                 .wrapMode = nowrap ? CLAY_TEXT_WRAP_NONE : CLAY_TEXT_WRAP_WORDS,
                                  .fontId = style,
                                  .lineHeight = style ? 0 : cui_core_scalar(line_height),
                                  .textColor = {c.r, c.g, c.b, c.a}});
+}
+void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                 cui_text_style style) {
+    cui_core_text(ui, t, size, c, line_height, style, false);
+}
+void cui_text_line(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
+                   cui_text_style style) {
+    cui_core_text(ui, t, size, c, line_height, style, true);
 }
 void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
                                float line_height) {

@@ -1754,6 +1754,30 @@ static void test_explicit_text_line_height(void) {
     assert(list.count == 2 && list.commands[1].bounds.y - list.commands[0].bounds.y == 13);
     cui_destroy(ui);
 }
+static void test_unwrapped_text_line(void) {
+    cui_context *ui = make();
+    for (int nowrap = 0; nowrap < 2; nowrap++) {
+        begin(ui);
+        cui_begin_box(ui, 55, (cui_box){.width = 60, .fixed_width = true});
+        cui_text_style style = {.weight = CUI_TEXT_WEIGHT_BOLD, .italic = true};
+        if (nowrap)
+            cui_text_line(ui, cui_string("second paragraph"), 14.5f, (cui_color){1, 2, 3, 255}, 22,
+                          style);
+        else
+            cui_text_ex(ui, cui_string("second paragraph"), 14.5f, (cui_color){1, 2, 3, 255}, 22,
+                        style);
+        cui_end_box(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(list.count == (nowrap ? 1u : 2u));
+        assert(cui_bounds(ui, 55).h == (nowrap ? 22 : 44));
+        if (nowrap) {
+            assert(list.commands[0].text.length == strlen("second paragraph"));
+            assert(list.commands[0].bounds.w > 60);
+        }
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void test_bitmap_leaf(void) {
     unsigned char pixels[24] = {255};
     cui_context *ui = make();
@@ -2188,6 +2212,7 @@ int main(void) {
     test_absolute_boxes();
     test_bitmap_leaf();
     test_explicit_text_line_height();
+    test_unwrapped_text_line();
     test_anchored_underlay();
     test_hover_scope();
     test_layout_only_and_zero_size();

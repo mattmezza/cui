@@ -340,6 +340,10 @@ void cui_text_with_line_height(cui_context *, cui_str, float font_size, cui_colo
                                float line_height);
 void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_height,
                  cui_text_style);
+/* Unwrapped text for caller-laid-out lines. Overflows narrow boxes; use a
+ * clipping ancestor when needed. Same style and line-height rules as text_ex. */
+void cui_text_line(cui_context *, cui_str, float font_size, cui_color, float line_height,
+                   cui_text_style);
 /* Uses the same configured font measurement as layout; no frame allocation. */
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);

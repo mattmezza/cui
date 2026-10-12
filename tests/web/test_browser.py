@@ -157,6 +157,10 @@ def main():
             assert group_input.count() == 1
             action_count = page.evaluate('cuiGallery.exports.gallery_group_actions()')
             click_semantic('https://')
+            # Passive addon focus is applied by the C reducer on its next frame.
+            # Await that focus before sending keyboard events, including on slow CI hosts.
+            group_index = semantic_index('Workspace address', 6)
+            page.wait_for_function('(i)=>document.activeElement===document.querySelector("canvas") && cuiGallery.exports.gallery_semantic(i,7)===1', arg=group_index)
             page.keyboard.press('Control+a')
             page.keyboard.type('studio')
             page.wait_for_function('document.querySelector("#accessible [role=status]")?.getAttribute("aria-label")?.includes("https://studio.example.com")')
@@ -165,6 +169,7 @@ def main():
             page.locator('#group-mode').select_option('1')
             page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Workspace address"]`)?.getAttribute("aria-readonly")==="true"')
             click_semantic('Workspace address', 6)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=group_index)
             page.keyboard.press('Control+a')
             page.keyboard.type('blocked')
             page.wait_for_timeout(40)

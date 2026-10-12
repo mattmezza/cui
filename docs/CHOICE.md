@@ -383,7 +383,7 @@ Short labels keep their natural width. Label prefixes end at UTF-8 codepoint
 boundaries, and the semantic name keeps the full original label. The five tab
 variants share this behavior. Custom `render` callbacks own their body layout and
 are not truncated, so nested close buttons retain their composition contract.
-Tabs still lack built-in overflow menus and drag reordering. UTF-8
+Tabs still lack drag reordering. UTF-8
 truncation preserves codepoints but does not promise grapheme-cluster boundaries.
 
 ## Bounded tab scrolling
@@ -403,5 +403,23 @@ pre-scroll geometry in a scrolling event batch. Standalone base users provide
 the state's viewport, receiving ID and maximum themselves. Built-in labels have
 immediate measured extents; custom bodies use previous-frame tab widths. Tests
 cover both axes, translation, fixed slots, selection preservation, clamps,
-disabled and off-viewport input and removing tabs while scrolled. Overflow menus,
-automatic reveal, draggable reordering and native scrollbars remain gaps.
+disabled and off-viewport input and removing tabs while scrolled. Automatic reveal, draggable reordering and native scrollbars remain gaps.
+
+## All-tabs overflow menu
+
+Initialize `cui_tab_overflow` with `cui_tab_overflow_init`, unique popup/trigger
+IDs and application-owned scratch `cui_menu_entry` storage with capacity at least
+the tab count. Set its popup options and pass its address as `overflow` alongside
+a bounded scroll viewport. The fixed menu trigger appears when content exceeds
+`bar_extent`. It lists every full label, skips disabled tabs and changes the
+stable selected ID before tab painting and panel rendering. Standard menu
+keyboard navigation, dismissal and focus restoration apply. Fitting all tabs or
+insufficient scratch capacity hides the trigger and closes an existing menu;
+capacity is checked before any scratch writes. The implementation allocates no
+per-frame descriptor storage. Menu item IDs derive from tab IDs XOR
+`0x8322717be8bd65e1`, and must remain globally unique.
+
+Tests open the overflow menu through real pointer input, inspect full labels,
+select an offscreen enabled tab through batched Down/Enter, assert same-frame
+selected semantics and panel, restore trigger focus and close the popup when
+the bar expands. Insufficient-capacity storage is also checked.

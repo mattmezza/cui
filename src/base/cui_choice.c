@@ -24,8 +24,21 @@ static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, si
     }
     return count;
 }
+void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger,
+                           cui_menu_entry *entries, size_t capacity) {
+    if (!state)
+        return;
+    *state = (cui_tab_overflow){.entries = entries, .capacity = capacity, .trigger = trigger};
+    cui_menu_tree_init(&state->menu, popup);
+}
 bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_tabs_options options) {
+    if (!count && options.overflow) {
+        options.overflow->visible = false;
+        if (options.overflow->menu.overlay.open)
+            cui_overlay_close(ui, &options.overflow->menu.overlay);
+        options.overflow->menu.depth = 0;
+    }
     if (!items || !selected || !count)
         return false;
     if (options.scroll) {
@@ -64,6 +77,34 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
             cui_invalidate(ui);
     }
     cui_id old = *selected;
+    if (options.overflow) {
+        cui_tab_overflow *overflow = options.overflow;
+        overflow->visible = options.scroll && options.scroll->maximum > 0 && overflow->trigger &&
+                            overflow->menu.overlay.id && overflow->entries &&
+                            overflow->capacity >= count;
+        if (!overflow->visible) {
+            if (overflow->menu.overlay.open)
+                cui_overlay_close(ui, &overflow->menu.overlay);
+            overflow->menu.depth = 0;
+        } else {
+            for (size_t i = 0; i < count; i++)
+                overflow->entries[i] =
+                    (cui_menu_entry){.id = items[i].id ^ UINT64_C(0x8322717be8bd65e1),
+                                     .label = items[i].label,
+                                     .disabled = items[i].disabled,
+                                     .kind = CUI_MENU_ACTION};
+            cui_id action = 0;
+            if (cui_base_menu_tree(ui, overflow->trigger, cui_string("All tabs"), overflow->entries,
+                                   count, &action, &overflow->menu,
+                                   options.disabled || overflow->options.popup.disabled,
+                                   overflow->options.popup.dt, false)) {
+                for (size_t i = 0; i < count; i++)
+                    if (overflow->entries[i].id == action)
+                        *selected = items[i].id;
+            }
+        }
+    }
+
     for (size_t i = 0; i < count; ++i) {
         cui_interact(ui, items[i].id, CUI_ROLE_TAB, items[i].label,
                      options.disabled || items[i].disabled, *selected == items[i].id, (float)i);

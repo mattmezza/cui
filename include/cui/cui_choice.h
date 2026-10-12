@@ -27,6 +27,7 @@ typedef enum {
     CUI_TAB_OUTLINE,
     CUI_TAB_SEGMENTED
 } cui_tab_variant;
+typedef struct cui_tab_overflow cui_tab_overflow;
 typedef struct {
     float offset, maximum;
     cui_rect viewport;
@@ -43,6 +44,7 @@ typedef struct {
     float max_width;              /* zero unconstrained; built-in labels ellipsize to fit */
     cui_tab_scroll_state *scroll; /* optional application-owned bounded viewport */
     float bar_extent;             /* scroll viewport width, or height for vertical tabs */
+    cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -193,6 +195,16 @@ typedef struct {
     cui_choice_popup_options popup;
     bool keep_open_checks, checks_on_right;
 } cui_menu_tree_options;
+struct cui_tab_overflow {
+    cui_menu_tree_state menu;
+    cui_menu_entry *entries; /* caller-owned scratch descriptors; capacity >= tab count */
+    size_t capacity;
+    cui_id trigger;
+    cui_menu_tree_options options;
+    bool visible;
+};
+void cui_tab_overflow_init(cui_tab_overflow *, cui_id popup, cui_id trigger,
+                           cui_menu_entry *entries, size_t capacity);
 void cui_menu_tree_init(cui_menu_tree_state *, cui_id popup);
 /* Ordered reducer before painting. Descriptors and pointed-to check/radio values
  * are borrowed; IDs must be globally unique throughout the tree. */

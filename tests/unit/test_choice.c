@@ -1824,6 +1824,75 @@ static void test_tab_scrolling(void) {
         cui_destroy(ui);
     }
 }
+static bool tab_overflow_scene(cui_context *ui, cui_tab_scroll_state *scroll,
+                               cui_tab_overflow *overflow, cui_id *value, float extent,
+                               size_t count) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {{10, {"First long tab", 14}, false},
+                                       {20, {"Disabled long tab", 17}, true},
+                                       {30, {"Third long tab", 14}, false}};
+    visible = 99;
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    bool changed = cui_tabs(
+        ui, 1, &theme, entries, count, value,
+        (cui_tabs_options){
+            .max_width = 100, .scroll = scroll, .bar_extent = extent, .overflow = overflow},
+        panel, NULL);
+    dropdown_draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void test_tab_overflow_menu(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_tab_scroll_state scroll = {0};
+    cui_tab_overflow overflow;
+    cui_menu_entry scratch[3];
+    cui_tab_overflow_init(&overflow, 3100, 3101, scratch, 3);
+    overflow.options.popup.viewport = (cui_rect){0, 0, 640, 480};
+    overflow.options.popup.width = 220;
+    cui_id value = 10;
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
+    assert(overflow.visible && !overflow.menu.overlay.open);
+    click(ui, 3101);
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
+    assert(overflow.menu.overlay.open);
+    bool full = false;
+    for (size_t i = 0; i < dropdown_draw.count; i++) {
+        cui_draw_command command = dropdown_draw.commands[i];
+        full |= command.type == CUI_DRAW_TEXT && command.text.length == 17 &&
+                memcmp(command.text.data, "Disabled long tab", 17) == 0;
+    }
+    assert(full);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3));
+    assert(value == 30 && visible == 2 && !overflow.menu.overlay.open && cui_focused(ui) == 3101);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    bool selected = false;
+    for (size_t i = 0; i < count; i++)
+        selected |= semantics[i].id == 30 && semantics[i].details.selected;
+    assert(selected);
+    click(ui, 3101);
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
+    assert(overflow.menu.overlay.open);
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 400, 3);
+    assert(!overflow.visible && !overflow.menu.overlay.open && overflow.menu.depth == 0);
+    semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].id != 3101);
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
+    click(ui, 3101);
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
+    assert(overflow.menu.overlay.open);
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 0);
+    assert(!overflow.visible && !overflow.menu.overlay.open);
+    overflow.capacity = 1;
+    tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
+    assert(!overflow.visible);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1850,6 +1919,7 @@ int main(void) {
     test_dropdown_action_tooltip();
     test_tab_max_width();
     test_tab_scrolling();
+    test_tab_overflow_menu();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

@@ -3,6 +3,9 @@
 #include "cui/cui_base.h"
 #include "cui/cui_components.h"
 #include <math.h>
+static void cui_choice_menu_level(cui_context *, const cui_theme *, const cui_menu_entry *, size_t,
+                                  cui_menu_tree_state *, size_t, cui_rect, cui_menu_tree_options,
+                                  cui_str);
 static void cui_choice_ellipsized_text(cui_context *ui, cui_str label, float font_size,
                                        cui_color color, float width) {
     cui_str ellipsis = cui_string("\xe2\x80\xa6");
@@ -168,6 +171,20 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         cui_end_box(ui);
     if (options.suffix)
         options.suffix(ui, options.content_user);
+    if (options.overflow && options.overflow->visible) {
+        cui_tab_overflow *overflow = options.overflow;
+        cui_choice_item trigger = {.id = overflow->trigger, .label = {"v", 1}};
+        cui_choice_draw(ui, &trigger, theme, overflow->menu.overlay.open,
+                        options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT);
+        cui_set_semantic_details(ui, overflow->trigger, (cui_semantic_details){.parent = list_id});
+        overflow->menu.row_height = theme->control_height;
+        overflow->menu.padding = theme->padding;
+        if (overflow->menu.overlay.open)
+            cui_choice_menu_level(ui, theme, overflow->entries, count, &overflow->menu, 0,
+                                  cui_bounds(ui, overflow->trigger), overflow->options,
+                                  cui_string("All tabs"));
+    }
+
     cui_end_box(ui);
     if (active != count && panel) {
         cui_id panel_id = items[active].id ^ UINT64_C(0x691a17db80e22f45);

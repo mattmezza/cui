@@ -235,6 +235,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                        events[i].y - state->bounds.y);
                 state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
                 state->hovered_value = hit.valid ? hit.value : 0;
+                if (hit.valid) {
+                    state->tooltip_cursor_x = events[i].x - state->bounds.x;
+                    state->tooltip_cursor_y = events[i].y - state->bounds.y;
+                    state->tooltip_cursor_valid = true;
+                }
             }
         }
     }
@@ -773,36 +778,32 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_end_box(ui);
         }
     if (!o->noninteractive && state->hovered < o->count) {
-        if (o->tooltip_content) {
-            o->tooltip_content(ui, id, state->hovered, &o->data[state->hovered], o->tooltip_user);
-        } else {
-            const cui_chart_datum *datum = &o->data[state->hovered];
-            cui_str title = o->tooltip_title
-                                ? o->tooltip_title(datum, state->hovered, o->tooltip_user)
-                                : datum->label;
-            if (title.length && title.data) {
-                cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
-                                       (cui_box){.width = 72,
-                                                 .height = 14,
-                                                 .fixed_width = true,
-                                                 .fixed_height = true,
-                                                 .background = o->background},
-                                       (cui_rect){w > 74 ? w - 74 : 0, 2, 72, 14});
-                cui_text(ui, title, 11, o->foreground);
-                cui_end_box(ui);
-            }
+        const cui_chart_datum *datum = &o->data[state->hovered];
+        cui_str title = {0};
+        char row_text[8][52] = {{0}};
+        size_t row_length[8] = {0}, row_count = 0;
+        cui_color row_color[8] = {{0}};
+        float tooltip_width = 150;
+        if (!o->tooltip_content) {
+            title = o->tooltip_title ? o->tooltip_title(datum, state->hovered, o->tooltip_user)
+                                     : datum->label;
+            if (title.data && title.length)
+                tooltip_width =
+                    fmaxf(tooltip_width,
+                          cui_measure_text_ex(ui, title, 11,
+                                              (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD})
+                                  .width +
+                              16);
             size_t rows = o->kind == CUI_CHART_CANDLESTICK ? 4 : o->extra_series_count + 1;
             for (size_t series = 0; series < rows; series++) {
                 double number = state->hovered_value;
                 if (o->kind != CUI_CHART_CANDLESTICK && series)
                     number = o->extra_series[series - 1].values[state->hovered];
-                if (o->kind == CUI_CHART_CANDLESTICK) {
-                    const cui_chart_datum *d = &o->data[state->hovered];
-                    number = series == 0   ? d->open
-                             : series == 1 ? d->high
-                             : series == 2 ? d->low
-                                           : d->close;
-                }
+                if (o->kind == CUI_CHART_CANDLESTICK)
+                    number = series == 0   ? datum->open
+                             : series == 1 ? datum->high
+                             : series == 2 ? datum->low
+                                           : datum->close;
                 char value[48];
                 cui_str formatted;
                 if (o->tooltip_value) {
@@ -815,40 +816,86 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                  o->format_user);
                 if (!formatted.length)
                     continue;
-                char row[52];
-                cui_str label = formatted;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
                     static const char prefix[] = "OHLC";
-                    row[0] = prefix[series];
-                    row[1] = ':';
-                    row[2] = ' ';
-                    size_t length =
-                        formatted.length < sizeof row - 3 ? formatted.length : sizeof row - 3;
-                    memcpy(row + 3, formatted.data, length);
-                    label = (cui_str){row, length + 3};
+                    row_text[row_count][0] = prefix[series];
+                    row_text[row_count][1] = ':';
+                    row_text[row_count][2] = ' ';
+                    size_t length = formatted.length < sizeof row_text[0] - 3
+                                        ? formatted.length
+                                        : sizeof row_text[0] - 3;
+                    memcpy(row_text[row_count] + 3, formatted.data, length);
+                    row_length[row_count] = length + 3;
+                } else {
+                    memcpy(row_text[row_count], formatted.data, formatted.length);
+                    row_length[row_count] = formatted.length;
                 }
-                cui_begin_absolute_box(
-                    ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
-                    (cui_box){.width = 72,
-                              .height = 16,
-                              .fixed_width = true,
-                              .fixed_height = true,
-                              .background = o->background},
-                    (cui_rect){w > 74 ? w - 74 : 0, 16 + 16 * (float)series, 72, 16});
-                cui_color text_color = o->foreground;
+                row_color[row_count] = o->foreground;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
-                    const cui_chart_datum *d = &o->data[state->hovered];
-                    cui_color direction = d->close > d->open ? o->bullish : o->bearish;
+                    cui_color direction = datum->close > datum->open ? o->bullish : o->bearish;
                     if (direction.a)
-                        text_color = direction;
+                        row_color[row_count] = direction;
                 }
                 if (o->tooltip_value_color)
-                    text_color = o->tooltip_value_color(datum, state->hovered, series, number,
-                                                        o->tooltip_user);
-                cui_text(ui, label, 11, text_color);
-                cui_end_box(ui);
+                    row_color[row_count] = o->tooltip_value_color(datum, state->hovered, series,
+                                                                  number, o->tooltip_user);
+                tooltip_width = fmaxf(
+                    tooltip_width,
+                    cui_measure_text(ui, (cui_str){row_text[row_count], row_length[row_count]}, 11)
+                            .width +
+                        16);
+                row_count++;
             }
         }
+        float tooltip_height =
+            o->tooltip_content ? 64
+                               : 16 + (title.length && title.data ? 18 : 0) + 16 * (float)row_count;
+        float cursor_x = state->tooltip_cursor_valid ? state->tooltip_cursor_x : 0;
+        float cursor_y = state->tooltip_cursor_valid ? state->tooltip_cursor_y : 0;
+        float tooltip_x = cursor_x < w / 2 ? cursor_x + 8 : cursor_x - 8 - tooltip_width;
+        float tooltip_y = cursor_y < h / 2 ? cursor_y + 8 : cursor_y - 8 - tooltip_height;
+        cui_begin_portal(ui, id ^ UINT64_C(0xd8a736411cb50000),
+                         (cui_box){.width = tooltip_width,
+                                   .height = tooltip_height,
+                                   .fixed_width = true,
+                                   .fixed_height = true,
+                                   .radius = 4,
+                                   .background = o->background,
+                                   .border = o->grid,
+                                   .border_width = 1},
+                         (cui_rect){state->bounds.x + tooltip_x, state->bounds.y + tooltip_y,
+                                    tooltip_width, tooltip_height},
+                         120);
+        if (o->tooltip_content)
+            o->tooltip_content(ui, id, state->hovered, datum, o->tooltip_user);
+        else {
+            float row_y = 8;
+            if (title.length && title.data) {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
+                                       (cui_box){.width = tooltip_width - 16,
+                                                 .height = 14,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){8, row_y, tooltip_width - 16, 14});
+                cui_text_ex(ui, title, 11, o->foreground, 0,
+                            (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD});
+                cui_end_box(ui);
+                row_y += 18;
+            }
+            for (size_t series = 0; series < row_count; series++) {
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
+                                       (cui_box){.width = tooltip_width - 16,
+                                                 .height = 16,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){8, row_y, tooltip_width - 16, 16});
+                cui_text(ui, (cui_str){row_text[series], row_length[series]}, 11,
+                         row_color[series]);
+                cui_end_box(ui);
+                row_y += 16;
+            }
+        }
+        cui_end_box(ui);
     }
     cui_end_box(ui);
     return ok;

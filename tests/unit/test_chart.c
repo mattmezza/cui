@@ -1080,7 +1080,8 @@ int main(void) {
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT) {
             cui_str label = draw.commands[i].text;
-            overridden_title |= label.length == 5 && memcmp(label.data, "Price", 5) == 0;
+            overridden_title |= label.length == 5 && memcmp(label.data, "Price", 5) == 0 &&
+                                draw.commands[i].text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD;
             overridden_value |= label.length == 4 && memcmp(label.data, "O: V", 4) == 0 &&
                                 draw.commands[i].color.g == 210;
         }
@@ -1278,6 +1279,43 @@ int main(void) {
     assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
     assert(differs(pixels, options.width * options.height, options.background));
     (void)cui_end_frame(ui);
+    options.logical_width = 200;
+    options.logical_height = 100;
+    options.data_revision = 0;
+    options.show_bar_values = false;
+    state.hovered = SIZE_MAX;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    (void)cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 60,
+                                           .y = state.bounds.y + 25}));
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    float left_popup_x = NAN;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w >= 150 &&
+            draw.commands[i].bounds.h >= 48)
+            left_popup_x = draw.commands[i].bounds.x;
+    assert(state.hovered < options.count && left_popup_x > state.bounds.x + 60 &&
+           left_popup_x + 150 > state.bounds.x + state.bounds.w);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 180,
+                                           .y = state.bounds.y + 70}));
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    float right_popup_x = NAN, bottom_popup_y = NAN;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w >= 150 &&
+            draw.commands[i].bounds.h >= 48)
+            right_popup_x = draw.commands[i].bounds.x, bottom_popup_y = draw.commands[i].bounds.y;
+    assert(state.hovered < options.count && right_popup_x < state.bounds.x + 180 &&
+           bottom_popup_y < state.bounds.y + 70);
+    options.logical_width = 64;
+    options.logical_height = 48;
     cui_destroy(ui);
 #endif
     points[0].value = -DBL_MAX;

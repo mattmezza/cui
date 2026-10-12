@@ -220,6 +220,8 @@ typedef struct {
     bool emphasis_started;
     size_t emphasis_visual_index;                /* last hovered mark during exit fade */
     float pie_lift[256], pie_lift_velocity[256]; /* bounded source per-slice spring */
+    float tooltip_cursor_x, tooltip_cursor_y;    /* last valid plot-relative pointer */
+    bool tooltip_cursor_valid;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {

@@ -1689,6 +1689,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->emphasis_velocity = 0;
         s->emphasis_started = false;
         s->emphasis_visual_index = SIZE_MAX;
+        s->tooltip_cursor_valid = false;
         memset(s->pie_lift, 0, sizeof s->pie_lift);
         memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }

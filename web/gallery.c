@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_carousel.h"
 #include "cui/cui_choice.h"
 #include "cui/cui_chrome.h"
 #include "cui/cui_components.h"
@@ -16,6 +17,7 @@
 #include "cui/cui_plot.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_scroll.h"
+#include "cui/cui_settings.h"
 #include "cui/cui_sidebar.h"
 #include "cui/cui_status.h"
 #include "cui/cui_surface.h"
@@ -60,6 +62,58 @@ static int status_right = 1, status_custom;
 static int resizable_vertical, resizable_disabled;
 static cui_resizable_slot resizable_slots[2];
 static cui_resizable_state resizable_state;
+static cui_carousel_state carousel_state;
+static cui_carousel_geometry carousel_geometry[4];
+static unsigned carousel_changes;
+static int carousel_axis, carousel_looping;
+static cui_settings_state settings_state;
+static cui_settings_page_state settings_pages_state[2];
+static char settings_search_buffer[96], settings_name_buffer[96] = "Ada";
+static char settings_number_buffer[64] = "15";
+static cui_edit *settings_search_edit, *settings_name_edit;
+static cui_input_state settings_name_state;
+static cui_number_state settings_number_state;
+static bool settings_email = true, settings_desktop, settings_usage;
+static double settings_refresh = 15;
+static cui_id settings_mode;
+static cui_settings_dropdown_state settings_mode_menu;
+static cui_menu_entry settings_mode_entries[3];
+static bool settings_mode_checks[3];
+static int settings_size, settings_variant;
+static cui_settings_result settings_result;
+void gallery_settings_options(int size, int variant) {
+    settings_size =
+        size >= CUI_SETTINGS_MEDIUM && size <= CUI_SETTINGS_LARGE ? size : CUI_SETTINGS_MEDIUM;
+    settings_variant = variant >= CUI_SETTINGS_NORMAL && variant <= CUI_SETTINGS_OUTLINE
+                           ? variant
+                           : CUI_SETTINGS_NORMAL;
+}
+float gallery_settings_stats(int field) {
+    return field == 0   ? (float)settings_state.selected_page
+           : field == 1 ? (float)settings_result.visible_items
+           : field == 2 ? (float)settings_result.visible_pages
+           : field == 3 ? (float)settings_email
+           : field == 4 ? (float)settings_desktop
+           : field == 5 ? (float)settings_usage
+           : field == 6 ? (float)settings_refresh
+           : field == 7 ? settings_state.sidebar_width
+           : field == 8 ? (settings_mode == cui_id_from(ui, "settings-standard")  ? 0.f
+                           : settings_mode == cui_id_from(ui, "settings-focused") ? 1.f
+                                                                                  : 2.f)
+           : field == 9 ? (float)settings_mode_menu.menu.overlay.open
+                        : 0;
+}
+void gallery_carousel_options(int axis, int looping) {
+    carousel_axis = axis != 0;
+    carousel_looping = looping != 0;
+}
+float gallery_carousel_stats(int field) {
+    return field == 0   ? (float)carousel_state.selected
+           : field == 1 ? (float)carousel_changes
+           : field == 2 ? carousel_state.offset
+           : field == 3 ? carousel_state.target
+                        : 0;
+}
 static int icon_choice, icon_size = CUI_ICON_MEDIUM, icon_rotate, icon_color, icon_loaded = -1;
 static cui_icon_state icon_state;
 static int toolbar_size = CUI_TOOLBAR_MEDIUM, toolbar_grouped = 1, toolbar_show_input = 1;
@@ -219,6 +273,54 @@ static void toolbar_group_render(cui_context *context, const cui_theme *theme,
 }
 static void resizable_content(cui_context *context, void *user) {
     cui_label(context, &current_theme, cui_string((uintptr_t)user == 0 ? "Explorer" : "Editor"));
+}
+static void gallery_carousel_changed(size_t index, void *user) {
+    (void)index;
+    (void)user;
+    carousel_changes++;
+}
+static void gallery_carousel_item(cui_context *context, const cui_theme *theme, size_t index,
+                                  void *user) {
+    (void)user;
+    static const char *titles[] = {"Build", "Preview", "Test", "Ship"};
+    cui_begin_box(context, 0,
+                  (cui_box){.width = -1,
+                            .height = -1,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .radius = theme->radius,
+                            .background = theme->secondary});
+    cui_label(context, theme, cui_string(titles[index]));
+    cui_end_box(context);
+}
+static void gallery_carousel_page_content(cui_context *context, const cui_theme *theme,
+                                          size_t index, void *user) {
+    (void)user;
+    static const char *numbers[] = {"1", "2", "3", "4"};
+    cui_text(context, cui_string(numbers[index]), theme->font_size * .8f, theme->text);
+}
+static void gallery_carousel_controls(cui_context *context, const cui_theme *theme,
+                                      cui_carousel_state *state, cui_id root, void *user) {
+    (void)user;
+    cui_carousel_control(context, cui_id_from(context, "carousel-prev"), theme, state, root, false,
+                         (cui_carousel_control_options){0});
+    cui_carousel_control(context, cui_id_from(context, "carousel-next"), theme, state, root, true,
+                         (cui_carousel_control_options){0});
+}
+static void gallery_carousel_pagination(cui_context *context, const cui_theme *theme,
+                                        cui_carousel_state *state, cui_id root, void *user) {
+    (void)user;
+    if (!cui_carousel_pagination_begin(context, cui_id_from(context, "carousel-pages"),
+                                       cui_string("Slides"), NULL))
+        return;
+    static const char *names[] = {"Go to slide 1", "Go to slide 2", "Go to slide 3",
+                                  "Go to slide 4"};
+    for (size_t i = 0; i < 4; i++)
+        cui_carousel_pagination_item(
+            context, cui_id_from(context, names[i]), theme, state, root, i,
+            (cui_carousel_control_options){.label = cui_string(names[i]),
+                                           .content = gallery_carousel_page_content});
+    cui_carousel_pagination_end(context);
 }
 static cui_check_state check_state;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
@@ -803,6 +905,22 @@ int gallery_init(void) {
                      CUI_SURFACE_ALERT);
     cui_surface_init(&sheet_surface, cui_id_from(ui, "sheet-surface"), CUI_SURFACE_SHEET);
     cui_surface_init(&popover_surface, cui_id_from(ui, "popover-surface"), CUI_SURFACE_POPOVER);
+    if (!cui_carousel_state_init(&carousel_state, carousel_geometry, 4, 4))
+        return 0;
+    carousel_state.on_change = gallery_carousel_changed;
+    settings_search_edit = cui_edit_create((cui_edit_config){
+        .buffer = settings_search_buffer, .capacity = sizeof(settings_search_buffer)});
+    settings_name_edit = cui_edit_create((cui_edit_config){
+        .buffer = settings_name_buffer, .capacity = sizeof(settings_name_buffer)});
+    settings_number_state.edit = cui_edit_create((cui_edit_config){
+        .buffer = settings_number_buffer, .capacity = sizeof(settings_number_buffer)});
+    if (!settings_search_edit || !settings_name_edit || !settings_number_state.edit ||
+        !cui_settings_state_init(&settings_state, settings_pages_state, 2, settings_search_edit))
+        return 0;
+    settings_mode = cui_id_from(ui, "settings-standard");
+    if (!cui_settings_dropdown_init(&settings_mode_menu, cui_id_from(ui, "settings-mode-popup"),
+                                    settings_mode_entries, settings_mode_checks, 3))
+        return 0;
     return ui && edit && group_edit && form_name_edit && form_email_edit && dock && query &&
            number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
@@ -1078,6 +1196,102 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                    .readonly = textarea_readonly != 0,
                                    .disabled = disabled != 0,
                                    .placeholder = cui_string("Write project notes")});
+        break;
+    }
+    case 72: {
+        cui_choice_item modes[] = {
+            {cui_id_from(ui, "settings-standard"), cui_string("Standard"), false},
+            {cui_id_from(ui, "settings-focused"), cui_string("Focused"), false},
+            {cui_id_from(ui, "settings-minimal"), cui_string("Minimal"), false}};
+        cui_setting_item general[] = {
+            {.title = cui_string("Email alerts"),
+             .description = cui_string("Receive updates by email"),
+             .kind = CUI_SETTING_CHECKBOX,
+             .boolean = &settings_email,
+             .has_default = true,
+             .default_boolean = false},
+            {.title = cui_string("Desktop alerts"),
+             .description = cui_string("Show workspace notifications"),
+             .kind = CUI_SETTING_SWITCH,
+             .boolean = &settings_desktop,
+             .has_default = true,
+             .default_boolean = false},
+            {.title = cui_string("Display name"),
+             .kind = CUI_SETTING_INPUT,
+             .edit = settings_name_edit,
+             .input_state = &settings_name_state,
+             .has_default = true,
+             .default_text = cui_string("Ada")},
+            {.title = cui_string("Refresh minutes"),
+             .kind = CUI_SETTING_NUMBER,
+             .number = &settings_refresh,
+             .number_state = &settings_number_state,
+             .number_options =
+                 {.step = 1, .minimum = 1, .maximum = 60, .has_minimum = true, .has_maximum = true},
+             .has_default = true,
+             .default_number = 10},
+            {.title = cui_string("Workspace mode"),
+             .kind = CUI_SETTING_DROPDOWN,
+             .choices = modes,
+             .choice_count = 3,
+             .choice = &settings_mode,
+             .dropdown_state = &settings_mode_menu,
+             .has_default = true,
+             .default_choice = modes[0].id}};
+        cui_setting_item privacy[] = {{.title = cui_string("Usage metrics"),
+                                       .description = cui_string("Share anonymous statistics"),
+                                       .kind = CUI_SETTING_CHECKBOX,
+                                       .boolean = &settings_usage,
+                                       .has_default = true,
+                                       .default_boolean = false}};
+        cui_setting_group groups[] = {
+            {.title = cui_string("General"), .items = general, .count = 2},
+            {.title = cui_string("Profile"), .items = general + 2, .count = 3}};
+        cui_setting_group privacy_group = {
+            .title = cui_string("Privacy"), .items = privacy, .count = 1};
+        cui_setting_page pages[] = {{.title = cui_string("Preferences"),
+                                     .icon = cui_string("settings"),
+                                     .groups = groups,
+                                     .count = 2,
+                                     .default_open = true},
+                                    {.title = cui_string("Advanced"),
+                                     .icon = cui_string("shield"),
+                                     .groups = &privacy_group,
+                                     .count = 1}};
+        cui_settings_options options = cui_settings_default();
+        options.width = width - 48;
+        options.height = height - 48;
+        options.sidebar_width = 220;
+        options.size = (cui_settings_size)settings_size;
+        options.variant = (cui_settings_variant)settings_variant;
+        settings_result = cui_settings(ui, cui_id_from(ui, "settings-preview"), &t, pages, 2,
+                                       &settings_state, options);
+        break;
+    }
+    case 73: {
+        cui_carousel_set_axis(&carousel_state, carousel_axis ? CUI_ORIENTATION_VERTICAL
+                                                             : CUI_ORIENTATION_HORIZONTAL);
+        cui_carousel_set_looping(&carousel_state, carousel_looping != 0);
+        static const char *labels[] = {"Build slide", "Preview slide", "Test slide", "Ship slide"};
+        cui_carousel_item items[4];
+        for (size_t i = 0; i < 4; i++)
+            items[i] = (cui_carousel_item){.id = cui_id_from(ui, labels[i]),
+                                           .label = cui_string(labels[i]),
+                                           .render = gallery_carousel_item};
+        cui_begin_box(ui, cui_id_from(ui, "carousel-margin"),
+                      (cui_box){.width = -1, .padding = 48});
+        cui_carousel_options options = cui_carousel_default();
+        options.width = width - 144;
+        options.height = 200;
+        options.label = cui_string("Workflow carousel");
+        options.now_seconds = host_seconds;
+        options.reduced_motion = reduced_motion;
+        options.disabled = disabled != 0;
+        options.controls = gallery_carousel_controls;
+        options.pagination = gallery_carousel_pagination;
+        cui_carousel(ui, cui_id_from(ui, "carousel-preview"), &t, &carousel_state, items, 4,
+                     options);
+        cui_end_box(ui);
         break;
     }
     case 0: {

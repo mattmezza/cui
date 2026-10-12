@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 70
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 72
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -262,6 +262,50 @@ def main():
                     page.wait_for_function('(role)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Export options")', arg=role)
             def dropdown_check(control):
                 control_change('dropdown-'+control, True)
+            page.evaluate('location.hash="Settings"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Settings"')
+            assert page.evaluate('cuiGallery.exports.gallery_settings_stats(1)') == 6
+            assert page.evaluate('cuiGallery.exports.gallery_settings_stats(2)') == 2
+            assert semantic_index('Email alerts', 2) is not None
+            assert semantic_index('Desktop alerts', 3) is not None
+            assert semantic_index('Display name', 6) is not None
+            assert semantic_index('Refresh minutes', 6) is not None
+            click_semantic('Email alerts', 2)
+            page.wait_for_function('cuiGallery.exports.gallery_settings_stats(3)===0')
+            click_semantic('Desktop alerts', 3)
+            page.wait_for_function('cuiGallery.exports.gallery_settings_stats(4)===1')
+            click_semantic('Workspace mode', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_settings_stats(9)===1')
+            assert semantic_index('Focused') is not None
+            click_semantic('Focused')
+            page.wait_for_function('cuiGallery.exports.gallery_settings_stats(8)===1&&cuiGallery.exports.gallery_settings_stats(9)===0')
+            click_semantic('Advanced', 23)
+            page.wait_for_function('cuiGallery.exports.gallery_settings_stats(0)===1')
+            assert semantic_index('Usage metrics', 2) is not None
+            click_semantic('Usage metrics', 2)
+            page.wait_for_function('cuiGallery.exports.gallery_settings_stats(5)===1')
+            for size in ('1', '2', '0', '3'):
+                control_change('settings-size', size)
+                assert semantic_index('Usage metrics', 2) is not None
+            for variant in ('1', '2', '0'):
+                control_change('settings-variant', variant)
+                assert semantic_index('Usage metrics', 2) is not None
+            page.evaluate('location.hash="Carousel"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Carousel"')
+            assert semantic_index('Next slide', 1) is not None
+            assert semantic_index('Build slide') is not None
+            click_semantic('Next slide', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===1&&cuiGallery.exports.gallery_carousel_stats(1)>=1')
+            click_semantic('Previous slide', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===0')
+            control_change('carousel-axis', '1')
+            click_semantic('Next slide', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===1')
+            control_change('carousel-loop', True)
+            click_semantic('Go to slide 4')
+            page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===3')
+            click_semantic('Next slide', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===0')
             page.evaluate('location.hash="Sidebar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
             assert semantic_index('Workspace sidebar', 9) is not None
@@ -1870,7 +1914,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 70 real WASM stories, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 72 real WASM stories, Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

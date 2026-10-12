@@ -771,6 +771,12 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     options.candle_body_ratio = 0;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    size_t candle_grid_pixel = (size_t)0 * options.width + 36;
+    size_t candle_left_pixel = (size_t)5 * options.width;
+    assert(pixels[4 * candle_grid_pixel] != options.background.r ||
+           pixels[4 * candle_grid_pixel + 1] != options.background.g);
+    assert(pixels[4 * candle_left_pixel] == options.background.r &&
+           pixels[4 * candle_left_pixel + 1] == options.background.g);
     cui_chart_hit candle_hit =
         cui_chart_hit_test(&options, (float)(first_candle.wick.x_min / 2), 18);
     assert(candle_hit.valid && candle_hit.hovered == 0 && candle_hit.value == 105);

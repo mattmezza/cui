@@ -685,7 +685,9 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                 double x = left + (right - left) * i / (n - 1);
                 cui_chart_guide(s, o, x, top, x, bottom, grid, o->grid_solid);
             } else {
-                double y = top + (bottom - top) * i / (n - 1);
+                double y = o->kind == CUI_CHART_CANDLESTICK && !o->tick_count
+                               ? bottom * i / 4
+                               : top + (bottom - top) * i / (n - 1);
                 cui_chart_guide(s, o, left, y, right, y, grid, o->grid_solid);
             }
         }
@@ -695,7 +697,8 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         }
     }
     if (!o->hide_axes) {
-        cui_chart_line(s, o, left, top, left, bottom, grid);
+        if (o->kind != CUI_CHART_CANDLESTICK)
+            cui_chart_line(s, o, left, top, left, bottom, grid);
         if (!o->hide_x_axis)
             cui_chart_line(s, o, left, bottom, right, bottom, grid);
     }

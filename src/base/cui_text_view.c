@@ -1096,7 +1096,6 @@ static unsigned cui_text_view_block_flags(const cui_text_view_block *b) {
                                                     : b->level == 6 ? CUI_TEXT_VIEW_MEDIUM
                                                                     : CUI_TEXT_VIEW_SEMIBOLD)
            : b->kind == CUI_TEXT_VIEW_CODE_BLOCK ? CUI_TEXT_VIEW_CODE
-           : b->table_header                     ? CUI_TEXT_VIEW_SEMIBOLD
                                                  : 0;
 }
 static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, float x, float y,
@@ -1111,11 +1110,11 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                                                    : 1;
     float font = o.font_size * scale, line = o.line_height * scale,
           padding = b->kind == CUI_TEXT_VIEW_CODE_BLOCK   ? 12
-                    : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
+                    : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 4
                                                           : 0;
     float left = b->kind == CUI_TEXT_VIEW_QUOTE        ? 12
                  : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
-                 : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 12
+                 : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
                                                        : padding;
     if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level) {
         cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
@@ -1124,7 +1123,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         left = fmaxf(left, marker.width + 8);
     }
     b->text_inset = left;
-    float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 12 : padding));
+    float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
     float cursor_x = 0, cursor_y = 0;
     size_t first_glyph = s->glyph_count;
     if (b->kind == CUI_TEXT_VIEW_RULE) {
@@ -1224,6 +1223,53 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     b->bounds = (cui_rect){x, y, width, cursor_y + line + padding * 2};
     return true;
 }
+static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, size_t end,
+                                       float width) {
+    float weights[CUI_TEXT_VIEW_NODE_LIMIT], widths[CUI_TEXT_VIEW_NODE_LIMIT];
+    unsigned columns = 0;
+    for (size_t i = first; i < end; ++i)
+        if (s->workspace.blocks[i].column + 1 > columns)
+            columns = s->workspace.blocks[i].column + 1;
+    for (unsigned c = 0; c < columns; ++c) {
+        weights[c] = 5;
+        widths[c] = 0;
+    }
+    for (size_t i = first; i < end; ++i) {
+        const cui_text_view_block *cell = &s->workspace.blocks[i];
+        unsigned count = 0;
+        for (size_t j = cell->text.begin; j < cell->text.end && count < 150; ++j)
+            if (((unsigned char)s->workspace.rendered[j] & 0xc0) != 0x80)
+                ++count;
+        if ((float)count > weights[cell->column])
+            weights[cell->column] = (float)count;
+    }
+    float remaining = fmaxf(width, (float)columns * 64), total = 0;
+    for (unsigned c = 0; c < columns; ++c)
+        total += weights[c];
+    bool changed;
+    do {
+        changed = false;
+        for (unsigned c = 0; c < columns; ++c)
+            if (widths[c] == 0 && remaining * weights[c] / total < 64) {
+                widths[c] = 64;
+                remaining -= 64;
+                total -= weights[c];
+                changed = true;
+            }
+    } while (changed && total > 0);
+    float x = 0;
+    for (unsigned c = 0; c < columns; ++c) {
+        if (widths[c] == 0)
+            widths[c] = remaining * weights[c] / total;
+        for (size_t i = first; i < end; ++i)
+            if (s->workspace.blocks[i].column == c) {
+                s->workspace.blocks[i].bounds.x = x;
+                s->workspace.blocks[i].bounds.w = widths[c];
+                s->workspace.blocks[i].table_columns = columns;
+            }
+        x += widths[c];
+    }
+}
 cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_layout_options o,
                                          cui_text_view_measure_fn measure, void *user) {
     if (!s || !measure || !isfinite(o.width) || o.width <= 0 || !isfinite(o.font_size) ||
@@ -1239,19 +1285,22 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
     for (size_t b = 0; b < s->block_count;) {
         cui_text_view_block *block = &s->workspace.blocks[b];
         if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
-            unsigned table = block->table, row = block->row, columns = 0;
-            for (size_t i = b;
-                 i < s->block_count && s->workspace.blocks[i].kind == CUI_TEXT_VIEW_TABLE_CELL &&
-                 s->workspace.blocks[i].table == table;
-                 ++i)
-                if (s->workspace.blocks[i].column + 1 > columns)
-                    columns = s->workspace.blocks[i].column + 1;
-            float cell_width = o.width / fmaxf(1, (float)columns), height = 0;
+            unsigned table = block->table, row = block->row;
+            if (b == 0 || s->workspace.blocks[b - 1].kind != CUI_TEXT_VIEW_TABLE_CELL ||
+                s->workspace.blocks[b - 1].table != table) {
+                size_t end = b + 1;
+                while (end < s->block_count &&
+                       s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                       s->workspace.blocks[end].table == table)
+                    ++end;
+                cui_text_view_table_widths(s, b, end, o.width);
+            }
+            float height = 0;
             size_t first = b;
             while (b < s->block_count && s->workspace.blocks[b].kind == CUI_TEXT_VIEW_TABLE_CELL &&
                    s->workspace.blocks[b].table == table && s->workspace.blocks[b].row == row) {
-                if (!cui_text_view_layout_block(s, b, cell_width * s->workspace.blocks[b].column, y,
-                                                cell_width, o, measure, user))
+                float x = s->workspace.blocks[b].bounds.x, w = s->workspace.blocks[b].bounds.w;
+                if (!cui_text_view_layout_block(s, b, x, y, w, o, measure, user))
                     return CUI_TEXT_VIEW_INVALID;
                 if (s->workspace.blocks[b].bounds.h > height)
                     height = s->workspace.blocks[b].bounds.h;

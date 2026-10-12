@@ -10,6 +10,7 @@ cui_text_view_style cui_text_view_style_default(void) {
                                  .code_background = {244, 244, 245, 255},
                                  .border = {228, 228, 231, 255},
                                  .mark = {255, 220, 0, 100},
+                                 .table_background = {255, 255, 255, 255},
                                  .font_size = 14,
                                  .line_height = 20,
                                  .paragraph_gap = 16};
@@ -19,11 +20,12 @@ cui_text_view_style cui_text_view_style_from_theme(const cui_theme *t) {
         return cui_text_view_style_default();
     return (cui_text_view_style){.foreground = t->text,
                                  .muted = t->muted,
-                                 .link = t->link,
+                                 .link = t->primary,
                                  .selection = t->selection,
                                  .code_background = t->accent,
                                  .border = t->border,
                                  .mark = t->warning,
+                                 .table_background = t->surface,
                                  .font_size = t->font_size * .875f,
                                  .line_height = t->font_size * 1.25f,
                                  .paragraph_gap = t->font_size};
@@ -274,15 +276,19 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
             cui_text_view_quad(ui, part, r, style.code_background);
         } else if (b->kind == CUI_TEXT_VIEW_TABLE_CELL) {
-            if (s->clamped && r.y + 8 + style.line_height > s->height &&
+            if (s->clamped && r.y + 4 + style.line_height > s->height &&
                 style.line_height <= s->height)
                 continue;
-            cui_begin_absolute_box(
-                ui, part,
-                (cui_box){.background = b->table_header ? style.code_background : (cui_color){0},
-                          .border = style.border,
-                          .border_width = 1},
-                r);
+            cui_begin_absolute_box(ui, part,
+                                   (cui_box){.background = b->table_header ? style.code_background
+                                                                           : style.table_background,
+                                             .border = style.border,
+                                             .custom_border_edges = true,
+                                             .border_edges = {.left = b->column == 0 ? 1 : 0,
+                                                              .right = 1,
+                                                              .top = b->row == 0 ? 1 : 0,
+                                                              .bottom = 1}},
+                                   r);
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_QUOTE)
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
@@ -329,6 +335,14 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         r.w = last->bounds.x + last->bounds.w - r.x;
         cui_id link_id = id ^ UINT64_C(0x951f5d7100000000) ^ (uint64_t)span->link.begin ^
                          ((uint64_t)first->text.begin << 24);
+        cui_text_view_block *block = &s->workspace.blocks[first->block];
+        bool cell = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        if (cell) {
+            cui_begin_absolute_box(ui, link_id ^ UINT64_C(0x63a471cf00000000),
+                                   (cui_box){.clip = true}, block->bounds);
+            r.x -= block->bounds.x;
+            r.y -= block->bounds.y;
+        }
         cui_interaction interaction = cui_interact(
             ui, link_id, CUI_ROLE_LINK,
             cui_text_view_slice(cui_text_view_rendered_text(s),
@@ -338,6 +352,8 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         cui_begin_absolute_box(ui, link_id, (cui_box){0}, r);
         cui_end_box(ui);
         cui_text_view_link(ui, link_id, s, span->link, interaction.activated, o);
+        if (cell)
+            cui_end_box(ui);
         i = end;
     }
     cui_text_view_range selection = {s->anchor < s->cursor ? s->anchor : s->cursor,
@@ -378,6 +394,14 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         cui_id leaf = id ^ UINT64_C(0x164b82d900000000) ^ (uint64_t)first->text.begin;
         cui_text_view_span *span = &s->workspace.spans[first->span];
         bool is_link = span->link.end > span->link.begin;
+        cui_text_view_block *block = &s->workspace.blocks[first->block];
+        bool cell = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        if (cell) {
+            cui_begin_absolute_box(ui, leaf ^ UINT64_C(0x63a471cf00000000), (cui_box){.clip = true},
+                                   block->bounds);
+            r.x -= block->bounds.x;
+            r.y -= block->bounds.y;
+        }
         if (first->flags & CUI_TEXT_VIEW_CODE)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x719ccbbb), r, style.code_background);
         for (size_t h = 0; h < s->highlight_count; ++h)
@@ -399,6 +423,8 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         if (first->flags & CUI_TEXT_VIEW_STRIKE)
             cui_text_view_quad(ui, leaf ^ 2, (cui_rect){0, r.h * .5f, r.w, 1}, color);
         cui_end_box(ui);
+        if (cell)
+            cui_end_box(ui);
 
         i = end;
     }

@@ -73,9 +73,10 @@ alignment/error UI, global selection spanning multiple views, touch selection me
 and handles, grapheme/BiDi shaping, inherited parent foreground palettes, adaptive
 horizontal table scrolling/actions styling,
 custom word/CJK stagger and easing, automatic enclosing-list reveal, background
-syntax styles, cached/asynchronous parsing and layout. Current tables divide the
-available width equally rather than measuring intrinsic column widths. These
-limitations must not be presented as full source parity.
+syntax styles, cached/asynchronous parsing and layout. Default wrap tables use
+capped text-length column proportions (5 to 150 characters) and 64px minimum
+columns. Narrow wrap tables clip at the document edge; opt-in adaptive horizontal
+table scrolling remains unimplemented. These limitations must not be presented as full source parity.
 
 Headless tests cover transactional bounded parsing and randomized syntax, Unicode
 mapping/selection, edit tracking, entities, safe HTML, tables, clipping, fade state, composed action geometry and clicks,
@@ -93,3 +94,8 @@ without writing output, and insufficient capacity preserves existing output.
 For Ctrl+C, provide `options.copy_buffer/copy_capacity` and set `copy_format` to
 Source. Scrollable views copy plain text, matching the frozen source's effective
 format. Insufficient output capacity leaves the clipboard unchanged.
+
+Default table cells use 8px horizontal and 4px vertical padding, normal inherited
+text weight, clipped content, and one border at each shared edge. Header backgrounds
+use the code background, body cells use the theme surface. TextView links follow
+the frozen text style's primary color mapping rather than the general link token.

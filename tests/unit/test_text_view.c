@@ -228,7 +228,7 @@ static void test_table_copy_alignment(void) {
                (cui_text_view_layout_options){
                    .width = 300, .font_size = 14, .line_height = 20, .paragraph_gap = 16},
                measure, NULL) == CUI_TEXT_VIEW_OK);
-    assert(f.glyphs[0].bounds.x == 12);
+    assert(f.glyphs[0].bounds.x == 8);
     assert(f.glyphs[1].bounds.x > 140 && f.glyphs[1].bounds.x < 160);
     assert(f.glyphs[2].bounds.x > 280);
     size_t a = (size_t)(strstr(f.rendered, "y") - f.rendered);
@@ -265,6 +265,30 @@ static void test_fenced_code_content(void) {
                                                                .code_actions_height = 32},
                                 measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.blocks[0].bounds.h == 44 && f.glyphs[0].font_size == 14);
+}
+static void test_proportional_table_defaults(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("| A | abcdefghijklmnopqrst |\n| --- | --- |\n| x | y |")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_text_view_layout_options o = {
+        .width = 300, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.w == 64 && f.blocks[1].bounds.w == 236);
+    assert(f.blocks[0].bounds.h == 28 && f.blocks[2].bounds.w == 64);
+    assert(f.blocks[0].table_columns == 2 && !(f.glyphs[0].flags & CUI_TEXT_VIEW_SEMIBOLD));
+    o.width = 100;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.w == 64 && f.blocks[1].bounds.x == 64 && f.blocks[1].bounds.w == 64);
+    char source[256];
+    memcpy(source, "| A | ", 6);
+    memset(source + 6, 'x', 200);
+    strcpy(source + 206, " |\n| --- | --- |");
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    o.width = 2000;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(fabsf(f.blocks[0].bounds.w - (2000.f * 5 / 155)) < .01f);
 }
 static void test_html(void) {
     fixture f;
@@ -434,6 +458,9 @@ static void test_theme_scroll_and_reveal(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
     for (size_t n = 0; n < 4; ++n) {
+        cui_text_view_style mapped = cui_text_view_style_from_theme(&themes[n]);
+        assert(!memcmp(&mapped.link, &themes[n].primary, sizeof(cui_color)));
+        assert(!memcmp(&mapped.table_background, &themes[n].surface, sizeof(cui_color)));
         assert(cui_begin_frame(ui, 400, 300, .016f));
         assert(cui_text_view(ui, 77, &themes[n], &f.state, o));
         (void)cui_end_frame(ui);
@@ -530,6 +557,44 @@ static void test_action_composition(void) {
     assert(action_clicks == 1 && !f.state.selecting);
     cui_destroy(ui);
 }
+static void test_table_edges_and_clip(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state, text("| A | [site](https://x.test) |\n| --- | --- |\n| x | y |")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 100;
+    o.on_link = link_clicked;
+    o.link_user = &clicks;
+    cui_draw_list d = frame(ui, &f, o);
+    bool internal_edge = false, cell_clip = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *c = &d.commands[i];
+        if (c->type == CUI_DRAW_BORDER && c->custom_border_edges && c->border_edges.left == 0 &&
+            c->border_edges.top == 0 && c->border_edges.right == 1 && c->border_edges.bottom == 1)
+            internal_edge = true;
+        if (c->type == CUI_DRAW_CLIP_PUSH && c->bounds.w == 64)
+            cell_clip = true;
+    }
+    assert(internal_edge && cell_clip);
+    unsigned before = clicks;
+    float x = f.state.viewport.x + 110, y = f.state.viewport.y + 10;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(clicks == before && !f.state.selecting);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -609,6 +674,7 @@ int main(void) {
     test_unicode_ranges_and_stream();
     test_html();
     test_source_copy();
+    test_proportional_table_defaults();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -619,6 +685,7 @@ int main(void) {
     test_links_and_images();
     test_theme_scroll_and_reveal();
     test_action_composition();
+    test_table_edges_and_clip();
 #endif
     return 0;
 }

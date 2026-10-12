@@ -61,7 +61,7 @@ typedef enum {
 typedef struct {
     cui_text_view_block_kind kind;
     cui_text_view_range text, source, resource;
-    unsigned level, table, row, column;
+    unsigned level, table, row, column, table_columns;
     cui_text_view_range list_marker;
     unsigned list_number;
     char marker_text[12];
@@ -146,7 +146,7 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *, cui_text_view_la
                                          cui_text_view_measure_fn, void *);
 size_t cui_text_view_hit(const cui_text_view_state *, float x, float y);
 typedef struct {
-    cui_color foreground, muted, link, selection, code_background, border, mark;
+    cui_color foreground, muted, link, selection, code_background, border, mark, table_background;
     float font_size, line_height, paragraph_gap;
 } cui_text_view_style;
 cui_text_view_style cui_text_view_style_default(void);

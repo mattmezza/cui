@@ -944,6 +944,15 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         box.border = theme->focus;
         box.border_width = 2;
     }
+    box.custom_corners = true;
+    box.corner_radii =
+        trigger ? (cui_corner_radii){.top_right = theme->radius, .bottom_right = theme->radius}
+                : (cui_corner_radii){.top_left = theme->radius, .bottom_left = theme->radius};
+    box.custom_border_edges = true;
+    box.border_edges = (cui_border_edges){.left = trigger ? 0 : box.border_width,
+                                          .right = box.border_width,
+                                          .top = box.border_width,
+                                          .bottom = box.border_width};
     return box;
 }
 

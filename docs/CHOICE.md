@@ -349,7 +349,7 @@ that surface while its menu is open. The hovered half receives the stronger hove
 color. Escape restores the transparent resting appearance when the pointer has
 left. Disabled pairs remain transparent. Headless tests inspect the draw list after
 real pointer movement, menu activation and Escape, and verify inheritance and
-outer overrides. Independent joining-corner geometry remains a parity gap.
+outer overrides. The two halves use independent outer-corner radii and border edges.
 
 `hide_action` or `hide_menu` omits that half from rendering, semantics and focus
 registration. At least one half must remain visible. Hiding the menu half closes
@@ -441,3 +441,11 @@ and no-op insertions emit no request. Nested controls do not start a tab drag.
 Tests cover both axes, insertion painting, append requests, application-applied
 reorder/panel stability, Escape, disabled tabs and ordinary pointer activation.
 Cross-strip drag/drop, autoscroll and keyboard reordering remain unimplemented.
+
+DropdownButton rounds the action's left corners and trigger's right corners,
+leaving their joining corners square. The action owns the shared seam border;
+the trigger omits its left border, avoiding a doubled seam. Focus border widths
+follow the same ownership. Per-corner/per-edge core primitives carry this shape
+through renderer adapters. As upstream does, these half-specific corner rules
+also apply when a half is omitted. Draw-list tests inspect all corners and border
+edges across all five variants, three sizes and four supplied themes.

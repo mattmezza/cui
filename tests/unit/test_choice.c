@@ -1453,6 +1453,40 @@ static void test_dropdown_button(void) {
                                                                   : 1;
                 assert(left.w == 120 && left.h == themes[t].control_height * scale &&
                        right.h == left.h && left.x + left.w == right.x);
+                bool left_shape = false, right_shape = false, left_border = false,
+                     right_border = false;
+                for (size_t d = 0; d < dropdown_draw.count; d++) {
+                    cui_draw_command command = dropdown_draw.commands[d];
+                    bool is_left = command.bounds.x == left.x && command.bounds.w == left.w &&
+                                   command.bounds.y == left.y && command.bounds.h == left.h;
+                    bool is_right = command.bounds.x == right.x && command.bounds.w == right.w &&
+                                    command.bounds.y == right.y && command.bounds.h == right.h;
+                    if (command.type == CUI_DRAW_RECT && is_left)
+                        left_shape = command.custom_corners &&
+                                     command.corner_radii.top_left == themes[t].radius &&
+                                     command.corner_radii.bottom_left == themes[t].radius &&
+                                     command.corner_radii.top_right == 0 &&
+                                     command.corner_radii.bottom_right == 0;
+                    if (command.type == CUI_DRAW_RECT && is_right)
+                        right_shape = command.custom_corners &&
+                                      command.corner_radii.top_right == themes[t].radius &&
+                                      command.corner_radii.bottom_right == themes[t].radius &&
+                                      command.corner_radii.top_left == 0 &&
+                                      command.corner_radii.bottom_left == 0;
+                    if (command.type == CUI_DRAW_BORDER && is_left)
+                        left_border =
+                            command.custom_border_edges && command.border_edges.left == 1 &&
+                            command.border_edges.right == 1 && command.border_edges.top == 1 &&
+                            command.border_edges.bottom == 1;
+                    if (command.type == CUI_DRAW_BORDER && is_right)
+                        right_border =
+                            command.custom_border_edges && command.border_edges.left == 0 &&
+                            command.border_edges.right == 1 && command.border_edges.top == 1 &&
+                            command.border_edges.bottom == 1;
+                }
+                assert(left_shape && right_shape);
+                if (variant != CUI_DROPDOWN_BUTTON_GHOST)
+                    assert(left_border && right_border);
                 size_t count = 0;
                 const cui_semantic *semantics = cui_semantics(ui, &count);
                 bool action_named = false, trigger_named = false;

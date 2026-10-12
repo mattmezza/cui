@@ -14,7 +14,12 @@ static void decimal_locale(void) {
         assert(!requested);
         return;
     }
-    assert(strcmp(localeconv()->decimal_point, "."));
+    if (!strcmp(localeconv()->decimal_point, ".")) {
+        /* Some C runtimes accept locale names without implementing their radix. */
+        assert(!requested);
+        assert(setlocale(LC_NUMERIC, "C"));
+        return;
+    }
     double value;
     assert(cui_number_parse(cui_string("1.25e2"), &value) && value == 125);
     assert(!cui_number_parse(cui_string("1,25"), &value));

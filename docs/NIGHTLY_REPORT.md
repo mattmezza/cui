@@ -1,4 +1,4 @@
-# Current report — 12 October 2026
+# Current report — 13 October 2026
 
 The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Release `49d4bfe` passed CI and Pages; complete direct HTTPS78 and eight-asset verification is recorded in [published-49d4bfe.txt](validation/published-49d4bfe.txt). Full feature parity remains incomplete: all 78 manifest entries are preserved, with 5 implemented, 73 tested and 0 verified.
 
@@ -6,7 +6,7 @@ The new website and library feedback is preserved in [website-feedback.md](websi
 
 Build and test with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. Build the real browser gallery with `python scripts/build_web.py`; see [WEB_GALLERY.md](WEB_GALLERY.md) for serving and browser checks. The public renderer is the browser canvas host consuming actual CUI WASM draw lists. This is not evidence of native GPU runtime validation or complete native accessibility integration.
 
-Navigation batch `a679582` passes native77, sanitizer75, WASI67 and Chromium78, including a regression that fails the old word-navigation code. Publication awaits the next website/docs integration. The remaining feedback audit stays open.
+Navigation batch `a679582` passes native77, sanitizer75, WASI67 and Chromium78, including a regression that fails the old word-navigation code. The combined website/docs integration `3c08749` now passes native77, Chromium78, targeted visual checks, docs3 and quality gates. Portable source matches the sanitizer75/WASI67-validated navigation batch. Publication is the next step. The remaining feedback audit stays open.
 
 ## Historical report (superseded status and counts)
 

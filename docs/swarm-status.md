@@ -91,3 +91,7 @@ Pages38295715735 and CI38295715752 succeeded. Full HTTPS78 behavior passes for56
 ### Verified public releaseff475e6
 
 Pages38296393361 and CI38296393398 succeeded. Full HTTPS78 behavior passes; seven deployed assets including WASM match the artifact byte-for-byte. This is now the latest verified release. Isolatedfb4464b fixes unpainted-control semantic ancestry and Attachment hidden scrollbar semantics, with two failing-before regressions, native75 and targeted sanitizer2 passes. The gallery hierarchy update and further Chart/TextView parity work remain active; all78 entries remain in scope and no full feature parity is claimed.
+
+### Validated docs/navigation integration 3c08749
+
+Combined native77, Chromium78, targeted visual checks, docs3 and quality gates pass. New getting-started, state/callback and AI-agent guides include Copy buttons and downloadable llms indexes, full bundles and Markdown exports. Cropped images use isolated source bitmaps before smooth scaling, preserving crop/tint/clip pixel assertions. Portable source matches navigation a679582 with sanitizer75/WASI67 evidence. Publication remains pending; full parity and the feedback audit remain open.

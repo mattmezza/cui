@@ -30,6 +30,7 @@ typedef enum {
 typedef enum { CUI_TAB_MEDIUM, CUI_TAB_SMALL, CUI_TAB_LARGE, CUI_TAB_XSMALL } cui_tab_size;
 typedef struct {
     float height, inner_height, padding_x, font_size, icon_size, gap, part_gap;
+    float bar_padding_x, margin_top, margin_bottom;
 } cui_tab_metrics;
 /* Frozen logical-pixel metrics scaled by positive density (invalid uses1). */
 cui_tab_metrics cui_tab_size_metrics(cui_tab_variant, cui_tab_size, float density);

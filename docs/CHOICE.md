@@ -620,3 +620,9 @@ and glyph bounds, scroll extent, explicit density and height override. This is a
 visible default change: a standard 42px Button theme now has 32px Medium Tabs.
 Automatic intrinsic slot reservation, spring-driven indicators/text fading and
 full variant theme token styling remain separate parity gaps.
+
+Segmented bars reserve horizontal XS/S/M/L padding of 2/3/4/4 logical pixels,
+outside the scroll viewport and inside the bar prefix/suffix. Underline bodies
+reserve top margins 1/2/3/5 and bottom margins 2/3/4/6, centered within the outer
+height; the selected underline is a bottom border and consumes no body layout.
+Headless bounds tests cover each size, both margins and the padded viewport.

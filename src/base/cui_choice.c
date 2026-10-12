@@ -68,6 +68,7 @@ cui_tab_metrics cui_tab_size_metrics(cui_tab_variant variant, cui_tab_size size,
                 : variant == CUI_TAB_PILL      ? 4
                 : variant == CUI_TAB_SEGMENTED ? 2
                                                : 0;
+    const float bar_padding[] = {2, 3, 4, 4}, top[] = {1, 2, 3, 5}, bottom[] = {2, 3, 4, 6};
     return (cui_tab_metrics){
         .height =
             (variant == CUI_TAB_UNDERLINE ? underline_heights[index] : heights[index]) * density,
@@ -76,7 +77,10 @@ cui_tab_metrics cui_tab_size_metrics(cui_tab_variant variant, cui_tab_size size,
         .font_size = fonts[index] * density,
         .icon_size = icons[index] * density,
         .gap = gap * density,
-        .part_gap = 4 * density};
+        .part_gap = 4 * density,
+        .bar_padding_x = variant == CUI_TAB_SEGMENTED ? bar_padding[index] * density : 0,
+        .margin_top = variant == CUI_TAB_UNDERLINE ? top[index] * density : 0,
+        .margin_bottom = variant == CUI_TAB_UNDERLINE ? bottom[index] * density : 0};
 }
 static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) {
     cui_tab_scroll_state *scroll = options.scroll;

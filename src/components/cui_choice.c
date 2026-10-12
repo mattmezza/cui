@@ -97,18 +97,34 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
     else if (structured && !render && !icon && (!parts->prefix || prefix > 0) &&
              (!parts->suffix || suffix > 0))
         box.width = text_width + 2 * padding + prefix + suffix + gaps;
-    if (metrics)
+    if (metrics) {
         box.align_y = CUI_ALIGN_CENTER;
+        if (variant == CUI_TAB_UNDERLINE) {
+            box.custom_border_edges = true;
+            box.border_edges.bottom = 2;
+            box.border = selected ? theme->primary : (cui_color){0};
+        }
+    }
     cui_begin_box(ui, item->id, box);
-    if (variant == CUI_TAB_UNDERLINE)
-        cui_begin_box(ui, 0,
-                      (cui_box){.height = metrics                     ? metrics->inner_height
+    if (variant == CUI_TAB_UNDERLINE) {
+        cui_begin_box(ui, item->id ^ UINT64_C(0x9ae71a843e64b150),
+                      (cui_box){.height = metrics ? metrics->inner_height + metrics->margin_top +
+                                                        metrics->margin_bottom
                                           : theme->control_height > 2 ? theme->control_height - 2
                                                                       : 0,
                                 .padding = metrics ? 0 : theme->padding});
+        if (metrics && metrics->margin_top > 0) {
+            cui_begin_box(ui, 0, (cui_box){.height = metrics->margin_top});
+            cui_end_box(ui);
+        }
+    }
     if (composed) {
         cui_begin_box(ui, item->id ^ UINT64_C(0xacf7823ab98e17d0),
-                      (cui_box){.width = -1, .row = true, .gap = 0, .align_y = CUI_ALIGN_CENTER});
+                      (cui_box){.width = -1,
+                                .height = metrics ? metrics->inner_height : 0,
+                                .row = true,
+                                .gap = 0,
+                                .align_y = CUI_ALIGN_CENTER});
         if (padding > 0) {
             cui_begin_box(ui, 0, (cui_box){.width = padding});
             cui_end_box(ui);
@@ -162,12 +178,18 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
         cui_end_box(ui);
     }
     if (variant == CUI_TAB_UNDERLINE) {
+        if (metrics && metrics->margin_bottom > 0) {
+            cui_begin_box(ui, 0, (cui_box){.height = metrics->margin_bottom});
+            cui_end_box(ui);
+        }
         cui_end_box(ui);
-        cui_begin_box(ui, 0,
-                      (cui_box){.width = -1,
-                                .height = 2,
-                                .background = selected ? theme->primary : theme->background});
-        cui_end_box(ui);
+        if (!metrics) {
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = -1,
+                                    .height = 2,
+                                    .background = selected ? theme->primary : theme->background});
+            cui_end_box(ui);
+        }
     }
     cui_end_box(ui);
 }
@@ -268,7 +290,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         }
     }
 
-    cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
+    cui_begin_box(ui, container, (cui_box){.gap = supplied_theme->gap});
     cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
     cui_interact(ui, list_id, CUI_ROLE_TABLIST, cui_string(""), options.disabled, false, 0);
     cui_set_semantic_details(
@@ -276,9 +298,17 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         (cui_semantic_details){.orientation = options.vertical ? CUI_ORIENTATION_VERTICAL
                                                                : CUI_ORIENTATION_HORIZONTAL});
     cui_begin_box(ui, container ^ UINT64_C(0xcda0312561f50cab),
-                  (cui_box){.row = !options.vertical, .gap = theme->gap});
+                  (cui_box){.row = !options.vertical, .gap = 0});
     if (options.prefix)
         options.prefix(ui, options.content_user);
+    float bar_padding = options.vertical ? 0 : metrics.bar_padding_x;
+    cui_begin_box(ui, container ^ UINT64_C(0xa7eb5ea7941c2230), (cui_box){.row = true});
+    if (bar_padding > 0) {
+        cui_begin_box(ui, 0, (cui_box){.width = bar_padding});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, container ^ UINT64_C(0xa7eb5ea7941c2240),
+                  (cui_box){.row = !options.vertical, .gap = theme->gap});
     if (scrollable) {
         cui_interact(ui, viewport_id, CUI_ROLE_GROUP, cui_string("Tab viewport"), options.disabled,
                      false, 0);
@@ -342,6 +372,12 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     }
     if (scrollable)
         cui_end_box(ui);
+    cui_end_box(ui);
+    if (bar_padding > 0) {
+        cui_begin_box(ui, 0, (cui_box){.width = bar_padding});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
     if (options.suffix)
         options.suffix(ui, options.content_user);
     if (options.overflow && options.overflow->visible) {

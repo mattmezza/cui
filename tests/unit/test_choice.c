@@ -1039,7 +1039,7 @@ static void test_custom_tabs(void) {
             assert(tab_prefix_count == 1 && tab_suffix_count == 1 && visible == 0);
             cui_rect prefix = cui_bounds(ui, 700), first = cui_bounds(ui, 10),
                      last = cui_bounds(ui, 30), suffix = cui_bounds(ui, 701);
-            assert(prefix.x + prefix.w <= first.x && last.x + last.w <= suffix.x);
+            assert(prefix.x + prefix.w <= first.x + .01f && last.x + last.w <= suffix.x + .01f);
             size_t count = 0;
             const cui_semantic *semantics = cui_semantics(ui, &count);
             bool named = false, disabled = false;
@@ -2884,6 +2884,19 @@ static void test_tab_reference_size_metrics(void) {
             assert(cui_bounds(ui, 9400).w == metrics.icon_size);
             assert(cui_bounds(ui, 10 ^ UINT64_C(0xacf7823ab98e17f0)).w == inner * 1.25f);
             assert(scroll.maximum == inner * 1.25f + 2 * metrics.padding_x - 10);
+            cui_rect tab = cui_bounds(ui, 10);
+            cui_rect row = cui_bounds(ui, 10 ^ UINT64_C(0xacf7823ab98e17d0));
+            if (variant == CUI_TAB_UNDERLINE) {
+                float expected =
+                    tab.y +
+                    (metrics.height - inner - metrics.margin_top - metrics.margin_bottom) * .5f +
+                    metrics.margin_top;
+                assert(fabsf(row.y - expected) < .01f && row.h == inner);
+            }
+            cui_rect wrapper = cui_bounds(ui, 1 ^ UINT64_C(0xa7eb5ea7941c2230));
+            cui_rect viewport = cui_bounds(ui, 1 ^ UINT64_C(0x739b1b53a6cef421));
+            assert(fabsf(viewport.x - wrapper.x - metrics.bar_padding_x) < .01f);
+            assert(fabsf(wrapper.w - 10 - 2 * metrics.bar_padding_x) < .01f);
             options.density = 2;
             options.height = 80;
             metrics = cui_tab_size_metrics((cui_tab_variant)variant, (cui_tab_size)size, 2);

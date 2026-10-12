@@ -3,7 +3,7 @@
 import argparse,difflib,re
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-MODULES={"cui_form": ["src/base/cui_form.c", "src/components/cui_form.c"], "cui_surface": ["src/base/cui_surface.c", "src/components/cui_surface.c"], "cui_table": ["src/base/cui_table.c", "src/components/cui_table.c"], "cui_scroll": ["src/base/cui_scroll.c", "src/components/cui_scroll.c"], "cui_tree": ["src/base/cui_tree.c", "src/components/cui_tree.c"], "cui_picker": ["src/base/cui_picker.c", "src/components/cui_picker.c"], "cui_numeric": ["src/base/cui_numeric.c", "src/components/cui_numeric.c"], "cui_content": ["src/base/cui_content.c", "src/components/cui_content.c"], "cui_disclosure": ["src/base/cui_disclosure.c", "src/components/cui_disclosure.c"], "cui_choice": ["src/base/cui_choice.c", "src/components/cui_choice.c"], "cui_plot": ["src/base/cui_plot.c"],"cui": ["src/core/cui.c"],"cui_dock": ["src/base/cui_dock.c"],"cui_virtual": ["src/base/cui_virtual.c"],"cui_overlay": ["src/base/cui_overlay.c"],"cui_edit": ["src/base/cui_edit.c"],"cui_base": ["src/base/cui_base.c","src/base/cui_models.c"],"cui_theme": ["src/theme/cui_theme.c"],"cui_components": ["src/components/cui_components.c"]}
+MODULES={"cui_otp": ["src/base/cui_otp.c", "src/components/cui_otp.c"], "cui_form": ["src/base/cui_form.c", "src/components/cui_form.c"], "cui_surface": ["src/base/cui_surface.c", "src/components/cui_surface.c"], "cui_table": ["src/base/cui_table.c", "src/components/cui_table.c"], "cui_scroll": ["src/base/cui_scroll.c", "src/components/cui_scroll.c"], "cui_tree": ["src/base/cui_tree.c", "src/components/cui_tree.c"], "cui_picker": ["src/base/cui_picker.c", "src/components/cui_picker.c"], "cui_numeric": ["src/base/cui_numeric.c", "src/components/cui_numeric.c"], "cui_content": ["src/base/cui_content.c", "src/components/cui_content.c"], "cui_disclosure": ["src/base/cui_disclosure.c", "src/components/cui_disclosure.c"], "cui_choice": ["src/base/cui_choice.c", "src/components/cui_choice.c"], "cui_plot": ["src/base/cui_plot.c"],"cui": ["src/core/cui.c"],"cui_dock": ["src/base/cui_dock.c"],"cui_virtual": ["src/base/cui_virtual.c"],"cui_overlay": ["src/base/cui_overlay.c"],"cui_edit": ["src/base/cui_edit.c"],"cui_base": ["src/base/cui_base.c","src/base/cui_models.c"],"cui_theme": ["src/theme/cui_theme.c"],"cui_components": ["src/components/cui_components.c"]}
 def generate(name,sources):
     declaration=(ROOT/"include/cui"/(name+".h")).read_text(encoding="utf-8")
     declaration=re.sub(r'#include "cui/([^"\n]+)"',r'#include "\1"',declaration)
@@ -17,7 +17,7 @@ def generate(name,sources):
     if name=="cui_components":
         lines += ['#ifndef CUI_THEME_IMPLEMENTATION','#define CUI_THEME_IMPLEMENTATION','#endif','#include "cui_theme.h"']
     if name=="cui_components":
-        for module in ["cui_content", "cui_disclosure", "cui_choice", "cui_numeric", "cui_picker", "cui_tree", "cui_table", "cui_scroll", "cui_surface", "cui_form"]:
+        for module in ["cui_content", "cui_disclosure", "cui_choice", "cui_numeric", "cui_picker", "cui_tree", "cui_table", "cui_scroll", "cui_surface", "cui_form", "cui_otp"]:
             macro_dependency = module.upper()+"_IMPLEMENTATION"
             lines += [f'#ifndef {macro_dependency}',f'#define {macro_dependency}', '#endif',f'#include "{module}.h"']
     for source in sources:

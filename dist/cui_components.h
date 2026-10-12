@@ -8,6 +8,7 @@
 #include "cui_disclosure.h"
 #include "cui_form.h"
 #include "cui_numeric.h"
+#include "cui_otp.h"
 #include "cui_picker.h"
 #include "cui_scroll.h"
 #include "cui_surface.h"
@@ -126,6 +127,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_FORM_IMPLEMENTATION
 #endif
 #include "cui_form.h"
+#ifndef CUI_OTP_IMPLEMENTATION
+#define CUI_OTP_IMPLEMENTATION
+#endif
+#include "cui_otp.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

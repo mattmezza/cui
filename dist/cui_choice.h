@@ -40,6 +40,10 @@ typedef struct {
     cui_id receiving_id;
     bool changed;
     cui_id reveal_id, last_selected; /* explicit reveal request and auto-reveal tracking */
+    cui_id scrollbar_id;
+    cui_rect scrollbar_bounds;
+    float scrollbar_grab;
+    bool scrollbar_dragging;
 } cui_tab_scroll_state;
 typedef struct {
     bool vertical, disabled, manual_activation;
@@ -54,6 +58,7 @@ typedef struct {
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
     cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
     bool reveal_selected;     /* opt in to reveal selection changes in a bounded strip */
+    bool scrollbar;           /* optional pointer/keyboard scrollbar over the viewport edge */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -247,7 +252,10 @@ typedef enum {
     CUI_DROPDOWN_BUTTON_SECONDARY,
     CUI_DROPDOWN_BUTTON_OUTLINE,
     CUI_DROPDOWN_BUTTON_GHOST,
-    CUI_DROPDOWN_BUTTON_DANGER
+    CUI_DROPDOWN_BUTTON_DANGER,
+    CUI_DROPDOWN_BUTTON_WARNING,
+    CUI_DROPDOWN_BUTTON_SUCCESS,
+    CUI_DROPDOWN_BUTTON_INFO
 } cui_dropdown_button_variant;
 typedef enum {
     CUI_DROPDOWN_BUTTON_MEDIUM,
@@ -263,7 +271,7 @@ typedef enum {
 } cui_dropdown_button_anchor;
 typedef struct {
     bool disabled, action_disabled, action_loading, selected;
-    bool outline;                         /* orthogonal to primary/secondary/danger variant */
+    bool outline;                         /* orthogonal to filled color variants */
     bool action_selected, action_outline; /* preserve inner button presentation */
     float width; /* action-half width: zero fits contents; negative grows */
     cui_dropdown_button_variant variant;
@@ -355,6 +363,68 @@ void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger
         return;
     *state = (cui_tab_overflow){.entries = entries, .capacity = capacity, .trigger = trigger};
     cui_menu_tree_init(&state->menu, popup);
+}
+static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) {
+    cui_tab_scroll_state *scroll = options.scroll;
+    if (!scroll || !scroll->scrollbar_id || scroll->maximum <= 0) {
+        if (scroll)
+            scroll->scrollbar_dragging = false;
+        return;
+    }
+    if (options.disabled)
+        scroll->scrollbar_dragging = false;
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    cui_rect bounds = scroll->scrollbar_bounds;
+    float track = options.vertical ? bounds.h : bounds.w;
+    float thumb = track > 0 && options.bar_extent > 0
+                      ? track * (float)((double)options.bar_extent /
+                                        ((double)options.bar_extent + scroll->maximum))
+                      : 0;
+    thumb = fminf(track, fmaxf(16, thumb));
+    float travel = track - thumb;
+    for (size_t e = 0; e < count; e++) {
+        cui_event event = events[e];
+        if (event.type == CUI_EVENT_CANCEL ||
+            (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE))
+            scroll->scrollbar_dragging = false;
+        if (options.disabled || cui_event_target(ui, e) != scroll->scrollbar_id ||
+            ((event.type == CUI_EVENT_POINTER_DOWN || event.type == CUI_EVENT_POINTER_UP) &&
+             event.pointer_button != CUI_POINTER_PRIMARY))
+            continue;
+        float before = scroll->offset;
+        float position = options.vertical ? event.y - bounds.y : event.x - bounds.x;
+        if (event.type == CUI_EVENT_POINTER_DOWN && isfinite(position)) {
+            float start = travel > 0 ? travel * scroll->offset / scroll->maximum : 0;
+            scroll->scrollbar_grab =
+                position >= start && position <= start + thumb ? position - start : thumb * .5f;
+            scroll->scrollbar_dragging = true;
+        }
+        if (scroll->scrollbar_dragging && travel > 0 && isfinite(position) &&
+            (event.type == CUI_EVENT_POINTER_DOWN || event.type == CUI_EVENT_POINTER_MOVE ||
+             event.type == CUI_EVENT_POINTER_UP))
+            scroll->offset =
+                scroll->maximum * fminf(1, fmaxf(0, (position - scroll->scrollbar_grab) / travel));
+        if (event.type == CUI_EVENT_POINTER_UP)
+            scroll->scrollbar_dragging = false;
+        if (event.type == CUI_EVENT_KEY_DOWN) {
+            if (event.key == CUI_KEY_HOME)
+                scroll->offset = 0;
+            else if (event.key == CUI_KEY_END)
+                scroll->offset = scroll->maximum;
+            else if (event.key == CUI_KEY_PAGEUP)
+                scroll->offset -= options.bar_extent;
+            else if (event.key == CUI_KEY_PAGEDOWN)
+                scroll->offset += options.bar_extent;
+            else if (event.key == (options.vertical ? CUI_KEY_UP : CUI_KEY_LEFT))
+                scroll->offset -= 32;
+            else if (event.key == (options.vertical ? CUI_KEY_DOWN : CUI_KEY_RIGHT))
+                scroll->offset += 32;
+            scroll->offset = fminf(scroll->maximum, fmaxf(0, scroll->offset));
+        }
+        scroll->changed |= before != scroll->offset;
+    }
+    cui_update_semantic(ui, scroll->scrollbar_id, false, scroll->offset);
 }
 static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, size_t count,
                                cui_tabs_options options, cui_event event, cui_id target) {
@@ -468,7 +538,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         for (size_t e = 0; e < n && !options.disabled; e++) {
             cui_event event = events[e];
             cui_id target = cui_event_target(ui, e);
-            bool eligible = scroll->receiving_id && target == scroll->receiving_id;
+            bool eligible = (scroll->receiving_id && target == scroll->receiving_id) ||
+                            (scroll->scrollbar_id && target == scroll->scrollbar_id);
             for (size_t i = 0; i < count; i++)
                 eligible |= target == items[i].id;
             cui_rect bounds = scroll->viewport;
@@ -489,6 +560,9 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         if (scroll->changed)
             cui_invalidate(ui);
     }
+    cui_tab_scrollbar_reduce(ui, options);
+    if (options.scroll && options.scroll->changed)
+        cui_invalidate(ui);
     if (options.scroll && options.scroll->changed && options.drag) {
         options.drag->candidate = 0;
         options.drag->active = false;
@@ -1640,6 +1714,11 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                 content += extent;
         }
         options.scroll->maximum = fmaxf(0, content - options.bar_extent);
+        options.scroll->scrollbar_id = options.scrollbar && options.scroll->maximum > 0
+                                           ? container ^ UINT64_C(0x973a1e35f90453bc)
+                                           : 0;
+        options.scroll->scrollbar_bounds = cui_bounds(ui, options.scroll->scrollbar_id);
+
     } else
         options.scroll = NULL;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
@@ -1767,6 +1846,54 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     }
 
     cui_end_box(ui);
+    if (scrollable && options.scroll->scrollbar_id) {
+        cui_tab_scroll_state *scroll = options.scroll;
+        cui_rect viewport = scroll->viewport;
+        cui_rect track = options.vertical
+                             ? (cui_rect){viewport.x + viewport.w - 6, viewport.y, 6, viewport.h}
+                             : (cui_rect){viewport.x, viewport.y + viewport.h - 6, viewport.w, 6};
+        if (track.w > 0 && track.h > 0) {
+            float length = options.vertical ? track.h : track.w;
+            float thumb_length = length * (float)((double)options.bar_extent /
+                                                  ((double)options.bar_extent + scroll->maximum));
+            thumb_length = fminf(length, fmaxf(16, thumb_length));
+            float thumb_start = (length - thumb_length) * scroll->offset / scroll->maximum;
+            cui_rect thumb =
+                options.vertical
+                    ? (cui_rect){track.x, track.y + thumb_start, track.w, thumb_length}
+                    : (cui_rect){track.x + thumb_start, track.y, thumb_length, track.h};
+            cui_begin_portal(
+                ui, scroll->scrollbar_id,
+                (cui_box){.background = theme->border,
+                          .radius = 3,
+                          .border = theme->focus,
+                          .border_width = cui_focused(ui) == scroll->scrollbar_id ? 1 : 0},
+                track, 1);
+            cui_interact(ui, scroll->scrollbar_id, CUI_ROLE_SCROLLBAR, cui_string("Tab scrollbar"),
+                         options.disabled, false, scroll->offset);
+            cui_end_box(ui);
+            cui_begin_portal(
+                ui, scroll->scrollbar_id ^ UINT64_C(0x247d15723f61c98b),
+                (cui_box){.background = options.disabled ? theme->muted : theme->primary,
+                          .radius = 3},
+                thumb, 2);
+            cui_end_box(ui);
+        }
+        cui_update_semantic(ui, scroll->scrollbar_id, false, scroll->offset);
+        cui_set_semantic_details(
+            ui, scroll->scrollbar_id,
+            (cui_semantic_details){.orientation = options.vertical ? CUI_ORIENTATION_VERTICAL
+                                                                   : CUI_ORIENTATION_HORIZONTAL,
+                                   .minimum = 0,
+                                   .maximum = scroll->maximum,
+                                   .controls = viewport_id,
+                                   .parent = list_id,
+                                   .scrollable = true,
+                                   .scroll_x = options.vertical ? 0 : scroll->offset,
+                                   .scroll_y = options.vertical ? scroll->offset : 0,
+                                   .scroll_max_x = options.vertical ? 0 : scroll->maximum,
+                                   .scroll_max_y = options.vertical ? scroll->maximum : 0});
+    }
     if (active != count && panel) {
         cui_id panel_id = items[active].id ^ UINT64_C(0x691a17db80e22f45);
         cui_interact(ui, panel_id, CUI_ROLE_TABPANEL, items[active].label, false, false, 0);
@@ -2456,6 +2583,45 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
     return activated;
 }
 
+static cui_color cui_dropdown_intent(const cui_theme *theme, cui_dropdown_button_variant variant) {
+    switch (variant) {
+    case CUI_DROPDOWN_BUTTON_DANGER:
+        return theme->danger;
+    case CUI_DROPDOWN_BUTTON_WARNING:
+        return theme->warning;
+    case CUI_DROPDOWN_BUTTON_SUCCESS:
+        return theme->success;
+    case CUI_DROPDOWN_BUTTON_INFO:
+        return theme->info;
+    case CUI_DROPDOWN_BUTTON_SECONDARY:
+        return theme->border;
+    default:
+        return theme->primary;
+    }
+}
+static cui_color cui_dropdown_foreground(const cui_theme *theme,
+                                         cui_dropdown_button_options options) {
+    if (options.outline)
+        return options.variant == CUI_DROPDOWN_BUTTON_SECONDARY ||
+                       options.variant == CUI_DROPDOWN_BUTTON_OUTLINE ||
+                       options.variant == CUI_DROPDOWN_BUTTON_GHOST
+                   ? theme->text
+                   : cui_dropdown_intent(theme, options.variant);
+    switch (options.variant) {
+    case CUI_DROPDOWN_BUTTON_DANGER:
+        return theme->on_danger;
+    case CUI_DROPDOWN_BUTTON_WARNING:
+        return theme->on_warning;
+    case CUI_DROPDOWN_BUTTON_SUCCESS:
+        return theme->on_success;
+    case CUI_DROPDOWN_BUTTON_INFO:
+        return theme->on_info;
+    case CUI_DROPDOWN_BUTTON_PRIMARY:
+        return theme->on_primary;
+    default:
+        return options.selected ? theme->on_primary : theme->text;
+    }
+}
 static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_theme *theme,
                                        cui_dropdown_button_options options, bool trigger,
                                        bool disabled, bool pair_surfaced) {
@@ -2479,21 +2645,19 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     else if (options.variant == CUI_DROPDOWN_BUTTON_OUTLINE ||
              options.variant == CUI_DROPDOWN_BUTTON_GHOST)
         box.background.a = 0;
-    else if (options.variant == CUI_DROPDOWN_BUTTON_DANGER)
-        box.background = theme->danger;
+    else
+        box.background = cui_dropdown_intent(theme, options.variant);
     if (options.variant == CUI_DROPDOWN_BUTTON_GHOST) {
         box.border_width = 0;
         if (pair_surfaced && !disabled)
             box.background = theme->surface;
     }
-    if (options.selected && options.variant != CUI_DROPDOWN_BUTTON_DANGER)
+    if (options.selected && options.variant < CUI_DROPDOWN_BUTTON_DANGER)
         box.background = theme->primary;
     bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
                            options.variant != CUI_DROPDOWN_BUTTON_OUTLINE;
     if (colored_outline) {
-        box.background = options.variant == CUI_DROPDOWN_BUTTON_DANGER    ? theme->danger
-                         : options.variant == CUI_DROPDOWN_BUTTON_PRIMARY ? theme->primary
-                                                                          : theme->border;
+        box.background = cui_dropdown_intent(theme, options.variant);
         box.border = box.background;
         box.background.a = options.selected ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
     }
@@ -2555,19 +2719,10 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     bool pair_surfaced = state->overlay.open ||
                          (!options.hide_action && cui_hovered(ui, action_id)) ||
                          (!options.hide_menu && cui_hovered(ui, trigger_id));
-    cui_color action_foreground = options.variant == CUI_DROPDOWN_BUTTON_PRIMARY ||
-                                          options.variant == CUI_DROPDOWN_BUTTON_DANGER ||
-                                          options.selected
-                                      ? theme->on_primary
-                                      : theme->text;
-    cui_color trigger_foreground = action_foreground;
-    if (options.outline || options.action_outline) {
-        action_foreground = options.variant == CUI_DROPDOWN_BUTTON_PRIMARY  ? theme->primary
-                            : options.variant == CUI_DROPDOWN_BUTTON_DANGER ? theme->danger
-                                                                            : theme->text;
-        if (options.outline)
-            trigger_foreground = action_foreground;
-    }
+    cui_color trigger_foreground = cui_dropdown_foreground(theme, options);
+    cui_dropdown_button_options foreground_options = options;
+    foreground_options.outline = options.outline || options.action_outline;
+    cui_color action_foreground = cui_dropdown_foreground(theme, foreground_options);
     if (action_disabled)
         action_foreground = theme->muted;
     if (all_disabled)

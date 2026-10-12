@@ -52,7 +52,7 @@ void cui_table_begin_section(cui_context *ui, cui_id id, const cui_theme *t,
                              cui_table_section section) {
     if (!ui || !t)
         return;
-    cui_interact(ui, id, CUI_ROLE_GROUP,
+    cui_interact(ui, id, CUI_ROLE_ROWGROUP,
                  cui_string(section == CUI_TABLE_SECTION_HEADER   ? "Table header"
                             : section == CUI_TABLE_SECTION_FOOTER ? "Table footer"
                                                                   : "Table body"),

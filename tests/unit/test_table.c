@@ -419,7 +419,8 @@ static void row_headers(void) {
     bool disabled = false;
     for (size_t i = 0; i < count; i++)
         if (sem[i].id == cui_table_row_header_id(10, 2))
-            disabled = sem[i].disabled && sem[i].details.parent == cui_table_row_id(10, 2);
+            disabled = sem[i].disabled && sem[i].role == CUI_ROLE_ROWHEADER &&
+                       sem[i].details.parent == cui_table_row_id(10, 2);
     assert(disabled);
     cui_destroy(ui);
     cui_table_destroy(m);
@@ -468,7 +469,9 @@ static void static_tables(void) {
         size_t n;
         const cui_semantic *sem = cui_semantics(ui, &n);
         for (size_t j = 0; j < n; j++)
-            if (sem[j].id == 4)
+            if (sem[j].id == 2)
+                assert(sem[j].role == CUI_ROLE_ROWGROUP && sem[j].tab_index == -1);
+            else if (sem[j].id == 4)
                 assert(sem[j].role == CUI_ROLE_COLUMNHEADER && sem[j].details.readonly &&
                        sem[j].tab_index == -1);
         bool header = false;

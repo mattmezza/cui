@@ -34,10 +34,10 @@ static size_t semantic_count;
 static bool checked, enabled = true, toggled;
 static cui_check_state check_state;
 static const unsigned char image_story_pixels[80] = {
-    255,255,255,255, 255,255,255,255, 255,255,255,255, 255,255,255,255, 0,0,0,0,
-    255,255,255,255, 200,100,0,255, 200,100,0,255, 255,255,255,255, 0,0,0,0,
-    255,255,255,255, 200,100,0,255, 200,100,0,255, 255,255,255,255, 0,0,0,0,
-    255,255,255,255, 255,255,255,255, 255,255,255,255, 255,255,255,255, 0,0,0,0};
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0,
+    255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
+    255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0};
 static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
@@ -1766,21 +1766,36 @@ double gallery_bitmap(unsigned i, unsigned field) {
         return 0;
     const cui_bitmap_paint *paint = &draw.commands[i].bitmap;
     switch (field) {
-    case 0: return paint->bitmap.width;
-    case 1: return paint->bitmap.height;
-    case 2: return (double)paint->bitmap.stride;
-    case 3: return paint->source.x;
-    case 4: return paint->source.y;
-    case 5: return paint->source.w;
-    case 6: return paint->source.h;
-    case 7: return paint->opacity;
-    case 8: return paint->grayscale;
-    case 9: return paint->custom_tint;
-    case 10: return paint->tint.r;
-    case 11: return paint->tint.g;
-    case 12: return paint->tint.b;
-    case 13: return paint->tint.a;
-    default: return 0;
+    case 0:
+        return paint->bitmap.width;
+    case 1:
+        return paint->bitmap.height;
+    case 2:
+        return (double)paint->bitmap.stride;
+    case 3:
+        return paint->source.x;
+    case 4:
+        return paint->source.y;
+    case 5:
+        return paint->source.w;
+    case 6:
+        return paint->source.h;
+    case 7:
+        return paint->opacity;
+    case 8:
+        return paint->grayscale;
+    case 9:
+        return paint->custom_tint;
+    case 10:
+        return paint->tint.r;
+    case 11:
+        return paint->tint.g;
+    case 12:
+        return paint->tint.b;
+    case 13:
+        return paint->tint.a;
+    default:
+        return 0;
     }
 }
 unsigned gallery_semantic_count(void) {

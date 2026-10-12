@@ -37,6 +37,10 @@ typedef struct {
     double throughput;
     float x0, y0, x1, y1;
 } cui_chart_sankey_node;
+typedef struct {
+    cui_plot_rect wick, body;
+    bool bullish;
+} cui_chart_candle_geometry;
 typedef enum {
     CUI_CHART_CURVE_NATURAL,
     CUI_CHART_CURVE_LINEAR,
@@ -77,13 +81,15 @@ typedef struct {
     void *format_user;
     bool has_domain;
     double domain_min, domain_max;
-    double inner_radius; /* pie/donut pixels */
-    double pad_angle;    /* pie radians */
-    double bar_ratio;    /* zero means 0.6 */
+    double inner_radius;     /* pie/donut pixels */
+    double pie_outer_radius; /* zero selects 40% of pixel height */
+    double pad_angle;        /* pie radians */
+    double bar_ratio;        /* zero means 0.6 */
     cui_chart_bar_alignment bar_alignment;
     bool custom_bar_padding;
     float bar_padding_inner, bar_padding_outer; /* shares of a band; defaults .4/.2 */
     float max_bar_width, min_bar_length;        /* zero means source 30px/no stub */
+    float candle_body_ratio;                    /* zero selects source 0.8 */
     bool show_bar_values;
     cui_color bar_label_color; /* alpha zero uses foreground */
     cui_chart_curve curve;     /* natural is source default */
@@ -112,6 +118,8 @@ typedef struct {
 cui_plot_result cui_chart_render(cui_chart_state *, const cui_chart_options *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
+cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,
+                                        cui_chart_candle_geometry *);
 /* Caller-owned output; computes acyclic topology and proportional node bounds atomically. */
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *, cui_chart_sankey_node *,
                                         size_t capacity);

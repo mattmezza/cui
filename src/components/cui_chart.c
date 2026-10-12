@@ -95,6 +95,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float x = slots > 1 ? (left + (o->width - 12 - left) * (float)i / (float)(slots - 1)) *
                                       w / o->width
                                 : w / 2;
+            if (o->kind == CUI_CHART_CANDLESTICK) {
+                cui_chart_candle_geometry candle;
+                if (cui_chart_candle_bounds(o, i, &candle) == CUI_PLOT_OK)
+                    x = (float)(candle.wick.x_min * w / o->width);
+            }
             cui_begin_absolute_box(
                 ui, id ^ (UINT64_C(0x5db92a387c4e1100) + i),
                 (cui_box){.width = 56, .height = 12, .fixed_width = true, .fixed_height = true},

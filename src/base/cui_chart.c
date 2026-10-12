@@ -25,9 +25,11 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->width > 4096 || o->height > 4096 || o->width > SIZE_MAX / 4 / o->height ||
         ((o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_RADAR || o->kind == CUI_CHART_SANKEY) &&
          o->count > 256) ||
-        !isfinite(o->inner_radius) || o->inner_radius < 0 || !isfinite(o->pad_angle) ||
-        o->pad_angle < 0 || o->pad_angle > 2 * CUI_CHART_PI || !isfinite(o->bar_ratio) ||
-        o->bar_ratio < 0 || o->bar_ratio > 1 || o->tick_count == 1 || o->tick_count > 1000 ||
+        !isfinite(o->inner_radius) || o->inner_radius < 0 || !isfinite(o->pie_outer_radius) ||
+        o->pie_outer_radius < 0 || !isfinite(o->candle_body_ratio) || o->candle_body_ratio < 0 ||
+        o->candle_body_ratio > 1 || !isfinite(o->pad_angle) || o->pad_angle < 0 ||
+        o->pad_angle > 2 * CUI_CHART_PI || !isfinite(o->bar_ratio) || o->bar_ratio < 0 ||
+        o->bar_ratio > 1 || o->tick_count == 1 || o->tick_count > 1000 ||
         o->bar_alignment < CUI_CHART_BAR_BOTTOM || o->bar_alignment > CUI_CHART_BAR_RIGHT ||
         !isfinite(o->bar_padding_inner) || !isfinite(o->bar_padding_outer) ||
         !isfinite(o->max_bar_width) || !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 ||
@@ -161,8 +163,8 @@ static void cui_chart_domain(const cui_chart_options *o, double *lo, double *hi)
         *hi = o->domain_max;
         return;
     }
-    *lo = 0;
-    *hi = 0;
+    *lo = o->kind == CUI_CHART_CANDLESTICK ? o->data[0].low : 0;
+    *hi = o->kind == CUI_CHART_CANDLESTICK ? o->data[0].high : 0;
     for (size_t i = 0; i < o->count; i++) {
         double a = o->kind == CUI_CHART_CANDLESTICK ? o->data[i].low : o->data[i].value;
         double b = o->kind == CUI_CHART_CANDLESTICK ? o->data[i].high : o->data[i].value;
@@ -183,8 +185,9 @@ static void cui_chart_domain(const cui_chart_options *o, double *lo, double *hi)
         if (*hi == 0)
             *hi = 1;
         else {
-            *lo -= 1;
-            *hi += 1;
+            double delta = fmax(1, fabs(*lo) * .01);
+            *lo = fmax(-DBL_MAX, *lo - delta);
+            *hi = fmin(DBL_MAX, *hi + delta);
         }
     }
 }
@@ -193,7 +196,10 @@ bool cui_chart_value_domain(const cui_chart_options *o, double *minimum, double 
         o->extra_series_count > 7 || (o->extra_series_count && !o->extra_series))
         return false;
     for (size_t i = 0; i < o->count; i++)
-        if (!isfinite(o->data[i].value))
+        if (!isfinite(o->data[i].value) ||
+            (o->kind == CUI_CHART_CANDLESTICK &&
+             (!isfinite(o->data[i].low) || !isfinite(o->data[i].high) ||
+              o->data[i].low > o->data[i].high)))
             return false;
     for (size_t series = 0; series < o->extra_series_count; series++) {
         const cui_chart_series *extra = &o->extra_series[series];
@@ -269,6 +275,51 @@ cui_plot_result cui_chart_bar_bounds(const cui_chart_options *o, size_t index, c
     if (!cui_chart_value_domain(o, &lo, &hi))
         return CUI_PLOT_INVALID;
     return cui_chart_bar_bounds_domain(o, index, lo, hi, out);
+}
+cui_plot_result cui_chart_candle_bounds(const cui_chart_options *o, size_t index,
+                                        cui_chart_candle_geometry *out) {
+    if (!o || !out || o->kind != CUI_CHART_CANDLESTICK || !o->data || !o->count ||
+        o->count > CUI_CHART_MAX_ITEMS || index >= o->count || !o->width || !o->height ||
+        o->width > 4096 || o->height > 4096 ||
+        (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
+        (o->has_domain && (!isfinite(o->domain_min) || !isfinite(o->domain_max) ||
+                           o->domain_min >= o->domain_max)) ||
+        !isfinite(o->candle_body_ratio) || o->candle_body_ratio < 0 || o->candle_body_ratio > 1)
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < o->count; i++) {
+        const cui_chart_datum *d = &o->data[i];
+        if (!isfinite(d->open) || !isfinite(d->high) || !isfinite(d->low) || !isfinite(d->close) ||
+            d->low > d->high || d->open < d->low || d->open > d->high || d->close < d->low ||
+            d->close > d->high)
+            return CUI_PLOT_INVALID;
+    }
+    double lo, hi;
+    cui_chart_domain(o, &lo, &hi);
+    if (!isfinite(lo) || !isfinite(hi) || lo >= hi)
+        return CUI_PLOT_OVERFLOW;
+    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
+    double top = 12, bottom = o->height > 32 ? o->height - 20 : 12;
+    if (right <= left || bottom <= top)
+        return CUI_PLOT_EMPTY;
+    size_t slots = o->point_count ? o->point_count : o->count;
+    double extent = right - left, average = extent / slots;
+    double outer = average * .2;
+    double display = (extent - 2 * outer) / slots;
+    double step = slots > 1 ? display * (1 + .4 / (slots - 1)) : extent;
+    double band = fmin(30, average * .6);
+    double center = slots > 1 ? left + outer + index * step + band / 2 : (left + right) / 2;
+    double width = band * (o->candle_body_ratio ? o->candle_body_ratio : .8);
+    const cui_chart_datum *d = &o->data[index];
+    double y_low = cui_chart_map_y(d->low, lo, hi, top, bottom);
+    double y_high = cui_chart_map_y(d->high, lo, hi, top, bottom);
+    double y_open = cui_chart_map_y(d->open, lo, hi, top, bottom);
+    double y_close = cui_chart_map_y(d->close, lo, hi, top, bottom);
+    cui_chart_candle_geometry result = {.wick = {center, y_high, center, y_low},
+                                        .body = {center - width / 2, fmin(y_open, y_close),
+                                                 center + width / 2, fmax(y_open, y_close)},
+                                        .bullish = d->close > d->open};
+    *out = result;
+    return CUI_PLOT_OK;
 }
 static double cui_chart_series_value(const cui_chart_options *o, size_t series, size_t point) {
     return series ? o->extra_series[series - 1].values[point] : o->data[point].value;
@@ -405,8 +456,7 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
     for (size_t i = 0; i < o->count; i++) {
         const cui_chart_datum *d = &o->data[i];
         cui_color c = cui_chart_palette(o, i);
-        double x = cui_chart_x_at(o, i, left, right),
-               y = cui_chart_map_y(d->value, lo, hi, top, bottom);
+        double y = cui_chart_map_y(d->value, lo, hi, top, bottom);
         if (y < top)
             y = top;
         if (y > bottom)
@@ -417,17 +467,14 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                 cui_chart_rect(s, o, (int)floor(bounds.x_min), (int)floor(bounds.y_min),
                                (int)ceil(bounds.x_max), (int)ceil(bounds.y_max), c);
         } else if (o->kind == CUI_CHART_CANDLESTICK) {
-            double yo = cui_chart_map_y(d->open, lo, hi, top, bottom),
-                   yc = cui_chart_map_y(d->close, lo, hi, top, bottom);
-            double yl = cui_chart_map_y(d->low, lo, hi, top, bottom),
-                   yh = cui_chart_map_y(d->high, lo, hi, top, bottom);
-            c = d->close > d->open ? (o->bullish.a ? o->bullish : c)
-                                   : (o->bearish.a ? o->bearish : c);
-            cui_chart_line(s, o, x, yh, x, yl, c);
-            double band = (right - left) / (o->point_count ? o->point_count : o->count);
-            double w = band * (o->bar_ratio ? o->bar_ratio : .6);
-            cui_chart_rect(s, o, (int)floor(x - w / 2), (int)floor(fmin(yo, yc)),
-                           (int)ceil(x + w / 2), (int)ceil(fmax(yo, yc) + 1), c);
+            cui_chart_candle_geometry candle;
+            if (cui_chart_candle_bounds(o, i, &candle) != CUI_PLOT_OK)
+                continue;
+            c = candle.bullish ? (o->bullish.a ? o->bullish : c) : (o->bearish.a ? o->bearish : c);
+            cui_chart_line(s, o, candle.wick.x_min, candle.wick.y_min, candle.wick.x_max,
+                           candle.wick.y_max, c);
+            cui_chart_rect(s, o, (int)floor(candle.body.x_min), (int)floor(candle.body.y_min),
+                           (int)ceil(candle.body.x_max), (int)ceil(candle.body.y_max + 1), c);
         }
     }
 }
@@ -437,15 +484,16 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
         sum += o->data[i].value;
     if (sum <= 0)
         return;
-    double cx = o->width / 2.0, cy = o->height / 2.0, r = fmin(cx, cy) - 4;
+    double cx = o->width / 2.0, cy = o->height / 2.0;
+    double r = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
     if (r <= 0)
         return;
     double inner = fmin(o->inner_radius, r), edges[257] = {0};
     for (size_t i = 0; i < o->count; i++)
         edges[i + 1] = edges[i] + 2 * CUI_CHART_PI * (double)(o->data[i].value / sum);
     edges[o->count] = 2 * CUI_CHART_PI;
-    int y0 = (int)floor(cy - r), y1 = (int)ceil(cy + r), x0 = (int)floor(cx - r),
-        x1 = (int)ceil(cx + r);
+    int y0 = (int)fmax(0, floor(cy - r)), y1 = (int)fmin(o->height - 1, ceil(cy + r));
+    int x0 = (int)fmax(0, floor(cx - r)), x1 = (int)fmin(o->width - 1, ceil(cx + r));
     for (int y = y0; y <= y1; y++)
         for (int x = x0; x <= x1; x++) {
             double dx = x + .5 - cx, dy = y + .5 - cy, rr = dx * dx + dy * dy;
@@ -742,8 +790,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->domain_min));
     h = cui_chart_mix(h, cui_chart_bits(o->domain_max));
     h = cui_chart_mix(h, cui_chart_bits(o->inner_radius));
+    h = cui_chart_mix(h, cui_chart_bits(o->pie_outer_radius));
     h = cui_chart_mix(h, cui_chart_bits(o->pad_angle));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_ratio));
+    h = cui_chart_mix(h, cui_chart_bits(o->candle_body_ratio));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_padding_inner));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_padding_outer));
     h = cui_chart_mix(h, cui_chart_bits(o->max_bar_width));
@@ -825,8 +875,9 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
         y = (float)(y * o->height / o->logical_height);
     size_t index = 0;
     if (o->kind == CUI_CHART_PIE) {
-        double cx = o->width / 2.0, cy = o->height / 2.0, r = fmin(cx, cy) - 4, dx = x - cx,
-               dy = y - cy;
+        double cx = o->width / 2.0, cy = o->height / 2.0;
+        double r = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
+        double dx = x - cx, dy = y - cy;
         if (dx * dx + dy * dy > r * r || dx * dx + dy * dy < o->inner_radius * o->inner_radius)
             return hit;
         double sum = 0;
@@ -884,7 +935,7 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
             index = cui_chart_band_nearest(o, y, top, bottom - top);
             if (index >= o->count)
                 return hit;
-        } else if (o->kind == CUI_CHART_BAR) {
+        } else if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_CANDLESTICK) {
             index = cui_chart_band_nearest(o, x, left, right - left);
             if (index >= o->count)
                 return hit;

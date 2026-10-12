@@ -128,12 +128,19 @@ typedef struct {
     cui_chart_curve curve;     /* natural is source default */
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
+    float radar_label_gap;                      /* zero selects source 10px */
+    cui_color radar_label_color;
     cui_chart_sankey_align sankey_align;
     cui_chart_sankey_value_scale sankey_value_scale;
     unsigned sankey_iterations;  /* zero selects six relaxation passes; maximum 100 */
     float sankey_min_link_width; /* zero selects source 1px */
     bool custom_sankey_link_opacity;
-    float sankey_link_opacity;      /* default 0.3 */
+    float sankey_link_opacity;       /* default 0.3 */
+    float sankey_node_corner_radius; /* zero selects square nodes */
+    bool sankey_show_labels, sankey_show_values;
+    float sankey_label_gap; /* zero selects source 6px */
+    float sankey_font_size; /* zero selects 12px */
+    cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
     cui_color primary_fill; /* area/radar fill for the first series */

@@ -132,6 +132,21 @@ int main(void) {
     scaled_flow.sankey_link_opacity = 1;
     assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
     assert(memcmp(transparent_links, pixels, sizeof pixels) != 0);
+    flow[0].color = (cui_color){250, 0, 0, 255};
+    flow[1].color = (cui_color){0, 0, 250, 255};
+    assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    skewed[0].color = (cui_color){250, 0, 0, 255};
+    assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    skewed[0].color = (cui_color){0};
+    assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    scaled_flow.sankey_node_corner_radius = 4;
+    assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    flow[0].color = (cui_color){0};
+    flow[1].color = (cui_color){0};
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
     assert(nodes[0].depth == 0 && nodes[1].depth == 1 && nodes[2].depth == 2 &&
            nodes[3].depth == 2);
@@ -599,6 +614,39 @@ int main(void) {
     options.pie_show_labels = false;
     options.pie_outer_radius = 0;
     options.pie_label_gap = 0;
+    options.kind = CUI_CHART_RADAR;
+    options.radar_label_gap = 18;
+    options.radar_label_color = (cui_color){220, 10, 20, 255};
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Radar", 5}));
+    draw = cui_end_frame(ui);
+    bool radar_colored_label = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].color.r == 220 && draw.commands[i].color.g == 10)
+            radar_colored_label = true;
+    assert(radar_colored_label);
+    options.radar_label_gap = 0;
+    options.radar_label_color = (cui_color){0};
+    options.kind = CUI_CHART_SANKEY;
+    options.sankey_show_labels = true;
+    options.sankey_show_values = true;
+    options.sankey_value_format = format_q;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Flow", 4}));
+    draw = cui_end_frame(ui);
+    bool sankey_label = false, sankey_value = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1) {
+            sankey_label |= draw.commands[i].text.data[0] == 'A';
+            sankey_value |= draw.commands[i].text.data[0] == 'Q';
+        }
+    assert(sankey_label && sankey_value);
+    options.sankey_show_labels = false;
+    options.sankey_show_values = false;
+    options.sankey_value_format = NULL;
     options.logical_width = 64;
     options.logical_height = 48;
     options.kind = CUI_CHART_BAR;

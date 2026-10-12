@@ -13,6 +13,10 @@ typedef struct {
 typedef struct {
     float width, height, content_width, content_height, bar_thickness, wheel_step, gap;
     bool horizontal, vertical, disabled, content_row;
+    /* Hide tracks and their controls without disabling wheel scrolling. */
+    bool hide_scrollbars;
+    /* Route gestures by their starting axis when exactly one axis is enabled. */
+    bool axis_lock;
 } cui_scroll_options;
 typedef struct {
     cui_size viewport;

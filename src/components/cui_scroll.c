@@ -70,10 +70,10 @@ void cui_scrollable_end(cui_context *ui, cui_id id, const cui_theme *t, const cu
     cui_scroll_geometry g = cui_scroll_layout(o);
     cui_end_box(ui); /* content */
     cui_end_box(ui); /* viewport */
-    if (o.vertical)
+    if (o.vertical && !o.hide_scrollbars)
         cui_scrollbar(ui, id, t, s, g, o, true);
     cui_end_box(ui); /* body row */
-    if (o.horizontal)
+    if (o.horizontal && !o.hide_scrollbars)
         cui_scrollbar(ui, id, t, s, g, o, false);
     cui_end_box(ui); /* root */
 }

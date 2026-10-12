@@ -29,13 +29,13 @@ static cui_draw_list scene(cui_context *ui, const cui_theme *theme, cui_scroll_s
 #ifdef CUI_SCROLL_BASE_ONLY
     cui_end_box(ui);
     cui_end_box(ui);
-    if (o.vertical) {
+    if (o.vertical && !o.hide_scrollbars) {
         cui_begin_box(ui, cui_scrollbar_id(1, true),
                       (cui_box){.width = o.width - g.viewport.width, .height = g.viewport.height});
         cui_end_box(ui);
     }
     cui_end_box(ui);
-    if (o.horizontal) {
+    if (o.horizontal && !o.hide_scrollbars) {
         cui_begin_box(ui, cui_scrollbar_id(1, false),
                       (cui_box){.width = g.viewport.width, .height = o.height - g.viewport.height});
         cui_end_box(ui);
@@ -217,11 +217,71 @@ static void deferred_scroll(void) {
     deferred_frame(ui, &s, true);
     cui_destroy(ui);
 }
+static void hidden_tracks(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_theme theme = {0};
+    cui_scroll_state state = {.dragging_x = true, .dragging_y = true};
+    cui_scroll_options o = {.width = 200,
+                            .height = 100,
+                            .content_width = 600,
+                            .content_height = 400,
+                            .horizontal = true,
+                            .hide_scrollbars = true,
+                            .axis_lock = true};
+    cui_scroll_geometry g = cui_scroll_layout(o);
+    assert(g.viewport.width == 200 && g.viewport.height == 100 && g.maximum_x == 400);
+    scene(ui, &theme, &state, o);
+    assert(!state.dragging_x && !state.dragging_y);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    bool found = false;
+    for (size_t i = 0; i < count; i++) {
+        assert(sem[i].id != cui_scrollbar_id(1, true));
+        assert(sem[i].id != cui_scrollbar_id(1, false));
+        if (sem[i].id == 1) {
+            found = true;
+            assert(sem[i].details.scroll_axis_lock);
+            assert(sem[i].details.orientation == CUI_ORIENTATION_HORIZONTAL);
+        }
+    }
+    assert(found);
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 50, .y = 50, .dx = -25, .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+    assert(state.x == 25 && cui_event_consumed(ui, 0));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 50,
+                                           .y = 50,
+                                           .dx = -2,
+                                           .dy = -25,
+                                           .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+    assert(state.x == 25 && !cui_event_consumed(ui, 0));
+    /* Finish must preserve the routing policy rather than replace it with zeroes. */
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_base_scrollable(ui, 1, &state, o);
+    cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 100});
+    cui_base_scrollable_finish(ui, 1, &state, o);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    sem = cui_semantics(ui, &count);
+    assert(count == 1 && sem[0].details.scroll_axis_lock &&
+           sem[0].details.orientation == CUI_ORIENTATION_HORIZONTAL);
+    o.horizontal = false;
+    o.vertical = true;
+    scene(ui, &theme, &state, o);
+    sem = cui_semantics(ui, &count);
+    assert(sem[0].details.orientation == CUI_ORIENTATION_VERTICAL);
+    cui_destroy(ui);
+}
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+    hidden_tracks();
     deferred_scroll();
     consumed_wheel();
     behavior();

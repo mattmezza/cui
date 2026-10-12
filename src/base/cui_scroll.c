@@ -10,7 +10,8 @@ static float cui_scroll_limit(float value, float maximum) {
 cui_scroll_geometry cui_scroll_layout(cui_scroll_options o) {
     float width = cui_scroll_positive(o.width, 320), height = cui_scroll_positive(o.height, 240);
     float bar = fminf(cui_scroll_positive(o.bar_thickness, 10), fminf(width, height) * .5f);
-    cui_size viewport = {width - (o.vertical ? bar : 0), height - (o.horizontal ? bar : 0)};
+    cui_size viewport = {width - (o.vertical && !o.hide_scrollbars ? bar : 0),
+                         height - (o.horizontal && !o.hide_scrollbars ? bar : 0)};
     return (cui_scroll_geometry){
         viewport,
         o.horizontal
@@ -146,6 +147,12 @@ bool cui_base_scrollable_finish(cui_context *ui, cui_id id, cui_scroll_state *s,
     cui_scroll_reduce_wheel(ui, id, s, o, g);
     cui_set_semantic_details(ui, id,
                              (cui_semantic_details){.scrollable = !o.disabled,
+                                                    .scroll_axis_lock = o.axis_lock,
+                                                    .orientation = o.horizontal == o.vertical
+                                                                       ? CUI_ORIENTATION_UNSPECIFIED
+                                                                   : o.horizontal
+                                                                       ? CUI_ORIENTATION_HORIZONTAL
+                                                                       : CUI_ORIENTATION_VERTICAL,
                                                     .scroll_x = s->x,
                                                     .scroll_y = s->y,
                                                     .scroll_max_x = g.maximum_x,
@@ -157,16 +164,24 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
         return false;
     cui_scroll_geometry g = cui_scroll_layout(o);
     float old_x = s->x, old_y = s->y;
+    if (o.hide_scrollbars)
+        s->dragging_x = s->dragging_y = false;
     s->x = cui_scroll_limit(s->x, g.maximum_x);
     s->y = cui_scroll_limit(s->y, g.maximum_y);
     cui_scroll_reduce_wheel(ui, id, s, o, g);
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Scrollable content"), o.disabled, false, 0);
-    if (o.horizontal)
+    if (o.horizontal && !o.hide_scrollbars)
         cui_base_scrollbar(ui, id, s, g, o, false);
-    if (o.vertical)
+    if (o.vertical && !o.hide_scrollbars)
         cui_base_scrollbar(ui, id, s, g, o, true);
     cui_set_semantic_details(ui, id,
                              (cui_semantic_details){.scrollable = !o.disabled,
+                                                    .scroll_axis_lock = o.axis_lock,
+                                                    .orientation = o.horizontal == o.vertical
+                                                                       ? CUI_ORIENTATION_UNSPECIFIED
+                                                                   : o.horizontal
+                                                                       ? CUI_ORIENTATION_HORIZONTAL
+                                                                       : CUI_ORIENTATION_VERTICAL,
                                                     .scroll_x = s->x,
                                                     .scroll_y = s->y,
                                                     .scroll_max_x = g.maximum_x,

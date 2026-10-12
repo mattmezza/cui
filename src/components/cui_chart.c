@@ -865,6 +865,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                       sizeof value, o->tooltip_user);
                     formatted =
                         (cui_str){value, written < sizeof value ? written : sizeof value - 1};
+                } else if (o->kind == CUI_CHART_PIE && !o->tooltip_format) {
+                    long double total = 0;
+                    for (size_t part = 0; part < o->count; part++)
+                        total += fmax(0, o->data[part].value);
+                    double share = total > 0 ? (double)((long double)number / total * 100) : 0;
+                    int written = snprintf(value, sizeof value, "%.3g (%.1f%%)", number, share);
+                    formatted =
+                        (cui_str){value, written <= 0                     ? 0
+                                         : (size_t)written < sizeof value ? (size_t)written
+                                                                          : sizeof value - 1};
                 } else
                     formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
                                                  o->format_user);
@@ -878,7 +888,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     row_label[row_count] = candle_labels[series];
                     row_swatch[row_count] = datum->close > datum->open ? o->bullish : o->bearish;
                 } else if (o->kind == CUI_CHART_PIE) {
-                    row_label[row_count] = datum->label;
+                    row_label[row_count] = name;
                     row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
                 } else if (o->kind == CUI_CHART_SANKEY) {
                     row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
@@ -888,6 +898,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                 ? o->extra_series[series - 1].color
                                                 : o->series[series % 8];
                 }
+                if (o->tooltip_label)
+                    row_label[row_count] =
+                        o->tooltip_label(datum, tooltip_index, series, o->tooltip_user);
+                if (row_label[row_count].length && !row_label[row_count].data)
+                    row_label[row_count] = (cui_str){0};
                 row_color[row_count] = o->foreground;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
                     cui_color direction = datum->close > datum->open ? o->bullish : o->bearish;

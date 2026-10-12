@@ -134,6 +134,12 @@ static cui_color tooltip_color_override(const cui_chart_datum *datum, size_t ind
     assert(datum && index == 0 && series < 4 && isfinite(value));
     return (cui_color){3, 210, 4, 255};
 }
+static cui_str tooltip_label_override(const cui_chart_datum *datum, size_t index, size_t series,
+                                      void *user) {
+    (void)user;
+    assert(datum && index == 0 && series == 0);
+    return (cui_str){"CustomName", 10};
+}
 static void custom_tooltip(cui_context *ui, cui_id id, size_t index, const cui_chart_datum *datum,
                            void *user) {
     size_t *calls = user;
@@ -1158,8 +1164,31 @@ int main(void) {
     options.kind = CUI_CHART_PIE;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
     draw = cui_end_frame(ui);
+    bool pie_named_row = false, pie_share = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str label = draw.commands[i].text;
+            if (label.length == 6 && memcmp(label.data, "Shares", 6) == 0)
+                pie_named_row = true;
+            if (label.length >= 2 && label.data[label.length - 2] == '%' &&
+                label.data[label.length - 1] == ')')
+                pie_share = true;
+        }
+    assert(pie_named_row && pie_share);
+    options.tooltip_label = tooltip_label_override;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
+    draw = cui_end_frame(ui);
+    bool pie_custom_name = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 10 &&
+            memcmp(draw.commands[i].text.data, "CustomName", 10) == 0)
+            pie_custom_name = true;
+    assert(pie_custom_name);
+    options.tooltip_label = NULL;
     bool outside_label = false;
     cui_chart_pie_label styled_pie_labels[3];
     assert(cui_chart_pie_labels(&options, styled_pie_labels, 3) == CUI_PLOT_OK);

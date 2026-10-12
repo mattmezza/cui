@@ -53,7 +53,7 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
     if (!ui || !t || !m || !s)
         return (cui_table_result){.error = CUI_TABLE_INVALID};
     cui_table_result result = cui_table_reduce(ui, id, m, s, o);
-    if (result.error != CUI_TABLE_OK)
+    if (result.error != CUI_TABLE_OK && result.error != CUI_TABLE_CAPACITY)
         return result;
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480,
           height = isfinite(o.height) && o.height > 0 ? o.height : 240;
@@ -132,10 +132,7 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
         for (size_t c = columns.begin; c < columns.end; c++) {
             cui_table_get_column(m, c, &col);
             cui_id cid = cui_table_cell_id(id, rr.key, col.key);
-            bool selected = o.selection_mode == CUI_TABLE_SELECT_ROW ? s->row == rr.key
-                            : o.selection_mode == CUI_TABLE_SELECT_COLUMN
-                                ? s->column == col.key
-                                : s->row == rr.key && s->column == col.key;
+            bool selected = cui_table_is_selected(s, o, rr.key, col.key);
             cui_begin_box(ui, cid,
                           (cui_box){.width = col.width,
                                     .height = row,

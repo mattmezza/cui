@@ -58,7 +58,7 @@ column indices, and total grid counts. Indices are one based data indices and
 exclude the header. IDs are stable keyed hashes; applications must avoid hash/ID
 collisions with other controls as required by the core.
 
-Tests cover transactional validation, keyed lookup in 10,000 rows, fractional
+Tests cover bounded row/column/cell ranges, toggles, capacity rejection, and transactional validation, keyed lookup in 10,000 rows, fractional
 viewport arithmetic, clipped overscan, callback count and accessible labels,
 fixed header geometry, horizontal clipping/virtualization, load request deduplication, ordered keyboard events, disabled skipping, manual
 selection, sorting, column reorder, keyboard/pointer resize, width clamps,
@@ -67,9 +67,9 @@ behavior tests run with a base-only core link; sanitizer validation instruments
 both layout and reducer.
 
 This is not full GPUI family parity. Remaining features include pinned left
-columns, multi-selection/range selection,
+columns,
 column drag reorder, menu composition, asynchronous loading indicators, scrollbar
 chrome, variable row heights, Table cell spans/sections/captions, and row-header
-styling. Selection is a single controlled keyed item in each dimension. Caller
+styling. Selection defaults to a single controlled keyed item in each dimension. An opt-in multiple-selection mode uses a caller-provided buffer of at most 4096 keyed items, with Ctrl/Meta toggles and Shift row/column/rectangular ranges. Disabled rows and columns are excluded from ranges. Capacity failures preserve the prior selection and keep the table rendered; callers may enlarge the buffer and retry. The anchor and buffer are controlled state, and callers must retain unique normalized keys in the buffer. Caller
 sorting/filtering is supported but this module does not provide a comparator or
 filter engine. Native accessibility adapters must map the portable grid roles.

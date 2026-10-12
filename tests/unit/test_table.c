@@ -209,6 +209,88 @@ static void events(void) {
     cui_destroy(ui);
     cui_table_destroy(m);
 }
+static void multiple_selection(void) {
+    cui_table_model *m = cui_table_create(4);
+    cui_table_row rows[] = {{.key = 1}, {.key = 2, .disabled = true}, {.key = 3}, {.key = 4}};
+    cui_table_column cols[] = {{.key = 10, .width = 100}, {.key = 20, .width = 100}};
+    assert(cui_table_bind(m, rows, 4, cols, 2) == CUI_TABLE_OK);
+    cui_table_selection buffer[8] = {0};
+    cui_table_state state = {.selection = buffer, .selection_capacity = 8};
+    cui_table_options o = {.width = 200,
+                           .height = 160,
+                           .selection_mode = CUI_TABLE_SELECT_CELL,
+                           .multiple_selection = true};
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    scene(ui, m, &state, o);
+    cui_focus(ui, cui_table_cell_id(10, 1, 10));
+    key(ui, CUI_KEY_ENTER, 0);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 1 && cui_table_is_selected(&state, o, 1, 10));
+    key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_SHIFT);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 4 && cui_table_is_selected(&state, o, 3, 20) &&
+           !cui_table_is_selected(&state, o, 2, 10));
+    key(ui, CUI_KEY_ENTER, CUI_MOD_CTRL);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 3 && !cui_table_is_selected(&state, o, 3, 20));
+    key(ui, CUI_KEY_ENTER, CUI_MOD_CTRL);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 4 && cui_table_is_selected(&state, o, 3, 20));
+    state.selection_capacity = 4;
+    key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    cui_table_result result;
+#ifdef CUI_TABLE_BASE_ONLY
+    result = cui_base_data_table(ui, 10, m, &state, o);
+#else
+    cui_theme t = cui_theme_dark();
+    result = cui_data_table(ui, 10, &t, m, &state, o, label, cell, NULL);
+#endif
+    cui_end_frame(ui);
+    assert(result.error == CUI_TABLE_OK); /* Anchor changed by Ctrl toggle: two cells. */
+    assert(state.selection_count == 2 && cui_table_is_selected(&state, o, 4, 20));
+    state.selection_capacity = 1;
+    state.selection_count = 1;
+    state.anchor_row = 1;
+    state.anchor_column = 10;
+    cui_focus(ui, cui_table_cell_id(10, 4, 20));
+    key(ui, CUI_KEY_HOME, CUI_MOD_SHIFT);
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+#ifdef CUI_TABLE_BASE_ONLY
+    result = cui_base_data_table(ui, 10, m, &state, o);
+#else
+    result = cui_data_table(ui, 10, &t, m, &state, o, label, cell, NULL);
+#endif
+    cui_end_frame(ui);
+    assert(result.error == CUI_TABLE_CAPACITY && state.selection_count == 1);
+    size_t n;
+    const cui_semantic *sem = cui_semantics(ui, &n);
+    assert(n > 0 && sem[0].details.multiselectable);
+    state.selection_capacity = 8;
+    state.selection_count = 0;
+    state.anchor_row = state.anchor_column = 0;
+    o.selection_mode = CUI_TABLE_SELECT_ROW;
+    scene(ui, m, &state, o);
+    cui_focus(ui, cui_table_cell_id(10, 1, 10));
+    key(ui, CUI_KEY_ENTER, 0);
+    key(ui, CUI_KEY_END, CUI_MOD_SHIFT);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 3 && cui_table_is_selected(&state, o, 4, 20));
+    state.selection_count = 0;
+    state.anchor_row = state.anchor_column = 0;
+    o.selection_mode = CUI_TABLE_SELECT_COLUMN;
+    scene(ui, m, &state, o);
+    cui_focus(ui, cui_table_header_id(10, 10));
+    key(ui, CUI_KEY_ENTER, 0);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_SHIFT);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 2 && cui_table_is_selected(&state, o, 4, 10) &&
+           cui_table_is_selected(&state, o, 1, 20));
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
 #ifndef CUI_TABLE_BASE_ONLY
 static void pointer_resize(void) {
     cui_table_model *m = cui_table_create(1);
@@ -332,6 +414,7 @@ int main(void) {
     models();
     columns_and_loading();
     events();
+    multiple_selection();
 #ifndef CUI_TABLE_BASE_ONLY
     virtual_scene();
     pointer_resize();

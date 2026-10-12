@@ -62,6 +62,9 @@ cui_table_view cui_table_viewport(const cui_table_model *, float scroll, float h
 cui_table_view cui_table_column_viewport(const cui_table_model *, float scroll, float width,
                                          size_t overscan);
 typedef struct {
+    cui_id row, column;
+} cui_table_selection;
+typedef struct {
     cui_id row, column; /* Controlled selection; zero means none. */
     cui_id cursor_row, cursor_column, header_cursor;
     cui_id sort_column;
@@ -71,11 +74,15 @@ typedef struct {
     float resize_x, resize_width;
     size_t visible_begin, visible_end, column_begin, column_end, previous_row_count;
     bool viewport_initialized, load_pending;
+    cui_table_selection *selection;
+    size_t selection_count, selection_capacity;
+    cui_id anchor_row, anchor_column;
 } cui_table_state;
 typedef struct {
     float width, height, row_height, header_height;
     size_t overscan, column_overscan, load_more_threshold;
-    bool disabled, striped, bordered, manual_selection, loop_selection, load_more;
+    bool disabled, striped, bordered, manual_selection, loop_selection, load_more,
+        multiple_selection;
     cui_table_selection_mode selection_mode;
 } cui_table_options;
 typedef struct {
@@ -86,6 +93,7 @@ typedef struct {
     cui_id activated_row, activated_column;
     cui_table_error error;
 } cui_table_result;
+bool cui_table_is_selected(const cui_table_state *, cui_table_options, cui_id row, cui_id column);
 cui_id cui_table_row_id(cui_id table, cui_id row);
 cui_id cui_table_cell_id(cui_id table, cui_id row, cui_id column);
 cui_id cui_table_header_id(cui_id table, cui_id column);

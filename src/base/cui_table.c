@@ -221,9 +221,101 @@ cui_table_view cui_table_column_viewport(const cui_table_model *m, float scroll,
     }
     return v;
 }
-static void select(cui_table_state *s, cui_table_options o, cui_id row, cui_id col) {
-    s->row = o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : row;
-    s->column = o.selection_mode == CUI_TABLE_SELECT_ROW ? 0 : col;
+bool cui_table_is_selected(const cui_table_state *s, cui_table_options o, cui_id row, cui_id col) {
+    if (!s)
+        return false;
+    row = o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : row;
+    col = o.selection_mode == CUI_TABLE_SELECT_ROW ? 0 : col;
+    if (o.multiple_selection) {
+        if (!s->selection || s->selection_count > s->selection_capacity)
+            return false;
+        for (size_t i = 0; i < s->selection_count; i++)
+            if (s->selection[i].row == row && s->selection[i].column == col)
+                return true;
+        return false;
+    }
+    return s->row == row && s->column == col;
+}
+static uint64_t selection_hash(const cui_table_state *s) {
+    uint64_t h = 0;
+    for (size_t i = 0; i < s->selection_count; i++)
+        h ^= mix(s->selection[i].row) ^ mix(s->selection[i].column ^ UINT64_C(0x23761889fc4a6bd2));
+    return h;
+}
+static cui_table_error select(cui_table_model *m, cui_table_state *s, cui_table_options o,
+                              cui_id row, cui_id col, unsigned mods) {
+    cui_id normalized_row = o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : row,
+           normalized_col = o.selection_mode == CUI_TABLE_SELECT_ROW ? 0 : col;
+    if (!o.multiple_selection) {
+        s->row = normalized_row;
+        s->column = normalized_col;
+        return CUI_TABLE_OK;
+    }
+    if ((mods & CUI_MOD_SHIFT) && s->anchor_column) {
+        size_t r = 0, ar = 0, c = column(m, col), ac = column(m, s->anchor_column);
+        if (o.selection_mode != CUI_TABLE_SELECT_COLUMN &&
+            (!cui_table_row_index(m, row, &r) || !cui_table_row_index(m, s->anchor_row, &ar)))
+            return CUI_TABLE_INVALID;
+        if (o.selection_mode == CUI_TABLE_SELECT_ROW)
+            c = ac = 0;
+        if (c == SIZE_MAX || ac == SIZE_MAX)
+            return CUI_TABLE_INVALID;
+        size_t r0 = r < ar ? r : ar, r1 = r > ar ? r : ar, c0 = c < ac ? c : ac,
+               c1 = c > ac ? c : ac, needed = 0;
+        for (size_t ri = r0; ri <= r1; ri++)
+            for (size_t ci = c0; ci <= c1; ci++) {
+                if ((o.selection_mode != CUI_TABLE_SELECT_COLUMN && m->rows[ri].disabled) ||
+                    (o.selection_mode != CUI_TABLE_SELECT_ROW && m->cols[ci].disabled))
+                    continue;
+                if (++needed > s->selection_capacity)
+                    return CUI_TABLE_CAPACITY;
+            }
+        s->selection_count = 0;
+        for (size_t ri = r0; ri <= r1; ri++)
+            for (size_t ci = c0; ci <= c1; ci++) {
+                if ((o.selection_mode != CUI_TABLE_SELECT_COLUMN && m->rows[ri].disabled) ||
+                    (o.selection_mode != CUI_TABLE_SELECT_ROW && m->cols[ci].disabled))
+                    continue;
+                s->selection[s->selection_count++] = (cui_table_selection){
+                    o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : m->rows[ri].key,
+                    o.selection_mode == CUI_TABLE_SELECT_ROW ? 0 : m->cols[ci].key};
+            }
+    } else if (mods & (CUI_MOD_CTRL | CUI_MOD_META)) {
+        size_t found = SIZE_MAX;
+        for (size_t i = 0; i < s->selection_count; i++)
+            if (s->selection[i].row == normalized_row && s->selection[i].column == normalized_col) {
+                found = i;
+                break;
+            }
+        if (found != SIZE_MAX) {
+            memmove(s->selection + found, s->selection + found + 1,
+                    (s->selection_count - found - 1) * sizeof(*s->selection));
+            s->selection_count--;
+        } else {
+            if (s->selection_count == s->selection_capacity)
+                return CUI_TABLE_CAPACITY;
+            s->selection[s->selection_count++] =
+                (cui_table_selection){normalized_row, normalized_col};
+        }
+        s->anchor_row = row;
+        s->anchor_column = col;
+    } else {
+        if (!s->selection_capacity)
+            return CUI_TABLE_CAPACITY;
+        s->selection[0] = (cui_table_selection){normalized_row, normalized_col};
+        s->selection_count = 1;
+        s->anchor_row = row;
+        s->anchor_column = col;
+    }
+    s->row = normalized_row;
+    s->column = normalized_col;
+    return CUI_TABLE_OK;
+}
+static void apply_selection(cui_table_model *m, cui_table_state *s, cui_table_options o, cui_id row,
+                            cui_id col, unsigned mods, cui_table_result *out) {
+    cui_table_error error = select(m, s, o, row, col, mods);
+    if (error != CUI_TABLE_OK)
+        out->error = error;
 }
 static size_t enabled_row(const cui_table_model *m, size_t start, int direction, bool loop) {
     if (!m->count)
@@ -280,6 +372,14 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         out.error = CUI_TABLE_INVALID;
         return out;
     }
+    if (o.multiple_selection &&
+        ((!s->selection && s->selection_capacity) || s->selection_capacity > 4096 ||
+         s->selection_count > s->selection_capacity)) {
+        out.error = CUI_TABLE_INVALID;
+        return out;
+    }
+    size_t oldcount = o.multiple_selection ? s->selection_count : 0;
+    uint64_t oldhash = o.multiple_selection ? selection_hash(s) : 0;
     cui_id oldrow = s->row, oldcol = s->column;
     size_t r = 0, c = column(m, s->cursor_column);
     if (!cui_table_row_index(m, s->cursor_row, &r) || m->rows[r].disabled) {
@@ -390,14 +490,14 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                         reveal_header = true;
                         cui_focus(ui, cui_table_header_id(id, s->header_cursor));
                         if (!o.manual_selection && o.selection_mode == CUI_TABLE_SELECT_COLUMN)
-                            select(s, o, 0, s->header_cursor);
+                            apply_selection(m, s, o, 0, s->header_cursor, ev[e].modifiers, &out);
                     }
                 }
                 if (activation == target &&
                     (ev[e].type == CUI_EVENT_KEY_DOWN || ev[e].type == CUI_EVENT_KEY_UP))
                     hc = column(m, s->header_cursor);
                 if (activation == target && o.selection_mode == CUI_TABLE_SELECT_COLUMN)
-                    select(s, o, 0, m->cols[hc].key);
+                    apply_selection(m, s, o, 0, m->cols[hc].key, ev[e].modifiers, &out);
                 if (activation == target && m->cols[hc].sortable) {
                     s->sort = s->sort_column == m->cols[hc].key
                                   ? (cui_table_sort)((s->sort + 1) % 3)
@@ -417,7 +517,8 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                 }
                 previous = target;
                 if (activation == target) {
-                    select(s, o, s->cursor_row, s->cursor_column);
+                    apply_selection(m, s, o, s->cursor_row, s->cursor_column, ev[e].modifiers,
+                                    &out);
                     reveal = true;
                     out.activated_row = s->cursor_row;
                     out.activated_column = s->cursor_column;
@@ -466,7 +567,8 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                         s->cursor_row = m->rows[nr].key;
                         s->cursor_column = m->cols[nc].key;
                         if (!o.manual_selection)
-                            select(s, o, s->cursor_row, s->cursor_column);
+                            out.error =
+                                select(m, s, o, s->cursor_row, s->cursor_column, ev[e].modifiers);
                         cui_focus(ui, cui_table_cell_id(id, s->cursor_row, s->cursor_column));
                     }
                 }
@@ -537,7 +639,9 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
     s->column_begin = out.columns.begin;
     s->column_end = out.columns.end;
     s->previous_row_count = m->count;
-    out.selection_changed = oldrow != s->row || oldcol != s->column;
+    out.selection_changed =
+        oldrow != s->row || oldcol != s->column ||
+        (o.multiple_selection && (oldcount != s->selection_count || oldhash != selection_hash(s)));
     return out;
 }
 void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
@@ -552,6 +656,7 @@ void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_t
         ui, id,
         (cui_semantic_details){.row_count = (unsigned)m->count,
                                .column_count = (unsigned)m->columns,
+                               .multiselectable = o.multiple_selection,
                                .scrollable = true,
                                .scroll_x = s->scroll_x,
                                .scroll_max_x = fmaxf(0, columns.total - width)});
@@ -581,7 +686,7 @@ void cui_table_submit_header(cui_context *ui, cui_id id, cui_table_model *m, cui
             (cui_semantic_details){.parent = id,
                                    .column_index = (unsigned)c + 1,
                                    .selected = o.selection_mode == CUI_TABLE_SELECT_COLUMN &&
-                                               s->column == m->cols[c].key});
+                                               cui_table_is_selected(s, o, 0, m->cols[c].key)});
         if (m->cols[c].resizable) {
             cui_id grip = cui_table_resize_id(id, m->cols[c].key);
             cui_interact(ui, grip, CUI_ROLE_SLIDER, cui_string("Column width"), disabled, false,
@@ -625,13 +730,10 @@ void cui_table_submit_body(cui_context *ui, cui_id id, cui_table_model *m, cui_t
             (cui_semantic_details){.parent = body,
                                    .row_index = (unsigned)r + 1,
                                    .selected = o.selection_mode == CUI_TABLE_SELECT_ROW &&
-                                               s->row == m->rows[r].key});
+                                               cui_table_is_selected(s, o, m->rows[r].key, 0)});
         for (size_t c = columns.begin; c < columns.end; c++) {
             cui_id cid = cui_table_cell_id(id, m->rows[r].key, m->cols[c].key);
-            bool selected = (o.selection_mode == CUI_TABLE_SELECT_ROW ? s->row == m->rows[r].key
-                             : o.selection_mode == CUI_TABLE_SELECT_COLUMN
-                                 ? s->column == m->cols[c].key
-                                 : s->row == m->rows[r].key && s->column == m->cols[c].key);
+            bool selected = cui_table_is_selected(s, o, m->rows[r].key, m->cols[c].key);
             cui_interact(ui, cid, CUI_ROLE_GRIDCELL,
                          label ? label(data, r, m->cols[c].key) : m->rows[r].label,
                          o.disabled || m->rows[r].disabled || m->cols[c].disabled, false, 0);
@@ -648,7 +750,7 @@ void cui_table_submit_body(cui_context *ui, cui_id id, cui_table_model *m, cui_t
 cui_table_result cui_base_data_table(cui_context *ui, cui_id id, cui_table_model *m,
                                      cui_table_state *s, cui_table_options o) {
     cui_table_result result = cui_table_reduce(ui, id, m, s, o);
-    if (result.error == CUI_TABLE_OK) {
+    if (result.error == CUI_TABLE_OK || result.error == CUI_TABLE_CAPACITY) {
         cui_table_submit_root(ui, id, m, s, o);
         cui_table_submit_header(ui, id, m, s, o);
         cui_table_submit_body(ui, id, m, s, o, NULL, NULL);

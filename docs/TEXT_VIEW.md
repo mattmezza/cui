@@ -189,12 +189,12 @@ repeats the quote prefix after a hard break and keeps any surrounding list inden
 Blank quote paragraphs, lazy unprefixed quote continuation, and nested quote
 containers remain outside this bounded paragraph representation.
 
-Standalone host images in list items retain parent ancestry, ordered counters and
-Source-copy grouping. The first image shares a row with a separate list prefix;
-its borrowed RGBA bitmap keeps its aspect ratio and a short first row reserves
-the marker line height. Removing the host image callback restores alt text without
-retaining the prior bitmap. These images remain standalone blocks with alt-text
-ranges, rather than mixed inline objects in a paragraph.
+Markdown images in list items retain parent ancestry, ordered counters and Source
+copy grouping. Standalone Markdown images now use the same one-byte paragraph
+object flow as mixed images, including default inline sizing, loaded/unloaded slots
+and list continuation marker rules. Their ranges cover complete image syntax,
+rather than the former alt-text ranges. Bare root HTML images retain legacy
+standalone blocks pending migration.
 
 Exact source inline image flow requires styled font ascent, descent and baseline
 metrics. In frozen `inline_flow.rs`, each line starts with the body's baseline
@@ -211,7 +211,7 @@ reserve horizontal space among text runs and wrap at object boundaries. Default
 inline height is 75% of the logical line height, with loaded aspect ratio or a
 square unloaded slot, matching the frozen source. Selection maps each slot to
 the entire image source syntax, and Source copy preserves that syntax. Title tooltips,
-standalone-image dimensions and custom object renderers remain unimplemented. Standalone image blocks still retain their earlier alt-text ranges.
+standalone-image dimensions and custom object renderers remain unimplemented. Bare root HTML image blocks still retain their earlier alt-text ranges.
 
 Tables following existing list content retain parent membership and paint in the
 16px continuation column. Column sizing, horizontal viewport clipping and footer

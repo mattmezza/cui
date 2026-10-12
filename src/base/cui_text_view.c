@@ -677,8 +677,6 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                 if (remainder != b)
                     image_last = SIZE_MAX;
             }
-            if (image_last != SIZE_MAX && kind == CUI_TEXT_VIEW_PARAGRAPH)
-                kind = CUI_TEXT_VIEW_IMAGE;
         }
         unsigned heading_prefix = 0;
         while (heading_prefix < 6 && a + heading_prefix < b &&
@@ -876,10 +874,9 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         if (image_last != SIZE_MAX) {
             if (p->write) {
                 cui_text_view_block *block = &p->state->workspace.blocks[p->block];
-                block->kind = CUI_TEXT_VIEW_IMAGE;
                 block->resource = cui_text_view_link_uri(p->input, image_close + 2, image_last);
             }
-            cui_text_view_inline(p, a + 2, image_close, 0, (cui_text_view_range){0}, 0);
+            cui_text_view_inline(p, a, image_last + 1, 0, (cui_text_view_range){0}, 0);
             cui_text_view_block_end(p, next, true);
             a = next;
             continue;

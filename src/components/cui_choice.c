@@ -41,7 +41,22 @@ static void cui_choice_ellipsized_text(cui_context *ui, cui_str label, float fon
 static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                                bool selected, bool disabled, cui_tab_variant variant,
                                cui_choice_render_fn render, size_t index, void *render_user,
-                               float max_width) {
+                               float max_width, const cui_tab_parts *parts) {
+    cui_choice_item effective = *item;
+    effective.disabled = disabled;
+    bool structured = parts && (parts->prefix || parts->suffix || parts->icon);
+    bool icon = structured && parts->icon;
+    if (icon)
+        max_width = 0;
+    float prefix = structured && parts->prefix && isfinite(parts->prefix_width)
+                       ? fmaxf(0, parts->prefix_width)
+                       : 0;
+    float suffix = structured && parts->suffix && isfinite(parts->suffix_width)
+                       ? fmaxf(0, parts->suffix_width)
+                       : 0;
+    float gaps = structured ? theme->gap * ((parts->prefix != NULL) + (parts->suffix != NULL)) : 0;
+    float text_width = cui_measure_text(ui, item->label, theme->font_size).width;
+    float body_limit = fmaxf(0, max_width - 2 * theme->padding - prefix - suffix - gaps);
     cui_box box = {.height = theme->control_height,
                    .padding = theme->padding,
                    .radius = theme->radius,
@@ -67,22 +82,44 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
         box.border = theme->focus;
         box.border_width = 2;
     }
-    bool ellipsized =
-        !render && isfinite(max_width) && max_width > 0 &&
-        cui_measure_text(ui, item->label, theme->font_size).width + 2 * theme->padding > max_width;
+    bool ellipsized = !render && isfinite(max_width) && max_width > 0 &&
+                      text_width + 2 * theme->padding + prefix + suffix + gaps > max_width;
     if (isfinite(max_width) && max_width > 0) {
         box.max_width = max_width;
         box.clip = true;
     }
     if (ellipsized)
         box.width = max_width;
+    else if (structured && !render && !icon && (!parts->prefix || prefix > 0) &&
+             (!parts->suffix || suffix > 0))
+        box.width = text_width + 2 * theme->padding + prefix + suffix + gaps;
     cui_begin_box(ui, item->id, box);
     if (variant == CUI_TAB_UNDERLINE)
         cui_begin_box(ui, 0,
                       (cui_box){.height = theme->control_height > 2 ? theme->control_height - 2 : 0,
                                 .padding = theme->padding});
-    if (render)
-        render(ui, item, index, render_user);
+    if (structured) {
+        cui_begin_box(
+            ui, item->id ^ UINT64_C(0xacf7823ab98e17d0),
+            (cui_box){.width = -1, .row = true, .gap = theme->gap, .align_y = CUI_ALIGN_CENTER});
+        if (parts->prefix) {
+            cui_begin_box(ui, item->id ^ UINT64_C(0xacf7823ab98e17e0),
+                          (cui_box){.width = prefix, .clip = prefix > 0});
+            parts->prefix(ui, &effective, index, parts->user);
+            cui_end_box(ui);
+        }
+        cui_begin_box(ui, item->id ^ UINT64_C(0xacf7823ab98e17f0),
+                      (cui_box){.width = icon     ? theme->control_height * 1.25f
+                                         : render ? -1
+                                                  : fminf(text_width,
+                                                          max_width > 0 ? body_limit : text_width),
+                                .fixed_width = !render && !icon,
+                                .clip = true});
+    }
+    if (icon)
+        parts->icon(ui, &effective, index, parts->user);
+    else if (render)
+        render(ui, &effective, index, render_user);
     else {
         cui_color color = disabled ? theme->muted
                           : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
@@ -90,9 +127,20 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
                               : theme->text;
         if (ellipsized)
             cui_choice_ellipsized_text(ui, item->label, theme->font_size, color,
-                                       fmaxf(0, max_width - 2 * theme->padding));
+                                       structured ? body_limit
+                                                  : fmaxf(0, max_width - 2 * theme->padding));
         else
             cui_text(ui, item->label, theme->font_size, color);
+    }
+    if (structured) {
+        cui_end_box(ui);
+        if (parts->suffix) {
+            cui_begin_box(ui, item->id ^ UINT64_C(0xacf7823ab98e1710),
+                          (cui_box){.width = suffix, .clip = suffix > 0});
+            parts->suffix(ui, &effective, index, parts->user);
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
     }
     if (variant == CUI_TAB_UNDERLINE) {
         cui_end_box(ui);
@@ -106,7 +154,31 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
 }
 static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                             bool selected, bool disabled, cui_tab_variant variant) {
-    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0);
+    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0, NULL);
+}
+static float cui_tab_extent(cui_context *ui, const cui_theme *theme, const cui_choice_item *item,
+                            size_t index, cui_tabs_options options) {
+    if (options.vertical)
+        return theme->control_height;
+    const cui_tab_parts *parts =
+        options.parts && index < options.parts_count ? &options.parts[index] : NULL;
+    bool natural_parts =
+        parts && ((parts->prefix && (!isfinite(parts->prefix_width) || parts->prefix_width <= 0)) ||
+                  (parts->suffix && (!isfinite(parts->suffix_width) || parts->suffix_width <= 0)));
+    float extent =
+        options.render || natural_parts ? cui_bounds(ui, item->id).w
+        : parts && parts->icon
+            ? theme->control_height * 1.25f + 2 * theme->padding
+            : cui_measure_text(ui, item->label, theme->font_size).width + 2 * theme->padding;
+    if (parts && !options.render && !natural_parts) {
+        if (parts->prefix)
+            extent += fmaxf(0, parts->prefix_width) + theme->gap;
+        if (parts->suffix)
+            extent += fmaxf(0, parts->suffix_width) + theme->gap;
+    }
+    if ((!parts || !parts->icon) && options.max_width > 0 && extent > options.max_width)
+        extent = options.max_width;
+    return extent;
 }
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
@@ -120,13 +192,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         options.scroll->viewport = cui_bounds(ui, viewport_id);
         float content = count > 1 ? (float)(count - 1) * theme->gap : 0;
         for (size_t i = 0; i < count; i++) {
-            float extent = options.vertical ? theme->control_height
-                           : options.render
-                               ? cui_bounds(ui, items[i].id).w
-                               : cui_measure_text(ui, items[i].label, theme->font_size).width +
-                                     2 * theme->padding;
-            if (!options.vertical && options.max_width > 0 && extent > options.max_width)
-                extent = options.max_width;
+            float extent = cui_tab_extent(ui, theme, &items[i], i, options);
             if (isfinite(extent) && extent > 0)
                 content += extent;
         }
@@ -148,13 +214,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
             float start = 0;
             bool found = false;
             for (size_t i = 0; i < count; i++) {
-                float extent = options.vertical ? theme->control_height
-                               : options.render
-                                   ? cui_bounds(ui, items[i].id).w
-                                   : cui_measure_text(ui, items[i].label, theme->font_size).width +
-                                         2 * theme->padding;
-                if (!options.vertical && options.max_width > 0 && extent > options.max_width)
-                    extent = options.max_width;
+                float extent = cui_tab_extent(ui, theme, &items[i], i, options);
                 if (items[i].id == scroll->reveal_id) {
                     found = true;
                     if (extent > 0 && isfinite(extent)) {
@@ -209,7 +269,8 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     for (size_t i = 0; i < count; ++i) {
         cui_choice_draw_ex(ui, &items[i], theme, items[i].id == *selected,
                            options.disabled || items[i].disabled, options.variant, options.render,
-                           i, options.render_user, options.max_width);
+                           i, options.render_user, options.max_width,
+                           options.parts && i < options.parts_count ? &options.parts[i] : NULL);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.selected = items[i].id == *selected,
@@ -1082,9 +1143,9 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     } else if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM) {
         box.background = active    ? options.custom.active
                          : hovered ? options.custom.hover
-                                   : cui_dropdown_opacity(options.custom.color, .8f);
+                                   : cui_dropdown_opacity(options.custom.color, .2f);
         box.border =
-            outlined ? cui_dropdown_opacity(options.custom.color, .6f) : options.custom.color;
+            outlined ? cui_dropdown_opacity(options.custom.color, .4f) : options.custom.color;
         box.border_width = outlined ? 1 : 0;
         *foreground = options.custom.foreground;
     }
@@ -1095,7 +1156,7 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
             options.variant == CUI_DROPDOWN_BUTTON_TEXT)
             box.background = box.border = (cui_color){0};
         else if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM) {
-            box.background = cui_dropdown_opacity(options.custom.color, outlined ? .4f : .15f);
+            box.background = cui_dropdown_opacity(options.custom.color, outlined ? .1f : .15f);
             box.border = cui_dropdown_opacity(box.border, outlined ? .5f : .15f);
         } else if (outlined) {
             box.background = cui_dropdown_opacity(colors.outline_normal, .5f);

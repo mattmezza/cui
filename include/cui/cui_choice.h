@@ -44,6 +44,14 @@ typedef struct {
     float scrollbar_grab;
     bool scrollbar_dragging;
 } cui_tab_scroll_state;
+/* Structured per-tab content; explicit positive widths reserve nonshrinking
+ * prefix/suffix space under a cap. Zero widths fit naturally without reserving
+ * truncation space. Icon mode replaces the body and ignores max_width. */
+typedef struct {
+    cui_choice_render_fn prefix, suffix, icon;
+    void *user;
+    float prefix_width, suffix_width;
+} cui_tab_parts;
 typedef struct {
     bool vertical, disabled, manual_activation;
     cui_tab_variant variant;
@@ -55,9 +63,11 @@ typedef struct {
     cui_tab_scroll_state *scroll; /* optional application-owned bounded viewport */
     float bar_extent;             /* scroll viewport width, or height for vertical tabs */
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
-    cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
-    bool reveal_selected;     /* opt in to reveal selection changes in a bounded strip */
-    bool scrollbar;           /* optional pointer/keyboard scrollbar over the viewport edge */
+    cui_tab_drag_state *drag;   /* optional stable-ID reorder request; caller applies after frame */
+    bool reveal_selected;       /* opt in to reveal selection changes in a bounded strip */
+    const cui_tab_parts *parts; /* optional borrowed per-item slots */
+    size_t parts_count;
+    bool scrollbar; /* optional pointer/keyboard scrollbar over the viewport edge */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

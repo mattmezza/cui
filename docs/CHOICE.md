@@ -514,7 +514,7 @@ measured underline, and Text uses a transparent background with a slightly faded
 resting label. Link/Text stay transparent on hover and selection. Custom accepts
 portable `color`, `foreground`, `hover` and `active` colors shared by both halves;
 selection and held pointer/Space capture use active. Custom normal uses color
-with .8 opacity; hover and active use the corresponding supplied colors, including
+with .2 opacity; hover and active use the corresponding supplied colors, including
 when outlined. A custom content callback owns its
 label decoration; built-in Link labels and the menu indicator are underlined.
 Custom shadows and rich gradient backgrounds remain unfinished.
@@ -565,9 +565,11 @@ selected uses the secondary active surface. Disabled styles derive opacity from
 the normal tokens, and loading preserves normal color with .8 opacity while
 blocking action activation. Arbitrarily distinct palette tests prove that hover,
 held active, selected, outlined and disabled states use the configured values
-without deriving their RGB colors from another state. Custom outline border
-currently changes alpha without reproducing upstream Oklab white mixing; rich
-backgrounds and custom shadow painting remain explicit gaps.
+without deriving their RGB colors from another state. Custom normal/outline-normal mixing toward transparent uses .2 alpha and
+outline border mixing uses .4 alpha, matching the source factor-first convention.
+For a fully transparent target, premultiplied Oklab mixing preserves RGB, so
+these alpha operations are equivalent. Rich backgrounds and custom shadow
+painting remain explicit gaps.
 
 Tab `max_width` now caps custom-rendered bodies as well as built-in labels.
 The core natural-width constraint leaves short bodies untouched on the first
@@ -575,3 +577,18 @@ frame and clips long bodies without a measurement flash. Custom callbacks still
 own text ellipsis/decoration inside their body. Scroll range/reveal calculations
 use the capped tab width. Headless tests cover short/long custom content from the
 first frame across all variants, retained scroll geometry and actual selection.
+
+Optional per-item `cui_tab_parts` arrays (`parts`/`parts_count`) provide prefix,
+suffix and icon callbacks. Declare positive `prefix_width`/`suffix_width` to
+reserve their full widths while the built-in middle label absorbs truncation.
+Callbacks receive the effective disabled item and remain inside the tab; suffix
+controls can handle their own activation without selecting the tab. Slot user
+pointers are borrowed. With zero/invalid widths slots fit naturally, but automatic
+intrinsic width reservation under a cap remains unfinished. Icon mode replaces
+the normal/custom body, reserves a theme-height-based icon area and exempts the
+tab from max_width, as in the reference icon-only behavior. Scroll/reveal extents
+include declared slots and icon exemptions; intrinsic/custom bodies use retained
+geometry. Tests cover every variant, prefix width, suffix placement, ellipsis,
+custom body composition, slot clicks, effective disabled propagation, array bounds
+and icon exemption. Slot wrappers reserve tab IDs XOR `0xacf7823ab98e17d0`,
+`0xacf7823ab98e17e0`, `0xacf7823ab98e17f0`, `0xacf7823ab98e1710`.

@@ -2363,7 +2363,7 @@ static void test_dropdown_presentation_variants(void) {
                                  : v == CUI_DROPDOWN_BUTTON_DEFAULT ? themes[t].surface
                                                                     : (cui_color){0};
             if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
-                expected.a = (uint8_t)(expected.a * .8f);
+                expected.a = (uint8_t)(expected.a * .2f);
             if (transparent)
                 assert(dropdown_surface(ui, 2001).a == 0);
             else
@@ -2676,7 +2676,95 @@ static void test_custom_tab_width_caps(void) {
         cui_destroy(ui);
     }
 }
+static bool tab_slot_action, tab_slot_disabled;
+static void tab_part_prefix(cui_context *ui, const cui_choice_item *item, size_t index,
+                            void *user) {
+    (void)user;
+    tab_slot_disabled = item->disabled;
+    cui_begin_box(ui, 9100 + index,
+                  (cui_box){.width = 12, .height = 12, .background = {7, 8, 9, 255}});
+    cui_end_box(ui);
+}
+static void tab_part_suffix(cui_context *ui, const cui_choice_item *item, size_t index,
+                            void *user) {
+    (void)user;
+    cui_theme theme = cui_theme_light();
+    theme.control_height = 14;
+    theme.padding = 2;
+    theme.font_size = 10;
+    tab_slot_action |= cui_button(ui, 9200 + index, &theme, cui_string("x"), item->disabled);
+}
+static void tab_part_icon(cui_context *ui, const cui_choice_item *item, size_t index, void *user) {
+    (void)item;
+    (void)user;
+    cui_begin_box(ui, 9300 + index,
+                  (cui_box){.width = 20, .height = 20, .background = {7, 8, 9, 255}});
+    cui_end_box(ui);
+}
+static void test_structured_tab_parts(void) {
+    const cui_choice_item entries[] = {{10, {"An exceptionally long tab label", 31}, false},
+                                       {20, {"A", 1}, false}};
+    cui_tab_parts parts[] = {{.prefix = tab_part_prefix,
+                              .suffix = tab_part_suffix,
+                              .prefix_width = 12,
+                              .suffix_width = 16},
+                             {0}};
+    cui_theme theme = cui_theme_light();
+    for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_id selected = 10;
+        cui_tabs_options options = {.variant = (cui_tab_variant)variant,
+                                    .max_width = 140,
+                                    .parts = parts,
+                                    .parts_count = 1};
+        tab_slot_action = false;
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL);
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        cui_rect tab = cui_bounds(ui, 10), prefix = cui_bounds(ui, 9100),
+                 suffix = cui_bounds(ui, 9200);
+        assert(tab.w == 140 && prefix.w == 12 && suffix.w <= 16);
+        assert(suffix.x > tab.x + tab.w / 2 && suffix.x + suffix.w <= tab.x + tab.w);
+        assert(cui_bounds(ui, 20).w < 140);
+        bool ellipsis = false;
+        for (size_t i = 0; i < draw.count; i++)
+            ellipsis |= draw.commands[i].type == CUI_DRAW_TEXT &&
+                        draw.commands[i].text.length == 3 &&
+                        memcmp(draw.commands[i].text.data, "\xe2\x80\xa6", 3) == 0;
+        assert(ellipsis);
+        click(ui, 9200);
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        assert(!cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL));
+        cui_end_frame(ui);
+        assert(tab_slot_action && selected == 10);
+        options.disabled = true;
+        tab_slot_action = false;
+        click(ui, 9200);
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL);
+        cui_end_frame(ui);
+        assert(tab_slot_disabled && !tab_slot_action);
+        options.disabled = false;
+        options.render = capped_custom_tab;
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL);
+        cui_end_frame(ui);
+        assert(cui_bounds(ui, 10).w < 140 && cui_bounds(ui, 20).w == 140);
+        options.render = NULL;
+        parts[0].icon = tab_part_icon;
+        options.max_width = 20;
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        cui_tabs(ui, 1, &theme, entries, 1, &selected, options, NULL, NULL);
+        cui_end_frame(ui);
+        assert(cui_bounds(ui, 10).w > 20 && cui_bounds(ui, 9300).w == 20);
+        parts[0].icon = NULL;
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_structured_tab_parts();
     test_custom_tab_width_caps();
     test_dropdown_configurable_palettes();
     test_hierarchical_menu_scroll();

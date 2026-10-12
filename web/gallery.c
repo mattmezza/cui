@@ -728,11 +728,29 @@ static void gallery_toggle_group_change(void *user, const bool *requested, size_
             memcpy(toggle_group_values, requested, count * sizeof(*requested));
     }
 }
-static const unsigned char image_story_pixels[80] = {
+static bool renderer_fixture_enabled;
+static const unsigned char renderer_fixture_pixels[80] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0};
+/* Browser pixel regression fixture; absent from the ordinary component preview. */
+void gallery_renderer_fixture(int enabled) {
+    renderer_fixture_enabled = enabled != 0;
+}
+static void gallery_paint_renderer_fixture(cui_context *ui) {
+    cui_begin_box(ui, cui_id_from(ui, "renderer-fixture-clip"),
+                  (cui_box){.width = 32, .height = 32, .clip = true});
+    cui_paint_bitmap(ui, cui_id_from(ui, "renderer-fixture-image"),
+                     (cui_bitmap_paint){.bitmap = {renderer_fixture_pixels, 4, 4, 20, 1},
+                                        .source = {1, 1, 2, 2},
+                                        .opacity = .5f,
+                                        .grayscale = true,
+                                        .custom_tint = true,
+                                        .tint = {255, 128, 0, 128}},
+                     (cui_box){.width = 60, .height = 60, .radius = 12});
+    cui_end_box(ui);
+}
 #include "gallery_image.inc"
 static const cui_image_frame image_frames[] = {{gallery_lake_pixels, 256, 144, 1024, 1, 0}};
 static cui_image_state image_state, attachment_images[6];
@@ -2310,17 +2328,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_begin_message_group(ui, cui_id_from(ui, "message-group"), width - 48, 24);
         cui_message(ui, cui_id_from(ui, "message"), &t, options);
         cui_end_message_group(ui);
-        cui_begin_box(ui, cui_id_from(ui, "image-clip"),
-                      (cui_box){.width = 32, .height = 32, .clip = true});
-        cui_paint_bitmap(ui, cui_id_from(ui, "image-example"),
-                         (cui_bitmap_paint){.bitmap = {image_story_pixels, 4, 4, 20, 1},
-                                            .source = {1, 1, 2, 2},
-                                            .opacity = .5f,
-                                            .grayscale = true,
-                                            .custom_tint = true,
-                                            .tint = {255, 128, 0, 128}},
-                         (cui_box){.width = 60, .height = 60, .radius = 12});
-        cui_end_box(ui);
+        if (renderer_fixture_enabled)
+            gallery_paint_renderer_fixture(ui);
         break;
     }
     case 61: {

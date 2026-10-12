@@ -1003,6 +1003,8 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
             page.evaluate('location.hash="Message"')
             page.wait_for_function('cuiGallery.renderedComponent==="Message"')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).every(type=>type!==5)')
+            page.evaluate('cuiGallery.exports.gallery_renderer_fixture(1);cuiGallery.render()')
             bitmap = page.evaluate('''()=>{const e=cuiGallery.exports,c=document.querySelector('canvas'),
                 ctx=c.getContext('2d'),i=Array.from({length:e.gallery_count()},(_,i)=>i)
                 .find(i=>e.gallery_command(i,0)===5),f=n=>e.gallery_command(i,n),scale=c.width/c.clientWidth;
@@ -1014,6 +1016,8 @@ def main():
             corner, center, clipped_edge, outside = bitmap['samples']
             assert all(abs(a-b) <= 1 for a,b in zip(corner,outside)) and all(abs(a-b) <= 2 for a,b in zip(center,clipped_edge)), bitmap
             assert center != corner and center[0] > center[1] > center[2] and center[3] == 255
+            page.evaluate('cuiGallery.exports.gallery_renderer_fixture(0);cuiGallery.render()')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).every(type=>type!==5)')
             assert page.locator('#accessible [role=listitem][aria-label="Workspace conversation"]').count() == 1
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,9)', semantic_index('Workspace conversation', 37)) == -1
             click_semantic('Acknowledge message', 2)

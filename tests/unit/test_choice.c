@@ -2667,7 +2667,9 @@ static void test_custom_tab_width_caps(void) {
             assert(cui_last_error(ui) == CUI_OK);
             assert(cui_bounds(ui, 10).w < 100 && cui_bounds(ui, 20).w == 100);
         }
-        assert(scroll.maximum == cui_bounds(ui, 10).w + 100 + theme.gap - 110);
+        assert(scroll.maximum ==
+               cui_bounds(ui, 10).w + 100 +
+                   cui_tab_size_metrics((cui_tab_variant)variant, CUI_TAB_MEDIUM, 1).gap - 110);
         click(ui, 20);
         assert(cui_begin_frame(ui, 640, 480, .016f));
         assert(cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL));
@@ -2833,7 +2835,67 @@ static void test_list_confirmation_contract(void) {
     assert(list_cancels == 2);
     cui_destroy(ui);
 }
+static void sized_tab_icon(cui_context *ui, const cui_choice_item *item, size_t index, void *user) {
+    (void)item;
+    (void)index;
+    const cui_tab_metrics *metrics = user;
+    cui_begin_box(ui, 9400,
+                  (cui_box){.width = metrics->icon_size,
+                            .height = metrics->icon_size,
+                            .background = {1, 2, 3, 255}});
+    cui_end_box(ui);
+}
+static void test_tab_reference_size_metrics(void) {
+    const cui_choice_item entry = {10, {"Accessible icon", 15}, false};
+    const float outer[] = {32, 24, 36, 20}, underline_outer[] = {36, 30, 44, 26};
+    const float tab_inner[] = {30, 22, 36, 18}, rounded_inner[] = {26, 22, 36, 18};
+    const float segmented_inner[] = {24, 18, 28, 16}, underline_inner[] = {26, 22, 32, 20};
+    const float icons[] = {16, 14, 16, 10};
+    for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++)
+        for (int size = CUI_TAB_MEDIUM; size <= CUI_TAB_XSMALL; size++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            assert(ui);
+            cui_theme theme = cui_theme_light();
+            cui_tab_metrics metrics =
+                cui_tab_size_metrics((cui_tab_variant)variant, (cui_tab_size)size, 1);
+            float inner = variant == CUI_TAB_UNDERLINE   ? underline_inner[size]
+                          : variant == CUI_TAB_SEGMENTED ? segmented_inner[size]
+                          : variant == CUI_TAB_OUTLINE || variant == CUI_TAB_PILL
+                              ? rounded_inner[size]
+                              : tab_inner[size];
+            assert(metrics.height ==
+                   (variant == CUI_TAB_UNDERLINE ? underline_outer[size] : outer[size]));
+            assert(metrics.inner_height == inner && metrics.icon_size == icons[size]);
+            cui_tab_parts parts = {.icon = sized_tab_icon, .user = &metrics};
+            cui_tab_scroll_state scroll = {0};
+            cui_tabs_options options = {.variant = (cui_tab_variant)variant,
+                                        .size = (cui_tab_size)size,
+                                        .max_width = 5,
+                                        .parts = &parts,
+                                        .parts_count = 1,
+                                        .scroll = &scroll,
+                                        .bar_extent = 10};
+            cui_id selected = 10;
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_tabs(ui, 1, &theme, &entry, 1, &selected, options, NULL, NULL);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            assert(cui_bounds(ui, 10).h == metrics.height);
+            assert(cui_bounds(ui, 9400).w == metrics.icon_size);
+            assert(cui_bounds(ui, 10 ^ UINT64_C(0xacf7823ab98e17f0)).w == inner * 1.25f);
+            assert(scroll.maximum == inner * 1.25f + 2 * metrics.padding_x - 10);
+            options.density = 2;
+            options.height = 80;
+            metrics = cui_tab_size_metrics((cui_tab_variant)variant, (cui_tab_size)size, 2);
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_tabs(ui, 1, &theme, &entry, 1, &selected, options, NULL, NULL);
+            cui_end_frame(ui);
+            assert(cui_bounds(ui, 10).h == 80 && cui_bounds(ui, 9400).w == metrics.icon_size);
+            cui_destroy(ui);
+        }
+}
 int main(void) {
+    test_tab_reference_size_metrics();
     test_list_confirmation_contract();
     test_structured_tab_parts();
     test_custom_tab_width_caps();

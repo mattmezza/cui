@@ -27,6 +27,12 @@ typedef enum {
     CUI_TAB_OUTLINE,
     CUI_TAB_SEGMENTED
 } cui_tab_variant;
+typedef enum { CUI_TAB_MEDIUM, CUI_TAB_SMALL, CUI_TAB_LARGE, CUI_TAB_XSMALL } cui_tab_size;
+typedef struct {
+    float height, inner_height, padding_x, font_size, icon_size, gap, part_gap;
+} cui_tab_metrics;
+/* Frozen logical-pixel metrics scaled by positive density (invalid uses1). */
+cui_tab_metrics cui_tab_size_metrics(cui_tab_variant, cui_tab_size, float density);
 typedef struct {
     cui_id candidate, before, moved;
     float start_x, start_y;
@@ -54,6 +60,9 @@ typedef struct {
 } cui_tab_parts;
 typedef struct {
     bool vertical, disabled, manual_activation;
+    cui_tab_size size;
+    float density; /* zero uses theme font_size/16 */
+    float height;  /* optional positive styled height override */
     cui_tab_variant variant;
     cui_choice_render_fn render; /* optional tab body, preserving the label semantics */
     void *render_user;

@@ -46,6 +46,38 @@ void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger
     *state = (cui_tab_overflow){.entries = entries, .capacity = capacity, .trigger = trigger};
     cui_menu_tree_init(&state->menu, popup);
 }
+cui_tab_metrics cui_tab_size_metrics(cui_tab_variant variant, cui_tab_size size, float density) {
+    if (!isfinite(density) || density <= 0)
+        density = 1;
+    unsigned index = size == CUI_TAB_XSMALL  ? 0
+                     : size == CUI_TAB_SMALL ? 1
+                     : size == CUI_TAB_LARGE ? 3
+                                             : 2;
+    const float heights[] = {20, 24, 32, 36}, underline_heights[] = {26, 30, 36, 44};
+    const float tab_inner[] = {18, 22, 30, 36}, rounded_inner[] = {18, 22, 26, 36};
+    const float segmented_inner[] = {16, 18, 24, 28}, underline_inner[] = {20, 22, 26, 32};
+    const float paddings[] = {8, 10, 12, 16}, fonts[] = {12, 14, 14, 16},
+                icons[] = {10, 14, 16, 16};
+    float inner = variant == CUI_TAB_UNDERLINE                            ? underline_inner[index]
+                  : variant == CUI_TAB_SEGMENTED                          ? segmented_inner[index]
+                  : variant == CUI_TAB_OUTLINE || variant == CUI_TAB_PILL ? rounded_inner[index]
+                                                                          : tab_inner[index];
+    const float outline_gap[] = {8, 8, 12, 16}, underline_gap[] = {10, 12, 16, 20};
+    float gap = variant == CUI_TAB_OUTLINE     ? outline_gap[index]
+                : variant == CUI_TAB_UNDERLINE ? underline_gap[index]
+                : variant == CUI_TAB_PILL      ? 4
+                : variant == CUI_TAB_SEGMENTED ? 2
+                                               : 0;
+    return (cui_tab_metrics){
+        .height =
+            (variant == CUI_TAB_UNDERLINE ? underline_heights[index] : heights[index]) * density,
+        .inner_height = inner * density,
+        .padding_x = variant == CUI_TAB_UNDERLINE ? 0 : paddings[index] * density,
+        .font_size = fonts[index] * density,
+        .icon_size = icons[index] * density,
+        .gap = gap * density,
+        .part_gap = 4 * density};
+}
 static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) {
     cui_tab_scroll_state *scroll = options.scroll;
     if (!scroll || !scroll->scrollbar_id || scroll->maximum <= 0) {

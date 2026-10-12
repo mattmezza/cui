@@ -603,3 +603,20 @@ confirmation, Escape, removed/hidden/disabled row or disabling the option clears
 that highlight. Empty lists retain focused cancellation. Tests cover callback
 order, modified/unmodified Enter, modified primary release, context highlighting,
 disabled behavior and empty cancellation.
+
+Tabs now default to the frozen Medium metrics rather than generic Button control
+height. `size` selects Medium/Small/Large/XSmall; `density` defaults to theme
+font_size/16 and scales logical pixels, and positive `height` is an explicit
+styled height override. Public `cui_tab_size_metrics` gives outer/inner heights,
+horizontal padding, font and icon glyph sizes for composing callbacks. At density
+one outer heights XS/S/M/L are 20/24/32/36 (Underline 26/30/36/44), and icon
+glyphs 10/14/16/16. The icon area uses the variant's inner height times 1.25, with
+its cap exemption preserved. Horizontal spacer layout avoids introducing vertical
+padding. Inter-tab gaps follow the variant/size table (Medium: Tab0, Outline12,
+Pill4, Segmented2, Underline16), while prefix/body/suffix gaps are four logical
+pixels. Panels retain supplied
+theme styles. Tests cover all twenty variant/size combinations, exact icon area
+and glyph bounds, scroll extent, explicit density and height override. This is a
+visible default change: a standard 42px Button theme now has 32px Medium Tabs.
+Automatic intrinsic slot reservation, spring-driven indicators/text fading and
+full variant theme token styling remain separate parity gaps.

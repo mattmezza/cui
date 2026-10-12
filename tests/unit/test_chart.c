@@ -1158,6 +1158,16 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(state.emphasis_center > first_hover_candle.wick.x_min &&
            state.emphasis_center < next_hover_candle.wick.x_min);
+    options.reduced_motion = true;
+    state.hovered = 2;
+    cui_chart_candle_geometry last_hover_candle;
+    assert(cui_chart_candle_bounds(&options, 2, &last_hover_candle) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    (void)cui_end_frame(ui);
+    assert(fabs(state.emphasis_center - last_hover_candle.wick.x_min) < .01 &&
+           state.emphasis_focus == 1);
+    options.reduced_motion = false;
     state.hovered = 0;
     size_t tooltip_calls = 0;
     options.tooltip_content = custom_tooltip;

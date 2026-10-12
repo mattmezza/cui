@@ -24,6 +24,74 @@ static void queue(cui_context *ui, cui_event_type type, float x, float y, cui_ke
     assert(cui_queue_event(
         ui, (cui_event){.type = type, .x = x, .y = y, .key = key, .modifiers = mods}));
 }
+static void scope_event_scene(cui_context *ui, bool check) {
+    assert(cui_begin_focus_scope(ui, 900, false));
+    assert(cui_begin_focus_scope(ui, 901, false));
+    if (check) {
+        assert(cui_event_within_scope(ui, 0, 900));
+        assert(cui_event_within_scope(ui, 0, 901));
+        assert(!cui_event_within_scope(ui, 0, 999));
+        assert(!cui_event_within_scope(ui, 1, 900));
+        assert(!cui_event_consumed(ui, 0));
+    }
+    control(ui, 1, false);
+    cui_end_focus_scope(ui);
+    cui_end_focus_scope(ui);
+    assert(cui_begin_focus_scope(ui, 902, false));
+    if (check)
+        assert(!cui_event_within_scope(ui, 0, 902));
+    control(ui, 2, false);
+    cui_end_focus_scope(ui);
+}
+static void test_event_scope(void) {
+    cui_context *ui = make();
+    begin(ui);
+    scope_event_scene(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    begin(ui);
+    assert(!cui_event_within_scope(ui, 0, 900)); /* Not yet submitted. */
+    scope_event_scene(ui, true);
+    cui_end_frame(ui);
+    assert(!cui_event_within_scope(ui, 0, 900));
+    cui_destroy(ui);
+}
+static void test_activation_cancellation(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    /* Cancel the second of two clicks without erasing the first. */
+    for (unsigned i = 0; i < 2; ++i) {
+        queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+        queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    }
+    begin(ui);
+    assert(!cui_cancel_event_activation(ui, 0));
+    assert(!cui_cancel_event_activation(ui, 4));
+    assert(cui_cancel_event_activation(ui, 3));
+    assert(!cui_cancel_event_activation(ui, 3));
+    assert(cui_event_target(ui, 3) == 1 && !cui_event_activation(ui, 3));
+    assert(cui_event_activation(ui, 1) == 1);
+    assert(control(ui, 1, false).activated);
+    assert(!cui_cancel_event_activation(ui, 1));
+    cui_end_frame(ui);
+    assert(!cui_pressed(ui, 1));
+    assert(!cui_cancel_event_activation(ui, 1));
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    begin(ui);
+    assert(cui_cancel_event_activation(ui, 1));
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    assert(cui_cancel_event_activation(ui, 0));
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 1 && !cui_pressed(ui, 1));
+    cui_destroy(ui);
+}
 static void test_input(void) {
     cui_context *ui = make();
     cui_id a = cui_id_from(ui, "a"), b = cui_id_from(ui, "b");
@@ -1925,6 +1993,8 @@ int main(void) {
     test_underlay_order_and_layout();
     test_underlay_capacity_and_hidden();
     test_table_semantic_roles();
+    test_event_scope();
+    test_activation_cancellation();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

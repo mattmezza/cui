@@ -240,7 +240,30 @@ static void input_consumes_caret_keys(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void consumed_release_ends_selection(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    char buffer[32] = "abc";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_behavior_state state = {0};
+    assert(ui && edit);
+    base_frame(ui, edit, &state, (cui_base_input_options){0});
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 10, .y = 10}));
+    base_frame(ui, edit, &state, (cui_base_input_options){0});
+    assert(state.dragging);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 20, .y = 10}));
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    assert(cui_consume_event(ui, 0));
+    cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 40});
+    cui_base_input_ex(ui, 1, cui_string("Input"), edit, &state, (cui_base_input_options){0});
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(!state.dragging && !cui_pressed(ui, 1));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    consumed_release_ends_selection();
     input_consumes_caret_keys();
     clipboard_and_readonly();
 #ifndef CUI_INPUT_BASE_ONLY

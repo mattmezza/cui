@@ -90,6 +90,7 @@ struct cui_context {
     size_t queued_count, event_count;
     bool event_consumed[CUI_CORE_EVENT_MAX];
     cui_id event_targets[CUI_CORE_EVENT_MAX], event_activations[CUI_CORE_EVENT_MAX];
+    size_t event_activation_slots[CUI_CORE_EVENT_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
     size_t scope_count;
     bool opened[CUI_CORE_STACK_MAX];
@@ -536,6 +537,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         cui_event e = ui->events[i];
         size_t before_activation = ui->activation_count;
         ui->event_activations[i] = 0;
+        ui->event_activation_slots[i] = SIZE_MAX;
         ui->event_targets[i] = ui->focus;
         if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_UP)
             ui->event_targets[i] = ui->capture;
@@ -606,8 +608,10 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 cui_core_activate(ui, ui->focus);
             ui->space_capture = 0;
         }
-        if (ui->activation_count > before_activation)
+        if (ui->activation_count > before_activation) {
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
+            ui->event_activation_slots[i] = ui->activation_count - 1;
+        }
     }
     ui->node_count = 0;
     ui->paint_root_count = 0;
@@ -1445,6 +1449,42 @@ bool cui_consume_event(cui_context *ui, size_t index) {
         return false;
     ui->event_consumed[index] = true;
     return true;
+}
+bool cui_cancel_event_activation(cui_context *ui, size_t index) {
+    if (!ui || !ui->in_frame || cui_core_inert(ui) || index >= ui->event_count)
+        return false;
+    size_t slot = ui->event_activation_slots[index];
+    if (slot >= ui->activation_count || !ui->activations[slot])
+        return false;
+    ui->activations[slot] = 0;
+    ui->event_activations[index] = 0;
+    return true;
+}
+bool cui_event_within_scope(cui_context *ui, size_t index, cui_id scope) {
+    if (!ui || !ui->in_frame || cui_core_inert(ui) || !scope || index >= ui->event_count)
+        return false;
+    bool active = false;
+    for (size_t i = 0; i < ui->focus_scope_count; ++i)
+        if (ui->focus_scopes[i].id == scope && ui->focus_scopes[i].active)
+            active = true;
+    if (!active || !cui_pointer_scope_allowed(ui, scope))
+        return false;
+    cui_id target = ui->event_targets[index];
+    for (size_t i = 0; target && i < ui->previous_count; ++i) {
+        if (ui->previous[i].id != target || !cui_core_previous_allowed(ui, i))
+            continue;
+        if (target == scope)
+            return true;
+        size_t parent = ui->previous_semantic_scopes[i];
+        while (parent != SIZE_MAX) {
+            if (!ui->previous_focus_scopes[parent].active)
+                return false;
+            if (ui->previous_focus_scopes[parent].id == scope)
+                return true;
+            parent = ui->previous_focus_scopes[parent].parent;
+        }
+    }
+    return false;
 }
 
 bool cui_pointer_scope_allowed(cui_context *ui, cui_id owned_scope) {

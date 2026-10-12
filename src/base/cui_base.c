@@ -129,6 +129,9 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
         cui_event event = events[i];
         if (event.type == CUI_EVENT_CANCEL)
             state->dragging = false;
+        if (cui_event_consumed(ui, i) && event.type == CUI_EVENT_POINTER_UP &&
+            event.pointer_button == CUI_POINTER_PRIMARY)
+            state->dragging = false;
         if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
             continue;
         if (event.type == CUI_EVENT_KEY_DOWN &&

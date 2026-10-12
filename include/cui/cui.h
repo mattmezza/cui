@@ -315,6 +315,14 @@ cui_id cui_event_activation(cui_context *ui, size_t index);
  * Event targets remain available for diagnostics; callers check consumption. */
 bool cui_event_consumed(cui_context *, size_t index);
 bool cui_consume_event(cui_context *, size_t index);
+/* Capture-phase cancellation: suppress only this event's pending activation.
+ * Call before submitting its target widget. Event target and pointer release
+ * remain intact; false means no pending activation (including already used). */
+bool cui_cancel_event_activation(cui_context *, size_t index);
+/* Whether the event target belonged to this named focus scope (or a nested
+ * scope) in the previous frame. The scope must be active in this frame.
+ * Portals retain their logical scope. This query does not consume input. */
+bool cui_event_within_scope(cui_context *, size_t index, cui_id scope);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
 /* Register one current-layout bounds result per ID for this frame. The retained

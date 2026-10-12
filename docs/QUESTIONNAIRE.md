@@ -1,6 +1,6 @@
 # Questionnaire source audit
 
-Questionnaire remains unimplemented. The next implementation must preserve the frozen source contract, rather than treating it as a generic next/previous form. Reference commit: `87d10ae5e1299d1be18670a37570c5402f952e34`, `crates/base/src/questionnaire/{types,state,keyboard,control}.rs` and `crates/component/src/questionnaire/components.rs`.
+Questionnaire is in development in this isolated branch and is not registered in the main library or gallery yet. The retained model and initial composable styled parts are implemented; this is not full parity. Reference commit: `87d10ae5e1299d1be18670a37570c5402f952e34`, `crates/base/src/questionnaire/{types,state,keyboard,control}.rs` and `crates/component/src/questionnaire/components.rs`.
 
 ## State and answers
 
@@ -23,3 +23,9 @@ Enabled choices receive A–Z or 1–9 shortcuts by enabled position, skipping d
 ## Verification requirements
 
 Port source behavioral cases for schema rejection, silent setters, draft preservation, reset, disabled restoration, schema order, external errors, cross-item validation, first-invalid focus, completion ordering, shortcuts, disabled-current fallback, delayed choice confirmation and no confirmation from radio arrows/typing. Add transactional capacity/UTF-8 and standalone base-link checks. Styled composition needs its own source audit and actual pointer/keyboard, four-size, disabled/error and focus tests before being called implemented. Full parity is not established by a state reducer or a static wizard screenshot.
+
+## Current implementation evidence
+
+The portable retained model tests cover schema errors, disabled answer restoration, effective-answer change detection, input drafts, capacity/UTF-8 atomicity, optional skip validation, delayed/reduced-motion confirmation, and completion-before-submit ordering. Styled tests exercise all four card sizes, pointer activation and updated checkbox semantics, minimum card height, error/action visibility, Skip completion, actual text editing into a freeform answer, and disabled input suppression. Standalone strict C11 and ASan/UBSan checks pass; the existing branch CTest suite passes73/73.
+
+Remaining work includes root keyboard capture and focus choreography, complete composable item/choices/action containers, custom indicator/content/shortcut slots, localization hooks, exact selected/hover/focus colors and source radius refinements, input Enter confirmation, comprehensive radio and keyboard tests, packaging/registration, WASI tests, and the real browser story. Existing styled code is a development checkpoint, not evidence that these gaps are complete.

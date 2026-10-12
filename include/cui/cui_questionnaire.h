@@ -2,6 +2,8 @@
 #ifndef CUI_QUESTIONNAIRE_H
 #define CUI_QUESTIONNAIRE_H
 #include "cui_edit.h"
+#include "cui_platform.h"
+#include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -140,6 +142,53 @@ char cui_questionnaire_shortcut(const cui_questionnaire_state *, size_t item, si
                                 bool numbers);
 bool cui_questionnaire_activate_shortcut(cui_questionnaire_state *, char key, bool numbers,
                                          double now, bool reduced_motion);
+typedef enum {
+    CUI_QUESTIONNAIRE_MEDIUM,
+    CUI_QUESTIONNAIRE_SMALL,
+    CUI_QUESTIONNAIRE_LARGE,
+    CUI_QUESTIONNAIRE_XSMALL
+} cui_questionnaire_size;
+typedef struct {
+    cui_questionnaire_size size;
+    float width;
+    bool disabled, numeric_shortcuts;
+} cui_questionnaire_options;
+typedef struct {
+    bool dragging;
+    float scroll_x;
+} cui_questionnaire_input_state;
+/* Keep one input state per item. Text editing updates the retained answer and
+ * emits AnswerChanged; a capacity error leaves the previous semantic answer. */
+cui_questionnaire_result cui_questionnaire_input_control(cui_context *, cui_id, const cui_theme *,
+                                                         cui_questionnaire_state *, size_t item,
+                                                         cui_questionnaire_input_state *,
+                                                         const cui_platform *clipboard,
+                                                         cui_questionnaire_options);
+typedef enum {
+    CUI_QUESTIONNAIRE_PREVIOUS,
+    CUI_QUESTIONNAIRE_SKIP,
+    CUI_QUESTIONNAIRE_NEXT,
+    CUI_QUESTIONNAIRE_FINISH
+} cui_questionnaire_action;
+void cui_questionnaire_heading(cui_context *, cui_id, const cui_theme *,
+                               const cui_questionnaire_state *, size_t item,
+                               cui_questionnaire_options);
+void cui_questionnaire_error_control(cui_context *, cui_id, const cui_theme *,
+                                     const cui_questionnaire_state *, size_t item,
+                                     cui_questionnaire_options);
+bool cui_questionnaire_action_control(cui_context *, cui_id, const cui_theme *,
+                                      cui_questionnaire_state *, cui_questionnaire_action,
+                                      cui_str label, cui_questionnaire_options);
+/* Composable parts: begin/end enclose caller-selected children. Choice parts
+ * render only for the current item. Call tick from the host frame clock. */
+bool cui_questionnaire_begin(cui_context *, cui_id, const cui_theme *, cui_questionnaire_state *,
+                             cui_questionnaire_options);
+void cui_questionnaire_end(cui_context *);
+void cui_questionnaire_progress(cui_context *, cui_id, const cui_theme *,
+                                const cui_questionnaire_state *, cui_questionnaire_options);
+bool cui_questionnaire_choice_control(cui_context *, cui_id, const cui_theme *,
+                                      cui_questionnaire_state *, size_t item, size_t choice,
+                                      cui_questionnaire_options);
 #ifdef __cplusplus
 }
 #endif

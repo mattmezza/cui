@@ -1145,7 +1145,8 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "106 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending."
+        "106 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
+        "Icon is decorative by default; named image semantics must currently be supplied by the caller. Dedicated accessible/decorative API remains pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1166,10 +1167,8 @@
         },
         {
           "name": "accessible/decorative distinction",
-          "status": "tested",
-          "evidence": [
-            "tests/unit/test_icon.c"
-          ]
+          "status": "not_started",
+          "evidence": []
         }
       ],
       "upstream_doc": {

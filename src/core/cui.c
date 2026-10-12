@@ -80,6 +80,7 @@ struct cui_context {
     size_t id_count, activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_EVENT_MAX];
     size_t queued_count, event_count;
+    bool event_consumed[CUI_CORE_EVENT_MAX];
     cui_id event_targets[CUI_CORE_EVENT_MAX], event_activations[CUI_CORE_EVENT_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
     size_t scope_count;
@@ -480,6 +481,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 }
         }
     }
+    memset(ui->event_consumed, 0, sizeof ui->event_consumed);
     ui->event_count = ui->queued_count;
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
@@ -1316,6 +1318,16 @@ cui_id cui_event_activation(cui_context *ui, size_t index) {
     return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_activations[index] : 0;
 }
 
+bool cui_event_consumed(cui_context *ui, size_t index) {
+    return ui && index < ui->event_count && ui->event_consumed[index];
+}
+bool cui_consume_event(cui_context *ui, size_t index) {
+    if (!ui || !ui->in_frame || cui_core_inert(ui) || index >= ui->event_count)
+        return false;
+    ui->event_consumed[index] = true;
+    return true;
+}
+
 bool cui_pointer_scope_allowed(cui_context *ui, cui_id owned_scope) {
     if (!ui || !ui->in_frame || cui_core_inert(ui))
         return false;
@@ -1398,6 +1410,46 @@ bool cui_focus_within(cui_context *ui, cui_id scope) {
     }
     return false;
 }
+bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
+    if (!ui || !ui->in_frame || !scope || !ui->focus || cui_core_inert(ui))
+        return false;
+    size_t owner = SIZE_MAX, start = SIZE_MAX;
+    for (size_t i = 0; i < ui->focus_scope_count; ++i)
+        if (ui->focus_scopes[i].id == scope && ui->focus_scopes[i].active)
+            owner = i;
+    if (owner == SIZE_MAX)
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; ++i)
+        if (ui->semantics[i].id == ui->focus &&
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], owner))
+            start = i;
+    if (start == SIZE_MAX)
+        return false;
+    for (size_t step = 1; step <= ui->semantic_count; ++step) {
+        size_t i = forward ? (start + step) % ui->semantic_count
+                           : (start + ui->semantic_count - step) % ui->semantic_count;
+        cui_semantic *candidate = &ui->semantics[i];
+        if (!cui_core_focusable(candidate) || candidate->tab_index < 0 ||
+            !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], owner) ||
+            !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal))
+            continue;
+        bool active = true;
+        for (size_t n = ui->semantic_scopes[i]; n != SIZE_MAX; n = ui->focus_scopes[n].parent)
+            if (!ui->focus_scopes[n].active)
+                active = false;
+        /* A control may submit behavior before its own inert paint box. */
+        uint32_t folded = cui_core_folded(candidate->id);
+        for (size_t n = 0; n < ui->node_count; ++n)
+            if (ui->nodes[n].clay_id == folded && (ui->nodes[n].inert || ui->nodes[n].layout_only))
+                active = false;
+        if (!active)
+            continue;
+        cui_focus(ui, candidate->id);
+        return true;
+    }
+    return false;
+}
+
 bool cui_hover_within(cui_context *ui, cui_id scope) {
     if (!ui || !scope || cui_core_inert(ui))
         return false;

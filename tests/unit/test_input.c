@@ -208,7 +208,40 @@ static void styled_selection(void) {
     }
 }
 #endif
+static void input_consumes_caret_keys(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    char buffer[32] = "abc";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_behavior_state state = {0};
+    assert(ui && edit);
+    base_frame(ui, edit, &state, (cui_base_input_options){0});
+    cui_focus(ui, 1);
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    for (unsigned readonly = 0; readonly < 2; ++readonly) {
+        key(ui, CUI_KEY_LEFT, 0);
+        assert(cui_begin_frame(ui, 400, 200, .016f));
+        assert(cui_begin_focus_scope(ui, 90, false));
+        cui_base_input_ex(ui, 1, cui_string("Input"), edit, &state,
+                          (cui_base_input_options){.readonly = readonly != 0});
+        assert(cui_event_consumed(ui, 0));
+        /* Even an arrow at the start is handled by the editor. */
+        assert(cui_edit_get_state(edit).cursor == 0);
+        cui_end_focus_scope(ui);
+        cui_end_frame(ui);
+    }
+    key(ui, CUI_KEY_RIGHT, 0);
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    assert(cui_edit_apply_events(edit, ui, 1, false) == CUI_EDIT_OK);
+    assert(cui_event_consumed(ui, 0) && cui_edit_get_state(edit).cursor == 1);
+    assert(cui_edit_apply_events(edit, ui, 1, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 1);
+    cui_end_frame(ui);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    input_consumes_caret_keys();
     clipboard_and_readonly();
 #ifndef CUI_INPUT_BASE_ONLY
     paint_only_reduction();

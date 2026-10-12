@@ -211,8 +211,11 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
         cui_event event = events[i];
         if (event.type == CUI_EVENT_CANCEL)
             state->dragging = false;
-        if (options.disabled || cui_event_target(ui, i) != id)
+        if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
             continue;
+        if (event.type == CUI_EVENT_KEY_DOWN &&
+            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT))
+            cui_consume_event(ui, i);
         cui_edit_result error = CUI_EDIT_OK;
         bool primary = event.pointer_button == CUI_POINTER_PRIMARY;
         if (primary && event.type == CUI_EVENT_POINTER_DOWN)

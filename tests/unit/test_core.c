@@ -1720,7 +1720,51 @@ static void test_percentage_dimensions(void) {
     }
     cui_destroy(ui);
 }
+static void test_scoped_focus_and_consumption(void) {
+    cui_context *ui = make();
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_RIGHT, 0);
+    begin(ui);
+    assert(!cui_event_consumed(ui, 0));
+    assert(cui_consume_event(ui, 0) && cui_event_consumed(ui, 0));
+    assert(cui_consume_event(ui, 0) && !cui_consume_event(ui, 1));
+    control(ui, 1000, false);
+    assert(cui_begin_focus_scope(ui, 1100, false));
+    control(ui, 1001, false);
+    control(ui, 1002, true);
+    control(ui, 1003, false);
+    cui_set_tab_stop(ui, 1003, false);
+    assert(cui_begin_focus_scope(ui, 1101, false));
+    control(ui, 1004, false);
+    cui_end_focus_scope(ui);
+    cui_interact(ui, 1005, CUI_ROLE_BUTTON, cui_string("inert after behavior"), false, false, 0);
+    cui_begin_box(ui, 1005, (cui_box){.inert = true});
+    cui_end_box(ui);
+    cui_focus(ui, 1001);
+    assert(cui_focus_step_within(ui, 1100, true) && cui_focused(ui) == 1004);
+    assert(cui_focus_step_within(ui, 1100, true) && cui_focused(ui) == 1001);
+    assert(cui_focus_step_within(ui, 1100, false) && cui_focused(ui) == 1004);
+    assert(cui_focus_step_within(ui, 1101, true) && cui_focused(ui) == 1004);
+    cui_focus(ui, 1000);
+    assert(!cui_focus_step_within(ui, 1100, true) && cui_focused(ui) == 1000);
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    assert(!cui_consume_event(ui, 0) && !cui_focus_step_within(ui, 1100, true));
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_LEFT, 0);
+    begin(ui);
+    assert(!cui_event_consumed(ui, 0));
+    assert(cui_begin_focus_scope(ui, 1100, false));
+    control(ui, 1001, false);
+    cui_focus(ui, 1001);
+    assert(cui_begin_focus_scope(ui, 1102, true));
+    control(ui, 1006, false);
+    cui_end_focus_scope(ui);
+    assert(cui_focus_step_within(ui, 1100, true) && cui_focused(ui) == 1006);
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_scoped_focus_and_consumption();
     test_percentage_dimensions();
     test_layout_hit_order();
     test_fractional_text_metrics();

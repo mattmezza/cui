@@ -367,8 +367,11 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
     const cui_event *events = cui_frame_events(ui, &count);
     cui_edit_result first = CUI_EDIT_OK;
     for (size_t i = 0; i < count; ++i) {
-        if (cui_event_target(ui, i) != id)
+        if (cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
             continue;
+        if (events[i].type == CUI_EVENT_KEY_DOWN &&
+            (events[i].key == CUI_KEY_LEFT || events[i].key == CUI_KEY_RIGHT))
+            cui_consume_event(ui, i);
         cui_edit_result r = cui_edit_apply_event(e, events[i]);
         if (first == CUI_EDIT_OK && r != CUI_EDIT_OK)
             first = r;

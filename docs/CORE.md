@@ -151,3 +151,13 @@ as a fraction of the current parent's inner extent. Fractions clamp to0..1 and
 take precedence over fixed flags and max caps. This resolves proportional rows
 on the first frame and after resize, without previous-frame measurements.
 Absolute/portal bounds retain their explicit dimension semantics.
+
+Cooperative event bubbling uses `cui_event_consumed` and `cui_consume_event`:
+leaf controls handle input before ancestor callbacks inspect it. Consumption does
+not erase the original target or activation diagnostics and resets each frame.
+Both editor event paths consume Left/Right, including at the text boundary.
+`cui_focus_step_within` traverses current submitted, enabled Tab stops inside a
+focus scope and wraps; call it after children. Nested scopes participate, while
+inert content, disabled controls, explicit non-Tab stops and controls outside
+the active modal are excluded. Missing scopes or removed focused children leave
+focus untouched. This is an opt-in traversal primitive; ordinary Tab is unchanged.

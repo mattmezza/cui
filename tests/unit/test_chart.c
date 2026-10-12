@@ -1796,6 +1796,38 @@ int main(void) {
     cui_chart_sankey_margins measured_margins = {0};
     assert(cui_chart_measure_sankey_margins(ui, &options, &measured_margins) == CUI_PLOT_OK);
     assert(measured_margins.left > 0 && measured_margins.right > 0 && measured_margins.bottom > 0);
+    unsigned char expected_sankey_pixels[sizeof pixels];
+    unsigned char automatic_sankey_pixels[sizeof pixels] = {0};
+    cui_chart_state expected_sankey = {.pixels = expected_sankey_pixels,
+                                       .byte_capacity = sizeof expected_sankey_pixels};
+    cui_chart_state automatic_sankey = {.pixels = automatic_sankey_pixels,
+                                        .byte_capacity = sizeof automatic_sankey_pixels};
+    cui_chart_options explicit_sankey = options;
+    explicit_sankey.sankey_margins = measured_margins;
+    assert(cui_chart_render(&expected_sankey, &explicit_sankey) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 92, &automatic_sankey, &options, (cui_str){"Auto flow", 9}));
+    (void)cui_end_frame(ui);
+    assert(memcmp(expected_sankey_pixels, automatic_sankey_pixels, sizeof expected_sankey_pixels) ==
+           0);
+    unsigned char animated_sankey_pixels[sizeof pixels] = {0};
+    cui_chart_state animated_sankey = {.pixels = animated_sankey_pixels,
+                                       .byte_capacity = sizeof animated_sankey_pixels};
+    cui_chart_options immediate_sankey = options;
+    immediate_sankey.disable_appear = true;
+    assert(cui_begin_frame(ui, 256, 256, .001));
+    assert(cui_chart_render_animated(ui, &animated_sankey, &immediate_sankey) == CUI_PLOT_OK);
+    (void)cui_end_frame(ui);
+    assert(memcmp(expected_sankey_pixels, animated_sankey_pixels, sizeof expected_sankey_pixels) ==
+           0);
+    cui_chart_options compact_sankey = options;
+    compact_sankey.custom_sankey_margins = true;
+    assert(cui_chart_render(&expected_sankey, &compact_sankey) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, .002));
+    assert(cui_chart(ui, 92, &automatic_sankey, &compact_sankey, (cui_str){"Compact", 7}));
+    (void)cui_end_frame(ui);
+    assert(memcmp(expected_sankey_pixels, automatic_sankey_pixels, sizeof expected_sankey_pixels) ==
+           0);
     options.sankey_margins = measured_margins;
     state.hovered = SIZE_MAX;
     assert(cui_begin_frame(ui, 256, 256, 0));

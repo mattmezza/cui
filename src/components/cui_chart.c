@@ -311,6 +311,14 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
         options->appear_duration < 0)
         return CUI_PLOT_INVALID;
     cui_chart_options frame = *options;
+    if (frame.kind == CUI_CHART_SANKEY && !frame.custom_sankey_margins &&
+        frame.sankey_margins.left == 0 && frame.sankey_margins.right == 0 &&
+        frame.sankey_margins.top == 0 && frame.sankey_margins.bottom == 0) {
+        cui_plot_result measured =
+            cui_chart_measure_sankey_margins(ui, &frame, &frame.sankey_margins);
+        if (measured != CUI_PLOT_OK)
+            return measured;
+    }
     if (frame.show_y_axis && !frame.y_axis_inside && frame.value_axis_gutter == 0 &&
         (frame.kind == CUI_CHART_LINE || frame.kind == CUI_CHART_AREA ||
          (frame.kind == CUI_CHART_BAR && frame.bar_alignment != CUI_CHART_BAR_LEFT &&
@@ -361,6 +369,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         o->point_count > 1000000 || state->byte_capacity < (size_t)o->width * o->height * 4)
         return false;
     cui_chart_options measured_options = *o;
+    if (o->kind == CUI_CHART_SANKEY && !o->custom_sankey_margins && o->sankey_margins.left == 0 &&
+        o->sankey_margins.right == 0 && o->sankey_margins.top == 0 &&
+        o->sankey_margins.bottom == 0) {
+        if (cui_chart_measure_sankey_margins(ui, o, &measured_options.sankey_margins) !=
+            CUI_PLOT_OK)
+            return false;
+        o = &measured_options;
+    }
     bool measure_outside_axis =
         o->show_y_axis && !o->y_axis_inside && o->value_axis_gutter == 0 &&
         (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA ||

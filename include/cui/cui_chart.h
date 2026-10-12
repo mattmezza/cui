@@ -221,7 +221,9 @@ typedef struct {
     cui_chart_sankey_label_measure_fn sankey_label_measure;
     cui_chart_sankey_label_paint_fn sankey_label_paint;
     void *sankey_label_user; /* measured/painted CUI content takes precedence over lines */
-    cui_chart_sankey_margins sankey_margins; /* measured before layout; zero preserves legacy */
+    cui_chart_sankey_margins
+        sankey_margins;         /* explicit nonzero, or auto-measured by styled chart */
+    bool custom_sankey_margins; /* preserve even zero margins in styled chart */
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
@@ -283,9 +285,10 @@ float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options
  * Copy the result to options and set custom_horizontal_bar_gutters. */
 cui_plot_result cui_chart_measure_horizontal_bar_gutters(cui_context *, const cui_chart_options *,
                                                          float *category, float *value_end);
-/* Measures source-style label margins using the host's text metrics. Call before
- * render, assign the result to options.sankey_margins, then reuse those options
- * for layout, hit testing, and styled painting. Output is unchanged on failure. */
+/* Measures source-style label margins using the host's text metrics. Styled
+ * rendering measures automatically with zero margins unless custom_sankey_margins
+ * is set; base callers can assign the result before layout and rendering.
+ * Output is unchanged on failure. */
 cui_plot_result cui_chart_measure_sankey_margins(cui_context *, const cui_chart_options *,
                                                  cui_chart_sankey_margins *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);

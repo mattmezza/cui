@@ -1,44 +1,44 @@
 {
-  "source": "b219eee",
+  "source": "e96fa1a",
   "published_source": "2bb4b6ee62e788a7c8247e81036abacf3f68fd38",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local picker release passes63/63 native and70/70 real Chromium stories, including all38 named CSS/C palette comparisons, keyboardselection, persistence, system changes and highcontrast. Shared palette button intent surfaces corrected from source defaults. Sidebar/Textarea stories added; Settings/Carousel/Input-size native followups queued. Public2bb4b6e homepage/docs/search/copy-code is verified with68stories; picker awaitsdeployment. All78entries retained:7notstarted,4implementedpartial,67testedpartial,0verified. Full parity unfinished.",
+  "summary": "Local release passes 65/65 native, 63/63 sanitizer and 70 real Chromium stories, including 38 exact CSS/C palette comparisons, keyboard selection, persistence, live system changes, and four source Input/NumberInput sizes. Carousel native registration is included; Settings/Carousel browser stories remain in progress. Public 2bb4b6e remains verified with 68 stories; picker deployment dc63e71 failed an asynchronous test wait, corrected in e96fa1a. All 78 entries retained: 6 not started, 4 implemented partial, 68 tested partial, 0 verified. Full parity unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "1c1322e",
-      "passed": 53,
-      "total": 53,
-      "log": "wasi-1c1322e.txt"
+      "source": "283a328",
+      "passed": 55,
+      "total": 55,
+      "log": "wasi-283a328.txt"
     },
     {
       "name": "native",
-      "source": "b219eee",
-      "passed": 63,
-      "total": 63,
-      "log": "native-b219eee.txt"
+      "source": "283a328",
+      "passed": 65,
+      "total": 65,
+      "log": "native-283a328.txt"
     },
     {
       "name": "browser",
-      "source": "b219eee",
+      "source": "e96fa1a",
       "passed": 70,
       "total": 70,
-      "palettes": 38,
-      "log": "browser-b219eee.txt"
+      "log": "browser-e96fa1a.txt",
+      "palettes": 38
     },
     {
       "name": "sanitizers",
-      "source": "2190f5b",
-      "passed": 61,
-      "total": 61,
-      "log": "asan-2190f5b.txt"
+      "source": "283a328",
+      "passed": 63,
+      "total": 63,
+      "log": "sanitizers-283a328.txt"
     }
   ],
   "previous_deployment": {
-    "source": "9e72440",
+    "source": "dc63e71",
     "status": "failed",
-    "reason": "Image test measured before actual READY bitmap; repaired natural-frame readiness and fixed-header click visibility",
-    "log": "pages-9e72440-failure.txt"
+    "reason": "Palette test observed a prior natural frame before selected WASM palette rendered; fixed by waiting for exact expected C RGBA as well as frame advancement.",
+    "run": 38269606486
   },
   "published_evidence": "published-e49dc95.txt"
 }

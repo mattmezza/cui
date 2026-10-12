@@ -1,0 +1,1 @@
+PASS: 78 catalog entries, 70 real WASM stories, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting

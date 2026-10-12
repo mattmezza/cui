@@ -400,7 +400,114 @@ static void progress_semantics(void) {
     }
     cui_destroy(ui);
 }
+static const cui_semantic *container_semantic(cui_context *ui, cui_id id) {
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == id)
+            return &semantics[i];
+    return NULL;
+}
+static void container_frame(cui_context *ui, cui_questionnaire_state *state,
+                            cui_questionnaire_options options) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    assert(cui_questionnaire_begin(ui, 10, &theme, state, options));
+    assert(!cui_questionnaire_item_begin(ui, 999, state, 9, options));
+    for (size_t item = 0; item < 2; item++) {
+        if (!cui_questionnaire_item_begin(ui, 20 + item, state, item, options)) {
+            assert(!cui_questionnaire_choices_begin(ui, 30 + item, state, item, options));
+            continue;
+        }
+        cui_begin_box(ui, 100 + item, (cui_box){.width = 40, .height = 11});
+        cui_end_box(ui);
+        assert(cui_questionnaire_choices_begin(ui, 30 + item, state, item, options));
+        for (size_t choice = 0; choice < 2; choice++)
+            cui_questionnaire_choice_control(ui, 200 + item * 10 + choice, &theme, state, item,
+                                             choice, options);
+        cui_questionnaire_part_end(ui);
+        cui_begin_box(ui, 150 + item, (cui_box){.width = 40, .height = 7});
+        cui_end_box(ui);
+        cui_questionnaire_part_end(ui);
+    }
+    assert(cui_questionnaire_actions_begin(ui, 40, state, options));
+    for (unsigned i = 0; i < 2; i++) {
+        cui_begin_box(ui, 300 + i, (cui_box){.width = 50, .height = i ? 30 : 20});
+        cui_interact(ui, 300 + i, CUI_ROLE_BUTTON, cui_string("Action"), false, false, 0);
+        cui_end_box(ui);
+    }
+    cui_questionnaire_part_end(ui);
+    cui_questionnaire_end(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void composable_containers(void) {
+    const float item_gap[] = {16, 12, 24, 8}, choices_gap[] = {8, 6, 10, 4};
+    for (unsigned multiple = 0; multiple < 2; multiple++) {
+        cui_context *ui = cui_create((cui_config){.max_elements = 256});
+        cui_questionnaire_choice choices[] = {{.value = cui_string("first")},
+                                              {.value = cui_string("second")}};
+        cui_questionnaire_item items[] = {{.name = cui_string("one"),
+                                           .label = cui_string("First item"),
+                                           .description = cui_string("Help"),
+                                           .choices = choices,
+                                           .choice_count = 2,
+                                           .multiple = multiple != 0},
+                                          {.name = cui_string("two"),
+                                           .choices = choices,
+                                           .choice_count = 2,
+                                           .multiple = multiple != 0}};
+        cui_questionnaire_item_runtime runtime[2];
+        cui_questionnaire_choice_runtime selected[4];
+        cui_questionnaire_state state = {0};
+        assert(cui_questionnaire_init(&state, items, 2,
+                                      (cui_questionnaire_workspace){.items = runtime,
+                                                                    .item_capacity = 2,
+                                                                    .choices = selected,
+                                                                    .choice_capacity = 4},
+                                      NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+        for (unsigned size = 0; size < 4; size++) {
+            cui_questionnaire_options options = {.width = 300,
+                                                 .size = (cui_questionnaire_size)size};
+            container_frame(ui, &state, options);
+            const cui_semantic *item = container_semantic(ui, 20),
+                               *group = container_semantic(ui, 30);
+            assert(item && group && item->role == CUI_ROLE_GROUP && item->details.focusable &&
+                   item->tab_index == -1);
+            assert(item->name.length == 10 && item->details.description.length == 4);
+            assert(group->role == (multiple ? CUI_ROLE_GROUP : CUI_ROLE_RADIOGROUP));
+            assert(!container_semantic(ui, 21) && !container_semantic(ui, 31));
+            assert(cui_semantic_parent(ui, 30) == 20 && cui_semantic_parent(ui, 200) == 30);
+            cui_rect heading = cui_bounds(ui, 100), rows = cui_bounds(ui, 30),
+                     tail = cui_bounds(ui, 150);
+            assert(fabsf(rows.y - heading.y - heading.h - item_gap[size]) < .01f);
+            assert(fabsf(tail.y - rows.y - rows.h - item_gap[size]) < .01f);
+            cui_rect first = cui_bounds(ui, 200), second = cui_bounds(ui, 201);
+            assert(fabsf(second.y - first.y - first.h - choices_gap[size]) < .01f);
+            cui_rect left = cui_bounds(ui, 300), right = cui_bounds(ui, 301);
+            assert(fabsf(right.x - left.x - left.w - choices_gap[size]) < .01f);
+            assert(fabsf(left.y + left.h / 2 - right.y - right.h / 2) < .01f);
+            cui_focus(ui, 20);
+            assert(cui_focused(ui) == 20);
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB}));
+            container_frame(ui, &state, options);
+            assert(cui_focused(ui) == 200); /* Item accepts restoration, not a Tab stop. */
+        }
+        assert(cui_questionnaire_set_current(&state, 1, false) == CUI_QUESTIONNAIRE_OK);
+        container_frame(ui, &state, (cui_questionnaire_options){.width = 300});
+        assert(!container_semantic(ui, 20) && container_semantic(ui, 21)->name.length == 3);
+        assert(cui_semantic_parent(ui, 210) == 31);
+        assert(cui_questionnaire_disable_item(&state, 1, true) == CUI_QUESTIONNAIRE_OK);
+        assert(cui_questionnaire_disable_item(&state, 0, true) == CUI_QUESTIONNAIRE_OK);
+        container_frame(ui, &state, (cui_questionnaire_options){.width = 300});
+        assert(!container_semantic(ui, 20) && !container_semantic(ui, 21));
+        assert(cui_bounds(ui, 40).h == 30); /* Actions remain composable without an active item. */
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    composable_containers();
     custom_choice_slots();
     source_card_styles();
     progress_semantics();

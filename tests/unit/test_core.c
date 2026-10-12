@@ -182,9 +182,11 @@ static void test_scroll_gesture_metadata(void) {
     cui_begin_box(ui, 1, (cui_box){.width = 100, .height = 40});
     cui_interact(ui, 1, CUI_ROLE_GROUP, cui_string("Gallery"), false, false, 0);
     assert(cui_set_semantic_role(ui, 1, CUI_ROLE_REGION));
+    assert(cui_set_semantic_role(ui, 1, CUI_ROLE_RADIOGROUP));
+    assert(!cui_set_semantic_role(ui, 1, (cui_role)(CUI_ROLE_RADIOGROUP + 1)));
     cui_end_box(ui);
     cui_end_frame(ui);
-    assert(cui_semantics(ui, &count)[0].role == CUI_ROLE_REGION && count == 1);
+    assert(cui_semantics(ui, &count)[0].role == CUI_ROLE_RADIOGROUP && count == 1);
     cui_destroy(ui);
 }
 static void test_activation_cancellation(void) {
@@ -2308,7 +2310,35 @@ static void test_bitmap_underlay(void) {
         assert(draw.commands[i].type != CUI_DRAW_IMAGE);
     cui_destroy(ui);
 }
+static void test_semantic_parent_query(void) {
+    cui_context *ui = make();
+    assert(!cui_semantic_parent(NULL, 1));
+    for (unsigned frame = 0; frame < 2; frame++) {
+        begin(ui);
+        assert(!cui_semantic_parent(ui, 102));
+        cui_id parent = frame ? 104 : 100;
+        cui_begin_box(ui, parent, (cui_box){.width = 200, .height = 100});
+        cui_interact(ui, parent, CUI_ROLE_GROUP, cui_string("Parent"), false, false, 0);
+        cui_begin_box(ui, 101, (cui_box){.width = 100, .height = 60});
+        cui_begin_box(ui, 102, (cui_box){.width = 40, .height = 20});
+        cui_interact(ui, 102, CUI_ROLE_RADIO, cui_string("Child"), false, false, 0);
+        cui_end_box(ui);
+        cui_begin_box(ui, 103, (cui_box){.width = 40, .height = 20});
+        cui_interact(ui, 103, CUI_ROLE_LABEL, cui_string("Explicit"), false, false, 0);
+        cui_set_semantic_details(ui, 103, (cui_semantic_details){.parent = 999});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_frame(ui);
+        assert(cui_semantic_parent(ui, 102) == parent);
+        assert(cui_semantic_parent(ui, 103) == 999);
+        assert(!cui_semantic_parent(ui, parent));
+        assert(!cui_semantic_parent(ui, 555) && !cui_semantic_parent(ui, 0));
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    test_semantic_parent_query();
     test_font_metrics();
     test_styled_text_pipeline();
     test_bitmap_underlay();

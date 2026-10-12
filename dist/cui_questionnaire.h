@@ -170,6 +170,18 @@ typedef struct {
     cui_questionnaire_choice_render_fn render_indicator, render_content, render_shortcut;
     void *render_user;
 } cui_questionnaire_options;
+/* Composable containers. Item/choices begin returns false for inactive, unknown
+ * or disabled items and opens nothing. Call part_end only after a true result.
+ * Item is a programmatically focusable Group, excluded from Tab order; choices
+ * uses Group for multiple answers and RadioGroup for single answers. Explicit
+ * keyboard helpers remain responsible for answer navigation. */
+bool cui_questionnaire_item_begin(cui_context *, cui_id, const cui_questionnaire_state *,
+                                  size_t item, cui_questionnaire_options);
+bool cui_questionnaire_choices_begin(cui_context *, cui_id, const cui_questionnaire_state *,
+                                     size_t item, cui_questionnaire_options);
+bool cui_questionnaire_actions_begin(cui_context *, cui_id, const cui_questionnaire_state *,
+                                     cui_questionnaire_options);
+void cui_questionnaire_part_end(cui_context *);
 typedef struct {
     bool dragging;
     float scroll_x;
@@ -844,6 +856,60 @@ bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
 void cui_questionnaire_end(cui_context *ui) {
     cui_end_box(ui);
     cui_end_focus_scope(ui);
+}
+static bool cui_questionnaire_visible_item(const cui_questionnaire_state *s, size_t item) {
+    return s && s->initialized && item < s->count && item == s->current &&
+           !s->storage.items[item].disabled;
+}
+static float cui_questionnaire_choices_gap(cui_questionnaire_size size) {
+    switch (size) {
+    case CUI_QUESTIONNAIRE_XSMALL:
+        return 4;
+    case CUI_QUESTIONNAIRE_SMALL:
+        return 6;
+    case CUI_QUESTIONNAIRE_LARGE:
+        return 10;
+    default:
+        return 8;
+    }
+}
+bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
+                                  size_t item, cui_questionnaire_options o) {
+    if (!ui || !id || !cui_questionnaire_visible_item(s, item))
+        return false;
+    const cui_questionnaire_item *definition = &s->items[item];
+    cui_interact(ui, id, CUI_ROLE_GROUP,
+                 definition->label.length ? definition->label : definition->name, o.disabled, false,
+                 0);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.description = definition->description, .focusable = true});
+    cui_set_tab_stop(ui, id, false);
+    cui_begin_box(ui, id,
+                  (cui_box){.width = -1, .gap = cui_questionnaire_measure(o.size).root_gap});
+    return true;
+}
+bool cui_questionnaire_choices_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
+                                     size_t item, cui_questionnaire_options o) {
+    if (!ui || !id || !cui_questionnaire_visible_item(s, item))
+        return false;
+    cui_interact(ui, id, s->items[item].multiple ? CUI_ROLE_GROUP : CUI_ROLE_RADIOGROUP,
+                 (cui_str){0}, o.disabled, false, 0);
+    cui_begin_box(ui, id, (cui_box){.width = -1, .gap = cui_questionnaire_choices_gap(o.size)});
+    return true;
+}
+bool cui_questionnaire_actions_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
+                                     cui_questionnaire_options o) {
+    if (!ui || !id || !s || !s->initialized)
+        return false;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = -1,
+                            .row = true,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .gap = cui_questionnaire_choices_gap(o.size)});
+    return true;
+}
+void cui_questionnaire_part_end(cui_context *ui) {
+    cui_end_box(ui);
 }
 void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
                                 const cui_questionnaire_state *s, cui_questionnaire_options o) {

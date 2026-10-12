@@ -169,6 +169,18 @@ typedef struct {
     cui_questionnaire_choice_render_fn render_indicator, render_content, render_shortcut;
     void *render_user;
 } cui_questionnaire_options;
+/* Composable containers. Item/choices begin returns false for inactive, unknown
+ * or disabled items and opens nothing. Call part_end only after a true result.
+ * Item is a programmatically focusable Group, excluded from Tab order; choices
+ * uses Group for multiple answers and RadioGroup for single answers. Explicit
+ * keyboard helpers remain responsible for answer navigation. */
+bool cui_questionnaire_item_begin(cui_context *, cui_id, const cui_questionnaire_state *,
+                                  size_t item, cui_questionnaire_options);
+bool cui_questionnaire_choices_begin(cui_context *, cui_id, const cui_questionnaire_state *,
+                                     size_t item, cui_questionnaire_options);
+bool cui_questionnaire_actions_begin(cui_context *, cui_id, const cui_questionnaire_state *,
+                                     cui_questionnaire_options);
+void cui_questionnaire_part_end(cui_context *);
 typedef struct {
     bool dragging;
     float scroll_x;

@@ -65,7 +65,7 @@ typedef struct {
     cui_text_view_range list_marker;
     unsigned list_number;
     char marker_text[12];
-    bool table_header, image_ready;
+    bool table_header, image_ready, task, checked;
     cui_text_view_alignment alignment;
     cui_bitmap image;
     cui_rect bounds, table_frame;

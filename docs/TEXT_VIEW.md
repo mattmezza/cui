@@ -20,7 +20,7 @@ first-frame wrapping. Grow dimensions use retained bounds and a first-frame
 estimate (320 by 240); bounds changes schedule a follow-up measurement frame.
 
 Markdown handles headings, emphasis, strikethrough, inline/fenced code, links,
-entities, escaped punctuation, flat lists with source starting numbers and consecutive numbering, rules, pipe tables and block images. Soft paragraph breaks join with spaces; two-space hard breaks retain line breaks.
+entities, escaped punctuation, flat lists and passive task checkboxes with source starting numbers and consecutive numbering, rules, pipe tables and block images. Soft paragraph breaks join with spaces; two-space hard breaks retain line breaks.
 HTML handles the corresponding safe presentation tags and strips script/style
 bodies; it never executes markup or loads resources itself. Each rendered scalar
 maps to its original source bytes, including entity atoms, while block separators
@@ -62,7 +62,7 @@ rows and tables shifted as an unchanged suffix retain highlights. Nested HTML
 emphasis preserves outer styles after an inner close.
 
 `src/base/cui_text_view.c` links with the C math library only. Styled presentation
-requires Core, Theme and Scroll (base and components), plus portable platform
+requires Core, Theme and Scroll (base and components), the components checkmark drawing helper, plus portable platform
 clipboard declarations. Styled text uses real weight/italic/monospace measurement
 and drawing; register matching native faces for the desired typography. The regular
 face remains the renderer fallback. No Content rich-text parser existed to reuse.
@@ -113,3 +113,11 @@ source start remain stable. Reveal requests bring the target cell text into the
 horizontal viewport. Changing a table's source start or block ordinal resets its
 scroll state. Window-shared selection, touch and horizontal selection edge
 autoscroll remain separate limitations.
+
+Task list markers (`[ ]`, `[x]`, `[X]`) are source metadata rather than selectable
+text. Partial Source copy reconstructs them after the list marker. Presentation
+uses a 14px foreground border box, a foreground fill when checked, and the shared
+10px checkmark drawing helper; the indicator has no interactive semantics.
+The checkmark chooses black or white contrast against the supplied foreground,
+which preserves the source defaults while also supporting custom palettes.
+Nested lists and multi-paragraph list continuation remain parser limitations.

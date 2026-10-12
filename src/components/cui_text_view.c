@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_text_view.h"
+#include "cui/cui_components.h"
 #include <math.h>
 #include <string.h>
 cui_text_view_style cui_text_view_style_default(void) {
@@ -328,7 +329,27 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
         else if (b->kind == CUI_TEXT_VIEW_RULE)
             cui_text_view_quad(ui, part, r, style.border);
-        else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
+        else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->task) {
+            cui_begin_absolute_box(
+                ui, part,
+                (cui_box){.width = 14,
+                          .height = 14,
+                          .border_width = 1,
+                          .border = style.foreground,
+                          .background = b->checked ? style.foreground : (cui_color){0},
+                          .padding = 1,
+                          .align_x = CUI_ALIGN_CENTER,
+                          .align_y = CUI_ALIGN_CENTER},
+                (cui_rect){r.x, r.y + fmaxf(0, (style.line_height - 14) * .5f), 14, 14});
+            if (b->checked) {
+                float brightness = style.foreground.r * .2126f + style.foreground.g * .7152f +
+                                   style.foreground.b * .0722f;
+                cui_checkmark(ui, 10,
+                              brightness > 128 ? (cui_color){0, 0, 0, 255}
+                                               : (cui_color){255, 255, 255, 255});
+            }
+            cui_end_box(ui);
+        } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
             cui_begin_absolute_box(
                 ui, part, (cui_box){0},
                 (cui_rect){r.x, r.y, fmaxf(16, b->text_inset - 8), style.line_height});

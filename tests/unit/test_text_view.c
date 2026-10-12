@@ -345,6 +345,35 @@ static void test_adaptive_table_model(void) {
     o.table_mode = (cui_text_view_table_mode)-1;
     assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_INVALID);
 }
+static void test_task_list_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state, text("- [ ] todo\n- [x] done\n3. [X] ordered\n- [q] literal\n- [x]")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 5);
+    assert(f.blocks[0].task && !f.blocks[0].checked);
+    assert(f.blocks[1].task && f.blocks[1].checked);
+    assert(f.blocks[2].task && f.blocks[2].checked && f.blocks[2].list_number == 3);
+    assert(!f.blocks[3].task && f.blocks[4].task && f.blocks[4].checked);
+    assert(!memcmp(f.rendered, "todo\ndone\nordered\n[q] literal\n", 30));
+    assert(f.mapping[0].source.begin == 6);
+    assert(cui_text_view_select(&f.state, 0, f.blocks[1].text.end));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- [ ] todo\n- [x] done"));
+    assert(cui_text_view_select(&f.state, f.blocks[2].text.begin, f.blocks[2].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "3. [x] ordered"));
+    assert(cui_text_view_layout(
+               &f.state,
+               (cui_text_view_layout_options){.width = 200, .font_size = 14, .line_height = 20},
+               measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[2].text_inset == 20);
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -745,6 +774,41 @@ static void test_horizontal_table_interaction(void) {
     assert(f.state.scroll.y == 2 && f.blocks[0].table_scroll.x == 2);
     cui_destroy(ui);
 }
+static void test_passive_task_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("- [x] done\n- [ ] todo")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_terminal(),
+                          cui_theme_high_contrast()};
+    for (size_t theme = 0; theme < 4; ++theme) {
+        assert(cui_begin_frame(ui, 400, 300, .016f));
+        assert(cui_text_view(ui, 77, &themes[theme], &f.state, cui_text_view_default()));
+        cui_draw_list d = cui_end_frame(ui);
+        unsigned boxes = 0, checks = 0;
+        for (size_t i = 0; i < d.count; ++i) {
+            const cui_draw_command *c = &d.commands[i];
+            if (c->type == CUI_DRAW_BORDER && c->bounds.w == 14 && c->bounds.h == 14) {
+                ++boxes;
+                float offset = fmaxf(
+                    0, (cui_text_view_style_from_theme(&themes[theme]).line_height - 14) * .5f);
+                assert(c->bounds.y == f.blocks[0].bounds.y + offset ||
+                       c->bounds.y == f.blocks[1].bounds.y + offset);
+            }
+            if (c->type == CUI_DRAW_IMAGE) {
+                ++checks;
+                assert(c->bounds.w == 10 && c->bounds.h == 10 && c->bitmap.custom_tint);
+            }
+        }
+        assert(boxes == 2 && checks == 1);
+        size_t count;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        for (size_t i = 0; i < count; ++i)
+            assert(semantics[i].role != CUI_ROLE_CHECKBOX && semantics[i].role != CUI_ROLE_BUTTON);
+    }
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -826,6 +890,7 @@ int main(void) {
     test_source_copy();
     test_proportional_table_defaults();
     test_adaptive_table_model();
+    test_task_list_model();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -838,6 +903,7 @@ int main(void) {
     test_action_composition();
     test_table_edges_and_clip();
     test_horizontal_table_interaction();
+    test_passive_task_paint();
 #endif
     return 0;
 }

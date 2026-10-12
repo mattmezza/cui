@@ -50,7 +50,9 @@ static void cui_carousel_pointer_events(cui_context *ui, cui_id id, cui_carousel
             continue;
         }
         if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY &&
-            cui_event_within_scope(ui, i, id)) {
+            cui_event_within_scope(ui, i, id) && e->x >= s->frame_bounds.x &&
+            e->y >= s->frame_bounds.y && e->x < s->frame_bounds.x + s->frame_bounds.w &&
+            e->y < s->frame_bounds.y + s->frame_bounds.h) {
             if (cui_event_target(ui, i) == id)
                 s->focus_ring_suppressed = true;
             if (cui_carousel_begin_drag(s, e->x, e->y))

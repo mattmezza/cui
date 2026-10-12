@@ -62,7 +62,7 @@ reduced motion or disabled travel settles immediately. Critical and overdamped
 settings also have an analytic solution. Settled motion does not request frames.
 
 Pointer processing happens before child callbacks using Core's previous-frame
-logical scope ownership. A tap retains ordinary child press/release/activation.
+logical scope ownership and the measured slide-frame bounds. Navigation and pagination controls outside that frame never start a drag, so clicking them during spring motion cannot first snap to a different slide. A tap retains ordinary child press/release/activation.
 Movement greater than 2px locks to the dominant axis; ties lock to the Carousel
 axis. A stronger cross-axis move cancels the drag so ancestors can handle it,
 and suppresses that sequence's click. A locked release selects the nearest snap.

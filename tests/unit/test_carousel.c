@@ -257,6 +257,35 @@ static void pagination(cui_context *ui, const cui_theme *theme, cui_carousel_sta
                                      (cui_carousel_control_options){0});
     cui_carousel_pagination_end(ui);
 }
+static void test_controls_during_motion(void) {
+    for (unsigned axis = 0; axis < 2; axis++) {
+        cui_context *ui = cui_create((cui_config){.max_elements = 256});
+        cui_theme theme = cui_theme_light();
+        cui_carousel_state state;
+        cui_carousel_geometry workspace[8];
+        setup(&state, workspace, 3);
+        cui_carousel_set_axis(&state, axis ? CUI_ORIENTATION_VERTICAL : CUI_ORIENTATION_HORIZONTAL);
+        cui_carousel_set_looping(&state, true);
+        cui_carousel_options options = cui_carousel_default();
+        options.width = 200;
+        options.height = 80;
+        options.controls = controls;
+        options.pagination = pagination;
+        frame(ui, &theme, &state, options);
+        frame(ui, &theme, &state, options);
+        assert(cui_carousel_select(&state, 2));
+        frame(ui, &theme, &state, options);
+        assert(fabsf(state.offset - state.target) > 1);
+        cui_rect next = find(ui, 2001)->bounds;
+        pointer(ui, CUI_EVENT_POINTER_DOWN, next.x + next.w / 2, next.y + next.h / 2);
+        frame(ui, &theme, &state, options);
+        assert(!state.dragging && state.selected == 2);
+        pointer(ui, CUI_EVENT_POINTER_UP, next.x + next.w / 2, next.y + next.h / 2);
+        frame(ui, &theme, &state, options);
+        assert(state.selected == 0);
+        cui_destroy(ui);
+    }
+}
 static void test_controls(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     cui_theme theme = cui_theme_dark();
@@ -757,6 +786,7 @@ int main(void) {
 #ifndef CUI_CAROUSEL_BASE_ONLY
     test_widget();
     test_controls();
+    test_controls_during_motion();
     test_parent_handoff();
     test_disjoint_bursts();
     test_actual_scroll_parent();

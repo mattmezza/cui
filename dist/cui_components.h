@@ -6,6 +6,7 @@
 #include "cui_carousel.h"
 #include "cui_choice.h"
 #include "cui_chrome.h"
+#include "cui_command.h"
 #include "cui_content.h"
 #include "cui_description.h"
 #include "cui_disclosure.h"
@@ -293,6 +294,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_CAROUSEL_IMPLEMENTATION
 #endif
 #include "cui_carousel.h"
+#ifndef CUI_COMMAND_IMPLEMENTATION
+#define CUI_COMMAND_IMPLEMENTATION
+#endif
+#include "cui_command.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

@@ -5,6 +5,7 @@
 #include "cui_carousel.h"
 #include "cui_choice.h"
 #include "cui_chrome.h"
+#include "cui_command.h"
 #include "cui_content.h"
 #include "cui_description.h"
 #include "cui_disclosure.h"

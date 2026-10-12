@@ -5562,30 +5562,49 @@
       "name": "Command",
       "reference_url": "https://gpui-kit.com/component/command/",
       "category": "advanced",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_command_rebuild",
+        "cui_command_move",
+        "cui_command_confirm"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_command.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_command.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Unicode matching, arbitrary intrinsic wrapping, native Action/window lifecycle and deferred callbacks remain explicit host boundaries; see docs/COMMAND.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "fuzzy filtering and action model",
-          "status": "not_started",
-          "evidence": []
+          "name": "grouped filtering and retained original selection paths",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_command.c"
+          ]
         },
         {
-          "name": "keyboard navigation and focus restore",
-          "status": "not_started",
-          "evidence": []
+          "name": "wrapping keyboard and cross-frame pointer actions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_command.c"
+          ]
         },
         {
-          "name": "shortcut contexts and dismissal",
+          "name": "virtual rows with actual Input, Scroll and Dialog composition",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_command.c"
+          ]
+        },
+        {
+          "name": "complete source layout and host Action lifecycle parity",
           "status": "not_started",
           "evidence": []
         }

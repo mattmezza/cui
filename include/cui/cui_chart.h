@@ -80,6 +80,7 @@ typedef struct {
     size_t point_count;                  /* zero means count */
     unsigned tick_count;                 /* zero means 5 */
     unsigned x_tick_count, grid_columns; /* zero: source stride/all, no columns */
+    unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;
     bool hide_x_axis, show_y_axis, y_axis_inside, grid_solid;
     const double *reference_values;

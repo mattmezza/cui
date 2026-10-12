@@ -436,6 +436,23 @@ int main(void) {
                 formatted = true;
         }
     assert(image && text && formatted);
+    options.x_tick_count = 0;
+    options.x_tick_margin = 2;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool category_a = false, category_b = false, category_c = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1) {
+            char c = draw.commands[i].text.data[0];
+            category_a |= c == 'A';
+            category_b |= c == 'B';
+            category_c |= c == 'C';
+        }
+    assert(!category_a && category_b && !category_c);
+    options.x_tick_margin = 0;
+    options.x_tick_count = 2;
     size_t count;
     const cui_semantic *semantics = cui_semantics(ui, &count);
     bool named = false;

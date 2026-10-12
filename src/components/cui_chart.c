@@ -16,6 +16,22 @@ static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
         length = capacity ? capacity - 1 : 0;
     return (cui_str){buffer, length};
 }
+static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
+    if (!o->x_tick_count) {
+        size_t margin = o->x_tick_margin ? o->x_tick_margin : 1;
+        return (index + 1) % margin == 0;
+    }
+    if (o->x_tick_count >= o->count)
+        return true;
+    if (o->x_tick_count == 1)
+        return index == 0;
+    for (unsigned tick = 0; tick < o->x_tick_count; tick++) {
+        size_t selected = (size_t)lround((double)tick * (o->count - 1) / (o->x_tick_count - 1));
+        if (selected == index)
+            return true;
+    }
+    return false;
+}
 cui_chart_options cui_chart_theme(cui_chart_options o, const cui_theme *theme) {
     if (!theme)
         return o;
@@ -109,13 +125,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         (cui_box){.width = w, .height = h, .fixed_width = true, .fixed_height = true});
     if (!o->hide_axes && !o->hide_x_axis && o->kind != CUI_CHART_PIE &&
         o->kind != CUI_CHART_RADAR && o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40) {
-        size_t label_count = o->x_tick_count ? o->x_tick_count : o->count > 8 ? 8 : o->count;
-        if (label_count > 32)
-            label_count = 32;
         size_t slots = o->point_count ? o->point_count : o->count;
-        for (size_t slot = 0; slot < label_count; slot++) {
-            size_t i = label_count > 1 ? (slots - 1) * slot / (label_count - 1) : 0;
-            if (i >= o->count)
+        for (size_t i = 0; i < o->count; i++) {
+            if (!cui_chart_x_label_visible(o, i))
                 continue;
             cui_str label = o->data[i].label;
             if (!label.length || !label.data)
@@ -124,15 +136,27 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float x = slots > 1 ? (left + (o->width - 12 - left) * (float)i / (float)(slots - 1)) *
                                       w / o->width
                                 : w / 2;
+            float y = h - 14;
             if (o->kind == CUI_CHART_CANDLESTICK) {
                 cui_chart_candle_geometry candle;
                 if (cui_chart_candle_bounds(o, i, &candle) == CUI_PLOT_OK)
                     x = (float)(candle.wick.x_min * w / o->width);
             }
+            if (o->kind == CUI_CHART_BAR) {
+                cui_plot_rect bar;
+                if (cui_chart_bar_bounds(o, i, &bar) == CUI_PLOT_OK) {
+                    if (o->bar_alignment == CUI_CHART_BAR_LEFT ||
+                        o->bar_alignment == CUI_CHART_BAR_RIGHT) {
+                        x = 28;
+                        y = (float)((bar.y_min + bar.y_max) * h / (2 * o->height) - 6);
+                    } else
+                        x = (float)((bar.x_min + bar.x_max) * w / (2 * o->width));
+                }
+            }
             cui_begin_absolute_box(
                 ui, id ^ (UINT64_C(0x5db92a387c4e1100) + i),
                 (cui_box){.width = 56, .height = 12, .fixed_width = true, .fixed_height = true},
-                (cui_rect){x - 28, h - 14, 56, 12});
+                (cui_rect){x - 28, y, 56, 12});
             cui_text(ui, label, 10, o->foreground);
             cui_end_box(ui);
         }

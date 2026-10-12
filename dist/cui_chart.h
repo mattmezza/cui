@@ -1187,7 +1187,7 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
     }
 }
 static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
-                                   size_t layers, double padding);
+                                   size_t layers, double padding, double ky);
 static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
                                                 cui_chart_sankey_node *nodes, size_t layers);
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sankey_node *out,
@@ -1301,8 +1301,7 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
     if (!isfinite(ky) || ky < 0)
         return CUI_PLOT_OVERFLOW;
     for (size_t l = 0; l < layers; l++) {
-        long double total = sums[l] * ky + padding * (counts[l] ? counts[l] - 1 : 0);
-        long double y = plot_top + (plot_height - total) / 2;
+        long double y = plot_top;
         if (!isfinite(y) || y < -4096 || y > 4096)
             return CUI_PLOT_OVERFLOW;
         for (size_t i = 0; i < o->count; i++)
@@ -1318,8 +1317,16 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
                 nodes[i].y1 = (float)y;
                 y += padding;
             }
+        long double leftover = (plot_bottom - y + padding) / (counts[l] + 1);
+        size_t ordinal = 0;
+        for (size_t i = 0; i < o->count; i++)
+            if (nodes[i].layer == l) {
+                double shift = (double)(leftover * ++ordinal);
+                nodes[i].y0 += (float)shift;
+                nodes[i].y1 += (float)shift;
+            }
     }
-    cui_chart_sankey_relax(o, nodes, layers, padding);
+    cui_chart_sankey_relax(o, nodes, layers, padding, (double)ky);
     cui_chart_sankey_center_and_stagger(o, nodes, layers);
     memcpy(out, nodes, o->count * sizeof(*out));
     return CUI_PLOT_OK;
@@ -1367,7 +1374,7 @@ static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
     }
 }
 static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count, size_t layer,
-                                     double padding, double top, double bottom) {
+                                     double padding, double top, double bottom, double beta) {
     size_t indices[256], n = 0;
     for (size_t i = 0; i < count; i++)
         if (nodes[i].layer == layer)
@@ -1380,62 +1387,194 @@ static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count,
         }
         indices[j] = item;
     }
-    double cursor = top;
-    for (size_t i = 0; i < n; i++) {
+    if (!n)
+        return;
+    size_t middle = n / 2;
+    double cursor = nodes[indices[middle]].y0 - padding;
+    for (size_t i = middle; i > 0; i--) {
+        cui_chart_sankey_node *node = &nodes[indices[i - 1]];
+        double shift = fmax(0, node->y1 - cursor) * beta;
+        node->y0 -= (float)shift;
+        node->y1 -= (float)shift;
+        cursor = node->y0 - padding;
+    }
+    cursor = nodes[indices[middle]].y1 + padding;
+    for (size_t i = middle + 1; i < n; i++) {
         cui_chart_sankey_node *node = &nodes[indices[i]];
-        double height = node->y1 - node->y0;
-        double y = fmax(cursor, node->y0);
-        node->y0 = (float)y;
-        node->y1 = (float)(y + height);
+        double shift = fmax(0, cursor - node->y0) * beta;
+        node->y0 += (float)shift;
+        node->y1 += (float)shift;
         cursor = node->y1 + padding;
     }
     cursor = bottom;
     for (size_t i = n; i > 0; i--) {
         cui_chart_sankey_node *node = &nodes[indices[i - 1]];
-        double height = node->y1 - node->y0;
-        double y = fmin(cursor - height, node->y0);
-        node->y0 = (float)y;
-        node->y1 = (float)(y + height);
-        cursor = y - padding;
+        double shift = fmax(0, node->y1 - cursor) * beta;
+        node->y0 -= (float)shift;
+        node->y1 -= (float)shift;
+        cursor = node->y0 - padding;
+    }
+    cursor = top;
+    for (size_t i = 0; i < n; i++) {
+        cui_chart_sankey_node *node = &nodes[indices[i]];
+        double shift = fmax(0, cursor - node->y0) * beta;
+        node->y0 += (float)shift;
+        node->y1 += (float)shift;
+        cursor = node->y1 + padding;
     }
 }
+static void cui_chart_sankey_sort_adj(const cui_chart_options *o,
+                                      const cui_chart_sankey_node *nodes, size_t *order,
+                                      size_t first, size_t end, bool sources) {
+    for (size_t i = first + 1; i < end; i++) {
+        size_t item = order[i], j = i;
+        size_t other = sources ? o->links[item].target : o->links[item].source;
+        while (j > first) {
+            size_t previous = order[j - 1];
+            size_t previous_other = sources ? o->links[previous].target : o->links[previous].source;
+            if (nodes[previous_other].y0 < nodes[other].y0 ||
+                (nodes[previous_other].y0 == nodes[other].y0 && previous < item))
+                break;
+            order[j] = previous;
+            j--;
+        }
+        order[j] = item;
+    }
+}
+static double cui_chart_sankey_link_width(const cui_chart_options *o, size_t link, double ky) {
+    return cui_chart_sankey_scaled(o, o->links[link].value) * ky;
+}
+static double cui_chart_sankey_target_top(const cui_chart_options *o,
+                                          const cui_chart_sankey_node *nodes,
+                                          const size_t *out_order, const size_t *out_offsets,
+                                          const size_t *in_order, const size_t *in_offsets,
+                                          size_t source, size_t target, double padding, double ky) {
+    size_t outgoing = out_offsets[source + 1] - out_offsets[source];
+    double y = nodes[source].y0 - (outgoing ? outgoing - 1 : 0) * padding / 2;
+    for (size_t pos = out_offsets[source]; pos < out_offsets[source + 1]; pos++) {
+        size_t link = out_order[pos];
+        if (o->links[link].target == target)
+            break;
+        y += cui_chart_sankey_link_width(o, link, ky) + padding;
+    }
+    for (size_t pos = in_offsets[target]; pos < in_offsets[target + 1]; pos++) {
+        size_t link = in_order[pos];
+        if (o->links[link].source == source)
+            break;
+        y -= cui_chart_sankey_link_width(o, link, ky);
+    }
+    return y;
+}
+static double cui_chart_sankey_source_top(const cui_chart_options *o,
+                                          const cui_chart_sankey_node *nodes,
+                                          const size_t *out_order, const size_t *out_offsets,
+                                          const size_t *in_order, const size_t *in_offsets,
+                                          size_t source, size_t target, double padding, double ky) {
+    size_t incoming = in_offsets[target + 1] - in_offsets[target];
+    double y = nodes[target].y0 - (incoming ? incoming - 1 : 0) * padding / 2;
+    for (size_t pos = in_offsets[target]; pos < in_offsets[target + 1]; pos++) {
+        size_t link = in_order[pos];
+        if (o->links[link].source == source)
+            break;
+        y += cui_chart_sankey_link_width(o, link, ky) + padding;
+    }
+    for (size_t pos = out_offsets[source]; pos < out_offsets[source + 1]; pos++) {
+        size_t link = out_order[pos];
+        if (o->links[link].target == target)
+            break;
+        y -= cui_chart_sankey_link_width(o, link, ky);
+    }
+    return y;
+}
 static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
-                                   size_t layers, double padding) {
+                                   size_t layers, double padding, double ky) {
+    size_t out_offsets[257] = {0}, in_offsets[257] = {0};
+    size_t out_order[1024], in_order[1024];
+    for (size_t link = 0; link < o->link_count; link++) {
+        out_offsets[o->links[link].source + 1]++;
+        in_offsets[o->links[link].target + 1]++;
+    }
+    for (size_t node = 1; node <= o->count; node++) {
+        out_offsets[node] += out_offsets[node - 1];
+        in_offsets[node] += in_offsets[node - 1];
+    }
+    size_t out_next[256], in_next[256];
+    for (size_t node = 0; node < o->count; node++) {
+        out_next[node] = out_offsets[node];
+        in_next[node] = in_offsets[node];
+    }
+    for (size_t link = 0; link < o->link_count; link++) {
+        out_order[out_next[o->links[link].source]++] = link;
+        in_order[in_next[o->links[link].target]++] = link;
+    }
+    for (size_t node = 0; node < o->count; node++) {
+        cui_chart_sankey_sort_adj(o, nodes, out_order, out_offsets[node], out_offsets[node + 1],
+                                  true);
+        cui_chart_sankey_sort_adj(o, nodes, in_order, in_offsets[node], in_offsets[node + 1],
+                                  false);
+    }
     unsigned iterations = o->sankey_iterations ? o->sankey_iterations : 6;
     for (unsigned pass = 0; pass < iterations; pass++) {
         double alpha = pow(.99, pass);
+        double beta = fmax(1 - alpha, (pass + 1.0) / iterations);
         for (int direction = 0; direction < 2; direction++)
-            for (size_t step = 0; step < layers; step++) {
+            for (size_t step = 1; step < layers; step++) {
                 size_t layer = direction == 0 ? layers - 1 - step : step;
-                for (size_t node_index = 0; node_index < o->count; node_index++) {
-                    cui_chart_sankey_node *node = &nodes[node_index];
-                    if (node->layer != layer)
-                        continue;
-                    long double total = 0, weighted = 0;
-                    for (size_t link_index = 0; link_index < o->link_count; link_index++) {
-                        const cui_chart_link *link = &o->links[link_index];
-                        size_t other;
-                        if (direction == 0 && link->source == node_index)
-                            other = link->target;
-                        else if (direction == 1 && link->target == node_index)
-                            other = link->source;
-                        else
-                            continue;
+                size_t column[256], count = 0;
+                for (size_t node = 0; node < o->count; node++)
+                    if (nodes[node].layer == layer)
+                        column[count++] = node;
+                for (size_t i = 1; i < count; i++) {
+                    size_t item = column[i], j = i;
+                    while (j && nodes[column[j - 1]].y0 > nodes[item].y0) {
+                        column[j] = column[j - 1];
+                        j--;
+                    }
+                    column[j] = item;
+                }
+                for (size_t item = 0; item < count; item++) {
+                    size_t node = column[item];
+                    long double weighted = 0, total = 0;
+                    size_t *order = direction == 0 ? out_order : in_order;
+                    size_t *offsets = direction == 0 ? out_offsets : in_offsets;
+                    for (size_t pos = offsets[node]; pos < offsets[node + 1]; pos++) {
+                        size_t link = order[pos];
+                        size_t source = o->links[link].source;
+                        size_t target = o->links[link].target;
+                        size_t other = direction == 0 ? target : source;
                         size_t distance = nodes[other].layer > layer ? nodes[other].layer - layer
                                                                      : layer - nodes[other].layer;
-                        long double weight = cui_chart_sankey_scaled(o, link->value) * distance;
-                        weighted += weight * (nodes[other].y0 + nodes[other].y1) / 2;
+                        long double weight =
+                            cui_chart_sankey_scaled(o, o->links[link].value) * distance;
+                        double ideal =
+                            direction == 0
+                                ? cui_chart_sankey_source_top(o, nodes, out_order, out_offsets,
+                                                              in_order, in_offsets, source, target,
+                                                              padding, ky)
+                                : cui_chart_sankey_target_top(o, nodes, out_order, out_offsets,
+                                                              in_order, in_offsets, source, target,
+                                                              padding, ky);
+                        weighted += weight * ideal;
                         total += weight;
                     }
                     if (total > 0) {
-                        double center = (node->y0 + node->y1) / 2;
-                        double delta = ((double)(weighted / total) - center) * alpha;
-                        node->y0 += (float)delta;
-                        node->y1 += (float)delta;
+                        double delta = ((double)(weighted / total) - nodes[node].y0) * alpha;
+                        nodes[node].y0 += (float)delta;
+                        nodes[node].y1 += (float)delta;
+                        for (size_t pos = in_offsets[node]; pos < in_offsets[node + 1]; pos++) {
+                            size_t source = o->links[in_order[pos]].source;
+                            cui_chart_sankey_sort_adj(o, nodes, out_order, out_offsets[source],
+                                                      out_offsets[source + 1], true);
+                        }
+                        for (size_t pos = out_offsets[node]; pos < out_offsets[node + 1]; pos++) {
+                            size_t target = o->links[out_order[pos]].target;
+                            cui_chart_sankey_sort_adj(o, nodes, in_order, in_offsets[target],
+                                                      in_offsets[target + 1], false);
+                        }
                     }
                 }
                 cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8 + o->sankey_margins.top,
-                                         o->height - 8 - o->sankey_margins.bottom);
+                                         o->height - 8 - o->sankey_margins.bottom, beta);
             }
     }
 }

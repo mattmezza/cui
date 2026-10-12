@@ -1,8 +1,8 @@
 # Current report — 12 October 2026
 
-The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Main `869d451` passed CI and Pages; the most recent complete direct HTTPS and seven-asset verification is [a70afe9](validation/published-a70afe9.txt). Full feature parity remains incomplete: all 78 manifest entries are preserved, with 5 implemented, 73 tested and 0 verified.
+The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Release `49d4bfe` passed CI and Pages; complete direct HTTPS78 and eight-asset verification is recorded in [published-49d4bfe.txt](validation/published-49d4bfe.txt). Full feature parity remains incomplete: all 78 manifest entries are preserved, with 5 implemented, 73 tested and 0 verified.
 
-The new website and library feedback is preserved in [website-feedback.md](website-feedback.md). Root is implementing the first shared rendering/interaction fixes in an isolated branch. Native75, sanitizer75, WASI67, full Chromium78, targeted visual regressions and quality checks pass; publication is pending. No user dependency installation is needed. All earlier worker files and branches are preserved.
+The new website and library feedback is preserved in [website-feedback.md](website-feedback.md). Root is implementing the first shared rendering/interaction fixes in an isolated branch. Native75, sanitizer75, WASI67, full Chromium78, targeted visual regressions and quality checks pass; the first batch is published and directly verified. No user dependency installation is needed. All earlier worker files and branches are preserved.
 
 Build and test with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. Build the real browser gallery with `python scripts/build_web.py`; see [WEB_GALLERY.md](WEB_GALLERY.md) for serving and browser checks. The public renderer is the browser canvas host consuming actual CUI WASM draw lists. This is not evidence of native GPU runtime validation or complete native accessibility integration.
 

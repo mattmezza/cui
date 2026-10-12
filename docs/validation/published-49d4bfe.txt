@@ -1,0 +1,14 @@
+CI 38313695051 and Pages 38313694957 succeeded. Direct HTTPS Chromium78 passes; seven deployment assets and the landscape JPEG match the Pages artifact byte-for-byte.
+
+PASS gallery.wasm 7b365caabe05395b5a39084546644487cfed9e106791df9594ff5d4f72dd7caa
+PASS gallery.js e7b302a3fb1f008143dafeca887fda89ab6c1a98def4a5bf495fab2bc06c4ff4
+PASS gallery.css fc7989381ed627cb5698655e006d8d4d5fd936bff667f60e0c2b4becba8179f2
+PASS index.html 45d9175b2b0f6cba70a01582fd22addef47e657ceb127695c96b47d893ca1e0d
+PASS catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+PASS themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+PASS docs.json a5ca3327c1b44f7016b0ee8e409f36cd11fdc8d25e07394a76161c2709ea41c7
+PASS assets/alpine-lake.jpg 92a48f1cc90763ed83e23f6db9dc1b76fa05c72b82908f895f84b363d95a9be6
+
+Installed 4 packages in 24ms
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting

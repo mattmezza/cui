@@ -1,8 +1,8 @@
 {
   "source": "3d05c2a",
-  "published_source": "a70afe9",
+  "published_source": "49d4bfe9ed5384bb823ea173b61726042ab02de2",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "First reported-defect batch: controlled Radio redraw, full/half/empty SVG Rating stars, Avatar/Tooltip and numeric-button centering, measured Marker width, original Image/Attachment asset. Integrated native77, sanitizer75, WASI67, Chromium78, targeted visual regressions and quality gates pass. Publication is pending. All78 entries remain in scope; full feature parity and remaining website feedback are unfinished.",
+  "summary": "First reported-defect batch: controlled Radio redraw, full/half/empty SVG Rating stars, Avatar/Tooltip and numeric-button centering, measured Marker width, original Image/Attachment asset. Integrated native77, sanitizer75, WASI67, Chromium78, targeted visual regressions and quality gates pass. Published49d4bfe is directly verified over HTTPS with all78 browser stories and eight artifact-matching assets. All78 entries remain in scope; full feature parity and remaining website feedback are unfinished.",
   "checks": [
     {
       "name": "native",
@@ -36,13 +36,13 @@
   "visual_regressions": "visual-3d05c2a.txt",
   "failing_before": "radio-failing-before-3d05c2a.txt",
   "quality": "quality-3d05c2a.txt",
-  "published_evidence": "published-a70afe9.txt",
+  "published_evidence": "published-49d4bfe.txt",
   "latest_deployment": {
-    "source": "869d451",
+    "source": "49d4bfe9ed5384bb823ea173b61726042ab02de2",
     "status": "success",
-    "pages_run": 38311899962,
-    "ci_run": 38311900050,
-    "direct_https_verification": "pending"
+    "pages_run": 38313694957,
+    "ci_run": 38313695051,
+    "direct_https_verification": "Chromium78 and eight assets pass"
   },
   "feedback_audit": "../website-feedback.md"
 }

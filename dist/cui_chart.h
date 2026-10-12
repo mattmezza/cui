@@ -217,6 +217,9 @@ typedef struct {
     float hover_x, hover_y[8], hover_vx, hover_vy[8]; /* private pointer spring */
     size_t hover_visual_index;
     bool hover_visual_started;
+    float emphasis_focus, emphasis_center, emphasis_velocity;
+    bool emphasis_started;
+    float pie_lift[256], pie_lift_velocity[256]; /* bounded source per-slice spring */
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {
@@ -869,6 +872,17 @@ static cui_color cui_chart_blend_color(cui_color a, cui_color b, double t) {
 }
 static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, size_t index,
                                cui_plot_rect bounds, cui_color solid) {
+    double emphasis = 1;
+    if (!o->noninteractive && s->emphasis_focus > 0 && o->count > 1) {
+        float center = 0, first = 0, second = 0;
+        if (cui_chart_bar_band_center(o, index, &center) == CUI_PLOT_OK &&
+            cui_chart_bar_band_center(o, 0, &first) == CUI_PLOT_OK &&
+            cui_chart_bar_band_center(o, 1, &second) == CUI_PLOT_OK) {
+            double step = fmax(.0001, fabs(second - first));
+            double distance = fmin(1, fabs(center - s->emphasis_center) / step);
+            emphasis = 1 - .45 * fmin(1, s->emphasis_focus) * distance;
+        }
+    }
     bool horizontal =
         o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
     bool positive = o->data[index].value >= 0;
@@ -916,6 +930,7 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
                 color = o->bar_fill_pixel(&o->data[index], index, bounds,
                                           (cui_plot_rect){0, 0, o->width, o->height}, (float)px,
                                           (float)py, o->bar_fill_user);
+            color.a = (unsigned char)lround(color.a * emphasis);
             cui_chart_pixel(s, o, x, y, color);
         }
 }
@@ -1761,6 +1776,9 @@ static void cui_chart_sankey(cui_chart_state *s, const cui_chart_options *o,
         cui_color source_color = cui_chart_palette(o, source);
         cui_color target_color = cui_chart_palette(o, target);
         double opacity = o->custom_sankey_link_opacity ? o->sankey_link_opacity : .3;
+        if (!o->noninteractive && s->emphasis_focus > 0 && s->hovered < o->count &&
+            source != s->hovered && target != s->hovered)
+            opacity *= 1 - .7 * fmin(1, s->emphasis_focus);
         for (int x = (int)ceil(x0); x < (int)x1; x++) {
             double t = (x - x0) / (x1 - x0), smooth = t * t * (3 - 2 * t),
                    center = (1 - smooth) * start_y + smooth * end_y;
@@ -1891,6 +1909,15 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     for (size_t i = 0; i < sizeof(o->area_radar_fill_pixel); i++)
         h = cui_chart_mix(h, region_fill[i]);
     h = cui_chart_mix(h, (uintptr_t)o->area_radar_fill_user);
+    if (!o->noninteractive &&
+        (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY)) {
+        h = cui_chart_mix(h, s->hovered);
+        h = cui_chart_mix(h, cui_chart_bits(s->emphasis_focus));
+        h = cui_chart_mix(h, cui_chart_bits(s->emphasis_center));
+        if (o->kind == CUI_CHART_PIE)
+            for (size_t i = 0; i < o->count; i++)
+                h = cui_chart_mix(h, cui_chart_bits(s->pie_lift[i]));
+    }
     return h ? h : 1;
 }
 cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o) {
@@ -1906,6 +1933,19 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         status = cui_chart_sankey_link_bounds(o, nodes, link_geometry, 1024);
         if (status != CUI_PLOT_OK)
             return status;
+    }
+    if (s->rendered_data != o->data || s->rendered_count != o->count ||
+        s->rendered_kind != o->kind) {
+        s->hovered = SIZE_MAX;
+        s->hovered_value = 0;
+        s->hover_visual_started = false;
+        s->hover_progress = 0;
+        s->emphasis_focus = 0;
+        s->emphasis_center = 0;
+        s->emphasis_velocity = 0;
+        s->emphasis_started = false;
+        memset(s->pie_lift, 0, sizeof s->pie_lift);
+        memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }
     uint64_t key = cui_chart_cache_key(o, s);
     if (key && key == s->cache_key)
@@ -1928,13 +1968,6 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->mark_clip_x = o->width * o->reveal_progress;
         cui_chart_sankey(s, o, nodes, link_geometry);
         s->mark_clip_active = false;
-    }
-    if (s->rendered_data != o->data || s->rendered_count != o->count ||
-        s->rendered_kind != o->kind) {
-        s->hovered = SIZE_MAX;
-        s->hovered_value = 0;
-        s->hover_visual_started = false;
-        s->hover_progress = 0;
     }
     s->rendered_data = o->data;
     s->rendered_count = o->count;
@@ -2300,6 +2333,51 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 state->hovered_value = hit.valid ? hit.value : 0;
             }
         }
+    }
+    if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) {
+        bool active = !o->noninteractive && state->hovered < o->count;
+        bool instant = o->reduced_motion || cui_reduced_motion(ui);
+        float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
+        float dt = cui_frame_delta(ui);
+        if (!isfinite(dt) || dt < 0)
+            dt = 0;
+        if (dt == 0 && active && state->emphasis_focus == 0)
+            dt = 1.f / 60;
+        dt = fminf(dt, .25f);
+        state->emphasis_focus =
+            instant ? (active ? 1 : 0)
+                    : fmaxf(0, fminf(1, state->emphasis_focus + (active ? dt : -dt) / duration));
+        if (o->kind == CUI_CHART_BAR && active) {
+            float target;
+            if (cui_chart_bar_band_center(o, state->hovered, &target) == CUI_PLOT_OK) {
+                if (!state->emphasis_started || instant) {
+                    state->emphasis_center = target;
+                    state->emphasis_velocity = 0;
+                    state->emphasis_started = true;
+                } else
+                    cui_chart_hover_spring(&state->emphasis_center, &state->emphasis_velocity,
+                                           target, dt, duration);
+            }
+        }
+        bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
+        if (o->kind == CUI_CHART_PIE)
+            for (size_t i = 0; i < o->count && i < 256; i++) {
+                float target = active && state->hovered == i ? 1 : 0;
+                if (instant) {
+                    state->pie_lift[i] = target;
+                    state->pie_lift_velocity[i] = 0;
+                } else
+                    cui_chart_hover_spring(&state->pie_lift[i], &state->pie_lift_velocity[i],
+                                           target, dt, duration);
+                moving |= fabsf(state->pie_lift[i] - target) > .001f ||
+                          fabsf(state->pie_lift_velocity[i]) > .001f;
+            }
+        if (!active && state->emphasis_focus == 0)
+            state->emphasis_started = false;
+        if (!instant && moving)
+            cui_invalidate(ui);
+        if (cui_chart_render(state, o) != CUI_PLOT_OK)
+            return false;
     }
     cui_begin_box(
         ui, id,

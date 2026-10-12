@@ -8,7 +8,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Attachment and Image: show a real image, replacing the tiny blue fixture. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Avatar: center initials. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Marker: keep “Synchronizing 3 tasks” on the intended horizontal line. — first polish batch; native/browser geometry and interaction evidence below.
-- [ ] Message: inspect and correct body/action layout.
+- [x] Message: remove the stray renderer test bitmap from the normal body layout. — 0e4ee4a passes Chromium78 and retains the explicit crop/tint/clip pixel fixture checks. Native Message interactions and remaining family limitations are unchanged. Publication pending.
 - [x] Pagination: center button text vertically. — first polish batch; native/browser geometry and interaction evidence below.
 - [ ] Progress: demonstrate animated progress and reduced motion.
 - [x] Radio: one click clears the previous selection visually and semantically. — first polish batch; native/browser geometry and interaction evidence below.

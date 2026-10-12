@@ -86,6 +86,7 @@ static bool checked, enabled = true, toggled;
 static int description_columns = 3, description_vertical, description_plain, description_size;
 static int status_right = 1, status_custom;
 static int resizable_vertical, resizable_disabled;
+static unsigned resizable_document;
 static cui_resizable_slot resizable_slots[2];
 static cui_resizable_state resizable_state;
 static cui_carousel_state carousel_state;
@@ -650,7 +651,45 @@ static void toolbar_group_render(cui_context *context, const cui_theme *theme,
                                             .label = cui_string("Formatting")});
 }
 static void resizable_content(cui_context *context, void *user) {
-    cui_label(context, &current_theme, cui_string((uintptr_t)user == 0 ? "Explorer" : "Editor"));
+    static const char *files[] = {"main.c", "layout.c", "theme.c"};
+    static const char *code[][3] = {
+        {"if (cui_button(ui, save_id, &theme,", "    cui_string(\"Save\"), false))",
+         "    save_document(application);"},
+        {"cui_begin_box(ui, panel_id,", "    (cui_box){.row = true, .gap = 8});",
+         "cui_end_box(ui);"},
+        {"cui_theme theme = cui_theme_dark();", "theme.radius = 8;", "theme.gap = 12;"}};
+    cui_begin_box(context, 0,
+                  (cui_box){.width = -1, .height = -1, .padding = 10, .gap = 8, .clip = true});
+    bool explorer = (uintptr_t)user == 0;
+    cui_text_ex(context, cui_string(explorer ? "Explorer" : files[resizable_document]), 14,
+                current_theme.text, 18, (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD});
+    if (explorer) {
+        for (unsigned i = 0; i < 3; i++)
+            if (cui_button_ex(context, cui_id_from(context, files[i]), &current_theme,
+                              cui_string(files[i]),
+                              (cui_button_options){.width = -1,
+                                                   .size = CUI_CONTROL_XSMALL,
+                                                   .variant = CUI_BUTTON_GHOST,
+                                                   .selected = resizable_document == i,
+                                                   .icon = cui_string("file-text")})) {
+                resizable_document = i;
+                cui_invalidate(context);
+            }
+    } else {
+        cui_begin_box(context, 0,
+                      (cui_box){.width = -1,
+                                .height = -1,
+                                .padding = 8,
+                                .gap = 2,
+                                .background = current_theme.surface,
+                                .radius = 4,
+                                .clip = true});
+        for (unsigned i = 0; i < 3; i++)
+            cui_text_line(context, cui_string(code[resizable_document][i]), 12, current_theme.text,
+                          16, (cui_text_style){.monospace = true});
+        cui_end_box(context);
+    }
+    cui_end_box(context);
 }
 static void gallery_carousel_changed(size_t index, void *user) {
     (void)index;
@@ -1717,8 +1756,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         panels[1].content = resizable_content;
         panels[0].content_user = (void *)(uintptr_t)0;
         panels[1].content_user = (void *)(uintptr_t)1;
-        panels[0].box.background = t.surface;
-        panels[1].box.background = t.surface;
+        panels[0].box.background = t.secondary;
+        panels[1].box.background = t.background;
+        panels[0].box.border = panels[1].box.border = t.border;
+        panels[0].box.border_width = panels[1].box.border_width = 1;
         cui_resizable_options options = cui_resizable_options_default();
         options.axis = resizable_vertical ? CUI_RESIZABLE_VERTICAL : CUI_RESIZABLE_HORIZONTAL;
         options.extent = resizable_vertical ? 210 : width - 48;
@@ -1728,6 +1769,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.now_seconds = host_seconds;
         cui_resizable(ui, cui_id_from(ui, "resizable-group"), &t, &resizable_state, panels, 2,
                       options);
+        char sizes[96];
+        snprintf(sizes, sizeof sizes, "Pane %s: Explorer %.0f px / Editor %.0f px",
+                 resizable_vertical ? "heights" : "widths", resizable_state.slots[0].size,
+                 resizable_state.slots[1].size);
+        cui_label(ui, &t, cui_string(sizes));
+        cui_label(ui, &t, cui_string("Drag the divider, or focus it and use the arrow keys."));
         break;
     }
     case 67: {

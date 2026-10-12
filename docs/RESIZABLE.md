@@ -120,3 +120,5 @@ payload objects are not built-ins here. Applications retain state and provide
 content/callbacks; durable preference storage is host-owned. This implementation
 provides substantive sizing, composition, painting and real input, not a claim of
 complete native API equivalence.
+
+The gallery demonstrates a small workspace with selectable files, a read-only code preview, contrasting pane backgrounds and live pane dimensions. Drag the divider or focus it and press arrow keys; the browser checks both the retained sizes and the visible pane widths/positions. The vertical mode demonstrates the same model with pane heights.

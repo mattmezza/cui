@@ -789,6 +789,13 @@ def main():
             assert separator.get_attribute('aria-orientation') == 'vertical'
             assert float(separator.get_attribute('aria-valuenow')) >= 80
             initial_panel = page.evaluate('cuiGallery.exports.gallery_resizable_size(0)')
+            explorer_bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Explorer panel', 9))
+            editor_bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Editor panel', 9))
+            assert abs(explorer_bounds[2]-initial_panel) < 1
+            click_semantic('layout.c', 1)
+            page.wait_for_function('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.from(
+                {length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&d.decode(new Uint8Array(
+                    e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='cui_begin_box(ui, panel_id,');}''')
             click_semantic('Resize panels', 40)
             page.keyboard.press('ArrowRight')
             page.wait_for_function('(size)=>cuiGallery.exports.gallery_resizable_size(0)>size', arg=initial_panel)
@@ -803,6 +810,11 @@ def main():
             page.mouse.move(handle_x+24, handle_y, steps=4)
             page.mouse.up()
             page.wait_for_function('(size)=>cuiGallery.exports.gallery_resizable_size(0)>size+15', arg=keyboard_panel)
+            resized_explorer = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Explorer panel', 9))
+            resized_editor = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Editor panel', 9))
+            assert abs(resized_explorer[2]-page.evaluate('cuiGallery.exports.gallery_resizable_size(0)')) < 1
+            assert resized_explorer[2] > explorer_bounds[2]+15
+            assert abs(resized_editor[0]-editor_bounds[0]-resized_explorer[2]+explorer_bounds[2]) < 1
             control_change('resizable-disabled', True)
             locked_panel = page.evaluate('cuiGallery.exports.gallery_resizable_size(0)')
             page.keyboard.press('ArrowRight')

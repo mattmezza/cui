@@ -33,6 +33,7 @@ static void radio_frame(cui_context *ui, cui_questionnaire_state *s) {
     cui_id ids[] = {22, 23, 24};
     (void)cui_questionnaire_radio_keys(ui, s, ids, 3);
     assert(cui_questionnaire_begin(ui, 20, &t, s, (cui_questionnaire_options){.width = 300}));
+    (void)cui_questionnaire_confirm_keys(ui, 20, s, ids, 3, 0, CUI_MOD_CTRL);
     for (size_t i = 0; i < 3; i++)
         (void)cui_questionnaire_choice_control(ui, ids[i], &t, s, 0, i,
                                                (cui_questionnaire_options){0});
@@ -73,6 +74,16 @@ static void radio_keyboard(void) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_LEFT}));
     radio_frame(ui, &s);
     assert(cui_focused(ui) == 24 && cui_questionnaire_choice_selected(&s, 0, 2));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    radio_frame(ui, &s);
+    assert(s.complete && cui_event_consumed(ui, 0));
+    assert(cui_questionnaire_reset(&s));
+    cui_focus(ui, 22);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .modifiers = CUI_MOD_CTRL}));
+    radio_frame(ui, &s);
+    assert(!s.complete && cui_questionnaire_item_error(&s, 0).kind == CUI_QUESTIONNAIRE_UNFILLED);
     cui_destroy(ui);
 }
 int main(void) {

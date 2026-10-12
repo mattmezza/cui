@@ -359,3 +359,40 @@ bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionna
     }
     return handled;
 }
+bool cui_questionnaire_confirm_keys(cui_context *ui, cui_id scope, cui_questionnaire_state *s,
+                                    const cui_id *ids, size_t count, cui_id input_id,
+                                    unsigned submit_modifier) {
+    if (!ui || !scope || !s || !s->initialized || s->current >= s->count || (count && !ids) ||
+        count != s->items[s->current].choice_count || !cui_focus_within(ui, scope) ||
+        s->storage.items[s->current].disabled ||
+        (submit_modifier && submit_modifier != CUI_MOD_CTRL && submit_modifier != CUI_MOD_META))
+        return false;
+    size_t item = s->current, event_count;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    bool handled = false;
+    for (size_t e = 0; e < event_count && s->current == item; e++) {
+        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN ||
+            events[e].key != CUI_KEY_ENTER || events[e].repeat)
+            continue;
+        bool filled = false;
+        cui_id focus = cui_focused(ui);
+        if (input_id && focus == input_id)
+            filled = cui_questionnaire_freeform(s, item).length != 0;
+        for (size_t c = 0; c < count; c++)
+            if (ids[c] && focus == ids[c])
+                filled = cui_questionnaire_choice_selected(s, item, c);
+        bool modified = submit_modifier && events[e].modifiers == submit_modifier;
+        if (modified || (!events[e].modifiers && filled)) {
+            bool confirmed = cui_questionnaire_confirm(s);
+            /* Modified Enter belongs to the form even when validation fails;
+             * it must not fall through to selecting the focused radio. */
+            if (confirmed || modified) {
+                cui_consume_event(ui, e);
+                cui_cancel_event_activation(ui, e);
+                handled = true;
+            }
+            cui_invalidate(ui);
+        }
+    }
+    return handled;
+}

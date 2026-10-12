@@ -455,6 +455,8 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from)
             (event.dx > 0 && d.scroll_x > 0) || (event.dx < 0 && d.scroll_x < d.scroll_max_x);
         bool can_y =
             (event.dy > 0 && d.scroll_y > 0) || (event.dy < 0 && d.scroll_y < d.scroll_max_y);
+        if (d.scroll_trap_horizontal && fabsf(event.dx) > fabsf(event.dy))
+            can_x = true;
         if (d.scroll_axis_lock) {
             bool vertical = fabsf(event.dy) >= fabsf(event.dx);
             if (d.orientation == CUI_ORIENTATION_VERTICAL) {

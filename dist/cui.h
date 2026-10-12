@@ -158,6 +158,9 @@ typedef struct {
     float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
     /* Route only dominant-axis wheel motion for the declared orientation. */
     bool scroll_axis_lock;
+    /* Horizontal masks retain horizontal-dominant wheel events at both edges,
+     * including when content fits. Normal scroll owners leave this false. */
+    bool scroll_trap_horizontal;
     /* Opt a normally passive semantic container into keyboard/pointer focus. */
     bool focusable;
     /* Primary pointer activation without opting into focus or keyboard activation. */
@@ -5943,6 +5946,8 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from)
             (event.dx > 0 && d.scroll_x > 0) || (event.dx < 0 && d.scroll_x < d.scroll_max_x);
         bool can_y =
             (event.dy > 0 && d.scroll_y > 0) || (event.dy < 0 && d.scroll_y < d.scroll_max_y);
+        if (d.scroll_trap_horizontal && fabsf(event.dx) > fabsf(event.dy))
+            can_x = true;
         if (d.scroll_axis_lock) {
             bool vertical = fabsf(event.dy) >= fabsf(event.dx);
             if (d.orientation == CUI_ORIENTATION_VERTICAL) {

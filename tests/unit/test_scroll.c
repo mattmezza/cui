@@ -276,11 +276,59 @@ static void hidden_tracks(void) {
     assert(sem[0].details.orientation == CUI_ORIENTATION_VERTICAL);
     cui_destroy(ui);
 }
+static void horizontal_mask_edges(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_theme theme = {0};
+    cui_scroll_state state = {0};
+    cui_scroll_options o = {.width = 200,
+                            .height = 100,
+                            .content_width = 200,
+                            .content_height = 100,
+                            .horizontal = true,
+                            .hide_scrollbars = true,
+                            .axis_lock = true,
+                            .trap_horizontal = true};
+    for (int overflow = 0; overflow < 2; overflow++) {
+        o.content_width = overflow ? 600 : 200;
+        state.x = overflow ? 400 : 0;
+        scene(ui, &theme, &state, o);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = 50,
+                                               .y = 50,
+                                               .dx = -40,
+                                               .dy = -10,
+                                               .scroll_precise = true}));
+        scene(ui, &theme, &state, o);
+        assert(state.x == (overflow ? 400 : 0));
+        assert(cui_event_target(ui, 0) == 1 && cui_event_consumed(ui, 0));
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = 50,
+                                               .y = 50,
+                                               .dx = -10,
+                                               .dy = -40,
+                                               .scroll_precise = true}));
+        scene(ui, &theme, &state, o);
+        assert(!cui_event_consumed(ui, 0));
+    }
+    o.trap_horizontal = false;
+    scene(ui, &theme, &state, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 50,
+                                           .y = 50,
+                                           .dx = -40,
+                                           .dy = -10,
+                                           .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+    assert(!cui_event_consumed(ui, 0));
+    cui_destroy(ui);
+}
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+    horizontal_mask_edges();
     hidden_tracks();
     deferred_scroll();
     consumed_wheel();

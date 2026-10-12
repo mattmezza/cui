@@ -157,6 +157,9 @@ typedef struct {
     float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
     /* Route only dominant-axis wheel motion for the declared orientation. */
     bool scroll_axis_lock;
+    /* Horizontal masks retain horizontal-dominant wheel events at both edges,
+     * including when content fits. Normal scroll owners leave this false. */
+    bool scroll_trap_horizontal;
     /* Opt a normally passive semantic container into keyboard/pointer focus. */
     bool focusable;
     /* Primary pointer activation without opting into focus or keyboard activation. */

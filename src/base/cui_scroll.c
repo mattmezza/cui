@@ -132,7 +132,8 @@ static void cui_scroll_reduce_wheel(cui_context *ui, cui_id id, cui_scroll_state
                 s->x = cui_scroll_limit(s->x - events[i].dx * step, g.maximum_x);
             if (o.vertical && isfinite(events[i].dy))
                 s->y = cui_scroll_limit(s->y - events[i].dy * step, g.maximum_y);
-            if (s->x != previous_x || s->y != previous_y)
+            if (s->x != previous_x || s->y != previous_y ||
+                (o.horizontal && o.trap_horizontal && fabsf(events[i].dx) > fabsf(events[i].dy)))
                 cui_consume_event(ui, i);
             else
                 cui_defer_scroll_event(ui, i, id);
@@ -145,18 +146,19 @@ bool cui_base_scrollable_finish(cui_context *ui, cui_id id, cui_scroll_state *s,
     cui_scroll_geometry g = cui_scroll_layout(o);
     float old_x = s->x, old_y = s->y;
     cui_scroll_reduce_wheel(ui, id, s, o, g);
-    cui_set_semantic_details(ui, id,
-                             (cui_semantic_details){.scrollable = !o.disabled,
-                                                    .scroll_axis_lock = o.axis_lock,
-                                                    .orientation = o.horizontal == o.vertical
-                                                                       ? CUI_ORIENTATION_UNSPECIFIED
-                                                                   : o.horizontal
-                                                                       ? CUI_ORIENTATION_HORIZONTAL
-                                                                       : CUI_ORIENTATION_VERTICAL,
-                                                    .scroll_x = s->x,
-                                                    .scroll_y = s->y,
-                                                    .scroll_max_x = g.maximum_x,
-                                                    .scroll_max_y = g.maximum_y});
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.scrollable = !o.disabled,
+                               .scroll_axis_lock = o.axis_lock,
+                               .scroll_trap_horizontal = o.horizontal && o.trap_horizontal,
+                               .orientation = o.horizontal == o.vertical
+                                                  ? CUI_ORIENTATION_UNSPECIFIED
+                                              : o.horizontal ? CUI_ORIENTATION_HORIZONTAL
+                                                             : CUI_ORIENTATION_VERTICAL,
+                               .scroll_x = s->x,
+                               .scroll_y = s->y,
+                               .scroll_max_x = g.maximum_x,
+                               .scroll_max_y = g.maximum_y});
     return s->x != old_x || s->y != old_y;
 }
 bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_scroll_options o) {
@@ -174,17 +176,18 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
         cui_base_scrollbar(ui, id, s, g, o, false);
     if (o.vertical && !o.hide_scrollbars)
         cui_base_scrollbar(ui, id, s, g, o, true);
-    cui_set_semantic_details(ui, id,
-                             (cui_semantic_details){.scrollable = !o.disabled,
-                                                    .scroll_axis_lock = o.axis_lock,
-                                                    .orientation = o.horizontal == o.vertical
-                                                                       ? CUI_ORIENTATION_UNSPECIFIED
-                                                                   : o.horizontal
-                                                                       ? CUI_ORIENTATION_HORIZONTAL
-                                                                       : CUI_ORIENTATION_VERTICAL,
-                                                    .scroll_x = s->x,
-                                                    .scroll_y = s->y,
-                                                    .scroll_max_x = g.maximum_x,
-                                                    .scroll_max_y = g.maximum_y});
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.scrollable = !o.disabled,
+                               .scroll_axis_lock = o.axis_lock,
+                               .scroll_trap_horizontal = o.horizontal && o.trap_horizontal,
+                               .orientation = o.horizontal == o.vertical
+                                                  ? CUI_ORIENTATION_UNSPECIFIED
+                                              : o.horizontal ? CUI_ORIENTATION_HORIZONTAL
+                                                             : CUI_ORIENTATION_VERTICAL,
+                               .scroll_x = s->x,
+                               .scroll_y = s->y,
+                               .scroll_max_x = g.maximum_x,
+                               .scroll_max_y = g.maximum_y});
     return s->x != old_x || s->y != old_y;
 }

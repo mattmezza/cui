@@ -17,6 +17,7 @@ typedef struct {
     bool hide_scrollbars;
     /* Route gestures by their starting axis when exactly one axis is enabled. */
     bool axis_lock;
+    bool trap_horizontal; /* Opt-in horizontal mask edge ownership. */
 } cui_scroll_options;
 typedef struct {
     cui_size viewport;

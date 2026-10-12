@@ -88,6 +88,7 @@ typedef struct {
     cui_popup_side side;         /* preferred anchor side; defaults below */
     cui_choice_render_fn render; /* optional fixed-height option body */
     void *render_user;
+    bool align_end; /* align popup right edge with anchor right edge */
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */
@@ -220,6 +221,12 @@ typedef enum {
     CUI_DROPDOWN_BUTTON_SMALL,
     CUI_DROPDOWN_BUTTON_LARGE
 } cui_dropdown_button_size;
+typedef enum {
+    CUI_DROPDOWN_ANCHOR_TOP_RIGHT,
+    CUI_DROPDOWN_ANCHOR_TOP_LEFT,
+    CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT,
+    CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT
+} cui_dropdown_button_anchor;
 typedef struct {
     bool disabled, action_disabled, action_loading, selected;
     float width; /* action-half width: zero fits contents; negative grows */
@@ -232,7 +239,8 @@ typedef struct {
     /* When an outer property is unset, inherit the action button's property
      * for both halves. Zero-initialized options keep the existing defaults. */
     bool inherit_action_variant, inherit_action_size;
-    bool hide_action, hide_menu; /* at least one half must remain visible */
+    bool hide_action, hide_menu;       /* at least one half must remain visible */
+    cui_dropdown_button_anchor anchor; /* popup corner; default top right */
     cui_dropdown_button_variant action_variant;
     cui_dropdown_button_size action_size;
 } cui_dropdown_button_options;

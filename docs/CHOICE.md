@@ -350,7 +350,7 @@ color. Escape restores the transparent resting appearance when the pointer has
 left. Disabled pairs remain transparent. Headless tests inspect the draw list after
 real pointer movement, menu activation and Escape, and verify inheritance and
 outer overrides. Action tooltip composition, independent corner
-geometry and the complete upstream anchor-corner contract remain parity gaps.
+geometry remain parity gaps.
 
 `hide_action` or `hide_menu` omits that half from rendering, semantics and focus
 registration. At least one half must remain visible. Hiding the menu half closes
@@ -359,3 +359,11 @@ and keyboard activation. The base function accepts a zero action or trigger ID
 for the same omission; both zero is invalid. Headless tests cover menu-only action
 dispatch, action-only pointer and Enter activation, absent semantic nodes and
 changing to action-only while a menu is open.
+
+DropdownButton `anchor` selects the popup corner: top corners open below the
+trigger, bottom corners open above it, and right corners align the right edges.
+The default is top right. Popup placement flips vertically and clamps against
+the viewport when the preferred corner cannot fit. The menu's `popup.side` is
+superseded by this explicit corner. General menu trees can independently request
+right-edge alignment through `popup.align_end`. Four-corner pointer-opening
+headless tests verify the resulting popup rectangles.

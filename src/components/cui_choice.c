@@ -633,6 +633,16 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     cui_popup_result placement = cui_popup_place(
         anchor, (cui_size){width, height}, options.popup.viewport,
         level ? CUI_POPUP_RIGHT : options.popup.side, !level && state->contextual ? 0 : 4);
+    if (!level && options.popup.align_end &&
+        (options.popup.side == CUI_POPUP_BELOW || options.popup.side == CUI_POPUP_ABOVE)) {
+        float x = anchor.x + anchor.w - placement.bounds.w;
+        float max_x = options.popup.viewport.x + options.popup.viewport.w - placement.bounds.w;
+        if (x > max_x)
+            x = max_x;
+        if (x < options.popup.viewport.x)
+            x = options.popup.viewport.x;
+        placement.bounds.x = x;
+    }
     state->panels[level] = placement.bounds;
     if (!level)
         cui_overlay_set_bounds(&state->overlay, placement.bounds);
@@ -891,6 +901,12 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         cui_update_semantic(ui, trigger_id, options.selected, options.selected);
     state->row_height = theme->control_height;
     state->padding = theme->padding;
+    options.menu.popup.side = options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT ||
+                                      options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT
+                                  ? CUI_POPUP_ABOVE
+                                  : CUI_POPUP_BELOW;
+    options.menu.popup.align_end = options.anchor == CUI_DROPDOWN_ANCHOR_TOP_RIGHT ||
+                                   options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT;
     if (state->overlay.open)
         cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger_id),
                               options.menu, menu_name);

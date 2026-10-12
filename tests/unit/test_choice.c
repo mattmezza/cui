@@ -1604,6 +1604,44 @@ static void test_dropdown_optional_halves(void) {
     assert(result.action_activated && !result.menu_activated);
     cui_destroy(ui);
 }
+static void test_dropdown_anchor_corners(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    const cui_menu_entry entries[] = {{.id = 2101, .label = {"Save as", 7}}};
+    for (int corner = CUI_DROPDOWN_ANCHOR_TOP_RIGHT; corner <= CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT;
+         corner++) {
+        for (int frame = 0; frame < 2; frame++) {
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_begin_box(ui, 1999, (cui_box){.width = 640, .height = 480, .padding = 100});
+            cui_dropdown_button(
+                ui, 2000, 2001, 2002, &theme, cui_string("Save"), cui_string("Actions"), entries, 1,
+                &action, &state,
+                (cui_dropdown_button_options){
+                    .width = 100,
+                    .anchor = (cui_dropdown_button_anchor)corner,
+                    .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 160}}});
+            cui_end_box(ui);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            if (!frame)
+                click(ui, 2002);
+        }
+        assert(state.overlay.open);
+        cui_rect anchor = cui_bounds(ui, 2002), panel = state.panels[0];
+        bool right =
+            corner == CUI_DROPDOWN_ANCHOR_TOP_RIGHT || corner == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT;
+        bool above =
+            corner == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT || corner == CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT;
+        assert(panel.x == (right ? anchor.x + anchor.w - panel.w : anchor.x));
+        assert(panel.y == (above ? anchor.y - panel.h - 4 : anchor.y + anchor.h + 4));
+        cui_overlay_close(ui, &state.overlay);
+    }
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1626,6 +1664,7 @@ int main(void) {
     test_dropdown_button();
     test_dropdown_inheritance_and_ghost_pair();
     test_dropdown_optional_halves();
+    test_dropdown_anchor_corners();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

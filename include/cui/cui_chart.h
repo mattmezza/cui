@@ -199,6 +199,8 @@ typedef struct {
     cui_chart_bar_label_color_fn bar_label_color_fn;
     void *bar_label_color_user;
     cui_chart_curve curve; /* natural is source default */
+    float
+        line_width; /* Cartesian line/area stroke in bitmap pixels; zero selects 2, capped at 16. */
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     float radar_label_gap;                      /* zero selects source 10px */

@@ -213,7 +213,54 @@ static void sankey_content_paint(cui_context *ui, cui_id id, const cui_chart_dat
     }
 }
 #endif
+static void continuous_curve_stroke(void) {
+    cui_chart_datum data[] = {{.value = 20}, {.value = 40}, {.value = 30}};
+    unsigned char pixels[128 * 96 * 4];
+    cui_chart_state state = {.pixels = pixels, .byte_capacity = sizeof pixels};
+    cui_chart_options options = {.kind = CUI_CHART_LINE,
+                                 .data = data,
+                                 .count = 3,
+                                 .width = 128,
+                                 .height = 96,
+                                 .hide_grid = true,
+                                 .hide_axes = true,
+                                 .hide_x_axis = true,
+                                 .hide_legend = true,
+                                 .background = {0, 0, 0, 255},
+                                 .series = {{255, 0, 0, 255}},
+                                 .data_revision = 1};
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    for (unsigned x = 4; x < 124; ++x) {
+        unsigned ink = 0;
+        for (unsigned y = 0; y < 96; ++y)
+            ink += pixels[((size_t)y * 128 + x) * 4] > 80;
+        assert(ink >= 2);
+    }
+    unsigned char default_pixels[sizeof pixels];
+    memcpy(default_pixels, pixels, sizeof pixels);
+    uint64_t revision = state.revision;
+    options.line_width = 1;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK && state.revision == revision + 1);
+    unsigned narrow = 0, wide = 0;
+    for (size_t i = 0; i < sizeof pixels; i += 4)
+        narrow += pixels[i] > 80;
+    options.line_width = 4;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    for (size_t i = 0; i < sizeof pixels; i += 4)
+        wide += pixels[i] > 80;
+    assert(wide > narrow * 2);
+    options.line_width = NAN;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(default_pixels, pixels, sizeof pixels) == 0);
+    options.line_width = 16;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    memcpy(default_pixels, pixels, sizeof pixels);
+    options.line_width = 100;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(default_pixels, pixels, sizeof pixels) == 0);
+}
 int main(void) {
+    continuous_curve_stroke();
     cui_chart_datum points[] = {
         {.label = {"A", 1}, .value = 20, .open = 15, .high = 25, .low = 10, .close = 20},
         {.label = {"B", 1}, .value = 40, .open = 20, .high = 45, .low = 15, .close = 30},

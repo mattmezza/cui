@@ -200,6 +200,8 @@ typedef struct {
     cui_chart_bar_label_color_fn bar_label_color_fn;
     void *bar_label_color_user;
     cui_chart_curve curve; /* natural is source default */
+    float
+        line_width; /* Cartesian line/area stroke in bitmap pixels; zero selects 2, capped at 16. */
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     float radar_label_gap;                      /* zero selects source 10px */
@@ -579,6 +581,29 @@ static void cui_chart_line(cui_chart_state *s, const cui_chart_options *o, doubl
         cui_chart_pixel(s, o, (int)lround(ax + dx * t), (int)lround(ay + dy * t), c);
     }
 }
+static void cui_chart_stroke(cui_chart_state *s, const cui_chart_options *o, double ax, double ay,
+                             double bx, double by, cui_color color) {
+    double width = isfinite(o->line_width) && o->line_width > 0 ? fmin(o->line_width, 16) : 2;
+    double radius = width / 2, dx = bx - ax, dy = by - ay, length2 = dx * dx + dy * dy;
+    if (!isfinite(ax) || !isfinite(ay) || !isfinite(bx) || !isfinite(by) || !isfinite(length2))
+        return;
+    int x0 = (int)fmax(0, fmin(o->width, floor(fmin(ax, bx) - radius - .5)));
+    int x1 = (int)fmax(0, fmin(o->width, ceil(fmax(ax, bx) + radius + .5)));
+    int y0 = (int)fmax(0, fmin(o->height, floor(fmin(ay, by) - radius - .5)));
+    int y1 = (int)fmax(0, fmin(o->height, ceil(fmax(ay, by) + radius + .5)));
+    for (int y = y0; y < y1; ++y)
+        for (int x = x0; x < x1; ++x) {
+            double px = x + .5, py = y + .5;
+            double t = length2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / length2 : 0;
+            t = fmax(0, fmin(1, t));
+            double distance = hypot(px - ax - t * dx, py - ay - t * dy);
+            double coverage = fmax(0, fmin(1, radius + .5 - distance));
+            cui_color covered = color;
+            covered.a = (unsigned char)lround(color.a * coverage);
+            if (covered.a)
+                cui_chart_pixel(s, o, x, y, covered);
+        }
+}
 static void cui_chart_guide(cui_chart_state *s, const cui_chart_options *o, double ax, double ay,
                             double bx, double by, cui_color c, bool solid) {
     if (solid) {
@@ -946,14 +971,14 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
         cui_chart_series_point(o, series, i - 1, left, right, lo, hi, top, bottom, &x0, &y0);
         cui_chart_series_point(o, series, i, left, right, lo, hi, top, bottom, &x1, &y1);
         if (curve == CUI_CHART_CURVE_STEP_AFTER) {
-            cui_chart_line(s, o, x0, y0, x1, y0, color);
+            cui_chart_stroke(s, o, x0, y0, x1, y0, color);
             if (i + 1 < o->count)
-                cui_chart_line(s, o, x1, y0, x1, y1, color);
+                cui_chart_stroke(s, o, x1, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
                 cui_chart_area_rect(s, o, (int)ceil(x0), (int)floor(fmin(y0, baseline)),
                                     (int)ceil(x1), (int)ceil(fmax(y0, baseline)), fill, series);
         } else if (curve == CUI_CHART_CURVE_LINEAR) {
-            cui_chart_line(s, o, x0, y0, x1, y1, color);
+            cui_chart_stroke(s, o, x0, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
                 for (int x = (int)ceil(x0); x <= (int)floor(x1); x++) {
                     double y = y0 + (y1 - y0) * (x - x0) / (x1 - x0);
@@ -983,7 +1008,7 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
                     y = top;
                 if (y > bottom)
                     y = bottom;
-                cui_chart_line(s, o, prev_x, prev_y, x, y, color);
+                cui_chart_stroke(s, o, prev_x, prev_y, x, y, color);
                 if (o->kind == CUI_CHART_AREA)
                     cui_chart_area_rect(s, o, (int)floor(x), (int)floor(fmin(y, baseline)),
                                         (int)ceil(x + 1), (int)ceil(fmax(y, baseline)), fill,
@@ -2008,6 +2033,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->tick_count);
     h = cui_chart_mix(h, o->grid_columns);
     h = cui_chart_mix(h, o->curve);
+    h = cui_chart_mix(h, cui_chart_bits(o->line_width));
     h = cui_chart_mix(h, o->bar_alignment);
     h = cui_chart_mix(h, o->custom_bar_padding);
     h = cui_chart_mix(h, o->show_dots);

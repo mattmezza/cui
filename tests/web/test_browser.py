@@ -575,6 +575,7 @@ def main():
             assert semantic_index('Project activity chart', 20) is not None
             assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===5&&cuiGallery.exports.gallery_bitmap_pixels(i)>0)')
+            page.screenshot(path='/tmp/cui-web-chart-line.png')
             chart_signatures = []
             for kind in range(7):
                 control_change('chart-kind', str(kind))

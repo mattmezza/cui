@@ -188,7 +188,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             }
         }
     }
-    if (o->kind == CUI_CHART_RADAR && o->count <= 64 && w >= 50 && h >= 50) {
+    if (o->kind == CUI_CHART_RADAR && w >= 50 && h >= 50) {
         double cx = w / 2.0, cy = h / 2.0;
         double radius =
             (o->radar_outer_radius > 0 ? o->radar_outer_radius : o->height * .4) * h / o->height;
@@ -200,44 +200,75 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float gap = o->radar_label_gap > 0 ? o->radar_label_gap : 10;
             float x = (float)(cx + (radius + gap) * cos(angle));
             float y = (float)(cy + (radius + gap) * sin(angle));
-            cui_begin_absolute_box(
-                ui, id ^ (UINT64_C(0x25a41f7c9d310000) + i),
-                (cui_box){.width = 70, .height = 12, .fixed_width = true, .fixed_height = true},
-                (cui_rect){x - 35, y - 6, 70, 12});
+            cui_size measured = cui_measure_text(ui, label, 10);
+            float label_width = fmaxf(1, fminf(w, measured.width));
+            float label_height = fmaxf(12, measured.height);
+            float left = fmaxf(0, fminf(w - label_width, x - label_width / 2));
+            float top = fmaxf(0, fminf(h - label_height, y - label_height / 2));
+            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x25a41f7c9d310000) + i),
+                                   (cui_box){.width = label_width,
+                                             .height = label_height,
+                                             .fixed_width = true,
+                                             .fixed_height = true},
+                                   (cui_rect){left, top, label_width, label_height});
             cui_text(ui, label, 10, o->radar_label_color.a ? o->radar_label_color : o->foreground);
             cui_end_box(ui);
         }
     }
-    if (o->kind == CUI_CHART_SANKEY && (o->sankey_show_labels || o->sankey_show_values) &&
-        o->count <= 64) {
+    if (o->kind == CUI_CHART_SANKEY && (o->sankey_show_labels || o->sankey_show_values)) {
         cui_chart_sankey_node nodes[256];
         if (cui_chart_sankey_layout(o, nodes, 256) == CUI_PLOT_OK)
             for (size_t i = 0; i < o->count; i++) {
                 cui_str label = o->data[i].label;
                 float gap = o->sankey_label_gap > 0 ? o->sankey_label_gap : 6;
                 float size = o->sankey_font_size > 0 ? o->sankey_font_size : 12;
-                float x = nodes[i].x1 * w / o->width + gap * w / o->width;
-                float y = (nodes[i].y0 + nodes[i].y1) * h / (2 * o->height) - 6;
+                float line_height = size + 2;
+                bool first = nodes[i].layer == 0;
+                bool last = true;
+                for (size_t j = 0; j < o->count; j++)
+                    if (nodes[j].layer > nodes[i].layer)
+                        last = false;
+                unsigned lines = (o->sankey_show_labels && label.length && label.data) +
+                                 (unsigned)o->sankey_show_values;
+                float block_height = lines * line_height;
+                float center_y = (nodes[i].y0 + nodes[i].y1) * h / (2 * o->height);
+                float y = first || last
+                              ? fmaxf(0, fminf(h - block_height, center_y - block_height / 2))
+                              : nodes[i].y0 * h / o->height - block_height - 2;
+                char value[48];
+                cui_str formatted = cui_chart_number(value, sizeof value, nodes[i].throughput,
+                                                     o->sankey_value_format, o->format_user);
+                float label_width = o->sankey_show_labels && label.length && label.data
+                                        ? cui_measure_text(ui, label, size).width
+                                        : 0;
+                float value_width =
+                    o->sankey_show_values ? cui_measure_text(ui, formatted, size).width : 0;
+                float text_width = fmaxf(1, fminf(w * .2f, fmaxf(label_width, value_width)));
+                float node_left = nodes[i].x0 * w / o->width;
+                float node_right = nodes[i].x1 * w / o->width;
+                float x = first  ? fmaxf(0, node_left - gap - text_width)
+                          : last ? fminf(w - text_width, node_right + gap)
+                                 : fmaxf(0, fminf(w - text_width,
+                                                  (node_left + node_right - text_width) / 2));
                 if (o->sankey_show_labels && label.length && label.data) {
                     cui_begin_absolute_box(ui, id ^ (UINT64_C(0xe5374a8b09ef0000) + i),
-                                           (cui_box){.width = 72,
-                                                     .height = size + 2,
+                                           (cui_box){.width = text_width,
+                                                     .height = line_height,
                                                      .fixed_width = true,
                                                      .fixed_height = true},
-                                           (cui_rect){x, y, 72, size + 2});
+                                           (cui_rect){x, y, text_width, line_height});
                     cui_text(ui, label, size, o->foreground);
                     cui_end_box(ui);
                 }
                 if (o->sankey_show_values) {
-                    char value[48];
-                    cui_str formatted = cui_chart_number(value, sizeof value, nodes[i].throughput,
-                                                         o->sankey_value_format, o->format_user);
-                    cui_begin_absolute_box(ui, id ^ (UINT64_C(0x57bb8cf4e1b20000) + i),
-                                           (cui_box){.width = 72,
-                                                     .height = size + 2,
-                                                     .fixed_width = true,
-                                                     .fixed_height = true},
-                                           (cui_rect){x, y + size + 2, 72, size + 2});
+                    cui_begin_absolute_box(
+                        ui, id ^ (UINT64_C(0x57bb8cf4e1b20000) + i),
+                        (cui_box){.width = text_width,
+                                  .height = line_height,
+                                  .fixed_width = true,
+                                  .fixed_height = true},
+                        (cui_rect){x, y + (o->sankey_show_labels && label.length ? line_height : 0),
+                                   text_width, line_height});
                     cui_text(ui, formatted, size, o->foreground);
                     cui_end_box(ui);
                 }

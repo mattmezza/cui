@@ -205,6 +205,43 @@ bool cui_base_context_menu(cui_context *, cui_id target, const cui_menu_entry *,
 bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str name,
                       const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                       cui_menu_tree_options);
+/* Split action and menu trigger. The explicit IDs remain independently
+ * focusable; container is paint-only in the styled function. */
+typedef enum {
+    CUI_DROPDOWN_BUTTON_PRIMARY,
+    CUI_DROPDOWN_BUTTON_SECONDARY,
+    CUI_DROPDOWN_BUTTON_OUTLINE,
+    CUI_DROPDOWN_BUTTON_GHOST,
+    CUI_DROPDOWN_BUTTON_DANGER
+} cui_dropdown_button_variant;
+typedef enum {
+    CUI_DROPDOWN_BUTTON_MEDIUM,
+    CUI_DROPDOWN_BUTTON_SMALL,
+    CUI_DROPDOWN_BUTTON_LARGE
+} cui_dropdown_button_size;
+typedef struct {
+    bool disabled, action_disabled, action_loading, selected;
+    float width; /* action-half width: zero fits contents; negative grows */
+    cui_dropdown_button_variant variant;
+    cui_dropdown_button_size size;
+    cui_str leading, trailing;
+    cui_choice_content_fn content;
+    void *content_user;
+    cui_menu_tree_options menu;
+} cui_dropdown_button_options;
+typedef struct {
+    bool action_activated, menu_activated;
+} cui_dropdown_button_result;
+cui_dropdown_button_result cui_base_dropdown_button(
+    cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,
+    bool action_disabled, bool action_loading, float dt, bool keep_open_checks);
+cui_dropdown_button_result cui_dropdown_button(cui_context *, cui_id container, cui_id action_id,
+                                               cui_id trigger_id, const cui_theme *,
+                                               cui_str action_name, cui_str menu_name,
+                                               const cui_menu_entry *, size_t count,
+                                               cui_id *menu_action, cui_menu_tree_state *,
+                                               cui_dropdown_button_options);
 #ifdef __cplusplus
 }
 #endif

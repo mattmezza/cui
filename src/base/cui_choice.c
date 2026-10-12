@@ -973,3 +973,23 @@ bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry 
     return cui_base_menu_tree(ui, target, cui_string(""), items, count, action, state, disabled, dt,
                               keep_open_checks);
 }
+
+cui_dropdown_button_result cui_base_dropdown_button(
+    cui_context *ui, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *items, size_t count, cui_id *menu_action, cui_menu_tree_state *state,
+    bool disabled, bool action_disabled, bool action_loading, float dt, bool keep_open_checks) {
+    cui_dropdown_button_result result = {0};
+    if (!ui || !action_id || !trigger_id || action_id == trigger_id || !menu_action || !state ||
+        (!items && count))
+        return result;
+    result.action_activated =
+        cui_base_button(ui, action_id, action_name, disabled || action_disabled || action_loading)
+            .activated;
+    if (action_loading)
+        cui_set_semantic_details(
+            ui, action_id,
+            (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
+    result.menu_activated = cui_base_menu_tree(ui, trigger_id, menu_name, items, count, menu_action,
+                                               state, disabled, dt, keep_open_checks);
+    return result;
+}

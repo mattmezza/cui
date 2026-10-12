@@ -1398,6 +1398,109 @@ static void test_menu_configuration(void) {
     assert(action == 52 && !state.overlay.open && cui_focused(ui) == 2);
     cui_destroy(ui);
 }
+
+static unsigned dropdown_custom_calls;
+static void dropdown_custom_body(cui_context *ui, void *user) {
+    assert(user == &dropdown_custom_calls);
+    dropdown_custom_calls++;
+    cui_text(ui, cui_string("Custom save"), 11, (cui_color){1, 2, 3, 255});
+}
+static cui_dropdown_button_result dropdown_scene(cui_context *ui, cui_menu_tree_state *state,
+                                                 cui_id *action, const cui_theme *theme,
+                                                 cui_dropdown_button_options options) {
+    static const cui_menu_entry entries[] = {
+        {.id = 2101, .label = {"Save as", 7}, .kind = CUI_MENU_ACTION},
+        {.id = 2102, .label = {"Export", 6}, .kind = CUI_MENU_ACTION}};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_dropdown_button_result result =
+        cui_dropdown_button(ui, 2000, 2001, 2002, theme, cui_string("Save"),
+                            cui_string("More save actions"), entries, 2, action, state, options);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_dropdown_button(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t t = 0; t < 4; t++)
+        for (int variant = CUI_DROPDOWN_BUTTON_PRIMARY; variant <= CUI_DROPDOWN_BUTTON_DANGER;
+             variant++)
+            for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_LARGE; size++) {
+                cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+                assert(ui);
+                cui_menu_tree_state state;
+                cui_menu_tree_init(&state, 2200);
+                cui_id action = 0;
+                dropdown_custom_calls = 0;
+                cui_dropdown_button_options options = {
+                    .selected = true,
+                    .width = 120,
+                    .variant = (cui_dropdown_button_variant)variant,
+                    .size = (cui_dropdown_button_size)size,
+                    .leading = {"[", 1},
+                    .trailing = {"]", 1},
+                    .content = dropdown_custom_body,
+                    .content_user = &dropdown_custom_calls,
+                    .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+                cui_dropdown_button_result result =
+                    dropdown_scene(ui, &state, &action, &themes[t], options);
+                assert(!result.action_activated && !result.menu_activated &&
+                       dropdown_custom_calls == 1);
+                cui_rect left = cui_bounds(ui, 2001), right = cui_bounds(ui, 2002);
+                float scale = size == CUI_DROPDOWN_BUTTON_SMALL   ? .8f
+                              : size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
+                                                                  : 1;
+                assert(left.w == 120 && left.h == themes[t].control_height * scale &&
+                       right.h == left.h && left.x + left.w == right.x);
+                size_t count = 0;
+                const cui_semantic *semantics = cui_semantics(ui, &count);
+                bool action_named = false, trigger_named = false;
+                for (size_t i = 0; i < count; i++) {
+                    if (semantics[i].id == 2001)
+                        action_named = semantics[i].role == CUI_ROLE_BUTTON &&
+                                       semantics[i].name.length == 4 && semantics[i].checked;
+                    if (semantics[i].id == 2002)
+                        trigger_named = semantics[i].role == CUI_ROLE_BUTTON &&
+                                        semantics[i].name.length == 17 && semantics[i].checked;
+                }
+                assert(action_named && trigger_named);
+                cui_destroy(ui);
+            }
+
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    cui_dropdown_button_options options = {
+        .variant = CUI_DROPDOWN_BUTTON_OUTLINE,
+        .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+    dropdown_scene(ui, &state, &action, &theme, options);
+    click(ui, 2001);
+    cui_dropdown_button_result result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(result.action_activated && !result.menu_activated && !state.overlay.open && !action);
+    click(ui, 2002);
+    result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!result.action_activated && !result.menu_activated && state.overlay.open &&
+           cui_focused(ui) == 2101);
+    key(ui, CUI_KEY_ENTER);
+    result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!result.action_activated && result.menu_activated && action == 2101 &&
+           !state.overlay.open && cui_focused(ui) == 2002);
+    options.action_loading = true;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    click(ui, 2001);
+    result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!result.action_activated);
+    click(ui, 2002);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(state.overlay.open);
+    options.disabled = true;
+    result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!result.action_activated && !result.menu_activated && !state.overlay.open);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1417,6 +1520,7 @@ int main(void) {
     test_combo_editor_paint_and_hit();
     test_closable_tab_composition();
     test_menu_configuration();
+    test_dropdown_button();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

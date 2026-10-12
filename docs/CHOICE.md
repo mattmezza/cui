@@ -75,6 +75,22 @@ is not yet verified.
 
 ## List, Select and Menu
 
+`cui_dropdown_button` composes two adjacent, independently focusable actions: a
+primary button and a caret trigger backed by the hierarchical menu reducer. The
+result reports primary activation and menu-item activation separately, and the
+caller receives the selected menu action ID. Shared primary, secondary, outline,
+ghost and danger variants, three sizes, selection, outer disabled state and custom
+primary content apply to the joined control. `action_disabled` and
+`action_loading` affect only the primary half, so alternate menu actions remain
+available. Callers provide distinct stable container, action, trigger and popup
+IDs. `cui_base_dropdown_button` exposes the same split behavior without paint.
+
+The menu trigger owns expanded/controls semantics and restores focus after menu
+activation. The primary half never opens the menu, and menu activation never
+reports primary activation. Tests cover every variant, size and built-in theme,
+joined geometry, accessible names, independent pointer/keyboard activation and
+disabled/loading behavior.
+
 The same header also supplies flat selectable lists and anchored popup controls:
 
 ```c

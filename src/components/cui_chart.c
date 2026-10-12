@@ -280,7 +280,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->emphasis_started = false;
         if (!instant && moving)
             cui_invalidate(ui);
-        if (cui_chart_render(state, o) != CUI_PLOT_OK)
+        cui_chart_options frame = *o;
+        if (!frame.reveal_enabled && state->appear_started && state->rendered_reveal_progress < 1) {
+            frame.reveal_enabled = true;
+            frame.reveal_progress = state->rendered_reveal_progress;
+        }
+        if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
             return false;
     }
     cui_begin_box(

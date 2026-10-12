@@ -1222,10 +1222,15 @@ int main(void) {
     options.appear_key = 7;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     assert(!differs(pixels, options.width * options.height, options.background));
     (void)cui_end_frame(ui);
     assert(cui_begin_frame(ui, 256, 256, .5f));
     assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    float reveal_before_hover = state.rendered_reveal_progress;
+    assert(reveal_before_hover > 0 && reveal_before_hover < 1);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    assert(state.rendered_reveal_progress == reveal_before_hover);
     assert(differs(pixels, options.width * options.height, options.background));
     (void)cui_end_frame(ui);
     assert(cui_begin_frame(ui, 256, 256, .5f));

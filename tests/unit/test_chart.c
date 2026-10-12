@@ -917,7 +917,9 @@ int main(void) {
             if (draw.commands[i].text.length == 1 && draw.commands[i].text.data[0] == 'Q')
                 formatted = true;
         } else if (draw.commands[i].type == CUI_DRAW_RECT) {
-            hover_crosshair |= draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20;
+            hover_crosshair |= draw.commands[i].bounds.w == 1 &&
+                               fabsf(draw.commands[i].bounds.y) < .01f &&
+                               fabsf(draw.commands[i].bounds.h - 38) < .01f;
             if (draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20)
                 eased_crosshair |=
                     fabsf(draw.commands[i].color.a -

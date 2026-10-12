@@ -506,9 +506,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (state->hover_visual_started && state->hover_progress > 0) {
             float opacity = state->tooltip_focus;
             float x = state->hover_x;
-            float top = (o->custom_y_padding ? o->y_padding_top : 10) * h / o->height;
-            float bottom =
-                (o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)) * h / o->height;
+            float top = 0;
+            float bottom = h - (o->hide_x_axis ? 0 : 20 * h / o->height);
             cui_color crosshair = o->grid.a ? o->grid : (cui_color){120, 120, 120, 150};
             crosshair.a = (unsigned char)lroundf(crosshair.a * opacity);
             cui_begin_absolute_box(ui, id ^ UINT64_C(0x9f39c738cd235001),

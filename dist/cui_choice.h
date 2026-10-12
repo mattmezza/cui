@@ -1546,10 +1546,13 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         if (active == n || cui_menu_entry_is_disabled(&entries[active]))
             continue;
         const cui_menu_entry *entry = &entries[active];
+        bool same_child = entry->kind == CUI_MENU_SUBMENU && level + 1 < state->depth &&
+                          state->path[level] == entry->id;
         if (events[e].type == CUI_EVENT_POINTER_MOVE) {
             state->levels[level].active = entry->id;
             cui_focus(ui, entry->id);
-            state->depth = level + 1;
+            if (!same_child)
+                state->depth = level + 1;
             logical_level = level;
             redirected = true;
         }
@@ -1562,6 +1565,12 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
             (activation || events[e].type == CUI_EVENT_POINTER_MOVE ||
              (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_RIGHT));
         if (open_child) {
+            if (same_child) {
+                cui_focus(ui, state->levels[level + 1].active);
+                logical_level = level + 1;
+                redirected = true;
+                continue;
+            }
             if (level + 1 == CUI_MENU_DEPTH_MAX) {
                 state->depth_limit = true;
                 continue;

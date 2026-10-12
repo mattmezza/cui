@@ -54,3 +54,5 @@ run is preserved in [validation/wasi-initial.txt](validation/wasi-initial.txt):
 That real target-specific failure prompted a parser correction; it was not
 skipped or converted into a compilation-only claim. SDL/native renderer tests
 and FreeType/HarfBuzz shaping are outside this runner's tested surface.
+
+The runner bounds each suite to 30 billion WebAssembly instructions (overridable with `--fuel`). The expanded Choice theme/variant matrix exhausted the previous 10-billion limit while repeatedly allocating contexts; the same module completes with the larger finite budget. Assertions and all cases remain enabled.

@@ -122,7 +122,9 @@ def main() -> int:
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path(__file__).resolve().parents[1])
     parser.add_argument("--build-dir", type=pathlib.Path, help="defaults to ROOT/build/wasi")
     parser.add_argument("--zig", default="zig", help="path to Zig 0.16.0")
-    parser.add_argument("--fuel", type=int, default=10_000_000_000, help="per-suite instruction budget")
+    # Theme/variant matrices repeatedly construct full contexts; keep a finite
+    # suite budget large enough for those allocation-heavy behavioral tests.
+    parser.add_argument("--fuel", type=int, default=30_000_000_000, help="per-suite instruction budget")
     args = parser.parse_args()
     root = args.root.resolve()
     build = (args.build_dir or root / "build/wasi").resolve()
@@ -149,6 +151,7 @@ def main() -> int:
         print("Tracked source modifications: " + ("present" if dirty else "none"), flush=True)
         print(f"Target: wasm32-wasi (WASI Preview 1), Zig {actual_zig}, wasmtime {actual_wasmtime}", flush=True)
         print("Optional adapters disabled: SDL, GPU, FreeType, HarfBuzz; no browser host tested.", flush=True)
+        print(f"Per-suite instruction budget: {args.fuel:,}", flush=True)
         print("Assertions enabled. Virtual clock() compatibility uses wall time; benchmarks not invoked.", flush=True)
         flags = [args.zig, "cc", "-target", "wasm32-wasi", "-std=c11", "-O2", "-UNDEBUG",
                  "-Wall", "-Wextra", "-Wpedantic", "-Werror", "-I", str(root / "include"),

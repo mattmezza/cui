@@ -1,0 +1,63 @@
+CUI source revision: 6657425da5342f14664e945c133ffdcef13d03bd
+Portable source SHA256: 39194d20896584b0ab9eb7b8a477cbeec4e6eb7e0c27e7499910f59c7f3f1c6a
+Tracked source modifications: present
+Target: wasm32-wasi (WASI Preview 1), Zig 0.16.0, wasmtime 49.0.0
+Optional adapters disabled: SDL, GPU, FreeType, HarfBuzz; no browser host tested.
+Assertions enabled. Virtual clock() compatibility uses wall time; benchmarks not invoked.
+PASS bootstrap (0.42s)
+core tests passed
+PASS core (1.55s)
+PASS base (0.37s)
+PASS components (0.67s)
+software renderer geometry, nested clipping and straight alpha passed
+PASS render (0.31s)
+edit tests passed
+PASS edit (0.53s)
+PASS overlay (0.42s)
+virtual tests passed
+PASS virtual (0.22s)
+dock tests passed
+PASS dock (0.90s)
+PASS plot (0.18s)
+PASS content (0.52s)
+PASS disclosure (0.67s)
+FAIL choice: choice trapped or exited unsuccessfully: error while executing at wasm backtrace:
+    0:    0xa28 - choice.wasm!c.malloc.calloc
+    1:  0x25a7c - choice.wasm!cui_create
+    2:  0x4b66b - choice.wasm!__original_main
+    3:    0x4e4 - choice.wasm!_start
+note: using the `WASMTIME_BACKTRACE_DETAILS=1` environment variable may show more debugging information
+
+Caused by:
+    wasm trap: all fuel consumed by WebAssembly
+
+PASS numeric (0.60s)
+PASS picker (0.72s)
+PASS tree (0.57s)
+PASS input (0.58s)
+PASS table (0.93s)
+PASS scroll (0.44s)
+PASS surface (0.81s)
+PASS form (0.58s)
+PASS otp (0.54s)
+PASS status (0.50s)
+PASS numeric_base_only (4.48s)
+PASS picker_base_only (4.33s)
+PASS tree_base_only (4.33s)
+PASS input_base_only (4.38s)
+PASS table_base_only (4.48s)
+PASS scroll_base_only (4.24s)
+PASS status_base_only (0.25s)
+PASS otp_base_only (4.21s)
+PASS form_base_only (4.46s)
+PASS surface_base_only (4.79s)
+PASS implementation_embedding (4.60s)
+unstyled frame 0: 3 commands, checked=0
+unstyled frame 1: 3 commands, checked=1
+PASS example_unstyled (0.32s)
+settings: 36 draw commands
+PASS example_styled_settings (0.33s)
+PASS distribution_single (11.40s)
+PASS distribution_multi (11.52s)
+WASI runtime suites: 37/38 passed
+Failed suites: choice

@@ -18,7 +18,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled expansion, disabled triggers, keyboard traversal, semantic panels and custom title/icon rendering tested. Animated measured reveal and complete upstream styling audit remain pending."
+        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Theme spring configuration and complete inherited styling audit remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -42,6 +42,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_disclosure.c"
+          ]
+        },
+        {
+          "name": "measured reversible reveal and inert exit with reduced motion",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c",
+            "docs/validation/gcc-56.txt"
           ]
         }
       ],
@@ -726,7 +734,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled keyboard/pointer disclosure, panel semantics and custom trigger composition tested. Animated measured reveal and full reference styling audit remain pending."
+        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Theme spring configuration and complete inherited styling audit remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -750,6 +758,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_disclosure.c"
+          ]
+        },
+        {
+          "name": "measured reversible reveal and inert exit with reduced motion",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c",
+            "docs/validation/gcc-56.txt"
           ]
         }
       ],
@@ -1347,31 +1363,49 @@
       "reference_url": "https://gpui-kit.com/component/marker/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_status.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_status.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Text wrapping, inherited font styling, arbitrary separator styling and the default Oklab highlight blend remain incomplete. Custom child widths/layout and exact highlight colors are application supplied."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "status/separator modes",
-          "status": "not_started",
-          "evidence": []
+          "name": "plain/separator/border variants and alignment",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py",
+            "docs/validation/browser-56-integrated.txt"
+          ]
         },
         {
-          "name": "semantic content",
-          "status": "not_started",
-          "evidence": []
+          "name": "ordered icon/text/rich/custom content and optional semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py",
+            "docs/validation/browser-56-integrated.txt"
+          ]
         },
         {
-          "name": "themed styling",
-          "status": "not_started",
-          "evidence": []
+          "name": "spinner suppression, clipped shimmer, pulse and bounded animation deadlines",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py",
+            "docs/validation/browser-56-integrated.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1397,7 +1431,8 @@
           "`MarkerContent`",
           "Related types"
         ]
-      }
+      },
+      "last_tested_commit": "6657425"
     },
     {
       "name": "Message",
@@ -2177,31 +2212,49 @@
       "reference_url": "https://gpui-kit.com/component/tag/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_status.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_status.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Frozen Tag has no built-in close action; interactive children are application composition. Exact inherited typography and distinct secondary theme tokens remain incomplete."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "variants and close action",
-          "status": "not_started",
-          "evidence": []
+          "name": "semantic/custom/named palettes, outlines, sizes and radius",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py",
+            "docs/validation/browser-56-integrated.txt"
+          ]
         },
         {
-          "name": "disabled/focus behavior",
-          "status": "not_started",
-          "evidence": []
+          "name": "passive accessible text and arbitrary rich children",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py",
+            "docs/validation/browser-56-integrated.txt"
+          ]
         },
         {
-          "name": "accessible removal",
-          "status": "not_started",
-          "evidence": []
+          "name": "hover opacity and four-theme geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py",
+            "docs/validation/browser-56-integrated.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2240,7 +2293,8 @@
           "Color Usage",
           "Size Guidelines"
         ]
-      }
+      },
+      "last_tested_commit": "6657425"
     },
     {
       "name": "Toggle",
@@ -4651,7 +4705,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Stable-ID selection, keyboard navigation, five variants, custom slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Full custom-body width constraints, grapheme/bidi ellipsis and cross-strip/autoscroll drag behavior remain pending."
+        "Stable-ID selection, keyboard navigation, five variants, custom slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom-body width constraints, structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

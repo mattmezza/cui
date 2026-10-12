@@ -1,41 +1,48 @@
 {
-  "source": "d7e0e18",
+  "source": "6657425",
   "published_source": "afca0334247cb18f66c25a869f32f63b4ab82ab3",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Native GCC45/45, ASan/UBSan43/43, WASI36/36 and Chromium53 real WASM stories passed for integrated OTP, Form/InputGroup, tab scrollbars, semantic Button/Dropdown variants and inert/layout-only core measurement. Published afca033 has51 stories with six CI jobs and Pages green; this53-story update awaits deployment. Full78-family parity remains unfinished.",
+  "summary": "Native GCC47/47, ASan/UBSan45/45, WASI38/38 and Chromium56 real WASM stories passed for Tag/Marker, OTP, configurable button palettes, animated disclosures and same-frame InputGroup focus routing. WASI Choice exhausted its former instruction budget; the identical module and full rerun pass with a finite30-billion budget, with the initial failure preserved. Source daf43b9 passed six framework CI jobs but Pages failed the InputGroup focus race; core routing and a held-frame browser regression now address it. Published afca033 still has51 stories pending a successful new deployment. All78 entries remain; full parity is unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "d7e0e18",
-      "passed": 45,
-      "total": 45,
-      "log": "gcc-otp.txt"
+      "source": "6657425",
+      "passed": 47,
+      "total": 47,
+      "log": "gcc-56.txt"
     },
     {
       "name": "sanitizers",
-      "source": "d7e0e18",
-      "passed": 43,
-      "total": 43,
-      "log": "asan-otp.txt"
+      "source": "6657425",
+      "passed": 45,
+      "total": 45,
+      "log": "asan-56.txt"
     },
     {
       "name": "WASI",
-      "source": "d7e0e18",
-      "passed": 36,
-      "total": 36,
-      "log": "wasi-otp.txt"
+      "source": "6657425",
+      "passed": 38,
+      "total": 38,
+      "log": "wasi-56.txt"
     },
     {
       "name": "browser",
-      "source": "d7e0e18",
-      "stories": 53,
+      "source": "6657425",
+      "stories": 56,
       "catalog_entries": 78,
-      "log": "browser-53-integrated.txt"
+      "log": "browser-56-integrated.txt"
     },
     {
-      "name": "published CI",
-      "source": "afca033",
-      "log": "ci-afca033.json"
+      "name": "previous framework CI",
+      "source": "daf43b9",
+      "conclusion": "success",
+      "log": "ci-daf43b9.json"
+    },
+    {
+      "name": "previous Pages attempt",
+      "source": "daf43b9",
+      "conclusion": "failure",
+      "log": "pages-daf43b9.json"
     },
     {
       "name": "published gallery pipeline",

@@ -273,9 +273,9 @@ Reference: https://gpui-kit.com/component/switch/
 
 Reference: https://gpui-kit.com/component/tag/
 
-- variants and close action
-- disabled/focus behavior
-- accessible removal
+- semantic/custom/named palettes, outlines, sizes and radius
+- passive accessible text and arbitrary rich children
+- hover opacity and inherited theme styling
 
 ## Toggle
 

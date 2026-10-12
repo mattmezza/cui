@@ -114,9 +114,12 @@ def main():
                 before_palette_frame = page.evaluate('cuiGallery.frame')
                 page.locator(f'#palette-menu [data-palette="{preset["id"]}"]').click()
                 page.wait_for_function('(expected)=>cuiGallery.themeChoice===expected.id&&getComputedStyle(document.body).backgroundColor===expected.css', arg={'id':preset['id'],'css':f'rgb({int(preset["colors"]["background"][1:3],16)}, {int(preset["colors"]["background"][3:5],16)}, {int(preset["colors"]["background"][5:7],16)})'})
-                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before_palette_frame)
+                expected_channels = [int(preset['colors']['background'][n:n+2],16) for n in (1,3,5,7)]
+                page.wait_for_function('''expected=>cuiGallery.frame>expected.before&&
+                    [0,1,2,3].every((channel)=>cuiGallery.exports.gallery_theme_channel(0,channel)===expected.rgba[channel])''',
+                    arg={'before':before_palette_frame,'rgba':expected_channels})
                 channels = page.evaluate('Array.from({length:4},(_,channel)=>cuiGallery.exports.gallery_theme_channel(0,channel))')
-                assert channels == [int(preset['colors']['background'][n:n+2],16) for n in (1,3,5,7)], (index,preset['name'],channels)
+                assert channels == expected_channels, (index,preset['name'],channels)
                 assert page.locator('#palette-trigger').get_attribute('aria-expanded') == 'false'
                 assert page.locator('#palette-trigger').evaluate('(node)=>document.activeElement===node')
                 if index == 12:

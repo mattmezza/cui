@@ -176,11 +176,14 @@ bool cui_base_root_render(cui_context *ui, cui_id id, cui_root *root, cui_rect v
                             .padding = style.padding,
                             .background = style.background});
     content(ui, content_user);
+    cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c182a75db0394ef), (cui_box){0},
+                           (cui_rect){0, 0, -1, -1});
     for (size_t i = 0; i < root->plugin_count; i++) {
         cui_root_plugin_instance *plugin = &root->plugins[i];
         if (plugin->plugin.overlay)
             plugin->plugin.overlay(ui, plugin->state, viewport);
     }
+    cui_end_box(ui);
     if (facilities)
         facilities(ui, facilities_user);
     if (root->copy_selection) {

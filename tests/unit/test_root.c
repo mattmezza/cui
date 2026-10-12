@@ -66,8 +66,7 @@ static void overlay(cui_context *ui, void *user, cui_rect viewport) {
     root_test_plugin *plugin = user;
     mark(plugin->window, 'O', plugin->tag);
     assert(viewport.w == 400 && viewport.h == 300);
-    cui_begin_portal(ui, 900 + (unsigned char)plugin->tag, (cui_box){.width = 5, .height = 5},
-                     (cui_rect){0, 0, 5, 5}, 5);
+    cui_begin_box(ui, 900 + (unsigned char)plugin->tag, (cui_box){.width = 5, .height = 5});
     cui_end_box(ui);
 }
 static void app(cui_context *ui, void *user) {
@@ -151,6 +150,14 @@ static void test_registry_and_base_root(void) {
     assert(cui_bounds(ui, 100).w == 400 && cui_bounds(ui, 100).h == 300);
     assert(cui_bounds(ui, 700 + 'b').x < cui_bounds(ui, 700 + 'a').x &&
            cui_bounds(ui, 700 + 'a').x < cui_bounds(ui, 100).x);
+    /* Ordinary plugin children occupy the absolute overlay host, independently
+     * of application flow, root padding and outer decorator placement. */
+    cui_rect root_bounds = cui_bounds(ui, 100);
+    cui_rect first_overlay = cui_bounds(ui, 900 + 'a');
+    cui_rect second_overlay = cui_bounds(ui, 900 + 'b');
+    assert(first_overlay.x == root_bounds.x && first_overlay.y == root_bounds.y);
+    assert(second_overlay.x == root_bounds.x && second_overlay.y == root_bounds.y + 5);
+    assert(cui_bounds(ui, 12).y == root_bounds.y + 6);
     bool override_painted = false;
     for (size_t i = 0; i < draw.count; i++)
         override_painted |=

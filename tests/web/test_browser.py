@@ -1559,6 +1559,15 @@ def main():
             # body and its corrected layout to render before clicking again.
             page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
             click_semantic('Delete')
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            print('Alert second confirmation:', page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return {
+                attempts:e.gallery_alert_attempts(),open:e.gallery_surface_open(1),
+                pointers:[e.gallery_pointer_stats(0),e.gallery_pointer_stats(1),e.gallery_pointer_stats(2),e.gallery_pointer_stats(3)],
+                canvas:[document.querySelector('canvas').getBoundingClientRect().x,document.querySelector('canvas').getBoundingClientRect().y],
+                semantics:Array.from({length:e.gallery_semantic_count()},(_,i)=>i).map(i=>({
+                    name:d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i))),
+                    role:e.gallery_semantic(i,0),bounds:[1,2,3,4].map(f=>e.gallery_semantic(i,f)),
+                    focused:e.gallery_semantic(i,7),scroll:e.gallery_semantic(i,19),maximum:e.gallery_semantic(i,21)}))};}'''), flush=True)
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===0')
             index = semantic_index('Delete workspace')
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1

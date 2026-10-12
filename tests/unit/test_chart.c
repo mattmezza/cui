@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_chart.h"
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <string.h>
 static bool differs(const unsigned char *pixels, size_t count, cui_color background) {
@@ -114,6 +115,19 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     extra.count = 3;
+    options.kind = CUI_CHART_RADAR;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(green_pixel(pixels, options.width * options.height));
+    memcpy(saved, pixels, sizeof pixels);
+    options.radar_max_value = 100;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    memcpy(saved, pixels, sizeof pixels);
+    options.show_dots = true;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    options.show_dots = false;
+    options.radar_max_value = 0;
     options.extra_series = NULL;
     options.extra_series_count = 0;
     options.kind = CUI_CHART_BAR;
@@ -217,5 +231,18 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(state.hovered < options.count);
     cui_destroy(ui);
+    points[0].value = -DBL_MAX;
+    points[1].value = DBL_MAX;
+    points[2].value = 0;
+    options.has_domain = false;
+    options.kind = CUI_CHART_BAR;
+    options.bar_alignment = CUI_CHART_BAR_TOP;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    options.kind = CUI_CHART_LINE;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    flow_links[0].value = DBL_MAX;
+    flow_links[1].value = DBL_MAX;
+    flow_links[2].value = 0;
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
     return 0;
 }

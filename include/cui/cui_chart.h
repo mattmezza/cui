@@ -61,7 +61,7 @@ typedef struct {
     size_t count;
     const cui_chart_link *links;
     size_t link_count;
-    const cui_chart_series *extra_series; /* additional line/area series, at most 7 */
+    const cui_chart_series *extra_series; /* additional line/area/radar series, at most 7 */
     size_t extra_series_count;
     unsigned width, height;
     float logical_width, logical_height; /* zero selects pixel dimensions */
@@ -82,6 +82,8 @@ typedef struct {
     double bar_ratio;    /* zero means 0.6 */
     cui_chart_bar_alignment bar_alignment;
     cui_chart_curve curve; /* natural is source default */
+    bool show_dots;
+    double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     cui_chart_sankey_align sankey_align;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;

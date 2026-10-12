@@ -3,8 +3,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-static cui_str chart_number(char *buffer, size_t capacity, double value,
-                            cui_chart_format_fn formatter, void *user) {
+static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
+                                cui_chart_format_fn formatter, void *user) {
     size_t length;
     if (formatter)
         length = formatter(value, buffer, capacity, user);
@@ -38,9 +38,12 @@ cui_chart_options cui_chart_theme(cui_chart_options o, const cui_theme *theme) {
 }
 bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_chart_options *o,
                cui_str name) {
-    if (!ui || !id || !state || !o || !name.data || !name.length || !state->pixels ||
-        state->byte_capacity < (size_t)o->width * o->height * 4 || o->width > 4096 ||
-        o->height > 4096 || !o->width || !o->height)
+    if (!ui || !id || !state || !o || !name.data || !name.length || !state->pixels || !o->data ||
+        !o->count || o->count > 4096 || o->extra_series_count > 7 ||
+        (o->extra_series_count && !o->extra_series) || !isfinite(o->logical_width) ||
+        !isfinite(o->logical_height) || o->width > 4096 || o->height > 4096 || !o->width ||
+        !o->height || o->point_count > 1000000 ||
+        state->byte_capacity < (size_t)o->width * o->height * 4)
         return false;
     float w = o->logical_width > 0 ? o->logical_width : (float)o->width;
     float h = o->logical_height > 0 ? o->logical_height : (float)o->height;
@@ -101,16 +104,22 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         }
     }
     if (o->show_y_axis && o->kind != CUI_CHART_PIE && o->kind != CUI_CHART_RADAR &&
-        o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40) {
+        o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40 && o->width >= 60 && o->height >= 40) {
         double lo, hi;
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
-            for (unsigned i = 0; i < count; i++) {
+            unsigned visible = count < 32 ? count : 32;
+            cui_plot_scale scale = {
+                CUI_PLOT_LINEAR, lo, hi, o->height > 32 ? o->height - 20 : 12, 12, true};
+            for (unsigned i = 0; i < visible; i++) {
                 char text[48];
-                double value = hi - (hi - lo) * i / (count - 1);
+                unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
+                double pixel_y = 12 + (o->height - 32) * (double)tick / (count - 1);
+                double value = lo;
+                (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label =
-                    chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
-                float y = (12 + (o->height - 32) * (float)i / (count - 1)) * h / o->height;
+                    cui_chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
+                float y = (float)(pixel_y * h / o->height);
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;
                 cui_begin_absolute_box(
                     ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
@@ -120,6 +129,42 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 cui_end_box(ui);
             }
         }
+    }
+    if (o->kind == CUI_CHART_RADAR && o->count <= 64 && w >= 50 && h >= 50) {
+        double cx = w / 2.0, cy = h / 2.0;
+        double radius =
+            (o->radar_outer_radius > 0 ? o->radar_outer_radius : o->height * .4) * h / o->height;
+        for (size_t i = 0; i < o->count; i++) {
+            cui_str label = o->data[i].label;
+            if (!label.length || !label.data)
+                continue;
+            double angle = -3.14159265358979323846 / 2 + 2 * 3.14159265358979323846 * i / o->count;
+            float x = (float)(cx + (radius + 9) * cos(angle));
+            float y = (float)(cy + (radius + 9) * sin(angle));
+            cui_begin_absolute_box(
+                ui, id ^ (UINT64_C(0x25a41f7c9d310000) + i),
+                (cui_box){.width = 70, .height = 12, .fixed_width = true, .fixed_height = true},
+                (cui_rect){x - 35, y - 6, 70, 12});
+            cui_text(ui, label, 10, o->foreground);
+            cui_end_box(ui);
+        }
+    }
+    if (o->kind == CUI_CHART_SANKEY && o->count <= 64) {
+        cui_chart_sankey_node nodes[256];
+        if (cui_chart_sankey_layout(o, nodes, 256) == CUI_PLOT_OK)
+            for (size_t i = 0; i < o->count; i++) {
+                cui_str label = o->data[i].label;
+                if (!label.length || !label.data)
+                    continue;
+                float x = nodes[i].x1 * w / o->width + 2;
+                float y = (nodes[i].y0 + nodes[i].y1) * h / (2 * o->height) - 6;
+                cui_begin_absolute_box(
+                    ui, id ^ (UINT64_C(0xe5374a8b09ef0000) + i),
+                    (cui_box){.width = 72, .height = 12, .fixed_width = true, .fixed_height = true},
+                    (cui_rect){x, y, 72, 12});
+                cui_text(ui, label, 10, o->foreground);
+                cui_end_box(ui);
+            }
     }
     if (!o->hide_legend && o->kind == CUI_CHART_PIE && w >= 100 && h >= 40) {
         size_t limit = o->count < 6 ? o->count : 6;
@@ -168,7 +213,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 series ? o->extra_series[series - 1].values[state->hovered] : state->hovered_value;
             char value[48];
             cui_str label =
-                chart_number(value, sizeof value, number, o->tooltip_format, o->format_user);
+                cui_chart_number(value, sizeof value, number, o->tooltip_format, o->format_user);
             if (!label.length)
                 continue;
             cui_begin_absolute_box(

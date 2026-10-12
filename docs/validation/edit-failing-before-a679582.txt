@@ -1,0 +1,1 @@
+cui-nav-edit-before: tests/unit/test_edit.c:299: test_word_and_vertical_navigation: Assertion `cui_edit_get_state(edit).cursor == chinese' failed.

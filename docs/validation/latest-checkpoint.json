@@ -1,41 +1,41 @@
 {
-  "source": "3d05c2a",
+  "source": "a679582",
   "published_source": "49d4bfe9ed5384bb823ea173b61726042ab02de2",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "First reported-defect batch: controlled Radio redraw, full/half/empty SVG Rating stars, Avatar/Tooltip and numeric-button centering, measured Marker width, original Image/Attachment asset. Integrated native77, sanitizer75, WASI67, Chromium78, targeted visual regressions and quality gates pass. Published49d4bfe is directly verified over HTTPS with all78 browser stories and eight artifact-matching assets. All78 entries remain in scope; full feature parity and remaining website feedback are unfinished.",
+  "summary": "Word and vertical caret navigation with UTF-8 scalar-column preservation, read-only Input support and explicit composite key delegation passes native77, sanitizer75, WASI67 and Chromium78. Previous keyboard code fails the new word-motion regression. Published49d4bfe remains HTTPS78/eight-asset verified; the navigation batch awaits publication. Full78-entry parity and remaining website feedback stay unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "3d05c2a",
+      "source": "a679582",
       "passed": 77,
       "total": 77,
-      "log": "native-3d05c2a.txt"
+      "log": "native-a679582.txt"
     },
     {
       "name": "sanitizers",
-      "source": "3d05c2a",
+      "source": "a679582",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-3d05c2a.txt"
+      "log": "sanitizers-a679582.txt"
     },
     {
       "name": "WASI",
-      "source": "3d05c2a",
+      "source": "a679582",
       "passed": 67,
       "total": 67,
-      "log": "wasi-3d05c2a.txt"
+      "log": "wasi-a679582.txt"
     },
     {
       "name": "browser",
-      "source": "3d05c2a",
+      "source": "a679582",
       "passed": 78,
       "total": 78,
-      "log": "browser-3d05c2a.txt"
+      "log": "browser-a679582.txt"
     }
   ],
   "visual_regressions": "visual-3d05c2a.txt",
-  "failing_before": "radio-failing-before-3d05c2a.txt",
-  "quality": "quality-3d05c2a.txt",
+  "failing_before": "edit-failing-before-a679582.txt",
+  "quality": "quality-a679582.txt",
   "published_evidence": "published-49d4bfe.txt",
   "latest_deployment": {
     "source": "49d4bfe9ed5384bb823ea173b61726042ab02de2",

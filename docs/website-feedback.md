@@ -18,9 +18,9 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] Calendar and DatePicker: use SVG navigation icons; center popup content.
 - [ ] ColorPicker: screen eyedropper through an explicit host capability.
 - [ ] Combobox and Select: options span the field width.
-- [ ] Editor and Input: word navigation and vertical caret navigation.
+- [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.
 - [ ] Input Group: constrain the field so addons stay on the same row.
-- [ ] Textarea: word/vertical navigation; repeated Down must preserve visible content.
+- [ ] Textarea: word/vertical navigation is implemented/tested in the navigation batch; repeated Down/content visibility remains under investigation.
 - [ ] Dock: a visible, interactive docking demonstration and instructions.
 - [ ] Resizable: divider drag resizes panes correctly.
 - [ ] Scrollable and Sidebar: natural wheel sensitivity and working scrollbar.
@@ -60,3 +60,5 @@ Full GPUI Kit 0.7.1 parity remains unfinished. See `gpui-parity.json` and `swarm
 ## First polish batch evidence
 
 Native75, sanitizer75, WASI67, full Chromium78 and targeted visual regression checks pass. The Radio redraw regression fails against the previous base implementation. The Image gallery uses an original generated landscape; image-state, fit, grayscale, opacity and failure checks remain active. See [native](validation/native-3d05c2a.txt), [sanitizers](validation/sanitizers-3d05c2a.txt), [WASI](validation/wasi-3d05c2a.txt), [browser](validation/browser-3d05c2a.txt) and [visual regressions](validation/visual-3d05c2a.txt). These checks close the specific defects above; they do not certify full component parity.
+
+Navigation evidence: [native](validation/native-a679582.txt), [sanitizers](validation/sanitizers-a679582.txt), [WASI](validation/wasi-a679582.txt), [browser](validation/browser-a679582.txt), and [failing-before word motion](validation/edit-failing-before-a679582.txt).

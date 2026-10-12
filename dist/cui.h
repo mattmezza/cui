@@ -57,7 +57,9 @@ typedef enum {
     CUI_KEY_Y,
     CUI_KEY_C,
     CUI_KEY_X,
-    CUI_KEY_V
+    CUI_KEY_V,
+    CUI_KEY_PAGEUP,
+    CUI_KEY_PAGEDOWN
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
 typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
@@ -102,7 +104,8 @@ typedef enum {
     CUI_ROLE_CELL,
     CUI_ROLE_COLUMNHEADER,
     CUI_ROLE_GRIDCELL,
-    CUI_ROLE_GRID
+    CUI_ROLE_GRID,
+    CUI_ROLE_SCROLLBAR
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -110,13 +113,15 @@ typedef enum {
     CUI_ORIENTATION_VERTICAL
 } cui_orientation;
 typedef struct {
-    bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy;
+    bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy,
+        scrollable;
     cui_orientation orientation;
     cui_id controls, labelled_by, parent;
     cui_str description;
     float minimum, maximum;
     unsigned level, pos_in_set, set_size;
     unsigned row_index, column_index, row_count, column_count;
+    float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -5497,6 +5502,7 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_CHECKBOX:
     case CUI_ROLE_SWITCH:
     case CUI_ROLE_RADIO:
+    case CUI_ROLE_SCROLLBAR:
     case CUI_ROLE_SLIDER:
     case CUI_ROLE_TEXTBOX:
     case CUI_ROLE_TAB:
@@ -5537,6 +5543,29 @@ static cui_id cui_core_hit(cui_context *ui, float x, float y) {
             layer = ui->previous_layers[i];
         }
     return hit;
+}
+static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
+    cui_id hit = 0;
+    int16_t layer = INT16_MIN, blocking_layer = INT16_MIN;
+    for (size_t i = 0; i < ui->previous_count; ++i) {
+        const cui_semantic *node = &ui->previous[i];
+        if (!cui_core_previous_allowed(ui, i) ||
+            !cui_core_inside(ui->previous_hits[i], event.x, event.y))
+            continue;
+        if (cui_core_focusable(node) && ui->previous_layers[i] > blocking_layer)
+            blocking_layer = ui->previous_layers[i];
+        cui_semantic_details d = node->details;
+        bool can_x =
+            (event.dx > 0 && d.scroll_x > 0) || (event.dx < 0 && d.scroll_x < d.scroll_max_x);
+        bool can_y =
+            (event.dy > 0 && d.scroll_y > 0) || (event.dy < 0 && d.scroll_y < d.scroll_max_y);
+        if (!node->disabled && d.scrollable && (can_x || can_y) &&
+            ui->previous_layers[i] >= layer) {
+            hit = node->id;
+            layer = ui->previous_layers[i];
+        }
+    }
+    return layer >= blocking_layer ? hit : 0;
 }
 static void cui_core_activate(cui_context *ui, cui_id id) {
     if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
@@ -5619,6 +5648,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             if (!ui->event_targets[i] && ui->previous_top_modal != SIZE_MAX)
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
         }
+        if (e.type == CUI_EVENT_SCROLL)
+            ui->event_targets[i] = cui_core_scroll_hit(ui, e);
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
             size_t scope = ui->previous_focus_scope_count;

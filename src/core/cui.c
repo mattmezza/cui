@@ -211,6 +211,7 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_CHECKBOX:
     case CUI_ROLE_SWITCH:
     case CUI_ROLE_RADIO:
+    case CUI_ROLE_SCROLLBAR:
     case CUI_ROLE_SLIDER:
     case CUI_ROLE_TEXTBOX:
     case CUI_ROLE_TAB:
@@ -251,6 +252,29 @@ static cui_id cui_core_hit(cui_context *ui, float x, float y) {
             layer = ui->previous_layers[i];
         }
     return hit;
+}
+static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
+    cui_id hit = 0;
+    int16_t layer = INT16_MIN, blocking_layer = INT16_MIN;
+    for (size_t i = 0; i < ui->previous_count; ++i) {
+        const cui_semantic *node = &ui->previous[i];
+        if (!cui_core_previous_allowed(ui, i) ||
+            !cui_core_inside(ui->previous_hits[i], event.x, event.y))
+            continue;
+        if (cui_core_focusable(node) && ui->previous_layers[i] > blocking_layer)
+            blocking_layer = ui->previous_layers[i];
+        cui_semantic_details d = node->details;
+        bool can_x =
+            (event.dx > 0 && d.scroll_x > 0) || (event.dx < 0 && d.scroll_x < d.scroll_max_x);
+        bool can_y =
+            (event.dy > 0 && d.scroll_y > 0) || (event.dy < 0 && d.scroll_y < d.scroll_max_y);
+        if (!node->disabled && d.scrollable && (can_x || can_y) &&
+            ui->previous_layers[i] >= layer) {
+            hit = node->id;
+            layer = ui->previous_layers[i];
+        }
+    }
+    return layer >= blocking_layer ? hit : 0;
 }
 static void cui_core_activate(cui_context *ui, cui_id id) {
     if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
@@ -333,6 +357,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             if (!ui->event_targets[i] && ui->previous_top_modal != SIZE_MAX)
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
         }
+        if (e.type == CUI_EVENT_SCROLL)
+            ui->event_targets[i] = cui_core_scroll_hit(ui, e);
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
             size_t scope = ui->previous_focus_scope_count;

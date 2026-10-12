@@ -56,7 +56,9 @@ typedef enum {
     CUI_KEY_Y,
     CUI_KEY_C,
     CUI_KEY_X,
-    CUI_KEY_V
+    CUI_KEY_V,
+    CUI_KEY_PAGEUP,
+    CUI_KEY_PAGEDOWN
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
 typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
@@ -101,7 +103,8 @@ typedef enum {
     CUI_ROLE_CELL,
     CUI_ROLE_COLUMNHEADER,
     CUI_ROLE_GRIDCELL,
-    CUI_ROLE_GRID
+    CUI_ROLE_GRID,
+    CUI_ROLE_SCROLLBAR
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -109,13 +112,15 @@ typedef enum {
     CUI_ORIENTATION_VERTICAL
 } cui_orientation;
 typedef struct {
-    bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy;
+    bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy,
+        scrollable;
     cui_orientation orientation;
     cui_id controls, labelled_by, parent;
     cui_str description;
     float minimum, maximum;
     unsigned level, pos_in_set, set_size;
     unsigned row_index, column_index, row_count, column_count;
+    float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

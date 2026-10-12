@@ -684,11 +684,62 @@ static void test_pointer_scope_guard(void) {
     cui_destroy(ui);
 }
 
+static void scroll_regions(cui_context *ui, float inner_scroll, bool portal) {
+    cui_begin_box(ui, 10, (cui_box){.width = 200, .height = 160, .clip = true});
+    cui_interact(ui, 10, CUI_ROLE_GROUP, cui_string("Outer"), false, false, 0);
+    cui_set_semantic_details(
+        ui, 10, (cui_semantic_details){.scrollable = true, .scroll_y = 50, .scroll_max_y = 300});
+    cui_begin_box(ui, 20, (cui_box){.width = 100, .height = 80, .clip = true});
+    cui_interact(ui, 20, CUI_ROLE_GROUP, cui_string("Inner"), false, false, 0);
+    cui_set_semantic_details(
+        ui, 20,
+        (cui_semantic_details){.scrollable = true, .scroll_y = inner_scroll, .scroll_max_y = 100});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    if (portal) {
+        cui_begin_portal(ui, 30, (cui_box){0}, (cui_rect){0, 0, 100, 80}, 4);
+        cui_interact(ui, 30, CUI_ROLE_BUTTON, cui_string("Popup"), false, false, 0);
+        cui_end_box(ui);
+    }
+}
+static void wheel(cui_context *ui, float x, float y, float dy) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dy = dy}));
+}
+static void test_nested_wheel_routing(void) {
+    cui_context *ui = make();
+    begin(ui);
+    scroll_regions(ui, 0, false);
+    cui_end_frame(ui);
+    wheel(ui, 20, 20, 1); /* Inner is already at its start: bubble upward. */
+    wheel(ui, 20, 20, -1);
+    wheel(ui, 120, 100, -1);
+    wheel(ui, 250, 100, -1);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10 && cui_event_target(ui, 1) == 20);
+    assert(cui_event_target(ui, 2) == 10 && !cui_event_target(ui, 3));
+    scroll_regions(ui, 100, false);
+    cui_end_frame(ui);
+    wheel(ui, 20, 20, -1); /* Inner is at its end. */
+    wheel(ui, 20, 20, 1);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10 && cui_event_target(ui, 1) == 20);
+    scroll_regions(ui, 50, true);
+    cui_end_frame(ui);
+    wheel(ui, 20, 20, -1); /* An interactive higher portal blocks background scrolling. */
+    begin(ui);
+    assert(!cui_event_target(ui, 0));
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();
     test_pointer_scope_guard();
+    test_nested_wheel_routing();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

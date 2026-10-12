@@ -28,6 +28,10 @@ static cui_key key(SDL_Keycode k) {
         return CUI_KEY_X;
     case SDLK_V:
         return CUI_KEY_V;
+    case SDLK_PAGEUP:
+        return CUI_KEY_PAGEUP;
+    case SDLK_PAGEDOWN:
+        return CUI_KEY_PAGEDOWN;
     default:
         return CUI_KEY_NONE;
     }

@@ -455,6 +455,44 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_nested_list_continuations(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("- parent\n  - child\n\n  resumed\n\n  final\n- sibling")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 5 && f.blocks[2].list_parent == 0 &&
+           f.blocks[3].list_parent == 0);
+    assert(f.blocks[2].list_repeat_marker && !f.blocks[3].list_repeat_marker);
+    cui_text_view_layout_options o = {
+        .width = 400, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[2].bounds.x == 0 && f.blocks[2].text_inset == f.blocks[0].text_inset &&
+           f.blocks[3].bounds.x == 16);
+    char output[256];
+    size_t length;
+    assert(cui_text_view_select(&f.state, f.blocks[0].text.begin, f.blocks[4].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- parent\n  resumed\n  final\n  - child\n- sibling"));
+    assert(cui_text_view_select(&f.state, f.blocks[1].text.begin, f.blocks[2].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- resumed\n  - child"));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "child\nresumed"));
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("10. parent\n    - child\n\n    resumed\n    - second\n\n    final")) ==
+        CUI_TEXT_VIEW_OK);
+    assert(f.blocks[2].list_repeat_marker && f.blocks[4].list_repeat_marker &&
+           f.blocks[4].list_parent == 0);
+    assert(cui_text_view_select(&f.state, f.blocks[0].text.begin, f.blocks[4].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "10. parent\n    resumed\n    final\n    - child\n    - second"));
+}
 static void test_setext_headings(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1050,6 +1088,67 @@ static void test_list_continuation_paint(void) {
     assert(checks == 1 && continuation);
     cui_destroy(ui);
 }
+static void test_nested_continuation_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(
+        cui_text_view_set_text(&f.state, text("- [x] parent\n  - child\n\n  resumed\n\n  final")) ==
+        CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 400;
+    cui_draw_list d = frame(ui, &f, o);
+    unsigned checks = 0;
+    bool resumed = false, final = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *command = &d.commands[i];
+        if (command->type == CUI_DRAW_IMAGE)
+            ++checks;
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 7 &&
+            !memcmp(command->text.data, "resumed", 7))
+            resumed = command->bounds.x == 20 && command->bounds.y >= 40 && command->bounds.y < 42;
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 5 &&
+            !memcmp(command->text.data, "final", 5))
+            final = command->bounds.x == 16 && command->bounds.y >= 60 && command->bounds.y < 62;
+    }
+    assert(checks == 2 && resumed && final);
+    frame(ui, &f, o);
+    cui_rect first = {0}, last = {0};
+    for (size_t i = 0; i < f.state.glyph_count; ++i) {
+        if (f.glyphs[i].text.begin == f.blocks[1].text.begin)
+            first = f.glyphs[i].bounds;
+        if (f.glyphs[i].text.end == f.blocks[2].text.end)
+            last = f.glyphs[i].bounds;
+    }
+    float x = f.state.viewport.x, y = f.state.viewport.y;
+    assert(first.w > 0 && last.w > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x + first.x,
+                                           .y = y + first.y + 2}));
+    frame(ui, &f, o);
+    assert(f.state.selecting && f.state.anchor == f.blocks[1].text.begin);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = x + last.x + last.w,
+                                           .y = y + last.y + 2}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x + last.x + last.w,
+                                           .y = y + last.y + 2}));
+    frame(ui, &f, o);
+    assert(!f.state.selecting && f.state.cursor == f.blocks[2].text.end);
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- [x] resumed\n  - child"));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "child\nresumed"));
+    cui_destroy(ui);
+}
 static void test_horizontal_table_gesture(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1199,6 +1298,7 @@ int main(void) {
     test_nested_list_model();
     test_list_continuations();
     test_setext_headings();
+    test_nested_list_continuations();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1215,6 +1315,7 @@ int main(void) {
     test_decoded_resource_callbacks();
     test_nested_list_paint();
     test_list_continuation_paint();
+    test_nested_continuation_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

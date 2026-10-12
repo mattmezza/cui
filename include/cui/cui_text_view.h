@@ -67,7 +67,7 @@ typedef struct {
     unsigned list_number, list_start, list_depth, list_source_indent;
     size_t list_parent;
     char marker_text[12], prefix_text[16];
-    bool table_header, image_ready, task, checked, list_continuation;
+    bool table_header, image_ready, task, checked, list_continuation, list_repeat_marker;
     cui_text_view_alignment alignment;
     cui_bitmap image;
     cui_rect bounds, table_frame;

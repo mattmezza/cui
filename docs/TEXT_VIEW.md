@@ -151,15 +151,20 @@ numeric prefixes. Bullet shapes vary across five depths. Each rendered nesting
 level adds 16px, while partial Source copy uses parent marker widths to indent
 children and includes empty ancestor markers for a selection confined to children.
 The parser supports at most 32 list levels and rejects deeper input transactionally.
-It does not yet provide a complete list AST for continuations after nested child
-blocks, loose-list spacing, or nested tables/images/code/quotes.
+Nested-child continuations reconnect to their enclosing list item. The first
+paragraph after a nested list repeats the parent marker or passive task indicator;
+later paragraphs use the continuation indent. Source copy groups an item's selected
+paragraphs before its nested lists, while plain copy and selection retain paint
+order. The bounded serialization order uses at most 8192 16-bit block indices and
+may take quadratic time in that fixed node bound. Loose-list spacing and nested
+tables/images/code/quotes are not yet represented as a complete list AST.
 
 Ordinary list paragraphs join lazy continuation lines with spaces and preserve
 two-space hard breaks. A following indented paragraph stays attached to its
 list item, paints at a 16px continuation indent, and does not repeat a task
 indicator or marker. Partial Source copy prefixes the first selected item
 paragraph and indents subsequent paragraphs and hard-break lines under its marker.
-More complex continuation placement after nested child blocks remains separate.
+Continuations after nested child lists follow the separate row and copy rules above.
 
 Setext headings recognize one or more equals signs or hyphens after a paragraph,
 including joined paragraph lines. Leading indentation is limited to three spaces.

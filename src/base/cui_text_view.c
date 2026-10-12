@@ -438,7 +438,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
     struct {
         unsigned indent, content_indent, number, start, copy_indent;
         size_t item;
-        bool ordered;
+        bool ordered, nested;
     } lists[CUI_TEXT_VIEW_LIST_DEPTH_LIMIT];
     unsigned list_count = 0;
     while (a < p->input.length && !p->error) {
@@ -625,6 +625,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         unsigned depth = 0, list_start = 0, copy_indent = 0;
         size_t parent = SIZE_MAX;
+        bool repeat_marker = false;
         if (kind == CUI_TEXT_VIEW_LIST_ITEM) {
             while (list_count && indent < lists[list_count - 1].indent)
                 --list_count;
@@ -637,6 +638,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                     p->error = CUI_TEXT_VIEW_INVALID;
                     return;
                 }
+                lists[list_count - 1].nested = true;
                 ++list_count;
                 fresh = true;
             }
@@ -653,6 +655,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                 lists[depth].number = lists[depth].start = list_number;
             } else if (level)
                 ++lists[depth].number;
+            lists[depth].nested = false;
             lists[depth].content_indent = indent + (unsigned)(marker_content - leading);
             if (depth) {
                 parent = lists[depth - 1].item;
@@ -667,18 +670,25 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             lists[depth].copy_indent = copy_indent;
             list_start = lists[depth].start;
             list_number = lists[depth].number;
-        } else if (kind == CUI_TEXT_VIEW_PARAGRAPH && list_count &&
-                   indent >= lists[list_count - 1].content_indent) {
-            depth = list_count - 1;
-            parent = lists[depth].item;
-            unsigned digits = 1, ordinal = lists[depth].number;
-            while (ordinal >= 10) {
-                ++digits;
-                ordinal /= 10;
-            }
-            copy_indent = lists[depth].copy_indent + (lists[depth].ordered ? digits + 2 : 2);
-        } else
-            list_count = 0;
+        } else {
+            while (kind == CUI_TEXT_VIEW_PARAGRAPH && list_count > 1 &&
+                   indent < lists[list_count - 1].content_indent)
+                --list_count;
+            if (kind == CUI_TEXT_VIEW_PARAGRAPH && list_count &&
+                indent >= lists[list_count - 1].content_indent) {
+                depth = list_count - 1;
+                parent = lists[depth].item;
+                repeat_marker = lists[depth].nested;
+                lists[depth].nested = false;
+                unsigned digits = 1, ordinal = lists[depth].number;
+                while (ordinal >= 10) {
+                    ++digits;
+                    ordinal /= 10;
+                }
+                copy_indent = lists[depth].copy_indent + (lists[depth].ordered ? digits + 2 : 2);
+            } else
+                list_count = 0;
+        }
         bool continuation = kind == CUI_TEXT_VIEW_PARAGRAPH && parent != SIZE_MAX;
         if (!cui_text_view_block_begin(p, kind, start, level))
             return;
@@ -695,6 +705,16 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             block->checked = checked;
             block->list_marker = marker;
             block->list_number = list_number;
+            block->list_repeat_marker = repeat_marker;
+            if (repeat_marker) {
+                const cui_text_view_block *owner = &p->state->workspace.blocks[parent];
+                block->task = owner->task;
+                block->checked = owner->checked;
+                block->level = owner->level;
+                block->list_number = owner->list_number;
+                block->list_start = owner->list_start;
+                memcpy(block->marker_text, owner->marker_text, sizeof block->marker_text);
+            }
             if (kind == CUI_TEXT_VIEW_LIST_ITEM && level) {
                 char digits[10];
                 unsigned number = list_number, count = 0;
@@ -1293,11 +1313,11 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
           padding = b->kind == CUI_TEXT_VIEW_CODE_BLOCK   ? 12
                     : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 4
                                                           : 0;
-    float left = b->kind == CUI_TEXT_VIEW_QUOTE        ? 12
-                 : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
-                 : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
-                                                       : padding;
-    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && !b->task) {
+    float left = b->kind == CUI_TEXT_VIEW_QUOTE                                  ? 12
+                 : (b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) ? 20
+                 : b->kind == CUI_TEXT_VIEW_TABLE_CELL                           ? 8
+                                                                                 : padding;
+    if ((b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) && !b->task) {
         if (b->level) {
             if (b->list_depth && b->list_start) {
                 b->prefix_text[0] =
@@ -1591,9 +1611,11 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
                     o.paragraph_gap + (o.table_actions_height > 0 ? o.table_actions_height + 4 : 0);
             }
         } else {
-            float indent = block->kind == CUI_TEXT_VIEW_LIST_ITEM || block->list_continuation
-                               ? block->list_depth * 16.f + (block->list_continuation ? 16 : 0)
-                               : 0;
+            float indent =
+                block->kind == CUI_TEXT_VIEW_LIST_ITEM || block->list_continuation
+                    ? block->list_depth * 16.f +
+                          (block->list_continuation && !block->list_repeat_marker ? 16 : 0)
+                    : 0;
             if (!cui_text_view_layout_block(s, b, indent, y, fmaxf(1, o.width - indent), o, measure,
                                             user))
                 return CUI_TEXT_VIEW_INVALID;
@@ -1825,7 +1847,33 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
                                                      size_t b) {
     bool prior = false, prior_list = false;
     bool listed[CUI_TEXT_VIEW_NODE_LIMIT] = {0};
+    uint16_t order[CUI_TEXT_VIEW_NODE_LIMIT];
+    for (size_t i = 0; i < s->block_count; ++i)
+        order[i] = (uint16_t)i;
+    /* Source serialization groups an item's paragraphs before its nested lists,
+     * independently of the document's paint/selection order. */
     for (size_t i = 0; i < s->block_count; ++i) {
+        const cui_text_view_block *block = &s->workspace.blocks[i];
+        if (!block->list_continuation)
+            continue;
+        if (block->list_parent >= i)
+            return CUI_TEXT_VIEW_INVALID;
+        size_t parent = 0, position = 0;
+        while (order[parent] != block->list_parent)
+            ++parent;
+        while (order[position] != i)
+            ++position;
+        size_t target = parent + 1;
+        while (target < position && s->workspace.blocks[order[target]].list_continuation &&
+               s->workspace.blocks[order[target]].list_parent == block->list_parent)
+            ++target;
+        if (target < position) {
+            memmove(order + target + 1, order + target, (position - target) * sizeof *order);
+            order[target] = (uint16_t)i;
+        }
+    }
+    for (size_t position = 0; position < s->block_count; ++position) {
+        size_t i = order[position];
         const cui_text_view_block *block = &s->workspace.blocks[i];
         if (block->text.end <= a || block->text.begin >= b)
             continue;
@@ -1843,7 +1891,7 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
             cui_text_view_copy_table(s, w, start, end, a, b);
             prior = true;
             prior_list = false;
-            i = end - 1;
+            position += end - i - 1;
             continue;
         }
         size_t begin = block->text.begin > a ? block->text.begin : a;

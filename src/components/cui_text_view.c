@@ -337,7 +337,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
         else if (b->kind == CUI_TEXT_VIEW_RULE)
             cui_text_view_quad(ui, part, r, style.border);
-        else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->task) {
+        else if ((b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) && b->task) {
             cui_begin_absolute_box(
                 ui, part,
                 (cui_box){.width = 14,
@@ -357,7 +357,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                                                : (cui_color){255, 255, 255, 255});
             }
             cui_end_box(ui);
-        } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
+        } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) {
             cui_begin_absolute_box(ui, part, (cui_box){0},
                                    (cui_rect){r.x, r.y, b->text_inset, style.line_height});
             cui_text_line(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,

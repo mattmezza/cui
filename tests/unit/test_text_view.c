@@ -46,6 +46,29 @@ static cui_size measure(void *u, cui_str t, float font, unsigned flags) {
             ++count;
     return (cui_size){(float)count * font * .5f, font};
 }
+static void test_inline_image_alt_fallback(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "![**alt**](asset) tail and ![other](asset) end";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && f.blocks[0].kind == CUI_TEXT_VIEW_PARAGRAPH);
+    assert(!strcmp(f.rendered, "alt tail and other end\n"));
+    for (size_t i = 0; i < f.state.span_count; ++i)
+        assert(f.spans[i].link.begin == f.spans[i].link.end);
+    assert(f.mapping[0].source.begin == 4 && f.mapping[0].source.end == 5);
+    assert(cui_text_view_select(&f.state, 0, cui_text_view_rendered_text(&f.state).length));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, source));
+    assert(cui_text_view_set_text(&f.state, text("- ![alt](asset) tail\n- next")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].list_item && f.blocks[0].kind == CUI_TEXT_VIEW_LIST_ITEM);
+    assert(!strcmp(f.rendered, "alt tail\nnext\n"));
+    assert(cui_text_view_set_text(&f.state, text("![alt](asset)  ")) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].kind == CUI_TEXT_VIEW_IMAGE);
+}
 static void test_image_font_metrics(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1922,6 +1945,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_inline_image_alt_fallback();
     test_image_font_metrics();
     test_markdown();
     test_unicode_ranges_and_stream();

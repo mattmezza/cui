@@ -320,6 +320,16 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
                 continue;
             }
         }
+        if (c == '!' && a + 1 < b && p->input.data[a + 1] == '[') {
+            size_t close = cui_text_view_find(p->input, a + 2, b, "](", 2);
+            size_t last =
+                close == SIZE_MAX ? SIZE_MAX : cui_text_view_find(p->input, close + 2, b, ")", 1);
+            if (last != SIZE_MAX) {
+                cui_text_view_inline(p, a + 2, close, flags, link, depth + 1);
+                a = last + 1;
+                continue;
+            }
+        }
         if (c == '[') {
             size_t close = cui_text_view_find(p->input, a + 1, b, "](", 2);
             if (close != SIZE_MAX) {
@@ -589,6 +599,14 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             image_close = cui_text_view_find(p->input, a + 2, b, "](", 2);
             if (image_close != SIZE_MAX)
                 image_last = cui_text_view_find(p->input, image_close + 2, b, ")", 1);
+            if (image_last != SIZE_MAX) {
+                size_t remainder = image_last + 1;
+                while (remainder < b &&
+                       (p->input.data[remainder] == ' ' || p->input.data[remainder] == '\t'))
+                    ++remainder;
+                if (remainder != b)
+                    image_last = SIZE_MAX;
+            }
             if (image_last != SIZE_MAX && kind == CUI_TEXT_VIEW_PARAGRAPH)
                 kind = CUI_TEXT_VIEW_IMAGE;
         }

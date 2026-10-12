@@ -221,3 +221,8 @@ on the first cell. Other cells and nested children retain that item as their par
 The separate marker column stays outside the horizontal mask and does not move
 when the table scrolls; table-body snapshots preserve its scroll offset when
 appending rows.
+
+Mixed inline image syntax currently preserves its formatted alt text and surrounding
+paragraph text without turning the image URI into a link. Only an image occupying
+the complete line becomes a host-rendered standalone image. This passive alt
+fallback prevents text loss while mixed inline object flow remains unfinished.

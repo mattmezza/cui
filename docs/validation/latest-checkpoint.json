@@ -1,8 +1,8 @@
 {
   "source": "c56fdb0",
-  "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
+  "published_source": "ab46d9d558a776f1d220ccc3bd2e4e87fc994e18",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "73 real WASM stories pass Chromium, including Command, Settings, Carousel and Textarea indentation. Carousel drag-scoping and Root plugin overlay fixes are integrated. Public remains 1b453ab until deployment succeeds. Full 78-entry parity remains unfinished.",
+  "summary": "Public ab46d9d: 73 real WASM stories; full HTTPS Chromium suite passed after successful CI and Pages deployment. TextView and Chart are integrated locally with further source fidelity work ongoing. Full 78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -40,12 +40,12 @@
     "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
     "run": 38273904793
   },
-  "published_evidence": "published-picker-1b453ab.txt",
+  "published_evidence": "published-ab46d9d.txt",
   "deployment": {
-    "source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
+    "source": "ab46d9d558a776f1d220ccc3bd2e4e87fc994e18",
     "status": "success",
-    "pages_run": 38270795919,
-    "ci_run": 38270795856
+    "pages_run": 38276297290,
+    "ci_run": 38276297328
   },
   "targeted_checks": [
     {

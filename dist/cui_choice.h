@@ -39,6 +39,7 @@ typedef struct {
     cui_rect viewport;
     cui_id receiving_id;
     bool changed;
+    cui_id reveal_id, last_selected; /* explicit reveal request and auto-reveal tracking */
 } cui_tab_scroll_state;
 typedef struct {
     bool vertical, disabled, manual_activation;
@@ -52,6 +53,7 @@ typedef struct {
     float bar_extent;             /* scroll viewport width, or height for vertical tabs */
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
     cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
+    bool reveal_selected;     /* opt in to reveal selection changes in a bounded strip */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -60,6 +62,8 @@ typedef void (*cui_tab_panel_fn)(cui_context *, size_t index, void *user);
 /* Selection is a stable item ID rather than a reorder-sensitive array index.
  * Zero means no selection. Invalid/disabled selections are left caller-owned;
  * they produce no visible panel. Base controls draw nothing. */
+/* Reveal content coordinates in an existing bounded scroll range. */
+bool cui_tab_scroll_reveal(cui_tab_scroll_state *, float start, float extent, float viewport);
 bool cui_base_tabs(cui_context *, const cui_choice_item *, size_t count, cui_id *selected,
                    cui_tabs_options);
 bool cui_base_toggle_group(cui_context *, const cui_choice_item *, size_t count, bool *selected,
@@ -329,6 +333,21 @@ static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, si
             return from;
     }
     return count;
+}
+bool cui_tab_scroll_reveal(cui_tab_scroll_state *state, float start, float extent, float viewport) {
+    if (!state || !isfinite(start) || !isfinite(extent) || !isfinite(viewport) || start < 0 ||
+        extent < 0 || viewport <= 0 || !isfinite(start + extent) || !isfinite(state->maximum) ||
+        state->maximum < 0)
+        return false;
+    float before = state->offset;
+    float offset = isfinite(before) ? fminf(state->maximum, fmaxf(0, before)) : 0;
+    if (extent >= viewport || start < offset)
+        offset = start;
+    else if (start + extent > offset + viewport)
+        offset = start + extent - viewport;
+    state->offset = fminf(state->maximum, fmaxf(0, offset));
+    state->changed |= before != state->offset;
+    return before != state->offset;
 }
 void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger,
                            cui_menu_entry *entries, size_t capacity) {
@@ -1624,6 +1643,40 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     } else
         options.scroll = NULL;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
+    if (scrollable) {
+        cui_tab_scroll_state *scroll = options.scroll;
+        if (options.reveal_selected && scroll->last_selected != *selected && !scroll->reveal_id)
+            scroll->reveal_id = *selected;
+        scroll->last_selected = *selected;
+        if (scroll->reveal_id) {
+            float start = 0;
+            bool found = false;
+            for (size_t i = 0; i < count; i++) {
+                float extent = options.vertical ? theme->control_height
+                               : options.render
+                                   ? cui_bounds(ui, items[i].id).w
+                                   : cui_measure_text(ui, items[i].label, theme->font_size).width +
+                                         2 * theme->padding;
+                if (!options.vertical && !options.render && options.max_width > 0 &&
+                    extent > options.max_width)
+                    extent = options.max_width;
+                if (items[i].id == scroll->reveal_id) {
+                    found = true;
+                    if (extent > 0 && isfinite(extent)) {
+                        if (cui_tab_scroll_reveal(scroll, start, extent, options.bar_extent))
+                            cui_invalidate(ui);
+                        scroll->reveal_id = 0;
+                    }
+                    break;
+                }
+                if (extent > 0 && isfinite(extent))
+                    start += extent + theme->gap;
+            }
+            if (!found)
+                scroll->reveal_id = 0;
+        }
+    }
+
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
     cui_interact(ui, list_id, CUI_ROLE_TABLIST, cui_string(""), options.disabled, false, 0);

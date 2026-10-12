@@ -317,7 +317,7 @@ cui_warnings(test_surface_base)
 add_test(NAME surface_base_only COMMAND test_surface_base)
 set_tests_properties(surface_base_only PROPERTIES TIMEOUT 60)
 
-add_executable(test_form_base tests/unit/test_form.c src/core/cui.c src/base/cui_form.c)
+add_executable(test_form_base tests/unit/test_form.c src/core/cui.c src/base/cui_form.c src/base/cui_base.c src/base/cui_edit.c)
 target_include_directories(test_form_base PRIVATE include third_party/clay)
 target_compile_definitions(test_form_base PRIVATE CUI_FORM_BASE_ONLY=1)
 if(NOT MSVC)

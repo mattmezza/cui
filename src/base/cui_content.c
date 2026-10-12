@@ -105,8 +105,13 @@ bool cui_hover_update(cui_hover_state *s, bool trigger, bool content, bool focus
         return false;
     bool old = s->open;
     if (disabled || escape) {
-        *s = (cui_hover_state){0};
+        *s = (cui_hover_state){.suppressed = escape};
         return old;
+    }
+    if (s->suppressed) {
+        if (trigger || focus || content)
+            return false;
+        s->suppressed = false;
     }
     bool target = trigger || focus || (s->open && content);
     if (target == s->open) {

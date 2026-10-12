@@ -10,6 +10,11 @@ static cui_color cui_content_blend(cui_color a, cui_color b, float amount) {
                        (uint8_t)(a.b + (b.b - a.b) * amount),
                        (uint8_t)(a.a + (b.a - a.a) * amount)};
 }
+static void cui_content_semantic(cui_context *ui, cui_id id, cui_role role, cui_str name,
+                                 bool disabled, bool checked, float value) {
+    cui_interact(ui, id, role, name, disabled, checked, value);
+    cui_set_tab_stop(ui, id, false);
+}
 static cui_id cui_content_child(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x874e65fa19c80721) + UINT64_C(0x9e3779b97f4a7c15) * index);
 }
@@ -30,7 +35,7 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options
                             .border = accent,
                             .border_width = 1,
                             .background = cui_content_blend(t->surface, accent, .1f)});
-    cui_interact(ui, id, CUI_ROLE_LABEL, o.message, false, false, 0);
+    cui_content_semantic(ui, id, CUI_ROLE_ALERT, o.message, false, false, 0);
     cui_text(ui, o.icon.length ? o.icon : cui_string(kind), t->font_size * .8f * scale, accent);
     if (!o.banner && o.title.length)
         cui_text(ui, o.title, t->font_size * scale, t->text);
@@ -58,8 +63,8 @@ void cui_avatar(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
                             .background = t->primary,
                             .border = t->border,
                             .border_width = 1});
-    cui_interact(ui, id, CUI_ROLE_LABEL, name.length ? name : cui_string("Anonymous"), false, false,
-                 0);
+    cui_content_semantic(ui, id, CUI_ROLE_IMAGE, name.length ? name : cui_string("Anonymous"),
+                         false, false, 0);
     cui_text(ui, (cui_str){initials, n}, size * .38f, t->on_primary);
     cui_end_box(ui);
 }
@@ -101,7 +106,7 @@ void cui_empty(cui_context *ui, cui_id id, const cui_theme *t, cui_str title, cu
                             .border = t->border,
                             .border_width = 1,
                             .radius = t->radius});
-    cui_interact(ui, id, CUI_ROLE_LABEL, title, false, false, 0);
+    cui_content_semantic(ui, id, CUI_ROLE_GROUP, title, false, false, 0);
     if (title.length)
         cui_text(ui, title, t->font_size * 1.2f, t->text);
     if (description.length)
@@ -120,7 +125,7 @@ void cui_begin_group_box(cui_context *ui, cui_id id, const cui_theme *t, cui_str
                             .border_width = 1,
                             .radius = t->radius,
                             .background = t->surface});
-    cui_interact(ui, id, CUI_ROLE_LABEL, title, false, false, 0);
+    cui_content_semantic(ui, id, CUI_ROLE_GROUP, title, false, false, 0);
     if (title.length)
         cui_text(ui, title, t->font_size, t->text);
 }
@@ -136,7 +141,7 @@ void cui_kbd(cui_context *ui, cui_id id, const cui_theme *t, cui_str chord) {
                             .background = t->background,
                             .border = t->border,
                             .border_width = 1});
-    cui_interact(ui, id, CUI_ROLE_LABEL, chord, false, false, 0);
+    cui_content_semantic(ui, id, CUI_ROLE_LABEL, chord, false, false, 0);
     cui_text(ui, chord, t->font_size * .8f, t->text);
     cui_end_box(ui);
 }
@@ -149,7 +154,7 @@ void cui_spinner(cui_context *ui, cui_id id, const cui_theme *t, float size, flo
     unsigned head = reduced ? 0 : (unsigned)(phase * 8);
     const unsigned ring[9] = {0, 1, 2, 7, 8, 3, 6, 5, 4};
     cui_begin_box(ui, id, (cui_box){.width = size, .height = size});
-    cui_interact(ui, id, CUI_ROLE_LABEL, cui_string("Loading"), false, false, 0);
+    cui_content_semantic(ui, id, CUI_ROLE_STATUS, cui_string("Loading"), false, false, 0);
     for (unsigned y = 0; y < 3; ++y) {
         cui_begin_box(ui, cui_content_child(id, 1 + y),
                       (cui_box){.row = true, .width = size, .height = size / 3});
@@ -202,5 +207,82 @@ void cui_divider(cui_context *ui, cui_id id, const cui_theme *t, float length, b
                   (cui_box){.width = vertical ? 1 : length,
                             .height = vertical ? length : 1,
                             .background = t->border});
+    cui_end_box(ui);
+}
+static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme *t,
+                                    cui_hover_state *state, cui_str name, cui_hover_options o,
+                                    bool card) {
+    if (!ui || !t || !state)
+        return false;
+    size_t n = 0;
+    const cui_event *events = cui_frame_events(ui, &n);
+    bool escape = false;
+    for (size_t i = 0; i < n; ++i)
+        if (events[i].type == CUI_EVENT_KEY_DOWN && events[i].key == CUI_KEY_ESCAPE)
+            escape = true;
+    cui_id focused = cui_focused(ui);
+    cui_rect previous = cui_bounds(ui, id), focus_bounds = cui_bounds(ui, focused);
+    bool inside_focus = card && state->open && focused && focused != o.trigger &&
+                        focus_bounds.w > 0 && focus_bounds.h > 0 && focus_bounds.x >= previous.x &&
+                        focus_bounds.y >= previous.y &&
+                        focus_bounds.x + focus_bounds.w <= previous.x + previous.w &&
+                        focus_bounds.y + focus_bounds.h <= previous.y + previous.h;
+    bool changed = cui_hover_update(
+        state, cui_hovered(ui, o.trigger), card && (cui_hovered(ui, id) || inside_focus),
+        focused == o.trigger, escape, o.disabled, o.dt, o.open_delay, o.close_delay);
+    if (changed || state->pending)
+        cui_invalidate(ui);
+    if (!state->open)
+        return false;
+    cui_rect anchor = cui_bounds(ui, o.trigger);
+    if (!isfinite(o.viewport.x) || !isfinite(o.viewport.y) || !isfinite(o.viewport.w) ||
+        !isfinite(o.viewport.h) || o.viewport.w <= 0 || o.viewport.h <= 0 || anchor.w <= 0 ||
+        anchor.h <= 0) {
+        state->open = false;
+        return false;
+    }
+    float width = cui_content_positive(o.width, card ? 240 : 200);
+    float height =
+        cui_content_positive(o.height, card ? 120 : t->font_size * 1.5f + t->padding * 2);
+    cui_popup_result placement =
+        cui_popup_place(anchor, (cui_size){width, height}, o.viewport, o.side, o.gap);
+    cui_begin_portal(ui, id,
+                     (cui_box){.padding = t->padding,
+                               .gap = t->gap,
+                               .radius = t->radius,
+                               .background = t->surface,
+                               .border = t->border,
+                               .border_width = 1,
+                               .clip = true},
+                     placement.bounds, card ? 110 : 120);
+    cui_content_semantic(ui, id, card ? CUI_ROLE_GROUP : CUI_ROLE_LABEL, name, false, false, 0);
+    cui_set_semantic_details(ui, id, (cui_semantic_details){.parent = o.trigger});
+    if (!card) {
+        size_t semantic_count = 0;
+        const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+        for (size_t i = 0; i < semantic_count; ++i) {
+            if (semantics[i].id == o.trigger) {
+                cui_semantic_details details = semantics[i].details;
+                details.description = name;
+                cui_set_semantic_details(ui, o.trigger, details);
+                break;
+            }
+        }
+    }
+    return true;
+}
+bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state *state,
+                 cui_str text, cui_hover_options options) {
+    if (!cui_content_hover_panel(ui, id, t, state, text, options, false))
+        return false;
+    cui_text(ui, text, t->font_size, t->text);
+    cui_end_box(ui);
+    return true;
+}
+bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state *state,
+                          cui_str name, cui_hover_options options) {
+    return cui_content_hover_panel(ui, id, t, state, name, options, true);
+}
+void cui_end_hover_card(cui_context *ui) {
     cui_end_box(ui);
 }

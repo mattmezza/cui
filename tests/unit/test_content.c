@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_components.h"
 #include "cui/cui_content.h"
 #include <assert.h>
 #include <math.h>
@@ -36,6 +37,8 @@ static void models(void) {
     assert(!cui_hover_update(&s, true, false, false, false, false, .5f, .3f, .2f) && s.open &&
            !s.pending);
     assert(cui_hover_update(&s, false, false, false, true, false, 0, .3f, .2f) && !s.open);
+    assert(!cui_hover_update(&s, false, false, true, false, false, 0, 0, .2f) && !s.open);
+    assert(!cui_hover_update(&s, false, false, false, false, false, 0, 0, .2f));
     assert(cui_hover_update(&s, false, false, true, false, false, 0, 0, .2f) && s.open);
     assert(cui_hover_update(&s, true, true, true, false, true, .5f, .3f, .2f) && !s.open);
     assert(!cui_hover_update(&s, true, false, false, false, false, NAN, .3f, .2f) &&
@@ -70,7 +73,88 @@ static cui_draw_list scene(cui_context *ui, const cui_theme *t, bool *visible, f
     assert(cui_last_error(ui) == CUI_OK);
     return list;
 }
+static cui_draw_list hover_scene(cui_context *ui, const cui_theme *t, cui_hover_state *s, bool card,
+                                 float dt, bool disabled) {
+    assert(cui_begin_frame(ui, 300, 180, dt));
+    cui_begin_box(ui, 40, (cui_box){.width = 300, .height = 40, .padding = 4, .clip = true});
+    cui_button(ui, 41, t, cui_string("Help"), disabled);
+    cui_set_semantic_details(ui, 41, (cui_semantic_details){.required = true});
+    cui_hover_options options = {.trigger = 41,
+                                 .side = CUI_POPUP_ABOVE,
+                                 .viewport = {0, 0, 300, 180},
+                                 .width = 140,
+                                 .height = 40,
+                                 .gap = 8,
+                                 .dt = dt,
+                                 .open_delay = .2f,
+                                 .close_delay = .2f,
+                                 .disabled = disabled};
+    if (card) {
+        if (cui_begin_hover_card(ui, 42, t, s, cui_string("Details"), options)) {
+            cui_text(ui, cui_string("Details body"), t->font_size, t->text);
+            cui_end_hover_card(ui);
+        }
+    } else
+        cui_tooltip(ui, 42, t, s, cui_string("Help text"), options);
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return list;
+}
+static void hover_panels(void) {
+    cui_theme t = cui_theme_light();
+    for (unsigned card = 0; card < 2; ++card) {
+        cui_context *ui = cui_create((cui_config){.width = 300, .height = 180});
+        assert(ui);
+        cui_hover_state s = {0};
+        hover_scene(ui, &t, &s, card, 0, false);
+        cui_rect trigger = cui_bounds(ui, 41);
+        cui_queue_event(
+            ui,
+            (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = trigger.x + 2, .y = trigger.y + 2});
+        hover_scene(ui, &t, &s, card, .1f, false);
+        assert(!s.open && s.pending);
+        cui_draw_list list = hover_scene(ui, &t, &s, card, .11f, false);
+        assert(s.open);
+        cui_rect panel = cui_bounds(ui, 42);
+        assert(panel.w == 140 && panel.h == 40 && panel.y >= 40);
+        bool visible = false;
+        for (size_t i = 0; i < list.count; ++i) {
+            const cui_draw_command *c = &list.commands[i];
+            if (c->type == CUI_DRAW_TEXT && c->bounds.y >= 40)
+                visible = true;
+        }
+        assert(visible);
+        size_t n;
+        const cui_semantic *sem = cui_semantics(ui, &n);
+        assert(n == 2 && sem[1].details.parent == 41 && sem[0].details.required);
+        if (!card)
+            assert(sem[0].details.description.length == 9);
+        assert(sem[1].tab_index == -1);
+        cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = panel.x + 2, .y = panel.y + 2});
+        hover_scene(ui, &t, &s, card, .1f, false);
+        hover_scene(ui, &t, &s, card, .11f, false);
+        assert(s.open == (bool)card);
+        if (card) {
+            cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE});
+            hover_scene(ui, &t, &s, true, 0, false);
+            assert(!s.open && s.suppressed);
+        }
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 290, .y = 170});
+        hover_scene(ui, &t, &s, card, 0, false);
+        assert(!s.suppressed);
+        cui_focus(ui, 41);
+        hover_scene(ui, &t, &s, card, .3f, false);
+        assert(s.open);
+        hover_scene(ui, &t, &s, card, 0, true);
+        assert(!s.open);
+        cui_destroy(ui);
+    }
+}
+
 int main(void) {
+    hover_panels();
     models();
     cui_context *ui = cui_create((cui_config){.width = 800, .height = 1000});
     assert(ui);

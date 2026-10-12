@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_CONTENT_H
 #define CUI_CONTENT_H
+#include "cui_base.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -55,12 +56,28 @@ void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *theme, float widt
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *theme, float length, bool vertical);
 /* Shared delayed lifecycle for hover cards/tooltips, independent of styling. */
 typedef struct {
-    bool open, pending, target;
+    bool open, pending, target, suppressed;
     float elapsed;
 } cui_hover_state;
 bool cui_hover_update(cui_hover_state *state, bool trigger_hovered, bool content_hovered,
                       bool focused, bool escape, bool disabled, float dt, float open_delay,
                       float close_delay);
+typedef struct {
+    cui_id trigger;
+    cui_rect viewport;
+    cui_popup_side side;
+    float width, height, gap, dt, open_delay, close_delay;
+    bool disabled;
+} cui_hover_options;
+/* Trigger must already have been submitted. State is persistent/application-owned.
+ * Explicit dimensions clip content, flip at viewport edges, and bound placement. */
+bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_state *state,
+                 cui_str text, cui_hover_options options);
+/* Pair end only when begin returns true; accepts arbitrary children without a
+ * modal focus trap. Hover/focus inside the open card extends its lifetime. */
+bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *theme,
+                          cui_hover_state *state, cui_str name, cui_hover_options options);
+void cui_end_hover_card(cui_context *ui);
 #ifdef __cplusplus
 }
 #endif

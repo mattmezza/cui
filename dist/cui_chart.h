@@ -3032,6 +3032,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
                 } else if (o->kind == CUI_CHART_SANKEY) {
                     row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
+                } else if (o->kind == CUI_CHART_BAR) {
+                    row_label[row_count] = name;
+                    row_swatch[row_count] = o->bar_gradient_start.a ? o->bar_gradient_start
+                                            : datum->color.a        ? datum->color
+                                                                    : o->series[0];
                 } else {
                     row_label[row_count] = series ? o->extra_series[series - 1].name : name;
                     row_swatch[row_count] = series && o->extra_series[series - 1].color.a

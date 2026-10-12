@@ -57,6 +57,28 @@
       "passed": 2,
       "total": 2,
       "log": "sanitizers-root-overlay-5ccee5a.txt"
+    },
+    {
+      "name": "Portable styled font metrics: native branch suite",
+      "source": "7fdfe35",
+      "passed": 75,
+      "total": 75,
+      "log": "native-font-metrics-7fdfe35.txt"
+    },
+    {
+      "name": "Portable styled font metrics: core/render/gallery sanitizers",
+      "source": "7fdfe35",
+      "passed": 3,
+      "total": 3,
+      "log": "sanitizers-font-metrics-7fdfe35.txt"
+    },
+    {
+      "name": "Composition-owned editor keys: native branch suite",
+      "source": "17cf96b",
+      "passed": 75,
+      "total": 75,
+      "log": "native-editor-ime-17cf96b.txt",
+      "failing_before": "editor-ime-before-17cf96b.txt"
     }
   ]
 }

@@ -1,0 +1,1 @@
+cui-ime-edit-before: tests/unit/test_edit.c:272: test_composition_keys: Assertion `after.cursor == before.cursor && after.anchor == before.anchor && after.revision == before.revision && !strcmp(buffer, "ab\ncd")' failed.

@@ -162,6 +162,7 @@ typedef struct {
     bool focusable;
     /* Primary pointer activation without opting into focus or keyboard activation. */
     bool pointer_activatable;
+    bool handles_tab; /* Focused editable control consumes Tab and Shift-Tab itself. */
     cui_cursor cursor;
     bool no_focus; /* Suppress role-default focus; pointer activation remains opt-in. */
 } cui_semantic_details;
@@ -6071,9 +6072,19 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->capture = 0;
             ui->space_capture = 0;
         } else if (e.type == CUI_EVENT_KEY_DOWN && !e.repeat) {
-            if (e.key == CUI_KEY_TAB)
-                cui_core_tab(ui, (e.modifiers & CUI_MOD_SHIFT) != 0);
-            else if (e.key == CUI_KEY_ENTER)
+            if (e.key == CUI_KEY_TAB) {
+                bool handled = false;
+                if (!(e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))
+                    for (size_t n = 0; n < ui->previous_count; n++)
+                        if (ui->previous[n].id == ui->focus &&
+                            ui->previous[n].details.handles_tab && !ui->previous[n].disabled &&
+                            cui_core_previous_allowed(ui, n)) {
+                            handled = true;
+                            break;
+                        }
+                if (!handled)
+                    cui_core_tab(ui, (e.modifiers & CUI_MOD_SHIFT) != 0);
+            } else if (e.key == CUI_KEY_ENTER)
                 cui_core_activate(ui, ui->focus);
             else if (e.key == CUI_KEY_SPACE)
                 ui->space_capture = ui->focus;

@@ -51,6 +51,10 @@ cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
  * selection. Undo restores the original selection; success collapses it after
  * the inserted text. Rejection leaves text, selection and history unchanged. */
 cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui_str text);
+/* Indent selected lines (inclusive of a selection ending at line start), or
+ * insert at the collapsed cursor. Outdent removes only an exact line prefix.
+ * One successful change is one undo step with both selection endpoints mapped. */
+cui_edit_result cui_edit_indent(cui_edit *, bool outdent, size_t tab_size, bool hard_tabs);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);
@@ -331,6 +335,97 @@ cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
         return CUI_EDIT_INVALID_ARGUMENT;
     return cui_edit_private_replace(e, text, e->cursor < e->anchor ? e->cursor : e->anchor,
                                     e->cursor > e->anchor ? e->cursor : e->anchor);
+}
+static bool cui_edit_private_indent_match(const cui_edit *e, size_t at, size_t width,
+                                          bool hard_tabs) {
+    if (width > e->length - at)
+        return false;
+    for (size_t i = 0; i < width; i++)
+        if (e->config.buffer[at + i] != (hard_tabs ? '\t' : ' '))
+            return false;
+    return true;
+}
+static size_t cui_edit_private_line_start(const cui_edit *e, size_t at) {
+    while (at && e->config.buffer[at - 1] != '\n')
+        at--;
+    return at;
+}
+static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t anchor,
+                                           size_t cursor) {
+    cui_edit_private_save_state(e);
+    memcpy(e->config.buffer, e->scratch, length + 1);
+    e->length = length;
+    e->anchor = anchor;
+    e->cursor = cursor;
+    e->revision++;
+    cui_edit_private_record(e);
+}
+cui_edit_result cui_edit_indent(cui_edit *e, bool outdent, size_t tab_size, bool hard_tabs) {
+    if (!e || !e->config.multiline || !tab_size || tab_size > 4096)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t unit = hard_tabs ? 1 : tab_size;
+    bool block = e->anchor != e->cursor;
+    if (!block && !outdent) {
+        if (unit > e->config.capacity - 1 - e->length)
+            return CUI_EDIT_CAPACITY;
+        size_t at = e->cursor;
+        memcpy(e->scratch, e->config.buffer, at);
+        memset(e->scratch + at, hard_tabs ? '\t' : ' ', unit);
+        memcpy(e->scratch + at + unit, e->config.buffer + at, e->length - at + 1);
+        cui_edit_private_indent_commit(e, e->length + unit, at + unit, at + unit);
+        return CUI_EDIT_OK;
+    }
+    size_t first = e->anchor < e->cursor ? e->anchor : e->cursor;
+    size_t last = e->anchor > e->cursor ? e->anchor : e->cursor;
+    size_t first_line = cui_edit_private_line_start(e, first);
+    size_t last_line = cui_edit_private_line_start(e, last);
+    size_t edits = 0;
+    for (size_t at = first_line; at <= last_line;) {
+        if (!outdent || cui_edit_private_indent_match(e, at, unit, hard_tabs))
+            edits++;
+        size_t next = at;
+        while (next < e->length && e->config.buffer[next] != '\n')
+            next++;
+        if (next == e->length)
+            break;
+        at = next + 1;
+    }
+    if (!edits)
+        return CUI_EDIT_OK;
+    if (!outdent && edits > (e->config.capacity - 1 - e->length) / unit)
+        return CUI_EDIT_CAPACITY;
+    size_t mapped_anchor = e->anchor, mapped_cursor = e->cursor;
+    size_t output = 0;
+    for (size_t at = 0; at <= e->length;) {
+        bool line_start = !at || e->config.buffer[at - 1] == '\n';
+        bool selected = line_start && at >= first_line && at <= last_line;
+        if (selected && (!outdent || cui_edit_private_indent_match(e, at, unit, hard_tabs))) {
+            if (outdent) {
+                if (e->anchor >= at + unit)
+                    mapped_anchor -= unit;
+                else if (e->anchor >= at)
+                    mapped_anchor = output;
+                if (e->cursor >= at + unit)
+                    mapped_cursor -= unit;
+                else if (e->cursor >= at)
+                    mapped_cursor = output;
+                at += unit;
+            } else {
+                if (e->anchor >= at)
+                    mapped_anchor += unit;
+                if (e->cursor >= at)
+                    mapped_cursor += unit;
+                memset(e->scratch + output, hard_tabs ? '\t' : ' ', unit);
+                output += unit;
+            }
+        }
+        if (at == e->length)
+            break;
+        e->scratch[output++] = e->config.buffer[at++];
+    }
+    e->scratch[output] = 0;
+    cui_edit_private_indent_commit(e, output, mapped_anchor, mapped_cursor);
+    return CUI_EDIT_OK;
 }
 static cui_edit_result cui_edit_private_erase(cui_edit *e, bool backwards) {
     if (!e)

@@ -91,6 +91,18 @@ static void behavior(void) {
         assert(s.x == 96 && s.y == 48);
         cui_rect row = cui_bounds(ui, 102);
         assert(row.x == -96 && row.y == 32);
+        for (unsigned precise = 0; precise < 2; ++precise) {
+            float delta = precise ? .5f : -.5f;
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                                   .x = 50,
+                                                   .y = 50,
+                                                   .dx = delta,
+                                                   .dy = delta,
+                                                   .scroll_precise = true,
+                                                   .scroll_phase = CUI_SCROLL_PHASE_MOVED}));
+            scene(ui, &themes[i], &s, o);
+            assert(s.x == (precise ? 96 : 96.5f) && s.y == (precise ? 48 : 48.5f));
+        }
         pointer(ui, CUI_EVENT_POINTER_DOWN, 10, 10);
         scene(ui, &themes[i], &s, o);
         assert(cui_focused(ui) == 101); /* Row 0 is outside the clipped viewport. */
@@ -139,11 +151,27 @@ static void behavior(void) {
         cui_destroy(ui);
     }
 }
+static void consumed_wheel(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_scroll_state state = {0};
+    cui_scroll_options options = {
+        .width = 200, .height = 120, .content_height = 400, .vertical = true};
+    cui_theme theme = {0};
+    scene(ui, &theme, &state, options);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 50, .y = 50, .dy = -1}));
+    assert(cui_begin_frame(ui, 400, 300, 0));
+    assert(cui_event_target(ui, 0) == 1 && cui_consume_event(ui, 0));
+    cui_base_scrollable(ui, 1, &state, options);
+    cui_end_frame(ui);
+    assert(state.y == 0);
+    cui_destroy(ui);
+}
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+    consumed_wheel();
     behavior();
     return 0;
 }

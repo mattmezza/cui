@@ -201,6 +201,8 @@ int main(int argc, char **argv) {
     if (driver && (!strcmp(driver, "dummy") || !strcmp(driver, "offscreen")))
         assert(info.actions == (1u << CUI_WINDOW_CLOSE));
     bool decorated = cui_sdl3_set_decorated(s, false);
+    if (driver && (!strcmp(driver, "dummy") || !strcmp(driver, "offscreen")))
+        assert(!decorated);
     if (driver && strcmp(driver, "dummy") && strcmp(driver, "offscreen"))
         assert(decorated);
     if (decorated) {

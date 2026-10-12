@@ -128,8 +128,9 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count && !o.disabled; ++i)
-        if (events[i].type == CUI_EVENT_SCROLL && cui_event_target(ui, i) == id) {
-            float step = cui_scroll_positive(o.wheel_step, 48);
+        if (events[i].type == CUI_EVENT_SCROLL && !cui_event_consumed(ui, i) &&
+            cui_event_target(ui, i) == id) {
+            float step = events[i].scroll_precise ? 1 : cui_scroll_positive(o.wheel_step, 48);
             if (o.horizontal && isfinite(events[i].dx))
                 s->x = cui_scroll_limit(s->x - events[i].dx * step, g.maximum_x);
             if (o.vertical && isfinite(events[i].dy))

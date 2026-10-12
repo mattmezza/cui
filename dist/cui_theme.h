@@ -54,6 +54,7 @@ typedef struct {
     void *icon_loader_user;
     uint64_t icon_revision; /* Increment when the same loader supplies new artwork. */
     cui_color caret;
+    cui_color group_box, group_box_foreground;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -138,6 +139,12 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
                                 (uint8_t)((9u * t.background.b + t.primary.b) / 10u), 51};
     t.selection = cui_theme_opacity(t.primary, .3f);
     t.caret = t.text;
+    unsigned group_alpha = t.background.r + t.background.g + t.background.b < 384 ? 3 : 4;
+    t.group_box = (cui_color){
+        (uint8_t)(((10 - group_alpha) * t.background.r + group_alpha * t.secondary.r) / 10),
+        (uint8_t)(((10 - group_alpha) * t.background.g + group_alpha * t.secondary.g) / 10),
+        (uint8_t)(((10 - group_alpha) * t.background.b + group_alpha * t.secondary.b) / 10), 255};
+    t.group_box_foreground = t.text;
     t.list_active_highlight = true;
     t.description_list_label = (cui_color){(uint8_t)((4u * t.background.r + t.border.r) / 5u),
                                            (uint8_t)((4u * t.background.g + t.border.g) / 5u),

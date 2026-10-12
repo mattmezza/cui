@@ -56,6 +56,27 @@ static void test_event_scope(void) {
     assert(!cui_event_within_scope(ui, 0, 900));
     cui_destroy(ui);
 }
+static void test_scroll_gesture_metadata(void) {
+    cui_context *ui = make();
+    for (unsigned phase = CUI_SCROLL_PHASE_STARTED; phase <= CUI_SCROLL_PHASE_CANCELLED; ++phase)
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .scroll_precise = true,
+                                               .scroll_phase = (cui_scroll_phase)phase}));
+    begin(ui);
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    assert(count == 4);
+    for (size_t i = 0; i < count; ++i)
+        assert(events[i].scroll_precise && events[i].scroll_phase == (cui_scroll_phase)(i + 1) &&
+               events[i].dx == 0 && events[i].dy == 0);
+    cui_begin_box(ui, 1, (cui_box){.width = 100, .height = 40});
+    cui_interact(ui, 1, CUI_ROLE_GROUP, cui_string("Gallery"), false, false, 0);
+    assert(cui_set_semantic_role(ui, 1, CUI_ROLE_REGION));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_semantics(ui, &count)[0].role == CUI_ROLE_REGION && count == 1);
+    cui_destroy(ui);
+}
 static void test_activation_cancellation(void) {
     cui_context *ui = make();
     begin(ui);
@@ -1993,6 +2014,7 @@ int main(void) {
     test_underlay_order_and_layout();
     test_underlay_capacity_and_hidden();
     test_table_semantic_roles();
+    test_scroll_gesture_metadata();
     test_event_scope();
     test_activation_cancellation();
     test_input();

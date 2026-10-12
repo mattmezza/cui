@@ -65,6 +65,13 @@ typedef enum {
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
 typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
+typedef enum {
+    CUI_SCROLL_PHASE_NONE,
+    CUI_SCROLL_PHASE_STARTED,
+    CUI_SCROLL_PHASE_MOVED,
+    CUI_SCROLL_PHASE_ENDED,
+    CUI_SCROLL_PHASE_CANCELLED
+} cui_scroll_phase;
 typedef struct {
     cui_event_type type;
     float x, y, dx, dy;
@@ -73,6 +80,10 @@ typedef struct {
     bool repeat;
     cui_pointer_button pointer_button; /* Zero preserves primary-button initializers. */
     char text[64];
+    /* Optional host gesture metadata. Zero preserves legacy wheel steps.
+     * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
+    bool scroll_precise;
+    cui_scroll_phase scroll_phase;
 } cui_event;
 typedef enum {
     CUI_ROLE_NONE,
@@ -115,7 +126,8 @@ typedef enum {
     CUI_ROLE_LISTITEM,
     CUI_ROLE_LOG,
     CUI_ROLE_TOOLBAR,
-    CUI_ROLE_SEPARATOR
+    CUI_ROLE_SEPARATOR,
+    CUI_ROLE_REGION
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,

@@ -1650,7 +1650,7 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
-        role > CUI_ROLE_SEPARATOR)
+        role > CUI_ROLE_REGION)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {

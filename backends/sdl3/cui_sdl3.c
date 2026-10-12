@@ -592,5 +592,8 @@ cui_window_host cui_sdl3_window_interface(cui_sdl3 *s) {
     return (cui_window_host){s, cui_sdl3_window_query, cui_sdl3_window_perform};
 }
 bool cui_sdl3_set_decorated(cui_sdl3 *s, bool decorated) {
-    return s && s->window && SDL_SetWindowBordered(s->window, decorated);
+    const char *driver = SDL_GetCurrentVideoDriver();
+    if (!s || !s->window || !driver || !strcmp(driver, "dummy") || !strcmp(driver, "offscreen"))
+        return false;
+    return SDL_SetWindowBordered(s->window, decorated);
 }

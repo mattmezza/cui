@@ -2,6 +2,18 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
+const textBaselineOffsets=new Map();
+function textBaselineOffset(size){
+ let offset=textBaselineOffsets.get(size);
+ if(offset!==undefined)return offset;
+ ctx.font=`${size}px system-ui`;ctx.textBaseline='alphabetic';
+ const metrics=ctx.measureText('Hg');
+ const ascent=Number.isFinite(metrics.fontBoundingBoxAscent)?metrics.fontBoundingBoxAscent:metrics.actualBoundingBoxAscent||size*.8;
+ const descent=Number.isFinite(metrics.fontBoundingBoxDescent)?metrics.fontBoundingBoxDescent:metrics.actualBoundingBoxDescent||size*.2;
+ // CUI already moves explicit line-height commands into their natural text line box.
+ offset=(size*1.25-ascent-descent)/2+ascent;
+ textBaselineOffsets.set(size,offset);return offset;
+}
 const bitmapCache=new Map();let bitmapCacheBytes=0;
 function cacheBitmap(key,bitmap,bytes){
  if(bytes>16*1024*1024)return;
@@ -154,7 +166,7 @@ function render(){
   if(type===3){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();clips++;continue;}
   if(type===4){if(clips){ctx.restore();clips--;}continue;}
   ctx.fillStyle=ctx.strokeStyle=`rgba(${f(5)},${f(6)},${f(7)},${f(8)/255})`;
-  if(type===2){ctx.font=`${f(11)}px system-ui`;ctx.textBaseline='top';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y);}
+  if(type===2){const size=f(11);ctx.font=`${size}px system-ui`;ctx.textBaseline='alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+textBaselineOffset(size));}
   else if(w>0&&h>0){
    const radii=(f(12)?[f(13),f(14),f(16),f(15)]:[f(9),f(9),f(9),f(9)]).map(r=>Math.min(Math.max(0,r),Math.min(w,h)/2));
    if(type===5){paintBitmap(i,x,y,w,h,radii);continue;}
@@ -267,7 +279,8 @@ function selectComponent(){
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['message-alignment','message-variant','message-inset','message-avatar-control'])$(id).hidden=selected.name!=='Message';
  $('checkbox-state').hidden=selected.name!=='Checkbox';
- $('control-size').hidden=!['Checkbox','Radio','Switch','Toggle'].includes(selected.name);
+ $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox'].includes(selected.name);
+ $('control-size').value='0';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
  for(const id of ['switch-side-control','switch-color-control'])$(id).hidden=selected.name!=='Switch';
  for(const id of ['toggle-variant','toggle-segmented-control','toggle-selection'])$(id).hidden=selected.name!=='Toggle';

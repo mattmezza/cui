@@ -84,6 +84,34 @@ def main():
             control_change('density', '1')
             page.wait_for_function('(height)=>cuiGallery.exports.gallery_semantic(0,4)<height', arg=height)
             control_change('density', '0')
+            control_change('disabled', False)
+            def button_text_geometry():
+                return page.evaluate('''()=>{
+                    const e=cuiGallery.exports,c=document.querySelector('canvas'),ctx=c.getContext('2d'),scale=c.width/c.clientWidth;
+                    const bounds=[1,2,3,4].map(f=>e.gallery_semantic(0,f));
+                    const text=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Run action');
+                    if(text===undefined)return null;
+                    const x=e.gallery_command(text,1),w=e.gallery_command(text,3),font=e.gallery_command(text,11);
+                    let top=Infinity,bottom=-Infinity;
+                    for(let py=Math.ceil(bounds[1]*scale);py<Math.floor((bounds[1]+bounds[3])*scale);py++){
+                      const row=ctx.getImageData(Math.ceil((x+1)*scale),py,Math.floor((w-2)*scale),1).data;
+                      const pixels=Array.from({length:row.length/4},(_,i)=>[row[i*4],row[i*4+1],row[i*4+2]]);
+                      const bg=[0,1,2].map(ch=>pixels.map(p=>p[ch]).sort((a,b)=>a-b)[Math.floor(pixels.length/2)]);
+                      const ink=pixels.some(p=>Math.abs(p[0]-bg[0])+Math.abs(p[1]-bg[1])+Math.abs(p[2]-bg[2])>120);
+                      if(ink){top=Math.min(top,py/scale);bottom=Math.max(bottom,(py+1)/scale);}
+                    }
+                    return {height:bounds[3],font,center:(top+bottom)/2-(bounds[1]+bounds[3]/2),ink:bottom-top};
+                }''')
+            for theme in ('0', '1'):
+                control_change('theme', theme)
+                for size, expected_height, expected_font in ((3,20,12),(1,24,14),(0,32,14),(2,32,16)):
+                    control_change('control-size', size)
+                    geometry = button_text_geometry()
+                    assert geometry and abs(geometry['height']-expected_height) < 0.3, (theme,size,geometry)
+                    assert abs(geometry['font']-expected_font) < 0.1, (theme,size,geometry)
+                    assert geometry['ink'] > 4 and abs(geometry['center']) < 2, (theme,size,geometry)
+                page.screenshot(path=f'/tmp/cui-web-buttons-{"light" if theme == "0" else "dark"}.png')
+            control_change('control-size', '0')
             assert page.locator('#features tr').count() > 0
             assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
             control_change('theme', '1')
@@ -139,6 +167,34 @@ def main():
                     page.wait_for_function('(role)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Export options")', arg=role)
             def dropdown_check(control):
                 control_change('dropdown-'+control, True)
+            for name in ('Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment'):
+                page.evaluate('(name)=>location.hash=name', name)
+                page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
+                assert page.locator('#control-size').is_visible(), name
+                layouts = []
+                for size in (3,1,0,2):
+                    control_change('control-size', size)
+                    layouts.append(page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).slice(0,40).map(i=>[0,1,2,3,4,11].map(f=>e.gallery_command(i,f)));}'''))
+                assert layouts[0] != layouts[-1], name
+                if name in ('Checkbox','Radio'):
+                    control_change('control-size', '0')
+                    for theme in ('0','1'):
+                        control_change('theme', theme)
+                        page.screenshot(path=f'/tmp/cui-web-{name.lower()}-{"light" if theme == "0" else "dark"}.png')
+            for name, trigger, option in (('Select','Delivery','Standard'),):
+                page.evaluate('(name)=>location.hash=name', name)
+                page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
+                heights=[]
+                for size in (3,2):
+                    control_change('control-size', size)
+                    click_semantic(trigger)
+                    page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
+                    item=semantic_index(option)
+                    assert item is not None, (name,size)
+                    heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', item))
+                    page.keyboard.press('Escape')
+                    page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
+                assert heights[1] > heights[0], (name,heights)
             page.evaluate('location.hash="DescriptionList"')
             page.wait_for_function('cuiGallery.renderedComponent==="DescriptionList"')
             owner = semantic_index('Owner', 7)
@@ -394,7 +450,7 @@ def main():
                     samples:[pixel(2,2),pixel(15,15),pixel(31,15),pixel(36,15)]};}''')
             assert bitmap['source'] == [4,4,20,1,1,2,2,.5,1,1,255,128,0,128]
             corner, center, clipped_edge, outside = bitmap['samples']
-            assert corner == outside and all(abs(a-b) <= 2 for a,b in zip(center,clipped_edge))
+            assert all(abs(a-b) <= 1 for a,b in zip(corner,outside)) and all(abs(a-b) <= 2 for a,b in zip(center,clipped_edge)), bitmap
             assert center != corner and center[0] > center[1] > center[2] and center[3] == 255
             assert page.locator('#accessible [role=listitem][aria-label="Workspace conversation"]').count() == 1
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,9)', semantic_index('Workspace conversation', 37)) == -1

@@ -118,6 +118,9 @@ static void resizable_content(cui_context *context, void *user) {
 }
 static cui_check_state check_state;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
+static int gallery_xsmall_second_size(void) {
+    return control_size == 1 ? 2 : control_size == 2 ? 3 : control_size == 3 ? 1 : 0;
+}
 static int switch_label_left, switch_custom_color, toggle_variant, toggle_segmented,
     toggle_selection_mode;
 static cui_switch_state gallery_switch_state;
@@ -224,7 +227,7 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
         options.name = cui_string(name);
         options.model.status =
             index ? CUI_ATTACHMENT_COMPLETE : (cui_attachment_status)attachment_status;
-        options.model.size = CUI_MEDIA_MEDIUM;
+        options.model.size = (cui_media_size)gallery_xsmall_second_size();
         options.model.width = 260;
         options.model.vertical = attachment_vertical != 0;
         options.model.identified = true;
@@ -906,7 +909,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 0: {
         char label[64];
-        if (cui_button(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"), disabled))
+        if (cui_button_ex(
+                ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                (cui_button_options){.size = (cui_control_size)control_size, .disabled = disabled}))
             clicks++;
         snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
@@ -1138,7 +1143,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 56: {
         cui_tag_options options = {.variant = (cui_tag_variant)tag_variant,
-                                   .size = compact_density ? CUI_STATUS_SMALL : CUI_STATUS_MEDIUM,
+                                   .size = (cui_status_size)gallery_xsmall_second_size(),
                                    .outline = tag_outline,
                                    .pill = tag_pill,
                                    .background = {29, 100, 220, 255},
@@ -1196,7 +1201,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_otp(ui, cui_id_from(ui, "verification-code"), &t, &otp_state,
                     (cui_otp_options){.name = cui_string("Verification code"),
                                       .groups = (size_t)otp_groups,
-                                      .size = compact_density ? CUI_OTP_SMALL : CUI_OTP_MEDIUM,
+                                      .size = (cui_otp_size)gallery_xsmall_second_size(),
                                       .disabled = disabled,
                                       .now_seconds = host_seconds});
         next_wake = result.next_wake_seconds;
@@ -1241,7 +1246,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             &group_state, addons, 4,
             (cui_input_group_options){
                 .width = width > 460 ? 400 : width - 48,
-                .size = compact_density ? CUI_FORM_SMALL : CUI_FORM_MEDIUM,
+                .size = (cui_form_size)gallery_xsmall_second_size(),
                 .name = cui_string("Workspace address"),
                 .placeholder = cui_string("workspace"),
                 .input = {.disabled = disabled || group_mode == 2, .readonly = group_mode == 1}});
@@ -1295,6 +1300,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_form(ui, cui_id_from(ui, "profile-form"), &t, fields, 2,
                  (cui_form_options){.width = width - 48,
                                     .columns = width > 580 ? 2 : 1,
+                                    .size = (cui_form_size)gallery_xsmall_second_size(),
                                     .name = cui_string("Profile form"),
                                     .render_footer = form_footer,
                                     .footer_user = &save_disabled});
@@ -1923,6 +1929,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_choice_popup_options options = {.disabled = disabled,
                                             .viewport = {0, 0, width, height},
                                             .width = width > 360 ? 280 : width - 48,
+                                            .size = (cui_list_size)control_size,
                                             .dt = host_dt};
         if (story == 30 && multiple_mode)
             cui_list_multi(ui, cui_id_from(ui, "list"), &t, items, 3, multi_selected, &list_state,
@@ -1995,6 +2002,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_choice_popup_options options = {.disabled = disabled,
                                             .viewport = {0, 0, width, height},
                                             .width = width > 360 ? 280 : width - 48,
+                                            .size = (cui_list_size)control_size,
                                             .dt = host_dt};
         if (multiple_mode) {
             bool filtered_selected[4];
@@ -2711,7 +2719,8 @@ int gallery_checkbox_state(int state) {
 }
 void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
                              int custom_color, int variant, int segmented, int multiple) {
-    control_size = size;
+    control_size =
+        size >= CUI_CONTROL_MEDIUM && size <= CUI_CONTROL_XSMALL ? size : CUI_CONTROL_MEDIUM;
     choice_required = required;
     choice_invalid = invalid;
     choice_skip_tab = skip_tab;

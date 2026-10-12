@@ -262,7 +262,7 @@
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "web_wasm": "tested_partial"
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity."
@@ -1212,7 +1212,7 @@
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "web_wasm": "tested_partial"
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity."

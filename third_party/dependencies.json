@@ -20,5 +20,28 @@
       "third_party/sokol/sokol_gfx.h": "e23802d543747b1d24b4ab76e52634fb8b0a4a30afdb9f1437f63814f6bc77d7",
       "third_party/sokol/LICENSE": "72f9367756dba68918b8955092c14503934681862eee33cc16495a02f40025ef"
     }
+  },
+  {
+    "name": "NanoSVG",
+    "version": "239e102ec2c691f2902e20ace2ed36ee4a35cfe6",
+    "source": "https://github.com/memononen/nanosvg",
+    "license": "Zlib",
+    "license_file": "third_party/nanosvg/LICENSE",
+    "sha256": {
+      "third_party/nanosvg/LICENSE": "e82bc3dd03400aecabe12201219ba14750dbc4b36faab58663a7a6068548d372",
+      "third_party/nanosvg/nanosvg.h": "e34fd5d084be106cea972d19ce5d27fd96d17ba89f8d06bdceee058420c8b2b0",
+      "third_party/nanosvg/nanosvgrast.h": "79a9c5f4db19debf9f3a648a1589e96d92854f245a5cb4f3d823f263785234d8"
+    }
+  },
+  {
+    "name": "GPUI Kit icon assets / Lucide",
+    "version": "87d10ae5e1299d1be18670a37570c5402f952e34 / Lucide1.43.0",
+    "source": "https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34/crates/assets",
+    "license": "ISC AND MIT AND Apache-2.0",
+    "license_file": "third_party/gpui_icons/LICENSE",
+    "sha256": {
+      "third_party/gpui_icons/LICENSE": "b5cffdd1e4fe552cc8fd313f44b37934af270154aa40da8589ed38a170aeee79",
+      "third_party/gpui_icons/icons.json": "f808ffcbc065cf1d45e40fda99e6ade248c0408d28d34357b1f6729ce7dd7ce3"
+    }
   }
 ]

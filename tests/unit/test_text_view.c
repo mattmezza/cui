@@ -455,6 +455,33 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_nested_table_structure(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state, text("10. parent\n    - child\n\n    | a | b |\n    | --- | --- |\n    | "
+                              "x | y |\n\n    after\n11. next")) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 8 && f.blocks[2].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+           f.blocks[2].list_parent == 0 && f.blocks[5].list_parent == 0 &&
+           f.blocks[6].list_parent == 0 && f.blocks[7].list_number == 11);
+    cui_text_view_layout_options o = {
+        .width = 400, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[2].table_frame.x == 16 && f.blocks[2].table_frame.w == 384 &&
+           f.blocks[2].bounds.x == 16 && f.blocks[3].bounds.x == 208 &&
+           f.blocks[6].bounds.y == f.blocks[2].table_frame.y + f.blocks[2].table_frame.h);
+    assert(cui_text_view_select(&f.state, 0, f.blocks[7].text.end));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "10. parent\n    | a | b |\n    | :-- | :-- |\n    | x | y |\n    "
+                           "after\n    - child\n11. next"));
+    assert(cui_text_view_set_text(&f.state, text("| a | b |\n| --- | --- |\n| x | y |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.state.height == f.blocks[0].table_frame.h);
+}
 static void test_list_image_structure(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1249,6 +1276,75 @@ static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *th
                       (cui_button_options){.size = CUI_CONTROL_SMALL}))
         ++action_clicks;
 }
+static void test_nested_table_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state,
+               text("- parent\n  - child\n\n  | abcdefghijklmnopqrstuvwxyz | "
+                    "abcdefghijklmnopqrstuvwxyz |\n  | --- | --- |\n  | x | y |\n\n  after")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 100;
+    o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    o.table_actions = table_controls;
+    action_count = 0;
+    cui_draw_list d = frame(ui, &f, o);
+    assert(action_count == 1 && f.blocks[2].table_frame.x == 16 && f.blocks[2].table_frame.w == 84);
+    bool frame_clip = false;
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_CLIP_PUSH && d.commands[i].bounds.x == 16 &&
+            d.commands[i].bounds.w == 84)
+            frame_clip = true;
+    assert(frame_clip);
+    cui_rect button = cui_bounds(ui, action_buttons[0]);
+    assert(button.x >= 16 && button.x + button.w <= 100 &&
+           button.y == f.blocks[2].table_frame.y + f.blocks[2].table_frame.h + 4);
+    unsigned before = action_clicks;
+    float x = button.x + button.w * .5f, y = button.y + button.h * .5f;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(action_clicks == before + 1);
+    o.table_actions = NULL;
+    o.scrollable = true;
+    o.height = 50;
+    frame(ui, &f, o);
+    frame(ui, &f, o);
+    f.state.scroll.y = f.blocks[2].table_frame.y;
+    frame(ui, &f, o);
+    float scroll_before = f.state.scroll.y;
+    float mask_x = f.state.viewport.x + f.blocks[2].table_frame.x + 4;
+    float mask_y = f.state.viewport.y + f.blocks[2].table_frame.y - scroll_before + 5;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = mask_x,
+                                           .y = mask_y,
+                                           .dx = -2,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_STARTED}));
+    frame(ui, &f, o);
+    assert(f.blocks[2].table_scroll.x == 2 && f.state.scroll.y == scroll_before);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = mask_x,
+                                           .y = mask_y,
+                                           .dy = -2,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_STARTED}));
+    frame(ui, &f, o);
+    assert(f.blocks[2].table_scroll.x == 2 && f.state.scroll.y == scroll_before + 2);
+    cui_destroy(ui);
+}
 static void test_wrapped_link_decoration_ids(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1683,6 +1779,7 @@ int main(void) {
     test_list_nonparagraph_blocks();
     test_quote_paragraph_lines();
     test_list_image_structure();
+    test_nested_table_structure();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1706,6 +1803,7 @@ int main(void) {
     test_quote_paragraph_paint();
     test_list_image_paint();
     test_wrapped_link_decoration_ids();
+    test_nested_table_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

@@ -530,6 +530,15 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                                  (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
             cui_rect action_bounds = {code ? 8 : 0, y, code ? fmaxf(1, s->width - 16) : s->width,
                                       b->actions_height};
+            if (!code) {
+                size_t first = i;
+                while (first > begin &&
+                       s->workspace.blocks[first - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                       s->workspace.blocks[first - 1].table == b->table)
+                    --first;
+                action_bounds.x = s->workspace.blocks[first].table_frame.x;
+                action_bounds.w = s->workspace.blocks[first].table_frame.w;
+            }
             if (action_bounds.y + action_bounds.h <= scroll || action_bounds.y >= scroll + viewport)
                 continue;
             action_bounds.x -= origin_x;

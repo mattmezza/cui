@@ -54,6 +54,37 @@ static unsigned toolbar_activations[4];
 static char toolbar_query_buffer[64] = "find";
 static cui_edit *toolbar_query;
 static cui_input_state toolbar_query_state;
+static int title_decoration, title_override, title_fullscreen;
+static bool title_maximized;
+static unsigned title_actions[7], title_closed;
+static cui_title_bar_state title_state;
+static cui_window_info title_query(void *user) {
+    (void)user;
+    return (cui_window_info){.decoration = (cui_window_decoration)title_decoration,
+                             .actions = title_decoration == CUI_WINDOW_CLIENT_DECORATED ? 127 : 0,
+                             .maximized = title_maximized,
+                             .fullscreen = title_fullscreen != 0};
+}
+static bool title_perform(void *user, cui_window_action action, float x, float y) {
+    (void)user;
+    (void)x;
+    (void)y;
+    if ((unsigned)action >= 7)
+        return false;
+    title_actions[action]++;
+    if (action == CUI_WINDOW_MAXIMIZE)
+        title_maximized = true;
+    if (action == CUI_WINDOW_RESTORE)
+        title_maximized = false;
+    redraw = true;
+    return true;
+}
+static void title_close(void *user) {
+    (void)user;
+    title_closed++;
+    redraw = true;
+}
+static cui_window_host title_host = {.query = title_query, .perform = title_perform};
 static void toolbar_activate(void *user) {
     (*(unsigned *)user)++;
 }
@@ -860,6 +891,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                           .custom_size = 20,
                                           .label = cui_string("Editing toolbar"),
                                           .disabled = disabled != 0});
+        break;
+    }
+    case 69: {
+        cui_chrome_item items[] = {
+            {.id = cui_id_from(ui, "title-workspace"), .text = cui_string("CUI workspace")},
+            {.id = cui_id_from(ui, "title-document"), .text = cui_string("Untitled document")}};
+        cui_title_bar(ui, cui_id_from(ui, "title-preview"), &t, &title_state, items, 2,
+                      (cui_title_bar_options){.width = width - 48,
+                                              .name = cui_string("Window title bar"),
+                                              .host = &title_host,
+                                              .on_close = title_override ? title_close : NULL});
         break;
     }
     case 0: {
@@ -2143,6 +2185,17 @@ unsigned gallery_toolbar_activations(unsigned index) {
 }
 unsigned gallery_toolbar_cursor(void) {
     return toolbar_query ? (unsigned)cui_edit_get_state(toolbar_query).cursor : 0;
+}
+void gallery_title_options(int decoration, int override_close, int fullscreen) {
+    title_decoration =
+        decoration >= CUI_WINDOW_BROWSER && decoration <= CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS
+            ? decoration
+            : CUI_WINDOW_BROWSER;
+    title_override = override_close != 0;
+    title_fullscreen = fullscreen != 0;
+}
+unsigned gallery_title_action(unsigned index) {
+    return index < 7 ? title_actions[index] : index == 7 ? title_closed : title_maximized;
 }
 unsigned gallery_count(void) {
     return (unsigned)draw.count;

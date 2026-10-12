@@ -121,7 +121,7 @@ def main():
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
                 page.wait_for_timeout(50)
                 assert page.locator('#preview-card').is_visible(), name
-                assert 'draw commands' in page.locator('#preview-note').inner_text()
+                assert 'draw commands' in page.locator('#preview-note').inner_text(), (name, page.locator('#preview-note').inner_text(), errors)
             def semantic_index(name, role=None):
                 return page.evaluate('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', {'name':name,'role':role})
             def click_semantic(name, role=None):
@@ -251,6 +251,56 @@ def main():
             control_change('disabled', True)
             assert page.locator('#accessible [role=button][aria-label="Save"]').is_disabled()
             control_change('disabled', False)
+            page.evaluate('location.hash="TitleBar"')
+            page.wait_for_function('cuiGallery.renderedComponent==="TitleBar"')
+            title = semantic_index('Window title bar', 9)
+            assert title is not None
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', title)-34) < 1
+            assert page.locator('#accessible [role=button]').count() == 0
+            gradient = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_command(i,0)===5&&cuiGallery.exports.gallery_bitmap(i,1)===34)')
+            assert gradient is not None
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap(i,0)', gradient) == 1
+            control_change('title-decoration', '2')
+            assert all(semantic_index(name, 1) is not None for name in ('Minimize window', 'Maximize window', 'Close window'))
+            click_semantic('Minimize window', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_title_action(1)===1')
+            click_semantic('Maximize window', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_title_action(2)===1&&cuiGallery.exports.gallery_title_action(8)===1')
+            page.wait_for_function('document.querySelector(`#accessible [role=button][aria-label="Restore window"]`)!==null')
+            click_semantic('Restore window', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_title_action(3)===1&&cuiGallery.exports.gallery_title_action(8)===0')
+            close_actions = page.evaluate('cuiGallery.exports.gallery_title_action(4)')
+            control_change('title-close', True)
+            click_semantic('Close window', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_title_action(7)===1')
+            assert page.evaluate('cuiGallery.exports.gallery_title_action(4)') == close_actions
+            canvas.scroll_into_view_if_needed()
+            page.evaluate('y=>{const rect=document.querySelector("canvas").getBoundingClientRect(),header=document.querySelector("header").getBoundingClientRect(),target=rect.top+y;if(target<header.bottom+8)window.scrollBy(0,target-header.bottom-8);}', 41)
+            title_rect = canvas.bounding_box()
+            blank_x, blank_y = title_rect['x']+350, title_rect['y']+41
+            assert page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x':blank_x,'y':blank_y})
+            moves = page.evaluate('cuiGallery.exports.gallery_title_action(0)')
+            page.mouse.move(blank_x, blank_y)
+            page.mouse.down()
+            page.mouse.move(blank_x+20, blank_y, steps=3)
+            page.mouse.up()
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_title_action(0)===n+1', arg=moves)
+            menus = page.evaluate('cuiGallery.exports.gallery_title_action(5)')
+            page.mouse.click(blank_x, blank_y, button='right')
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_title_action(5)===n+1', arg=menus)
+            doubles = page.evaluate('cuiGallery.exports.gallery_title_action(6)')
+            page.mouse.click(blank_x, blank_y)
+            page.mouse.click(blank_x+1, blank_y)
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_title_action(6)===n+1', arg=doubles)
+            client_title_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('CUI workspace', 7))
+            control_change('title-decoration', '3')
+            assert page.locator('#accessible [role=button]').count() == 0
+            native_title_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('CUI workspace', 7))
+            assert native_title_x > client_title_x+60
+            control_change('title-fullscreen', True)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('CUI workspace', 7)) > native_title_x+10
+            control_change('title-decoration', '0')
+            assert page.locator('#accessible [role=button]').count() == 0
             page.evaluate('location.hash="Notification"')
             page.wait_for_function('cuiGallery.renderedComponent==="Notification"')
             control_change('notification-autohide', False)
@@ -1590,7 +1640,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 67 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 68 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

@@ -81,6 +81,15 @@ static void columns_and_loading(void) {
     result = cui_table_reduce(ui, 10, m, &state, o);
     assert(result.load_more);
     cui_end_frame(ui);
+    o.selection_mode = (cui_table_selection_mode)99;
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    assert(cui_table_reduce(ui, 10, m, &state, o).error == CUI_TABLE_INVALID);
+    cui_end_frame(ui);
+    o.selection_mode = CUI_TABLE_SELECT_ROW;
+    state.sort = (cui_table_sort)99;
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    assert(cui_table_reduce(ui, 10, m, &state, o).error == CUI_TABLE_INVALID);
+    cui_end_frame(ui);
     cui_destroy(ui);
     cui_table_destroy(m);
 }
@@ -278,6 +287,12 @@ static void multiple_selection(void) {
     key(ui, CUI_KEY_END, CUI_MOD_SHIFT);
     scene(ui, m, &state, o);
     assert(state.selection_count == 3 && cui_table_is_selected(&state, o, 4, 20));
+    state.anchor_row = 999;
+    cui_focus(ui, cui_table_cell_id(10, 4, 20));
+    key(ui, CUI_KEY_HOME, CUI_MOD_SHIFT);
+    scene(ui, m, &state, o);
+    assert(state.selection_count == 1 && cui_table_is_selected(&state, o, 1, 10));
+
     state.selection_count = 0;
     state.anchor_row = state.anchor_column = 0;
     o.selection_mode = CUI_TABLE_SELECT_COLUMN;
@@ -328,6 +343,49 @@ static void pointer_resize(void) {
                                            .y = y,
                                            .pointer_button = CUI_POINTER_SECONDARY}));
     assert(!scene(ui, m, &state, o).columns_changed && col.width == 150);
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
+static void pinned_geometry(void) {
+    cui_table_model *m = cui_table_create(1);
+    cui_table_row row = {.key = 1, .label = {"Row", 3}};
+    cui_table_column cols[] = {
+        {.key = 10, .label = {"Pinned", 6}, .width = 100, .fixed_left = true, .movable = true},
+        {.key = 20, .label = {"Scroll", 6}, .width = 100, .movable = true},
+        {.key = 30, .label = {"Last", 4}, .width = 100, .movable = true}};
+    assert(cui_table_bind(m, &row, 1, cols, 3) == CUI_TABLE_OK);
+    assert(cui_table_fixed_columns(m) == 1 && cui_table_fixed_width(m) == 100);
+    assert(!cui_table_move_column(m, 10, 1) && !cui_table_move_column(m, 20, 0));
+    cui_table_state state = {.scroll_x = 50};
+    cui_table_options o = {
+        .width = 250, .height = 64, .row_height = 32, .selection_mode = CUI_TABLE_SELECT_CELL};
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    scene(ui, m, &state, o);
+    assert(cui_bounds(ui, cui_table_cell_id(10, 1, 10)).x == 0);
+    assert(cui_bounds(ui, cui_table_cell_id(10, 1, 20)).x == 50);
+    assert(cui_bounds(ui, cui_table_header_id(10, 10)).x == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 75, .y = 40}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 75, .y = 40}));
+    cui_table_result result = scene(ui, m, &state, o);
+    assert(result.activated_column == 10 && state.column == 10);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 125, .y = 40}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 125, .y = 40}));
+    result = scene(ui, m, &state, o);
+    assert(result.activated_column == 20 && state.column == 20);
+    state.scroll_x = 0;
+    scene(ui, m, &state, o);
+    cui_focus(ui, cui_table_cell_id(10, 1, 10));
+    key(ui, CUI_KEY_RIGHT, 0);
+    key(ui, CUI_KEY_RIGHT, 0);
+    scene(ui, m, &state, o);
+    assert(state.cursor_column == 30 && state.scroll_x == 50 &&
+           cui_bounds(ui, cui_table_cell_id(10, 1, 10)).x == 0);
+    cols[0].fixed_left = false;
+    cols[1].fixed_left = true;
+    assert(cui_table_bind(m, &row, 1, cols, 3) == CUI_TABLE_INVALID);
+    cols[0].fixed_left = true;
+    cols[1].fixed_left = false;
     cui_destroy(ui);
     cui_table_destroy(m);
 }
@@ -419,6 +477,7 @@ int main(void) {
     virtual_scene();
     pointer_resize();
     horizontal_virtualization();
+    pinned_geometry();
 #else
     (void)rendered;
     (void)label;

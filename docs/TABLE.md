@@ -19,7 +19,7 @@ and 128 columns. The model allocates two row-key hash banks once at creation;
 rendering, navigation, resize and movement do not allocate. Caller metadata stays
 valid until a successful bind. Rebind after changing row ordering or keys; the
 caller implements sorting/filtering and may keep selection keyed through both.
-Columns may be mutated through resize and move functions between frames.
+Columns may be mutated through resize and move functions between frames. Columns marked fixed_left must form a contiguous prefix. Their header and cells remain fixed horizontally, with separate clip scopes preventing scrolling cells from receiving input beneath pinned cells. Column movement cannot cross the pinned boundary. Keep the total pinned width below the viewport width to leave space for scrolling columns. The column viewport describes the scrolling suffix; fixed columns are available through dedicated count/width accessors.
 
 `cui_table_state` is caller controlled: selected row/column, keyboard cursor, sort
 column/direction, horizontal/vertical scroll and transient resize gesture. Row,
@@ -30,8 +30,8 @@ requested by the result, without rearranging caller data automatically.
 
 The pure base API separates input reduction from semantic submission. A custom
 renderer can call `cui_table_reduce`, submit the root outside clip scopes, submit
-headers inside the header clip, and submit body semantics inside its translated
-body clip. Lay out the public stable header, resize, row and cell IDs. The
+headers inside their pane clips, and submit body semantics inside its translated
+body clip. Per-column/row/cell submission helpers support distinct pinned and scrolling clip scopes. Lay out the public stable header, resize, row and cell IDs. The
 `cui_base_data_table` convenience registers all semantics without drawing; it
 links only core and table base. `cui_data_table` performs that separation and
 paints the fixed header and virtual rows using theme tokens. A label callback
@@ -60,14 +60,13 @@ collisions with other controls as required by the core.
 
 Tests cover bounded row/column/cell ranges, toggles, capacity rejection, and transactional validation, keyed lookup in 10,000 rows, fractional
 viewport arithmetic, clipped overscan, callback count and accessible labels,
-fixed header geometry, horizontal clipping/virtualization, load request deduplication, ordered keyboard events, disabled skipping, manual
+fixed header geometry, pinned header/cell geometry and clipping/hit behavior, horizontal clipping/virtualization, load request deduplication, ordered keyboard events, disabled skipping, manual
 selection, sorting, column reorder, keyboard/pointer resize, width clamps,
 secondary gestures, wheel/focus interaction and semantic hierarchy. The same
 behavior tests run with a base-only core link; sanitizer validation instruments
 both layout and reducer.
 
-This is not full GPUI family parity. Remaining features include pinned left
-columns,
+This is not full GPUI family parity. Remaining features include
 column drag reorder, menu composition, asynchronous loading indicators, scrollbar
 chrome, variable row heights, Table cell spans/sections/captions, and row-header
 styling. Selection defaults to a single controlled keyed item in each dimension. An opt-in multiple-selection mode uses a caller-provided buffer of at most 4096 keyed items, with Ctrl/Meta toggles and Shift row/column/rectangular ranges. Disabled rows and columns are excluded from ranges. Capacity failures preserve the prior selection and keep the table rendered; callers may enlarge the buffer and retry. The anchor and buffer are controlled state, and callers must retain unique normalized keys in the buffer. Caller

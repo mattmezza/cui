@@ -47,6 +47,77 @@ void cui_table_begin_cell(cui_context *ui, cui_id id, float width, float height,
 void cui_table_end(cui_context *ui) {
     cui_end_box(ui);
 }
+static void header_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
+                        cui_table_state *s, cui_table_options o, size_t c, float header) {
+    cui_table_column col;
+    cui_table_get_column(m, c, &col);
+    cui_id cid = cui_table_header_id(id, col.key);
+    cui_begin_box(ui, cid,
+                  (cui_box){.width = col.width,
+                            .height = header,
+                            .row = true,
+                            .padding = 4,
+                            .gap = 2,
+                            .clip = true,
+                            .background = t->background,
+                            .border = t->focus,
+                            .border_width = cui_focused(ui) == cid ? 2 : 0});
+    cui_table_submit_header_column(ui, id, m, s, o, c);
+    float grip = col.resizable ? 8 : 0;
+    cui_begin_box(ui, style_id(cid, 1),
+                  (cui_box){.width = fmaxf(1, col.width - 8 - grip),
+                            .height = fmaxf(1, header - 8),
+                            .align_x = align(col.align),
+                            .align_y = CUI_ALIGN_CENTER});
+    cui_text(ui, col.label, t->font_size, col.disabled || o.disabled ? t->muted : t->text);
+    if (s->sort_column == col.key && s->sort != CUI_TABLE_SORT_DEFAULT)
+        cui_text(ui, cui_string(s->sort == CUI_TABLE_SORT_ASCENDING ? "^" : "v"), t->font_size,
+                 t->primary);
+    cui_end_box(ui);
+    if (col.resizable) {
+        cui_begin_box(ui, cui_table_resize_id(id, col.key),
+                      (cui_box){.width = 8,
+                                .height = fmaxf(1, header - 8),
+                                .background = cui_focused(ui) == cui_table_resize_id(id, col.key)
+                                                  ? t->focus
+                                                  : t->border});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+}
+static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
+                      cui_table_state *s, cui_table_options o, size_t r, size_t c, float row,
+                      cui_table_label_fn label, cui_table_cell_fn render, void *data) {
+    cui_table_row rr;
+    cui_table_column col;
+    cui_table_get_row(m, r, &rr);
+    cui_table_get_column(m, c, &col);
+    cui_id cid = cui_table_cell_id(id, rr.key, col.key);
+    bool selected = cui_table_is_selected(s, o, rr.key, col.key);
+    cui_begin_box(ui, cid,
+                  (cui_box){.width = col.width,
+                            .height = row,
+                            .padding = 4,
+                            .clip = true,
+                            .align_x = align(col.align),
+                            .align_y = CUI_ALIGN_CENTER,
+                            .background = selected               ? t->primary
+                                          : o.striped && (r & 1) ? t->background
+                                                                 : t->surface,
+                            .border = cui_focused(ui) == cid ? t->focus : t->border,
+                            .border_width = cui_focused(ui) == cid ? 2
+                                            : o.bordered           ? 1
+                                                                   : 0});
+    cui_table_submit_cell(ui, id, m, s, o, r, c, label, data);
+    if (render)
+        render(ui, t, data, r, col.key);
+    else
+        cui_text(ui, label ? label(data, r, col.key) : rr.label, t->font_size,
+                 o.disabled || rr.disabled || col.disabled ? t->muted
+                 : selected                                ? t->on_primary
+                                                           : t->text);
+    cui_end_box(ui);
+}
 cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
                                 cui_table_state *s, cui_table_options o, cui_table_label_fn label,
                                 cui_table_cell_fn render, void *data) {
@@ -56,12 +127,14 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
     if (result.error != CUI_TABLE_OK && result.error != CUI_TABLE_CAPACITY)
         return result;
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480,
-          height = isfinite(o.height) && o.height > 0 ? o.height : 240;
+          h = isfinite(o.height) && o.height > 0 ? o.height : 240;
     float row = isfinite(o.row_height) && o.row_height > 0 ? fminf(o.row_height, 4096) : 32,
           header = isfinite(o.header_height) && o.header_height > 0 ? o.header_height : 32;
-    cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, width, o.column_overscan);
-    float total = columns.total - columns.before - columns.after;
-    cui_table_column col;
+    size_t fixed = cui_table_fixed_columns(m);
+    float pin = cui_table_fixed_width(m), available = fmaxf(1, width - pin);
+    cui_table_view cols = cui_table_column_viewport(m, s->scroll_x, width, o.column_overscan),
+                   rows = cui_table_viewport(m, s->scroll_y, h, row, o.overscan);
+    float span = cols.total - cols.before - cols.after;
     cui_begin_box(ui, id,
                   (cui_box){.width = width,
                             .background = t->surface,
@@ -72,94 +145,60 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
     cui_begin_box(ui, style_id(id, 1),
                   (cui_box){.width = width,
                             .height = header,
+                            .row = true,
                             .clip = true,
-                            .offset_x = columns.before - s->scroll_x,
                             .background = t->background});
-    cui_table_submit_header(ui, id, m, s, o);
-    cui_begin_box(ui, style_id(id, 2), (cui_box){.width = total, .height = header, .row = true});
-    for (size_t c = columns.begin; c < columns.end; c++) {
-        cui_table_get_column(m, c, &col);
-        cui_id cid = cui_table_header_id(id, col.key);
-        cui_begin_box(ui, cid,
-                      (cui_box){.width = col.width,
-                                .height = header,
-                                .row = true,
-                                .padding = 4,
-                                .gap = 2,
-                                .clip = true,
-                                .background = t->background,
-                                .border = t->focus,
-                                .border_width = cui_focused(ui) == cid ? 2 : 0});
-        float grip = col.resizable ? 8 : 0;
-        cui_begin_box(ui, style_id(cid, 1),
-                      (cui_box){.width = fmaxf(1, col.width - 8 - grip),
-                                .height = fmaxf(1, header - 8),
-                                .align_x = align(col.align),
-                                .align_y = CUI_ALIGN_CENTER});
-        cui_text(ui, col.label, t->font_size, col.disabled || o.disabled ? t->muted : t->text);
-        if (s->sort_column == col.key && s->sort != CUI_TABLE_SORT_DEFAULT)
-            cui_text(ui, cui_string(s->sort == CUI_TABLE_SORT_ASCENDING ? "^" : "v"), t->font_size,
-                     t->primary);
-        cui_end_box(ui);
-        if (col.resizable) {
-            cui_begin_box(
-                ui, cui_table_resize_id(id, col.key),
-                (cui_box){.width = 8,
-                          .height = fmaxf(1, header - 8),
-                          .background = cui_focused(ui) == cui_table_resize_id(id, col.key)
-                                            ? t->focus
-                                            : t->border});
-            cui_end_box(ui);
-        }
+    if (fixed) {
+        cui_begin_box(ui, style_id(id, 3),
+                      (cui_box){.width = pin, .height = header, .row = true, .clip = true});
+        for (size_t c = 0; c < fixed; c++)
+            header_cell(ui, id, t, m, s, o, c, header);
         cui_end_box(ui);
     }
+    cui_begin_box(ui, style_id(id, 4),
+                  (cui_box){.width = available,
+                            .height = header,
+                            .clip = true,
+                            .offset_x = cols.before - s->scroll_x});
+    cui_begin_box(ui, style_id(id, 2), (cui_box){.width = span, .height = header, .row = true});
+    for (size_t c = cols.begin; c < cols.end; c++)
+        header_cell(ui, id, t, m, s, o, c, header);
     cui_end_box(ui);
     cui_end_box(ui);
-    cui_table_view v = cui_table_viewport(m, s->scroll_y, height, row, o.overscan);
+    cui_end_box(ui);
     cui_begin_box(ui, cui_table_body_id(id),
                   (cui_box){.width = width,
-                            .height = height,
+                            .height = h,
                             .clip = true,
-                            .offset_x = columns.before - s->scroll_x,
-                            .offset_y = v.before - v.scroll,
+                            .offset_y = rows.before - rows.scroll,
                             .background = t->surface});
-    cui_table_submit_body(ui, id, m, s, o, label, data);
-    for (size_t r = v.begin; r < v.end; r++) {
+    cui_table_submit_body_root(ui, id, m, s, o);
+    for (size_t r = rows.begin; r < rows.end; r++) {
         cui_table_row rr;
         cui_table_get_row(m, r, &rr);
         cui_id rid = cui_table_row_id(id, rr.key);
-        cui_begin_box(ui, rid, (cui_box){.width = total, .height = row, .row = true});
-        for (size_t c = columns.begin; c < columns.end; c++) {
-            cui_table_get_column(m, c, &col);
-            cui_id cid = cui_table_cell_id(id, rr.key, col.key);
-            bool selected = cui_table_is_selected(s, o, rr.key, col.key);
-            cui_begin_box(ui, cid,
-                          (cui_box){.width = col.width,
-                                    .height = row,
-                                    .padding = 4,
-                                    .clip = true,
-                                    .align_x = align(col.align),
-                                    .align_y = CUI_ALIGN_CENTER,
-                                    .background = selected               ? t->primary
-                                                  : o.striped && (r & 1) ? t->background
-                                                                         : t->surface,
-                                    .border = cui_focused(ui) == cid ? t->focus : t->border,
-                                    .border_width = cui_focused(ui) == cid ? 2
-                                                    : o.bordered           ? 1
-                                                                           : 0});
-            cui_str value = label ? label(data, r, col.key) : rr.label;
-            if (render)
-                render(ui, t, data, r, col.key);
-            else
-                cui_text(ui, value, t->font_size,
-                         o.disabled || rr.disabled || col.disabled ? t->muted
-                         : selected                                ? t->on_primary
-                                                                   : t->text);
+        cui_begin_box(ui, rid, (cui_box){.width = width, .height = row, .row = true});
+        cui_table_submit_row(ui, id, m, s, o, r);
+        if (fixed) {
+            cui_begin_box(ui, style_id(rid, 3),
+                          (cui_box){.width = pin, .height = row, .row = true, .clip = true});
+            for (size_t c = 0; c < fixed; c++)
+                body_cell(ui, id, t, m, s, o, r, c, row, label, render, data);
             cui_end_box(ui);
         }
+        cui_begin_box(ui, style_id(rid, 4),
+                      (cui_box){.width = available,
+                                .height = row,
+                                .clip = true,
+                                .offset_x = cols.before - s->scroll_x});
+        cui_begin_box(ui, style_id(rid, 2), (cui_box){.width = span, .height = row, .row = true});
+        for (size_t c = cols.begin; c < cols.end; c++)
+            body_cell(ui, id, t, m, s, o, r, c, row, label, render, data);
+        cui_end_box(ui);
+        cui_end_box(ui);
         cui_end_box(ui);
     }
     cui_end_box(ui);
-    cui_table_end(ui);
+    cui_end_box(ui);
     return result;
 }

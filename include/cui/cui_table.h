@@ -20,7 +20,7 @@ typedef struct {
     cui_id key;
     cui_str label;
     float width, minimum, maximum;
-    bool sortable, resizable, movable, disabled;
+    bool sortable, resizable, movable, disabled, fixed_left;
     cui_table_align align;
 } cui_table_column;
 typedef enum {
@@ -48,6 +48,8 @@ cui_table_error cui_table_bind(cui_table_model *, const cui_table_row *, size_t 
                                cui_table_column *, size_t columns);
 size_t cui_table_rows(const cui_table_model *);
 size_t cui_table_columns(const cui_table_model *);
+size_t cui_table_fixed_columns(const cui_table_model *);
+float cui_table_fixed_width(const cui_table_model *);
 bool cui_table_get_row(const cui_table_model *, size_t, cui_table_row *);
 bool cui_table_get_column(const cui_table_model *, size_t, cui_table_column *);
 bool cui_table_row_index(const cui_table_model *, cui_id, size_t *);
@@ -110,6 +112,15 @@ void cui_table_submit_header(cui_context *, cui_id, cui_table_model *, cui_table
                              cui_table_options);
 void cui_table_submit_body(cui_context *, cui_id, cui_table_model *, cui_table_state *,
                            cui_table_options, cui_table_label_fn, void *);
+void cui_table_submit_header_column(cui_context *, cui_id, cui_table_model *, cui_table_state *,
+                                    cui_table_options, size_t column);
+void cui_table_submit_body_root(cui_context *, cui_id, cui_table_model *, cui_table_state *,
+                                cui_table_options);
+void cui_table_submit_row(cui_context *, cui_id, cui_table_model *, cui_table_state *,
+                          cui_table_options, size_t row);
+void cui_table_submit_cell(cui_context *, cui_id, cui_table_model *, cui_table_state *,
+                           cui_table_options, size_t row, size_t column, cui_table_label_fn,
+                           void *);
 cui_table_result cui_base_data_table(cui_context *, cui_id, cui_table_model *, cui_table_state *,
                                      cui_table_options);
 /* Callback runs only for the virtual window, inside a clipped fixed-size cell.

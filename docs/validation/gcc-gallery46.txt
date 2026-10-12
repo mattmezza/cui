@@ -1,0 +1,83 @@
+Test project /home/matteo/dev/cui/build
+      Start  1: bootstrap
+ 1/39 Test  #1: bootstrap ........................   Passed    0.00 sec
+      Start  2: core
+ 2/39 Test  #2: core .............................   Passed    0.01 sec
+      Start  3: base
+ 3/39 Test  #3: base .............................   Passed    0.00 sec
+      Start  4: components
+ 4/39 Test  #4: components .......................   Passed    0.01 sec
+      Start  5: render
+ 5/39 Test  #5: render ...........................   Passed    0.01 sec
+      Start  6: edit
+ 6/39 Test  #6: edit .............................   Passed    0.01 sec
+      Start  7: overlay
+ 7/39 Test  #7: overlay ..........................   Passed    0.01 sec
+      Start  8: virtual
+ 8/39 Test  #8: virtual ..........................   Passed    0.06 sec
+      Start  9: dock
+ 9/39 Test  #9: dock .............................   Passed    0.27 sec
+      Start 10: plot
+10/39 Test #10: plot .............................   Passed    0.02 sec
+      Start 11: content
+11/39 Test #11: content ..........................   Passed    0.01 sec
+      Start 12: disclosure
+12/39 Test #12: disclosure .......................   Passed    0.00 sec
+      Start 13: choice
+13/39 Test #13: choice ...........................   Passed    0.03 sec
+      Start 14: numeric
+14/39 Test #14: numeric ..........................   Passed    0.02 sec
+      Start 15: picker
+15/39 Test #15: picker ...........................   Passed    0.06 sec
+      Start 16: tree
+16/39 Test #16: tree .............................   Passed    0.02 sec
+      Start 17: input
+17/39 Test #17: input ............................   Passed    0.01 sec
+      Start 18: table
+18/39 Test #18: table ............................   Passed    0.02 sec
+      Start 19: scroll
+19/39 Test #19: scroll ...........................   Passed    0.01 sec
+      Start 20: example_unstyled
+20/39 Test #20: example_unstyled .................   Passed    0.00 sec
+      Start 21: example_styled_settings
+21/39 Test #21: example_styled_settings ..........   Passed    0.00 sec
+      Start 22: manifest
+22/39 Test #22: manifest .........................   Passed    0.16 sec
+      Start 23: licenses
+23/39 Test #23: licenses .........................   Passed    0.16 sec
+      Start 24: distribution
+24/39 Test #24: distribution .....................   Passed    0.18 sec
+      Start 25: cpp_embedding
+25/39 Test #25: cpp_embedding ....................   Passed    0.00 sec
+      Start 26: distribution_single
+26/39 Test #26: distribution_single ..............   Passed    0.00 sec
+      Start 27: distribution_multi
+27/39 Test #27: distribution_multi ...............   Passed    0.00 sec
+      Start 28: sdl3_services
+28/39 Test #28: sdl3_services ....................   Passed    0.74 sec
+      Start 29: gpu_rendering
+29/39 Test #29: gpu_rendering ....................   Passed    1.01 sec
+      Start 30: gallery_layout
+30/39 Test #30: gallery_layout ...................   Passed    0.01 sec
+      Start 31: gallery_capture
+31/39 Test #31: gallery_capture ..................   Passed    0.25 sec
+      Start 32: implementation_embedding
+32/39 Test #32: implementation_embedding .........   Passed    0.00 sec
+      Start 33: sokol_rendering
+33/39 Test #33: sokol_rendering ..................   Passed    0.25 sec
+      Start 34: numeric_base_only
+34/39 Test #34: numeric_base_only ................   Passed    0.01 sec
+      Start 35: picker_base_only
+35/39 Test #35: picker_base_only .................   Passed    0.04 sec
+      Start 36: tree_base_only
+36/39 Test #36: tree_base_only ...................   Passed    0.02 sec
+      Start 37: input_base_only
+37/39 Test #37: input_base_only ..................   Passed    0.00 sec
+      Start 38: table_base_only
+38/39 Test #38: table_base_only ..................   Passed    0.01 sec
+      Start 39: scroll_base_only
+39/39 Test #39: scroll_base_only .................   Passed    0.01 sec
+
+100% tests passed out of 39
+
+Total Test time (real) =   3.44 sec

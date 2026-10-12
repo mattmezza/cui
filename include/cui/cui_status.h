@@ -75,6 +75,59 @@ bool cui_begin_tag(cui_context *ui, cui_id id, const cui_theme *theme, cui_tag_o
 void cui_end_tag(cui_context *ui, cui_id id, const cui_tag_style *style);
 bool cui_tag(cui_context *ui, cui_id id, const cui_theme *theme, cui_str text,
              cui_tag_options options);
+typedef enum { CUI_MARKER_PLAIN, CUI_MARKER_SEPARATOR, CUI_MARKER_BORDER } cui_marker_variant;
+typedef enum {
+    CUI_MARKER_ALIGN_DEFAULT,
+    CUI_MARKER_ALIGN_START,
+    CUI_MARKER_ALIGN_CENTER,
+    CUI_MARKER_ALIGN_END
+} cui_marker_alignment;
+typedef enum { CUI_MARKER_SPINNER, CUI_MARKER_SHIMMER } cui_marker_loading;
+typedef enum {
+    CUI_MARKER_ICON,
+    CUI_MARKER_TEXT,
+    CUI_MARKER_CONTENT,
+    CUI_MARKER_DIRECT
+} cui_marker_child_kind;
+/* Callback receives resolved text style and animated opacity. It owns children
+ * and must multiply paint alpha by opacity for rich-only shimmer. */
+typedef void (*cui_status_render_fn)(cui_context *, cui_id, void *, float font_size,
+                                     cui_color color, float opacity);
+typedef struct {
+    cui_marker_child_kind kind;
+    cui_str text;
+    float width;
+    cui_status_render_fn render;
+    void *user;
+} cui_marker_child;
+#define CUI_MARKER_MAX_CHILDREN 32
+typedef struct {
+    cui_rect text_bounds[CUI_MARKER_MAX_CHILDREN];
+    float last_phase;
+    bool initialized;
+} cui_marker_state;
+typedef struct {
+    cui_marker_variant variant;
+    cui_marker_alignment alignment;
+    cui_marker_loading loading_style;
+    bool loading, reduced_motion, reverse, once, custom_highlight, absolute_spread;
+    cui_role role;
+    cui_str name;
+    float width, shimmer_spread;
+    double now_seconds, duration;
+    cui_color highlight;
+} cui_marker_options;
+typedef struct {
+    cui_marker_alignment alignment;
+    bool spinner, animated;
+    float phase, rich_opacity;
+    double next_wake_seconds;
+} cui_marker_plan;
+cui_marker_options cui_marker_options_default(void);
+bool cui_base_marker(cui_marker_options options, const cui_marker_child *children, size_t count,
+                     cui_marker_plan *plan);
+bool cui_marker(cui_context *ui, cui_id id, const cui_theme *theme, cui_marker_state *state,
+                const cui_marker_child *children, size_t count, cui_marker_options options);
 #ifdef __cplusplus
 }
 #endif

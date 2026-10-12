@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 typedef struct {
-    size_t *parent, *end, *visible, *position, *indices;
+    size_t *parent, *end, *visible, *position, *indices, *ordinal, *children;
+    size_t roots;
     cui_id *keys;
 } cui_tree_bank;
 struct cui_tree_model {
@@ -33,16 +34,19 @@ cui_tree_model *cui_tree_create(size_t capacity) {
     while (m->slots < capacity * 2)
         m->slots *= 2;
     m->bytes = sizeof(*m) +
-               2 * (capacity * 4 * sizeof(size_t) + m->slots * (sizeof(size_t) + sizeof(cui_id)));
+               2 * (capacity * 6 * sizeof(size_t) + m->slots * (sizeof(size_t) + sizeof(cui_id)));
     for (unsigned i = 0; i < 2; ++i) {
         cui_tree_bank *b = &m->banks[i];
         b->parent = malloc(capacity * sizeof(size_t));
         b->end = malloc(capacity * sizeof(size_t));
         b->visible = malloc(capacity * sizeof(size_t));
         b->position = malloc(capacity * sizeof(size_t));
+        b->ordinal = malloc(capacity * sizeof(size_t));
+        b->children = malloc(capacity * sizeof(size_t));
         b->indices = malloc(m->slots * sizeof(size_t));
         b->keys = calloc(m->slots, sizeof(cui_id));
-        if (!b->parent || !b->end || !b->visible || !b->position || !b->indices || !b->keys) {
+        if (!b->parent || !b->end || !b->visible || !b->position || !b->indices || !b->keys ||
+            !b->ordinal || !b->children) {
             cui_tree_destroy(m);
             return NULL;
         }
@@ -59,6 +63,8 @@ void cui_tree_destroy(cui_tree_model *m) {
         free(m->banks[i].position);
         free(m->banks[i].indices);
         free(m->banks[i].keys);
+        free(m->banks[i].ordinal);
+        free(m->banks[i].children);
     }
     free(m);
 }
@@ -70,6 +76,8 @@ cui_tree_error cui_tree_rebuild(cui_tree_model *m, const cui_tree_node *nodes, b
         return CUI_TREE_CAPACITY;
     cui_tree_bank *b = &m->banks[1 - m->active];
     memset(b->keys, 0, m->slots * sizeof(cui_id));
+    memset(b->children, 0, count * sizeof(size_t));
+    b->roots = 0;
     size_t stack[64], depth = 0, visible_count = 0;
     bool shown[64] = {0};
     for (size_t i = 0; i < count; ++i) {
@@ -87,6 +95,7 @@ cui_tree_error cui_tree_rebuild(cui_tree_model *m, const cui_tree_node *nodes, b
         while (depth > nodes[i].depth)
             b->end[stack[--depth]] = i;
         b->parent[i] = nodes[i].depth ? stack[nodes[i].depth - 1] : SIZE_MAX;
+        b->ordinal[i] = b->parent[i] == SIZE_MAX ? ++b->roots : ++b->children[b->parent[i]];
         bool visible = !nodes[i].depth || (shown[nodes[i].depth - 1] && expanded[b->parent[i]]);
         shown[nodes[i].depth] = visible;
         stack[nodes[i].depth] = i;
@@ -420,6 +429,9 @@ void cui_tree_submit(cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_sta
             (cui_semantic_details){
                 .selected = selected == key,
                 .level = m->nodes[i].depth + 1,
+                .pos_in_set = (unsigned)m->banks[m->active].ordinal[i],
+                .set_size = (unsigned)(parent == SIZE_MAX ? m->banks[m->active].roots
+                                                          : m->banks[m->active].children[parent]),
                 .expanded = cui_tree_is_branch(m, i) && m->expanded[i],
                 .parent = parent == SIZE_MAX ? id : cui_tree_row_id(id, m->nodes[parent].key)});
         cui_set_tab_stop(ui, row_id, key == s->cursor);

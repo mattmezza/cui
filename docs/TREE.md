@@ -18,3 +18,9 @@ The root exposes scroll offsets and extents for core wheel routing. Wheel events
 apply only when routed to this Tree; ancestor boundary bubbling is handled by
 core. Scrolling does not repeatedly reveal the focused row; keyboard navigation
 reveals it again. Tree-item semantics include the one-based hierarchy level.
+
+Items expose one-based hierarchy level, sibling position and sibling set size,
+including disabled siblings and siblings outside the virtual window. Parents
+remain logical keyed relations even when their row is unmounted by virtualization;
+a DOM adapter cannot resolve an unmounted parent element directly. Sibling metadata
+is computed during rebuild, without rescanning the hierarchy during rendering.

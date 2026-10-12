@@ -205,9 +205,11 @@ static void events(void) {
         for (size_t j = 0; j < n; ++j) {
             if (sem[j].id == cui_tree_row_id(10, 3))
                 hierarchy = sem[j].details.parent == cui_tree_row_id(10, 2) &&
-                            sem[j].role == CUI_ROLE_TREEITEM;
+                            sem[j].role == CUI_ROLE_TREEITEM && sem[j].details.level == 3 &&
+                            sem[j].details.pos_in_set == 1 && sem[j].details.set_size == 1;
             if (sem[j].id == cui_tree_row_id(10, 4))
-                disabled = sem[j].disabled;
+                disabled = sem[j].disabled && sem[j].details.level == 2 &&
+                           sem[j].details.pos_in_set == 2 && sem[j].details.set_size == 3;
         }
         assert(hierarchy && disabled);
         cui_destroy(ui);
@@ -271,6 +273,8 @@ static void virtualization(void) {
     size_t n;
     const cui_semantic *sem = cui_semantics(ui, &n);
     assert(n == 13 && sem[1].id == cui_tree_row_id(10, 4999));
+    assert(sem[1].details.level == 1 && sem[1].details.pos_in_set == 4999 &&
+           sem[1].details.set_size == 10000);
     assert(sem[0].details.scrollable && sem[0].details.scroll_max_y == 319760);
 #ifndef CUI_TREE_BASE_ONLY
     assert(cui_bounds(ui, cui_tree_row_id(10, 5001)).y == -5);

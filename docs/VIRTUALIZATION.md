@@ -23,3 +23,9 @@ A portable `clock()` benchmark compiled with GCC `-O2` in this workspace measure
 | 100000 | 7.134 ms | 15.627 ms | 12388720 |
 
 These are local CPU timings, not performance guarantees. Run `test_virtual --benchmark` to reproduce on the current machine. Normal tests impose no timing threshold.
+
+## Browser demonstration
+
+The VirtualList gallery composes the retained model with `cui_scrollable_begin`/`cui_scrollable_end_ex`. It submits a top spacer plus only the viewport range and one overscan row on each side. The fixed 144px viewport shows 24px tasks; an unaligned scroll can require seven intersecting rows and two overscan rows, at most nine of 100,000. Stable task keys provide row IDs and list-item position semantics.
+
+Wheel over the list, click or drag its scrollbar, or focus the scrollbar and press Home/End or arrow keys. The live submission count makes virtualization visible. The demo does not add asynchronous measurement, offscreen item focus, or drag-and-drop behavior to the model.

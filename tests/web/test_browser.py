@@ -439,6 +439,30 @@ def main():
             page.wait_for_function('Math.abs(cuiGallery.exports.gallery_carousel_stats(2)-cuiGallery.exports.gallery_carousel_stats(3))<0.01', timeout=5000)
             click_semantic('Next slide', 1)
             page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===0')
+            page.evaluate('location.hash="VirtualList"')
+            page.wait_for_function('cuiGallery.renderedComponent==="VirtualList"')
+            wait_semantic('Task 000001', 37)
+            def virtual_rows():
+                return page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
+                    .filter(i=>e.gallery_semantic(i,0)===37).map(i=>d.decode(new Uint8Array(
+                        e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i))));}''')
+            assert 6 <= len(virtual_rows()) <= 8
+            virtual_owner = semantic_index('Scrollable content', 9)
+            virtual_rect = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', virtual_owner)
+            canvas.scroll_into_view_if_needed()
+            virtual_canvas = canvas.bounding_box()
+            page.mouse.move(virtual_canvas['x']+virtual_rect[0]+80, virtual_canvas['y']+virtual_rect[1]+70)
+            page.mouse.wheel(0,240)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,19)>0', arg=virtual_owner)
+            assert virtual_rows()[0] != 'Task 000001'
+            assert len(virtual_rows()) <= 9
+            click_semantic('Vertical scroll', 32)
+            page.keyboard.press('End')
+            wait_semantic('Task 100000', 37)
+            assert len(virtual_rows()) <= 9
+            page.keyboard.press('Home')
+            wait_semantic('Task 000001', 37)
+            page.screenshot(path='/tmp/cui-web-virtual-list.png')
             page.evaluate('location.hash="Command"')
             page.wait_for_function('cuiGallery.renderedComponent==="Command"')
             assert semantic_index('Command palette', 6) is not None

@@ -962,7 +962,7 @@ static void conversation_row(cui_context *context, cui_id id, size_t index, void
 }
 static cui_hover_state tooltip_state, card_state;
 static cui_virtual_list *virtual_list;
-static float scroll_percent;
+static cui_scroll_state virtual_scroll;
 static cui_dock *dock;
 static cui_date date = {2026, 10, 12};
 static cui_calendar_state calendar;
@@ -2918,15 +2918,48 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 26: {
-        cui_label(ui, &t, cui_string("Base model: 100,000 retained rows"));
-        cui_slider(ui, cui_id_from(ui, "virtual-scroll"), &t, cui_string("Scroll position"),
-                   &scroll_percent, 0, 100, 1, disabled);
-        cui_virtual_view view = cui_virtual_viewport(
-            virtual_list, cui_virtual_total(virtual_list) * scroll_percent / 100, 144, 1);
+        cui_label(ui, &t, cui_string("100,000 tasks; only visible rows are drawn."));
+        cui_id owner = cui_id_from(ui, "virtual-viewport");
+        cui_scroll_options options = {.width = width - 48,
+                                      .height = 144,
+                                      .content_height = (float)cui_virtual_total(virtual_list),
+                                      .vertical = true,
+                                      .disabled = disabled,
+                                      .wheel_step = 24};
+        cui_scroll_geometry geometry = cui_scroll_layout(options);
+        cui_virtual_view view = {0};
+        if (cui_scrollable_begin(ui, owner, &t, &virtual_scroll, options)) {
+            view =
+                cui_virtual_viewport(virtual_list, virtual_scroll.y, geometry.viewport.height, 1);
+            if (view.before > 0) {
+                cui_begin_box(ui, cui_id_from(ui, "virtual-before"),
+                              (cui_box){.height = (float)view.before});
+                cui_end_box(ui);
+            }
+            for (size_t row = view.begin; row < view.end; ++row) {
+                uint64_t key;
+                cui_virtual_key(virtual_list, row, &key);
+                char label[48];
+                snprintf(label, sizeof(label), "Task %06llu", (unsigned long long)key);
+                cui_id row_id = owner ^ (key * UINT64_C(0x9e3779b97f4a7c15));
+                cui_begin_box(ui, row_id,
+                              (cui_box){.width = geometry.viewport.width,
+                                        .height = 24,
+                                        .padding = 0,
+                                        .align_y = CUI_ALIGN_CENTER,
+                                        .background = row % 2 ? t.muted_background : t.surface});
+                cui_interact(ui, row_id, CUI_ROLE_LISTITEM, cui_string(label), disabled, false, 0);
+                cui_set_semantic_details(
+                    ui, row_id,
+                    (cui_semantic_details){.pos_in_set = (unsigned)row + 1, .set_size = 100000});
+                cui_text(ui, cui_string(label), 14, t.text);
+                cui_end_box(ui);
+            }
+            cui_scrollable_end_ex(ui, owner, &t, &virtual_scroll, options);
+        }
         char text[128];
-        snprintf(text, sizeof(text), "Visible range: %zu .. %zu / 100000", view.begin, view.end);
-        cui_label(ui, &t, cui_string(text));
-        snprintf(text, sizeof(text), "Offset: %.0f px; total: %.0f px", view.before, view.total);
+        snprintf(text, sizeof(text), "Submitted %zu rows: %zu .. %zu / 100000",
+                 view.end - view.begin, view.begin + 1, view.end);
         cui_label(ui, &t, cui_string(text));
         break;
     }

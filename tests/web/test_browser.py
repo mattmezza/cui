@@ -1972,6 +1972,11 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_modal() === 1')
             texts = 'Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{let e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)));})'
             page.wait_for_function(texts + '.some(s=>s.includes("1 matching options"))')
+            widths = page.evaluate('''()=>{const e=cuiGallery.exports;
+                const rows=Array.from({length:e.gallery_semantic_count()},(_,i)=>i);
+                return [Math.max(...rows.filter(i=>e.gallery_semantic(i,0)===13).map(i=>e.gallery_semantic(i,3))),
+                    ...rows.filter(i=>e.gallery_semantic(i,0)===14).map(i=>e.gallery_semantic(i,3))];}''')
+            assert len(widths) > 1 and all(abs(w-widths[0]+8) < 1 for w in widths[1:]), widths
             page.keyboard.press('ArrowDown')
             page.keyboard.press('Enter')
             page.wait_for_function('cuiGallery.exports.gallery_modal() === 0')
@@ -1983,6 +1988,12 @@ def main():
                 bounds = page.evaluate('Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(0,i+1))')
                 page.mouse.click(box['x'] + bounds[0] + bounds[2]/2, box['y'] + bounds[1] + bounds[3]/2)
                 page.wait_for_function('cuiGallery.exports.gallery_modal() === 1')
+                if name == 'Select':
+                    widths = page.evaluate('''()=>{const e=cuiGallery.exports;
+                        const rows=Array.from({length:e.gallery_semantic_count()},(_,i)=>i);
+                        return [Math.max(...rows.filter(i=>e.gallery_semantic(i,0)===13).map(i=>e.gallery_semantic(i,3))),
+                            ...rows.filter(i=>e.gallery_semantic(i,0)===14).map(i=>e.gallery_semantic(i,3))];}''')
+                    assert len(widths) == 4 and all(abs(w-widths[0]+8) < 1 for w in widths[1:]), widths
                 page.keyboard.press('Escape')
                 page.wait_for_function('cuiGallery.exports.gallery_modal() === 0')
                 assert page.evaluate('cuiGallery.exports.gallery_semantic(0,7)') == 1

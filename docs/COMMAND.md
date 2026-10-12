@@ -1,7 +1,7 @@
 # Command
 
 Command is an inline command palette, composed from the real persistent Input,
-virtual rows and Scroll control. An application can host it in the existing
+virtual rows and Scroll control. The scroll area spans the panel width; rows reserve space for its scrollbar and horizontal insets. An application can host it in the existing
 Dialog/Overlay. This module follows the pinned GPUI 0.7.1
 `component/src/command/{command,item,state}.rs` contracts; it does not supply a
 native application Action registry or automatically create a modal dialog.

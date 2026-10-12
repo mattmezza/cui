@@ -432,7 +432,7 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
     if (width <= 0)
         width = 380 * density;
     float inset = 4 * density, font = 14 * density,
-          content = fmaxf(0, width - 2 * inset - (o.bordered ? 2 : 0));
+          content = fmaxf(0, width - 2 * inset - (o.bordered ? 2 : 0) - 10);
     float total;
     if (!cui_command_geometry(ui, s, content, font, density, &total))
         return false;
@@ -523,7 +523,7 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
         }
     }
     cui_id list = cui_command_list_id(id);
-    cui_scroll_options scroll = {.width = -1,
+    cui_scroll_options scroll = {.width = fmaxf(1, width - (o.bordered ? 2 : 0)),
                                  .height = viewport,
                                  .content_height = s->row_count ? total : viewport,
                                  .vertical = true,

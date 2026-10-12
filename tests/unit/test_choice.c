@@ -3644,6 +3644,7 @@ static void test_searchable_reference_metrics(void) {
                 sized_search_scene(ui, mode, &theme, &popup, query, options, &value, chosen);
             assert(popup.overlay.open);
             cui_rect first = cui_bounds(ui, 10), second = cui_bounds(ui, 20);
+            assert(fabsf(first.w - (popup.overlay.bounds.w - 8 * metrics.density)) < .001f);
             assert(fabsf(first.h - metrics.height) < .0001f &&
                    fabsf(second.y - first.y - first.h) < .0001f);
             cui_rect body = cui_bounds(ui, 10 ^ UINT64_C(0x9e3f5d2a91bca002));

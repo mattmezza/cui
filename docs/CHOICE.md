@@ -801,3 +801,5 @@ callbacks choose their own text presentation. Natural popup width, portal shadow
 and remaining icon/loader substitution remain separate gaps. Legacy flat Menu
 shares the flat popup infrastructure; hierarchical Menu has its dedicated
 source row metrics and nonuniform separator/label accounting.
+
+Searchable Select and Combobox option rows span the popup interior, including their pointer targets and highlight backgrounds. This applies to single and multiple selection at every supported row size.

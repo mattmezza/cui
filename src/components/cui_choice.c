@@ -804,7 +804,7 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                                    options.visible_count && count > options.visible_count
                                        ? (count - options.visible_count) * metrics->height
                                        : 0});
-    cui_begin_box(ui, container, (cui_box){.gap = 0});
+    cui_begin_box(ui, container, (cui_box){.width = -1, .gap = 0});
     size_t begin = options.visible_count ? state->first_visible : 0;
     size_t length = options.visible_count ? options.visible_count : count;
     if (begin > count)

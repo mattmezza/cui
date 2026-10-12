@@ -271,6 +271,29 @@ static const cui_semantic *semantic(cui_context *ui, cui_id id) {
             return &all[i];
     return NULL;
 }
+static void test_panel_width(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = {0};
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_command_state state;
+    cui_command_row rows[8];
+    cui_command_entry entry = {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Open")}};
+    cui_command_options options = cui_command_default();
+    assert(ui && edit && cui_command_init(&state, rows, 8, edit));
+    const float widths[] = {280, 420};
+    for (unsigned i = 0; i < 2; i++) {
+        options.width = widths[i];
+        draw(ui, &state, &entry, 1, options);
+        cui_rect panel = cui_bounds(ui, 42), list = cui_bounds(ui, cui_command_list_id(42));
+        cui_rect row = cui_bounds(ui, cui_command_row_id(42, (cui_command_index){0, 0}));
+        assert(fabsf(list.w - panel.w + 2) < .01f);
+        assert(fabsf(row.w - list.w + 18) < .01f);
+        assert(row.x >= list.x && row.x + row.w <= list.x + list.w - 10);
+    }
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
 static void test_virtual_geometry(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);
@@ -485,6 +508,7 @@ int main(void) {
     test_separator_before_heading();
     test_render();
     test_virtual_geometry();
+    test_panel_width();
     test_dialog();
     test_slots_and_loading();
 #endif

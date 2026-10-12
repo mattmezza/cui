@@ -1,37 +1,37 @@
 {
-  "source": "a5d5f23",
+  "source": "6e023e8",
   "published_source": "0cbfcbbf3f5037a3869348b58362edd79f51d5ba",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public0cbfcbb deployed successfully and passed full HTTPS75-story browser suite, including real TextView and Command two-Escape regression. New Chart and TextView source fidelity updates remain local. Full78-entry parity remains unfinished.",
+  "summary": "Local76-story real WASM gallery passes full Chromium suite, including all seven Chart families and physical hover. Public0cbfcbb remains verified75-story release until new deployment completes. Full78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "bb4d462",
+      "source": "1da5aca",
       "passed": 65,
       "total": 65,
-      "log": "wasi-bb4d462.txt"
+      "log": "wasi-1da5aca.txt"
     },
     {
       "name": "native",
-      "source": "db79e1e",
+      "source": "d5c0631",
       "passed": 75,
       "total": 75,
-      "log": "native-db79e1e.txt"
+      "log": "native-d5c0631.txt"
     },
     {
       "name": "browser",
-      "source": "a5d5f23",
-      "passed": 75,
-      "total": 75,
+      "source": "6e023e8",
+      "passed": 76,
+      "total": 76,
       "palettes": 38,
-      "log": "browser-a5d5f23.txt"
+      "log": "browser-6e023e8.txt"
     },
     {
       "name": "sanitizers",
-      "source": "bb4d462",
+      "source": "1da5aca",
       "passed": 73,
       "total": 73,
-      "log": "sanitizers-bb4d462.txt"
+      "log": "sanitizers-1da5aca.txt"
     }
   ],
   "previous_deployment": {

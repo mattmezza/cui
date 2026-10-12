@@ -1495,10 +1495,10 @@ static void test_dropdown_button(void) {
                 for (size_t i = 0; i < count; i++) {
                     if (semantics[i].id == 2001)
                         action_named = semantics[i].role == CUI_ROLE_BUTTON &&
-                                       semantics[i].name.length == 4 && semantics[i].checked;
+                                       semantics[i].name.length == 4 && !semantics[i].checked;
                     if (semantics[i].id == 2002)
                         trigger_named = semantics[i].role == CUI_ROLE_BUTTON &&
-                                        semantics[i].name.length == 17 && semantics[i].checked;
+                                        semantics[i].name.length == 17 && !semantics[i].checked;
                 }
                 assert(action_named && trigger_named);
                 cui_destroy(ui);
@@ -2099,6 +2099,56 @@ static void test_dropdown_colored_outline(void) {
             cui_destroy(ui);
         }
 }
+static void test_dropdown_inner_button_presentation(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    cui_dropdown_button_options options = {
+        .action_selected = true,
+        .variant = CUI_DROPDOWN_BUTTON_GHOST,
+        .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(same_color(dropdown_surface(ui, 2001), theme.primary));
+    assert(same_color(dropdown_surface(ui, 2002), theme.primary));
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == 2001 || semantics[i].id == 2002)
+            assert(!semantics[i].checked && !semantics[i].details.selected &&
+                   semantics[i].value == 0);
+    options.action_selected = false;
+    options.variant = CUI_DROPDOWN_BUTTON_DANGER;
+    options.action_outline = true;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(dropdown_surface(ui, 2001).a == 26);
+    assert(same_color(dropdown_surface(ui, 2002), theme.danger));
+    bool action_color = false, trigger_color = false;
+    for (size_t i = 0; i < dropdown_draw.count; i++) {
+        cui_draw_command command = dropdown_draw.commands[i];
+        if (command.type != CUI_DRAW_TEXT)
+            continue;
+        action_color |= command.text.length == 4 && same_color(command.color, theme.danger);
+        trigger_color |= command.text.length == 1 && same_color(command.color, theme.on_primary);
+    }
+    assert(action_color && trigger_color);
+    options.outline = true;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(dropdown_surface(ui, 2001).a == 26 && dropdown_surface(ui, 2002).a == 26);
+    click(ui, 2002);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(state.overlay.open);
+    semantics = cui_semantics(ui, &count);
+    bool expanded = false;
+    for (size_t i = 0; i < count; i++)
+        expanded |=
+            semantics[i].id == 2002 && semantics[i].details.expanded && !semantics[i].checked;
+    assert(expanded);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -2129,6 +2179,7 @@ int main(void) {
     test_tab_drag_reorder();
     test_long_tab_label_measurement();
     test_dropdown_colored_outline();
+    test_dropdown_inner_button_presentation();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

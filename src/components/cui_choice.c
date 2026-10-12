@@ -1000,6 +1000,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         options.variant = options.action_variant;
     if (options.inherit_action_size)
         options.size = options.action_size;
+    options.selected = options.selected || (!options.hide_action && options.action_selected);
     result = cui_base_dropdown_button(
         ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
         menu_name, items, count, menu_action, state,
@@ -1015,12 +1016,14 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                           options.selected
                                       ? theme->on_primary
                                       : theme->text;
-    if (options.outline) {
+    cui_color trigger_foreground = action_foreground;
+    if (options.outline || options.action_outline) {
         action_foreground = options.variant == CUI_DROPDOWN_BUTTON_PRIMARY  ? theme->primary
                             : options.variant == CUI_DROPDOWN_BUTTON_DANGER ? theme->danger
                                                                             : theme->text;
+        if (options.outline)
+            trigger_foreground = action_foreground;
     }
-    cui_color trigger_foreground = action_foreground;
     if (action_disabled)
         action_foreground = theme->muted;
     if (all_disabled)
@@ -1031,7 +1034,9 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                                               : 1;
     cui_begin_box(ui, container, (cui_box){.row = true, .gap = 0});
     if (!options.hide_action) {
-        cui_box action_box = cui_dropdown_button_box(ui, action_id, theme, options, false,
+        cui_dropdown_button_options action_options = options;
+        action_options.outline = options.outline || options.action_outline;
+        cui_box action_box = cui_dropdown_button_box(ui, action_id, theme, action_options, false,
                                                      action_disabled, pair_surfaced);
         cui_begin_box(ui, action_id, action_box);
         if (options.action_loading)
@@ -1056,10 +1061,6 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         cui_end_box(ui);
     }
     cui_end_box(ui);
-    if (!options.hide_action)
-        cui_update_semantic(ui, action_id, options.selected, options.selected);
-    if (!options.hide_menu)
-        cui_update_semantic(ui, trigger_id, options.selected, options.selected);
     state->row_height = theme->control_height;
     state->padding = theme->padding;
     if (options.tooltip_id && options.tooltip_state) {

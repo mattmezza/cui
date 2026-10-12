@@ -258,8 +258,9 @@ typedef enum {
 } cui_dropdown_button_anchor;
 typedef struct {
     bool disabled, action_disabled, action_loading, selected;
-    bool outline; /* orthogonal to primary/secondary/danger variant */
-    float width;  /* action-half width: zero fits contents; negative grows */
+    bool outline;                         /* orthogonal to primary/secondary/danger variant */
+    bool action_selected, action_outline; /* preserve inner button presentation */
+    float width; /* action-half width: zero fits contents; negative grows */
     cui_dropdown_button_variant variant;
     cui_dropdown_button_size size;
     cui_str leading, trailing;

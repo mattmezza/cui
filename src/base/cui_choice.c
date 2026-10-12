@@ -1177,5 +1177,7 @@ cui_dropdown_button_result cui_base_dropdown_button(
         cui_overlay_close(ui, &state->overlay);
         state->depth = 0;
     }
+    if (trigger_id)
+        cui_update_semantic(ui, trigger_id, false, 0);
     return result;
 }

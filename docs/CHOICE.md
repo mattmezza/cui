@@ -465,3 +465,11 @@ across all theme/variant pairs, plus real hover/action activation and selected/
 disabled outline surfaces. Upstream warning/success/info and link/text/default/
 custom Button styles remain missing from the split facade; warning/success/info
 also lack corresponding semantic colors in the current public theme.
+
+`action_selected` preserves an inner action button's selected appearance and
+surfaces both halves, combined with outer `selected`. `action_outline` preserves
+an action-only outline; outer `outline` applies to both halves. Visual selection
+is presentation only: it does not set checked, selected or toggled accessibility
+state on these action buttons. The menu trigger reports its actual expanded
+state independently. Tests inspect inherited appearance, independent foregrounds,
+outer outline precedence and expanded/unchecked semantics after pointer opening.

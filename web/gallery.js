@@ -80,6 +80,19 @@ const snippets = {
  Label:'cui_label(ui, &theme,\n    cui_string("A useful label"));',
  Badge:'cui_badge(ui, id, &theme,\n    cui_string("In review"));',
  Progress:'cui_progress(ui, id, &theme,\n    progress / 100.0f, 300);',
+ Alert:'cui_alert(ui, id, &theme, (cui_alert_options){\n    .kind = CUI_ALERT_INFO,\n    .title = cui_string("Heads up"),\n    .message = cui_string("Your changes were saved"),\n    .width = 360});',
+ Bubble:'cui_begin_bubble(ui, id, &theme, CUI_BUBBLE_FILLED, 240);\ncui_label(ui, &theme, cui_string("Message"));\ncui_end_bubble(ui);',
+ Empty:'cui_empty(ui, id, &theme, cui_string("No results"),\n    cui_string("Try a different search"), 320);',
+ GroupBox:'cui_begin_group_box(ui, id, &theme, cui_string("Preferences"), 320);\ncui_label(ui, &theme, cui_string("Your settings"));\ncui_end_group_box(ui);',
+ Skeleton:'cui_skeleton(ui, id, &theme, 240, 20, 6,\n    cui_loading_phase(now_seconds, 1.2f), false, reduced_motion);',
+ Spinner:'cui_spinner(ui, id, &theme, 24,\n    cui_loading_phase(now_seconds, .8f), reduced_motion);',
+ Tooltip:'/* Paint trigger before calling the tooltip. */\ncui_tooltip(ui, id, &theme, &hover, cui_string("Helpful detail"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport});',
+ HoverCard:'/* Paint trigger before opening the card. */\nif (cui_begin_hover_card(ui, id, &theme, &hover, cui_string("Profile"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport})) {\n    cui_label(ui, &theme, cui_string("Alex Morgan"));\n    cui_end_hover_card(ui);\n}',
+ 'Focus Trap':'if (cui_begin_focus_scope(ui, scope_id, true)) {\n    /* Paint focusable children here. */\n    cui_end_focus_scope(ui);\n}',
+ Clipboard:'/* Install clipboard_set/get on cui_platform first. */\nif (cui_button(ui, id, &theme, cui_string("Copy"), false))\n    platform.clipboard_set(platform.user, cui_string("Copied text"));',
+ Shimmer:'cui_shimmer_text(ui, id, &theme, &shimmer,\n    cui_string("Loading content"), cui_shimmer_options_default());',
+ Message:'cui_message(ui, id, &theme, (cui_message_options){\n    .width = 360, .body = bodies, .body_count = body_count});',
+ MessageScroller:'cui_message_scroller(ui, id, &theme, scroll_state,\n    draw_message_row, user, cui_message_scroller_options_default());',
 
  Editor:'cui_edit_undo(edit);\ncui_edit_redo(edit);',
  VirtualList:'cui_virtual_view view = cui_virtual_viewport(\n    list, scroll, viewport_height, 1);',
@@ -118,14 +131,8 @@ const snippets = {
  Settings:'cui_settings_state_init(&state, page_workspace, 2, search);\ncui_settings(ui, id, &theme, pages, 2, &state,\n    (cui_settings_options){.width = 800, .height = 500});',
  Carousel:'cui_carousel_state_init(&state, geometry, 4, 4);\ncui_carousel(ui, id, &theme, &state, slides, 4,\n    (cui_carousel_options){.width = 480, .height = 200,\n        .controls = draw_controls, .pagination = draw_pages});',
  Command:'cui_command_init(&state, rows, 32, query);\ncui_command(ui, id, &theme, &state, entries, count, options);',
- Questionnaire:`/* Application owns state and choice definitions. */
-static void draw_choice_content(cui_context *ui, cui_id id,
-    const cui_questionnaire_choice_view *view, void *user) {
-    const cui_theme *theme = user;
-    (void)id; (void)view;
-    cui_text(ui, cui_string("Custom answer"), theme->font_size, theme->text);
-}
-/* In a helper taking (ui, theme, state, ids, item, choice): */
+ Questionnaire:`/* Application owns state, choices and render callbacks.
+ * draw_choice_content has cui_questionnaire_choice_render_fn signature. */
 options.render_content = draw_choice_content;
 options.render_user = &theme;
 if (cui_questionnaire_begin(ui, root_id, &theme, &state, options)) {

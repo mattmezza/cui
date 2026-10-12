@@ -8,11 +8,14 @@ import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import subprocess
+import sys
 import threading
 from playwright.sync_api import sync_playwright
 
 
 def main():
+    subprocess.run([sys.executable, str(Path(__file__).with_name('test_snippets.py'))], check=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium', help='Optional installed Chromium executable')
@@ -308,6 +311,8 @@ def main():
                 page.wait_for_timeout(50)
                 assert page.locator('#preview-card').is_visible(), name
                 assert 'draw commands' in page.locator('#preview-note').inner_text(), (name, page.locator('#preview-note').inner_text(), errors)
+                excerpt = page.locator('#snippet').inner_text()
+                assert excerpt.strip() and 'No complete styled browser example' not in excerpt, name
             def semantic_index(name, role=None):
                 return page.evaluate('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', {'name':name,'role':role})
             def wait_semantic(name, role):

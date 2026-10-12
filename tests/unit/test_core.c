@@ -1409,6 +1409,24 @@ static void test_hover_scope(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+static void test_anchored_underlay(void) {
+    cui_context *ui = make();
+    for (int width = 80; width <= 140; width += 60) {
+        begin(ui);
+        cui_begin_box(ui, 80, (cui_box){.width = (float)width, .height = 30});
+        assert(cui_set_underlay_ex(ui,
+                                   (cui_underlay_layout){.bounds = {0, 0, 0, 1},
+                                                         .grow_width = true,
+                                                         .vertical = CUI_ALIGN_END},
+                                   (cui_color){17, 18, 19, 255}, (cui_corner_radii){0}));
+        cui_end_box(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(list.count == 3 && list.commands[1].type == CUI_DRAW_RECT);
+        assert(list.commands[1].bounds.w == width && list.commands[1].bounds.y == 29 &&
+               list.commands[1].bounds.h == 1);
+    }
+    cui_destroy(ui);
+}
 static void test_bitmap_leaf(void) {
     unsigned char pixels[24] = {255};
     cui_context *ui = make();
@@ -1438,6 +1456,7 @@ static void test_bitmap_leaf(void) {
 }
 int main(void) {
     test_bitmap_leaf();
+    test_anchored_underlay();
     test_hover_scope();
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();

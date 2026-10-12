@@ -248,6 +248,14 @@ void cui_pop_id(cui_context *ui);
 /* Paint one rectangle below children of the current open box, clipped to it.
  * Coordinates are relative to the box's current-frame origin; last call wins. */
 bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
+typedef struct {
+    cui_rect bounds;
+    cui_align horizontal, vertical;
+    /* Growing dimensions add bounds.w/h to the current box size, clamped at zero.
+     * Alignment is resolved after sizing; x/y then offset that aligned origin. */
+    bool grow_width, grow_height;
+} cui_underlay_layout;
+bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corner_radii);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Floating viewport coordinates, independent of ancestor clipping/layout.
  * layer must be positive. Close with cui_end_box. Portal dimensions come from

@@ -249,6 +249,14 @@ void cui_pop_id(cui_context *ui);
 /* Paint one rectangle below children of the current open box, clipped to it.
  * Coordinates are relative to the box's current-frame origin; last call wins. */
 bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
+typedef struct {
+    cui_rect bounds;
+    cui_align horizontal, vertical;
+    /* Growing dimensions add bounds.w/h to the current box size, clamped at zero.
+     * Alignment is resolved after sizing; x/y then offset that aligned origin. */
+    bool grow_width, grow_height;
+} cui_underlay_layout;
+bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corner_radii);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Floating viewport coordinates, independent of ancestor clipping/layout.
  * layer must be positive. Close with cui_end_box. Portal dimensions come from
@@ -5405,6 +5413,7 @@ typedef struct {
     int16_t layer;
     cui_bitmap_paint bitmap;
     cui_rect underlay_bounds;
+    cui_underlay_layout underlay_layout;
     cui_color underlay_color;
     cui_corner_radii underlay_radii;
 } cui_core_box_node;
@@ -6072,19 +6081,28 @@ bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_bo
     cui_end_box(ui);
     return ok;
 }
-bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_corner_radii radii) {
+bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color color,
+                         cui_corner_radii radii) {
+    cui_rect bounds = layout.bounds;
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
         !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
-        bounds.w < 0 || bounds.h < 0 || !isfinite(radii.top_left) || !isfinite(radii.top_right) ||
-        !isfinite(radii.bottom_left) || !isfinite(radii.bottom_right) || radii.top_left < 0 ||
-        radii.top_right < 0 || radii.bottom_left < 0 || radii.bottom_right < 0)
+        (!layout.grow_width && bounds.w < 0) || (!layout.grow_height && bounds.h < 0) ||
+        layout.horizontal < CUI_ALIGN_START || layout.horizontal > CUI_ALIGN_END ||
+        layout.vertical < CUI_ALIGN_START || layout.vertical > CUI_ALIGN_END ||
+        !isfinite(radii.top_left) || !isfinite(radii.top_right) || !isfinite(radii.bottom_left) ||
+        !isfinite(radii.bottom_right) || radii.top_left < 0 || radii.top_right < 0 ||
+        radii.bottom_left < 0 || radii.bottom_right < 0)
         return false;
     cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
     node->underlay_bounds = bounds;
+    node->underlay_layout = layout;
     node->underlay_color = color;
     node->underlay_radii = radii;
     Clay__GetOpenLayoutElement()->config.custom.customData = node;
     return true;
+}
+bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_corner_radii radii) {
+    return cui_set_underlay_ex(ui, (cui_underlay_layout){.bounds = bounds}, color, radii);
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
     cui_core_begin_box(ui, id, b, NULL, 0);
@@ -6346,14 +6364,25 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             }
             ui->commands[ui->count++] =
                 (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds};
-            ui->commands[ui->count++] =
-                (cui_draw_command){.type = CUI_DRAW_RECT,
-                                   .bounds = {d.bounds.x + node->underlay_bounds.x,
-                                              d.bounds.y + node->underlay_bounds.y,
-                                              node->underlay_bounds.w, node->underlay_bounds.h},
-                                   .color = node->underlay_color,
-                                   .corner_radii = node->underlay_radii,
-                                   .custom_corners = true};
+            cui_underlay_layout layout = node->underlay_layout;
+            cui_rect underlay = node->underlay_bounds;
+            if (layout.grow_width)
+                underlay.w = fmaxf(0, d.bounds.w + underlay.w);
+            if (layout.grow_height)
+                underlay.h = fmaxf(0, d.bounds.h + underlay.h);
+            float align_x = layout.horizontal == CUI_ALIGN_END      ? 1
+                            : layout.horizontal == CUI_ALIGN_CENTER ? .5f
+                                                                    : 0;
+            float align_y = layout.vertical == CUI_ALIGN_END      ? 1
+                            : layout.vertical == CUI_ALIGN_CENTER ? .5f
+                                                                  : 0;
+            underlay.x += d.bounds.x + (d.bounds.w - underlay.w) * align_x;
+            underlay.y += d.bounds.y + (d.bounds.h - underlay.h) * align_y;
+            ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_RECT,
+                                                           .bounds = underlay,
+                                                           .color = node->underlay_color,
+                                                           .corner_radii = node->underlay_radii,
+                                                           .custom_corners = true};
             ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
             continue;
         }

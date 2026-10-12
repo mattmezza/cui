@@ -38,6 +38,7 @@ typedef struct {
     cui_color secondary_hover, tab_foreground, tab_active_foreground, tab_active, tab_bar,
         tab_bar_segmented;
     cui_spring_settings spring_move;
+    cui_color switch_background, switch_thumb;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

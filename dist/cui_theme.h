@@ -39,6 +39,7 @@ typedef struct {
     cui_color secondary_hover, tab_foreground, tab_active_foreground, tab_active, tab_bar,
         tab_bar_segmented;
     cui_spring_settings spring_move;
+    cui_color switch_background, switch_thumb;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -114,6 +115,8 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
     t.tab_active = t.surface;
     t.tab_bar = t.background;
     t.tab_bar_segmented = t.secondary;
+    t.switch_background = t.buttons[CUI_THEME_BUTTON_SECONDARY].active;
+    t.switch_thumb = t.background;
     t.spring_move =
         (cui_spring_settings){.response = .28f, .damping = .85f, .epsilon = .1f, .travel = true};
     return t;

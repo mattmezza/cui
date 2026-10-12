@@ -2196,9 +2196,11 @@ static void cui_text_view_copy_table(const cui_text_view_state *s, cui_text_view
         ++columns;
         size_t begin = cell->text.begin > a ? cell->text.begin : a,
                finish = cell->text.end < b ? cell->text.end : b;
-        while (begin < finish && s->workspace.rendered[begin] == ' ')
+        while (begin < finish && s->workspace.rendered[begin] == ' ' &&
+               !(s->workspace.mapping[begin].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             ++begin;
-        while (finish > begin && s->workspace.rendered[finish - 1] == ' ')
+        while (finish > begin && s->workspace.rendered[finish - 1] == ' ' &&
+               !(s->workspace.mapping[finish - 1].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             --finish;
         if (begin < finish)
             cui_text_view_copy_inline(s, w, (cui_text_view_range){begin, finish}, i);

@@ -140,6 +140,19 @@ static void test_linked_image_model(void) {
            CUI_TEXT_VIEW_OK);
     assert(f.spans[0].link.end - f.spans[0].link.begin == strlen("https://x.test/a(b)"));
 }
+static void test_image_only_table_copy(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("| ![alt](asset) |\n| --- |\n| after |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].flags & CUI_TEXT_VIEW_INLINE_IMAGE);
+    assert(cui_text_view_select(&f.state, f.spans[0].text.begin, f.spans[0].text.end));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "| ![alt](asset) |\n| :-- |\n|  |"));
+}
 static void test_image_font_metrics(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -2162,6 +2175,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_image_only_table_copy();
     test_linked_image_model();
     test_inline_image_objects();
     test_image_font_metrics();

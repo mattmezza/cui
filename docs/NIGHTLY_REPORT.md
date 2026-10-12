@@ -288,3 +288,7 @@ Safe branch pushes are performed with ordinary Git; no force push/history rewrit
 ### Validated integration bc295be
 
 The Chart/TextView/Questionnaire batch from portable source75ef24f is now integrated on main together with the browser physical-click repair. Native77, sanitizers75, WASI67, quality, strict web build and full Chromium78 pass. The merged portable source, adapters, examples, build scripts and browser files match the tested integration branch exactly. Publication is pending; public04e044e remains the last verified HTTPS78 release. All78 entries remain in scope and full feature parity is not claimed.
+
+### Verified publication5608e51 and next release2af3f39
+
+Pages38295715735 and CI38295715752 succeeded. Full HTTPS78 behavior passes for5608e51; WASM, JS, CSS, HTML, catalog, themes and docs match its Pages artifact byte-for-byte. The next automatic-axis/atomic-image/Questionnaire-semantics batch2af3f39 is now integrated after native77, sanitizers75, WASI67, browser78, quality and web-build gates passed. Its publication remains pending; full78-entry feature parity is still incomplete.

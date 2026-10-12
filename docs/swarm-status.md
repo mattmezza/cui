@@ -81,3 +81,7 @@ The Chart/TextView/Questionnaire batch from portable source75ef24f is now integr
 ### Next isolated batch: 2af3f39
 
 Automatic Chart axis-label measurement, Bar/point-axis source geometry, atomic standalone Markdown/HTML image sizing and baseline flow, and Questionnaire answer description/enabled-position semantics pass native77, ASan/UBSan75, WASI67, full Chromium78, quality and strict web build. This batch remains isolated until release5608e51 HTTPS validation completes; it does not establish full feature parity.
+
+### Verified publication5608e51 and next release2af3f39
+
+Pages38295715735 and CI38295715752 succeeded. Full HTTPS78 behavior passes for5608e51; WASM, JS, CSS, HTML, catalog, themes and docs match its Pages artifact byte-for-byte. The next automatic-axis/atomic-image/Questionnaire-semantics batch2af3f39 is now integrated after native77, sanitizers75, WASI67, browser78, quality and web-build gates passed. Its publication remains pending; full78-entry feature parity is still incomplete.

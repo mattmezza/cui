@@ -1,0 +1,1 @@
+cui-questionnaire-before-focus: tests/unit/test_questionnaire_styled.c:193: card_paint: Assertion `same_color(d->color, border) && d->corner_radii.top_left == radius' failed.

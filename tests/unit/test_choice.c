@@ -2907,7 +2907,64 @@ static void test_tab_reference_size_metrics(void) {
             cui_destroy(ui);
         }
 }
+static void test_tab_independent_palette(void) {
+    for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        theme.tab_foreground = (cui_color){11, 22, 33, 255};
+        theme.tab_active_foreground = (cui_color){44, 55, 66, 255};
+        theme.tab_active = (cui_color){77, 88, 99, 255};
+        theme.tab_bar = (cui_color){100, 110, 120, 255};
+        theme.tab_bar_segmented = (cui_color){130, 140, 150, 255};
+        theme.secondary_hover = (cui_color){160, 170, 180, 255};
+        const cui_choice_item entry = {10, {"Palette", 7}, false};
+        cui_id selected = 0;
+        for (int phase = 0; phase < 4; phase++) {
+            if (phase == 1) {
+                cui_rect bounds = cui_bounds(ui, 10);
+                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                                       .x = bounds.x + 2,
+                                                       .y = bounds.y + 2}));
+            }
+            if (phase >= 2)
+                selected = 10;
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_tabs(ui, 1, &theme, &entry, 1, &selected,
+                     (cui_tabs_options){.variant = variant, .disabled = phase == 3}, NULL, NULL);
+            cui_draw_list draw = cui_end_frame(ui);
+            cui_color expected =
+                phase == 3                ? theme.muted
+                : variant == CUI_TAB_PILL ? (phase == 2   ? theme.on_primary
+                                             : phase == 1 ? theme.secondary_foreground
+                                                          : theme.text)
+                : variant == CUI_TAB_OUTLINE && phase == 2 ? theme.primary
+                : variant == CUI_TAB_OUTLINE && phase == 1 ? theme.secondary_foreground
+                : phase == 0                               ? theme.tab_foreground
+                                                           : theme.tab_active_foreground;
+            if (variant == CUI_TAB_PILL && phase == 3) {
+                expected = theme.on_primary;
+                expected.a *= .5f;
+            }
+            bool label = false, bar = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                cui_draw_command command = draw.commands[i];
+                if (command.type == CUI_DRAW_TEXT && command.text.length == 7)
+                    label |= same_color(command.color, expected);
+                if (command.type == CUI_DRAW_RECT)
+                    bar |= same_color(command.color, variant == CUI_TAB_DEFAULT
+                                                         ? theme.tab_bar
+                                                         : theme.tab_bar_segmented);
+            }
+            assert(label);
+            if (variant == CUI_TAB_DEFAULT || variant == CUI_TAB_SEGMENTED)
+                assert(bar);
+        }
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_tab_independent_palette();
     test_tab_reference_size_metrics();
     test_list_confirmation_contract();
     test_structured_tab_parts();

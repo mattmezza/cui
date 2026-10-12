@@ -1,0 +1,4 @@
+Combined source: cf11f39. Portable source matches sanitizer75/WASI67 source593bbb1.
+Scope: Stepper, Calendar/DatePicker, choice and Command widths, InputGroup, clean Message preview, AlertDialog centering.
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting

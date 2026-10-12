@@ -95,3 +95,7 @@ Pages38296393361 and CI38296393398 succeeded. Full HTTPS78 behavior passes; seve
 ### Validated docs/navigation integration 3c08749
 
 Combined native77, Chromium78, targeted visual checks, docs3 and quality gates pass. New getting-started, state/callback and AI-agent guides include Copy buttons and downloadable llms indexes, full bundles and Markdown exports. Cropped images use isolated source bitmaps before smooth scaling, preserving crop/tint/clip pixel assertions. Portable source matches navigation a679582 with sanitizer75/WASI67 evidence. Publication remains pending; full parity and the feedback audit remain open.
+
+### Validated component feedback batch cf11f39
+
+Native77, sanitizer75, WASI67, Chromium78, targeted visuals and quality pass. Portable source matches593bbb1. Stepper, calendar/date picker, choice/Command width, InputGroup, Message fixture and AlertDialog fixes are integrated. Public e6a5395 remains HTTPS78/fifteen-file verified until this batch is deployed and checked. Full parity remains incomplete; DataTable ordering/header polish is isolated work in progress.

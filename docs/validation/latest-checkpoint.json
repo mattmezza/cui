@@ -1,48 +1,48 @@
 {
-  "source": "a679582",
-  "published_source": "49d4bfe9ed5384bb823ea173b61726042ab02de2",
+  "source": "cf11f39",
+  "published_source": "e6a5395d8c2d7a5940d0c344ce17a9c23182883b",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Word and vertical caret navigation with UTF-8 scalar-column preservation, read-only Input support and explicit composite key delegation passes native77, sanitizer75, WASI67 and Chromium78. Previous keyboard code fails the new word-motion regression. Published49d4bfe remains HTTPS78/eight-asset verified; the navigation batch awaits publication. Full78-entry parity and remaining website feedback stay unfinished.",
+  "summary": "Combined component presentation fixes pass native77, sanitizer75, WASI67, Chromium78, visual regressions and quality. Portable source matches validated593bbb1. Stepper selection, calendar SVG/centering, choice/Command width, InputGroup inline sizing/frame, clean Message preview and centered scrollable AlertDialog are fixed. Published e6a5395 is HTTPS78/fifteen-file verified. Full78-entry parity and remaining feedback are incomplete.",
   "checks": [
     {
       "name": "native",
-      "source": "a679582",
+      "source": "cf11f39",
       "passed": 77,
       "total": 77,
-      "log": "native-a679582.txt"
+      "log": "native-cf11f39.txt"
     },
     {
       "name": "sanitizers",
-      "source": "a679582",
+      "source": "593bbb1",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-a679582.txt"
+      "log": "sanitizers-593bbb1.txt"
     },
     {
       "name": "WASI",
-      "source": "a679582",
+      "source": "593bbb1",
       "passed": 67,
       "total": 67,
-      "log": "wasi-a679582.txt"
+      "log": "wasi-593bbb1.txt"
     },
     {
       "name": "browser",
-      "source": "a679582",
+      "source": "cf11f39",
       "passed": 78,
       "total": 78,
-      "log": "browser-a679582.txt"
+      "log": "browser-cf11f39.txt"
     }
   ],
-  "visual_regressions": "visual-3d05c2a.txt",
-  "failing_before": "edit-failing-before-a679582.txt",
-  "quality": "quality-a679582.txt",
-  "published_evidence": "published-49d4bfe.txt",
+  "visual_regressions": "visual-cf11f39.txt",
+  "failing_before": "alert-failing-before-593bbb1.txt",
+  "quality": "quality-cf11f39.txt",
+  "published_evidence": "published-e6a5395.txt",
   "latest_deployment": {
-    "source": "49d4bfe9ed5384bb823ea173b61726042ab02de2",
+    "source": "e6a5395d8c2d7a5940d0c344ce17a9c23182883b",
     "status": "success",
-    "pages_run": 38313694957,
-    "ci_run": 38313695051,
-    "direct_https_verification": "Chromium78 and eight assets pass"
+    "pages_run": 38318335379,
+    "ci_run": 38318335400,
+    "direct_https_verification": "Chromium78 and fifteen files pass"
   },
   "feedback_audit": "../website-feedback.md"
 }

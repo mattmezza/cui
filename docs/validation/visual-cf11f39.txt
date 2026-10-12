@@ -1,0 +1,3 @@
+Combined source: cf11f39. Portable source matches sanitizer75/WASI67 source593bbb1.
+Scope: Stepper, Calendar/DatePicker, choice and Command widths, InputGroup, clean Message preview, AlertDialog centering.
+PASS: Marker line, Pagination/Stepper text centering, graphical Rating, real Image pixels

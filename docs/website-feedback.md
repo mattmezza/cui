@@ -4,7 +4,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 
 ## Rendering and behavior
 
-- [ ] AlertDialog: center content within the dialog.
+- [x] AlertDialog: center content within the dialog. — 593bbb1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks centered content, overflow start/end scrolling and recovery in four themes; browser checks visible title/action centering. Publication pending.
 - [x] Attachment and Image: show a real image, replacing the tiny blue fixture. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Avatar: center initials. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Marker: keep “Synchronizing 3 tasks” on the intended horizontal line. — first polish batch; native/browser geometry and interaction evidence below.

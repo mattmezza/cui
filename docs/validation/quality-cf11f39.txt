@@ -1,0 +1,9 @@
+Combined source: cf11f39. Portable source matches sanitizer75/WASI67 source593bbb1.
+Scope: Stepper, Calendar/DatePicker, choice and Command widths, InputGroup, clean Message preview, AlertDialog centering.
+python scripts/check_manifest.py
+78 unique components: {'not_started': 0, 'scaffolded': 0, 'implemented': 5, 'tested': 73, 'verified': 0}
+python scripts/check_licenses.py
+Pinned dependency hashes and license files match
+python scripts/theme_presets.py --check
+python scripts/format.py --check
+python scripts/amalgamate.py --check

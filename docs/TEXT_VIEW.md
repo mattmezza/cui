@@ -243,3 +243,10 @@ Each mixed image line expands its logical ascent and descent from the actual bod
 baseline and image baseline. Wrapped following lines begin after that complete
 logical extent, including fonts whose ascent or descent exceeds the requested line
 height. Text-only lines retain their requested logical height.
+
+Bounded balanced brackets and parentheses recognize linked Markdown images and
+parenthesized destinations. Quoted titles and angle-delimited destinations no
+longer become part of the host image URI. A linked image uses its alt source as
+its link label, activates the host link callback through ordinary capture, and
+Source copy preserves its enclosing link. Title tooltip presentation remains absent;
+this delimiter parser is not a complete CommonMark grammar.

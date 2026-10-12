@@ -433,11 +433,13 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             r.x -= cell_bounds.x;
             r.y -= cell_bounds.y;
         }
-        cui_interaction interaction = cui_interact(
-            ui, link_id, CUI_ROLE_LINK,
+        cui_str label =
             cui_text_view_slice(cui_text_view_rendered_text(s),
-                                (cui_text_view_range){first->text.begin, last->text.end}),
-            o.disabled, false, 0);
+                                (cui_text_view_range){first->text.begin, last->text.end});
+        if (end == i + 1 && (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            label = cui_text_view_slice(cui_text_view_source(s), span->alt);
+        cui_interaction interaction =
+            cui_interact(ui, link_id, CUI_ROLE_LINK, label, o.disabled, false, 0);
         cui_set_semantic_details(ui, link_id, (cui_semantic_details){.cursor = CUI_CURSOR_POINTER});
         cui_begin_absolute_box(ui, link_id, (cui_box){0}, r);
         cui_end_box(ui);
@@ -528,10 +530,10 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                                     (cui_text_view_range){first->text.begin, last->text.end}),
                 first->font_size, color, first->line_height,
                 cui_text_view_text_style(first->flags));
-        if (is_link)
+        if (is_link && !(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x756e646572000000),
                                (cui_rect){0, r.h - 2, r.w, 1}, color);
-        if (first->flags & CUI_TEXT_VIEW_STRIKE)
+        if ((first->flags & CUI_TEXT_VIEW_STRIKE) && !(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x737472696b000000),
                                (cui_rect){0, r.h * .5f, r.w, 1}, color);
         cui_end_box(ui);

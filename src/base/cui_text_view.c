@@ -290,6 +290,79 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *s,
     output[required] = 0;
     return CUI_TEXT_VIEW_OK;
 }
+static bool cui_text_view_link_syntax(cui_str input, size_t opening, size_t end, size_t *label_end,
+                                      size_t *destination_end) {
+    if (opening >= end || input.data[opening] != '[')
+        return false;
+    unsigned brackets = 1;
+    size_t close = opening + 1;
+    for (; close < end; ++close) {
+        char c = input.data[close];
+        if (c == '\\' && close + 1 < end) {
+            ++close;
+            continue;
+        }
+        if (c == '[' && ++brackets > 32)
+            return false;
+        if (c == ']' && --brackets == 0)
+            break;
+    }
+    if (close + 1 >= end || input.data[close + 1] != '(')
+        return false;
+    unsigned parentheses = 1;
+    bool angle = false;
+    char quote = 0;
+    for (size_t at = close + 2; at < end; ++at) {
+        char c = input.data[at];
+        if (c == '\\' && at + 1 < end) {
+            ++at;
+            continue;
+        }
+        if (quote) {
+            if (c == quote)
+                quote = 0;
+            continue;
+        }
+        if (angle) {
+            if (c == '>')
+                angle = false;
+            continue;
+        }
+        if (c == '<' && at == close + 2) {
+            angle = true;
+            continue;
+        }
+        if ((c == '"' || c == '\'') && at > close + 2 &&
+            (input.data[at - 1] == ' ' || input.data[at - 1] == '\t')) {
+            quote = c;
+            continue;
+        }
+        if (c == '(' && ++parentheses > 32)
+            return false;
+        if (c == ')' && --parentheses == 0) {
+            *label_end = close;
+            *destination_end = at;
+            return true;
+        }
+    }
+    return false;
+}
+static cui_text_view_range cui_text_view_link_uri(cui_str input, size_t begin, size_t end) {
+    while (begin < end && (input.data[begin] == ' ' || input.data[begin] == '\t'))
+        ++begin;
+    if (begin < end && input.data[begin] == '<') {
+        size_t close = cui_text_view_find(input, begin + 1, end, ">", 1);
+        if (close != SIZE_MAX)
+            return (cui_text_view_range){begin + 1, close};
+    }
+    size_t at = begin;
+    while (at < end && input.data[at] != ' ' && input.data[at] != '\t') {
+        if (input.data[at] == '\\' && at + 1 < end)
+            ++at;
+        ++at;
+    }
+    return (cui_text_view_range){begin, at};
+}
 static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, unsigned flags,
                                  cui_text_view_range link, unsigned depth) {
     if (depth > 16) {
@@ -322,13 +395,11 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
             }
         }
         if (c == '!' && a + 1 < b && p->input.data[a + 1] == '[') {
-            size_t close = cui_text_view_find(p->input, a + 2, b, "](", 2);
-            size_t last =
-                close == SIZE_MAX ? SIZE_MAX : cui_text_view_find(p->input, close + 2, b, ")", 1);
-            if (last != SIZE_MAX) {
+            size_t close, last;
+            if (cui_text_view_link_syntax(p->input, a + 1, b, &close, &last)) {
                 cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, last + 1},
                                    flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
-                p->last.resource = (cui_text_view_range){close + 2, last};
+                p->last.resource = cui_text_view_link_uri(p->input, close + 2, last);
                 p->last.alt = (cui_text_view_range){a + 2, close};
                 if (p->write && !p->error)
                     p->state->workspace.spans[p->spans - 1] = p->last;
@@ -337,18 +408,12 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
             }
         }
         if (c == '[') {
-            size_t close = cui_text_view_find(p->input, a + 1, b, "](", 2);
-            if (close != SIZE_MAX) {
-                size_t dest = close + 2, last = cui_text_view_find(p->input, dest, b, ")", 1);
-                if (last != SIZE_MAX) {
-                    size_t uri = dest;
-                    while (uri < last && p->input.data[uri] != ' ' && p->input.data[uri] != '\t')
-                        ++uri;
-                    cui_text_view_inline(p, a + 1, close, flags, (cui_text_view_range){dest, uri},
-                                         depth + 1);
-                    a = last + 1;
-                    continue;
-                }
+            size_t close, last;
+            if (cui_text_view_link_syntax(p->input, a, b, &close, &last)) {
+                cui_text_view_inline(p, a + 1, close, flags,
+                                     cui_text_view_link_uri(p->input, close + 2, last), depth + 1);
+                a = last + 1;
+                continue;
             }
         }
         if (c == '*' || c == '_' || c == '~') {
@@ -602,9 +667,8 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         size_t image_close = SIZE_MAX, image_last = SIZE_MAX;
         if (b - a >= 4 && p->input.data[a] == '!' && p->input.data[a + 1] == '[') {
-            image_close = cui_text_view_find(p->input, a + 2, b, "](", 2);
-            if (image_close != SIZE_MAX)
-                image_last = cui_text_view_find(p->input, image_close + 2, b, ")", 1);
+            if (!cui_text_view_link_syntax(p->input, a + 1, b, &image_close, &image_last))
+                image_close = image_last = SIZE_MAX;
             if (image_last != SIZE_MAX) {
                 size_t remainder = image_last + 1;
                 while (remainder < b &&
@@ -813,7 +877,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             if (p->write) {
                 cui_text_view_block *block = &p->state->workspace.blocks[p->block];
                 block->kind = CUI_TEXT_VIEW_IMAGE;
-                block->resource = (cui_text_view_range){image_close + 2, image_last};
+                block->resource = cui_text_view_link_uri(p->input, image_close + 2, image_last);
             }
             cui_text_view_inline(p, a + 2, image_close, 0, (cui_text_view_range){0}, 0);
             cui_text_view_block_end(p, next, true);
@@ -2047,8 +2111,19 @@ static void cui_text_view_copy_inline(const cui_text_view_state *s, cui_text_vie
         size_t b = span->text.end < r.end ? span->text.end : r.end;
         cui_str t = {s->workspace.rendered + a, b - a};
         if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            bool linked = span->link.end > span->link.begin;
+            if (linked)
+                cui_text_view_copy_literal(w, "[");
             cui_text_view_copy_write(w, (cui_str){s->workspace.source + span->source.begin,
                                                   span->source.end - span->source.begin});
+            if (linked) {
+                cui_text_view_copy_literal(w, "](");
+                cui_text_view_copy_escape(w,
+                                          (cui_str){s->workspace.source + span->link.begin,
+                                                    span->link.end - span->link.begin},
+                                          true);
+                cui_text_view_copy_literal(w, ")");
+            }
             continue;
         }
         bool link = span->link.end > span->link.begin;

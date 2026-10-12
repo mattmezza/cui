@@ -116,6 +116,30 @@ static void test_inline_image_objects(void) {
     }
     assert(aligned);
 }
+static void test_linked_image_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "[![alt](asset \"image (title)\")](https://x.test) end";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.rendered, "  end\n") && f.state.span_count == 2);
+    cui_text_view_span *image = &f.spans[0];
+    assert((image->flags & CUI_TEXT_VIEW_INLINE_IMAGE) && image->text.end == 1 &&
+           image->resource.end - image->resource.begin == 5 &&
+           image->link.end - image->link.begin == strlen("https://x.test"));
+    assert(cui_text_view_select(&f.state, 0, 1));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "[![alt](asset \"image (title)\")](https://x.test)"));
+    assert(cui_text_view_set_text(&f.state, text("![nested [alt]](<asset> \"title)\")")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].kind == CUI_TEXT_VIEW_IMAGE &&
+           f.blocks[0].resource.end - f.blocks[0].resource.begin == 5);
+    assert(cui_text_view_set_text(&f.state, text("[text](https://x.test/a(b))")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].link.end - f.spans[0].link.begin == strlen("https://x.test/a(b)"));
+}
 static void test_image_font_metrics(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1026,6 +1050,53 @@ static void test_inline_image_paint(void) {
         assert(d.commands[i].type != CUI_DRAW_IMAGE);
     assert(!f.spans[1].image_ready && f.spans[1].image_bounds.w == 15 &&
            f.glyphs[0].bounds.y == f.glyphs[2].bounds.y && !strcmp(f.rendered, "a b\n"));
+    cui_destroy(ui);
+}
+static unsigned image_link_clicks;
+static void image_link_clicked(cui_str uri, const cui_event *event, void *user) {
+    (void)user;
+    assert(uri.length == strlen("https://x.test") &&
+           !memcmp(uri.data, "https://x.test", uri.length));
+    assert(event->pointer_button == CUI_POINTER_PRIMARY);
+    ++image_link_clicks;
+}
+static void test_linked_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("[![alt](asset \"title)\")](https://x.test) after")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    o.on_link = image_link_clicked;
+    frame(ui, &f, o);
+    cui_draw_list draw = frame(ui, &f, o);
+    for (size_t i = 0; i < draw.count; ++i)
+        assert(draw.commands[i].type != CUI_DRAW_RECT || draw.commands[i].bounds.h != 1);
+    bool label = false;
+    const cui_semantic *nodes;
+    size_t count;
+    nodes = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].role == CUI_ROLE_LINK)
+            label |= nodes[i].name.length == 3 && !memcmp(nodes[i].name.data, "alt", 3);
+    assert(label);
+    float x = f.state.viewport.x + f.glyphs[0].bounds.x + 5;
+    float y = f.state.viewport.y + f.glyphs[0].bounds.y + 5;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(image_link_clicks == 1);
     cui_destroy(ui);
 }
 static unsigned heading_metric_calls;
@@ -2091,6 +2162,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_linked_image_model();
     test_inline_image_objects();
     test_image_font_metrics();
     test_markdown();
@@ -2119,6 +2191,7 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_linked_image_paint();
     test_inline_image_heading_metrics();
     test_inline_image_paint();
     test_image_metric_paint();

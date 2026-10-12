@@ -125,3 +125,10 @@ apply it after `cui_end_frame`; unsupported hosts may retain their default.
 The SDL3 host exposes `cui_sdl3_set_cursor` and also applies the last completed
 frame's hint during polling. System cursors are cached and released with the
 adapter; headless drivers report unsupported without failing event dispatch.
+
+A box may set `custom_opacity=true` and `opacity` to multiply every descendant
+paint's alpha, including text, bitmap, underlay and logically nested portals.
+Nested factors multiply; default boxes preserve full opacity. Values clamp to
+0..1, with nonfinite values treated as zero. This is per-draw alpha modulation,
+not isolated group compositing. Opacity alone preserves semantics and input;
+combine with `inert` when hidden content should stop receiving interaction.

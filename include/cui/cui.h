@@ -193,6 +193,10 @@ typedef struct {
     bool inert;
     /* Positive finite caps apply to FIT/GROW/fixed; zero means unbounded. */
     float max_width, max_height;
+    /* Inherited per-draw opacity; custom_opacity distinguishes zero from default1.
+     * Finite values clamp to0..1; nonfinite values normalize to0. */
+    float opacity;
+    bool custom_opacity;
 } cui_box;
 /* Borrowed straight-alpha RGBA8 pixels, valid through renderer completion.
  * Increment revision whenever pixels change; stride includes row padding. */

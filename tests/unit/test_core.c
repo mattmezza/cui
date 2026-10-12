@@ -1557,7 +1557,65 @@ static void test_absolute_boxes(void) {
     assert(cui_last_error(ui) == CUI_ERROR_LAYOUT);
     cui_destroy(ui);
 }
+static void test_inherited_opacity(void) {
+    cui_context *ui = make();
+    unsigned char rgba[] = {255, 255, 255, 255};
+    begin(ui);
+    cui_begin_box(ui, 910,
+                  (cui_box){.width = 200,
+                            .height = 150,
+                            .background = {1, 0, 0, 200},
+                            .opacity = .5f,
+                            .custom_opacity = true});
+    cui_begin_box(ui, 911,
+                  (cui_box){.width = 100,
+                            .height = 70,
+                            .background = {2, 0, 0, 200},
+                            .border = {3, 0, 0, 200},
+                            .border_width = 1,
+                            .opacity = .5f,
+                            .custom_opacity = true});
+    assert(cui_set_underlay(ui, (cui_rect){0, 0, 5, 5}, (cui_color){4, 0, 0, 200},
+                            (cui_corner_radii){0}));
+    cui_text(ui, cui_string("Opacity"), 10, (cui_color){5, 0, 0, 200});
+    assert(cui_paint_bitmap(ui, 912,
+                            (cui_bitmap_paint){.bitmap = {rgba, 1, 1, 4, 1}, .opacity = .8f},
+                            (cui_box){.width = 5, .height = 5}));
+    cui_end_box(ui);
+    cui_begin_portal(ui, 913, (cui_box){.background = {6, 0, 0, 200}}, (cui_rect){220, 10, 20, 20},
+                     1);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    unsigned found = 0;
+    for (size_t i = 0; i < list.count; i++) {
+        cui_draw_command d = list.commands[i];
+        if (d.type == CUI_DRAW_IMAGE) {
+            assert(fabsf(d.bitmap.opacity - .2f) < .0001f);
+            found |= 1u << 7;
+        } else if (d.type == CUI_DRAW_RECT || d.type == CUI_DRAW_BORDER ||
+                   d.type == CUI_DRAW_TEXT) {
+            assert(d.color.r >= 1 && d.color.r <= 6);
+            assert(d.color.a == (d.color.r == 1 || d.color.r == 6 ? 100 : 50));
+            found |= 1u << d.color.r;
+        }
+    }
+    assert(found == 254);
+    begin(ui);
+    cui_begin_box(
+        ui, 920,
+        (cui_box){.width = 20, .height = 20, .background = {1, 2, 3, 255}, .custom_opacity = true});
+    cui_interact(ui, 920, CUI_ROLE_BUTTON, cui_string("Invisible"), false, false, 0);
+    cui_end_box(ui);
+    list = cui_end_frame(ui);
+    assert(list.count == 1 && list.commands[0].color.a == 0);
+    size_t count;
+    assert(cui_semantics(ui, &count) && count == 1); /* Opacity does not imply inert. */
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_inherited_opacity();
     test_absolute_boxes();
     test_bitmap_leaf();
     test_explicit_text_line_height();

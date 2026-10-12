@@ -194,6 +194,10 @@ typedef struct {
     bool inert;
     /* Positive finite caps apply to FIT/GROW/fixed; zero means unbounded. */
     float max_width, max_height;
+    /* Inherited per-draw opacity; custom_opacity distinguishes zero from default1.
+     * Finite values clamp to0..1; nonfinite values normalize to0. */
+    float opacity;
+    bool custom_opacity;
 } cui_box;
 /* Borrowed straight-alpha RGBA8 pixels, valid through renderer completion.
  * Increment revision whenever pixels change; stride includes row padding. */
@@ -5433,6 +5437,7 @@ typedef struct {
     size_t parent;
     bool clip, layout_only, inert;
     int16_t layer;
+    float opacity;
     cui_bitmap_paint bitmap;
     cui_rect underlay_bounds;
     cui_underlay_layout underlay_layout;
@@ -6036,6 +6041,10 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
     bool layout_only = b.layout_only || (parent != SIZE_MAX && ui->nodes[parent].layout_only);
     bool inert = layout_only || b.inert || (parent != SIZE_MAX && ui->nodes[parent].inert);
+    float opacity =
+        b.custom_opacity ? (isfinite(b.opacity) ? fminf(1, fmaxf(0, b.opacity)) : 0) : 1;
+    if (parent != SIZE_MAX)
+        opacity *= ui->nodes[parent].opacity;
     if (portal && !absolute)
         parent = SIZE_MAX;
     else if (parent != SIZE_MAX)
@@ -6045,7 +6054,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                     .clip = b.clip,
                                                     .layout_only = layout_only,
                                                     .inert = inert,
-                                                    .layer = layer};
+                                                    .layer = layer,
+                                                    .opacity = opacity};
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
@@ -6062,7 +6072,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                       cui_core_scalar(b.border_edges.bottom), 0}
                                  : (Clay_BorderWidth){bw, bw, bw, bw, 0};
     Clay__ConfigureOpenElement((Clay_ElementDeclaration){
-        .userData = layout_only ? ui : NULL,
+        .userData = layout_only ? (void *)ui : &ui->nodes[ui->node_count - 1],
         .layout = {.sizing = {cui_core_box_axis(b.width, b.fixed_width, b.max_width),
                               cui_core_box_axis(b.height, b.fixed_height, b.max_height)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
@@ -6218,11 +6228,14 @@ void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color
     }
     ui->element_count++;
     t = cui_core_copy_string(ui, t);
-    Clay__OpenTextElement((Clay_String){false, (int32_t)t.length, t.data},
-                          (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? ui : NULL,
-                                                   .fontSize = cui_core_scalar(size),
-                                                   .lineHeight = cui_core_scalar(line_height),
-                                                   .textColor = {c.r, c.g, c.b, c.a}});
+    Clay__OpenTextElement(
+        (Clay_String){false, (int32_t)t.length, t.data},
+        (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? (void *)ui
+                                             : ui->depth ? &ui->nodes[ui->node_stack[ui->depth - 1]]
+                                                         : NULL,
+                                 .fontSize = cui_core_scalar(size),
+                                 .lineHeight = cui_core_scalar(line_height),
+                                 .textColor = {c.r, c.g, c.b, c.a}});
 }
 void cui_text(cui_context *ui, cui_str text, float size, cui_color color) {
     cui_text_with_line_height(ui, text, size, color, 0);
@@ -6360,6 +6373,9 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         if (c->userData == ui && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
             c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END)
             continue;
+        float opacity = c->userData && c->userData != ui
+                            ? ((const cui_core_box_node *)c->userData)->opacity
+                            : 1;
         cui_draw_command d = {.bounds = {c->boundingBox.x, c->boundingBox.y, c->boundingBox.width,
                                          c->boundingBox.height}};
         switch (c->commandType) {
@@ -6403,6 +6419,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             underlay_background_id = c->id;
             const cui_core_box_node *node = c->renderData.custom.customData;
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
+            background.a = (uint8_t)(background.a * opacity);
             size_t needed = 3 + (background.a ? 1 : 0);
             if (needed > ui->config.max_commands - ui->count) {
                 cui_core_fail(ui, CUI_ERROR_CAPACITY);
@@ -6435,9 +6452,11 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                                                   : 0;
             underlay.x += d.bounds.x + (d.bounds.w - underlay.w) * align_x;
             underlay.y += d.bounds.y + (d.bounds.h - underlay.h) * align_y;
+            cui_color underlay_color = node->underlay_color;
+            underlay_color.a = (uint8_t)(underlay_color.a * opacity);
             ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_RECT,
                                                            .bounds = underlay,
-                                                           .color = node->underlay_color,
+                                                           .color = underlay_color,
                                                            .corner_radii = node->underlay_radii,
                                                            .custom_corners = true};
             ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
@@ -6464,6 +6483,10 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             ui->count = 0;
             break;
         }
+        if (d.type == CUI_DRAW_IMAGE)
+            d.bitmap.opacity *= opacity;
+        else if (d.type == CUI_DRAW_RECT || d.type == CUI_DRAW_BORDER || d.type == CUI_DRAW_TEXT)
+            d.color.a = (uint8_t)(d.color.a * opacity);
         ui->commands[ui->count++] = d;
     }
 cui_core_commands_done:

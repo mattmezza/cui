@@ -1,43 +1,43 @@
 {
-  "source": "d6fe7b0",
+  "source": "bfb9f4f",
   "published_source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local78-story gallery passed all broad gates, but Pages release5ced994 failed its hosted Skip-after-validation browser test. A physical-click reproduction identified stale test coordinates during the error layout transition. Fix under validation; published3aecd89 remains verified77 stories. Full78-entry feature parity remains unfinished.",
+  "summary": "Release repair waits for the rendered validation alert before clicking Skip; physical-click reproduction confirmed the old test could click shifted Start over. Full Chromium78, native77, ASan/UBSan75, WASI67 and quality gates pass for bfb9f4f. Updated78-story release is ready for publication; published3aecd89 remains verified77 stories until hosted deployment and HTTPS checks pass. Full feature parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "d6fe7b0",
+      "source": "bfb9f4f",
       "passed": 67,
       "total": 67,
-      "log": "wasi-d6fe7b0.txt"
+      "log": "wasi-bfb9f4f.txt"
     },
     {
       "name": "native",
-      "source": "d6fe7b0",
+      "source": "bfb9f4f",
       "passed": 77,
       "total": 77,
-      "log": "native-d6fe7b0.txt"
+      "log": "native-bfb9f4f.txt"
     },
     {
       "name": "browser",
-      "source": "d6fe7b0",
+      "source": "bfb9f4f",
       "passed": 78,
       "total": 78,
       "palettes": 38,
-      "log": "browser-d6fe7b0.txt"
+      "log": "browser-bfb9f4f.txt"
     },
     {
       "name": "sanitizers",
-      "source": "d6fe7b0",
+      "source": "bfb9f4f",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-d6fe7b0.txt"
+      "log": "sanitizers-bfb9f4f.txt"
     }
   ],
   "previous_deployment": {
     "source": "5ced994bae34dec46293a32a9317b14a77af2d42",
     "status": "failed",
-    "reason": "Hosted Chromium timed out after invalid Submit then Skip. Reproduction shows test reads old Skip bounds before error layout paints and clicks shifted Start over. Browser worker is validating a rendered-alert readiness regression; public77-story source remains unchanged.",
+    "reason": "Hosted Skip-after-validation test read old button coordinates and clicked shifted Start over. Reproduced and fixed in cb48d0b by waiting for the rendered alert and asserting the layout shift; full local78-story browser revalidation passed.",
     "run": 38287215259,
     "framework_ci_run": 38287215256,
     "framework_ci_status": "success",

@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `71a64d54fdaa6773444adb9cc465973032a5785c`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `27f0751a88334a2c57ca5bcda4529fc10c9e691f`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -12,17 +12,17 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 
 | Status | Families |
 |---|---:|
-| not_started | 12 |
+| not_started | 10 |
 | scaffolded | 0 |
 | implemented | 4 |
-| tested | 62 |
+| tested | 64 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-Recovery candidate71a64d5 passes56/56 native,54/54 sanitizer,47/47 WASI and62 real Chromium gallery stories. Four additional families (DescriptionList, StatusBar, Resizable, Icon) now have tested partial C implementations; their browser stories are in progress. Public59a0988 remains60 stories until deployment. Pages9e72440 failed stale Image readiness; the repair also fixes physical clicks hidden beneath the fixed header. All78 entries retained;12 not started,4 implemented partial,62 tested partial,zero verified. Full parity unfinished.
+Recovery candidate71a64d5 passes56/56 native,54/54 sanitizer,47/47 WASI and62 real Chromium gallery stories. Four additional families (DescriptionList, StatusBar, Resizable, Icon) now have tested partial C implementations; their browser stories are in progress. Publice49dc95 now serves62 stories: all six CI jobs and Pages passed; actual HTTPS verifies system dark/light and real Radio/Checkbox/Image/Attachment without page errors. Pages9e72440 failed stale Image readiness; the repair also fixes physical clicks hidden beneath the fixed header. All78 entries retained;12 not started,4 implemented partial,62 tested partial,zero verified. Full parity unfinished.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
@@ -114,6 +114,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [pages-daf43b9-failure.txt](validation/pages-daf43b9-failure.txt)
 - [published-0e61b2f.txt](validation/published-0e61b2f.txt)
 - [published-59a0988.txt](validation/published-59a0988.txt)
+- [published-e49dc95.txt](validation/published-e49dc95.txt)
 - [published-edea484.txt](validation/published-edea484.txt)
 - [release-headless.txt](validation/release-headless.txt)
 - [release-resumed.txt](validation/release-resumed.txt)
@@ -263,8 +264,8 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | StatusBar | tested | Pinned end regions, adaptive center alignment, themed spacing and callback composition tested headlessly. Independent region clipping, inherited rich font styles and full Styled refinement remain partial; browser/native audit pending. |
 | Tabs | tested | Stable-ID selection, keyboard navigation, five variants, custom body slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom body width caps preserve short content and clip oversized bodies from the first frame. Structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source. |
 | Theme | tested | Four runtime token structs tested; system integration, comprehensive tokens and reduced motion pending. |
-| TitleBar | not_started | Full documented behavior pending implementation and audit. |
-| Toolbar | not_started | Full documented behavior pending implementation and audit. |
+| TitleBar | tested | Source geometry/gradient/window SVGs and mock-host pointer/keyboard routing tested. SDL decoration/query/close contracts tested on X11; minimize/maximize remain OS-asynchronous. Native drag/menu, macOS traffic-light placement/preferences and Windows control hit areas remain host integration gaps. Portable double-click thresholds substitute OS preferences; browser story pending. |
+| Toolbar | tested | Source audit corrects initial left/center/right-slot assumption: Toolbar provides ordered sized/unsized children and labelled groups. Scoped wrapping arrow navigation, ordinary Tab, nested consumption and hosted Input caret tested. Callbacks receive explicit preparation metrics; custom-box replacement substitutes full Styled refinement; caller owns icon paint/tooltips. Browser/native visual audit pending. |
 | Tree | tested | Actual bounded keyed hierarchy, controlled expand/select, ordered parent/child navigation, fractional virtual viewport and clipped wheel routing tested. Variable row heights, drag/drop, custom row slots, full context actions and native accessibility remain pending. |
 | VirtualList | tested | Retained keyed variable-height Fenwick model tested including anchor restoration. No styled scroll/focus/navigation widget yet. |
 | Chart | not_started | Full documented behavior pending implementation and audit. |

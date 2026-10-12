@@ -1,0 +1,14 @@
+{
+  "url": "https://matteo.merola.co/cui/?release=e49dc95#Attachment",
+  "stories": 62,
+  "catalog": 78,
+  "system_dark_default": true,
+  "live_system_light_change": true,
+  "checked_stories": [
+    "Radio",
+    "Checkbox",
+    "Image",
+    "Attachment"
+  ],
+  "page_errors": []
+}

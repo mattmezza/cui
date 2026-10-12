@@ -1,8 +1,8 @@
 {
   "source": "71a64d5",
-  "published_source": "59a0988ecf432f371378e1398193587de6806fb3",
+  "published_source": "e49dc95e0de9602ed1e4f4afe76f93a309e239ae",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Recovery candidate71a64d5 passes56/56 native,54/54 sanitizer,47/47 WASI and62 real Chromium gallery stories. Four additional families (DescriptionList, StatusBar, Resizable, Icon) now have tested partial C implementations; their browser stories are in progress. Public59a0988 remains60 stories until deployment. Pages9e72440 failed stale Image readiness; the repair also fixes physical clicks hidden beneath the fixed header. All78 entries retained;12 not started,4 implemented partial,62 tested partial,zero verified. Full parity unfinished.",
+  "summary": "Recovery candidate71a64d5 passes56/56 native,54/54 sanitizer,47/47 WASI and62 real Chromium gallery stories. Four additional families (DescriptionList, StatusBar, Resizable, Icon) now have tested partial C implementations; their browser stories are in progress. Publice49dc95 now serves62 stories: all six CI jobs and Pages passed; actual HTTPS verifies system dark/light and real Radio/Checkbox/Image/Attachment without page errors. Pages9e72440 failed stale Image readiness; the repair also fixes physical clicks hidden beneath the fixed header. All78 entries retained;12 not started,4 implemented partial,62 tested partial,zero verified. Full parity unfinished.",
   "checks": [
     {
       "name": "native",
@@ -39,5 +39,5 @@
     "reason": "Image test measured before actual READY bitmap; repaired natural-frame readiness and fixed-header click visibility",
     "log": "pages-9e72440-failure.txt"
   },
-  "published_evidence": "published-59a0988.txt"
+  "published_evidence": "published-e49dc95.txt"
 }

@@ -70,13 +70,12 @@ face remains the renderer fallback. No Content rich-text parser existed to reuse
 Remaining frozen-source gaps are tracked explicitly: complete CommonMark/HTML5
 and nested lists, inline/linked images, MDX/plugins/YAML front matter, image
 alignment/error UI, global selection spanning multiple views, touch selection menus
-and handles, grapheme/BiDi shaping, inherited parent foreground palettes, adaptive
-horizontal table scrolling/actions styling,
+and handles, grapheme/BiDi shaping, inherited parent foreground palettes, fully configurable table/action refinements,
 custom word/CJK stagger and easing, automatic enclosing-list reveal, background
 syntax styles, cached/asynchronous parsing and layout. Default wrap tables use
 capped text-length column proportions (5 to 150 characters) and 64px minimum
 columns. Narrow wrap tables clip at the document edge; opt-in adaptive horizontal
-table scrolling remains unimplemented. These limitations must not be presented as full source parity.
+table scrolling is available through `table_mode`. These limitations must not be presented as full source parity.
 
 Headless tests cover transactional bounded parsing and randomized syntax, Unicode
 mapping/selection, edit tracking, entities, safe HTML, tables, clipping, fade state, composed action geometry and clicks,
@@ -106,6 +105,11 @@ its styled spans, retain a 48px minimum, and shrink to content-dependent floors
 between 160px and 480px (never above the measured content). Nowrap columns keep
 single-line content widths. Both account for 16px horizontal padding, shared
 1px column borders, and the 2px outer frame. Extra viewport space grows columns
-in proportion to measured widths. This model currently supplies geometry only;
-the styled component still uses default wrap mode until horizontal scrolling is
-connected. It must not be described as an interactive scrolling implementation.
+in proportion to measured widths. The styled component uses the same mode and composes actual axis-locked horizontal
+Scroll owners with hidden bars. Borders stay fixed while cell content moves;
+links and selection use translated coordinates. Each first table cell owns its
+scroll state, retained across append/edit parsing when its block ordinal and
+source start remain stable. Reveal requests bring the target cell text into the
+horizontal viewport. Changing a table's source start or block ordinal resets its
+scroll state. Window-shared selection, touch and horizontal selection edge
+autoscroll remain separate limitations.

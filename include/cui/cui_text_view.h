@@ -68,7 +68,9 @@ typedef struct {
     bool table_header, image_ready;
     cui_text_view_alignment alignment;
     cui_bitmap image;
-    cui_rect bounds;
+    cui_rect bounds, table_frame;
+    float table_track_width;
+    cui_scroll_state table_scroll;
     float actions_height, text_inset;
 } cui_text_view_block;
 typedef struct {
@@ -160,6 +162,7 @@ cui_text_view_style cui_text_view_style_default(void);
 cui_text_view_style cui_text_view_style_from_theme(const cui_theme *);
 typedef struct {
     float width, height, dt;
+    cui_text_view_table_mode table_mode;
     float code_actions_height, table_actions_height;
     bool selectable, scrollable, disabled, stream_fade, reduced_motion;
     size_t max_lines;

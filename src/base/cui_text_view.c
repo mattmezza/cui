@@ -129,9 +129,19 @@ static bool cui_text_view_block_begin(cui_text_view_parser *p, cui_text_view_blo
         return false;
     }
     p->block = p->blocks++;
-    if (p->write)
-        p->state->workspace.blocks[p->block] = (cui_text_view_block){
-            .kind = kind, .text = {p->text, p->text}, .source = {start, start}, .level = level};
+    if (p->write) {
+        cui_scroll_state scroll = {0};
+        if (kind == CUI_TEXT_VIEW_TABLE_CELL && p->block < p->state->block_count) {
+            const cui_text_view_block *old = &p->state->workspace.blocks[p->block];
+            if (old->kind == kind && old->source.begin == start)
+                scroll = old->table_scroll;
+        }
+        p->state->workspace.blocks[p->block] = (cui_text_view_block){.kind = kind,
+                                                                     .text = {p->text, p->text},
+                                                                     .source = {start, start},
+                                                                     .level = level,
+                                                                     .table_scroll = scroll};
+    }
     p->last.text.end = SIZE_MAX;
     return true;
 }
@@ -1341,12 +1351,17 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         return CUI_TEXT_VIEW_CAPACITY;
     s->glyph_count = 0;
     float y = 0;
+    size_t table_first = 0;
     for (size_t b = 0; b < s->block_count;) {
         cui_text_view_block *block = &s->workspace.blocks[b];
         if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
             unsigned table = block->table, row = block->row;
             if (b == 0 || s->workspace.blocks[b - 1].kind != CUI_TEXT_VIEW_TABLE_CELL ||
                 s->workspace.blocks[b - 1].table != table) {
+                table_first = b;
+                s->workspace.blocks[b].table_frame = (cui_rect){0, y, o.width, 0};
+                if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+                    y += 1;
                 size_t end = b + 1;
                 while (end < s->block_count &&
                        s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
@@ -1360,6 +1375,8 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             while (b < s->block_count && s->workspace.blocks[b].kind == CUI_TEXT_VIEW_TABLE_CELL &&
                    s->workspace.blocks[b].table == table && s->workspace.blocks[b].row == row) {
                 float x = s->workspace.blocks[b].bounds.x, w = s->workspace.blocks[b].bounds.w;
+                if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+                    x += 1;
                 if (!cui_text_view_layout_block(s, b, x, y, w, o, measure, user))
                     return CUI_TEXT_VIEW_INVALID;
                 if (s->workspace.blocks[b].bounds.h > height)
@@ -1371,7 +1388,18 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             y += height;
             if (b == s->block_count || s->workspace.blocks[b].kind != CUI_TEXT_VIEW_TABLE_CELL ||
                 s->workspace.blocks[b].table != table) {
-                s->workspace.blocks[b - 1].actions_height = o.table_actions_height;
+                cui_text_view_block *first_cell = &s->workspace.blocks[table_first];
+                cui_text_view_block *last_cell = &s->workspace.blocks[b - 1];
+                if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+                    y += 1;
+                first_cell->table_frame.h = y - first_cell->table_frame.y;
+                float track_end = 0;
+                for (size_t cell = table_first; cell < b; ++cell)
+                    track_end = fmaxf(track_end, s->workspace.blocks[cell].bounds.x +
+                                                     s->workspace.blocks[cell].bounds.w);
+                first_cell->table_track_width =
+                    track_end + (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
+                last_cell->actions_height = o.table_actions_height;
                 y +=
                     o.paragraph_gap + (o.table_actions_height > 0 ? o.table_actions_height + 4 : 0);
             }

@@ -328,7 +328,7 @@ static void test_adaptive_table_model(void) {
     o.width = 1000;
     assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(fabsf(f.blocks[0].bounds.w - 998.f * 417 / 465) < .01f);
-    assert(fabsf(f.blocks[1].bounds.x + f.blocks[1].bounds.w - 998) < .01f);
+    assert(fabsf(f.blocks[1].bounds.x + f.blocks[1].bounds.w - 999) < .01f);
     o.width = 100;
     o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
     assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
@@ -338,6 +338,10 @@ static void test_adaptive_table_model(void) {
            CUI_TEXT_VIEW_OK);
     assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.blocks[0].bounds.w == 817);
+    assert(cui_text_view_set_text(&f.state, text("| **WWWW** | iiii |\n| --- | --- |\n| x |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].table_track_width == 867 && f.blocks[0].table_frame.h == 58);
     o.table_mode = (cui_text_view_table_mode)-1;
     assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_INVALID);
 }
@@ -646,6 +650,101 @@ static void test_table_edges_and_clip(void) {
     assert(clicks == before && !f.state.selecting);
     cui_destroy(ui);
 }
+static void test_horizontal_table_interaction(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("| abcdefghijklmnopqrstuvwxyz | [site](https://x.test) |\n| "
+                                       "--- | --- |\n| x | y |")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 100;
+    o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    o.on_link = link_clicked;
+    o.link_user = &clicks;
+    frame(ui, &f, o);
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_frame.w == 100 && f.blocks[0].table_track_width > 100);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        assert(semantics[i].role != CUI_ROLE_SCROLLBAR);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -40,
+                                           .dy = -100,
+                                           .scroll_precise = true}));
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -500,
+                                           .dy = -1,
+                                           .scroll_precise = true}));
+    cui_draw_list d = frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x > 0);
+    bool link_painted = false;
+    float link_x = 0, link_y = 0;
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 4 &&
+            !memcmp(d.commands[i].text.data, "site", 4)) {
+            link_x = d.commands[i].bounds.x + 2;
+            link_y = d.commands[i].bounds.y + 4;
+            link_painted = link_x > 0 && link_x < 100;
+        }
+    assert(link_painted);
+    unsigned before = clicks;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = link_x,
+                                           .y = link_y}));
+    frame(ui, &f, o);
+    assert(f.state.anchor == f.spans[1].text.begin);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = link_x,
+                                           .y = link_y}));
+    frame(ui, &f, o);
+    assert(clicks == before + 1 && !f.state.selecting);
+    f.blocks[0].table_scroll.x = 0;
+    assert(cui_text_view_reveal(&f.state, f.spans[1].text) == CUI_TEXT_VIEW_OK);
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x > 0 && !f.state.reveal_pending);
+    float scroll = f.blocks[0].table_scroll.x;
+    assert(cui_text_view_set_text(&f.state,
+                                  text("| abcdefghijklmnopqrstuvwxyz | [site](https://x.test) |\n| "
+                                       "--- | --- |\n| x | y |\n\nappend")) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].table_scroll.x == scroll);
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x == scroll);
+    o.scrollable = true;
+    o.height = 35;
+    frame(ui, &f, o);
+    frame(ui, &f, o);
+    float horizontal = f.blocks[0].table_scroll.x;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -1,
+                                           .dy = -2,
+                                           .scroll_precise = true}));
+    frame(ui, &f, o);
+    assert(f.state.scroll.y == 2 && f.blocks[0].table_scroll.x == horizontal);
+    f.blocks[0].table_scroll.x = 0;
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -2,
+                                           .dy = -1,
+                                           .scroll_precise = true}));
+    frame(ui, &f, o);
+    assert(f.state.scroll.y == 2 && f.blocks[0].table_scroll.x == 2);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -738,6 +837,7 @@ int main(void) {
     test_theme_scroll_and_reveal();
     test_action_composition();
     test_table_edges_and_clip();
+    test_horizontal_table_interaction();
 #endif
     return 0;
 }

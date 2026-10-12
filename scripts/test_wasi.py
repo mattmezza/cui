@@ -37,6 +37,8 @@ SOURCES = (
     "src/components/cui_textarea.c",
     "src/base/cui_settings.c",
     "src/components/cui_settings.c",
+    "src/base/cui_chart.c",
+    "src/components/cui_chart.c",
     "src/base/cui_text_view.c",
     "src/components/cui_text_view.c",
     "src/base/cui_root.c",
@@ -81,7 +83,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root", "text_view")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root", "text_view", "chart")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -197,6 +199,7 @@ def main() -> int:
         virtual_clock = ["-D_WASI_EMULATED_PROCESS_CLOCKS", "-lwasi-emulated-process-clocks"]
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("chart_base_only", ["tests/unit/test_chart.c", "src/base/cui_chart.c", "src/base/cui_plot.c"], False, ["-DCUI_CHART_BASE_ONLY=1"])]
         targets += [("text_view_base_only", ["tests/unit/test_text_view.c", "src/base/cui_text_view.c"], False, ["-DCUI_TEXT_VIEW_BASE_ONLY=1"])]
         targets += [("root_base_only", ["tests/unit/test_root.c", "src/base/cui_root.c", "src/core/cui.c", "src/base/cui_surface.c", "src/base/cui_overlay.c", "src/base/cui_models.c", "src/base/cui_status.c"], False, ["-DCUI_ROOT_BASE_ONLY=1"])]
         targets += [("command_base_only", ["tests/unit/test_command.c", "src/base/cui_command.c"], False, ["-DCUI_COMMAND_BASE_ONLY=1"])]

@@ -5500,35 +5500,56 @@
       "name": "Chart",
       "reference_url": "https://gpui-kit.com/component/chart/",
       "category": "advanced",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_chart_render",
+        "cui_chart_sankey_layout",
+        "cui_chart_hit_test"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_chart.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_chart.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Basic rendering for seven chart families, bounded geometry, explicit Sankey topology, theme colors and pointer hover are tested. Source-complete axes, legends, tooltips, gradients, layout refinement and animation remain unfinished; see docs/CHART.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "line/bar/area/pie/candlestick series",
-          "status": "not_started",
-          "evidence": []
+          "name": "basic seven-family raster rendering and bounded geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart.c"
+          ]
         },
         {
-          "name": "axes/scales/ticks/legend",
-          "status": "not_started",
-          "evidence": []
+          "name": "line and area curves plus radar multi-series",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart.c"
+          ]
         },
         {
-          "name": "hover and accessible data",
-          "status": "not_started",
-          "evidence": []
+          "name": "acyclic Sankey layers and flow widths",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart.c"
+          ]
         },
         {
-          "name": "theme and headless models",
+          "name": "theme colors and pointer hover values",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart.c"
+          ]
+        },
+        {
+          "name": "complete source chart layout, motion, tooltip and accessibility parity",
           "status": "not_started",
           "evidence": []
         }

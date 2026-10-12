@@ -307,6 +307,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_TEXT_VIEW_IMPLEMENTATION
 #endif
 #include "cui_text_view.h"
+#ifndef CUI_CHART_IMPLEMENTATION
+#define CUI_CHART_IMPLEMENTATION
+#endif
+#include "cui_chart.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

@@ -37,6 +37,7 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->max_bar_width < 0 || o->min_bar_length < 0 || !isfinite(o->radar_max_value) ||
         !isfinite(o->bar_corner_radius) || o->bar_corner_radius < 0 ||
         !isfinite(o->reveal_progress) || o->reveal_progress < 0 || o->reveal_progress > 1 ||
+        !isfinite(o->appear_duration) || o->appear_duration < 0 ||
         (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
         !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
         o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
@@ -96,7 +97,8 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
 }
 static void cui_chart_pixel(cui_chart_state *s, const cui_chart_options *o, int x, int y,
                             cui_color c) {
-    if (x < 0 || y < 0 || (unsigned)x >= o->width || (unsigned)y >= o->height || !c.a)
+    if (x < 0 || y < 0 || (unsigned)x >= o->width || (unsigned)y >= o->height || !c.a ||
+        (s->mark_clip_active && (x + .5 < s->mark_clip_left || x + .5 > s->mark_clip_x)))
         return;
     unsigned char *p = s->pixels + ((size_t)y * o->width + (unsigned)x) * 4;
     unsigned a = c.a, inv = 255 - a, back = p[3];
@@ -514,10 +516,18 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
     if (baseline > bottom)
         baseline = bottom;
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
+        s->mark_clip_active = o->reveal_enabled && !o->reduced_motion && o->reveal_progress < 1;
+        s->mark_clip_left = left;
+        s->mark_clip_x = left + (right - left) * o->reveal_progress;
         for (size_t series = 0; series <= o->extra_series_count; series++)
             cui_chart_draw_series(s, o, series, left, right, top, bottom, lo, hi, baseline);
+        s->mark_clip_active = false;
         return;
     }
+    s->mark_clip_active = o->kind == CUI_CHART_CANDLESTICK && o->reveal_enabled &&
+                          !o->reduced_motion && o->reveal_progress < 1;
+    s->mark_clip_left = 0;
+    s->mark_clip_x = o->width * o->reveal_progress;
     for (size_t i = 0; i < o->count; i++) {
         const cui_chart_datum *d = &o->data[i];
         cui_color c = cui_chart_palette(o, i);
@@ -541,6 +551,7 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                            (int)ceil(candle.body.x_max), (int)ceil(candle.body.y_max + 1), c);
         }
     }
+    s->mark_clip_active = false;
 }
 static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     long double sum = 0;
@@ -553,9 +564,10 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     if (r <= 0)
         return;
     double inner = fmin(o->inner_radius, r), edges[257] = {0};
+    double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
     for (size_t i = 0; i < o->count; i++)
-        edges[i + 1] = edges[i] + 2 * CUI_CHART_PI * (double)(o->data[i].value / sum);
-    edges[o->count] = 2 * CUI_CHART_PI;
+        edges[i + 1] = edges[i] + 2 * CUI_CHART_PI * progress * (double)(o->data[i].value / sum);
+    edges[o->count] = 2 * CUI_CHART_PI * progress;
     int y0 = (int)fmax(0, floor(cy - r)), y1 = (int)fmin(o->height - 1, ceil(cy + r));
     int x0 = (int)fmax(0, floor(cx - r)), x1 = (int)fmin(o->width - 1, ceil(cx + r));
     for (int y = y0; y <= y1; y++)
@@ -634,6 +646,8 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
             cui_chart_line(s, o, cx, cy, cx + radius * cos(a), cy + radius * sin(a), grid);
         }
     }
+    if (o->reveal_enabled && !o->reduced_motion && o->reveal_progress <= 0)
+        return;
     for (size_t series = 0; series <= o->extra_series_count; series++) {
         cui_color color = series ? o->extra_series[series - 1].color : o->series[0];
         if (!color.a)
@@ -644,7 +658,8 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
         for (size_t i = 0; i < o->count; i++) {
             double a = -CUI_CHART_PI / 2 + 2 * CUI_CHART_PI * i / o->count;
             double ratio = fmax(0, cui_chart_series_value(o, series, i)) / max;
-            double r = fmin(8192, radius * ratio);
+            double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
+            double r = fmin(8192, radius * ratio * progress);
             xs[i] = cx + r * cos(a);
             ys[i] = cy + r * sin(a);
         }
@@ -999,6 +1014,9 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     for (size_t i = 0; i < 4; i++)
         h = cui_chart_mix(h, cui_chart_bits(o->bar_corner_radii[i]));
     h = cui_chart_mix(h, o->reveal_enabled);
+    h = cui_chart_mix(h, o->appear_key);
+    h = cui_chart_mix(h, o->disable_appear);
+    h = cui_chart_mix(h, cui_chart_bits(o->appear_duration));
     h = cui_chart_mix(h, o->reduced_motion);
     h = cui_chart_mix(h, cui_chart_bits(o->reveal_progress));
     const unsigned char *gradient = (const unsigned char *)&o->bar_gradient_start;
@@ -1053,8 +1071,13 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         cui_chart_cartesian(s, o);
     else if (o->kind == CUI_CHART_RADAR)
         cui_chart_radar(s, o);
-    else if (o->kind == CUI_CHART_SANKEY)
+    else if (o->kind == CUI_CHART_SANKEY) {
+        s->mark_clip_active = o->reveal_enabled && !o->reduced_motion && o->reveal_progress < 1;
+        s->mark_clip_left = 0;
+        s->mark_clip_x = o->width * o->reveal_progress;
         cui_chart_sankey(s, o, nodes, link_geometry);
+        s->mark_clip_active = false;
+    }
     s->hovered = SIZE_MAX;
     s->hovered_value = 0;
     s->revision++;

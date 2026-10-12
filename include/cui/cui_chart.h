@@ -107,6 +107,9 @@ typedef struct {
     float bar_corner_radii[4]; /* top-left, top-right, bottom-right, bottom-left */
     bool reveal_enabled, reduced_motion;
     float reveal_progress; /* host animation progress 0..1; reduced motion paints fully */
+    bool disable_appear;   /* styled animated render skips first-paint/replay motion */
+    uint64_t appear_key;   /* changing this replays styled appear */
+    float appear_duration; /* seconds; zero selects styled source default 1s */
     bool show_bar_values;
     cui_color bar_label_color; /* alpha zero uses foreground */
     cui_chart_curve curve;     /* natural is source default */
@@ -125,7 +128,12 @@ typedef struct {
     size_t hovered; /* SIZE_MAX when no point is hovered */
     double hovered_value;
     uint64_t cache_key; /* private; zero disables the cache */
-    cui_rect bounds;    /* retained logical bounds for pointer interaction */
+    uint64_t active_appear_key;
+    double appear_started_at;
+    bool appear_started;
+    double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
+    bool mark_clip_active;
+    cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {
     bool valid;
@@ -135,6 +143,9 @@ typedef struct {
 } cui_chart_hit;
 /* Validates all data and storage before mutating any pixel or state. */
 cui_plot_result cui_chart_render(cui_chart_state *, const cui_chart_options *);
+/* Styled one-second ease-out-quart appear using core frame time and reduced motion. */
+cui_plot_result cui_chart_render_animated(cui_context *, cui_chart_state *,
+                                          const cui_chart_options *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,

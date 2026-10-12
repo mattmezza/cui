@@ -36,6 +36,35 @@ cui_chart_options cui_chart_theme(cui_chart_options o, const cui_theme *theme) {
         o.bearish = theme->danger;
     return o;
 }
+cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *state,
+                                          const cui_chart_options *options) {
+    if (!ui || !state || !options || !isfinite(options->appear_duration) ||
+        options->appear_duration < 0)
+        return CUI_PLOT_INVALID;
+    cui_chart_options frame = *options;
+    bool restart = !state->appear_started || state->active_appear_key != options->appear_key;
+    double now = cui_frame_time(ui);
+    double started = restart ? now : state->appear_started_at;
+    double duration = options->appear_duration > 0 ? options->appear_duration : 1;
+    frame.reveal_enabled = true;
+    frame.reduced_motion = options->reduced_motion || cui_reduced_motion(ui);
+    if (options->disable_appear || frame.reduced_motion)
+        frame.reveal_progress = 1;
+    else {
+        double elapsed = fmax(0, now - started);
+        double t = fmax(0, fmin(1, elapsed / duration));
+        frame.reveal_progress = (float)(1 - pow(1 - t, 4));
+    }
+    cui_plot_result result = cui_chart_render(state, &frame);
+    if (result != CUI_PLOT_OK)
+        return result;
+    state->appear_started = true;
+    state->appear_started_at = started;
+    state->active_appear_key = options->appear_key;
+    if (frame.reveal_progress < 1)
+        cui_invalidate(ui);
+    return CUI_PLOT_OK;
+}
 bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_chart_options *o,
                cui_str name) {
     if (!ui || !id || !state || !o || !name.data || !name.length || !state->pixels || !o->data ||

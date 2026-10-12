@@ -77,6 +77,23 @@ int main(void) {
         options.data_revision++;
         assert(cui_chart_render(&state, &options) == CUI_PLOT_OK && state.revision == revision + 1);
     }
+    options.data_revision = 0;
+    options.reveal_enabled = true;
+    options.hide_grid = true;
+    options.hide_axes = true;
+    for (int kind = CUI_CHART_LINE; kind <= CUI_CHART_SANKEY; kind++) {
+        options.kind = (cui_chart_kind)kind;
+        options.reveal_progress = 0;
+        assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+        assert(!differs(pixels, options.width * options.height, options.background));
+        options.reveal_progress = .5f;
+        assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+        assert(differs(pixels, options.width * options.height, options.background));
+    }
+    options.reveal_enabled = false;
+    options.reveal_progress = 0;
+    options.hide_grid = false;
+    options.hide_axes = false;
     unsigned char saved[sizeof pixels];
     uint64_t old_revision;
     cui_chart_datum flow[] = {
@@ -482,6 +499,32 @@ int main(void) {
                 default_ohlc = true;
         }
     assert(tooltip_calls == 1 && custom && !default_ohlc);
+    options.kind = CUI_CHART_BAR;
+    options.hide_axes = true;
+    options.hide_grid = true;
+    options.data_revision = 102;
+    options.appear_key = 7;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    assert(!differs(pixels, options.width * options.height, options.background));
+    (void)cui_end_frame(ui);
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    assert(differs(pixels, options.width * options.height, options.background));
+    (void)cui_end_frame(ui);
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    (void)cui_end_frame(ui);
+    options.appear_key++;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    assert(!differs(pixels, options.width * options.height, options.background));
+    (void)cui_end_frame(ui);
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
+    assert(differs(pixels, options.width * options.height, options.background));
+    (void)cui_end_frame(ui);
     cui_destroy(ui);
 #endif
     points[0].value = -DBL_MAX;

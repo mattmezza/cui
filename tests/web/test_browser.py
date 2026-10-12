@@ -178,6 +178,21 @@ def main():
                 page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===0')
             assert page.evaluate('cuiGallery.exports.gallery_notification_stats(1)') == click_count + 1
             assert page.evaluate('cuiGallery.exports.gallery_notification_stats(3)') == close_count + 7
+            page.evaluate('location.hash="Shimmer"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Shimmer"')
+            assert page.locator('#accessible [role=status][aria-label="Preparing your workspace"]').count() == 1
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
+            page.locator('#shimmer-mode').select_option('1')
+            page.wait_for_function('cuiGallery.exports.gallery_shimmer_phase()>.8')
+            phase = page.evaluate('cuiGallery.exports.gallery_shimmer_phase()')
+            page.wait_for_function('(p)=>cuiGallery.exports.gallery_shimmer_phase()<p-.05', arg=phase)
+            page.locator('#shimmer-mode').select_option('2')
+            page.wait_for_function('cuiGallery.exports.gallery_shimmer_phase()===1&&cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
+            page.emulate_media(reduced_motion='reduce')
+            page.locator('#shimmer-mode').select_option('3')
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
+            page.emulate_media(reduced_motion='no-preference')
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
             page.evaluate('location.hash="Accordion"')
             page.wait_for_function('cuiGallery.renderedComponent==="Accordion"')
             started = page.locator('#accessible button[aria-label="Getting started"]')
@@ -1031,7 +1046,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 57 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 58 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

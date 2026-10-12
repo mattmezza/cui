@@ -111,6 +111,9 @@ static cui_otp_state otp_state;
 static char otp_buffer[32];
 static int otp_completions, otp_groups = 2;
 static double next_wake;
+static cui_shimmer_state shimmer_state;
+static int shimmer_mode;
+static float shimmer_started;
 static bool otp_masked;
 static int tag_variant, tag_color = CUI_STATUS_COLOR_BLUE;
 static bool tag_outline, tag_pill;
@@ -446,6 +449,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         t.gap *= .75f;
     }
     if (previous_story != story) {
+        if (story == 59)
+            shimmer_started = host_seconds;
         cui_overlay_close(ui, &select_popup.overlay);
         cui_overlay_close(ui, &menu_popup.overlay);
         cui_overlay_close(ui, &menu_tree.overlay);
@@ -525,6 +530,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 59: {
+        cui_shimmer_options options = cui_shimmer_options_default();
+        options.now_seconds = host_seconds - shimmer_started;
+        options.duration = 1.2;
+        options.reverse = shimmer_mode == 1;
+        options.once = shimmer_mode == 2;
+        options.absolute_spread = shimmer_mode == 3;
+        options.spread = shimmer_mode == 3 ? 48 : .3f;
+        options.font_size = 24;
+        options.max_width = width - 48;
+        options.role = CUI_ROLE_STATUS;
+        options.reduced_motion = reduced_motion;
+        cui_shimmer_plan plan;
+        if (cui_base_shimmer(options, &plan) && plan.next_wake_seconds > 0)
+            next_wake = shimmer_started + plan.next_wake_seconds;
+        cui_shimmer_text(ui, cui_id_from(ui, "shimmer"), &t, &shimmer_state,
+                         cui_string("Preparing your workspace"), options);
+        break;
+    }
     case 58: {
         if (cui_button(ui, cui_id_from(ui, "notification-add"), &t, cui_string("Add notification"),
                        disabled || notification_state.count >= 8))
@@ -1872,4 +1896,14 @@ uint64_t gallery_semantic_controls(unsigned i) {
 }
 uint64_t gallery_semantic_labelled_by(unsigned i) {
     return i < semantic_count ? semantics[i].details.labelled_by : 0;
+}
+
+void gallery_shimmer_mode(int mode) {
+    if (mode != shimmer_mode) {
+        shimmer_mode = mode;
+        shimmer_started = host_seconds;
+    }
+}
+float gallery_shimmer_phase(void) {
+    return shimmer_state.last_phase;
 }

@@ -1,0 +1,11 @@
+# Scrollable content
+
+`cui_scrollable_begin`/`cui_scrollable_end` wrap caller content in a fixed-size clipped viewport with application-owned horizontal/vertical offsets. Content dimensions are explicit; the kit clamps offsets, translates children with fractional precision, and draws optional themed scrollbars. `cui_base_scrollable` performs the same reductions and semantic submission without drawing. Negative or nonfinite sizes use documented defaults (320×240 viewport, 10-pixel bars, 48-pixel wheel steps); axes not enabled remain at zero.
+
+Wheel events route to the innermost eligible clipped semantic scroll region under the pointer. A container at a boundary passes the event to an eligible parent based on the preceding frame's offsets. Higher interactive portals and unrelated modal scopes block background scrolling. Multiple events queued in one frame use that same preceding geometry; boundary handoff does not re-route later events dynamically after earlier reductions.
+
+Scrollbars expose their controlled value, range, orientation and related content. Arrow keys step, PageUp/PageDown move one viewport, and Home/End select an endpoint. Clicking a track pages toward the click; captured thumb dragging preserves the initial grab offset across frames. Secondary-button events do not change primary dragging. Disabled scrolling preserves the caller's current offsets after clamping; callers independently control the disabled state of their children.
+
+`tests/unit/test_scroll.c` exercises both axes, wheel routing, translated row geometry and clipped hits, scrollbar keyboard and captured dragging, semantics, all four themes, invalid offsets and small content. A separate base-only executable links only core and the scroll reducer. Bare layout fixtures emit their own clip commands; a behavior-only frame proves the reducer paints nothing. Core tests independently cover nested boundary routing and higher-portal blocking.
+
+Auto-measured content, grow-sized viewports, inertial/touch scrolling, auto-hidden/system-style bars, accessibility platform bridges, fractional DPI pixel snapping and exhaustive upstream integration remain unfinished. Existing virtual tree/table models can provide content dimensions and visible ranges; this container does not imply those models are rendered automatically.

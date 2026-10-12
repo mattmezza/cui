@@ -51,12 +51,18 @@ typedef struct {
     size_t first_visible;
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
+/* Styled row body; semantic name/disabled/selection remain supplied by item.
+ * index is relative to the displayed array, including filtered Combobox arrays. */
+typedef void (*cui_choice_render_fn)(cui_context *, const cui_choice_item *, size_t index,
+                                     void *user);
 typedef struct {
     bool disabled, menu;
     float dt;
     size_t visible_begin, visible_count;  /* count=0 submits all items */
     cui_choice_activation_fn on_activate; /* synchronous, in event order */
     void *activation_user;
+    cui_choice_render_fn render;
+    void *render_user;
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -66,7 +72,9 @@ typedef struct {
     bool disabled;
     cui_rect viewport;
     float width, dt;
-    cui_popup_side side; /* preferred anchor side; defaults below */
+    cui_popup_side side;         /* preferred anchor side; defaults below */
+    cui_choice_render_fn render; /* optional fixed-height option body */
+    void *render_user;
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */
@@ -1211,10 +1219,13 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                      options.disabled || items[i].disabled ? theme->muted
                      : state->active == items[i].id        ? theme->on_primary
                                                            : theme->text);
-        cui_text(ui, items[i].label, theme->font_size,
-                 options.disabled || items[i].disabled ? theme->muted
-                 : state->active == items[i].id        ? theme->on_primary
-                                                       : theme->text);
+        if (options.render)
+            options.render(ui, &items[i], i, options.render_user);
+        else
+            cui_text(ui, items[i].label, theme->font_size,
+                     options.disabled || items[i].disabled ? theme->muted
+                     : state->active == items[i].id        ? theme->on_primary
+                                                           : theme->text);
         cui_end_box(ui);
         bool checked = multiple_selected ? multiple_selected[i] : *selected == items[i].id;
         cui_update_semantic(ui, items[i].id, checked, (float)i);
@@ -1278,7 +1289,9 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                      .menu = menu,
                                      .dt = options.dt,
                                      .visible_begin = state->list.first_visible,
-                                     .visible_count = rows};
+                                     .visible_count = rows,
+                                     .render = options.render,
+                                     .render_user = options.render_user};
     cui_id old = *selected;
     bool activated =
         count ? cui_base_list(ui, items, count, selected, &state->list, list_options) : false;
@@ -1375,8 +1388,11 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return result;
-    cui_list_options list_options = {
-        .dt = options.dt, .visible_begin = state->list.first_visible, .visible_count = rows};
+    cui_list_options list_options = {.dt = options.dt,
+                                     .visible_begin = state->list.first_visible,
+                                     .visible_count = rows,
+                                     .render = options.render,
+                                     .render_user = options.render_user};
     cui_id old = *selected;
     bool activated =
         matched ? cui_base_list(ui, filtered, matched, selected, &state->list, list_options)
@@ -1489,7 +1505,9 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
     cui_list_options list_options = {.disabled = options.disabled,
                                      .dt = options.dt,
                                      .visible_begin = state->list.first_visible,
-                                     .visible_count = rows};
+                                     .visible_count = rows,
+                                     .render = options.render,
+                                     .render_user = options.render_user};
     if (count)
         changed |= cui_base_list_multi(ui, items, count, selected, &state->list, list_options);
     cui_begin_portal(ui, state->overlay.id,
@@ -1568,8 +1586,11 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return result;
-    cui_list_options list_options = {
-        .dt = options.dt, .visible_begin = state->list.first_visible, .visible_count = rows};
+    cui_list_options list_options = {.dt = options.dt,
+                                     .visible_begin = state->list.first_visible,
+                                     .visible_count = rows,
+                                     .render = options.render,
+                                     .render_user = options.render_user};
     bool activated = matched ? cui_base_list_multi(ui, filtered, matched, filtered_selected,
                                                    &state->list, list_options)
                              : false;

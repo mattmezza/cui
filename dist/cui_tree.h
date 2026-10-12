@@ -351,6 +351,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     cui_id source = 0;
+    bool reveal = false;
     for (size_t e = 0; e < count && !o.disabled; ++e) {
         cui_id activation = cui_event_activation(ui, e), target = cui_event_target(ui, e);
         size_t hit = SIZE_MAX;
@@ -441,6 +442,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                 }
         }
         if (next != SIZE_MAX && next < m->visible_count) {
+            reveal = true;
             cursor = m->banks[m->active].visible[next];
             s->cursor = m->nodes[cursor].key;
             if (!o.manual_selection)
@@ -453,7 +455,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
     if (cui_tree_node_index(m, s->cursor, &cursor)) {
         size_t position = m->banks[m->active].position[cursor];
         float top = (float)position * row;
-        if (position != SIZE_MAX && cui_focused(ui) == cui_tree_row_id(id, s->cursor)) {
+        if (reveal && position != SIZE_MAX && cui_focused(ui) == cui_tree_row_id(id, s->cursor)) {
             if (top < s->scroll)
                 s->scroll = top;
             else if (top + row > s->scroll + height)
@@ -463,10 +465,6 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
     for (size_t e = 0; e < count && !o.disabled; ++e)
         if (events[e].type == CUI_EVENT_SCROLL) {
             bool inside = cui_event_target(ui, e) == id;
-            cui_rect bounds = cui_bounds(ui, id);
-            if (cui_hovered(ui, id) && events[e].x >= bounds.x && events[e].y >= bounds.y &&
-                events[e].x < bounds.x + bounds.w && events[e].y < bounds.y + bounds.h)
-                inside = true;
             if (inside && isfinite(events[e].dy))
                 s->scroll -= events[e].dy * row;
         }
@@ -488,6 +486,10 @@ void cui_tree_submit(cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_sta
     cui_interact(ui, id, CUI_ROLE_TREE, cui_string("Tree"), o.disabled, false,
                  (float)m->visible_count);
     cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.scrollable = true,
+                                                    .scroll_y = s->scroll,
+                                                    .scroll_max_y = fmaxf(0, view.total - height)});
     for (size_t p = view.begin; p < view.end; ++p) {
         size_t i = m->banks[m->active].visible[p], parent = m->banks[m->active].parent[i];
         cui_id key = m->nodes[i].key, row_id = cui_tree_row_id(id, key);
@@ -497,6 +499,7 @@ void cui_tree_submit(cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_sta
             ui, row_id,
             (cui_semantic_details){
                 .selected = selected == key,
+                .level = m->nodes[i].depth + 1,
                 .expanded = cui_tree_is_branch(m, i) && m->expanded[i],
                 .parent = parent == SIZE_MAX ? id : cui_tree_row_id(id, m->nodes[parent].key)});
         cui_set_tab_stop(ui, row_id, key == s->cursor);

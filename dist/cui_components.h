@@ -8,6 +8,8 @@
 #include "cui_disclosure.h"
 #include "cui_numeric.h"
 #include "cui_picker.h"
+#include "cui_scroll.h"
+#include "cui_table.h"
 #include "cui_theme.h"
 #include "cui_tree.h"
 #ifdef __cplusplus
@@ -93,6 +95,14 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_TREE_IMPLEMENTATION
 #endif
 #include "cui_tree.h"
+#ifndef CUI_TABLE_IMPLEMENTATION
+#define CUI_TABLE_IMPLEMENTATION
+#endif
+#include "cui_table.h"
+#ifndef CUI_SCROLL_IMPLEMENTATION
+#define CUI_SCROLL_IMPLEMENTATION
+#endif
+#include "cui_scroll.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

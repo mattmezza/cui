@@ -7,6 +7,8 @@
 #include "cui_disclosure.h"
 #include "cui_numeric.h"
 #include "cui_picker.h"
+#include "cui_scroll.h"
+#include "cui_table.h"
 #include "cui_theme.h"
 #include "cui_tree.h"
 #ifdef __cplusplus

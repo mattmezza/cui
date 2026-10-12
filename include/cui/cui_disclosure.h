@@ -20,11 +20,14 @@ typedef struct {
     bool multiple, collapsible, disabled, bordered;
     cui_disclosure_header_fn render_header;
     void *header_user;
+    const cui_box *trigger_boxes, *panel_boxes; /* optional per-item full box styles */
+    size_t style_count; /* available entries in either nonnull style array */
 } cui_accordion_options;
 typedef struct {
     bool disabled, borderless;
     cui_disclosure_header_fn render_header;
     void *header_user;
+    const cui_box *trigger_box, *panel_box; /* optional full box styles */
 } cui_collapsible_options;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
 /* Base submits semantic triggers without layout or painting. */

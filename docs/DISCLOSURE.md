@@ -58,3 +58,12 @@ keyboard navigation and panel mounting continue to use base behavior. Callback
 item pointers are borrowed only for that invocation. Headless tests verify custom
 headers, semantic names, individual/group disabled propagation and actual pointer
 and keyboard activation of both components.
+
+Accordion `trigger_boxes` and `panel_boxes` are optional borrowed per-item arrays
+of full `cui_box` styles; `style_count` bounds both nonnull arrays, and later
+items keep the theme defaults. `cui_collapsible_ex` accepts individual
+`trigger_box` and `panel_box` pointers. These override layout/paint properties
+without replacing base activation or accessible names. Header focus still uses
+the theme focus color and border width; explicitly masked border edges remain
+a caller style decision. Tests assert distinct overridden header/panel bounds
+and colors, fallback styles beyond the array and pointer toggling in both APIs.

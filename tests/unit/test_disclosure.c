@@ -92,8 +92,56 @@ static void test_custom_disclosure_headers(void) {
     assert(!open);
     cui_destroy(ui);
 }
+static void test_disclosure_box_overrides(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    const cui_box trigger[] = {
+        {.width = 200, .height = 56, .padding = 2, .row = true, .background = {10, 20, 30, 255}}};
+    const cui_box content[] = {
+        {.width = 240, .height = 80, .padding = 2, .background = {30, 20, 10, 255}}};
+    opened[0] = true;
+    opened[1] = opened[2] = false;
+    cui_accordion_options options = {
+        .collapsible = true, .trigger_boxes = trigger, .panel_boxes = content, .style_count = 1};
+    assert(!scene(ui, options, &theme));
+    assert(cui_bounds(ui, 10).w == 200 && cui_bounds(ui, 10).h == 56);
+    assert(cui_bounds(ui, 30).h == theme.control_height);
+    cui_rect panel_bounds = cui_bounds(ui, 10 ^ UINT64_C(0x1d8f322539deca61));
+    assert(panel_bounds.w == 240 && panel_bounds.h == 80);
+    click(ui, 10);
+    assert(scene(ui, options, &theme) && !opened[0] && panels == 0);
+    bool open = true;
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_collapsible_ex(ui, 200, &theme, cui_string("More"), &open,
+                       (cui_collapsible_options){.trigger_box = trigger, .panel_box = content},
+                       panel, NULL);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(cui_bounds(ui, 200).w == 200 && cui_bounds(ui, 200).h == 56);
+    panel_bounds = cui_bounds(ui, 200 ^ UINT64_C(0x1d8f322539deca61));
+    assert(panel_bounds.w == 240 && panel_bounds.h == 80);
+    bool header_color = false, panel_color = false;
+    for (size_t i = 0; i < draw.count; i++) {
+        cui_draw_command command = draw.commands[i];
+        header_color |= command.type == CUI_DRAW_RECT && command.color.r == 10 &&
+                        command.color.g == 20 && command.color.b == 30;
+        panel_color |= command.type == CUI_DRAW_RECT && command.color.r == 30 &&
+                       command.color.g == 20 && command.color.b == 10;
+    }
+    assert(header_color && panel_color);
+    click(ui, 200);
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    assert(cui_collapsible_ex(
+        ui, 200, &theme, cui_string("More"), &open,
+        (cui_collapsible_options){.trigger_box = trigger, .panel_box = content}, panel, NULL));
+    cui_end_frame(ui);
+    assert(!open);
+    cui_destroy(ui);
+}
 int main(void) {
     test_custom_disclosure_headers();
+    test_disclosure_box_overrides();
     for (size_t i = 0; i < 3; i++)
         opened[i] = false;
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});

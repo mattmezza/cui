@@ -1,0 +1,3 @@
+Source: d564c70
+Scope: default 2px smooth Cartesian strokes; native coverage, width customization, clamping and cache invalidation. Old raster fails coverage regression.
+test_chart: /home/matteo/.cache/cui-worktrees/chart-stroke/tests/unit/test_chart.c:230: continuous_curve_stroke: Assertion `ink >= 2' failed.

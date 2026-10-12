@@ -3032,31 +3032,35 @@
       "reference_url": "https://gpui-kit.com/component/input-group/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_form.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
+      "tests": [
+        "tests/unit/test_form.c"
+      ],
+      "status": "tested",
       "platforms": {},
       "limitations": [
-        "Full documented behavior pending implementation and audit."
+        "Reference audit and real gallery integration remain in progress.",
+        "Uses retained single-line Input; multiline, IME, grapheme and native accessibility limitations remain."
       ],
-      "owner": "unassigned",
+      "owner": "forms",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "prefix/suffix/button slots",
-          "status": "not_started",
-          "evidence": []
+          "name": "Retained Input with positioned text, action and custom addons",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_form.c",
+            "docs/validation/gcc-input-group.txt"
+          ]
         },
         {
-          "name": "focus and disabled propagation",
-          "status": "not_started",
-          "evidence": []
-        },
-        {
-          "name": "validation and layout",
-          "status": "not_started",
-          "evidence": []
+          "name": "Shared focus/error frame and disabled/loading/read-only propagation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_form.c",
+            "docs/FORMS.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3072,7 +3076,8 @@
           "JavaScript",
           "Inline references"
         ]
-      }
+      },
+      "last_tested_commit": "dcfd121"
     },
     {
       "name": "NumberInput",

@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `ed10ae57c6c7918ae89cbc3f4eacc58320248ba4`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `e1142d8e98d55858c96ed8e0f872680d2eb069bb`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -12,17 +12,17 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 
 | Status | Families |
 |---|---:|
-| not_started | 26 |
+| not_started | 25 |
 | scaffolded | 0 |
 | implemented | 4 |
-| tested | 48 |
+| tested | 49 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-Integrated native GCC43/43, ASan/UBSan41/41, WASI34/34 and Chromium51 real WASM stories passed. Includes Form composition, measured Surface body scrolling, fixed footers, Sheet resizing, table composition and choice/disclosure improvements. Full78-family parity remains unfinished. Published site remains earlier46-story deployment pending this push.
+Integrated native GCC43/43, ASan/UBSan41/41, WASI34/34 and Chromium51 real WASM stories passed. Includes Form composition, measured Surface body scrolling, fixed footers, Sheet resizing, table composition and choice/disclosure improvements. Full78-family parity remains unfinished. Published afca033 passed all six CI jobs and Pages build/deploy; its 51-story live gallery was checked in Chromium. Subsequent layout measurement and InputGroup changes passed native43/43; broader follow-up checks pending.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
@@ -39,14 +39,18 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
 - [clang-zig-headless.txt](validation/clang-zig-headless.txt)
 - [deployed-42.txt](validation/deployed-42.txt)
+- [gcc-button-intents.txt](validation/gcc-button-intents.txt)
 - [gcc-choice-wheel.txt](validation/gcc-choice-wheel.txt)
 - [gcc-clip-lifecycle.txt](validation/gcc-clip-lifecycle.txt)
 - [gcc-combo-table.txt](validation/gcc-combo-table.txt)
 - [gcc-form.txt](validation/gcc-form.txt)
 - [gcc-gallery46.txt](validation/gcc-gallery46.txt)
+- [gcc-input-group.txt](validation/gcc-input-group.txt)
 - [gcc-input-paint.txt](validation/gcc-input-paint.txt)
 - [gcc-input-tree.txt](validation/gcc-input-tree.txt)
 - [gcc-integrated-51.txt](validation/gcc-integrated-51.txt)
+- [gcc-intent-theme.txt](validation/gcc-intent-theme.txt)
+- [gcc-measurement.txt](validation/gcc-measurement.txt)
 - [gcc-offset.txt](validation/gcc-offset.txt)
 - [gcc-pickers.txt](validation/gcc-pickers.txt)
 - [gcc-pointer.txt](validation/gcc-pointer.txt)
@@ -175,7 +179,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Editor | implemented | Reusable bounded UTF-8 scalar editing model exists. No source editor, gutter, highlighting, diagnostics, grapheme editing or200K-line validation. |
 | Form | tested | Validation, submission and responsive column counts are application-owned as in the frozen reference.; Gallery integration and feature-level reference audit remain in progress; inherited Input text/IME/native accessibility limitations remain. |
 | Input | tested | Actual single-line caret/selection painting, UTF-8 scalar pointer positioning, horizontal scrolling, disabled/readonly/required/invalid semantics, host clipboard and bounded undo/redo shortcuts tested. Multiline presentation, graphemes, IME, bidi, shaping cluster hit testing and asynchronous browser clipboard integration remain pending. |
-| Input Group | not_started | Full documented behavior pending implementation and audit. |
+| Input Group | tested | Reference audit and real gallery integration remain in progress.; Uses retained single-line Input; multiline, IME, grapheme and native accessibility limitations remain. |
 | NumberInput | tested | Independent headless and styled finite numeric editing, draft validation, CJK normalization, locale-aware ASCII parsing/formatting, bounds, steps, readonly/disabled and semantics tested. Thousands separators, full custom pattern/appearance, caret/selection painting, pointer positioning and IME pending. |
 | OtpInput | not_started | Full documented behavior pending implementation and audit. |
 | Questionnaire | not_started | Full documented behavior pending implementation and audit. |

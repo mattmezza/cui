@@ -1,8 +1,8 @@
 {
   "source": "ed10ae5",
-  "published_source": "a6fc99b1b0641fae800ce71a3f9f3183cbc80ebb",
+  "published_source": "afca0334247cb18f66c25a869f32f63b4ab82ab3",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Integrated native GCC43/43, ASan/UBSan41/41, WASI34/34 and Chromium51 real WASM stories passed. Includes Form composition, measured Surface body scrolling, fixed footers, Sheet resizing, table composition and choice/disclosure improvements. Full78-family parity remains unfinished. Published site remains earlier46-story deployment pending this push.",
+  "summary": "Integrated native GCC43/43, ASan/UBSan41/41, WASI34/34 and Chromium51 real WASM stories passed. Includes Form composition, measured Surface body scrolling, fixed footers, Sheet resizing, table composition and choice/disclosure improvements. Full78-family parity remains unfinished. Published afca033 passed all six CI jobs and Pages build/deploy; its 51-story live gallery was checked in Chromium. Subsequent layout measurement and InputGroup changes passed native43/43; broader follow-up checks pending.",
   "checks": [
     {
       "name": "native",
@@ -34,15 +34,15 @@
     },
     {
       "name": "published CI",
-      "source": "a6fc99b",
-      "log": "ci-a6fc99b.json"
+      "source": "afca033",
+      "log": "ci-afca033.json"
     },
     {
       "name": "published gallery pipeline",
-      "source": "a6fc99b",
-      "stories": 46,
+      "source": "afca033",
+      "stories": 51,
       "catalog_entries": 78,
-      "log": "pages-a6fc99b.json"
+      "log": "pages-afca033.json"
     }
   ]
 }

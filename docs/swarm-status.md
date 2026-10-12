@@ -24,3 +24,6 @@ Latest published source `a6fc99b` passed all six framework CI jobs and the 46-st
 
 
 Current integration: `ed10ae5` adds Form/Field composition and standalone base tests, the 51-story gallery, measured scrolling/fixed modal footers, bounded Sheet resizing, richer Table composition, DropdownButton and Tabs behavior, and renderer corner/border geometry. Native 43/43, ASan/UBSan 41/41 and Chromium 51-story tests pass locally; WASI 34/34 also passed. Manifest: 26 not started, 4 implemented partial, 48 tested partial, zero verified, all 78 preserved. Workers use GPT-6.1 Sol low; GPT-6 Sol low is only the capacity fallback. Active work remains Form/InputGroup/OTP, Choice/Disclosure reference behaviors and actual gallery coverage. Published deployment remains the earlier 46-story version until current release gates complete.
+
+
+Deployment `afca033` is confirmed: all six framework CI jobs and Pages build/deploy succeeded. Direct HTTPS Chromium verification opened Dialog via its actual canvas button, observed 51 registered stories and no page errors; capture: `docs/screenshots/web-gallery-surfaces.png`. Subsequent local InputGroup and exact-zero/layout-only measurement updates pass native 43/43. Manifest now records 25 not started, 4 implemented partial, 49 tested partial, zero verified. No family is complete merely from the story count.

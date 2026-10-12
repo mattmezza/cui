@@ -618,6 +618,20 @@ def main():
                 control_change('control-size', size)
                 heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Project notes', 6)))
             assert heights[-1] > heights[0], heights
+            character_flags = page.evaluate('''() => {
+                const e=cuiGallery.exports, canvas=document.querySelector('canvas');
+                const result=[];
+                for(const modifier of ['ctrlKey','metaKey','altKey'])for(const key of ['z','a','v']){
+                    const event=new KeyboardEvent('keydown',{key,[modifier]:true,bubbles:false});
+                    canvas.dispatchEvent(event);
+                    result.push(e.gallery_key_stats(5));
+                }
+                const plain=new KeyboardEvent('keydown',{key:'q',bubbles:false});
+                canvas.dispatchEvent(plain);
+                result.push(e.gallery_key_stats(5));
+                return result;
+            }''')
+            assert character_flags == [0]*9+[1], character_flags
             for name, accessible_name in (('Input','Display name'),('NumberInput','Quantity')):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)

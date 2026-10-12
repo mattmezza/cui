@@ -245,7 +245,8 @@ static void test_shared_disjoint_cells(void) {
     assert(!strcmp(output, "| abcdef | Z |\n| :-- | :-- |"));
 }
 static void test_shared_selection_model(void) {
-    fixture a, b, isolated;
+    /* Large bounded workspaces exceed the default Windows stack when combined. */
+    static fixture a, b, isolated;
     setup(&a, CUI_TEXT_VIEW_MARKDOWN);
     setup(&b, CUI_TEXT_VIEW_MARKDOWN);
     setup(&isolated, CUI_TEXT_VIEW_MARKDOWN);
@@ -1837,7 +1838,7 @@ static void shared_selection_frame(cui_context *ui, fixture *a, fixture *b,
     assert(cui_last_error(ui) == CUI_OK);
 }
 static void test_shared_selection_events(void) {
-    fixture a, b;
+    static fixture a, b;
     setup(&a, CUI_TEXT_VIEW_MARKDOWN);
     setup(&b, CUI_TEXT_VIEW_MARKDOWN);
     assert(cui_text_view_set_text(&a.state, text("f![alt](asset)irst")) == CUI_TEXT_VIEW_OK);

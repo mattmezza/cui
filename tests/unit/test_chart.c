@@ -220,8 +220,8 @@ int main(void) {
         {.label = {"C", 1}, .value = 30, .open = 30, .high = 40, .low = 25, .close = 28},
     };
     cui_chart_link links[] = {{0, 1, 20, {0}}, {0, 2, 10, {0}}};
-    unsigned char pixels[128 * 96 * 4];
-    unsigned char saved[sizeof pixels];
+    static unsigned char pixels[128 * 96 * 4];
+    static unsigned char saved[sizeof pixels];
     uint64_t old_revision;
     memset(pixels, 77, sizeof pixels);
     cui_chart_state state = {.pixels = pixels, .byte_capacity = sizeof pixels};
@@ -446,7 +446,7 @@ int main(void) {
     scaled_flow.custom_sankey_link_opacity = true;
     scaled_flow.sankey_link_opacity = 0;
     assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
-    unsigned char transparent_links[sizeof pixels];
+    static unsigned char transparent_links[sizeof pixels];
     memcpy(transparent_links, pixels, sizeof pixels);
     scaled_flow.sankey_link_opacity = 1;
     assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
@@ -536,7 +536,7 @@ int main(void) {
     options.data_revision = 0;
     options.curve = CUI_CHART_CURVE_NATURAL;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
-    unsigned char natural[sizeof pixels];
+    static unsigned char natural[sizeof pixels];
     memcpy(natural, pixels, sizeof pixels);
     options.curve = CUI_CHART_CURVE_LINEAR;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
@@ -722,7 +722,7 @@ int main(void) {
     options.has_domain = false;
     points[0].value = 20;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
-    unsigned char bottom_bars[sizeof pixels];
+    static unsigned char bottom_bars[sizeof pixels];
     memcpy(bottom_bars, pixels, sizeof pixels);
     options.bar_alignment = CUI_CHART_BAR_TOP;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
@@ -1134,7 +1134,7 @@ int main(void) {
     styled_auto.disable_appear = true;
     styled_manual.bar_category_gutter = category_gap;
     styled_manual.bar_value_end_gutter = value_end_gap;
-    unsigned char auto_pixels[512 * 96 * 4], manual_pixels[sizeof auto_pixels];
+    static unsigned char auto_pixels[512 * 96 * 4], manual_pixels[sizeof auto_pixels];
     cui_chart_state auto_chart = {
         .pixels = auto_pixels, .byte_capacity = sizeof auto_pixels, .hovered = SIZE_MAX};
     cui_chart_state manual_chart = {
@@ -1263,7 +1263,7 @@ int main(void) {
     styled_axis_auto.value_axis_gutter = 0;
     styled_axis_auto.disable_appear = true;
     styled_axis_manual.value_axis_gutter = wide_gutter;
-    unsigned char axis_auto_pixels[sizeof pixels], axis_manual_pixels[sizeof pixels];
+    static unsigned char axis_auto_pixels[sizeof pixels], axis_manual_pixels[sizeof pixels];
     cui_chart_state axis_auto_chart = {
         .pixels = axis_auto_pixels, .byte_capacity = sizeof axis_auto_pixels, .hovered = SIZE_MAX};
     cui_chart_state axis_manual_chart = {.pixels = axis_manual_pixels,
@@ -1359,7 +1359,7 @@ int main(void) {
     assert(image && text && formatted && hover_crosshair && hover_halo && hover_dot &&
            hover_stroke && eased_crosshair);
     assert(state.hover_progress > 0 && state.hover_progress < 1);
-    unsigned char guide_pixels[48 * 4] = {0};
+    static unsigned char guide_pixels[48 * 4] = {0};
     state.hover_guide_pixels = guide_pixels;
     state.hover_guide_capacity = sizeof guide_pixels;
     assert(cui_begin_frame(ui, 256, 256, .01));
@@ -1578,7 +1578,7 @@ int main(void) {
     options.foreground = (cui_color){20, 30, 40, 255};
     options.bullish = (cui_color){7, 180, 8, 255};
     options.tooltip_format = NULL;
-    unsigned char fresh_candle_pixels[sizeof pixels] = {0};
+    static unsigned char fresh_candle_pixels[sizeof pixels] = {0};
     cui_chart_state fresh_candle = {.pixels = fresh_candle_pixels,
                                     .byte_capacity = sizeof fresh_candle_pixels};
     assert(cui_begin_frame(ui, 256, 256, .069));
@@ -1901,8 +1901,8 @@ int main(void) {
     cui_chart_sankey_margins measured_margins = {0};
     assert(cui_chart_measure_sankey_margins(ui, &options, &measured_margins) == CUI_PLOT_OK);
     assert(measured_margins.left > 0 && measured_margins.right > 0 && measured_margins.bottom > 0);
-    unsigned char expected_sankey_pixels[sizeof pixels];
-    unsigned char automatic_sankey_pixels[sizeof pixels] = {0};
+    static unsigned char expected_sankey_pixels[sizeof pixels];
+    static unsigned char automatic_sankey_pixels[sizeof pixels] = {0};
     cui_chart_state expected_sankey = {.pixels = expected_sankey_pixels,
                                        .byte_capacity = sizeof expected_sankey_pixels};
     cui_chart_state automatic_sankey = {.pixels = automatic_sankey_pixels,
@@ -1918,7 +1918,7 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(memcmp(expected_sankey_pixels, automatic_sankey_pixels, sizeof expected_sankey_pixels) ==
            0);
-    unsigned char animated_sankey_pixels[sizeof pixels] = {0};
+    static unsigned char animated_sankey_pixels[sizeof pixels] = {0};
     cui_chart_state animated_sankey = {.pixels = animated_sankey_pixels,
                                        .byte_capacity = sizeof animated_sankey_pixels};
     cui_chart_options immediate_sankey = options;
@@ -2038,7 +2038,7 @@ int main(void) {
     options.hide_grid = true;
     options.data_revision = 102;
     options.appear_key = 7;
-    unsigned char default_appear_pixels[sizeof pixels] = {0};
+    static unsigned char default_appear_pixels[sizeof pixels] = {0};
     cui_chart_state default_appear = {.pixels = default_appear_pixels,
                                       .byte_capacity = sizeof default_appear_pixels,
                                       .hovered = SIZE_MAX};

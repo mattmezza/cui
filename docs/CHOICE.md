@@ -678,8 +678,12 @@ Loading preserves the action label and custom body instead of replacing them
 with an ellipsis. It keeps the action inert while the menu remains independently
 usable. Headless tests verify the custom callback runs during loading, layout
 width remains stable, built-in labels remain visible and action clicks are
-blocked. Existing icon-to-loader substitution and whole-subtree opacity for
-caller-colored custom bodies still need portable icon/opacity primitives.
+blocked. Loading now applies inherited opacity of 0.8 to the entire action
+subtree, including caller-colored text/shapes, bitmap checkmarks and nested
+opacity. It preserves base palette alpha and applies the fade exactly once;
+a disabled loading action keeps disabled styling without that extra fade.
+Tests cover all twelve variants, custom text/shapes and nested bitmap opacity.
+Icon-to-loader substitution still needs a portable icon primitive.
 
 Dropdown now uses the frozen button metrics: XS/S/M/L heights 20/24/32/32,
 horizontal padding 4/8/10/12, fonts 12/14/14/16, content gaps 4/4/8/8, and
@@ -757,3 +761,13 @@ true tail of a mixed-height menu. Source scroll still uses integer row windows;
 partial rows and continuous pixel offsets, natural intrinsic popup width,
 negative separator horizontal margins, custom arbitrary-height bodies and
 popover shadows remain gaps. Existing explicit popup.width remains supported.
+
+Dropdown variant ordinals now match the source default: Default 0, Primary 1,
+Secondary 2, Danger 3, Outline 4, Ghost 5, Warning 6, Success 7, Info 8, Link 9, Text 10,
+Custom 11. Zero-initialized options therefore use Default rather than Primary.
+This is an explicit enum-value migration: named constants continue to select
+the same variants, but persisted integers, foreign bindings and ordinal UI
+selectors must be remapped. Previous values were Primary 0, Secondary 1,
+Outline 2, Ghost 3, Danger 4, Warning 5, Success 6, Info 7, Default 8; Link/Text/Custom
+values remain unchanged. A custom Default token test verifies the zero-options
+presentation directly.

@@ -1428,7 +1428,7 @@ static void test_dropdown_button(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
     for (size_t t = 0; t < 4; t++)
-        for (int variant = CUI_DROPDOWN_BUTTON_PRIMARY; variant <= CUI_DROPDOWN_BUTTON_CUSTOM;
+        for (int variant = CUI_DROPDOWN_BUTTON_DEFAULT; variant <= CUI_DROPDOWN_BUTTON_CUSTOM;
              variant++)
             for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_XSMALL;
                  size++) {
@@ -2349,8 +2349,12 @@ static void test_tab_scrollbars(void) {
 static void test_dropdown_presentation_variants(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
+    const cui_dropdown_button_variant variants[] = {
+        CUI_DROPDOWN_BUTTON_DEFAULT, CUI_DROPDOWN_BUTTON_LINK, CUI_DROPDOWN_BUTTON_TEXT,
+        CUI_DROPDOWN_BUTTON_CUSTOM};
     for (size_t t = 0; t < 4; t++)
-        for (int v = CUI_DROPDOWN_BUTTON_DEFAULT; v <= CUI_DROPDOWN_BUTTON_CUSTOM; v++) {
+        for (size_t vi = 0; vi < 4; vi++) {
+            cui_dropdown_button_variant v = variants[vi];
             cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_menu_tree_state state;
@@ -3238,6 +3242,77 @@ static void test_first_tab_border_policy(void) {
     }
     cui_destroy(ui);
 }
+static void dropdown_loading_body(cui_context *ui, void *user) {
+    (void)user;
+    cui_begin_box(
+        ui, 8801,
+        (cui_box){.width = 160, .height = 20, .row = true, .background = {11, 22, 33, 201}});
+    cui_text(ui, cui_string("Loading body"), 11, (cui_color){44, 55, 66, 211});
+    cui_begin_box(ui, 8802, (cui_box){.custom_opacity = true, .opacity = .5f});
+    cui_checkmark(ui, 12, (cui_color){77, 88, 99, 255});
+    cui_end_box(ui);
+    cui_end_box(ui);
+}
+static void test_dropdown_loading_subtree_opacity(void) {
+    for (int variant = CUI_DROPDOWN_BUTTON_DEFAULT; variant <= CUI_DROPDOWN_BUTTON_CUSTOM;
+         variant++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        cui_menu_tree_state state;
+        cui_menu_tree_init(&state, 2200);
+        cui_id action = 0;
+        cui_dropdown_button_options options = {
+            .variant = (cui_dropdown_button_variant)variant,
+            .content = dropdown_loading_body,
+            .custom = {
+                {20, 30, 40, 255}, {100, 110, 120, 255}, {50, 60, 70, 255}, {80, 90, 100, 255}}};
+        for (unsigned phase = 0; phase < 3; phase++) {
+            options.action_loading = phase != 0;
+            options.action_disabled = phase == 2;
+            dropdown_scene(ui, &state, &action, &theme, options);
+            float opacity = phase == 1 ? .8f : 1;
+            bool rectangle = false, text = false, image = false;
+            for (size_t i = 0; i < dropdown_draw.count; i++) {
+                cui_draw_command command = dropdown_draw.commands[i];
+                if (command.type == CUI_DRAW_RECT && command.color.r == 11 &&
+                    command.color.g == 22 && command.color.b == 33) {
+                    rectangle = true;
+                    assert(command.color.a == (uint8_t)(201 * opacity));
+                }
+                if (command.type == CUI_DRAW_TEXT && command.text.length == 12 &&
+                    !memcmp(command.text.data, "Loading body", 12)) {
+                    text = true;
+                    assert(command.color.r == 44 && command.color.g == 55 &&
+                           command.color.b == 66 && command.color.a == (uint8_t)(211 * opacity));
+                }
+                if (command.type == CUI_DRAW_IMAGE) {
+                    image = true;
+                    assert(fabsf(command.bitmap.opacity - .5f * opacity) < .0001f);
+                }
+            }
+            assert(rectangle);
+            assert(text);
+            assert(image);
+            if (phase) {
+                click(ui, 2001);
+                assert(!dropdown_scene(ui, &state, &action, &theme, options).action_activated);
+            }
+        }
+        cui_destroy(ui);
+    }
+    assert(CUI_DROPDOWN_BUTTON_DEFAULT == 0 && CUI_DROPDOWN_BUTTON_PRIMARY == 1 &&
+           CUI_DROPDOWN_BUTTON_INFO == 8 && CUI_DROPDOWN_BUTTON_LINK == 9);
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_theme theme = cui_theme_light();
+    theme.buttons[CUI_THEME_BUTTON_DEFAULT].normal = (cui_color){12, 34, 56, 255};
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    dropdown_scene(ui, &state, &action, &theme, (cui_dropdown_button_options){0});
+    assert(same_color(dropdown_surface(ui, 2001), theme.buttons[CUI_THEME_BUTTON_DEFAULT].normal));
+    cui_destroy(ui);
+}
 static void test_dropdown_loading_keeps_content(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
@@ -3764,6 +3839,7 @@ int main(void) {
     test_choice_trailing_checks();
     test_menu_check_glyphs();
     test_dropdown_reference_metrics();
+    test_dropdown_loading_subtree_opacity();
     test_dropdown_loading_keeps_content();
     test_first_tab_border_policy();
     test_tab_scroll_tail();

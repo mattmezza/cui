@@ -1615,9 +1615,8 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         }
     }
     if (loading) {
-        box.background = cui_dropdown_opacity(box.background, .8f);
-        box.border = cui_dropdown_opacity(box.border, .8f);
-        *foreground = cui_dropdown_opacity(*foreground, .8f);
+        box.custom_opacity = true;
+        box.opacity = .8f;
     }
     if (cui_focused(ui) == id) {
         box.border = theme->focus;

@@ -129,7 +129,9 @@ def main():
                 assert index is not None, name
                 canvas.scroll_into_view_if_needed()
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
+                page.evaluate('y=>{const rect=document.querySelector("canvas").getBoundingClientRect(),header=document.querySelector("header").getBoundingClientRect(),target=rect.top+y;if(target<header.bottom+8)window.scrollBy(0,target-header.bottom-8);}', bounds[1]+bounds[3]/2)
                 rectangle = canvas.bounding_box()
+                assert page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x':rectangle['x']+bounds[0]+bounds[2]/2,'y':rectangle['y']+bounds[1]+bounds[3]/2}), name
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
             def dropdown_select(control, value, role=None):
                 control_change('dropdown-'+control, value)

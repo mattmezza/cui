@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_picker.h"
+#include "cui/cui_components.h"
+#include "cui/cui_icon.h"
 #include <math.h>
 #include <stdio.h>
 static cui_id cui_picker_style_id(cui_id id, unsigned index) {
@@ -23,12 +25,37 @@ static void cui_picker_paint_cell(cui_context *ui, cui_id id, const cui_theme *t
     cui_begin_box(ui, id,
                   (cui_box){.width = size,
                             .height = size,
-                            .padding = size * .15f,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
                             .radius = t->radius,
                             .background = selected ? t->primary : t->surface,
                             .border = cui_focused(ui) == id ? t->focus : t->border,
                             .border_width = cui_focused(ui) == id ? 2 : 0});
-    cui_text(ui, label, t->font_size, disabled ? t->muted : selected ? t->on_primary : t->text);
+    cui_text(ui, label, fminf(t->font_size, size * .625f),
+             disabled   ? t->muted
+             : selected ? t->on_primary
+                        : t->text);
+    cui_end_box(ui);
+}
+static void cui_picker_paint_navigation(cui_context *ui, cui_id id, const cui_theme *t, float size,
+                                        bool disabled, bool previous, bool year) {
+    cui_begin_box(ui, id,
+                  (cui_box){.width = size,
+                            .height = size,
+                            .row = true,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .radius = t->radius,
+                            .background = t->surface,
+                            .border = cui_focused(ui) == id ? t->focus : t->border,
+                            .border_width = cui_focused(ui) == id ? 2 : 0});
+    for (unsigned i = 0; i < (year ? 2u : 1u); i++)
+        cui_icon_named(ui, cui_picker_style_id(id, i), t,
+                       cui_string(previous ? "chevron-left" : "chevron-right"),
+                       (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                          .custom_size = size * (year ? .3f : .5f),
+                                          .custom_color = true,
+                                          .color = disabled ? t->muted : t->text});
     cui_end_box(ui);
 }
 static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_theme *t,
@@ -51,28 +78,39 @@ static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_them
             continue;
         cui_calendar_grid(month, o.first_weekday, grid);
         cui_begin_box(ui, cui_picker_style_id(id, 10 + m), (cui_box){.width = width, .gap = gap});
-        cui_begin_box(ui, cui_picker_style_id(id, 20 + m),
-                      (cui_box){.row = true, .gap = gap, .height = cell});
+        cui_begin_box(
+            ui, cui_picker_style_id(id, 20 + m),
+            (cui_box){
+                .row = true, .gap = gap, .width = -1, .height = cell, .align_y = CUI_ALIGN_CENTER});
         if (m == 0) {
-            cui_picker_paint_cell(ui, cui_calendar_navigation_id(id, 1), t, cui_string("«"), cell,
-                                  o.disabled, false);
-            cui_picker_paint_cell(ui, cui_calendar_navigation_id(id, 2), t, cui_string("‹"), cell,
-                                  o.disabled, false);
+            cui_picker_paint_navigation(ui, cui_calendar_navigation_id(id, 1), t, cell, o.disabled,
+                                        true, true);
+            cui_picker_paint_navigation(ui, cui_calendar_navigation_id(id, 2), t, cell, o.disabled,
+                                        true, false);
         }
         char title[24];
         snprintf(title, sizeof(title), "%04d-%02d", month.year, month.month);
-        cui_text(ui, cui_string(title), t->font_size, t->text);
+        cui_begin_box(ui, cui_picker_style_id(id, 40 + m),
+                      (cui_box){.width = -1,
+                                .height = cell,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
+        cui_text(ui, cui_string(title), fminf(t->font_size, cell * .625f), t->text);
+        cui_end_box(ui);
         if (m == 0) {
-            cui_picker_paint_cell(ui, cui_calendar_navigation_id(id, 3), t, cui_string("›"), cell,
-                                  o.disabled, false);
-            cui_picker_paint_cell(ui, cui_calendar_navigation_id(id, 4), t, cui_string("»"), cell,
-                                  o.disabled, false);
+            cui_picker_paint_navigation(ui, cui_calendar_navigation_id(id, 3), t, cell, o.disabled,
+                                        false, false);
+            cui_picker_paint_navigation(ui, cui_calendar_navigation_id(id, 4), t, cell, o.disabled,
+                                        false, true);
         }
         cui_end_box(ui);
         cui_begin_box(ui, cui_picker_style_id(id, 30 + m), (cui_box){.row = true, .gap = gap});
         for (unsigned w = 0; w < 7; ++w) {
             cui_begin_box(ui, cui_picker_style_id(id, 100 + m * 7 + w),
-                          (cui_box){.width = cell, .height = cell * .7f, .padding = cell * .1f});
+                          (cui_box){.width = cell,
+                                    .height = cell * .7f,
+                                    .align_x = CUI_ALIGN_CENTER,
+                                    .align_y = CUI_ALIGN_CENTER});
             cui_text(ui, cui_string(weekday[(o.first_weekday % 7 + w) % 7]), t->font_size * .8f,
                      t->muted);
             cui_end_box(ui);
@@ -120,15 +158,8 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     bool was_open = s->overlay.open;
     cui_calendar_result result =
         cui_base_date_picker(ui, id, cui_picker_style_id(id, 900), name, s, selection, o);
-    cui_begin_box(ui, id,
-                  (cui_box){.width = isfinite(o.width) && o.width > 0 ? o.width : 240,
-                            .height = t->control_height,
-                            .padding = t->padding,
-                            .radius = t->radius,
-                            .background = t->surface,
-                            .border = cui_focused(ui) == id ? t->focus : t->border,
-                            .border_width = 1});
     char value[40];
+    cui_str label;
     if (cui_date_valid(selection->start)) {
         if (o.calendar.range && cui_date_valid(selection->end))
             snprintf(value, sizeof(value), "%04d-%02d-%02d / %04d-%02d-%02d", selection->start.year,
@@ -137,11 +168,14 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
         else
             snprintf(value, sizeof(value), "%04d-%02d-%02d", selection->start.year,
                      selection->start.month, selection->start.day);
-        cui_text(ui, cui_string(value), t->font_size, o.disabled ? t->muted : t->text);
+        label = cui_string(value);
     } else
-        cui_text(ui, o.placeholder.length ? o.placeholder : cui_string("Select date"), t->font_size,
-                 t->muted);
-    cui_end_box(ui);
+        label = o.placeholder.length ? o.placeholder : cui_string("Select date");
+    cui_button_paint(ui, id, t, label,
+                     (cui_button_options){.variant = CUI_BUTTON_OUTLINE,
+                                          .width = isfinite(o.width) && o.width > 0 ? o.width : 240,
+                                          .disabled = o.disabled,
+                                          .icon = cui_string("calendar")});
     if (!s->overlay.open)
         return result.changed;
     if (!isfinite(o.viewport.x) || !isfinite(o.viewport.y) || !isfinite(o.viewport.w) ||
@@ -163,6 +197,8 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                .border = t->border,
                                .border_width = 1,
                                .radius = t->radius,
+                               .align_x = CUI_ALIGN_CENTER,
+                               .align_y = CUI_ALIGN_CENTER,
                                .clip = true},
                      placement.bounds, 100);
     cui_calendar_options calendar = o.calendar;

@@ -220,6 +220,72 @@ static void time_events(void) {
     cui_destroy(ui);
 }
 #ifndef CUI_PICKER_BASE_ONLY
+static void calendar_presentation(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
+    cui_theme theme = cui_theme_light();
+    cui_calendar_state state = {.month = {2024, 2, 1}, .cursor = {2024, 2, 1}};
+    cui_date_selection selected = {.start = {2024, 2, 1}};
+    const float sizes[] = {20, 32, 48};
+    assert(ui);
+    for (size_t n = 0; n < 3; n++) {
+        assert(cui_begin_frame(ui, 600, 600, .016f));
+        cui_calendar(ui, 10, &theme, &state, &selected,
+                     (cui_calendar_options){.cell_size = sizes[n]});
+        cui_draw_list list = cui_end_frame(ui);
+        cui_rect day = cui_bounds(ui, cui_calendar_day_id(10, selected.start));
+        unsigned images = 0, centered = 0;
+        for (size_t i = 0; i < list.count; i++) {
+            const cui_draw_command *c = &list.commands[i];
+            if (c->type == CUI_DRAW_IMAGE) {
+                images++;
+                assert(cui_bitmap_valid(c->bitmap.bitmap));
+            }
+            if (c->type == CUI_DRAW_TEXT && c->text.length == 1 && c->text.data[0] == '1') {
+                centered++;
+                assert(fabsf(c->bounds.x + c->bounds.w / 2 - day.x - day.w / 2) < .01f);
+                assert(fabsf(c->bounds.y + c->bounds.h / 2 - day.y - day.h / 2) < .01f);
+            }
+        }
+        assert(images == 6 && centered == 1);
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
+
+static void date_picker_presentation(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
+    cui_theme theme = cui_theme_light();
+    cui_date_picker_state state = {0};
+    cui_date_selection selected = {.start = {2024, 2, 1}};
+    assert(ui);
+    cui_date_picker_init(&state, 21, selected.start);
+    for (unsigned frame = 0; frame < 2; frame++) {
+        if (frame)
+            click(ui, cui_bounds(ui, 20));
+        assert(cui_begin_frame(ui, 600, 600, .016f));
+        cui_date_picker(ui, 20, &theme, cui_string("Date"), &state, &selected,
+                        (cui_date_picker_options){.viewport = {0, 0, 600, 600}});
+        cui_draw_list list = cui_end_frame(ui);
+        cui_rect trigger = cui_bounds(ui, 20);
+        assert(trigger.h == 32);
+        unsigned images = 0, labels = 0;
+        for (size_t i = 0; i < list.count; i++) {
+            const cui_draw_command *c = &list.commands[i];
+            if (c->type == CUI_DRAW_IMAGE)
+                images++;
+            if (c->type == CUI_DRAW_TEXT && c->text.length == 10 &&
+                !memcmp(c->text.data, "2024-02-01", 10)) {
+                labels++;
+                assert(fabsf(c->bounds.y + c->bounds.h / 2 - trigger.y - trigger.h / 2) < .5f);
+            }
+        }
+        assert(images == (frame ? 7u : 1u) && labels == 1);
+        assert(state.overlay.open == (frame != 0));
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
+
 static bool picker_scene(cui_context *ui, cui_date_picker_state *state,
                          cui_date_selection *selection, bool disabled) {
     cui_theme theme = cui_theme_light();
@@ -384,6 +450,8 @@ int main(void) {
     time_events();
 #ifndef CUI_PICKER_BASE_ONLY
     picker_events();
+    calendar_presentation();
+    date_picker_presentation();
 #endif
     return 0;
 }

@@ -254,18 +254,25 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_end_box(ui);
         }
     }
-    if (!o->hide_legend && o->kind == CUI_CHART_PIE && w >= 100 && h >= 40) {
-        size_t limit = o->count < 6 ? o->count : 6;
-        for (size_t i = 0; i < limit; i++) {
-            cui_str label = o->data[i].label;
-            if (!label.length || !label.data)
-                continue;
-            cui_begin_absolute_box(
-                ui, id ^ (UINT64_C(0xa6a9f030b2543000) + i),
-                (cui_box){.width = 58, .height = 12, .fixed_width = true, .fixed_height = true},
-                (cui_rect){w - 60, 2 + 12 * (float)i, 58, 12});
-            cui_text(ui, label, 10, o->foreground);
-            cui_end_box(ui);
+    if (o->kind == CUI_CHART_PIE && o->pie_show_labels && o->count <= 256) {
+        cui_chart_pie_label labels[256];
+        if (cui_chart_pie_labels(o, labels, 256) == CUI_PLOT_OK) {
+            float opacity = fmaxf(0, fminf(1, (state->rendered_reveal_progress - .7f) / .3f));
+            cui_color color = o->pie_label_color.a ? o->pie_label_color
+                              : o->foreground.a    ? o->foreground
+                                                   : (cui_color){32, 32, 32, 255};
+            color.a = (unsigned char)lroundf(color.a * opacity);
+            for (size_t i = 0; i < o->count; i++) {
+                if (!labels[i].visible || !color.a)
+                    continue;
+                cui_begin_absolute_box(
+                    ui, id ^ (UINT64_C(0xa6a9f030b2543000) + i),
+                    (cui_box){.width = 64, .height = 12, .fixed_width = true, .fixed_height = true},
+                    (cui_rect){labels[i].text_x * w / o->width, labels[i].text_y * h / o->height,
+                               64, 12});
+                cui_text(ui, labels[i].text, 10, color);
+                cui_end_box(ui);
+            }
         }
     }
     if (!o->hide_legend && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) && w >= 100 &&

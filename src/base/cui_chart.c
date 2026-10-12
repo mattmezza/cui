@@ -26,18 +26,18 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         ((o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_RADAR || o->kind == CUI_CHART_SANKEY) &&
          o->count > 256) ||
         !isfinite(o->inner_radius) || o->inner_radius < 0 || !isfinite(o->pie_outer_radius) ||
-        o->pie_outer_radius < 0 || !isfinite(o->candle_body_ratio) || o->candle_body_ratio < 0 ||
-        o->candle_body_ratio > 1 || !isfinite(o->pad_angle) || o->pad_angle < 0 ||
-        o->pad_angle > 2 * CUI_CHART_PI || !isfinite(o->bar_ratio) || o->bar_ratio < 0 ||
-        o->bar_ratio > 1 || o->tick_count == 1 || o->tick_count > 1000 ||
-        o->bar_alignment < CUI_CHART_BAR_BOTTOM || o->bar_alignment > CUI_CHART_BAR_RIGHT ||
-        !isfinite(o->bar_padding_inner) || !isfinite(o->bar_padding_outer) ||
-        !isfinite(o->max_bar_width) || !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 ||
-        o->bar_padding_inner > 1 || o->bar_padding_outer < 0 || o->bar_padding_outer > 1 ||
-        o->max_bar_width < 0 || o->min_bar_length < 0 || !isfinite(o->radar_max_value) ||
-        !isfinite(o->bar_corner_radius) || o->bar_corner_radius < 0 ||
-        !isfinite(o->reveal_progress) || o->reveal_progress < 0 || o->reveal_progress > 1 ||
-        !isfinite(o->appear_duration) || o->appear_duration < 0 ||
+        o->pie_outer_radius < 0 || !isfinite(o->pie_label_gap) || o->pie_label_gap < 0 ||
+        !isfinite(o->candle_body_ratio) || o->candle_body_ratio < 0 || o->candle_body_ratio > 1 ||
+        !isfinite(o->pad_angle) || o->pad_angle < 0 || o->pad_angle > 2 * CUI_CHART_PI ||
+        !isfinite(o->bar_ratio) || o->bar_ratio < 0 || o->bar_ratio > 1 || o->tick_count == 1 ||
+        o->tick_count > 1000 || o->bar_alignment < CUI_CHART_BAR_BOTTOM ||
+        o->bar_alignment > CUI_CHART_BAR_RIGHT || !isfinite(o->bar_padding_inner) ||
+        !isfinite(o->bar_padding_outer) || !isfinite(o->max_bar_width) ||
+        !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 || o->bar_padding_inner > 1 ||
+        o->bar_padding_outer < 0 || o->bar_padding_outer > 1 || o->max_bar_width < 0 ||
+        o->min_bar_length < 0 || !isfinite(o->radar_max_value) || !isfinite(o->bar_corner_radius) ||
+        o->bar_corner_radius < 0 || !isfinite(o->reveal_progress) || o->reveal_progress < 0 ||
+        o->reveal_progress > 1 || !isfinite(o->appear_duration) || o->appear_duration < 0 ||
         (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
         !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
         o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
@@ -553,6 +553,80 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
     }
     s->mark_clip_active = false;
 }
+cui_plot_result cui_chart_pie_labels(const cui_chart_options *o, cui_chart_pie_label *out,
+                                     size_t capacity) {
+    if (!o || o->kind != CUI_CHART_PIE || !o->data || !out || !o->count || o->count > 256 ||
+        !o->width || !o->height || o->width > 4096 || o->height > 4096 ||
+        !isfinite(o->pie_outer_radius) || o->pie_outer_radius < 0 || !isfinite(o->pie_label_gap) ||
+        o->pie_label_gap < 0)
+        return CUI_PLOT_INVALID;
+    if (capacity < o->count)
+        return CUI_PLOT_CAPACITY;
+    long double total = 0;
+    for (size_t i = 0; i < o->count; i++) {
+        if (!isfinite(o->data[i].value) || o->data[i].value < 0 ||
+            !cui_chart_valid_str(o->data[i].label))
+            return CUI_PLOT_INVALID;
+        total += o->data[i].value;
+    }
+    if (total <= 0 || total > DBL_MAX)
+        return CUI_PLOT_EMPTY;
+    cui_chart_pie_label labels[256];
+    memset(labels, 0, sizeof labels);
+    double radius = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
+    double gap = o->pie_label_gap > 0 ? o->pie_label_gap : 15;
+    double cx = o->width / 2.0, cy = o->height / 2.0, cumulative = 0;
+    for (size_t i = 0; i < o->count; i++) {
+        double sweep = 2 * CUI_CHART_PI * (double)(o->data[i].value / total);
+        double midpoint = cumulative + sweep / 2;
+        cumulative += sweep;
+        if (sweep < CUI_CHART_PI / 360 || !o->data[i].label.length)
+            continue;
+        cui_chart_pie_label *label = &labels[i];
+        label->text = o->data[i].label;
+        label->visible = true;
+        label->right = sin(midpoint) >= 0;
+        label->edge_x = (float)(cx + sin(midpoint) * radius);
+        label->edge_y = (float)(cy - cos(midpoint) * radius);
+        label->anchor_x = (float)(cx + sin(midpoint) * (radius + gap));
+        label->anchor_y = (float)(cy - cos(midpoint) * (radius + gap));
+    }
+    for (int side = 0; side < 2; side++) {
+        size_t indices[256], count = 0;
+        for (size_t i = 0; i < o->count; i++)
+            if (labels[i].visible && labels[i].right == (side == 1))
+                indices[count++] = i;
+        for (size_t i = 1; i < count; i++) {
+            size_t item = indices[i], j = i;
+            while (j && labels[indices[j - 1]].anchor_y > labels[item].anchor_y) {
+                indices[j] = indices[j - 1];
+                j--;
+            }
+            indices[j] = item;
+        }
+        double spacing = fmin(12, o->height / (double)(count + 1));
+        double previous = -DBL_MAX;
+        for (size_t i = 0; i < count; i++) {
+            cui_chart_pie_label *label = &labels[indices[i]];
+            double y = fmax(6, fmin(o->height - 6, label->anchor_y));
+            if (i && y < previous + spacing)
+                y = previous + spacing;
+            label->anchor_y = (float)y;
+            previous = y;
+        }
+        double next = o->height - 6;
+        for (size_t i = count; i > 0; i--) {
+            cui_chart_pie_label *label = &labels[indices[i - 1]];
+            if (label->anchor_y > next)
+                label->anchor_y = (float)next;
+            next = label->anchor_y - spacing;
+            label->text_x = label->anchor_x + (label->right ? 4 : -68);
+            label->text_y = label->anchor_y - 6;
+        }
+    }
+    memcpy(out, labels, o->count * sizeof(*out));
+    return CUI_PLOT_OK;
+}
 static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     long double sum = 0;
     for (size_t i = 0; i < o->count; i++)
@@ -591,6 +665,24 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
                 continue;
             cui_chart_pixel(s, o, x, y, cui_chart_palette(o, low));
         }
+    if (o->pie_show_labels) {
+        cui_chart_pie_label labels[256];
+        if (cui_chart_pie_labels(o, labels, 256) == CUI_PLOT_OK) {
+            double opacity = fmax(0, fmin(1, (progress - .7) / .3));
+            cui_color line = o->pie_label_line_color.a
+                                 ? o->pie_label_line_color
+                                 : (o->grid.a ? o->grid : (cui_color){120, 120, 120, 255});
+            line.a = (unsigned char)lround(line.a * opacity);
+            for (size_t i = 0; i < o->count; i++)
+                if (labels[i].visible) {
+                    cui_chart_line(s, o, labels[i].edge_x, labels[i].edge_y, labels[i].anchor_x,
+                                   labels[i].anchor_y, line);
+                    cui_chart_line(s, o, labels[i].anchor_x, labels[i].anchor_y,
+                                   labels[i].anchor_x + (labels[i].right ? 4 : -4),
+                                   labels[i].anchor_y, line);
+                }
+        }
+    }
 }
 static void cui_chart_triangle(cui_chart_state *s, const cui_chart_options *o, double ax, double ay,
                                double bx, double by, double cx, double cy, cui_color color) {
@@ -1006,6 +1098,11 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->domain_max));
     h = cui_chart_mix(h, cui_chart_bits(o->inner_radius));
     h = cui_chart_mix(h, cui_chart_bits(o->pie_outer_radius));
+    h = cui_chart_mix(h, o->pie_show_labels);
+    h = cui_chart_mix(h, cui_chart_bits(o->pie_label_gap));
+    const unsigned char *pie_label_colors = (const unsigned char *)&o->pie_label_color;
+    for (size_t i = 0; i < 2 * sizeof(cui_color); i++)
+        h = cui_chart_mix(h, pie_label_colors[i]);
     h = cui_chart_mix(h, cui_chart_bits(o->pad_angle));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_ratio));
     h = cui_chart_mix(h, cui_chart_bits(o->candle_body_ratio));
@@ -1082,6 +1179,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
     s->hovered_value = 0;
     s->revision++;
     s->cache_key = key;
+    s->rendered_reveal_progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
     return CUI_PLOT_OK;
 }
 static size_t cui_chart_band_nearest(const cui_chart_options *o, double position, double start,

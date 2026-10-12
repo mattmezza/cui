@@ -383,6 +383,17 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(state.revision == old_revision + 1 && memcmp(saved, pixels, sizeof pixels) != 0);
     options.data_revision = 0;
+    options.pie_show_labels = true;
+    cui_chart_pie_label pie_labels[3];
+    memset(pie_labels, 0, sizeof pie_labels);
+    assert(cui_chart_pie_labels(&options, pie_labels, 2) == CUI_PLOT_CAPACITY);
+    assert(!pie_labels[0].visible);
+    assert(cui_chart_pie_labels(&options, pie_labels, 3) == CUI_PLOT_OK);
+    assert(pie_labels[0].visible && pie_labels[1].visible && pie_labels[2].visible);
+    assert(hypot(pie_labels[0].edge_x - 64, pie_labels[0].edge_y - 48) > 35);
+    options.pie_label_gap = NAN;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
+    options.pie_label_gap = 0;
     options.inner_radius = 12;
     options.pad_angle = .02;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
@@ -516,6 +527,28 @@ int main(void) {
                 default_ohlc = true;
         }
     assert(tooltip_calls == 1 && custom && !default_ohlc);
+    options.tooltip_content = NULL;
+    options.pie_show_labels = true;
+    options.pie_outer_radius = 20;
+    options.pie_label_gap = 5;
+    options.logical_width = 128;
+    options.logical_height = 96;
+    options.kind = CUI_CHART_PIE;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
+    draw = cui_end_frame(ui);
+    bool outside_label = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            (draw.commands[i].text.data[0] == 'A' || draw.commands[i].text.data[0] == 'B'))
+            outside_label = true;
+    assert(outside_label);
+    options.pie_show_labels = false;
+    options.pie_outer_radius = 0;
+    options.pie_label_gap = 0;
+    options.logical_width = 64;
+    options.logical_height = 48;
     options.kind = CUI_CHART_BAR;
     options.hide_axes = true;
     options.hide_grid = true;

@@ -41,6 +41,11 @@ typedef struct {
     float source_y, target_y, source_width, target_width;
 } cui_chart_sankey_link_geometry;
 typedef struct {
+    cui_str text;
+    float edge_x, edge_y, anchor_x, anchor_y, text_x, text_y;
+    bool visible, right;
+} cui_chart_pie_label;
+typedef struct {
     cui_plot_rect wick, body;
     bool bullish;
 } cui_chart_candle_geometry;
@@ -93,8 +98,11 @@ typedef struct {
     double domain_min, domain_max;
     double inner_radius;     /* pie/donut pixels */
     double pie_outer_radius; /* zero selects 40% of pixel height */
-    double pad_angle;        /* pie radians */
-    double bar_ratio;        /* zero means 0.6 */
+    bool pie_show_labels;    /* outside labels and leader lines */
+    float pie_label_gap;     /* zero selects source 15px */
+    cui_color pie_label_color, pie_label_line_color;
+    double pad_angle; /* pie radians */
+    double bar_ratio; /* zero means 0.6 */
     cui_chart_bar_alignment bar_alignment;
     bool custom_bar_padding;
     float bar_padding_inner, bar_padding_outer;     /* shares of a band; defaults .4/.2 */
@@ -134,6 +142,7 @@ typedef struct {
     bool appear_started;
     double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
     bool mark_clip_active;
+    float rendered_reveal_progress;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {
@@ -157,6 +166,8 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *, cui_chart_san
 cui_plot_result cui_chart_sankey_link_bounds(const cui_chart_options *,
                                              const cui_chart_sankey_node *nodes,
                                              cui_chart_sankey_link_geometry *, size_t capacity);
+cui_plot_result cui_chart_pie_labels(const cui_chart_options *, cui_chart_pie_label *,
+                                     size_t capacity);
 /* Read-only hit geometry over a successfully rendered chart. */
 cui_chart_hit cui_chart_hit_test(const cui_chart_options *, float x, float y);
 /* Draws the caller-owned bitmap, labels and a named image semantic. Render first. */

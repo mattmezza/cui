@@ -187,7 +187,23 @@ static cui_message_scroller_result scene(cui_context *ui, cui_message_scroller_s
     cui_theme t = cui_theme_light();
     result = cui_message_scroller(ui, 22, &t, s, row, r, o);
 #endif
-    cui_end_frame(ui);
+    cui_draw_list drawing = cui_end_frame(ui);
+#ifndef CUI_MESSAGE_BASE_ONLY
+    if (result.jump_opacity > 0 && cui_bounds(ui, cui_message_scroller_jump_id(22)).w > 0) {
+        bool icon = false;
+        for (size_t i = 0; i < drawing.count; ++i) {
+            const cui_draw_command *c = &drawing.commands[i];
+            if (c->type == CUI_DRAW_IMAGE) {
+                icon = true;
+                assert(c->bitmap.bitmap.pixels && c->bounds.w == 16 && c->bounds.h == 16);
+            }
+            assert(c->type != CUI_DRAW_TEXT || c->text.length != 1 || c->text.data[0] != 'v');
+        }
+        assert(icon);
+    }
+#else
+    (void)drawing;
+#endif
     assert(cui_last_error(ui) == CUI_OK);
     assert(result.valid);
     return result;

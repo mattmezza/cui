@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_message.h"
+#include "cui/cui_icon.h"
 #include "cui/cui_virtual.h"
 #include <float.h>
 #include <math.h>
@@ -173,15 +174,21 @@ void cui_end_message_group(cui_context *ui) {
 typedef struct {
     cui_message_slot slot;
     cui_message_style style;
+    const cui_theme *theme;
     cui_id id;
 } cui_message_component_jump;
 static void cui_message_component_jump_content(cui_context *ui, void *user) {
     cui_message_component_jump *j = user;
     if (j->slot.render)
         j->slot.render(ui, j->id, j->slot.user, j->style);
+    else if (j->slot.text.length)
+        cui_text(ui, j->slot.text, j->style.font_size, j->style.color);
     else
-        cui_text(ui, j->slot.text.length ? j->slot.text : cui_string("v"), j->style.font_size,
-                 j->style.color);
+        cui_icon_named(ui, j->id, j->theme, cui_string("arrow-down"),
+                       (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                          .custom_size = j->style.font_size,
+                                          .custom_color = true,
+                                          .color = j->style.color});
 }
 cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, const cui_theme *t,
                                                  cui_message_scroller_state *s,
@@ -279,6 +286,7 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
             theme.background.a = (uint8_t)(theme.background.a * s->jump_opacity);
             cui_message_component_jump jump = {
                 .slot = o.jump_content,
+                .theme = &theme,
                 .style = {jump_width, t->font_size, theme.text, CUI_MESSAGE_START},
                 .id = cui_message_component_child(id, 601)};
             cui_begin_box(ui, cui_message_scroller_jump_id(id),

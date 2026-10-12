@@ -1,0 +1,12 @@
+CI 38309377313 and Pages 38309377463 succeeded. Served assets match the Pages artifact byte for byte.
+PASS gallery.wasm 5f61499802b25d5bb3a76082342c6db0770e66d6e59875c01395842f1e4bb8d4
+PASS gallery.js d6e6ae71eee12fccb6b6d01cc54501bd4d8203676eda734bd5d5b507acc68c21
+PASS gallery.css fc7989381ed627cb5698655e006d8d4d5fd936bff667f60e0c2b4becba8179f2
+PASS index.html 45d9175b2b0f6cba70a01582fd22addef47e657ceb127695c96b47d893ca1e0d
+PASS catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+PASS themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+PASS docs.json ef17e18c2727e3e35980c890128a5a034c27fc70501c474b33d1a92851422da9
+
+Installed 4 packages in 24ms
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting

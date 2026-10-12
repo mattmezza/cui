@@ -509,6 +509,15 @@ def main():
             canvas.focus()
             page.keyboard.press('Control+a')
             page.wait_for_function('cuiGallery.exports.gallery_text_view_stats(2)===cuiGallery.exports.gallery_text_view_stats(0)&&cuiGallery.exports.gallery_text_view_stats(3)===0')
+            heading = page.evaluate("()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Project notes');}")
+            assert heading is not None
+            heading_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_command(i,f+1))', heading)
+            canvas.scroll_into_view_if_needed()
+            rectangle = canvas.bounding_box()
+            for clicks, end in ((2, 7), (3, 13)):
+                page.mouse.click(rectangle['x']+heading_bounds[0]+2, rectangle['y']+heading_bounds[1]+heading_bounds[3]/2, click_count=clicks)
+                page.wait_for_function('end=>cuiGallery.exports.gallery_text_view_stats(3)===0&&cuiGallery.exports.gallery_text_view_stats(2)===end', arg=end)
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(4)') == 1
             control_change('text-view-format', '1')
             assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
             assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(1)') >= 3

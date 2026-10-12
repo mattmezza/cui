@@ -737,14 +737,18 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
             cui_color line = o->pie_label_line_color.a
                                  ? o->pie_label_line_color
                                  : (o->grid.a ? o->grid : (cui_color){120, 120, 120, 255});
-            line.a = (unsigned char)lround(line.a * opacity);
             for (size_t i = 0; i < o->count; i++)
                 if (labels[i].visible) {
+                    cui_color slice_line = o->pie_label_line_color_fn
+                                               ? o->pie_label_line_color_fn(
+                                                     &o->data[i], i, o->pie_label_line_color_user)
+                                               : line;
+                    slice_line.a = (unsigned char)lround(slice_line.a * opacity);
                     cui_chart_line(s, o, labels[i].edge_x, labels[i].edge_y, labels[i].anchor_x,
-                                   labels[i].anchor_y, line);
+                                   labels[i].anchor_y, slice_line);
                     cui_chart_line(s, o, labels[i].anchor_x, labels[i].anchor_y,
                                    labels[i].anchor_x + (labels[i].right ? 4 : -4),
-                                   labels[i].anchor_y, line);
+                                   labels[i].anchor_y, slice_line);
                 }
         }
     }
@@ -1200,6 +1204,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     const unsigned char *pie_label_colors = (const unsigned char *)&o->pie_label_color;
     for (size_t i = 0; i < 2 * sizeof(cui_color); i++)
         h = cui_chart_mix(h, pie_label_colors[i]);
+    const unsigned char *pie_line_callback = (const unsigned char *)&o->pie_label_line_color_fn;
+    for (size_t i = 0; i < sizeof(o->pie_label_line_color_fn); i++)
+        h = cui_chart_mix(h, pie_line_callback[i]);
+    h = cui_chart_mix(h, (uintptr_t)o->pie_label_line_color_user);
     h = cui_chart_mix(h, cui_chart_bits(o->pad_angle));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_ratio));
     h = cui_chart_mix(h, cui_chart_bits(o->candle_body_ratio));

@@ -75,6 +75,7 @@ typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index
                                            cui_plot_rect chart, float x, float y, void *user);
 typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
                                           double default_radius, void *user);
+typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
 typedef struct {
@@ -109,6 +110,8 @@ typedef struct {
     bool pie_show_labels;  /* outside labels and leader lines */
     float pie_label_gap;   /* zero selects source 15px */
     cui_color pie_label_color, pie_label_line_color;
+    cui_chart_pie_line_color_fn pie_label_line_color_fn;
+    void *pie_label_line_color_user;
     double pad_angle; /* pie radians */
     double bar_ratio; /* zero means 0.6 */
     cui_chart_bar_alignment bar_alignment;

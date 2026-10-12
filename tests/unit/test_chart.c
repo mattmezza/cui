@@ -45,6 +45,11 @@ static double pie_bad_radius(const cui_chart_datum *datum, size_t index, double 
     (void)user;
     return NAN;
 }
+static cui_color pie_green_line(const cui_chart_datum *datum, size_t index, void *user) {
+    (void)datum;
+    (void)user;
+    return index == 0 ? (cui_color){0, 230, 0, 255} : (cui_color){0, 0, 0, 0};
+}
 #ifndef CUI_CHART_BASE_ONLY
 static size_t format_q(double value, char *buffer, size_t capacity, void *user) {
     (void)value;
@@ -471,6 +476,10 @@ int main(void) {
     assert(state.revision == old_revision + 1 && memcmp(saved, pixels, sizeof pixels) != 0);
     options.data_revision = 0;
     options.pie_show_labels = true;
+    options.pie_label_line_color_fn = pie_green_line;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(green_pixel(pixels, options.width * options.height));
+    options.pie_label_line_color_fn = NULL;
     cui_chart_pie_label pie_labels[3];
     memset(pie_labels, 0, sizeof pie_labels);
     assert(cui_chart_pie_labels(&options, pie_labels, 2) == CUI_PLOT_CAPACITY);

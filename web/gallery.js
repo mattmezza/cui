@@ -33,7 +33,7 @@ function cacheBitmap(key,bitmap,bytes){
 }
 function paintBitmap(i,x,y,w,h,radii){
  const field=n=>wasm.gallery_bitmap(i,n),pointer=wasm.gallery_bitmap_pixels(i);
- const bw=field(0),bh=field(1),stride=field(2),sx=field(3),sy=field(4),sw=field(5),sh=field(6);
+ const bw=field(0),bh=field(1),stride=field(2);let sx=field(3),sy=field(4),sw=field(5),sh=field(6);
  if(!pointer||!bw||!bh||stride<bw*4||!sw||!sh)return;
  const gray=field(8),tinted=field(9),tint=tinted?[field(10),field(11),field(12),field(13)]:[255,255,255,255];
  const key=[pointer,bw,bh,stride,wasm.gallery_bitmap_revision(i,1),wasm.gallery_bitmap_revision(i,0),gray,...tint].join(':');
@@ -50,8 +50,15 @@ function paintBitmap(i,x,y,w,h,radii){
   bitmap.getContext('2d').putImageData(new ImageData(pixels,bw,bh),0,0);
   cacheBitmap(key,bitmap,pixels.length);
  }
+ // Isolate a crop before scaling so filtering cannot bleed excluded texels.
+ if(sx!==0||sy!==0||sw!==bw||sh!==bh){
+  const cropKey=`crop:${key}:${sx}:${sy}:${sw}:${sh}`,cw=Math.max(1,Math.ceil(sw)),ch=Math.max(1,Math.ceil(sh));
+  let cropped=bitmapCache.get(cropKey)?.bitmap;
+  if(!cropped){cropped=document.createElement('canvas');cropped.width=cw;cropped.height=ch;const cropCtx=cropped.getContext('2d');cropCtx.imageSmoothingEnabled=false;cropCtx.drawImage(bitmap,sx,sy,sw,sh,0,0,cw,ch);cacheBitmap(cropKey,cropped,cw*ch*4);}
+  bitmap=cropped;sx=0;sy=0;sw=cw;sh=ch;
+ }
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,radii);ctx.clip();ctx.globalAlpha=field(7);
- ctx.imageSmoothingEnabled=false;ctx.drawImage(bitmap,sx,sy,sw,sh,x,y,w,h);ctx.restore();
+ ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(bitmap,sx,sy,sw,sh,x,y,w,h);ctx.restore();
 }
 const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
@@ -409,6 +416,10 @@ function route(){
   const doc=documents.find(entry=>entry.slug===slug)||documents.find(entry=>entry.slug==='getting-started');
   selected=null;$('home-page').hidden=true;$('docs-page').hidden=false;$('gallery-page').hidden=true;$('catalog').hidden=true;$('docs-nav').hidden=false;
   $('docs-title').textContent=doc.title;$('docs-content').innerHTML=doc.html;$('docs-source').href=doc.source;
+  for(const code of $('docs-content').querySelectorAll('pre>code')){
+   const button=document.createElement('button');button.type='button';button.className='docs-copy';button.textContent='Copy';button.setAttribute('aria-label','Copy code block');
+   button.addEventListener('click',()=>copyCode(button,code.textContent));code.parentElement.classList.add('copyable');code.parentElement.prepend(button);
+  }
   document.title=`${doc.title} · CUI`;docsNavigation(doc.slug);document.body.classList.remove('menu-open');
   if(anchor)requestAnimationFrame(()=>document.getElementById(`doc-${anchor}`)?.scrollIntoView());else requestAnimationFrame(()=>window.scrollTo(0,0));
   return;

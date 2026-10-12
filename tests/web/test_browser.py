@@ -77,6 +77,19 @@ def main():
             page.wait_for_function('document.querySelector("#doc-build-and-run")?.getBoundingClientRect().top<200&&window.scrollY>0')
             page.locator('#docs-content a[href="#docs/api"]').first.click()
             page.wait_for_function('location.hash==="#docs/api"&&document.querySelector("#docs-title").textContent.includes("API")')
+            page.evaluate('location.hash="#docs/ai-agents"')
+            page.wait_for_function('document.querySelector("#docs-title").textContent==="Build CUI applications with an AI agent"')
+            page.locator('#docs-content .docs-copy').first.click()
+            page.wait_for_function('document.querySelector("#docs-content .docs-copy").textContent==="Copied"')
+            assert 'My application requirements:' in page.evaluate('navigator.clipboard.readText()')
+            exports = page.evaluate("async()=>{const names=['llms.txt','llm.txt','llms-full.txt','llm-full.txt','markdown/docs/AI_AGENTS.md'];return Promise.all(names.map(async name=>{const response=await fetch('./'+name);if(!response.ok)throw Error(name);return response.text();}));}")
+            assert exports[0] == exports[1] and exports[2] == exports[3]
+            assert 'markdown/docs/START_HERE.md' in exports[0]
+            assert 'Current component feature manifest' in exports[2]
+            assert 'My application requirements:' in exports[4]
+            page.evaluate('location.hash="#docs/start-here"')
+            page.wait_for_function('document.querySelector("#docs-title").textContent==="Start building with CUI"')
+            assert page.locator('#docs-content .docs-copy').count() == 2
             page.keyboard.press('/')
             assert page.locator('#search').evaluate('(node)=>document.activeElement===node')
             page.locator('#search').fill('bt')

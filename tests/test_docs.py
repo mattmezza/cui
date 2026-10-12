@@ -62,6 +62,17 @@ if (x < 2) puts("<script>");
             self.assertNotIn('href="javascript:', api['html'])
             self.assertEqual((output / 'docs-assets/docs/screenshots/test.png').read_bytes(), b'PNG fixture')
             self.assertEqual(json.loads((output / 'docs.json').read_text()), pages)
+            index = (output / 'llms.txt').read_text()
+            full = (output / 'llms-full.txt').read_text()
+            self.assertTrue(index.startswith('# CUI\n'))
+            self.assertIn('./markdown/README.md', index)
+            self.assertIn('./markdown/docs/API.md', index)
+            self.assertEqual(index, (output / 'llm.txt').read_text())
+            self.assertEqual(full, (output / 'llm-full.txt').read_text())
+            exported = (output / 'markdown/docs/API.md').read_text()
+            self.assertIn('https://raw.githubusercontent.com/mattmezza/cui/main/README.md', exported)
+            self.assertIn('if (x < 2) puts("<script>");', exported)
+            self.assertIn(exported, full)
 
     def test_complete_repository_docs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -70,8 +81,15 @@ if (x < 2) puts("<script>");
             for path in (ROOT / 'docs').rglob('*.md'):
                 self.assertIn(DOCS.REPOSITORY + path.relative_to(ROOT).as_posix(), sources)
             self.assertIn('getting-started', {p['slug'] for p in pages})
+            self.assertTrue({'start-here', 'ai-agents', 'immediate-and-state'} <= {p['slug'] for p in pages})
             self.assertEqual(len(pages), len({p['slug'] for p in pages}))
             self.assertTrue(all(p['title'] and p['html'] for p in pages))
+            index = (Path(directory) / 'llms.txt').read_text()
+            full = (Path(directory) / 'llms-full.txt').read_text()
+            self.assertIn('./markdown/docs/AI_AGENTS.md', index)
+            self.assertIn('## Current component feature manifest', full)
+            self.assertIn('"name": "Questionnaire"', full)
+            self.assertIn('"name": "TextView"', full)
 
     def test_collisions_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

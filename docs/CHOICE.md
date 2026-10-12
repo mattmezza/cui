@@ -738,3 +738,22 @@ The richer ToggleGroup_ex API provides independent size, variant, segmented
 styling and controlled requests. Routed tests cover rejected empty selection,
 exclusive changes, allowed clearing, same-batch navigation/activation and
 whole-group disablement through the convenience API.
+
+Hierarchical Menu options now expose size, density and max_height. Medium,
+Large and XSmall use the source 26 px row height; Small uses 20 px. Density defaults
+to theme.font_size/16 and scales these logical metrics. Rows use 14 px text,
+12 px icon slots,8 px horizontal padding,4 px outer padding and 2 px vertical gaps.
+The radius caps at 8 px and Small halves it. A separator reserves 6 px (2 px line
+plus two 2 px margins); group labels reserve 14*1.618034 px. The natural line-height
+factor comes from the pinned gpui-pre 0.3.8 TextStyle default, rather than a
+Tailwind line-height assumption. The explicit core text line-height API is used;
+its current integer internal text positioning remains a typography limitation.
+Default popup height caps at min(viewport.height/2,450 px); positive max_height
+sets an explicit cap. Popup fitting, semantic scroll offsets, submenu anchors,
+pointer hover routing and wheel tail limits account for nonuniform rows.
+Tests cover every size in four themes at densities 1/2, padding/font/bounds,
+submenus after separators/group labels, and one-event wheel movement to the
+true tail of a mixed-height menu. Source scroll still uses integer row windows;
+partial rows and continuous pixel offsets, natural intrinsic popup width,
+negative separator horizontal margins, custom arbitrary-height bodies and
+popover shadows remain gaps. Existing explicit popup.width remains supported.

@@ -261,11 +261,22 @@ typedef struct {
     bool drag_scroll, scroll_pending, scroll_dragging;
     size_t scroll_level;
     float scroll_start_y, scroll_last_y;
+    float label_height, separator_height, row_gap,
+        available_height; /* previous nonuniform styled row metrics */
 } cui_menu_tree_state;
+typedef enum { CUI_MENU_MEDIUM, CUI_MENU_SMALL, CUI_MENU_LARGE, CUI_MENU_XSMALL } cui_menu_size;
+typedef struct {
+    float row_height, label_height, separator_height, gap;
+    float padding, padding_x, font_size, icon_size, radius;
+} cui_menu_metrics;
+cui_menu_metrics cui_menu_size_metrics(cui_menu_size, float density, float radius);
 typedef struct {
     cui_choice_popup_options popup;
     bool keep_open_checks, checks_on_right;
-    bool drag_scroll; /* opt-in primary-pointer drag, usable by touch adapters */
+    bool drag_scroll;   /* opt-in primary-pointer drag, usable by touch adapters */
+    cui_menu_size size; /* source Small20; other sizes26 logical px */
+    float density;      /* zero derives theme.font_size/16 */
+    float max_height;   /* positive override; default min(viewport.height/2,450*density) */
 } cui_menu_tree_options;
 struct cui_tab_overflow {
     cui_menu_tree_state menu;

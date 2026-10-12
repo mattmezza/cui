@@ -1109,6 +1109,28 @@ void cui_base_menu_entry(cui_context *ui, const cui_menu_entry *entry, bool disa
                                                : 0,
                                .description = entry->shortcut});
 }
+static float cui_menu_retained_row_height(const cui_menu_tree_state *state,
+                                          const cui_menu_entry *entry) {
+    if (entry->kind == CUI_MENU_SEPARATOR && state->separator_height > 0)
+        return state->separator_height;
+    if (entry->kind == CUI_MENU_LABEL && state->label_height > 0)
+        return state->label_height;
+    return state->row_height - state->row_gap;
+}
+static size_t cui_menu_retained_fit(const cui_menu_tree_state *state, const cui_menu_entry *entries,
+                                    size_t count, size_t begin) {
+    size_t rows = 0;
+    float height = 0;
+    while (begin + rows < count && rows < 4096) {
+        float next = cui_menu_retained_row_height(state, &entries[begin + rows]) +
+                     (rows ? state->row_gap : 0);
+        if (rows && height + next > state->available_height)
+            break;
+        height += next;
+        rows++;
+    }
+    return rows;
+}
 static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries, size_t count,
                                   cui_menu_tree_state *state, size_t level, cui_id target,
                                   cui_event event) {
@@ -1123,6 +1145,18 @@ static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries
         return false;
     cui_list_state *cursor = &state->levels[level];
     size_t maximum = count - rows;
+    if (state->available_height > 0 && state->row_gap > 0) {
+        maximum = count - 1;
+        float height = cui_menu_retained_row_height(state, &entries[maximum]);
+        while (maximum && count - maximum < 4096) {
+            float next =
+                cui_menu_retained_row_height(state, &entries[maximum - 1]) + state->row_gap;
+            if (height + next > state->available_height)
+                break;
+            height += next;
+            maximum--;
+        }
+    }
     if (cursor->first_visible > maximum)
         cursor->first_visible = maximum;
     float amount = cursor->scroll_remainder - event.dy;
@@ -1139,6 +1173,8 @@ static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries
     }
     if (before == cursor->first_visible)
         return false;
+    if (state->available_height > 0 && state->row_gap > 0)
+        rows = cui_menu_retained_fit(state, entries, count, cursor->first_visible);
     bool focused = false, active_visible = false;
     for (size_t i = 0; i < count; i++) {
         focused |= cui_focused(ui) == entries[i].id;
@@ -1329,12 +1365,20 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
                 if (events[e].x >= panel.x && events[e].x < panel.x + panel.w &&
                     events[e].y >= panel.y + state->padding &&
                     events[e].y < panel.y + panel.h - state->padding) {
-                    float offset = (events[e].y - panel.y - state->padding) / state->row_height;
-                    if (offset >= (float)counts[level])
-                        break;
-                    size_t row = state->levels[level].first_visible + (size_t)offset;
-                    if (row < counts[level] && !cui_menu_entry_is_disabled(&menus[level][row]))
-                        target = menus[level][row].id;
+                    float offset = events[e].y - panel.y - state->padding;
+                    size_t row = state->levels[level].first_visible;
+                    while (row < counts[level]) {
+                        float height = cui_menu_retained_row_height(state, &menus[level][row]);
+                        if (offset < height) {
+                            if (!cui_menu_entry_is_disabled(&menus[level][row]))
+                                target = menus[level][row].id;
+                            break;
+                        }
+                        if (offset < height + state->row_gap)
+                            break;
+                        offset -= height + state->row_gap;
+                        row++;
+                    }
                     break;
                 }
             }

@@ -37,6 +37,10 @@ typedef struct {
     size_t parent;
     bool modal, active;
 } cui_core_focus_scope;
+typedef struct {
+    cui_id id;
+    cui_rect *retained;
+} cui_core_bounds_track;
 struct cui_context {
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
         previous_focus_scopes[CUI_CORE_STACK_MAX];
@@ -50,6 +54,8 @@ struct cui_context {
     cui_draw_command *commands;
     size_t count;
     cui_core_box_node *nodes;
+    cui_core_bounds_track *bounds_tracks;
+    size_t bounds_track_count;
     size_t *semantic_nodes;
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
     cui_rect *previous_hits;
@@ -138,6 +144,7 @@ cui_context *cui_create(cui_config config) {
         config.max_elements > SIZE_MAX / sizeof(cui_core_box_node) ||
         config.max_elements > SIZE_MAX / sizeof(size_t) ||
         config.max_elements > SIZE_MAX / sizeof(cui_rect) ||
+        config.max_elements > SIZE_MAX / sizeof(cui_core_bounds_track) ||
         config.max_elements > SIZE_MAX / sizeof(Clay__ScrollContainerDataInternal)) {
         free(ui);
         return NULL;
@@ -156,6 +163,7 @@ cui_context *cui_create(cui_config config) {
     ui->strings = malloc(config.frame_bytes);
     ui->clip_containers = calloc(config.max_elements, sizeof(*ui->clip_containers));
     ui->nodes = calloc(config.max_elements, sizeof(*ui->nodes));
+    ui->bounds_tracks = calloc(config.max_elements, sizeof(*ui->bounds_tracks));
     ui->semantic_nodes = calloc(config.max_elements, sizeof(*ui->semantic_nodes));
     ui->previous_hits = calloc(config.max_elements, sizeof(*ui->previous_hits));
     ui->previous_layers = calloc(config.max_elements, sizeof(*ui->previous_layers));
@@ -168,8 +176,8 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->commands || !ui->semantics || !ui->previous || !ui->ids || !ui->activations ||
         !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings || !ui->nodes ||
-        !ui->semantic_nodes || !ui->previous_hits || !ui->previous_layers || !ui->clip_containers ||
-        !ui->arena) {
+        !ui->semantic_nodes || !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers ||
+        !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -200,6 +208,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->semantic_scopes);
     free(ui->previous_semantic_scopes);
     free(ui->nodes);
+    free(ui->bounds_tracks);
     free(ui->semantic_nodes);
     free(ui->previous_hits);
     free(ui->previous_layers);
@@ -426,6 +435,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
     }
     ui->node_count = 0;
+    ui->bounds_track_count = 0;
     ui->overflow_depth = 0;
     ui->focus_depth = ui->focus_scope_count = 0;
     ui->top_modal = SIZE_MAX;
@@ -648,6 +658,25 @@ cui_rect cui_bounds(cui_context *ui, cui_id id) {
     Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = cui_core_folded(id)});
     return (cui_rect){d.boundingBox.x, d.boundingBox.y, d.boundingBox.width, d.boundingBox.height};
 }
+bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
+    if (!ui || !id || !retained || !cui_core_active(ui))
+        return false;
+    for (size_t i = 0; i < ui->bounds_track_count; i++) {
+        cui_core_bounds_track track = ui->bounds_tracks[i];
+        if (track.id == id && track.retained == retained)
+            return true;
+        if (track.id == id || track.retained == retained) {
+            cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
+            return false;
+        }
+    }
+    if (ui->bounds_track_count == ui->config.max_elements) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    ui->bounds_tracks[ui->bounds_track_count++] = (cui_core_bounds_track){id, retained};
+    return true;
+}
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value) {
     cui_interaction out = {0};
@@ -764,6 +793,24 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             break;
         }
         ui->commands[ui->count++] = d;
+    }
+    for (size_t i = 0; i < ui->bounds_track_count; i++) {
+        cui_core_bounds_track track = ui->bounds_tracks[i];
+        uint32_t folded = cui_core_folded(track.id);
+        cui_rect bounds = {0};
+        for (size_t n = 0; n < ui->node_count; n++) {
+            if (ui->nodes[n].clay_id == folded) {
+                Clay_ElementData data = Clay_GetElementData((Clay_ElementId){.id = folded});
+                bounds = (cui_rect){data.boundingBox.x, data.boundingBox.y, data.boundingBox.width,
+                                    data.boundingBox.height};
+                break;
+            }
+        }
+        cui_rect previous = *track.retained;
+        if (previous.x != bounds.x || previous.y != bounds.y || previous.w != bounds.w ||
+            previous.h != bounds.h)
+            ui->dirty = true;
+        *track.retained = bounds;
     }
     bool retained = false, captured = false, space = false;
     for (size_t i = 0; i < ui->semantic_count; i++) {

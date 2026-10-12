@@ -222,6 +222,13 @@ cui_id cui_event_target(cui_context *ui, size_t index);
 cui_id cui_event_activation(cui_context *ui, size_t index);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
+/* Register one current-layout bounds result per ID for this frame. The retained
+ * pointer must remain valid through cui_end_frame, which writes the computed
+ * rectangle (zero if absent) and invalidates only when its fields change.
+ * Repeating the same ID/pointer is idempotent; conflicting IDs/pointers fail
+ * with DUPLICATE_ID. Registrations are bounded by max_elements. Null arguments
+ * or zero IDs return false. Call only between begin_frame and end_frame. */
+bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained);
 /* Previous-frame clipped region, excluding higher interactive layers/modal scopes. */
 bool cui_hovered(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);

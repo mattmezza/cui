@@ -840,10 +840,64 @@ static void test_many_simultaneous_clips(void) {
     cui_destroy(ui);
 }
 
+static void tracked_frame(cui_context *ui, cui_rect *bounds, float height, bool present) {
+    begin(ui);
+    assert(cui_track_bounds(ui, 77, bounds));
+    assert(cui_track_bounds(ui, 77, bounds));
+    if (present) {
+        cui_begin_box(ui, 77, (cui_box){.width = 80, .height = height});
+        cui_end_box(ui);
+    }
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void test_bounds_tracking(void) {
+    cui_context *ui = make();
+    cui_rect bounds = {0}, other = {0};
+    assert(!cui_track_bounds(NULL, 77, &bounds));
+    assert(!cui_track_bounds(ui, 77, &bounds) && cui_last_error(ui) == CUI_ERROR_LIFECYCLE);
+    cui_clear_error(ui);
+    tracked_frame(ui, &bounds, 40, true);
+    assert(bounds.w == 80 && bounds.h == 40 && cui_needs_redraw(ui));
+    tracked_frame(ui, &bounds, 40, true);
+    assert(!cui_needs_redraw(ui));
+    tracked_frame(ui, &bounds, 90, true);
+    assert(bounds.h == 90 && cui_needs_redraw(ui));
+    tracked_frame(ui, &bounds, 90, true);
+    assert(!cui_needs_redraw(ui));
+    tracked_frame(ui, &bounds, 20, true);
+    assert(bounds.h == 20 && cui_needs_redraw(ui));
+    tracked_frame(ui, &bounds, 20, false);
+    assert(bounds.w == 0 && bounds.h == 0 && cui_needs_redraw(ui));
+    tracked_frame(ui, &bounds, 20, false);
+    assert(!cui_needs_redraw(ui));
+    begin(ui);
+    assert(!cui_track_bounds(ui, 0, &bounds) && !cui_track_bounds(ui, 77, NULL));
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(cui_track_bounds(ui, 77, &bounds));
+    assert(!cui_track_bounds(ui, 77, &other) && cui_last_error(ui) == CUI_ERROR_DUPLICATE_ID);
+    cui_clear_error(ui);
+    assert(!cui_track_bounds(ui, 78, &bounds) && cui_last_error(ui) == CUI_ERROR_DUPLICATE_ID);
+    cui_clear_error(ui);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    ui = cui_create((cui_config){.width = 300, .height = 200, .max_elements = 2});
+    assert(ui);
+    cui_rect slots[3] = {{0}};
+    begin(ui);
+    assert(cui_track_bounds(ui, 1, &slots[0]) && cui_track_bounds(ui, 2, &slots[1]));
+    assert(!cui_track_bounds(ui, 3, &slots[2]) && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_clear_error(ui);
+    cui_end_frame(ui);
+    assert(!cui_needs_redraw(ui));
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();
+    test_bounds_tracking();
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();

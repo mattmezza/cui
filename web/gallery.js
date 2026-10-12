@@ -129,6 +129,7 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
 });
+reducedMotion.addEventListener('change',requestFrame);
 $('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog)selectComponent();});
 $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',$('theme').value==='1');document.body.classList.toggle('contrast',$('theme').value==='2');requestFrame();});
 $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);

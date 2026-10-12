@@ -40,6 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.exports.gallery_count() > 0')
+            assert page.request.get(f'http://127.0.0.1:{server.server_port}/cui/LICENSE.txt').ok
             assert page.locator('#catalog a').count() == 78
             assert page.locator('#name').inner_text() == 'Button'
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == 0

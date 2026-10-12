@@ -38,6 +38,8 @@ def main():
         shutil.copyfile(ROOT / 'web' / name, out / name)
     manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text())
     (out / 'catalog.json').write_text(json.dumps(manifest, indent=2)+'\n')
+    notices = (ROOT / 'LICENSE').read_text() + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text() + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text()
+    (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
     (out / '.nojekyll').touch()
     print(f'Gallery built at {out}; serve over HTTP, e.g. python -m http.server -d {out}')
 

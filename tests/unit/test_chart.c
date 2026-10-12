@@ -17,6 +17,7 @@ static bool green_pixel(const unsigned char *pixels, size_t count) {
             return true;
     return false;
 }
+#ifndef CUI_CHART_BASE_ONLY
 static size_t format_q(double value, char *buffer, size_t capacity, void *user) {
     (void)value;
     (void)user;
@@ -24,6 +25,7 @@ static size_t format_q(double value, char *buffer, size_t capacity, void *user) 
         buffer[0] = 'Q';
     return capacity ? 1 : 0;
 }
+#endif
 int main(void) {
     cui_chart_datum points[] = {
         {.label = {"A", 1}, .value = 20, .open = 15, .high = 25, .low = 10, .close = 20},
@@ -183,6 +185,7 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_CAPACITY);
     assert(state.revision == old_revision && memcmp(pixels, saved, sizeof pixels) == 0);
     state.byte_capacity = sizeof pixels;
+#ifndef CUI_CHART_BASE_ONLY
     for (int t = 0; t < 4; t++) {
         cui_theme theme = t == 0   ? cui_theme_light()
                           : t == 1 ? cui_theme_dark()
@@ -231,6 +234,7 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(state.hovered < options.count);
     cui_destroy(ui);
+#endif
     points[0].value = -DBL_MAX;
     points[1].value = DBL_MAX;
     points[2].value = 0;

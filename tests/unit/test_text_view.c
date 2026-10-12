@@ -195,6 +195,37 @@ static void test_html_image_dimensions(void) {
            f.spans[1].image_bounds.x == f.glyphs[1].bounds.x &&
            f.glyphs[0].line_top == f.glyphs[1].line_top);
 }
+static void test_image_plain_copy(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("a![alt](asset)**b**")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_select(&f.state, 0, 3));
+    cui_str raw = cui_text_view_selected_text(&f.state);
+    assert(raw.data == f.rendered && raw.length == 3 && raw.data[1] == ' ');
+    char output[64];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK &&
+           length == 2 && !strcmp(output, "ab"));
+    strcpy(output, "preserved");
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output, 2, &length) ==
+               CUI_TEXT_VIEW_CAPACITY &&
+           length == 2 && !strcmp(output, "preserved"));
+    assert(cui_text_view_select(&f.state, 1, 2));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output, 1, &length) ==
+               CUI_TEXT_VIEW_OK &&
+           length == 0 && !output[0]);
+    assert(cui_text_view_set_text(&f.state, text("a[![alt](asset)](https://x.test)b")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_select(&f.state, 0, 3));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK &&
+           !strcmp(output, "ab"));
+    assert(cui_text_view_select(&f.state, 1, 2));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK &&
+           !strcmp(output, "[![alt](asset)](https://x.test)"));
+}
 static void test_markdown_html_image_model(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1573,6 +1604,58 @@ static bool clipboard_write(void *user, cui_str value) {
     clipboard_text[value.length] = 0;
     return true;
 }
+static void test_image_plain_clipboard(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("a![alt](asset)b")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_platform platform = {.user = clipboard_text,
+                             .capabilities = CUI_PLATFORM_CLIPBOARD,
+                             .clipboard_set = clipboard_write};
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.clipboard = &platform;
+    frame(ui, &f, o);
+    cui_focus(ui, 77);
+    assert(cui_text_view_select(&f.state, 0, 3));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, "ab"));
+    assert(cui_text_view_select(&f.state, 1, 2));
+    strcpy(clipboard_text, "preserved");
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, "preserved"));
+    assert(cui_text_view_set_text(&f.state, text("a[![alt](asset)](https://x.test)b")) ==
+           CUI_TEXT_VIEW_OK);
+    frame(ui, &f, o);
+    assert(cui_text_view_select(&f.state, 0, 3));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, "ab"));
+    char buffer[64];
+    o.copy_format = CUI_TEXT_VIEW_COPY_SOURCE;
+    o.copy_buffer = buffer;
+    o.copy_capacity = sizeof buffer;
+    assert(cui_text_view_select(&f.state, 1, 2));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, "[![alt](asset)](https://x.test)"));
+    o.scrollable = true;
+    o.height = 100;
+    frame(ui, &f, o);
+    assert(cui_text_view_select(&f.state, 0, 3));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, "ab"));
+    cui_destroy(ui);
+}
 static cui_id action_buttons[4];
 static unsigned action_count, action_clicks;
 static void code_controls(cui_context *ui, cui_id id, const cui_theme *theme, cui_str code,
@@ -2467,6 +2550,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_image_plain_copy();
     test_markdown_html_image_model();
     test_root_html_image_object();
     test_html_image_dimensions();
@@ -2501,6 +2585,7 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_image_plain_clipboard();
     test_standalone_markdown_object();
     test_linked_image_paint();
     test_markdown_html_image_paint();

@@ -190,9 +190,17 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                                                          &length) == CUI_TEXT_VIEW_OK)
                             (void)o.clipboard->clipboard_set(o.clipboard->user,
                                                              (cui_str){o.copy_buffer, length});
-                    } else
-                        (void)o.clipboard->clipboard_set(o.clipboard->user,
-                                                         cui_text_view_selected_text(s));
+                    } else {
+                        char scratch[CUI_TEXT_VIEW_BYTE_LIMIT];
+                        char *buffer = o.copy_buffer ? o.copy_buffer : scratch;
+                        size_t capacity = o.copy_buffer ? o.copy_capacity : sizeof scratch;
+                        size_t length;
+                        if (cui_text_view_copy_selection(s, CUI_TEXT_VIEW_COPY_PLAIN, buffer,
+                                                         capacity, &length) == CUI_TEXT_VIEW_OK &&
+                            length)
+                            (void)o.clipboard->clipboard_set(o.clipboard->user,
+                                                             (cui_str){buffer, length});
+                    }
                 }
                 handled = true;
             } else if (!(e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META | CUI_MOD_ALT)) &&

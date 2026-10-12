@@ -226,7 +226,7 @@ when the table scrolls; table-body snapshots preserve its scroll offset when
 appending rows.
 
 Inline image slots use a single space byte in the rendered selection coordinate
-space; Plain copy includes that slot, while Source copy writes the original image
+space; Plain copy omits that slot, while Source copy writes the original image
 syntax. No unloaded bitmap is fabricated. Removing the host loader restores a
 compact square slot without discarding surrounding text or retaining stale pixels.
 
@@ -281,3 +281,16 @@ URI, explicit dimensions, baseline and enclosing Markdown link behavior. This
 includes the frozen linked HTML image after a soft newline regression. Missing
 `src` tags are skipped. Other embedded HTML tags and multiline HTML grammar remain
 outside this targeted inline-image handling.
+
+Plain copy and Ctrl+C omit image slots, matching source paragraph text output.
+Copying only an image in Plain mode produces no text and leaves the clipboard
+unchanged. The raw `selected_text` accessor remains a borrowed coordinate slice
+of `workspace.rendered`, including object slots, valid until the next text mutation;
+use `copy_selection(PLAIN)` for presentation or clipboard text. Default Plain
+clipboard output uses bounded temporary storage when no caller buffer is supplied.
+Source-format Ctrl+C continues to require caller output storage.
+
+The frozen implementation selects shared text runs around images and includes
+images in Source copy when selection spans the adjacent run boundaries. CUI still
+uses a flat coordinate space with atomic image slots, so independent image selection
+and complete shared-window selection identity are not yet source-equivalent.

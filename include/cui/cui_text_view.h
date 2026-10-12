@@ -140,6 +140,8 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *,
                                                   cui_text_view_range source, char *output,
                                                   size_t capacity, size_t *length);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
+/* Borrowed coordinate slice from workspace.rendered, valid until the next text mutation.
+ * Includes one-byte image slots; use copy_selection(PLAIN) for image-free text output. */
 cui_str cui_text_view_selected_text(const cui_text_view_state *);
 typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_view_copy_format;
 /* Writes a zero-terminated copy. On capacity failure, *length reports required

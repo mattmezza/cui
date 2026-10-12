@@ -2579,6 +2579,17 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
     }
     return CUI_TEXT_VIEW_OK;
 }
+static void cui_text_view_copy_plain(const cui_text_view_state *s, cui_text_view_copy_writer *w,
+                                     size_t a, size_t b) {
+    size_t start = a;
+    for (size_t i = a; i < b; ++i) {
+        if (!(s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        cui_text_view_copy_write(w, (cui_str){s->workspace.rendered + start, i - start});
+        start = i + 1;
+    }
+    cui_text_view_copy_write(w, (cui_str){s->workspace.rendered + start, b - start});
+}
 cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
                                                  cui_text_view_copy_format f, char *output,
                                                  size_t capacity, size_t *length) {
@@ -2588,13 +2599,14 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
     cui_str direct = {0};
-    if (f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN)
-        direct = (cui_str){s->workspace.rendered + a, b - a};
-    else if (a == 0 && b == s->text_length && a != b)
+    bool plain = f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN;
+    if (!plain && a == 0 && b == s->text_length && a != b)
         direct = cui_text_view_source(s);
     cui_text_view_copy_writer w = {0};
     cui_text_view_error error = CUI_TEXT_VIEW_OK;
-    if (direct.data)
+    if (plain)
+        cui_text_view_copy_plain(s, &w, a, b);
+    else if (direct.data)
         cui_text_view_copy_write(&w, direct);
     else
         error = cui_text_view_copy_source(s, &w, a, b);
@@ -2605,7 +2617,9 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     if (capacity <= w.length)
         return CUI_TEXT_VIEW_CAPACITY;
     w = (cui_text_view_copy_writer){.output = output};
-    if (direct.data)
+    if (plain)
+        cui_text_view_copy_plain(s, &w, a, b);
+    else if (direct.data)
         cui_text_view_copy_write(&w, direct);
     else
         (void)cui_text_view_copy_source(s, &w, a, b);

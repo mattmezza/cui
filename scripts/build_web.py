@@ -7,13 +7,14 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = ['src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_edit.c',
+SOURCES = ['src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
+           'src/base/cui_virtual.c', 'src/base/cui_dock.c', 'src/base/cui_plot.c', 'src/base/cui_edit.c',
            'src/base/cui_content.c', 'src/components/cui_content.c',
            'src/base/cui_disclosure.c', 'src/components/cui_disclosure.c',
            'src/base/cui_choice.c', 'src/components/cui_choice.c',
            'src/theme/cui_theme.c', 'src/components/cui_components.c', 'web/gallery.c']
 EXPORTS = ['gallery_init', 'gallery_event', 'gallery_text', 'gallery_focus', 'gallery_frame',
-           'gallery_count', 'gallery_command', 'gallery_command_text', 'gallery_command_length',
+           'gallery_time', 'gallery_redraw', 'gallery_count', 'gallery_command', 'gallery_command_text', 'gallery_command_length',
            'gallery_semantic_count', 'gallery_semantic', 'gallery_semantic_name',
            'gallery_semantic_length', 'gallery_clicks', 'malloc', 'free']
 

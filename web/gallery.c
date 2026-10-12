@@ -3,7 +3,11 @@
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
 #include "cui/cui_disclosure.h"
+#include "cui/cui_dock.h"
+#include "cui/cui_plot.h"
+#include "cui/cui_virtual.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #if defined(__wasm__)
 __attribute__((import_module("host"), import_name("measure"))) extern float
@@ -23,6 +27,16 @@ static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static cui_id selected_tab;
 static cui_theme current_theme;
+static cui_hover_state tooltip_state, card_state;
+static cui_virtual_list *virtual_list;
+static float scroll_percent;
+static cui_dock *dock;
+static cui_date date = {2026, 10, 12};
+static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
+static bool redraw;
+static float host_seconds, host_dt = 1.0f / 60;
+static bool reduced_motion;
+static cui_id dock_serial = 3;
 static void panel(cui_context *context, size_t index, void *user) {
     (void)user;
     char text[64];
@@ -49,7 +63,20 @@ int gallery_init(void) {
                                              .capacity = sizeof(input_buffer),
                                              .history_bytes = 8192,
                                              .max_history_steps = 64});
-    return ui && edit;
+    virtual_list = cui_virtual_create((cui_virtual_config){100000, 24});
+    uint64_t *keys = malloc(100000 * sizeof(*keys));
+    if (!keys || !virtual_list)
+        return 0;
+    for (size_t i = 0; i < 100000; i++)
+        keys[i] = i + 1;
+    cui_virtual_result rebuilt = cui_virtual_rebuild(virtual_list, keys, NULL, 100000);
+    free(keys);
+    dock = cui_dock_create((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
+    if (dock) {
+        cui_dock_insert(dock, cui_dock_root(dock), 1, 0);
+        cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
+    }
+    return ui && edit && dock && rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat) {
     if (ui)
@@ -77,8 +104,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     cui_theme t = theme == 1   ? cui_theme_dark()
                   : theme == 2 ? cui_theme_high_contrast()
                                : cui_theme_light();
+    redraw = false;
     current_theme = t;
-    cui_begin_frame(ui, width, height, 1.0f / 60);
+    cui_begin_frame(ui, width, height, host_dt);
     cui_begin_box(ui, cui_id_from(ui, "preview"),
                   (cui_box){.width = width,
                             .height = height,
@@ -173,10 +201,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_kbd(ui, cui_id_from(ui, "kbd"), &t, cui_string("Ctrl + K"));
         break;
     case 18:
-        cui_skeleton(ui, cui_id_from(ui, "skeleton"), &t, width - 48, 36, 6, .4f, false, true);
+        cui_skeleton(ui, cui_id_from(ui, "skeleton"), &t, width - 48, 36, 6,
+                     cui_loading_phase(host_seconds, 1.4f), false, reduced_motion);
+        redraw = !reduced_motion;
         break;
     case 19:
-        cui_spinner(ui, cui_id_from(ui, "spinner"), &t, 32, .2f, true);
+        cui_spinner(ui, cui_id_from(ui, "spinner"), &t, 32, cui_loading_phase(host_seconds, 1.0f),
+                    reduced_motion);
+        redraw = !reduced_motion;
         break;
     case 20: {
         cui_disclosure_item items[3] = {
@@ -202,6 +234,111 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_tabs(ui, cui_id_from(ui, "tabs"), &t, items, 3, &selected_tab,
                  (cui_tabs_options){.disabled = disabled, .variant = CUI_TAB_UNDERLINE}, panel,
                  NULL);
+        break;
+    }
+    case 23:
+    case 24: {
+        cui_id trigger = cui_id_from(ui, "hover-trigger");
+        cui_button(ui, trigger, &t, cui_string("Hover or focus here"), disabled);
+        cui_hover_options options = {.trigger = trigger,
+                                     .viewport = {0, 0, width, height},
+                                     .side = CUI_POPUP_BELOW,
+                                     .width = width > 360 ? 280 : width - 48,
+                                     .height = 100,
+                                     .gap = 8,
+                                     .dt = host_dt,
+                                     .open_delay = .25f,
+                                     .close_delay = .1f,
+                                     .disabled = disabled};
+        if (story == 23)
+            cui_tooltip(ui, cui_id_from(ui, "tooltip"), &t, &tooltip_state,
+                        cui_string("A real CUI floating tooltip"), options);
+        else if (cui_begin_hover_card(ui, cui_id_from(ui, "hover-card"), &t, &card_state,
+                                      cui_string("Profile details"), options)) {
+            cui_label(ui, &t, cui_string("Alex Morgan"));
+            cui_label(ui, &t, cui_string("A composable floating card."));
+            cui_end_hover_card(ui);
+        }
+        redraw = story == 23 ? tooltip_state.pending : card_state.pending;
+        break;
+    }
+    case 25: {
+        cui_label(ui, &t, cui_string("Base model: scalar editing and undo history"));
+        cui_input(ui, cui_id_from(ui, "editor-model"), &t, cui_string("Model text"), edit,
+                  disabled);
+        cui_begin_box(ui, cui_id_from(ui, "edit-actions"), (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "undo"), &t, cui_string("Undo"), disabled))
+            cui_edit_undo(edit);
+        if (cui_button(ui, cui_id_from(ui, "redo"), &t, cui_string("Redo"), disabled))
+            cui_edit_redo(edit);
+        cui_end_box(ui);
+        break;
+    }
+    case 26: {
+        cui_label(ui, &t, cui_string("Base model: 100,000 retained rows"));
+        cui_slider(ui, cui_id_from(ui, "virtual-scroll"), &t, cui_string("Scroll position"),
+                   &scroll_percent, 0, 100, 1, disabled);
+        cui_virtual_view view = cui_virtual_viewport(
+            virtual_list, cui_virtual_total(virtual_list) * scroll_percent / 100, 144, 1);
+        char text[128];
+        snprintf(text, sizeof(text), "Visible range: %zu .. %zu / 100000", view.begin, view.end);
+        cui_label(ui, &t, cui_string(text));
+        snprintf(text, sizeof(text), "Offset: %.0f px; total: %.0f px", view.before, view.total);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 27: {
+        cui_label(ui, &t, cui_string("Base model: dock serialization and geometry"));
+        if (cui_button(ui, cui_id_from(ui, "split"), &t, cui_string("Split panel"), disabled)) {
+            cui_dock_node tab;
+            size_t index;
+            if (cui_dock_panel_find(dock, 1, &tab, &index)) {
+                cui_dock_node fresh;
+                if (cui_dock_split(dock, tab, CUI_DOCK_SPLIT_HORIZONTAL, .5, dock_serial, false,
+                                   &fresh) == CUI_DOCK_OK)
+                    dock_serial++;
+            }
+        }
+        cui_dock_geometry regions[16];
+        size_t count = 0;
+        bool fits;
+        cui_dock_layout(dock, (cui_rect){0, 0, width - 48, 100}, 4, regions, 16, &count, &fits);
+        char text[128];
+        snprintf(text, sizeof(text), "%zu tab regions; minimum sizes %s", count,
+                 fits ? "fit" : "compressed");
+        cui_label(ui, &t, cui_string(text));
+        size_t bytes;
+        cui_dock_serialize(dock, NULL, 0, &bytes);
+        snprintf(text, sizeof(text), "Serialized layout: %zu bytes", bytes);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 28: {
+        cui_label(ui, &t, cui_string("Base model: plot scale and tick calculation"));
+        if (cui_button(ui, cui_id_from(ui, "plot-zoom"), &t, cui_string("Zoom in at center"),
+                       disabled))
+            cui_plot_zoom(&plot_scale, 1.5, 150);
+        double ticks[32];
+        size_t count = 0;
+        cui_plot_ticks(&plot_scale, 5, ticks, 32, &count);
+        char text[128];
+        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; ticks: %zu", plot_scale.domain_min,
+                 plot_scale.domain_max, count);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 29: {
+        cui_label(ui, &t, cui_string("Base model: Gregorian date arithmetic"));
+        cui_begin_box(ui, cui_id_from(ui, "date-actions"), (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "prev-month"), &t, cui_string("Previous"), disabled))
+            date = cui_date_add_months(date, -1);
+        if (cui_button(ui, cui_id_from(ui, "next-month"), &t, cui_string("Next"), disabled))
+            date = cui_date_add_months(date, 1);
+        cui_end_box(ui);
+        char text[128];
+        snprintf(text, sizeof(text), "%04d-%02d-%02d; %d days in month", date.year, date.month,
+                 date.day, cui_date_days_in_month(date.year, date.month));
+        cui_label(ui, &t, cui_string(text));
         break;
     }
     default:
@@ -281,6 +418,16 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->focused;
     case 8:
         return s->value;
+    case 9:
+        return s->tab_index;
+    case 10:
+        return s->details.expanded;
+    case 11:
+        return s->details.selected;
+    case 12:
+        return s->details.minimum;
+    case 13:
+        return s->details.maximum;
     default:
         return 0;
     }
@@ -293,4 +440,14 @@ unsigned gallery_semantic_length(unsigned i) {
 }
 int gallery_clicks(void) {
     return clicks;
+}
+
+int gallery_redraw(void) {
+    return redraw;
+}
+
+void gallery_time(float seconds, float dt, int reduced) {
+    host_seconds = seconds;
+    host_dt = dt > 0 && dt < 1 ? dt : 1.0f / 60;
+    reduced_motion = reduced != 0;
 }

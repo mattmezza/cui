@@ -39,7 +39,7 @@ each clipped cell and can draw arbitrary content; the application must govern
 interactive children and disabled behavior consistently.
 
 Up/Down skip disabled rows, Left/Right skip disabled columns, and Home/End move to
-the first/last enabled row. PageUp/PageDown move a viewport of physical rows and skip disabled destinations. Navigation does not wrap unless requested. Multiple
+the first/last enabled row in row mode, or the first/last enabled column in the current row in cell/column mode. Escape clears controlled selection and range anchors while retaining the keyboard cursor; disabled/loading tables ignore it. PageUp/PageDown move a viewport of physical rows and skip disabled destinations. Navigation does not wrap unless requested. Multiple
 events in one frame operate in queue order. Roving cell Tab focus follows the
 cursor; the header cursor is a separate Tab stop, with Left/Right/Home/End navigation skipping disabled columns. Headers support Enter or pointer
 sort activation, and Ctrl+Left/Right moves movable columns without crossing an
@@ -69,6 +69,6 @@ secondary gestures, wheel/focus interaction, scrollbar keyboard/thumb behavior a
 behavior tests run with a base-only core link; sanitizer validation instruments
 both layout and reducer.
 
-This is not full GPUI family parity. Remaining features include composed menus and variable row heights. Selection defaults to a single controlled keyed item in each dimension. An opt-in multiple-selection mode uses a caller-provided buffer of at most 4096 keyed items, with Ctrl/Meta toggles and Shift row/column/rectangular ranges. Disabled rows and columns are excluded from ranges. Capacity failures preserve the prior selection and keep the table rendered; callers may enlarge the buffer and retry. The anchor and buffer are controlled state, and callers must retain unique normalized keys in the buffer. Caller
+This is not full GPUI family parity. Remaining features include composed menus, cell Tab traversal, double-click events, per-column padding/default sort configuration, and variable row heights. Selection defaults to a single controlled keyed item in each dimension. An opt-in multiple-selection mode uses a caller-provided buffer of at most 4096 keyed items, with Ctrl/Meta toggles and Shift row/column/rectangular ranges. Disabled rows and columns are excluded from ranges. Capacity failures preserve the prior selection and keep the table rendered; callers may enlarge the buffer and retry. The anchor and buffer are controlled state, and callers must retain unique normalized keys in the buffer. Caller
 sorting/filtering is supported but this module does not provide a comparator or
 filter engine. Native accessibility adapters must map the portable grid roles.

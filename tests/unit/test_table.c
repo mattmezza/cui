@@ -170,7 +170,17 @@ static void events(void) {
     assert(scene(ui, m, &state, o).selection_changed && state.row == 4 && state.column == 30);
     key(ui, CUI_KEY_HOME, 0);
     scene(ui, m, &state, o);
-    assert(state.row == 1 && state.column == 30);
+    assert(state.row == 4 && state.column == 10);
+    key(ui, CUI_KEY_END, 0);
+    scene(ui, m, &state, o);
+    assert(state.row == 4 && state.column == 30);
+    key(ui, CUI_KEY_ESCAPE, 0);
+    assert(scene(ui, m, &state, o).selection_changed);
+    assert(!state.row && !state.column && state.cursor_row == 4 && state.cursor_column == 30);
+    key(ui, CUI_KEY_ESCAPE, 0);
+    assert(!scene(ui, m, &state, o).selection_changed);
+    key(ui, CUI_KEY_ENTER, 0);
+    scene(ui, m, &state, o);
     key(ui, CUI_KEY_PAGEDOWN, 0);
     scene(ui, m, &state, o);
     assert(state.row == 4);
@@ -184,8 +194,9 @@ static void events(void) {
     o.manual_selection = false;
     o.disabled = true;
     key(ui, CUI_KEY_END, 0);
+    key(ui, CUI_KEY_ESCAPE, 0);
     scene(ui, m, &state, o);
-    assert(state.cursor_row == 3);
+    assert(state.cursor_row == 3 && state.row == 1);
     o.disabled = false;
     cui_focus(ui, cui_table_header_id(10, 10));
     key(ui, CUI_KEY_ENTER, 0);
@@ -400,6 +411,12 @@ static void multiple_selection(void) {
     scene(ui, m, &state, o);
     assert(state.selection_count == 2 && cui_table_is_selected(&state, o, 4, 10) &&
            cui_table_is_selected(&state, o, 1, 20));
+    key(ui, CUI_KEY_ESCAPE, 0);
+    assert(scene(ui, m, &state, o).selection_changed);
+    assert(state.selection_count == 0 && !state.row && !state.column && !state.anchor_row &&
+           !state.anchor_column);
+    key(ui, CUI_KEY_ESCAPE, 0);
+    assert(!scene(ui, m, &state, o).selection_changed);
     cui_destroy(ui);
     cui_table_destroy(m);
 }

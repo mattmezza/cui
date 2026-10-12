@@ -663,6 +663,19 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         }
         if (was_drag)
             activation = 0;
+        if (ev[e].type == CUI_EVENT_KEY_DOWN && ev[e].key == CUI_KEY_ESCAPE) {
+            bool owned = target == id || target == cui_table_body_id(id) ||
+                         target == cui_table_row_header_id(id, s->cursor_row) ||
+                         target == cui_table_cell_id(id, s->cursor_row, s->cursor_column) ||
+                         target == cui_table_header_id(id, s->header_cursor);
+            if (owned) {
+                out.selection_changed |= s->row != 0 || s->column != 0 || s->selection_count != 0;
+                s->row = s->column = s->anchor_row = s->anchor_column = 0;
+                s->selection_count = 0;
+                s->resizing = 0;
+                continue;
+            }
+        }
         if (row_header_event(ui, id, m, s, o, &ev[e], target, activation, &previous, &reveal, &out))
             continue;
         bool header = false, hit = false;
@@ -801,10 +814,15 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                             nc = n;
                     }
                     if (ev[e].key == CUI_KEY_HOME || ev[e].key == CUI_KEY_END) {
-                        for (size_t p = 0; p < m->count; p++) {
-                            size_t n = ev[e].key == CUI_KEY_HOME ? p : m->count - 1 - p;
-                            if (!m->rows[n].disabled) {
-                                nr = n;
+                        bool by_column = o.selection_mode != CUI_TABLE_SELECT_ROW;
+                        size_t length = by_column ? m->columns : m->count;
+                        for (size_t p = 0; p < length; p++) {
+                            size_t n = ev[e].key == CUI_KEY_HOME ? p : length - 1 - p;
+                            if (by_column ? !m->cols[n].disabled : !m->rows[n].disabled) {
+                                if (by_column)
+                                    nc = n;
+                                else
+                                    nr = n;
                                 break;
                             }
                         }

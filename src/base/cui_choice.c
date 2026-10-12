@@ -170,7 +170,55 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
         state->search_length = 0;
     size_t event_count = 0;
     const cui_event *events = cui_frame_events(ui, &event_count);
+    size_t window_length = options.visible_count ? options.visible_count : count;
+    if (window_length > count)
+        window_length = count;
+    size_t window_begin = options.visible_count ? options.visible_begin : 0;
+    if (window_begin > count - window_length)
+        window_begin = count - window_length;
+    bool scrolled = false;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        cui_event event = events[e];
+        cui_rect bounds = options.scroll_bounds;
+        if (event.type == CUI_EVENT_SCROLL && options.visible_count && isfinite(event.dy) &&
+            event.x >= bounds.x && event.x < bounds.x + bounds.w && event.y >= bounds.y &&
+            event.y < bounds.y + bounds.h && cui_pointer_scope_allowed(ui, options.scroll_scope)) {
+            float amount = state->scroll_remainder - event.dy;
+            if (!isfinite(amount))
+                amount = event.dy > 0 ? -(float)count : (float)count;
+            float whole = truncf(amount);
+            state->scroll_remainder = amount - whole;
+            size_t before = window_begin;
+            if (whole < 0) {
+                float steps = -whole;
+                window_begin = steps >= (float)window_begin ? 0 : window_begin - (size_t)steps;
+            } else {
+                size_t remaining = count - window_length - window_begin;
+                window_begin += whole >= (float)remaining ? remaining : (size_t)whole;
+            }
+            if (before != window_begin) {
+                bool focused_option = false, active_visible = false;
+                for (size_t i = 0; i < count; i++) {
+                    focused_option |= cui_focused(ui) == items[i].id;
+                    if (i >= window_begin && i < window_begin + window_length &&
+                        !items[i].disabled && items[i].id == state->active)
+                        active_visible = true;
+                }
+                if (!active_visible) {
+                    state->active = 0;
+                    for (size_t i = window_begin; i < window_begin + window_length; i++)
+                        if (!items[i].disabled) {
+                            state->active = items[i].id;
+                            break;
+                        }
+                    if (focused_option)
+                        cui_focus(ui, state->active);
+                }
+                scrolled = true;
+                cui_invalidate(ui);
+            }
+            continue;
+        }
         size_t target = count, from = count;
         for (size_t i = 0; i < count; ++i) {
             if (items[i].id == cui_event_target(ui, e))
@@ -182,7 +230,7 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             continue;
         if (from == count || items[from].disabled)
             from = target;
-        if (cui_event_activation(ui, e) &&
+        if (cui_event_activation(ui, e) && !(scrolled && event.type == CUI_EVENT_POINTER_UP) &&
             (events[e].type != CUI_EVENT_KEY_UP || items[from].id == cui_event_activation(ui, e))) {
             size_t chosen = events[e].type == CUI_EVENT_POINTER_UP ? target : from;
             *selected = state->active = items[chosen].id;
@@ -226,7 +274,7 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             }
         }
     }
-    size_t begin = options.visible_count ? options.visible_begin : 0;
+    size_t begin = window_begin;
     if (begin >= count)
         begin = count - 1;
     size_t length = options.visible_count ? options.visible_count : count;

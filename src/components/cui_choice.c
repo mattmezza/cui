@@ -162,6 +162,7 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
               cui_list_options options) {
     if (!theme || !items || !selected || !state)
         return false;
+    options.scroll_bounds = cui_bounds(ui, container);
     bool activated = cui_base_list(ui, items, count, selected, state, options);
     cui_choice_paint_list(ui, container, theme, items, count, selected, state, options, NULL);
     return activated;
@@ -214,7 +215,9 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
+                                     .scroll_scope = state->overlay.id};
     cui_id old = *selected;
     bool activated =
         count ? cui_base_list(ui, items, count, selected, &state->list, list_options) : false;
@@ -315,7 +318,9 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
+                                     .scroll_scope = state->overlay.id};
     cui_id old = *selected;
     bool activated =
         matched ? cui_base_list(ui, filtered, matched, selected, &state->list, list_options)
@@ -354,6 +359,7 @@ bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
                     cui_list_state *state, cui_list_options options) {
     if (!theme || !items || !selected || !state)
         return false;
+    options.scroll_bounds = cui_bounds(ui, container);
     bool activated = cui_base_list_multi(ui, items, count, selected, state, options);
     cui_id action = 0;
     cui_choice_paint_list(ui, container, theme, items, count, &action, state, options, selected);
@@ -430,7 +436,9 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
+                                     .scroll_scope = state->overlay.id};
     if (count)
         changed |= cui_base_list_multi(ui, items, count, selected, &state->list, list_options);
     cui_begin_portal(ui, state->overlay.id,
@@ -513,7 +521,9 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
+                                     .scroll_scope = state->overlay.id};
     bool activated = matched ? cui_base_list_multi(ui, filtered, matched, filtered_selected,
                                                    &state->list, list_options)
                              : false;

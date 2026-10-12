@@ -48,6 +48,7 @@ typedef struct {
     size_t search_length;
     float search_time;
     size_t first_visible;
+    float scroll_remainder; /* fractional wheel rows carried across frames */
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
 /* Styled row body; semantic name/disabled/selection remain supplied by item.
@@ -62,6 +63,8 @@ typedef struct {
     void *activation_user;
     cui_choice_render_fn render;
     void *render_user;
+    cui_rect scroll_bounds; /* base scrolling receiving bounds; styled fills automatically */
+    cui_id scroll_scope;    /* popup scope, or zero for a standalone list */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;

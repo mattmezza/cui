@@ -92,7 +92,12 @@ A flat empty popup renders an explicit empty state and remains dismissible.
 
 For long lists, only a bounded window of options is submitted and painted. Arrow
 navigation, Home/End and typeahead bring the active item into that window in the
-same frame. This provides keyboard paging without allocating or registering
+same frame. Wheel events inside the list or popup move this window in row units,
+carry fractional deltas across frames, clamp at both ends and respect modal scope
+ancestry. They do not commit selection. If the focused option leaves the window,
+focus moves to the first enabled visible option; Combobox keeps input focus while
+moving its active suggestion. Disabled lists ignore scrolling. This provides paging
+without allocating or registering
 thousands of offscreen controls. It is separate from the retained variable-height
 VirtualList model. Callers rendering a standalone list can set `visible_count` and
 `visible_begin`; `state.first_visible` returns the window after cursor navigation.
@@ -114,8 +119,11 @@ labels follow the core's frame-copy lifetime. Initialize state once, not per fra
 The headless choice test verifies selection, repeated menu dispatch, clipping
 escape, synchronous focus restoration, outside/Escape dismissal, empty lists,
 ASCII typeahead and keyboard paging over forty items with disabled endpoints.
+Scroll tests cover all six single/multi List/Select/Combobox paths, fractional
+wheel deltas, both clamps, out-of-bounds and nonfinite events, idle retention,
+disabled input, skipped disabled rows, focus transfer and subsequent selection.
 Hierarchical descriptors and multiple selection are documented below. Remaining
-list gaps include wheel/touch scrolling, variable-height item delegates, searchable
+list gaps include touch dragging, variable-height item delegates, searchable
 Select, Unicode normalization/case folding and OS accessibility adapters. Tab currently stays in the open popup rather than dismissing and
 advancing to the next background control. These are tracked parity gaps; rendering
 and keyboard selection of the implemented subset are real.
@@ -148,7 +156,8 @@ Combobox supports single and multiple selection. Remote query delegates,
 query/label synchronization policies, Unicode collation, IME,
 painted caret and selection, and the OS accessibility bridge remain incomplete.
 The current suggestion reducer applies edits before filtering for the frame;
-interleaving text edits and commits in a single batch is a remaining ordering gap.
+interleaving text edits or wheel scrolling with commits in a single batch remains
+an ordering gap.
 
 
 ## Multiple selection

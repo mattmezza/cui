@@ -2,6 +2,7 @@
 #include "cui/cui_choice.h"
 #include "cui/cui_components.h"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 static cui_choice_item items[] = {
     {10, {"First", 5}, false}, {20, {"Disabled", 8}, true}, {30, {"Last", 4}, false}};
@@ -746,6 +747,140 @@ static void test_custom_choice_rows(void) {
     }
 }
 
+static cui_choice_item scroll_items[12];
+static bool scroll_choices_scene(cui_context *ui, unsigned mode, cui_edit *query,
+                                 cui_choice_popup *state, cui_id *value, bool *chosen,
+                                 bool disabled) {
+    cui_theme theme = cui_theme_light();
+    cui_choice_item filtered[12];
+    bool filtered_selected[12];
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    cui_choice_popup_options options = {.disabled = disabled, .viewport = {0, 0, 640, 160}};
+    cui_list_options list_options = {
+        .disabled = disabled, .visible_begin = state->list.first_visible, .visible_count = 4};
+    bool changed;
+    if (mode == 0)
+        changed = cui_list(ui, 90, &theme, scroll_items, 12, value, &state->list, list_options);
+    else if (mode == 1)
+        changed =
+            cui_list_multi(ui, 90, &theme, scroll_items, 12, chosen, &state->list, list_options);
+    else if (mode == 2)
+        changed = cui_select(ui, 2, &theme, cui_string("Scroll"), cui_string("Choose"),
+                             scroll_items, 12, value, state, options);
+    else if (mode == 3)
+        changed = cui_select_multi(ui, 2, &theme, cui_string("Scroll"), cui_string("Choose"),
+                                   scroll_items, 12, chosen, state, options);
+    else if (mode == 4)
+        changed = cui_combobox(ui, 2, &theme, cui_string("Scroll"), query, scroll_items, 12,
+                               filtered, 12, value, state, options)
+                      .changed;
+    else
+        changed = cui_combobox_multi(ui, 2, &theme, cui_string("Scroll"), query, scroll_items, 12,
+                                     filtered, filtered_selected, 12, chosen, state, options)
+                      .changed;
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void wheel(cui_context *ui, float x, float y, float dy) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dy = dy}));
+}
+static void test_choice_scrolling(void) {
+    for (size_t i = 0; i < 12; i++)
+        scroll_items[i] = (cui_choice_item){1000 + i, cui_string("Scroll option"), i == 2};
+    for (unsigned mode = 0; mode < 6; mode++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        assert(ui);
+        char text[32] = "";
+        cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
+                                                            .capacity = sizeof(text),
+                                                            .history_bytes = 512,
+                                                            .max_history_steps = 8});
+        assert(query);
+        cui_choice_popup state;
+        cui_choice_popup_init(&state, 800);
+        cui_id value = 1000;
+        bool chosen[12] = {false};
+        scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        if (mode >= 2) {
+            click(ui, 2);
+            scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        } else
+            cui_focus(ui, 1000);
+        cui_rect bounds = cui_bounds(ui, mode >= 2 ? 800 : 90);
+        float x = bounds.x + 10, y = bounds.y + 12;
+        wheel(ui, x, y, -.25f);
+        assert(!scroll_choices_scene(ui, mode, query, &state, &value, chosen, false));
+        assert(state.list.first_visible == 0 && state.list.scroll_remainder == .25f);
+        wheel(ui, x, y, -1.75f);
+        assert(!scroll_choices_scene(ui, mode, query, &state, &value, chosen, false));
+        assert(state.list.first_visible == 2 && state.list.active == 1003);
+        assert(value == 1000 && !chosen[3]);
+        assert(cui_focused(ui) == (mode >= 4 ? 2 : 1003));
+        /* Idle frames retain the wheel window instead of snapping to old selection. */
+        scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        assert(state.list.first_visible == 2);
+        wheel(ui, 630, 530, -10);
+        scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        assert(state.list.first_visible == 2);
+        wheel(ui, x, y, NAN);
+        scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        assert(state.list.first_visible == 2);
+        wheel(ui, x, y, -10000);
+        scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        assert(state.list.first_visible > 2 && state.list.first_visible < 12);
+        wheel(ui, x, y, 10000);
+        scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+        assert(state.list.first_visible == 0 && value == 1000 && !chosen[11]);
+        if (mode < 2) {
+            wheel(ui, x, y, -3);
+            scroll_choices_scene(ui, mode, query, &state, &value, chosen, true);
+            assert(state.list.first_visible == 0);
+            scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+            cui_focus(ui, 1000);
+        }
+        key(ui, CUI_KEY_END);
+        key(ui, CUI_KEY_ENTER);
+        assert(scroll_choices_scene(ui, mode, query, &state, &value, chosen, false));
+        if (mode == 1 || mode == 3 || mode == 5)
+            assert(chosen[11] && !chosen[3]);
+        else
+            assert(value == 1011);
+        cui_edit_destroy(query);
+        cui_destroy(ui);
+    }
+}
+
+static void test_list_scroll_modal_guard(void) {
+    for (unsigned nested = 0; nested < 2; nested++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        cui_list_state state = {0};
+        cui_id selected = 1000;
+        for (unsigned frame = 0; frame < 2; frame++) {
+            if (frame) {
+                cui_rect bounds = cui_bounds(ui, 90);
+                wheel(ui, bounds.x + 10, bounds.y + 10, -3);
+            }
+            assert(cui_begin_frame(ui, 640, 540, .016f));
+            assert(cui_begin_focus_scope(ui, 5000, true));
+            cui_button(ui, 5001, &theme, cui_string("Modal"), false);
+            if (!nested)
+                cui_end_focus_scope(ui);
+            assert(!cui_list(
+                ui, 90, &theme, scroll_items, 12, &selected, &state,
+                (cui_list_options){.visible_count = 4, .visible_begin = state.first_visible}));
+            if (nested)
+                cui_end_focus_scope(ui);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+        }
+        assert(state.first_visible == (nested ? 3 : 0) && selected == 1000);
+        cui_destroy(ui);
+    }
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -824,6 +959,8 @@ int main(void) {
     test_context_menu();
     test_context_modal_guard();
     test_custom_choice_rows();
+    test_choice_scrolling();
+    test_list_scroll_modal_guard();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

@@ -79,6 +79,20 @@
       "total": 75,
       "log": "native-editor-ime-17cf96b.txt",
       "failing_before": "editor-ime-before-17cf96b.txt"
+    },
+    {
+      "name": "Integrated font metrics/editor/chart native suite",
+      "source": "46f31e6",
+      "passed": 77,
+      "total": 77,
+      "log": "native-46f31e6.txt"
+    },
+    {
+      "name": "Integrated font metrics/editor/chart sanitizer suite",
+      "source": "46f31e6",
+      "passed": 75,
+      "total": 75,
+      "log": "sanitizers-46f31e6.txt"
     }
   ]
 }

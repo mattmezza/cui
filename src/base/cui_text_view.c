@@ -184,12 +184,12 @@ static unsigned cui_text_view_encode(unsigned c, char out[4]) {
     out[3] = (char)(0x80 | (c & 63));
     return 4;
 }
-static bool cui_text_view_entity(cui_text_view_parser *p, size_t *at, size_t end, unsigned flags,
-                                 cui_text_view_range link) {
-    size_t a = *at, b = cui_text_view_find(p->input, a, end, ";", 1);
+static bool cui_text_view_entity_value(cui_str input, size_t *at, size_t end, unsigned *value) {
+    size_t a = *at, limit = end - a > 17 ? a + 17 : end,
+           b = cui_text_view_find(input, a, limit, ";", 1);
     if (b == SIZE_MAX || b - a > 16)
         return false;
-    cui_str name = {p->input.data + a + 1, b - a - 1};
+    cui_str name = {input.data + a + 1, b - a - 1};
     unsigned c = 0;
     if (name.length == 3 && !memcmp(name.data, "amp", 3))
         c = '&';
@@ -225,11 +225,68 @@ static bool cui_text_view_entity(cui_text_view_parser *p, size_t *at, size_t end
     }
     if (!c || c > 0x10ffff || (c >= 0xd800 && c <= 0xdfff))
         return false;
-    char encoded[4];
-    unsigned n = cui_text_view_encode(c, encoded);
-    cui_text_view_emit(p, (cui_str){encoded, n}, (cui_text_view_range){a, b + 1}, flags, link);
+    *value = c;
     *at = b + 1;
     return true;
+}
+static bool cui_text_view_entity(cui_text_view_parser *p, size_t *at, size_t end, unsigned flags,
+                                 cui_text_view_range link) {
+    size_t begin = *at;
+    unsigned value;
+    if (!cui_text_view_entity_value(p->input, at, end, &value))
+        return false;
+    char encoded[4];
+    unsigned n = cui_text_view_encode(value, encoded);
+    cui_text_view_emit(p, (cui_str){encoded, n}, (cui_text_view_range){begin, *at}, flags, link);
+    return true;
+}
+cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *s,
+                                                  cui_text_view_range range, char *output,
+                                                  size_t capacity, size_t *length) {
+    if (!s || !length || (!output && capacity) ||
+        !cui_text_view_range_valid(cui_text_view_source(s), range))
+        return CUI_TEXT_VIEW_INVALID;
+    cui_str input = cui_text_view_source(s);
+    size_t required = 0;
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        size_t written = 0;
+        for (size_t at = range.begin; at < range.end;) {
+            size_t start = at, end = at;
+            unsigned value = 0;
+            char encoded[4];
+            const char *bytes;
+            size_t n;
+            if (s->format != CUI_TEXT_VIEW_PLAIN && input.data[at] == '&' &&
+                cui_text_view_entity_value(input, &end, range.end, &value)) {
+                n = cui_text_view_encode(value, encoded);
+                bytes = encoded;
+                at = end;
+            } else {
+                if (s->format == CUI_TEXT_VIEW_MARKDOWN && input.data[at] == '\\' &&
+                    at + 1 < range.end) {
+                    unsigned char ch = (unsigned char)input.data[at + 1];
+                    if ((ch >= 33 && ch <= 47) || (ch >= 58 && ch <= 64) ||
+                        (ch >= 91 && ch <= 96) || (ch >= 123 && ch <= 126))
+                        ++at;
+                }
+                start = at;
+                n = cui_text_view_scalar(input, at);
+                bytes = input.data + start;
+                at += n;
+            }
+            if (pass)
+                memcpy(output + written, bytes, n);
+            written += n;
+        }
+        if (!pass) {
+            required = written;
+            *length = required;
+            if (!output || capacity <= required)
+                return CUI_TEXT_VIEW_CAPACITY;
+        }
+    }
+    output[required] = 0;
+    return CUI_TEXT_VIEW_OK;
 }
 static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, unsigned flags,
                                  cui_text_view_range link, unsigned depth) {

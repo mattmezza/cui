@@ -374,6 +374,38 @@ static void test_task_list_model(void) {
                measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.blocks[2].text_inset == 20);
 }
+static void test_resource_decoding(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(
+        cui_text_view_set_text(&f.state, text("[site](https://x.test?a=1&amp;b=\\!&#x1f642;)")) ==
+        CUI_TEXT_VIEW_OK);
+    char output[128] = "untouched";
+    size_t length;
+    cui_text_view_range resource = f.spans[0].link;
+    assert(cui_text_view_decode_resource(&f.state, resource, output, 2, &length) ==
+           CUI_TEXT_VIEW_CAPACITY);
+    assert(!strcmp(output, "untouched") && length > 2);
+    assert(cui_text_view_decode_resource(&f.state, resource, output, sizeof output, &length) ==
+           CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "https://x.test?a=1&b=!\xf0\x9f\x99\x82"));
+    assert(length == strlen(output));
+    assert(cui_text_view_decode_resource(
+               &f.state,
+               (cui_text_view_range){f.state.source_length + 1, f.state.source_length + 1}, output,
+               sizeof output, &length) == CUI_TEXT_VIEW_INVALID);
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(cui_text_view_set_text(&f.state, text("<a href='x\\!&amp;y'>site</a>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_decode_resource(&f.state, f.spans[0].link, output, sizeof output,
+                                         &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "x\\!&y"));
+    setup(&f, CUI_TEXT_VIEW_PLAIN);
+    assert(cui_text_view_set_text(&f.state, text("x\\!&amp;y")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_decode_resource(&f.state, (cui_text_view_range){0, f.state.source_length},
+                                         output, sizeof output, &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "x\\!&amp;y"));
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -809,6 +841,48 @@ static void test_passive_task_paint(void) {
     }
     cui_destroy(ui);
 }
+static unsigned decoded_link_clicks, decoded_image_calls;
+static void decoded_link(cui_str uri, const cui_event *event, void *user) {
+    (void)user;
+    assert(event->type == CUI_EVENT_POINTER_UP);
+    assert(uri.length == strlen("https://x.test?a=1&b=2") &&
+           !memcmp(uri.data, "https://x.test?a=1&b=2", uri.length));
+    ++decoded_link_clicks;
+}
+static bool decoded_image(cui_str uri, cui_bitmap *bitmap, void *user) {
+    (void)user;
+    static const unsigned char pixel[] = {255, 0, 0, 255};
+    assert(uri.length == strlen("asset?a=1&b=2") && !memcmp(uri.data, "asset?a=1&b=2", uri.length));
+    *bitmap = (cui_bitmap){.pixels = pixel, .width = 1, .height = 1, .stride = 4, .revision = 1};
+    ++decoded_image_calls;
+    return true;
+}
+static void test_decoded_resource_callbacks(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("<a href='https://x.test?a=1&amp;b=2'>site</a><img "
+                                       "src='asset?a=1&amp;b=2' alt='alt'>")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.on_link = decoded_link;
+    o.image = decoded_image;
+    frame(ui, &f, o);
+    assert(decoded_image_calls == 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = 2,
+                                           .y = 4}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = 2,
+                                           .y = 4}));
+    frame(ui, &f, o);
+    assert(decoded_link_clicks == 1 && decoded_image_calls == 3);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -891,6 +965,7 @@ int main(void) {
     test_proportional_table_defaults();
     test_adaptive_table_model();
     test_task_list_model();
+    test_resource_decoding();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -904,6 +979,7 @@ int main(void) {
     test_table_edges_and_clip();
     test_horizontal_table_interaction();
     test_passive_task_paint();
+    test_decoded_resource_callbacks();
 #endif
     return 0;
 }

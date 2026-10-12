@@ -119,6 +119,12 @@ bool cui_text_view_init(cui_text_view_state *, cui_text_view_workspace, cui_text
 cui_text_view_error cui_text_view_set_text(cui_text_view_state *, cui_str);
 cui_str cui_text_view_source(const cui_text_view_state *);
 cui_str cui_text_view_rendered_text(const cui_text_view_state *);
+/* Decode a resource source range into a separate caller buffer. Supports the
+ * parser's entity subset and Markdown punctuation escapes; HTML keeps backslashes.
+ * Capacity failure reports required bytes excluding zero and leaves output intact. */
+cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *,
+                                                  cui_text_view_range source, char *output,
+                                                  size_t capacity, size_t *length);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
 cui_str cui_text_view_selected_text(const cui_text_view_state *);
 typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_view_copy_format;
@@ -172,6 +178,7 @@ typedef struct {
     cui_text_view_copy_format copy_format;
     char *copy_buffer;
     size_t copy_capacity;
+    /* Decoded URIs are borrowed only during each callback. Copy for deferred use. */
     void (*on_link)(cui_str url, const cui_event *, void *);
     bool (*open_url)(cui_str url, void *);
     void *link_user;

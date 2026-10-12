@@ -259,7 +259,8 @@ static void cui_text_view_link(cui_context *ui, cui_id id, cui_text_view_state *
                                cui_text_view_range uri, bool activated, cui_text_view_options o) {
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
-    cui_str url = cui_text_view_slice(cui_text_view_source(s), uri);
+    char decoded[CUI_TEXT_VIEW_BYTE_LIMIT];
+    cui_str url = {0};
     for (size_t i = 0; i < count; ++i) {
         if (cui_event_consumed(ui, i))
             continue;
@@ -275,6 +276,13 @@ static void cui_text_view_link(cui_context *ui, cui_id id, cui_text_view_state *
         }
         if (!click)
             continue;
+        if (!url.data) {
+            size_t length;
+            if (cui_text_view_decode_resource(s, uri, decoded, sizeof decoded, &length) !=
+                CUI_TEXT_VIEW_OK)
+                continue;
+            url = (cui_str){decoded, length};
+        }
         if (o.on_link) {
             o.on_link(url, e, o.link_user);
             (void)cui_consume_event(ui, i);
@@ -605,13 +613,17 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
     float content_width = o.scrollable ? fmaxf(1, width - 10) : width;
     s->stream_fade = o.stream_fade;
     s->reduced_motion = o.reduced_motion;
+    char resource[CUI_TEXT_VIEW_BYTE_LIMIT];
     for (size_t i = 0; i < s->block_count; ++i)
         if (s->workspace.blocks[i].kind == CUI_TEXT_VIEW_IMAGE) {
             cui_text_view_block *b = &s->workspace.blocks[i];
             cui_bitmap bitmap = {0};
+            size_t length;
             b->image_ready =
-                o.image && o.image(cui_text_view_slice(cui_text_view_source(s), b->resource),
-                                   &bitmap, o.image_user);
+                o.image &&
+                cui_text_view_decode_resource(s, b->resource, resource, sizeof resource, &length) ==
+                    CUI_TEXT_VIEW_OK &&
+                o.image((cui_str){resource, length}, &bitmap, o.image_user);
             b->image = bitmap;
         }
     if (cui_text_view_layout(

@@ -34,8 +34,8 @@ select all, Escape clearing and copy through the optional portable clipboard
 interface. It is read-only. Links remain independently focusable; primary and
 secondary activation forward the original event to `on_link`. A selection drag
 suppresses link activation. An installed callback consumes activation; otherwise
-an explicit host `open_url` callback handles primary activation. URLs remain
-borrowed slices of the source buffer and must be copied for deferred use.
+an explicit host `open_url` callback handles primary activation. URLs are decoded temporary slices valid during the callback and must be copied
+for deferred use.
 
 Image loaders return borrowed straight RGBA bitmaps; pixels must survive renderer
 completion. Image callbacks run during submission and may report not ready until
@@ -121,3 +121,13 @@ uses a 14px foreground border box, a foreground fill when checked, and the share
 The checkmark chooses black or white contrast against the supplied foreground,
 which preserves the source defaults while also supporting custom palettes.
 Nested lists and multi-paragraph list continuation remain parser limitations.
+
+`cui_text_view_decode_resource` decodes the bounded parser entity subset and
+Markdown ASCII punctuation escapes into a separate caller buffer. HTML attribute
+backslashes and Plain format bytes remain literal. Link, opener and image callbacks
+receive decoded, zero-terminated URI bytes borrowed only for the callback;
+asynchronous loaders must copy them. No URL fetching or URI policy is implicit.
+Source copy retains original source spelling. Complete HTML5 named entity and URI
+normalization behavior remains part of the full parser gap. Resource callbacks
+use at most 64KiB of temporary stack storage, reused across images; entity lookup
+scans no more than 17 bytes per candidate.

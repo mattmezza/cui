@@ -171,6 +171,23 @@ int main(int argc, char **argv) {
         }
     assert(shortcut_index == strlen(shortcut_chars));
     cui_end_frame(ui);
+    SDL_Event composition = {.type = SDL_EVENT_TEXT_EDITING};
+    composition.edit.text = "preedit";
+    assert(SDL_PushEvent(&composition));
+    SDL_Event composing_key = {.type = SDL_EVENT_KEY_DOWN};
+    composing_key.key.key = SDLK_B;
+    assert(SDL_PushEvent(&composing_key));
+    composition.edit.text = "";
+    assert(SDL_PushEvent(&composition));
+    assert(SDL_PushEvent(&composing_key));
+    assert(cui_sdl3_poll(s, ui));
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    size_t composition_count;
+    const cui_event *composition_events = cui_frame_events(ui, &composition_count);
+    assert(composition_count == 2);
+    assert(composition_events[0].key == CUI_KEY_B && composition_events[0].ime_composing);
+    assert(composition_events[1].key == CUI_KEY_B && !composition_events[1].ime_composing);
+    cui_end_frame(ui);
     SDL_Event event = {0};
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.key = SDLK_TAB;

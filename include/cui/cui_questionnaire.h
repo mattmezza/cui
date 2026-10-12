@@ -187,6 +187,12 @@ bool cui_questionnaire_radio_keys(cui_context *, cui_questionnaire_state *,
  * input. Nonempty input drafts keep cursor movement. Call before rendering. */
 bool cui_questionnaire_answer_keys(cui_context *, cui_id scope, cui_questionnaire_state *,
                                    const cui_id *choice_ids, size_t count, cui_id input_id);
+/* Bare A-Z or 1-9 activates the enabled-position choice and focuses it.
+ * Input focus, modifiers, repeats, composition and consumed events are ignored.
+ * Call inside the root before rendering input/choices; IDs follow schema order. */
+bool cui_questionnaire_shortcut_keys(cui_context *, cui_id scope, cui_questionnaire_state *,
+                                     const cui_id *choice_ids, size_t count, cui_id input_id,
+                                     bool numbers);
 /* Enter confirms a focused filled answer. A single host-chosen Ctrl or Meta
  * modifier confirms from anywhere in the scope. Invoke before input/choices. */
 bool cui_questionnaire_confirm_keys(cui_context *, cui_id scope, cui_questionnaire_state *,

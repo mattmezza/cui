@@ -599,6 +599,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->events[i] = e;
             ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false);
         }
+        if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) &&
+            (e.ime_composing || e.prefer_character_input)) {
+            if (e.key == CUI_KEY_SPACE)
+                ui->space_capture = 0;
+            continue;
+        }
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
             size_t scope = ui->previous_focus_scope_count;

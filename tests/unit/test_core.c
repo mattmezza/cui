@@ -1196,6 +1196,39 @@ static void gesture_event(cui_context *ui, float x, float dx, float dy, cui_scro
                                            .scroll_phase = phase,
                                            .scroll_precise = precise}));
 }
+static void test_composition_activation(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 1);
+    for (int preferred = 0; preferred < 2; preferred++) {
+        const cui_key keys[] = {CUI_KEY_ENTER, CUI_KEY_TAB, CUI_KEY_SPACE};
+        for (size_t i = 0; i < 3; i++) {
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = keys[i],
+                                                   .ime_composing = !preferred,
+                                                   .prefer_character_input = preferred}));
+            begin(ui);
+            assert(cui_focused(ui) == 1 && !control(ui, 1, false).activated);
+            control(ui, 2, false);
+            cui_end_frame(ui);
+        }
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+        begin(ui);
+        assert(!control(ui, 1, false).activated);
+        control(ui, 2, false);
+        cui_end_frame(ui);
+    }
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void test_shortcut_key_characters(void) {
     /* Existing host numeric key mappings retain their original identities. */
     assert(CUI_KEY_A == 13 && CUI_KEY_PAGEDOWN == 20);
@@ -2250,6 +2283,7 @@ int main(void) {
     test_dominant_axis_scroll();
     test_persistent_scroll_routing();
     test_shortcut_key_characters();
+    test_composition_activation();
     test_perceptual_color_mix();
     test_focusable_container();
     test_nonfocusable_proxy_button();

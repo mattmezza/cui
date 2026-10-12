@@ -25,7 +25,7 @@ struct cui_sdl3 {
     SDL_Renderer *renderer;
     cui_font *font;
     cui_color ink;
-    bool quit, glyph_ok;
+    bool quit, glyph_ok, ime_composing;
     glyph_entry glyphs[GLYPH_CACHE_SLOTS];
     bitmap_entry bitmaps[BITMAP_SLOTS];
     size_t bitmap_bytes;
@@ -175,16 +175,23 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             v.type = e.type == SDL_EVENT_KEY_DOWN ? CUI_EVENT_KEY_DOWN : CUI_EVENT_KEY_UP;
             v.key = key(e.key.key);
             v.repeat = e.key.repeat;
+            v.ime_composing = s->ime_composing;
             v.modifiers = ((e.key.mod & SDL_KMOD_SHIFT) ? CUI_MOD_SHIFT : 0) |
                           ((e.key.mod & SDL_KMOD_CTRL) ? CUI_MOD_CTRL : 0) |
                           ((e.key.mod & SDL_KMOD_ALT) ? CUI_MOD_ALT : 0) |
                           ((e.key.mod & SDL_KMOD_GUI) ? CUI_MOD_META : 0);
             break;
+        case SDL_EVENT_TEXT_EDITING:
+            s->ime_composing = e.edit.text && e.edit.text[0];
+            send = false;
+            break;
         case SDL_EVENT_TEXT_INPUT:
+            s->ime_composing = false;
             v.type = CUI_EVENT_TEXT;
             SDL_strlcpy(v.text, e.text.text, sizeof(v.text));
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
+            s->ime_composing = false;
             v.type = CUI_EVENT_CANCEL;
             break;
         case SDL_EVENT_WINDOW_RESIZED:

@@ -9,6 +9,7 @@ static void frame(cui_context *ui, cui_questionnaire_state *s, cui_questionnaire
     cui_id answer_id = 12;
     assert(cui_questionnaire_begin(ui, 10, &t, s, o));
     (void)cui_questionnaire_answer_keys(ui, 10, s, &answer_id, 1, 19);
+    (void)cui_questionnaire_shortcut_keys(ui, 10, s, &answer_id, 1, 19, o.numeric_shortcuts);
     cui_questionnaire_progress(ui, 11, &t, s, o);
     cui_questionnaire_heading(ui, 13, &t, s, 0, o);
     (void)cui_questionnaire_choice_control(ui, 12, &t, s, 0, 0, o);
@@ -27,19 +28,23 @@ static void frame(cui_context *ui, cui_questionnaire_state *s, cui_questionnaire
     cui_draw_list draws = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK && draws.count > 0);
 }
-static void radio_frame(cui_context *ui, cui_questionnaire_state *s) {
+static void shortcut_frame(cui_context *ui, cui_questionnaire_state *s, bool numbers) {
     assert(cui_begin_frame(ui, 400, 300, .016f));
     cui_theme t = cui_theme_light();
     cui_id ids[] = {22, 23, 24};
     (void)cui_questionnaire_radio_keys(ui, s, ids, 3);
     assert(cui_questionnaire_begin(ui, 20, &t, s, (cui_questionnaire_options){.width = 300}));
     (void)cui_questionnaire_confirm_keys(ui, 20, s, ids, 3, 0, CUI_MOD_CTRL);
+    (void)cui_questionnaire_shortcut_keys(ui, 20, s, ids, 3, 0, numbers);
     for (size_t i = 0; i < 3; i++)
         (void)cui_questionnaire_choice_control(ui, ids[i], &t, s, 0, i,
                                                (cui_questionnaire_options){0});
     cui_questionnaire_end(ui);
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
+}
+static void radio_frame(cui_context *ui, cui_questionnaire_state *s) {
+    shortcut_frame(ui, s, false);
 }
 static void radio_keyboard(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
@@ -59,6 +64,34 @@ static void radio_keyboard(void) {
                                                                 .choice_capacity = 3},
                                   NULL, NULL) == CUI_QUESTIONNAIRE_OK);
     radio_frame(ui, &s);
+    cui_focus(ui, 22);
+    const cui_event ignored[] = {
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .repeat = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .modifiers = CUI_MOD_CTRL},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .ime_composing = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .prefer_character_input = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT, .ime_composing = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .ime_composing = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C}};
+    for (size_t i = 0; i < sizeof ignored / sizeof ignored[0]; i++) {
+        assert(cui_queue_event(ui, ignored[i]));
+        radio_frame(ui, &s);
+        assert(!cui_questionnaire_choice_selected(&s, 0, 0));
+        assert(!cui_questionnaire_choice_selected(&s, 0, 2));
+        assert(!s.pending_confirm && !s.complete && !cui_event_consumed(ui, 0));
+    }
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B}));
+    radio_frame(ui, &s);
+    assert(cui_questionnaire_choice_selected(&s, 0, 2));
+    assert(cui_focused(ui) == 24 && s.pending_confirm && cui_event_consumed(ui, 0));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B}));
+    radio_frame(ui, &s);
+    assert(s.complete && cui_event_consumed(ui, 0));
+    assert(cui_questionnaire_reset(&s));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_2}));
+    shortcut_frame(ui, &s, true);
+    assert(cui_questionnaire_choice_selected(&s, 0, 2) && cui_focused(ui) == 24);
+    assert(cui_questionnaire_reset(&s));
     cui_focus(ui, 22);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
     radio_frame(ui, &s);
@@ -203,6 +236,9 @@ int main(void) {
     frame(ui, &s, o);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "custom"}));
     frame(ui, &s, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_A}));
+    frame(ui, &s, o);
+    assert(!cui_event_consumed(ui, 0) && cui_focused(ui) == 19);
     assert(cui_questionnaire_freeform(&s, 0).length == 6);
     assert(!cui_questionnaire_choice_selected(&s, 0, 0));
     assert(cui_queue_event(

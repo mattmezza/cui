@@ -120,6 +120,9 @@ typedef struct {
      * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
     bool scroll_precise;
     cui_scroll_phase scroll_phase;
+    /* Host keyboard context: shortcut handlers must yield to composition and
+     * preferred character input. Zero preserves ordinary shortcut delivery. */
+    bool ime_composing, prefer_character_input;
 } cui_event;
 /* Caller-owned gesture filter. Clock is monotonic seconds; no allocation.
  * Precise gestures lock their initial dominant axis, release on strong turns,
@@ -6139,6 +6142,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                     }
             ui->events[i] = e;
             ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false);
+        }
+        if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) &&
+            (e.ime_composing || e.prefer_character_input)) {
+            if (e.key == CUI_KEY_SPACE)
+                ui->space_capture = 0;
+            continue;
         }
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {

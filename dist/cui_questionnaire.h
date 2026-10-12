@@ -188,6 +188,12 @@ bool cui_questionnaire_radio_keys(cui_context *, cui_questionnaire_state *,
  * input. Nonempty input drafts keep cursor movement. Call before rendering. */
 bool cui_questionnaire_answer_keys(cui_context *, cui_id scope, cui_questionnaire_state *,
                                    const cui_id *choice_ids, size_t count, cui_id input_id);
+/* Bare A-Z or 1-9 activates the enabled-position choice and focuses it.
+ * Input focus, modifiers, repeats, composition and consumed events are ignored.
+ * Call inside the root before rendering input/choices; IDs follow schema order. */
+bool cui_questionnaire_shortcut_keys(cui_context *, cui_id scope, cui_questionnaire_state *,
+                                     const cui_id *choice_ids, size_t count, cui_id input_id,
+                                     bool numbers);
 /* Enter confirms a focused filled answer. A single host-chosen Ctrl or Meta
  * modifier confirms from anywhere in the scope. Invoke before input/choices. */
 bool cui_questionnaire_confirm_keys(cui_context *, cui_id scope, cui_questionnaire_state *,
@@ -1068,7 +1074,8 @@ bool cui_questionnaire_radio_keys(cui_context *ui, cui_questionnaire_state *s, c
     size_t event_count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && s->current == item; e++) {
-        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN || events[e].repeat ||
+        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN ||
+            events[e].ime_composing || events[e].prefer_character_input || events[e].repeat ||
             events[e].modifiers ||
             (events[e].key != CUI_KEY_LEFT && events[e].key != CUI_KEY_RIGHT))
             continue;
@@ -1109,7 +1116,8 @@ bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionna
     const cui_event *events = cui_frame_events(ui, &event_count);
     bool handled = false;
     for (size_t e = 0; e < event_count && s->current == item; e++) {
-        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN || events[e].repeat ||
+        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN ||
+            events[e].ime_composing || events[e].prefer_character_input || events[e].repeat ||
             events[e].modifiers || (events[e].key != CUI_KEY_UP && events[e].key != CUI_KEY_DOWN))
             continue;
         cui_id focused = cui_focused(ui);
@@ -1141,6 +1149,48 @@ bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionna
     }
     return handled;
 }
+bool cui_questionnaire_shortcut_keys(cui_context *ui, cui_id scope, cui_questionnaire_state *s,
+                                     const cui_id *ids, size_t count, cui_id input_id,
+                                     bool numbers) {
+    if (!ui || !scope || !s || !s->initialized || s->current >= s->count || (count && !ids) ||
+        count != s->items[s->current].choice_count || s->storage.items[s->current].disabled ||
+        !cui_focus_within(ui, scope))
+        return false;
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    bool enabled_scope = false;
+    for (size_t n = 0; n < semantic_count; n++)
+        if (semantics[n].id == scope)
+            enabled_scope = !semantics[n].disabled;
+    if (!enabled_scope)
+        return false;
+    size_t item = s->current, event_count;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    bool handled = false;
+    for (size_t e = 0; e < event_count && s->current == item; e++) {
+        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN || events[e].repeat ||
+            events[e].modifiers || events[e].ime_composing || events[e].prefer_character_input ||
+            (input_id && cui_focused(ui) == input_id))
+            continue;
+        char key = cui_key_character(events[e].key);
+        if (!key)
+            continue;
+        for (size_t c = 0; c < count; c++) {
+            if (!ids[c] || cui_questionnaire_shortcut(s, item, c, numbers) != key)
+                continue;
+            if (cui_questionnaire_choose(s, item, c, cui_frame_time(ui), cui_reduced_motion(ui)) ==
+                CUI_QUESTIONNAIRE_OK) {
+                if (s->current == item)
+                    cui_focus(ui, ids[c]);
+                cui_consume_event(ui, e);
+                cui_invalidate(ui);
+                handled = true;
+            }
+            break;
+        }
+    }
+    return handled;
+}
 bool cui_questionnaire_confirm_keys(cui_context *ui, cui_id scope, cui_questionnaire_state *s,
                                     const cui_id *ids, size_t count, cui_id input_id,
                                     unsigned submit_modifier) {
@@ -1154,7 +1204,8 @@ bool cui_questionnaire_confirm_keys(cui_context *ui, cui_id scope, cui_questionn
     bool handled = false;
     for (size_t e = 0; e < event_count && s->current == item; e++) {
         if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN ||
-            events[e].key != CUI_KEY_ENTER || events[e].repeat)
+            events[e].key != CUI_KEY_ENTER || events[e].repeat || events[e].ime_composing ||
+            events[e].prefer_character_input)
             continue;
         bool filled = false;
         cui_id focus = cui_focused(ui);

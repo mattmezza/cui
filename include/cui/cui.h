@@ -119,6 +119,9 @@ typedef struct {
      * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
     bool scroll_precise;
     cui_scroll_phase scroll_phase;
+    /* Host keyboard context: shortcut handlers must yield to composition and
+     * preferred character input. Zero preserves ordinary shortcut delivery. */
+    bool ime_composing, prefer_character_input;
 } cui_event;
 /* Caller-owned gesture filter. Clock is monotonic seconds; no allocation.
  * Precise gestures lock their initial dominant axis, release on strong turns,

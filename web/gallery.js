@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Calendar']);
 const snippets = {
  Button:'if (cui_button(ui, id, &theme,\n    cui_string("Run action"), false)) {\n    run_action();\n}',
@@ -21,6 +21,9 @@ const snippets = {
  Dock:'cui_dock_split(dock, tab,\n    CUI_DOCK_SPLIT_HORIZONTAL, 0.5,\n    new_panel_key, false, &new_tab);',
  Plot:'cui_plot_zoom(&scale, 1.5, anchor_pixel);\ncui_plot_ticks(&scale, 5, ticks, 32, &count);',
  Calendar:'date = cui_date_add_months(date, 1);\nint days = cui_date_days_in_month(\n    date.year, date.month);',
+ List:'cui_list(ui, id, &theme, items, 3,\n    &selection, &state, options);',
+ Select:'cui_select(ui, id, &theme, label, placeholder,\n    items, 3, &selection, &popup, options);',
+ Menu:'if (cui_menu(ui, id, &theme, label,\n    items, 3, &action, &popup, options)) {\n    dispatch(action);\n}',
  Accordion:'cui_accordion(ui, id, &theme, items, 3,\n    expanded, options, draw_panel, user);',
  Collapsible:'cui_collapsible(ui, id, &theme, label,\n    &open, false, draw_panel, user);',
  Tabs:'cui_tabs(ui, id, &theme, items, 3,\n    &selection, options, draw_panel, user);',
@@ -75,7 +78,7 @@ function syncSemantics(){
   if(['checkbox','switch','radio'].includes(role))el.setAttribute('aria-checked',String(Boolean(f(6))));
   if(role==='slider'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   if(role==='tab'||role==='option')el.setAttribute('aria-selected',String(Boolean(f(11))));
-  if(selected.name==='Accordion'||selected.name==='Collapsible')el.setAttribute('aria-expanded',String(Boolean(f(10))));
+  if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));
   el.onclick=()=>{wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};
   root.append(el);
  }
@@ -114,7 +117,7 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
  if(e.key==='Tab'){
   const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&[1,2,3,4,5,6,8,14,16,23].includes(wasm.gallery_semantic(i,0)));
   const focused=enabled.findIndex(i=>wasm.gallery_semantic(i,7));
-  if(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0))return;
+  if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
  if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
  if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor')){

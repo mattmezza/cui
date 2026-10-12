@@ -36,6 +36,10 @@ static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
 static bool redraw;
 static float host_seconds, host_dt = 1.0f / 60;
 static bool reduced_motion;
+static cui_choice_popup select_popup, menu_popup;
+static cui_list_state list_state;
+static cui_id list_selection, select_selection, menu_action;
+static int menu_invocations, previous_story = -1;
 static cui_id dock_serial = 3;
 static void panel(cui_context *context, size_t index, void *user) {
     (void)user;
@@ -76,6 +80,8 @@ int gallery_init(void) {
         cui_dock_insert(dock, cui_dock_root(dock), 1, 0);
         cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
     }
+    cui_choice_popup_init(&select_popup, cui_id_from(ui, "select-popup"));
+    cui_choice_popup_init(&menu_popup, cui_id_from(ui, "menu-popup"));
     return ui && edit && dock && rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat) {
@@ -104,6 +110,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     cui_theme t = theme == 1   ? cui_theme_dark()
                   : theme == 2 ? cui_theme_high_contrast()
                                : cui_theme_light();
+    if (previous_story != story) {
+        cui_overlay_close(ui, &select_popup.overlay);
+        cui_overlay_close(ui, &menu_popup.overlay);
+        previous_story = story;
+    }
     redraw = false;
     current_theme = t;
     cui_begin_frame(ui, width, height, host_dt);
@@ -341,6 +352,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string(text));
         break;
     }
+    case 30:
+    case 31:
+    case 32: {
+        cui_choice_item items[3] = {{cui_id_from(ui, "choice-a"), cui_string("Standard"), false},
+                                    {cui_id_from(ui, "choice-b"), cui_string("Priority"), false},
+                                    {cui_id_from(ui, "choice-c"), cui_string("Unavailable"), true}};
+        cui_choice_popup_options options = {.disabled = disabled,
+                                            .viewport = {0, 0, width, height},
+                                            .width = width > 360 ? 280 : width - 48,
+                                            .dt = host_dt};
+        if (story == 30)
+            cui_list(ui, cui_id_from(ui, "list"), &t, items, 3, &list_selection, &list_state,
+                     (cui_list_options){.disabled = disabled, .dt = host_dt});
+        else if (story == 31)
+            cui_select(ui, cui_id_from(ui, "select"), &t, cui_string("Delivery"),
+                       cui_string("Select a service"), items, 3, &select_selection, &select_popup,
+                       options);
+        else if (cui_menu(ui, cui_id_from(ui, "menu"), &t, cui_string("Actions"), items, 3,
+                          &menu_action, &menu_popup, options))
+            menu_invocations++;
+        if (story == 32) {
+            char text[64];
+            snprintf(text, sizeof(text), "Actions invoked: %d", menu_invocations);
+            cui_label(ui, &t, cui_string(text));
+        }
+        break;
+    }
     default:
         cui_label(ui, &t, cui_string("This component has no browser story yet."));
         break;
@@ -450,4 +488,8 @@ void gallery_time(float seconds, float dt, int reduced) {
     host_seconds = seconds;
     host_dt = dt > 0 && dt < 1 ? dt : 1.0f / 60;
     reduced_motion = reduced != 0;
+}
+
+int gallery_modal(void) {
+    return select_popup.overlay.open || menu_popup.overlay.open;
 }

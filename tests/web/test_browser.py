@@ -63,6 +63,33 @@ def main():
                 page.wait_for_timeout(50)
                 assert page.locator('#preview-card').is_visible()
                 assert 'draw commands' in page.locator('#preview-note').inner_text()
+            for name in ['Select', 'Menu']:
+                page.evaluate('(name)=>location.hash=name', name)
+                page.wait_for_function('(name)=>document.querySelector("#name").textContent===name', arg=name)
+                page.wait_for_timeout(80)
+                box = canvas.bounding_box()
+                bounds = page.evaluate('Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(0,i+1))')
+                page.mouse.click(box['x'] + bounds[0] + bounds[2]/2, box['y'] + bounds[1] + bounds[3]/2)
+                page.wait_for_function('cuiGallery.exports.gallery_modal() === 1')
+                page.keyboard.press('Escape')
+                page.wait_for_function('cuiGallery.exports.gallery_modal() === 0')
+                assert page.evaluate('cuiGallery.exports.gallery_semantic(0,7)') == 1
+                page.keyboard.press('Enter')
+                page.wait_for_function('cuiGallery.exports.gallery_modal() === 1')
+                page.keyboard.press('Tab')
+                page.wait_for_timeout(50)
+                assert page.evaluate('document.activeElement.id') == 'preview'
+                page.keyboard.press('ArrowDown')
+                page.keyboard.press('Enter')
+                page.wait_for_function('cuiGallery.exports.gallery_modal() === 0')
+                assert page.evaluate('cuiGallery.exports.gallery_semantic(0,7)') == 1
+            page.evaluate('location.hash="Tabs"')
+            page.wait_for_function('document.querySelector("#name").textContent==="Tabs"')
+            page.wait_for_timeout(80)
+            canvas.focus()
+            page.keyboard.press('Tab')
+            page.keyboard.press('ArrowRight')
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)===8 && e.gallery_semantic(i,11) && new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==="Activity";}).some(Boolean)')
             for name, expected in [('Dock', '2 tab regions'), ('Calendar', '2026-09-12'), ('Plot', '16.67')]:
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name', arg=name)
@@ -130,7 +157,7 @@ def main():
             page.screenshot(path=str(root / 'browser-mobile.png'))
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 29 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 32 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

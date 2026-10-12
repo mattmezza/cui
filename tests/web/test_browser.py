@@ -1529,6 +1529,16 @@ def main():
             click_semantic('Delete workspace')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===1')
             assert page.locator('#accessible [role=alertdialog][aria-modal=true]').count() == 1
+            alert_geometry = page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+                const sem=Array.from({length:e.gallery_semantic_count()},(_,i)=>i);
+                const panel=sem.find(i=>e.gallery_semantic(i,0)===35);
+                const confirm=sem.find(i=>e.gallery_semantic(i,0)===1&&d.decode(new Uint8Array(
+                    e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==='Delete');
+                const title=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&
+                    d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Delete workspace?');
+                return [e.gallery_command(title,2),e.gallery_semantic(confirm,2)+e.gallery_semantic(confirm,4),
+                    e.gallery_semantic(panel,2)+e.gallery_semantic(panel,4)/2];}''')
+            assert abs((alert_geometry[0]+alert_geometry[1])/2-alert_geometry[2]) < 1, alert_geometry
             click_semantic('Delete')
             page.wait_for_function('cuiGallery.exports.gallery_alert_attempts()===1')
             assert page.evaluate('cuiGallery.exports.gallery_surface_open(1)') == 1

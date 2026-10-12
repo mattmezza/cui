@@ -283,6 +283,27 @@ static void styled_confirmation(void) {
             }
         assert(alert && cui_bounds(ui, cui_surface_part_id(100, 2)).w > 0 &&
                cui_bounds(ui, cui_surface_part_id(100, 3)).w > 0);
+        cui_rect panel = cui_bounds(ui, 100), content = cui_bounds(ui, cui_surface_part_id(100, 7));
+        assert(fabsf(content.y + content.h / 2 - panel.y - panel.h / 2) < .01f);
+        o.height = 80;
+        alert_scene(ui, &themes[theme], &s, o);
+        alert_scene(ui, &themes[theme], &s, o);
+        assert(s.body_maximum > 0);
+        cui_rect viewport = cui_bounds(ui, cui_surface_part_id(100, 6));
+        content = cui_bounds(ui, cui_surface_part_id(100, 7));
+        assert(fabsf(content.y - viewport.y) < .01f);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = viewport.x + 10,
+                                               .y = viewport.y + 10,
+                                               .dy = -100}));
+        alert_scene(ui, &themes[theme], &s, o);
+        assert(s.body_scroll == s.body_maximum);
+        content = cui_bounds(ui, cui_surface_part_id(100, 7));
+        assert(fabsf(content.y + content.h - viewport.y - viewport.h) < .01f);
+        o.height = 240;
+        alert_scene(ui, &themes[theme], &s, o);
+        alert_scene(ui, &themes[theme], &s, o);
+        assert(s.body_maximum == 0 && s.body_scroll == 0);
         allow_accept = false;
         decisions = 0;
         cui_focus(ui, cui_surface_part_id(100, 2));

@@ -375,6 +375,20 @@ void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
 /* SPDX-License-Identifier: MIT */
 
 
+static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s,
+                                   bool centered) {
+    cui_begin_box(
+        ui, cui_surface_part_id(s->overlay.id, 6),
+        (cui_box){.width = -1,
+                  .height = -1,
+                  .clip = true,
+                  .align_y = centered && s->body_maximum <= 0 ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
+                  .offset_y = -s->body_scroll});
+    cui_base_surface_submit_body(ui, s);
+    if (centered && s->body_content.h <= 0)
+        cui_invalidate(ui);
+    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7), (cui_box){.width = -1, .gap = t->gap});
+}
 bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o) {
     cui_rect bounds = s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
@@ -405,6 +419,9 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
                                .border = t->border,
                                .border_width = 1},
                      bounds, (int16_t)(layer + 1));
+    bool centered = s->kind == CUI_SURFACE_ALERT;
+    if (centered)
+        cui_surface_body_begin(ui, t, s, true);
     cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = t->gap});
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 4), (cui_box){.width = -1});
     cui_text(ui, title, t->font_size * 1.1f, t->text);
@@ -418,10 +435,8 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_end_box(ui);
     if (description.length)
         cui_text(ui, description, t->font_size, t->muted);
-    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 6),
-                  (cui_box){.width = -1, .height = -1, .clip = true, .offset_y = -s->body_scroll});
-    cui_base_surface_submit_body(ui, s);
-    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7), (cui_box){.width = -1, .gap = t->gap});
+    if (!centered)
+        cui_surface_body_begin(ui, t, s, false);
     cui_overlay_set_bounds(&s->overlay, bounds);
     return true;
 }

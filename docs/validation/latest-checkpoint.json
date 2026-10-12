@@ -1,15 +1,15 @@
 {
   "source": "6e023e8",
-  "published_source": "0cbfcbbf3f5037a3869348b58362edd79f51d5ba",
+  "published_source": "55a0b6a614f9398e281d8d2e2ef62a68cd55fbd1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local76-story real WASM gallery passes full Chromium suite, including all seven Chart families and physical hover. Public0cbfcbb remains verified75-story release until new deployment completes. Full78-entry parity remains unfinished.",
+  "summary": "Public55a0b6a deployed and passed full HTTPS76-story suite including all seven Chart families. Local Questionnaire registration passes native77, sanitizer75 and WASI67. Full78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "1da5aca",
-      "passed": 65,
-      "total": 65,
-      "log": "wasi-1da5aca.txt"
+      "source": "50ffcc4",
+      "passed": 67,
+      "total": 67,
+      "log": "wasi-50ffcc4.txt"
     },
     {
       "name": "native",
@@ -28,10 +28,10 @@
     },
     {
       "name": "sanitizers",
-      "source": "1da5aca",
-      "passed": 73,
-      "total": 73,
-      "log": "sanitizers-1da5aca.txt"
+      "source": "50ffcc4",
+      "passed": 75,
+      "total": 75,
+      "log": "sanitizers-50ffcc4.txt"
     }
   ],
   "previous_deployment": {
@@ -40,12 +40,12 @@
     "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
     "run": 38273904793
   },
-  "published_evidence": "published-0cbfcbb.txt",
+  "published_evidence": "published-55a0b6a.txt",
   "deployment": {
-    "source": "0cbfcbbf3f5037a3869348b58362edd79f51d5ba",
+    "source": "55a0b6a614f9398e281d8d2e2ef62a68cd55fbd1",
     "status": "success",
-    "pages_run": 38281971609,
-    "ci_run": 38281971637
+    "pages_run": 38283360036,
+    "ci_run": 38283359981
   },
   "targeted_checks": [
     {

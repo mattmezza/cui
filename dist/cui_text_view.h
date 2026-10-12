@@ -86,6 +86,7 @@ typedef struct {
     float table_track_width;
     cui_scroll_state table_scroll;
     float actions_height, text_inset, list_prefix_width;
+    cui_text_view_range projected_selection, projected_next;
 } cui_text_view_block;
 typedef struct {
     cui_text_view_range text;
@@ -118,7 +119,7 @@ typedef struct {
     cui_text_view_format format;
     size_t source_length, text_length, span_count, block_count, glyph_count, highlight_count;
     size_t anchor, cursor;
-    bool selecting, dragged, clamped, stream_fade, reduced_motion;
+    bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected;
     float pointer_x, pointer_y, press_x, press_y;
     cui_id secondary_link;
     float time, fade_duration, width, height;
@@ -152,6 +153,11 @@ typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_vi
 cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *,
                                                  cui_text_view_copy_format, char *output,
                                                  size_t capacity, size_t *length);
+/* Source-equivalent selected block serialization, used by styled clipboard delivery.
+ * Plain includes paragraph/heading/code terminators and table row/cell structure. */
+cui_text_view_error cui_text_view_copy_document_selection(const cui_text_view_state *,
+                                                          cui_text_view_copy_format, char *, size_t,
+                                                          size_t *length);
 bool cui_text_view_selected_source_range(const cui_text_view_state *, cui_text_view_range *);
 bool cui_text_view_range_for_source(const cui_text_view_state *, cui_text_view_range,
                                     cui_text_view_range *);
@@ -168,6 +174,33 @@ typedef enum {
     CUI_TEXT_VIEW_TABLE_ADAPTIVE,
     CUI_TEXT_VIEW_TABLE_NOWRAP
 } cui_text_view_table_mode;
+/* Application-owned shared selection. Registered states/workspaces must remain alive until
+ * removed. Registration storage remains alive until the manager is discarded. */
+typedef struct {
+    cui_text_view_state *state;
+    cui_id id, scope;
+    uint64_t document_order;
+    cui_text_view_table_mode table_mode;
+    bool enabled;
+} cui_text_view_selection_member;
+typedef struct {
+    cui_text_view_selection_member *members;
+    size_t count, capacity;
+    cui_id owner, scope;
+    float anchor_x, anchor_y, cursor_x, cursor_y;
+    bool active, dragging, dragged;
+} cui_text_view_selection;
+bool cui_text_view_selection_init(cui_text_view_selection *, cui_text_view_selection_member *,
+                                  size_t capacity);
+bool cui_text_view_selection_register(cui_text_view_selection *, cui_text_view_selection_member);
+bool cui_text_view_selection_remove(cui_text_view_selection *, cui_id);
+void cui_text_view_selection_clear(cui_text_view_selection *);
+/* Projects retained window-space points through current viewport/scroll geometry. */
+bool cui_text_view_selection_project(cui_text_view_selection *, cui_id scope, float anchor_x,
+                                     float anchor_y, float cursor_x, float cursor_y);
+cui_text_view_error cui_text_view_selection_copy(const cui_text_view_selection *,
+                                                 cui_text_view_copy_format, char *, size_t,
+                                                 size_t *length);
 /* Layout dimensions and measured text widths are bounded to 10,000,000 logical pixels. */
 typedef struct {
     float width, font_size, line_height, paragraph_gap;
@@ -217,8 +250,14 @@ typedef struct {
     void *highlighter_user;
     void (*on_reveal)(cui_rect window_line, void *);
     void *reveal_user;
+    cui_text_view_selection *shared_selection;
 } cui_text_view_options;
 cui_text_view_options cui_text_view_default(void);
+/* Call once after begin_frame and before any member is painted. Uses retained layout;
+ * first-frame members cannot be hit until they have submitted geometry. Clipboard options
+ * are read from options; member selection flags/lifetimes come from registration. */
+bool cui_text_view_selection_update(cui_context *, cui_text_view_selection *,
+                                    cui_text_view_options);
 /* Retained per-view selection and document render. Shared window selection,
  * touch handles and complete CommonMark/HTML5 parsing are tracked separately. */
 bool cui_text_view(cui_context *, cui_id, const cui_theme *, cui_text_view_state *,
@@ -1773,6 +1812,7 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     s->span_count = actual.spans;
     s->block_count = actual.blocks;
     s->glyph_count = 0;
+    s->selection_projected = false;
     s->workspace.rendered[s->text_length] = 0;
     s->highlight_count = 0;
     for (size_t i = 0; i < kept; ++i) {
@@ -1798,7 +1838,8 @@ bool cui_text_view_select(cui_text_view_state *s, size_t a, size_t c) {
     if (!s || !cui_text_view_boundary(cui_text_view_rendered_text(s), a) ||
         !cui_text_view_boundary(cui_text_view_rendered_text(s), c))
         return false;
-    bool changed = s->anchor != a || s->cursor != c;
+    bool changed = s->anchor != a || s->cursor != c || s->selection_projected;
+    s->selection_projected = false;
     s->anchor = a;
     s->cursor = c;
     return changed;
@@ -1827,6 +1868,18 @@ static void cui_text_view_source_selection(const cui_text_view_state *s, size_t 
             *b = r.end;
     }
 }
+static cui_text_view_range cui_text_view_block_selection(const cui_text_view_state *s, size_t index,
+                                                         size_t a, size_t b) {
+    const cui_text_view_block *block = &s->workspace.blocks[index];
+    if (s->selection_projected) {
+        a = block->projected_selection.begin;
+        b = block->projected_selection.end;
+        if (a != b)
+            cui_text_view_source_selection(s, &a, &b);
+    }
+    return (cui_text_view_range){a > block->text.begin ? a : block->text.begin,
+                                 b < block->text.end ? b : block->text.end};
+}
 bool cui_text_view_selected_source_range(const cui_text_view_state *s, cui_text_view_range *out) {
     if (!s || s->format == CUI_TEXT_VIEW_HTML)
         return false;
@@ -1835,6 +1888,16 @@ bool cui_text_view_selected_source_range(const cui_text_view_state *s, cui_text_
     cui_text_view_source_selection(s, &a, &b);
     size_t start = SIZE_MAX, end = 0;
     for (size_t i = a; i < b; ++i) {
+        if (s->selection_projected) {
+            bool selected = false;
+            for (size_t j = 0; j < s->block_count; ++j) {
+                cui_text_view_range r = cui_text_view_block_selection(s, j, a, b);
+                if (i >= r.begin && i < r.end)
+                    selected = true;
+            }
+            if (!selected)
+                continue;
+        }
         cui_text_view_range m = s->workspace.mapping[i].source;
         if (m.begin != SIZE_MAX) {
             if (m.begin < start)
@@ -2643,8 +2706,8 @@ static void cui_text_view_copy_table(const cui_text_view_state *s, cui_text_view
         if (columns)
             cui_text_view_copy_literal(w, " | ");
         ++columns;
-        size_t begin = cell->text.begin > a ? cell->text.begin : a,
-               finish = cell->text.end < b ? cell->text.end : b;
+        cui_text_view_range selected = cui_text_view_block_selection(s, i, a, b);
+        size_t begin = selected.begin, finish = selected.end;
         while (begin < finish && s->workspace.rendered[begin] == ' ' &&
                !(s->workspace.mapping[begin].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             ++begin;
@@ -2715,8 +2778,10 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
         const cui_text_view_block *block = &s->workspace.blocks[i];
         if (block->text.end <= a || block->text.begin >= b)
             continue;
-        size_t begin = block->text.begin > a ? block->text.begin : a;
-        size_t end = block->text.end < b ? block->text.end : b;
+        cui_text_view_range selected = cui_text_view_block_selection(s, i, a, b);
+        size_t begin = selected.begin, end = selected.end;
+        if (begin >= end)
+            continue;
         if (block->list_continuation && block->list_parent >= i)
             return CUI_TEXT_VIEW_INVALID;
         bool first_continuation = block->list_continuation && !listed[block->list_parent];
@@ -2854,7 +2919,7 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     bool plain = f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN;
     if (!plain)
         cui_text_view_source_selection(s, &a, &b);
-    if (!plain && a == 0 && b == s->text_length && a != b)
+    if (!plain && !s->selection_projected && a == 0 && b == s->text_length && a != b)
         direct = cui_text_view_source(s);
     cui_text_view_copy_writer w = {0};
     cui_text_view_error error = CUI_TEXT_VIEW_OK;
@@ -2878,6 +2943,275 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     else
         (void)cui_text_view_copy_source(s, &w, a, b);
     output[w.length] = 0;
+    return CUI_TEXT_VIEW_OK;
+}
+
+static void cui_text_view_copy_plain_document(const cui_text_view_state *s,
+                                              cui_text_view_copy_writer *w) {
+    size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
+           b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        const cui_text_view_block *block = &s->workspace.blocks[i];
+        cui_text_view_range r = cui_text_view_block_selection(s, i, a, b);
+        if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
+            size_t end = i + 1;
+            bool selected = r.begin < r.end;
+            while (end < s->block_count &&
+                   s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                   s->workspace.blocks[end].table == block->table) {
+                cui_text_view_range cell = cui_text_view_block_selection(s, end, a, b);
+                selected |= cell.begin < cell.end;
+                ++end;
+            }
+            if (selected) {
+                unsigned row = block->row;
+                for (size_t j = i; j < end; ++j) {
+                    const cui_text_view_block *cell = &s->workspace.blocks[j];
+                    if (j != i)
+                        cui_text_view_copy_literal(w, cell->row == row ? " " : "\n");
+                    row = cell->row;
+                    r = cui_text_view_block_selection(s, j, a, b);
+                    if (r.begin < r.end)
+                        cui_text_view_copy_plain(s, w, r.begin, r.end);
+                }
+                cui_text_view_copy_literal(w, "\n\n");
+            }
+            i = end - 1;
+            continue;
+        }
+        if (r.begin >= r.end)
+            continue;
+        size_t before = w->length;
+        cui_text_view_copy_plain(s, w, r.begin, r.end);
+        if (w->length != before) {
+            cui_text_view_copy_literal(w, "\n");
+            if (block->kind == CUI_TEXT_VIEW_QUOTE &&
+                (i + 1 == s->block_count || s->workspace.blocks[i + 1].kind != CUI_TEXT_VIEW_QUOTE))
+                cui_text_view_copy_literal(w, "\n");
+        }
+    }
+}
+cui_text_view_error cui_text_view_copy_document_selection(const cui_text_view_state *s,
+                                                          cui_text_view_copy_format format,
+                                                          char *out, size_t capacity,
+                                                          size_t *length) {
+    if (!s || format < CUI_TEXT_VIEW_COPY_PLAIN || format > CUI_TEXT_VIEW_COPY_SOURCE ||
+        (!out && capacity))
+        return CUI_TEXT_VIEW_INVALID;
+    if (format == CUI_TEXT_VIEW_COPY_SOURCE && s->format == CUI_TEXT_VIEW_MARKDOWN)
+        return cui_text_view_copy_selection(s, format, out, capacity, length);
+    cui_text_view_copy_writer w = {0};
+    cui_text_view_copy_plain_document(s, &w);
+    if (length)
+        *length = w.length;
+    if (capacity <= w.length)
+        return CUI_TEXT_VIEW_CAPACITY;
+    w = (cui_text_view_copy_writer){.output = out};
+    cui_text_view_copy_plain_document(s, &w);
+    out[w.length] = 0;
+    return CUI_TEXT_VIEW_OK;
+}
+bool cui_text_view_selection_init(cui_text_view_selection *m,
+                                  cui_text_view_selection_member *members, size_t capacity) {
+    if (!m || !members || !capacity || capacity > CUI_TEXT_VIEW_NODE_LIMIT)
+        return false;
+    *m = (cui_text_view_selection){.members = members, .capacity = capacity};
+    return true;
+}
+void cui_text_view_selection_clear(cui_text_view_selection *m) {
+    if (!m)
+        return;
+    for (size_t i = 0; i < m->count; ++i) {
+        cui_text_view_state *s = m->members[i].state;
+        (void)cui_text_view_select(s, s->cursor, s->cursor);
+        s->selecting = s->dragged = false;
+    }
+    m->active = m->dragging = m->dragged = false;
+    m->owner = m->scope = 0;
+}
+bool cui_text_view_selection_register(cui_text_view_selection *m,
+                                      cui_text_view_selection_member member) {
+    if (!m || !m->members || !member.state || !member.id || !member.scope ||
+        member.table_mode < CUI_TEXT_VIEW_TABLE_WRAP ||
+        member.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
+        return false;
+    for (size_t i = 0; i < m->count; ++i) {
+        if (m->members[i].id == member.id) {
+            if (m->members[i].state != member.state)
+                return false;
+            bool reset = !member.enabled || m->members[i].scope != member.scope ||
+                         m->members[i].table_mode != member.table_mode;
+            if (reset) {
+                (void)cui_text_view_select(member.state, member.state->cursor,
+                                           member.state->cursor);
+                if (m->owner == member.id)
+                    cui_text_view_selection_clear(m);
+            }
+            m->members[i] = member;
+            return true;
+        }
+        if (m->members[i].state == member.state)
+            return false;
+    }
+    if (m->count == m->capacity)
+        return false;
+    m->members[m->count++] = member;
+    return true;
+}
+bool cui_text_view_selection_remove(cui_text_view_selection *m, cui_id id) {
+    if (!m)
+        return false;
+    for (size_t i = 0; i < m->count; ++i)
+        if (m->members[i].id == id) {
+            if (m->owner == id)
+                cui_text_view_selection_clear(m);
+            cui_text_view_state *s = m->members[i].state;
+            (void)cui_text_view_select(s, s->cursor, s->cursor);
+            s->selecting = s->dragged = false;
+            memmove(m->members + i, m->members + i + 1, (m->count - i - 1) * sizeof *m->members);
+            --m->count;
+            return true;
+        }
+    return false;
+}
+static bool cui_text_view_selection_band(cui_rect r, float ax, float ay, float bx, float by) {
+    float top = fminf(ay, by), bottom = fmaxf(ay, by), x = r.x + r.w / 2;
+    if (r.y + r.h <= top || r.y > bottom)
+        return false;
+    bool a = ay >= r.y && ay < r.y + r.h, b = by >= r.y && by < r.y + r.h;
+    if (a && b)
+        return x >= fminf(ax, bx) && x <= fmaxf(ax, bx);
+    float tx = ay < by ? ax : bx, ty = fminf(ay, by), lx = ay < by ? bx : ax, ly = fmaxf(ay, by);
+    if (ty >= r.y && ty < r.y + r.h)
+        return x >= tx;
+    if (ly >= r.y && ly < r.y + r.h)
+        return x <= lx;
+    return true;
+}
+bool cui_text_view_selection_project(cui_text_view_selection *m, cui_id scope, float ax, float ay,
+                                     float bx, float by) {
+    if (!m || !isfinite(ax) || !isfinite(ay) || !isfinite(bx) || !isfinite(by))
+        return false;
+    bool changed = false;
+    m->scope = scope;
+    m->anchor_x = ax;
+    m->anchor_y = ay;
+    m->cursor_x = bx;
+    m->cursor_y = by;
+    m->active = true;
+    bool forward = ay < by || (ay == by && ax <= bx);
+    for (size_t i = 0; i < m->count; ++i) {
+        cui_text_view_selection_member *p = &m->members[i];
+        cui_text_view_state *s = p->state;
+        if (p->scope != scope)
+            continue;
+        size_t first = SIZE_MAX, last = 0;
+        for (size_t j = 0; j < s->block_count; ++j)
+            s->workspace.blocks[j].projected_next = (cui_text_view_range){0};
+        if (p->enabled && p->scope == scope)
+            for (size_t j = 0; j < s->glyph_count; ++j) {
+                cui_text_view_glyph *g = &s->workspace.glyphs[j];
+                if (g->flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+                    continue;
+                cui_rect r = g->bounds;
+                r.x += s->viewport.x;
+                r.y += s->viewport.y - s->scroll.y;
+                if (p->table_mode != CUI_TEXT_VIEW_TABLE_WRAP &&
+                    s->workspace.blocks[g->block].kind == CUI_TEXT_VIEW_TABLE_CELL)
+                    r.x -= s->workspace.blocks[g->block].table_scroll.x;
+                if (r.y + r.h <= s->viewport.y || r.y >= s->viewport.y + s->viewport.h ||
+                    r.x + r.w <= s->viewport.x || r.x >= s->viewport.x + s->viewport.w)
+                    continue;
+                if (cui_text_view_selection_band(r, ax, ay, bx, by)) {
+                    if (first == SIZE_MAX)
+                        first = g->text.begin;
+                    last = g->text.end;
+                    cui_text_view_range *range = &s->workspace.blocks[g->block].projected_next;
+                    if (range->begin == range->end)
+                        range->begin = g->text.begin;
+                    range->end = g->text.end;
+                }
+            }
+        size_t a = first == SIZE_MAX ? s->cursor : forward ? first : last;
+        size_t b = first == SIZE_MAX ? s->cursor : forward ? last : first;
+        changed |= s->anchor != a || s->cursor != b || !s->selection_projected;
+        s->anchor = a;
+        s->cursor = b;
+        for (size_t j = 0; j < s->block_count; ++j) {
+            cui_text_view_block *block = &s->workspace.blocks[j];
+            changed |= block->projected_selection.begin != block->projected_next.begin ||
+                       block->projected_selection.end != block->projected_next.end;
+            block->projected_selection = block->projected_next;
+        }
+        s->selection_projected = true;
+    }
+    return changed;
+}
+static bool cui_text_view_selection_has_copy(const cui_text_view_state *s,
+                                             cui_text_view_copy_format format) {
+    size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
+           b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    for (size_t block = 0; block < s->block_count; ++block) {
+        cui_text_view_range r = cui_text_view_block_selection(s, block, a, b);
+        for (size_t i = r.begin; i < r.end; ++i) {
+            if (s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+                if (format == CUI_TEXT_VIEW_COPY_SOURCE && s->format == CUI_TEXT_VIEW_MARKDOWN)
+                    return true;
+            } else if (!strchr(" \t\n\r\f\v", s->workspace.rendered[i]))
+                return true;
+        }
+    }
+    return false;
+}
+cui_text_view_error cui_text_view_selection_copy(const cui_text_view_selection *m,
+                                                 cui_text_view_copy_format format, char *out,
+                                                 size_t capacity, size_t *length) {
+    if (!m || format < CUI_TEXT_VIEW_COPY_PLAIN || format > CUI_TEXT_VIEW_COPY_SOURCE ||
+        (!out && capacity))
+        return CUI_TEXT_VIEW_INVALID;
+    size_t total = 0, selected = 0;
+    for (size_t i = 0; i < m->count; ++i) {
+        const cui_text_view_selection_member *p = &m->members[i];
+        if (!p->enabled || p->scope != m->scope ||
+            !cui_text_view_selection_has_copy(p->state, format))
+            continue;
+        size_t n = 0;
+        cui_text_view_error error =
+            cui_text_view_copy_document_selection(p->state, format, NULL, 0, &n);
+        if (error != CUI_TEXT_VIEW_CAPACITY)
+            return error;
+        if (n > SIZE_MAX - total - (selected != 0))
+            return CUI_TEXT_VIEW_CAPACITY;
+        total += n + (selected++ != 0);
+    }
+    if (length)
+        *length = total;
+    if (capacity <= total)
+        return CUI_TEXT_VIEW_CAPACITY;
+    size_t written = 0, previous = SIZE_MAX;
+    for (size_t ordinal = 0; ordinal < selected; ++ordinal) {
+        size_t next = SIZE_MAX;
+        for (size_t i = 0; i < m->count; ++i) {
+            const cui_text_view_selection_member *p = &m->members[i];
+            if (!p->enabled || p->scope != m->scope ||
+                !cui_text_view_selection_has_copy(p->state, format))
+                continue;
+            if (previous != SIZE_MAX &&
+                (p->document_order < m->members[previous].document_order ||
+                 (p->document_order == m->members[previous].document_order && i <= previous)))
+                continue;
+            if (next == SIZE_MAX || p->document_order < m->members[next].document_order)
+                next = i;
+        }
+        if (ordinal)
+            out[written++] = '\n';
+        size_t n;
+        (void)cui_text_view_copy_document_selection(m->members[next].state, format, out + written,
+                                                    capacity - written, &n);
+        written += n;
+        previous = next;
+    }
+    out[written] = 0;
     return CUI_TEXT_VIEW_OK;
 }
 
@@ -3003,6 +3337,88 @@ static bool cui_text_view_selection_target(const cui_text_view_state *s, cui_id 
     }
     return false;
 }
+bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
+                                    cui_text_view_options o) {
+    if (!ui || !m)
+        return false;
+    bool changed = false;
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i) {
+        const cui_event *e = &events[i];
+        if (e->type == CUI_EVENT_CANCEL) {
+            m->dragging = m->dragged = false;
+            continue;
+        }
+        if (cui_event_consumed(ui, i)) {
+            if (e->type == CUI_EVENT_POINTER_UP && e->pointer_button == CUI_POINTER_PRIMARY)
+                m->dragging = false;
+            continue;
+        }
+        if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY) {
+            for (size_t j = 0; j < m->count; ++j) {
+                cui_text_view_selection_member *p = &m->members[j];
+                if (!p->enabled || !p->state->glyph_count || p->state->viewport.w <= 0 ||
+                    p->state->viewport.h <= 0 || !cui_event_hit_within_scope(ui, i, p->scope) ||
+                    !cui_text_view_selection_target(p->state, p->id, cui_event_target(ui, i)))
+                    continue;
+                cui_text_view_selection_clear(m);
+                changed = true;
+                m->owner = p->id;
+                changed |= cui_text_view_selection_project(m, p->scope, e->x, e->y, e->x, e->y);
+                m->dragging = true;
+                cui_focus(ui, p->id);
+                break;
+            }
+        } else if (m->dragging && (e->type == CUI_EVENT_POINTER_MOVE ||
+                                   (e->type == CUI_EVENT_POINTER_UP &&
+                                    e->pointer_button == CUI_POINTER_PRIMARY))) {
+            if (!cui_pointer_scope_allowed(ui, m->scope)) {
+                m->dragging = false;
+                continue;
+            }
+            if (fabsf(e->x - m->anchor_x) > 2 || fabsf(e->y - m->anchor_y) > 2)
+                m->dragged = true;
+            if (m->dragged) {
+                changed |= cui_text_view_selection_project(m, m->scope, m->anchor_x, m->anchor_y,
+                                                           e->x, e->y);
+                (void)cui_cancel_event_activation(ui, i);
+                (void)cui_consume_event(ui, i);
+            }
+            if (e->type == CUI_EVENT_POINTER_UP)
+                m->dragging = false;
+        } else if (e->type == CUI_EVENT_KEY_DOWN && m->active && cui_focused(ui) == m->owner &&
+                   cui_focus_within(ui, m->scope)) {
+            bool handled = false;
+            if ((e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) && e->key == CUI_KEY_C) {
+                char scratch[CUI_TEXT_VIEW_BYTE_LIMIT];
+                char *buffer = o.copy_buffer ? o.copy_buffer : scratch;
+                size_t capacity = o.copy_buffer ? o.copy_capacity : sizeof scratch, length;
+                if (o.clipboard && (o.clipboard->capabilities & CUI_PLATFORM_CLIPBOARD) &&
+                    o.clipboard->clipboard_set &&
+                    cui_text_view_selection_copy(m, o.copy_format, buffer, capacity, &length) ==
+                        CUI_TEXT_VIEW_OK &&
+                    length)
+                    (void)o.clipboard->clipboard_set(o.clipboard->user, (cui_str){buffer, length});
+                handled = true;
+            } else if ((e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) && e->key == CUI_KEY_A) {
+                for (size_t j = 0; j < m->count; ++j)
+                    if (m->members[j].enabled && m->members[j].scope == m->scope)
+                        changed |= cui_text_view_select(m->members[j].state, 0,
+                                                        m->members[j].state->text_length);
+                handled = true;
+            } else if (e->key == CUI_KEY_ESCAPE) {
+                cui_text_view_selection_clear(m);
+                changed = handled = true;
+            }
+            if (handled)
+                (void)cui_consume_event(ui, i);
+        }
+    }
+    if (changed)
+        cui_invalidate(ui);
+    return changed;
+}
 static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state *s,
                                  cui_text_view_options o) {
     if (!o.selectable || o.disabled) {
@@ -3027,8 +3443,9 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                        e->type == CUI_EVENT_POINTER_UP;
         bool owned = pointer && cui_event_within_scope(ui, i, id) &&
                      cui_text_view_selection_target(s, id, cui_event_target(ui, i));
-        if (pointer && ((e->type == CUI_EVENT_POINTER_DOWN && owned) ||
-                        (s->selecting && cui_pointer_scope_allowed(ui, id)))) {
+        if (!o.shared_selection && pointer &&
+            ((e->type == CUI_EVENT_POINTER_DOWN && owned) ||
+             (s->selecting && cui_pointer_scope_allowed(ui, id)))) {
             size_t at = cui_text_view_pointer_hit(s, e->x - s->viewport.x,
                                                   e->y - s->viewport.y + s->scroll.y, o.table_mode);
             if (at == SIZE_MAX)
@@ -3069,9 +3486,9 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                     if (o.copy_format == CUI_TEXT_VIEW_COPY_SOURCE && !o.scrollable &&
                         s->format == CUI_TEXT_VIEW_MARKDOWN) {
                         size_t length;
-                        if (cui_text_view_copy_selection(s, o.copy_format, o.copy_buffer,
-                                                         o.copy_capacity,
-                                                         &length) == CUI_TEXT_VIEW_OK)
+                        if (cui_text_view_copy_document_selection(s, o.copy_format, o.copy_buffer,
+                                                                  o.copy_capacity,
+                                                                  &length) == CUI_TEXT_VIEW_OK)
                             (void)o.clipboard->clipboard_set(o.clipboard->user,
                                                              (cui_str){o.copy_buffer, length});
                     } else {
@@ -3079,8 +3496,9 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                         char *buffer = o.copy_buffer ? o.copy_buffer : scratch;
                         size_t capacity = o.copy_buffer ? o.copy_capacity : sizeof scratch;
                         size_t length;
-                        if (cui_text_view_copy_selection(s, CUI_TEXT_VIEW_COPY_PLAIN, buffer,
-                                                         capacity, &length) == CUI_TEXT_VIEW_OK &&
+                        if (cui_text_view_copy_document_selection(s, CUI_TEXT_VIEW_COPY_PLAIN,
+                                                                  buffer, capacity,
+                                                                  &length) == CUI_TEXT_VIEW_OK &&
                             length)
                             (void)o.clipboard->clipboard_set(o.clipboard->user,
                                                              (cui_str){buffer, length});
@@ -3106,6 +3524,14 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
             }
         }
     }
+}
+static bool cui_text_view_glyph_selected(const cui_text_view_state *s, const cui_text_view_glyph *g,
+                                         cui_text_view_range selection) {
+    if (!s->selection_projected)
+        return cui_text_view_overlap(g->text, selection);
+    if (g->flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+        return false;
+    return cui_text_view_overlap(g->text, s->workspace.blocks[g->block].projected_selection);
 }
 static float cui_text_view_opacity(const cui_text_view_state *s, size_t at) {
     if (!s->stream_fade || s->reduced_motion || s->workspace.mapping[at].born < 0)
@@ -3350,7 +3776,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             continue;
         }
         cui_color color = cui_text_view_foreground(s, first, style, o);
-        bool selected = o.selectable && cui_text_view_overlap(first->text, selection);
+        bool selected = o.selectable && cui_text_view_glyph_selected(s, first, selection);
         float opacity = cui_text_view_opacity(s, first->text.begin);
         size_t end = i + 1;
         while (end < s->glyph_count) {
@@ -3358,7 +3784,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                                 *previous = &s->workspace.glyphs[end - 1];
             if (g->span != first->span || g->bounds.y != first->bounds.y ||
                 g->text.begin != previous->text.end ||
-                cui_text_view_overlap(g->text, selection) != selected ||
+                cui_text_view_glyph_selected(s, g, selection) != selected ||
                 cui_text_view_opacity(s, g->text.begin) != opacity ||
                 !cui_text_view_color_equal(cui_text_view_foreground(s, g, style, o), color))
                 break;

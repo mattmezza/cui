@@ -222,7 +222,9 @@ typedef struct {
     cui_chart_sankey_label_measure_fn sankey_label_measure;
     cui_chart_sankey_label_paint_fn sankey_label_paint;
     void *sankey_label_user; /* measured/painted CUI content takes precedence over lines */
-    cui_chart_sankey_margins sankey_margins; /* measured before layout; zero preserves legacy */
+    cui_chart_sankey_margins
+        sankey_margins;         /* explicit nonzero, or auto-measured by styled chart */
+    bool custom_sankey_margins; /* preserve even zero margins in styled chart */
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
@@ -240,6 +242,9 @@ typedef struct {
     uint64_t active_appear_key;
     double appear_started_at;
     bool appear_started;
+    double animated_at_time; /* private frame-clock stamp for explicit animation calls */
+    bool animated_at_valid;
+    uint64_t animated_request_key;      /* private normalized visual input fingerprint */
     double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
     bool mark_clip_active;
     float rendered_reveal_progress;
@@ -284,9 +289,10 @@ float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options
  * Copy the result to options and set custom_horizontal_bar_gutters. */
 cui_plot_result cui_chart_measure_horizontal_bar_gutters(cui_context *, const cui_chart_options *,
                                                          float *category, float *value_end);
-/* Measures source-style label margins using the host's text metrics. Call before
- * render, assign the result to options.sankey_margins, then reuse those options
- * for layout, hit testing, and styled painting. Output is unchanged on failure. */
+/* Measures source-style label margins using the host's text metrics. Styled
+ * rendering measures automatically with zero margins unless custom_sankey_margins
+ * is set; base callers can assign the result before layout and rendering.
+ * Output is unchanged on failure. */
 cui_plot_result cui_chart_measure_sankey_margins(cui_context *, const cui_chart_options *,
                                                  cui_chart_sankey_margins *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
@@ -2110,6 +2116,46 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     }
     return h ? h : 1;
 }
+/* Compare explicit animation and styled rendering in the same frame, including
+ * caller-owned data when normal cross-frame caching is disabled. */
+uint64_t cui_chart_frame_key(const cui_chart_options *o, const cui_chart_state *s) {
+    if (!o || !s || !o->data || o->count > CUI_CHART_MAX_ITEMS || o->extra_series_count > 7 ||
+        (o->extra_series_count && !o->extra_series) || o->link_count > 1024 ||
+        (o->link_count && !o->links))
+        return 0;
+    cui_chart_options normalized = *o;
+    if (!normalized.data_revision)
+        normalized.data_revision = 1;
+    uint64_t h = cui_chart_cache_key(&normalized, s);
+    for (size_t i = 0; i < o->count; i++) {
+        const cui_chart_datum *d = &o->data[i];
+        h = cui_chart_mix(h, (uintptr_t)d->label.data);
+        h = cui_chart_mix(h, d->label.length);
+        h = cui_chart_mix(h, cui_chart_bits(d->value));
+        h = cui_chart_mix(h, cui_chart_bits(d->open));
+        h = cui_chart_mix(h, cui_chart_bits(d->high));
+        h = cui_chart_mix(h, cui_chart_bits(d->low));
+        h = cui_chart_mix(h, cui_chart_bits(d->close));
+        h = cui_chart_mix(h, d->color.r | ((uint64_t)d->color.g << 8) |
+                                 ((uint64_t)d->color.b << 16) | ((uint64_t)d->color.a << 24));
+    }
+    for (size_t i = 0; i < o->extra_series_count; i++) {
+        const cui_chart_series *series = &o->extra_series[i];
+        if (!series->values || series->count != o->count)
+            return 0;
+        for (size_t j = 0; j < o->count; j++)
+            h = cui_chart_mix(h, cui_chart_bits(series->values[j]));
+    }
+    for (size_t i = 0; i < o->link_count; i++) {
+        const cui_chart_link *link = &o->links[i];
+        h = cui_chart_mix(h, link->source);
+        h = cui_chart_mix(h, link->target);
+        h = cui_chart_mix(h, cui_chart_bits(link->value));
+        h = cui_chart_mix(h, link->color.r | ((uint64_t)link->color.g << 8) |
+                                 ((uint64_t)link->color.b << 16) | ((uint64_t)link->color.a << 24));
+    }
+    return h ? h : 1;
+}
 cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o) {
     cui_plot_result status = cui_chart_validate(s, o);
     if (status != CUI_PLOT_OK)
@@ -2145,6 +2191,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }
     uint64_t key = cui_chart_cache_key(o, s);
+    s->animated_at_valid = false;
     if (key && key == s->cache_key)
         return CUI_PLOT_OK;
     for (size_t i = 0; i < (size_t)o->width * o->height; i++) {
@@ -2299,6 +2346,7 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+uint64_t cui_chart_frame_key(const cui_chart_options *, const cui_chart_state *);
 static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
                                 cui_chart_format_fn formatter, void *user) {
     size_t length;
@@ -2607,6 +2655,14 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
         options->appear_duration < 0)
         return CUI_PLOT_INVALID;
     cui_chart_options frame = *options;
+    if (frame.kind == CUI_CHART_SANKEY && !frame.custom_sankey_margins &&
+        frame.sankey_margins.left == 0 && frame.sankey_margins.right == 0 &&
+        frame.sankey_margins.top == 0 && frame.sankey_margins.bottom == 0) {
+        cui_plot_result measured =
+            cui_chart_measure_sankey_margins(ui, &frame, &frame.sankey_margins);
+        if (measured != CUI_PLOT_OK)
+            return measured;
+    }
     if (frame.show_y_axis && !frame.y_axis_inside && frame.value_axis_gutter == 0 &&
         (frame.kind == CUI_CHART_LINE || frame.kind == CUI_CHART_AREA ||
          (frame.kind == CUI_CHART_BAR && frame.bar_alignment != CUI_CHART_BAR_LEFT &&
@@ -2624,6 +2680,7 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
             return measured;
         frame.custom_horizontal_bar_gutters = true;
     }
+    cui_chart_options request = frame;
     bool restart = !state->appear_started || state->active_appear_key != options->appear_key;
     double now = cui_frame_time(ui);
     double started = restart ? now : state->appear_started_at;
@@ -2643,6 +2700,9 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     state->appear_started = true;
     state->appear_started_at = started;
     state->active_appear_key = options->appear_key;
+    state->animated_at_time = now;
+    state->animated_at_valid = true;
+    state->animated_request_key = cui_chart_frame_key(&request, state);
     if (frame.reveal_progress < 1)
         cui_invalidate(ui);
     return CUI_PLOT_OK;
@@ -2657,6 +2717,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         o->point_count > 1000000 || state->byte_capacity < (size_t)o->width * o->height * 4)
         return false;
     cui_chart_options measured_options = *o;
+    if (o->kind == CUI_CHART_SANKEY && !o->custom_sankey_margins && o->sankey_margins.left == 0 &&
+        o->sankey_margins.right == 0 && o->sankey_margins.top == 0 &&
+        o->sankey_margins.bottom == 0) {
+        if (cui_chart_measure_sankey_margins(ui, o, &measured_options.sankey_margins) !=
+            CUI_PLOT_OK)
+            return false;
+        o = &measured_options;
+    }
     bool measure_outside_axis =
         o->show_y_axis && !o->y_axis_inside && o->value_axis_gutter == 0 &&
         (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA ||
@@ -2679,12 +2747,18 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         measured_options.custom_horizontal_bar_gutters = true;
         o = &measured_options;
     }
-    if (measure_outside_axis && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)) {
-        if (state->appear_started) {
-            if (cui_chart_render_animated(ui, state, o) != CUI_PLOT_OK)
-                return false;
-        } else if (cui_chart_render(state, o) != CUI_PLOT_OK)
+    bool animation_current =
+        state->animated_at_valid && state->animated_at_time == cui_frame_time(ui) &&
+        state->active_appear_key == o->appear_key && state->animated_request_key != 0 &&
+        state->animated_request_key == cui_chart_frame_key(o, state) &&
+        (!(o->disable_appear || o->reduced_motion || cui_reduced_motion(ui)) ||
+         state->rendered_reveal_progress == 1);
+    bool rendered_for_appearance = animation_current && !o->reveal_enabled;
+    if (!o->reveal_enabled && (state->appear_started || state->revision == 0) &&
+        !animation_current) {
+        if (cui_chart_render_animated(ui, state, o) != CUI_PLOT_OK)
             return false;
+        rendered_for_appearance = true;
     }
     float w = o->logical_width > 0 ? o->logical_width : (float)o->width;
     float h = o->logical_height > 0 ? o->logical_height : (float)o->height;
@@ -2808,13 +2882,19 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->emphasis_visual_index = SIZE_MAX;
         if (!instant && moving)
             cui_invalidate(ui);
-        cui_chart_options frame = *o;
-        if (!frame.reveal_enabled && state->appear_started && state->rendered_reveal_progress < 1) {
-            frame.reveal_enabled = true;
-            frame.reveal_progress = state->rendered_reveal_progress;
+        bool hover_raster =
+            (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) &&
+            (active || moving || state->emphasis_focus > 0);
+        if (!rendered_for_appearance || hover_raster) {
+            cui_chart_options frame = *o;
+            if (!frame.reveal_enabled && state->appear_started &&
+                state->rendered_reveal_progress < 1) {
+                frame.reveal_enabled = true;
+                frame.reveal_progress = state->rendered_reveal_progress;
+            }
+            if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
+                return false;
         }
-        if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
-            return false;
     }
     cui_begin_box(
         ui, id,

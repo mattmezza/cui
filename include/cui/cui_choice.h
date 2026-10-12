@@ -42,6 +42,15 @@ typedef struct {
 } cui_tab_motion;
 void cui_tab_motion_step(cui_tab_motion *, float target_left, float target_width, float dt,
                          cui_spring_settings, bool reduced_motion);
+/* Optional shared indicator state; keep alive until the next frame because
+ * measured bounds are written by cui_end_frame. */
+typedef struct {
+    cui_tab_motion spring;
+    cui_rect target_bounds, strip_bounds;
+    cui_id selected;
+    float last_scroll_offset, foreground_elapsed;
+    bool ready, transitioning;
+} cui_tab_animation;
 typedef struct {
     cui_id candidate, before, moved;
     float start_x, start_y;
@@ -85,7 +94,10 @@ typedef struct {
     bool reveal_selected;       /* opt in to reveal selection changes in a bounded strip */
     const cui_tab_parts *parts; /* optional borrowed per-item slots */
     size_t parts_count;
-    bool scrollbar; /* optional pointer/keyboard scrollbar over the viewport edge */
+    bool scrollbar;               /* optional pointer/keyboard scrollbar over the viewport edge */
+    cui_tab_animation *animation; /* optional retained shared indicator; horizontal strips */
+    float dt;
+    bool reduced_motion;
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

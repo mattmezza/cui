@@ -90,11 +90,69 @@ static cui_color cui_tab_palette(cui_box *box, const cui_theme *theme, cui_tab_v
         foreground = theme->muted;
     return foreground;
 }
+static void cui_tab_hsl(cui_color color, float channels[4]) {
+    float r = color.r / 255.f, g = color.g / 255.f, b = color.b / 255.f;
+    float high = fmaxf(r, fmaxf(g, b)), low = fminf(r, fminf(g, b));
+    float delta = high - low, light = (high + low) * .5f;
+    float hue = 0, saturation = 0;
+    if (delta > 0) {
+        saturation = delta / (1 - fabsf(2 * light - 1));
+        hue = high == r   ? fmodf((g - b) / delta, 6)
+              : high == g ? (b - r) / delta + 2
+                          : (r - g) / delta + 4;
+        hue /= 6;
+        if (hue < 0)
+            hue += 1;
+    }
+    channels[0] = hue;
+    channels[1] = saturation;
+    channels[2] = light;
+    channels[3] = color.a / 255.f;
+}
+static cui_color cui_tab_foreground_fade(cui_color from, cui_color to, float elapsed) {
+    if (elapsed <= 0)
+        return from;
+    if (elapsed >= .2f)
+        return to;
+    float t = elapsed / .2f;
+    t = t < .5f ? 4 * t * t * t : 1 - powf(-2 * t + 2, 3) * .5f;
+    float a[4], b[4];
+    cui_tab_hsl(from, a);
+    cui_tab_hsl(to, b);
+    for (size_t i = 0; i < 4; i++)
+        a[i] += (b[i] - a[i]) * t;
+    float chroma = (1 - fabsf(2 * a[2] - 1)) * a[1];
+    float x = chroma * (1 - fabsf(fmodf(a[0] * 6, 2) - 1));
+    float m = a[2] - chroma * .5f, r = 0, g = 0, blue = 0;
+    int sector = (int)(a[0] * 6) % 6;
+    if (sector == 0) {
+        r = chroma;
+        g = x;
+    } else if (sector == 1) {
+        r = x;
+        g = chroma;
+    } else if (sector == 2) {
+        g = chroma;
+        blue = x;
+    } else if (sector == 3) {
+        g = x;
+        blue = chroma;
+    } else if (sector == 4) {
+        r = x;
+        blue = chroma;
+    } else {
+        r = chroma;
+        blue = x;
+    }
+    return (cui_color){(uint8_t)lroundf((r + m) * 255), (uint8_t)lroundf((g + m) * 255),
+                       (uint8_t)lroundf((blue + m) * 255), (uint8_t)lroundf(a[3] * 255)};
+}
 static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                                bool selected, bool disabled, cui_tab_variant variant,
                                cui_choice_render_fn render, size_t index, void *render_user,
                                float max_width, const cui_tab_parts *parts,
-                               const cui_tab_metrics *metrics) {
+                               const cui_tab_metrics *metrics, const cui_tab_animation *animation) {
+    bool indicator_ready = animation && animation->ready;
     float padding = metrics ? metrics->padding_x : theme->padding;
     float part_gap = metrics ? metrics->part_gap : theme->gap;
     bool composed = metrics || (parts && (parts->prefix || parts->suffix || parts->icon));
@@ -155,6 +213,12 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
         tab_foreground =
             cui_tab_palette(&box, theme, variant, selected, disabled, cui_hovered(ui, item->id));
     }
+    if (metrics && indicator_ready && selected && !disabled) {
+        if (variant == CUI_TAB_PILL)
+            box.background = (cui_color){0};
+        else if (variant == CUI_TAB_UNDERLINE)
+            box.border = (cui_color){0};
+    }
     cui_begin_box(ui, item->id, box);
     if (variant == CUI_TAB_UNDERLINE) {
         cui_begin_box(ui, item->id ^ UINT64_C(0x9ae71a843e64b150),
@@ -180,7 +244,8 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
                                                                             : theme->radius) -
                                                    (metrics->inner_height >= 28 ? 3 : 2))
                                     : 0,
-                      .background = metrics && variant == CUI_TAB_SEGMENTED && selected
+                      .background = metrics && variant == CUI_TAB_SEGMENTED && selected &&
+                                            !(indicator_ready && !disabled)
                                         ? theme->background
                                         : (cui_color){0},
                       .align_y = CUI_ALIGN_CENTER});
@@ -214,8 +279,12 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
                           : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
                               ? theme->on_primary
                               : theme->text;
-        if (metrics)
+        if (metrics) {
             color = tab_foreground;
+            if (indicator_ready && animation->transitioning && selected && !disabled &&
+                variant == CUI_TAB_PILL)
+                color = cui_tab_foreground_fade(theme->text, color, animation->foreground_elapsed);
+        }
         if (ellipsized)
             cui_choice_ellipsized_text(ui, item->label, theme->font_size, color,
                                        structured ? body_limit : fmaxf(0, max_width - 2 * padding));
@@ -256,7 +325,8 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
 }
 static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                             bool selected, bool disabled, cui_tab_variant variant) {
-    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0, NULL, NULL);
+    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0, NULL, NULL,
+                       false);
 }
 static float cui_tab_extent(cui_context *ui, const cui_theme *theme, const cui_choice_item *item,
                             size_t index, cui_tabs_options options,
@@ -358,14 +428,11 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         ui, list_id,
         (cui_semantic_details){.orientation = options.vertical ? CUI_ORIENTATION_VERTICAL
                                                                : CUI_ORIENTATION_HORIZONTAL});
-    cui_begin_box(ui, container ^ UINT64_C(0xcda0312561f50cab),
-                  (cui_box){.row = !options.vertical, .gap = 0});
-    if (options.prefix)
-        options.prefix(ui, options.content_user);
-    float bar_padding = options.vertical ? 0 : metrics.bar_padding_x;
     cui_begin_box(
-        ui, container ^ UINT64_C(0xa7eb5ea7941c2230),
-        (cui_box){.row = true,
+        ui, list_id,
+        (cui_box){.row = !options.vertical,
+                  .gap = 0,
+                  .align_y = CUI_ALIGN_CENTER,
                   .background = options.variant == CUI_TAB_SEGMENTED ? theme->tab_bar_segmented
                                 : options.variant == CUI_TAB_DEFAULT ? theme->tab_bar
                                                                      : (cui_color){0},
@@ -374,6 +441,10 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                        ? theme->radius_lg
                                        : theme->radius)
                                 : 0});
+    if (options.prefix)
+        options.prefix(ui, options.content_user);
+    float bar_padding = options.vertical ? 0 : metrics.bar_padding_x;
+    cui_begin_box(ui, container ^ UINT64_C(0xa7eb5ea7941c2230), (cui_box){.row = true});
     if (bar_padding > 0) {
         cui_begin_box(ui, 0, (cui_box){.width = bar_padding});
         cui_end_box(ui);
@@ -402,12 +473,79 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                       .offset_x = options.vertical ? 0 : -options.scroll->offset,
                       .offset_y = options.vertical ? -options.scroll->offset : 0});
     }
+    cui_tab_animation *animation = options.animation;
+    bool animated_variant = options.variant == CUI_TAB_PILL ||
+                            options.variant == CUI_TAB_SEGMENTED ||
+                            options.variant == CUI_TAB_UNDERLINE;
+    if (animation) {
+        animation->ready = false;
+        size_t target = count;
+        for (size_t i = 0; i < count; i++)
+            if (items[i].id == *selected && !items[i].disabled && !options.disabled)
+                target = i;
+        cui_id strip_id = scrollable ? viewport_id : container ^ UINT64_C(0xa7eb5ea7941c2240);
+        cui_rect strip = cui_bounds(ui, strip_id);
+        if (animated_variant && !options.vertical && target < count) {
+            cui_rect bounds = cui_bounds(ui, items[target].id);
+            bool previous_exists = false;
+            for (size_t i = 0; i < count; i++)
+                previous_exists |= items[i].id == animation->selected;
+            bool had_target = animation->spring.initialized;
+            if (animation->selected != *selected) {
+                animation->foreground_elapsed = 0;
+                animation->transitioning = had_target && previous_exists;
+                animation->selected = *selected;
+            } else if (animation->transitioning && isfinite(options.dt) && options.dt > 0) {
+                animation->foreground_elapsed =
+                    fminf(.2f, animation->foreground_elapsed + options.dt);
+            }
+            if (options.reduced_motion || !theme->spring_move.travel ||
+                theme->spring_move.response == 0)
+                animation->foreground_elapsed = .2f;
+            if (animation->foreground_elapsed >= .2f)
+                animation->transitioning = false;
+            if (bounds.w > 0 && strip.w > 0) {
+                float offset = scrollable ? options.scroll->offset : 0;
+                float left = bounds.x - strip.x + animation->last_scroll_offset - offset;
+                cui_tab_motion_step(&animation->spring, left, bounds.w, options.dt,
+                                    theme->spring_move, options.reduced_motion);
+                cui_rect indicator = {animation->spring.left, 0, fmaxf(0, animation->spring.width),
+                                      metrics.height};
+                float radius = metrics.height * .5f;
+                cui_color color = theme->primary;
+                if (options.variant == CUI_TAB_UNDERLINE) {
+                    indicator.y = metrics.height - 2;
+                    indicator.h = 2;
+                    radius = 0;
+                } else if (options.variant == CUI_TAB_SEGMENTED) {
+                    indicator.y = (metrics.height - metrics.inner_height) * .5f;
+                    indicator.h = metrics.inner_height;
+                    radius =
+                        fmaxf(0, (options.size == CUI_TAB_MEDIUM || options.size == CUI_TAB_LARGE
+                                      ? theme->radius_lg
+                                      : theme->radius) -
+                                     (options.size == CUI_TAB_LARGE ? 3 : 2));
+                    color = theme->background;
+                }
+                animation->ready = cui_set_underlay(
+                    ui, indicator, color, (cui_corner_radii){radius, radius, radius, radius});
+                if (animation->spring.left != left || animation->spring.width != bounds.w ||
+                    animation->spring.left_velocity != 0 || animation->spring.width_velocity != 0 ||
+                    (options.variant == CUI_TAB_PILL && animation->transitioning))
+                    cui_invalidate(ui);
+            }
+            cui_track_bounds(ui, items[target].id, &animation->target_bounds);
+        }
+        cui_track_bounds(ui, strip_id, &animation->strip_bounds);
+        animation->last_scroll_offset = scrollable ? options.scroll->offset : 0;
+    }
     size_t active = count;
     for (size_t i = 0; i < count; ++i) {
-        cui_choice_draw_ex(
-            ui, &items[i], theme, items[i].id == *selected, options.disabled || items[i].disabled,
-            options.variant, options.render, i, options.render_user, options.max_width,
-            options.parts && i < options.parts_count ? &options.parts[i] : NULL, &metrics);
+        cui_choice_draw_ex(ui, &items[i], theme, items[i].id == *selected,
+                           options.disabled || items[i].disabled, options.variant, options.render,
+                           i, options.render_user, options.max_width,
+                           options.parts && i < options.parts_count ? &options.parts[i] : NULL,
+                           &metrics, options.animation);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.selected = items[i].id == *selected,

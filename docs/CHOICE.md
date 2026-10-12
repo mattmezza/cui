@@ -618,8 +618,7 @@ pixels. Panels retain supplied
 theme styles. Tests cover all twenty variant/size combinations, exact icon area
 and glyph bounds, scroll extent, explicit density and height override. This is a
 visible default change: a standard 42px Button theme now has 32px Medium Tabs.
-Automatic intrinsic slot reservation and spring-driven indicators/text fading
-remain separate parity gaps.
+Automatic intrinsic slot reservation remains a separate parity gap.
 
 Segmented bars reserve horizontal XS/S/M/L padding of 2/3/4/4 logical pixels,
 outside the scroll viewport and inside the bar prefix/suffix. Underline bodies
@@ -634,14 +633,25 @@ paint side borders, Underline paints only its bottom edge, and selected Segmente
 bodies paint an inset background with size-specific radius. A pointer-routed
 headless test customizes tokens and checks normal, hover, selected and disabled
 foregrounds for every variant. Segmented raised shadows still require a renderer
-primitive; this does not close animated indicator or text-fade parity.
+primitive; the optional animated presentation is described below.
 
 Caller-owned `cui_tab_motion` and `cui_tab_motion_step` provide the retained
 left/width springs used by the frozen indicator. Pass `theme.spring_move` and
 frame delta; first layout snaps, later targets retain both velocities, and
 reduced motion, disabled travel or response zero snaps. Invalid geometry leaves
 state untouched. Exact analytic steps handle under-, critically- and overdamped
-settings without frame-subdivision dependence. This primitive is not yet wired
-to Tabs painting: an absolute child that inherits clipping and paints below tab
-labels is required before the shared animated indicator can replace static
-selected visuals. Segmented shadows and Pill foreground fade remain gaps.
+settings without frame-subdivision dependence. Optional
+`cui_tabs_options.animation` wires this state to the shared indicator for
+horizontal Pill, Underline and Segmented strips. Supply frame `dt`; state and
+its retained bounds must live through `cui_end_frame`. First layout uses static
+selected visuals, then an underlay paints below labels with inherited clipping.
+Selection switches preserve velocity, scrolling adjusts box-relative position,
+and reduced motion snaps. Enabled selected static surfaces are suppressed while
+the indicator is ready; disabled selected tabs retain their static styling.
+Pill built-in text fades for 200ms with ease-in-out-cubic and linear HSL channels
+on later switches; custom body callbacks retain their own text presentation.
+Tests route clicks, check initial fallback and paint order, reverse retargets,
+scroll displacement, disabled fallback, reduced motion, grayscale and colored
+HSL fading. Full-bar background/radius includes prefix and suffix, and the bar
+centers its children vertically. Segmented shadows, the full-width Tab/Underline
+baseline, and suffix/menu scroll-tail composition remain separate gaps.

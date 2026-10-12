@@ -1040,6 +1040,8 @@ static void test_custom_tabs(void) {
             cui_rect prefix = cui_bounds(ui, 700), first = cui_bounds(ui, 10),
                      last = cui_bounds(ui, 30), suffix = cui_bounds(ui, 701);
             assert(prefix.x + prefix.w <= first.x + .01f && last.x + last.w <= suffix.x + .01f);
+            cui_rect bar = cui_bounds(ui, 1 ^ UINT64_C(0xcda0312561f50cab));
+            assert(bar.h == prefix.h && fabsf(first.y - bar.y - (bar.h - first.h) * .5f) < .01f);
             size_t count = 0;
             const cui_semantic *semantics = cui_semantics(ui, &count);
             bool named = false, disabled = false;
@@ -3003,7 +3005,118 @@ static void test_tab_retained_spring(void) {
         assert(motion.left == 0 && motion.width == 5);
     }
 }
+static cui_draw_list animated_tabs_scene(cui_context *ui, cui_id *selected, const cui_theme *theme,
+                                         cui_tab_animation *animation, cui_tab_variant variant,
+                                         float dt, bool reduced, bool disabled,
+                                         cui_tab_scroll_state *scroll) {
+    const cui_choice_item entries[] = {{10, {"One", 3}, false}, {20, {"Long second", 11}, false}};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_tabs(ui, 1, theme, entries, 2, selected,
+             (cui_tabs_options){.variant = variant,
+                                .animation = animation,
+                                .dt = dt,
+                                .reduced_motion = reduced,
+                                .disabled = disabled,
+                                .scroll = scroll,
+                                .bar_extent = scroll ? 70 : 0},
+             NULL, NULL);
+    return cui_end_frame(ui);
+}
+static cui_color tab_label_color(cui_draw_list draw, size_t length) {
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == length)
+            return draw.commands[i].color;
+    assert(false);
+    return (cui_color){0};
+}
+static void test_tab_shared_indicator(void) {
+    const cui_tab_variant variants[] = {CUI_TAB_PILL, CUI_TAB_UNDERLINE, CUI_TAB_SEGMENTED};
+    for (size_t v = 0; v < 3; v++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        theme.text = (cui_color){0, 0, 0, 255};
+        theme.on_primary = (cui_color){255, 255, 255, 255};
+        cui_tab_animation animation = {0};
+        cui_id selected = 10;
+        animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], 0, false, false, NULL);
+        assert(!animation.ready && animation.target_bounds.w > 0 && animation.strip_bounds.w > 0);
+        cui_draw_list draw = animated_tabs_scene(ui, &selected, &theme, &animation, variants[v],
+                                                 .016f, false, false, NULL);
+        assert(animation.ready && animation.spring.initialized && !animation.transitioning);
+        cui_color surface = variants[v] == CUI_TAB_SEGMENTED ? theme.background : theme.primary;
+        size_t indicators = 0, indicator_index = SIZE_MAX, label_index = SIZE_MAX;
+        for (size_t i = 0; i < draw.count; i++) {
+            if (draw.commands[i].type == CUI_DRAW_RECT &&
+                same_color(draw.commands[i].color, surface)) {
+                indicators++;
+                indicator_index = i;
+            }
+            if (draw.commands[i].type == CUI_DRAW_TEXT && label_index == SIZE_MAX)
+                label_index = i;
+        }
+        assert(indicators == 1 && indicator_index < label_index);
+        float initial_left = animation.spring.left, initial_width = animation.spring.width;
+        click(ui, 20);
+        draw = animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], 0, false, false,
+                                   NULL);
+        assert(selected == 20 && animation.transitioning && animation.spring.left == initial_left &&
+               animation.spring.width == initial_width);
+        if (variants[v] == CUI_TAB_PILL)
+            assert(same_color(tab_label_color(draw, 11), theme.text));
+        draw = animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], .1f, false,
+                                   false, NULL);
+        assert(animation.spring.left > initial_left && animation.spring.left_velocity > 0);
+        if (variants[v] == CUI_TAB_PILL)
+            assert(same_color(tab_label_color(draw, 11), (cui_color){128, 128, 128, 255}));
+        float moving_left = animation.spring.left, moving_velocity = animation.spring.left_velocity;
+        click(ui, 10);
+        animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], 0, false, false, NULL);
+        assert(selected == 10 && animation.spring.left == moving_left &&
+               animation.spring.left_velocity == moving_velocity);
+        draw = animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], .016f, true,
+                                   false, NULL);
+        assert(animation.spring.left == 0 && animation.spring.left_velocity == 0);
+        if (variants[v] == CUI_TAB_PILL)
+            assert(same_color(tab_label_color(draw, 3), theme.on_primary));
+        animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], .016f, false, true,
+                            NULL);
+        assert(!animation.ready);
+        cui_tab_scroll_state scroll = {0};
+        selected = 20;
+        animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], .016f, true, false,
+                            &scroll);
+        animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], .016f, true, false,
+                            &scroll);
+        float unscrolled_left = animation.spring.left;
+        scroll.offset = 20;
+        animated_tabs_scene(ui, &selected, &theme, &animation, variants[v], .016f, true, false,
+                            &scroll);
+        assert(fabsf(animation.spring.left - unscrolled_left + 20) < .01f);
+        cui_destroy(ui);
+    }
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    theme.text = (cui_color){255, 0, 0, 255};
+    theme.on_primary = (cui_color){0, 0, 255, 255};
+    cui_tab_animation animation = {0};
+    cui_id selected = 10;
+    animated_tabs_scene(ui, &selected, &theme, &animation, CUI_TAB_PILL, 0, false, false, NULL);
+    animated_tabs_scene(ui, &selected, &theme, &animation, CUI_TAB_PILL, .016f, false, false, NULL);
+    click(ui, 20);
+    animated_tabs_scene(ui, &selected, &theme, &animation, CUI_TAB_PILL, 0, false, false, NULL);
+    cui_draw_list draw = animated_tabs_scene(ui, &selected, &theme, &animation, CUI_TAB_PILL, .1f,
+                                             false, false, NULL);
+    /* Source interpolates hue channels: red -> blue crosses green at halfway. */
+    assert(same_color(tab_label_color(draw, 11), (cui_color){0, 255, 0, 255}));
+    draw = animated_tabs_scene(ui, &selected, &theme, &animation, CUI_TAB_PILL, .1f, false, false,
+                               NULL);
+    assert(same_color(tab_label_color(draw, 11), theme.on_primary) && !animation.transitioning);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_tab_shared_indicator();
     test_tab_retained_spring();
     test_tab_independent_palette();
     test_tab_reference_size_metrics();

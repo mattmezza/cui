@@ -45,6 +45,37 @@ static float cui_chart_hover_ease(float progress, bool entering) {
     float t = (lo + hi) / 2, inv = 1 - t;
     return 3 * inv * inv * t * y1 + 3 * inv * t * t * y2 + t * t * t;
 }
+static void cui_chart_hover_dot(cui_context *ui, cui_id id, float x, float y, cui_color fill,
+                                cui_color background, float progress) {
+    float halo_size = 20 * progress;
+    cui_color halo = fill;
+    halo.a = (unsigned char)lroundf(halo.a * .2f * progress);
+    if (halo_size > 0 && halo.a) {
+        cui_begin_absolute_box(
+            ui, id ^ UINT64_C(0x6b9a27a71d001011),
+            (cui_box){.width = halo_size,
+                      .height = halo_size,
+                      .radius = halo_size / 2,
+                      .fixed_width = true,
+                      .fixed_height = true,
+                      .background = halo},
+            (cui_rect){x - halo_size / 2, y - halo_size / 2, halo_size, halo_size});
+        cui_end_box(ui);
+    }
+    fill.a = (unsigned char)lroundf(fill.a * progress);
+    background.a = (unsigned char)lroundf(background.a * progress);
+    cui_begin_absolute_box(ui, id ^ UINT64_C(0x36b0f2a18e001011),
+                           (cui_box){.width = 8,
+                                     .height = 8,
+                                     .radius = 4,
+                                     .fixed_width = true,
+                                     .fixed_height = true,
+                                     .background = fill,
+                                     .border = background,
+                                     .border_width = 1},
+                           (cui_rect){x - 4, y - 4, 8, 8});
+    cui_end_box(ui);
+}
 static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
                                          const cui_chart_sankey_node *node, size_t index,
                                          cui_chart_sankey_label out[16], size_t *count,
@@ -560,59 +591,25 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 cui_color dot = series ? o->extra_series[series - 1].color : o->series[0];
                 if (!dot.a)
                     dot = o->series[series].a ? o->series[series] : o->foreground;
-                dot.a = (unsigned char)lroundf(dot.a * opacity);
-                cui_color halo = o->background;
-                halo.a = (unsigned char)lroundf(halo.a * opacity);
-                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x8e4ad6f381012000) + series),
-                                       (cui_box){.width = 10,
-                                                 .height = 10,
-                                                 .radius = 5,
-                                                 .fixed_width = true,
-                                                 .fixed_height = true,
-                                                 .background = halo},
-                                       (cui_rect){dot_x - 5, dot_y - 5, 10, 10});
-                cui_end_box(ui);
-                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9e4ad6f381012000) + series),
-                                       (cui_box){.width = 6,
-                                                 .height = 6,
-                                                 .radius = 3,
-                                                 .fixed_width = true,
-                                                 .fixed_height = true,
-                                                 .background = dot},
-                                       (cui_rect){dot_x - 3, dot_y - 3, 6, 6});
-                cui_end_box(ui);
+                cui_chart_hover_dot(ui, id ^ (UINT64_C(0x8e4ad6f381012000) + series), dot_x, dot_y,
+                                    dot, o->background, opacity);
             }
         }
     }
-    if (o->kind == CUI_CHART_RADAR && !o->noninteractive && state->hovered < o->count)
+    if (o->kind == CUI_CHART_RADAR && !o->noninteractive &&
+        state->tooltip_visual_index < o->count && state->tooltip_focus > 0)
         for (size_t series = 0; series <= o->extra_series_count; series++) {
             float pixel_x, pixel_y;
-            if (cui_chart_radar_vertex(o, state->hovered, series, &pixel_x, &pixel_y) !=
-                CUI_PLOT_OK)
+            if (cui_chart_radar_vertex(o, state->tooltip_visual_index, series, &pixel_x,
+                                       &pixel_y) != CUI_PLOT_OK)
                 continue;
             float dot_x = pixel_x * w / o->width;
             float dot_y = pixel_y * h / o->height;
             cui_color dot = series ? o->extra_series[series - 1].color : o->series[0];
             if (!dot.a)
                 dot = o->series[series].a ? o->series[series] : o->foreground;
-            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x46a5c19a4f310000) + series),
-                                   (cui_box){.width = 10,
-                                             .height = 10,
-                                             .radius = 5,
-                                             .fixed_width = true,
-                                             .fixed_height = true,
-                                             .background = o->background},
-                                   (cui_rect){dot_x - 5, dot_y - 5, 10, 10});
-            cui_end_box(ui);
-            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x56a5c19a4f310000) + series),
-                                   (cui_box){.width = 6,
-                                             .height = 6,
-                                             .radius = 3,
-                                             .fixed_width = true,
-                                             .fixed_height = true,
-                                             .background = dot},
-                                   (cui_rect){dot_x - 3, dot_y - 3, 6, 6});
-            cui_end_box(ui);
+            cui_chart_hover_dot(ui, id ^ (UINT64_C(0x46a5c19a4f310000) + series), dot_x, dot_y, dot,
+                                o->background, state->tooltip_focus);
         }
     if (!o->hide_axes && !o->hide_x_axis && o->kind != CUI_CHART_PIE &&
         o->kind != CUI_CHART_RADAR && o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40) {

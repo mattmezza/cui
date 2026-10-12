@@ -906,7 +906,7 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     cui_draw_list draw = cui_end_frame(ui);
     bool image = false, text = false, formatted = false, hover_crosshair = false,
-         hover_halo = false, eased_crosshair = false;
+         hover_halo = false, hover_dot = false, hover_stroke = false, eased_crosshair = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_IMAGE) {
             if (draw.commands[i].bitmap.bitmap.pixels == pixels) {
@@ -927,9 +927,15 @@ int main(void) {
             if (draw.commands[i].text.length == 1 && draw.commands[i].text.data[0] == 'Q')
                 formatted = true;
         } else if (draw.commands[i].type == CUI_DRAW_RECT) {
-            hover_halo |= draw.commands[i].bounds.w == 10 && draw.commands[i].bounds.h == 10;
-        }
-    assert(image && text && formatted && hover_crosshair && hover_halo && eased_crosshair);
+            hover_halo |= fabsf(draw.commands[i].bounds.w - 20 * state.tooltip_focus) < .01f &&
+                          draw.commands[i].color.r == options.series[0].r &&
+                          draw.commands[i].color.a > 0;
+            hover_dot |= draw.commands[i].bounds.w == 8 && draw.commands[i].bounds.h == 8 &&
+                         draw.commands[i].color.r == options.series[0].r;
+        } else if (draw.commands[i].type == CUI_DRAW_BORDER)
+            hover_stroke |= draw.commands[i].color.r == options.background.r;
+    assert(image && text && formatted && hover_crosshair && hover_halo && hover_dot &&
+           hover_stroke && eased_crosshair);
     assert(state.hover_progress > 0 && state.hover_progress < 1);
     unsigned char guide_pixels[48 * 4] = {0};
     state.hover_guide_pixels = guide_pixels;
@@ -1399,18 +1405,22 @@ int main(void) {
     state.hovered = 0;
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Radar", 5}));
     draw = cui_end_frame(ui);
-    bool radar_colored_label = false, radar_hover_dot = false;
+    bool radar_colored_label = false, radar_hover_dot = false, radar_hover_halo = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
             draw.commands[i].color.r == 220 && draw.commands[i].color.g == 10)
             radar_colored_label = true;
         else if (draw.commands[i].type == CUI_DRAW_RECT &&
-                 fabsf(draw.commands[i].bounds.w - 6) < .01f &&
-                 fabsf(draw.commands[i].bounds.h - 6) < .01f &&
+                 fabsf(draw.commands[i].bounds.w - 8) < .01f &&
+                 fabsf(draw.commands[i].bounds.h - 8) < .01f &&
                  draw.commands[i].color.r == options.series[0].r)
             radar_hover_dot = true;
+        else if (draw.commands[i].type == CUI_DRAW_RECT &&
+                 fabsf(draw.commands[i].bounds.w - 20 * state.tooltip_focus) < .01f &&
+                 draw.commands[i].color.r == options.series[0].r)
+            radar_hover_halo = true;
     assert(radar_colored_label);
-    assert(radar_hover_dot);
+    assert(radar_hover_dot && radar_hover_halo);
     radar_label_calls custom_labels = {0};
     options.radar_label_measure = measure_radar_label;
     options.radar_label_paint = paint_radar_label;

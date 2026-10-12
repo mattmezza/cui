@@ -1,0 +1,61 @@
+/* SPDX-License-Identifier: MIT */
+#include "cui/cui_otp.h"
+#include <math.h>
+cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_state *s,
+                       cui_otp_options o) {
+    if (!t)
+        return (cui_otp_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_otp_result out = cui_base_otp(ui, id, s, o);
+    if (out.error == CUI_EDIT_INVALID_ARGUMENT)
+        return out;
+    float size = o.cell_size > 0                                       ? o.cell_size
+                 : o.size == CUI_OTP_LARGE                             ? 44
+                 : o.size == CUI_OTP_SMALL || o.size == CUI_OTP_XSMALL ? 24
+                                                                       : 32;
+    float font = o.font_size > 0 ? o.font_size : o.cell_size > 0 ? size * .5f : t->font_size;
+    size_t groups = cui_otp_groups(s->length, o.groups);
+    size_t per_group = s->length ? (s->length + groups - 1) / groups : 1;
+    cui_str value = cui_otp_value(s);
+    size_t offset = 0, cell = 0, filled = cui_otp_count(s);
+    size_t cursor = s->length ? (filled < s->length ? filled : s->length - 1) : 0;
+    cui_begin_box(ui, id,
+                  (cui_box){.row = true,
+                            .gap = o.group_gap > 0 ? o.group_gap : 20,
+                            .align_y = CUI_ALIGN_CENTER});
+    for (size_t group = 0; group < groups; group++) {
+        cui_begin_box(
+            ui, id ^ (UINT64_C(0x2351ad67c85ae802) + group),
+            (cui_box){.row = true, .gap = o.gap > 0 ? o.gap : 4, .align_y = CUI_ALIGN_CENTER});
+        for (size_t j = 0; j < per_group && cell < s->length; j++, cell++) {
+            bool focus = s->focused && cell == cursor && !o.hide_focus_ring;
+            cui_begin_box(ui, cui_otp_cell_id(id, cell),
+                          (cui_box){.width = size,
+                                    .height = size,
+                                    .row = true,
+                                    .align_x = CUI_ALIGN_CENTER,
+                                    .align_y = CUI_ALIGN_CENTER,
+                                    .radius = t->radius,
+                                    .border_width = focus ? 2 : 1,
+                                    .border = focus ? t->focus : t->border,
+                                    .background = o.disabled ? t->background : t->surface});
+            if (offset < value.length) {
+                size_t end = offset + 1;
+                while (end < value.length && ((unsigned char)value.data[end] & 0xc0) == 0x80)
+                    end++;
+                cui_text(ui,
+                         s->masked ? cui_string("*") : (cui_str){value.data + offset, end - offset},
+                         font, o.disabled ? t->muted : t->text);
+                offset = end;
+            } else if (s->focused && cell == cursor && s->cursor_visible) {
+                cui_begin_box(
+                    ui, 0,
+                    (cui_box){.width = 3, .height = fminf(16, size * .5f), .background = t->text});
+                cui_end_box(ui);
+            }
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return out;
+}

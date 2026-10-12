@@ -90,8 +90,19 @@ size_t cui_kbd_format(unsigned modifiers, cui_str key, bool mac, char *out, size
                 out[length] = key.data[i];
             ++length;
         }
-    if (out && capacity)
-        out[length < capacity ? length : capacity - 1] = 0;
+    if (out && capacity) {
+        size_t copied = length < capacity ? length : capacity - 1;
+        out[copied] = 0;
+        /* Byte limits must never expose half a UTF-8 modifier/key scalar. */
+        for (size_t i = 0; i < copied;) {
+            size_t scalar = cui_content_scalar(out + i, copied - i);
+            if (!scalar) {
+                out[i] = 0;
+                break;
+            }
+            i += scalar;
+        }
+    }
     return length;
 }
 float cui_loading_phase(double seconds, float period) {

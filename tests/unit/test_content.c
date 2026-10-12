@@ -25,6 +25,10 @@ static void models(void) {
     assert(cui_kbd_format(CUI_MOD_CTRL, cui_string("P"), false, tiny, 3) == 6);
     assert(tiny[0] == 'C' && tiny[1] == 't' && tiny[2] == 0);
     assert(cui_kbd_format(0, cui_string("P"), false, NULL, 0) == 1);
+    assert(cui_kbd_format(CUI_MOD_META, cui_string("K"), true, tiny, 3) == 4);
+    assert(tiny[0] == 0);
+    assert(cui_kbd_format(0, cui_string("Éva"), false, tiny, 3) == 4);
+    assert(!strcmp(tiny, "É"));
     assert(cui_loading_phase(1, 2) == .5f);
     assert(cui_loading_phase(5, 2) == .5f);
     assert(cui_loading_phase(NAN, 2) == 0 && cui_loading_phase(1, 0) == 0);

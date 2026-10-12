@@ -2,6 +2,7 @@
 #include "cui/cui_carousel.h"
 #include "cui/cui_choice.h"
 #include "cui/cui_chrome.h"
+#include "cui/cui_command.h"
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
 #include "cui/cui_description.h"
@@ -25,6 +26,7 @@
 #include "cui/cui_textarea.h"
 #include "cui/cui_toolbar.h"
 #include "cui/cui_virtual.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,6 +83,54 @@ static cui_menu_entry settings_mode_entries[3];
 static bool settings_mode_checks[3];
 static int settings_size, settings_variant;
 static cui_settings_result settings_result;
+static char command_query_buffer[256];
+static cui_edit *command_query;
+static cui_command_row command_rows[32];
+static cui_command_state command_state;
+static cui_surface_state command_surface;
+static int command_modal, command_loading, command_filterable = 1;
+static unsigned command_actions, command_confirms, command_cancels;
+static cui_command_index command_last;
+static bool command_focus_pending;
+static void gallery_command_action(void *user) {
+    (void)user;
+    command_actions++;
+    redraw = true;
+}
+static cui_str gallery_command_binding(void *user) {
+    (void)user;
+    return cui_string("Ctrl + O");
+}
+static void gallery_command_confirm(cui_command_index index, void *user) {
+    (void)user;
+    command_last = index;
+    command_confirms++;
+    redraw = true;
+}
+static void gallery_command_cancel(void *user) {
+    (void)user;
+    command_cancels++;
+    if (command_modal)
+        cui_surface_request_close(ui, &command_surface, CUI_SURFACE_CANCELLED);
+    redraw = true;
+}
+void gallery_command_palette_options(int modal, int loading, int filterable) {
+    command_modal = modal != 0;
+    command_loading = loading != 0;
+    command_filterable = filterable != 0;
+}
+float gallery_command_palette_stats(int field) {
+    return field == 0   ? (float)command_state.row_count
+           : field == 1 ? (float)command_state.matched_count
+           : field == 2 ? (float)command_confirms
+           : field == 3 ? (float)command_actions
+           : field == 4 ? (float)command_cancels
+           : field == 5 ? (float)cui_edit_get_text(command_query).length
+           : field == 6 ? (float)command_last.section
+           : field == 7 ? (float)command_last.row
+           : field == 8 ? (float)command_surface.overlay.open
+                        : 0;
+}
 void gallery_settings_options(int size, int variant) {
     settings_size =
         size >= CUI_SETTINGS_MEDIUM && size <= CUI_SETTINGS_LARGE ? size : CUI_SETTINGS_MEDIUM;
@@ -921,6 +971,13 @@ int gallery_init(void) {
     if (!cui_settings_dropdown_init(&settings_mode_menu, cui_id_from(ui, "settings-mode-popup"),
                                     settings_mode_entries, settings_mode_checks, 3))
         return 0;
+    command_query = cui_edit_create((cui_edit_config){.buffer = command_query_buffer,
+                                                      .capacity = sizeof(command_query_buffer),
+                                                      .history_bytes = 4096,
+                                                      .max_history_steps = 8});
+    if (!command_query || !cui_command_init(&command_state, command_rows, 32, command_query))
+        return 0;
+    cui_surface_init(&command_surface, cui_id_from(ui, "command-dialog"), CUI_SURFACE_DIALOG);
     return ui && edit && group_edit && form_name_edit && form_email_edit && dock && query &&
            number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
@@ -1292,6 +1349,64 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_carousel(ui, cui_id_from(ui, "carousel-preview"), &t, &carousel_state, items, 4,
                      options);
         cui_end_box(ui);
+        break;
+    }
+    case 74: {
+        cui_command_item workspace[] = {
+            {.label = cui_string("Switch workspace"), .icon = cui_string("folder")},
+            {.label = cui_string("Copy path"), .icon = cui_string("copy")}};
+        cui_command_entry entries[] = {
+            {.kind = CUI_COMMAND_ITEM,
+             .item = {.label = cui_string("Open file"),
+                      .icon = cui_string("folder-open"),
+                      .action = gallery_command_action,
+                      .binding = gallery_command_binding}},
+            {.kind = CUI_COMMAND_ITEM,
+             .item = {.label = cui_string("Save file"),
+                      .icon = cui_string("save"),
+                      .checked = true}},
+            {.kind = CUI_COMMAND_ITEM,
+             .item = {.label = cui_string("Disabled action"), .disabled = true}},
+            {.kind = CUI_COMMAND_SEPARATOR},
+            {.kind = CUI_COMMAND_GROUP,
+             .heading = cui_string("Workspace"),
+             .items = workspace,
+             .item_count = 2}};
+        cui_command_options options = cui_command_default();
+        options.width = fminf(width - 64, 520);
+        options.max_height = 260;
+        options.label = cui_string("Command palette");
+        options.on_confirm = gallery_command_confirm;
+        options.on_cancel = gallery_command_cancel;
+        options.filterable = command_filterable != 0;
+        options.disabled = disabled != 0;
+        command_state.loading = command_loading != 0;
+        if (command_modal) {
+            cui_id trigger = cui_id_from(ui, "command-trigger");
+            if (cui_button(ui, trigger, &t, cui_string("Open command palette"), disabled)) {
+                cui_surface_open(ui, &command_surface, trigger);
+                command_focus_pending = true;
+            }
+            if (cui_surface_begin(ui, &t, &command_surface, cui_string("Command palette"),
+                                  cui_string("Search workspace actions."),
+                                  (cui_surface_options){.viewport = {0, 0, width, height},
+                                                        .width = fminf(width - 32, 600),
+                                                        .height = 400,
+                                                        .margin = 16,
+                                                        .no_escape_dismiss = true,
+                                                        .hide_close = true})) {
+                cui_command(ui, cui_id_from(ui, "command-preview"), &t, &command_state, entries,
+                            sizeof(entries) / sizeof(entries[0]), options);
+                if (command_focus_pending) {
+                    cui_command_focus(ui, cui_id_from(ui, "command-preview"), options);
+                    command_focus_pending = false;
+                }
+                cui_surface_end(ui);
+            }
+        } else {
+            cui_command(ui, cui_id_from(ui, "command-preview"), &t, &command_state, entries,
+                        sizeof(entries) / sizeof(entries[0]), options);
+        }
         break;
     }
     case 0: {

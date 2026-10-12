@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 72
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 73
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -317,6 +317,44 @@ def main():
             page.wait_for_function('Math.abs(cuiGallery.exports.gallery_carousel_stats(2)-cuiGallery.exports.gallery_carousel_stats(3))<0.01', timeout=5000)
             click_semantic('Next slide', 1)
             page.wait_for_function('cuiGallery.exports.gallery_carousel_stats(0)===0')
+            page.evaluate('location.hash="Command"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Command"')
+            assert semantic_index('Command palette', 6) is not None
+            assert semantic_index('Open file', 14) is not None
+            assert semantic_index('Disabled action', 14) is not None
+            assert page.evaluate('cuiGallery.exports.gallery_command_palette_stats(1)') == 5
+            click_semantic('Command palette', 6)
+            page.keyboard.type('path')
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===4&&cuiGallery.exports.gallery_command_palette_stats(1)===1')
+            assert semantic_index('Copy path', 14) is not None
+            assert semantic_index('Open file', 14) is None
+            page.keyboard.press('Escape')
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===0&&cuiGallery.exports.gallery_command_palette_stats(1)===5')
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===14&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Open file")')
+            click_semantic('Open file', 14)
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(2)===1&&cuiGallery.exports.gallery_command_palette_stats(3)===1')
+            click_semantic('Disabled action', 14)
+            assert page.evaluate('cuiGallery.exports.gallery_command_palette_stats(2)') == 1
+            click_semantic('Command palette', 6)
+            page.keyboard.press('ArrowDown')
+            page.keyboard.press('Enter')
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(2)===2')
+            assert page.evaluate('cuiGallery.exports.gallery_command_palette_stats(3)') == 1
+            assert page.evaluate('cuiGallery.exports.gallery_command_palette_stats(7)') == 1
+            control_change('command-loading', True)
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,14)===1)')
+            control_change('command-loading', False)
+            control_change('command-modal', True)
+            click_semantic('Open command palette', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(8)===1')
+            assert semantic_index('Command palette', 6) is not None
+            page.keyboard.type('save')
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===4&&cuiGallery.exports.gallery_command_palette_stats(1)===1')
+            before_clear = page.evaluate('cuiGallery.frame')
+            page.keyboard.press('Escape')
+            page.wait_for_function('(before)=>cuiGallery.frame>before&&cuiGallery.exports.gallery_command_palette_stats(5)===0&&cuiGallery.exports.gallery_command_palette_stats(8)===1', arg=before_clear)
+            page.keyboard.press('Escape')
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(8)===0&&cuiGallery.exports.gallery_command_palette_stats(4)>=1')
             page.evaluate('location.hash="Sidebar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
             assert semantic_index('Workspace sidebar', 9) is not None
@@ -1938,7 +1976,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 72 real WASM stories, Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 73 real WASM stories, Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

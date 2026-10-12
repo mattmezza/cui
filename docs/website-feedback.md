@@ -10,7 +10,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Marker: keep “Synchronizing 3 tasks” on the intended horizontal line. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Message: remove the stray renderer test bitmap from the normal body layout. — 0e4ee4a passes Chromium78 and retains the explicit crop/tint/clip pixel fixture checks. Native Message interactions and remaining family limitations are unchanged. Publication pending.
 - [x] Pagination: center button text vertically. — first polish batch; native/browser geometry and interaction evidence below.
-- [ ] Progress: demonstrate animated progress and reduced motion.
+- [x] Progress: indeterminate host-clock animation and reduced-motion fallback. — 18e1ec4 passes native75, sanitizers75, WASI67 and Chromium78. Determinate progress remains application-owned; indeterminate semantics are busy with no numeric current value in the browser. Publication pending.
 - [x] Radio: one click clears the previous selection visually and semantically. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Rating: proper empty, filled and partially filled star graphics. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Stepper: make navigation and its current status visibly work. — 9741448 passes native75, sanitizers75, WASI67 and Chromium78; rendered-selection regression fails old code. Publication pending.
@@ -22,14 +22,14 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Input Group: constrain the field so addons stay on the same row. — 87721c1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks all four sizes; browser checks 390px/1280px inline layout and block-mode opt-in. Publication pending.
 - [ ] Textarea: word/vertical navigation is implemented/tested in the navigation batch; repeated Down/content visibility remains under investigation.
 - [ ] Dock: a visible, interactive docking demonstration and instructions.
-- [ ] Resizable: divider drag resizes panes correctly.
+- [x] Resizable: a composed workspace visibly resizes Explorer/editor panes and switches example files. — 1ceb567 passes Chromium78 with physical drag and visible geometry assertions; portable code is unchanged from validated 41de104. Publication pending.
 - [ ] Scrollable and Sidebar: natural wheel sensitivity and working scrollbar.
 - [ ] Sheet: enter/exit animation with reduced-motion handling.
 - [ ] Theme: understandable, functional token demonstration.
 - [ ] VirtualList: visibly scroll a genuinely virtualized large list.
 - [ ] Chart: continuous, adequately thick curved line rendering.
 - [x] Command: content spans panel width. — 76c36ba checks full scroll/row width at two panel sizes, passes the same gates and fails old code. Publication pending.
-- [ ] DataTable: clickable header sorting with SVG indicators.
+- [x] DataTable: headers sort actual gallery rows and use themed SVG indicators. — 41de104 passes native75, sanitizers75, WASI67 and Chromium78; the graphic regression fails old code. Application-owned model sorting is documented. Publication pending.
 - [ ] Plot: visible, interactive plot with clear instructions.
 - [ ] TextView: Markdown fenced-code example.
 

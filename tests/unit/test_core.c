@@ -1085,12 +1085,48 @@ static void test_pointer_focus_proxy(void) {
     cui_destroy(ui);
 }
 
+static void test_focus_within_scopes(void) {
+    cui_context *ui = make();
+    begin(ui);
+    assert(cui_begin_focus_scope(ui, 100, false));
+    control(ui, 1, false);
+    assert(cui_begin_focus_scope(ui, 200, false));
+    control(ui, 2, false);
+    cui_focus(ui, 2);
+    assert(cui_focus_within(ui, 100) && cui_focus_within(ui, 200));
+    cui_end_focus_scope(ui);
+    cui_end_focus_scope(ui);
+    control(ui, 3, false);
+    cui_end_frame(ui);
+    assert(cui_focus_within(ui, 100) && cui_focus_within(ui, 200) && !cui_focus_within(ui, 999));
+    begin(ui);
+    assert(cui_focus_within(ui, 200));
+    assert(cui_begin_focus_scope(ui, 100, false));
+    control(ui, 1, false);
+    assert(cui_begin_focus_scope(ui, 200, false));
+    control(ui, 2, false);
+    cui_begin_box(ui, 4, (cui_box){.inert = true});
+    assert(!cui_focus_within(ui, 200));
+    cui_end_box(ui);
+    cui_end_focus_scope(ui);
+    assert(cui_dismiss_focus_scope(ui, 200, 1));
+    assert(cui_focus_within(ui, 100) && !cui_focus_within(ui, 200));
+    cui_end_focus_scope(ui);
+    control(ui, 3, false);
+    cui_focus(ui, 3);
+    assert(!cui_focus_within(ui, 100));
+    cui_end_frame(ui);
+    assert(!cui_focus_within(ui, 100) && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
     test_semantic_role_refinement();
     test_pressed_query();
     test_pointer_focus_proxy();
+    test_focus_within_scopes();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

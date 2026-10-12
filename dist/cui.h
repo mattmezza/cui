@@ -257,6 +257,8 @@ void cui_end_focus_scope(cui_context *ui);
  * begin/end remain required. Restores a previous-frame enabled trigger, if any. */
 bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger);
 bool cui_focus_restore(cui_context *ui, cui_id trigger);
+/* Scope ancestry, using current submissions or the last completed frame. */
+bool cui_focus_within(cui_context *ui, cui_id scope);
 const cui_event *cui_frame_events(cui_context *ui, size_t *count);
 cui_error cui_last_error(cui_context *ui);
 void cui_clear_error(cui_context *ui);
@@ -6362,6 +6364,35 @@ void cui_end_focus_scope(cui_context *ui) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     else
         ui->focus_depth--;
+}
+bool cui_focus_within(cui_context *ui, cui_id scope) {
+    if (!ui || !scope || !ui->focus || cui_core_inert(ui))
+        return false;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (ui->focus_scopes[i].id == scope && !ui->focus_scopes[i].active)
+            return false;
+    for (int pass = 0; pass < 2; pass++) {
+        const cui_core_focus_scope *scopes = pass ? ui->previous_focus_scopes : ui->focus_scopes;
+        size_t scope_count = pass ? ui->previous_focus_scope_count : ui->focus_scope_count;
+        const cui_semantic *sem = pass ? ui->previous : ui->semantics;
+        const size_t *owners = pass ? ui->previous_semantic_scopes : ui->semantic_scopes;
+        size_t count = pass ? ui->previous_count : ui->semantic_count;
+        for (size_t i = 0; i < count; i++)
+            if (sem[i].id == ui->focus) {
+                if (sem[i].disabled)
+                    return false;
+                size_t owner = owners[i];
+                while (owner < scope_count) {
+                    if (!scopes[owner].active)
+                        return false;
+                    if (scopes[owner].id == scope)
+                        return true;
+                    owner = scopes[owner].parent;
+                }
+                return false;
+            }
+    }
+    return false;
 }
 bool cui_focus_restore(cui_context *ui, cui_id trigger) {
     if (!ui)

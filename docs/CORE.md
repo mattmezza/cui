@@ -84,3 +84,10 @@ text events are routed, including events in the same frame. Pointer events stay
 addressed to the passive node and do not capture/activate it or move the target's
 caret. Disabled, missing and modal-inaccessible targets are ignored. This supports
 input addons and labels without exposing them as extra buttons or Tab stops.
+
+`cui_focus_within(ui, scope_id)` checks actual focus-scope ancestry for the focused
+semantic node, including nested scopes. It uses current submissions when
+available and the retained frame before those nodes have been resubmitted.
+Disabled nodes, inactive/dismissed scopes and calls from inert subtrees return
+false. It does not infer ownership from overlapping rectangles; notification
+stacks can use it to pause a timer when any custom child has keyboard focus.

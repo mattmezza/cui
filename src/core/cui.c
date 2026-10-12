@@ -1033,6 +1033,35 @@ void cui_end_focus_scope(cui_context *ui) {
     else
         ui->focus_depth--;
 }
+bool cui_focus_within(cui_context *ui, cui_id scope) {
+    if (!ui || !scope || !ui->focus || cui_core_inert(ui))
+        return false;
+    for (size_t i = 0; i < ui->focus_scope_count; i++)
+        if (ui->focus_scopes[i].id == scope && !ui->focus_scopes[i].active)
+            return false;
+    for (int pass = 0; pass < 2; pass++) {
+        const cui_core_focus_scope *scopes = pass ? ui->previous_focus_scopes : ui->focus_scopes;
+        size_t scope_count = pass ? ui->previous_focus_scope_count : ui->focus_scope_count;
+        const cui_semantic *sem = pass ? ui->previous : ui->semantics;
+        const size_t *owners = pass ? ui->previous_semantic_scopes : ui->semantic_scopes;
+        size_t count = pass ? ui->previous_count : ui->semantic_count;
+        for (size_t i = 0; i < count; i++)
+            if (sem[i].id == ui->focus) {
+                if (sem[i].disabled)
+                    return false;
+                size_t owner = owners[i];
+                while (owner < scope_count) {
+                    if (!scopes[owner].active)
+                        return false;
+                    if (scopes[owner].id == scope)
+                        return true;
+                    owner = scopes[owner].parent;
+                }
+                return false;
+            }
+    }
+    return false;
+}
 bool cui_focus_restore(cui_context *ui, cui_id trigger) {
     if (!ui)
         return false;

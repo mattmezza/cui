@@ -253,15 +253,19 @@
       "reference_url": "https://gpui-kit.com/component/attachment/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_media.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_media.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Host-provided RGBA image loading and fits, animation timing, and Attachment lifecycle/composition tested. Built-in file/network decoding, shared image cache, full text styling and exact effects remain pending. Browser story pending; not full parity."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -304,7 +308,12 @@
           "`AttachmentActions` and `AttachmentGroup`",
           "Related types"
         ]
-      }
+      },
+      "last_tested_commit": "2ef4f51",
+      "evidence": [
+        "tests/unit/test_media.c",
+        "docs/MEDIA.md"
+      ]
     },
     {
       "name": "Avatar",
@@ -1182,15 +1191,19 @@
       "reference_url": "https://gpui-kit.com/component/image/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_media.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_media.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Host-provided RGBA image loading and fits, animation timing, and Attachment lifecycle/composition tested. Built-in file/network decoding, shared image cache, full text styling and exact effects remain pending. Browser story pending; not full parity."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -1219,7 +1232,12 @@
           "Accessibility",
           "Learn more"
         ]
-      }
+      },
+      "last_tested_commit": "2ef4f51",
+      "evidence": [
+        "tests/unit/test_media.c",
+        "docs/MEDIA.md"
+      ]
     },
     {
       "name": "Kbd",

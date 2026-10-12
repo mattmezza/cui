@@ -181,6 +181,16 @@ static const unsigned char cui_components_check_pixels[16 * 16 * 4] = {
     255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
     0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
 };
+void cui_checkmark(cui_context *ui, float size, cui_color color) {
+    if (!ui || !isfinite(size) || size <= 0)
+        return;
+    cui_paint_bitmap(ui, 0,
+                     (cui_bitmap_paint){.bitmap = {cui_components_check_pixels, 16, 16, 64, 1},
+                                        .opacity = 1,
+                                        .custom_tint = true,
+                                        .tint = color},
+                     (cui_box){.width = size, .height = size});
+}
 bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
                      cui_check_state *value, cui_checkbox_options options) {
     if (!ui || !t || !value)
@@ -197,8 +207,8 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
                                                       : 16) *
                  density;
     float font = (options.size == CUI_CONTROL_XSMALL  ? 12
-                  : options.size == CUI_CONTROL_SMALL ? 14
-                                                      : 16) *
+                  : options.size == CUI_CONTROL_LARGE ? 16
+                                                      : 14) *
                  density;
     bool selected = *value != CUI_CHECK_UNCHECKED;
     cui_color border = options.invalid ? t->danger : selected ? t->primary : t->input;
@@ -231,12 +241,7 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER});
     if (*value == CUI_CHECK_CHECKED) {
-        cui_paint_bitmap(ui, 0,
-                         (cui_bitmap_paint){.bitmap = {cui_components_check_pixels, 16, 16, 64, 1},
-                                            .opacity = 1,
-                                            .custom_tint = true,
-                                            .tint = foreground},
-                         (cui_box){.width = size - 4 * density, .height = size - 4 * density});
+        cui_checkmark(ui, size - 4 * density, foreground);
     } else if (*value == CUI_CHECK_MIXED) {
         cui_begin_box(ui, 0,
                       (cui_box){.width = size - 6 * density,
@@ -290,8 +295,8 @@ bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, 
                                                       : 16) *
                  density;
     float font = (options.size == CUI_CONTROL_XSMALL  ? 12
-                  : options.size == CUI_CONTROL_SMALL ? 14
-                                                      : 16) *
+                  : options.size == CUI_CONTROL_LARGE ? 16
+                                                      : 14) *
                  density;
     bool selected = *value == option;
     cui_color ink = options.invalid ? t->danger : selected ? t->primary : t->input;
@@ -324,12 +329,7 @@ bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, 
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER});
     if (selected) {
-        cui_paint_bitmap(ui, 0,
-                         (cui_bitmap_paint){.bitmap = {cui_components_check_pixels, 16, 16, 64, 1},
-                                            .opacity = 1,
-                                            .custom_tint = true,
-                                            .tint = dot},
-                         (cui_box){.width = size - 4 * density, .height = size - 4 * density});
+        cui_checkmark(ui, size - 4 * density, dot);
     }
     cui_end_box(ui);
     cui_end_box(ui);

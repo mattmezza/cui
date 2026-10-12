@@ -48,6 +48,8 @@ typedef struct {
 } cui_button_options;
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
+/* Paint-only antialiased check glyph for composed selection indicators. */
+void cui_checkmark(cui_context *, float size, cui_color);
 typedef struct {
     cui_control_size size;
     bool disabled, required, invalid, skip_tab, hide_focus_ring;

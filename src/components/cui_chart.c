@@ -355,6 +355,8 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     state->appear_started = true;
     state->appear_started_at = started;
     state->active_appear_key = options->appear_key;
+    state->animated_at_time = now;
+    state->animated_at_valid = true;
     if (frame.reveal_progress < 1)
         cui_invalidate(ui);
     return CUI_PLOT_OK;
@@ -399,12 +401,17 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         measured_options.custom_horizontal_bar_gutters = true;
         o = &measured_options;
     }
-    if (measure_outside_axis && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)) {
-        if (state->appear_started) {
-            if (cui_chart_render_animated(ui, state, o) != CUI_PLOT_OK)
-                return false;
-        } else if (cui_chart_render(state, o) != CUI_PLOT_OK)
+    bool animation_current = state->animated_at_valid &&
+                             state->animated_at_time == cui_frame_time(ui) &&
+                             state->active_appear_key == o->appear_key &&
+                             (!(o->disable_appear || o->reduced_motion || cui_reduced_motion(ui)) ||
+                              state->rendered_reveal_progress == 1);
+    bool rendered_for_appearance = animation_current && !o->reveal_enabled;
+    if (!o->reveal_enabled && (state->appear_started || state->revision == 0) &&
+        !animation_current) {
+        if (cui_chart_render_animated(ui, state, o) != CUI_PLOT_OK)
             return false;
+        rendered_for_appearance = true;
     }
     float w = o->logical_width > 0 ? o->logical_width : (float)o->width;
     float h = o->logical_height > 0 ? o->logical_height : (float)o->height;
@@ -528,13 +535,19 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->emphasis_visual_index = SIZE_MAX;
         if (!instant && moving)
             cui_invalidate(ui);
-        cui_chart_options frame = *o;
-        if (!frame.reveal_enabled && state->appear_started && state->rendered_reveal_progress < 1) {
-            frame.reveal_enabled = true;
-            frame.reveal_progress = state->rendered_reveal_progress;
+        bool hover_raster =
+            (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) &&
+            (active || moving || state->emphasis_focus > 0);
+        if (!rendered_for_appearance || hover_raster) {
+            cui_chart_options frame = *o;
+            if (!frame.reveal_enabled && state->appear_started &&
+                state->rendered_reveal_progress < 1) {
+                frame.reveal_enabled = true;
+                frame.reveal_progress = state->rendered_reveal_progress;
+            }
+            if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
+                return false;
         }
-        if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
-            return false;
     }
     cui_begin_box(
         ui, id,

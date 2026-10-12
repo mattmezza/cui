@@ -1093,6 +1093,7 @@ int main(void) {
     assert(value_end_gap > 8);
     cui_chart_options styled_auto = measured_bar, styled_manual = measured_bar;
     styled_auto.custom_horizontal_bar_gutters = false;
+    styled_auto.disable_appear = true;
     styled_manual.bar_category_gutter = category_gap;
     styled_manual.bar_value_end_gutter = value_end_gap;
     unsigned char auto_pixels[512 * 96 * 4], manual_pixels[sizeof auto_pixels];
@@ -1157,6 +1158,7 @@ int main(void) {
     assert(cui_chart_measure_value_axis_gutter(ui, &no_candle_axis) == 0);
     cui_chart_options styled_axis_auto = options, styled_axis_manual = options;
     styled_axis_auto.value_axis_gutter = 0;
+    styled_axis_auto.disable_appear = true;
     styled_axis_manual.value_axis_gutter = wide_gutter;
     unsigned char axis_auto_pixels[sizeof pixels], axis_manual_pixels[sizeof pixels];
     cui_chart_state axis_auto_chart = {
@@ -1804,9 +1806,12 @@ int main(void) {
                                         .byte_capacity = sizeof automatic_sankey_pixels};
     cui_chart_options explicit_sankey = options;
     explicit_sankey.sankey_margins = measured_margins;
+    cui_chart_options automatic_sankey_options = options;
+    automatic_sankey_options.disable_appear = true;
     assert(cui_chart_render(&expected_sankey, &explicit_sankey) == CUI_PLOT_OK);
     assert(cui_begin_frame(ui, 256, 256, 0));
-    assert(cui_chart(ui, 92, &automatic_sankey, &options, (cui_str){"Auto flow", 9}));
+    assert(
+        cui_chart(ui, 92, &automatic_sankey, &automatic_sankey_options, (cui_str){"Auto flow", 9}));
     (void)cui_end_frame(ui);
     assert(memcmp(expected_sankey_pixels, automatic_sankey_pixels, sizeof expected_sankey_pixels) ==
            0);
@@ -1822,6 +1827,7 @@ int main(void) {
            0);
     cui_chart_options compact_sankey = options;
     compact_sankey.custom_sankey_margins = true;
+    compact_sankey.disable_appear = true;
     assert(cui_chart_render(&expected_sankey, &compact_sankey) == CUI_PLOT_OK);
     assert(cui_begin_frame(ui, 256, 256, .002));
     assert(cui_chart(ui, 92, &automatic_sankey, &compact_sankey, (cui_str){"Compact", 7}));
@@ -1929,6 +1935,70 @@ int main(void) {
     options.hide_grid = true;
     options.data_revision = 102;
     options.appear_key = 7;
+    unsigned char default_appear_pixels[sizeof pixels] = {0};
+    cui_chart_state default_appear = {.pixels = default_appear_pixels,
+                                      .byte_capacity = sizeof default_appear_pixels,
+                                      .hovered = SIZE_MAX};
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 93, &default_appear, &options, (cui_str){"Auto appear", 11}));
+    (void)cui_end_frame(ui);
+    assert(default_appear.revision == 1 && default_appear.appear_started &&
+           default_appear.rendered_reveal_progress == 0 &&
+           !differs(default_appear_pixels, options.width * options.height, options.background));
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart(ui, 93, &default_appear, &options, (cui_str){"Auto appear", 11}));
+    (void)cui_end_frame(ui);
+    assert(default_appear.revision == 2 && default_appear.rendered_reveal_progress > 0 &&
+           default_appear.rendered_reveal_progress < 1 &&
+           differs(default_appear_pixels, options.width * options.height, options.background));
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 256, 256, .1f));
+    assert(cui_chart(ui, 93, &default_appear, &options, (cui_str){"Auto appear", 11}));
+    (void)cui_end_frame(ui);
+    assert(default_appear.rendered_reveal_progress == 1);
+    cui_set_reduced_motion(ui, false);
+    cui_chart_state disabled_appear = {.pixels = default_appear_pixels,
+                                       .byte_capacity = sizeof default_appear_pixels,
+                                       .hovered = SIZE_MAX};
+    cui_chart_options no_auto_appear = options;
+    no_auto_appear.disable_appear = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 93, &disabled_appear, &no_auto_appear, (cui_str){"No appear", 9}));
+    (void)cui_end_frame(ui);
+    assert(disabled_appear.rendered_reveal_progress == 1 &&
+           differs(default_appear_pixels, options.width * options.height, options.background));
+    cui_chart_options explicit_clock = options;
+    explicit_clock.data_revision = 0;
+    cui_chart_state explicit_clock_state = {.pixels = default_appear_pixels,
+                                            .byte_capacity = sizeof default_appear_pixels,
+                                            .hovered = SIZE_MAX};
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render_animated(ui, &explicit_clock_state, &explicit_clock) == CUI_PLOT_OK);
+    uint64_t explicit_revision = explicit_clock_state.revision;
+    assert(
+        cui_chart(ui, 94, &explicit_clock_state, &explicit_clock, (cui_str){"Explicit clock", 14}));
+    (void)cui_end_frame(ui);
+    assert(explicit_clock_state.revision == explicit_revision);
+    explicit_clock.appear_key++;
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(
+        cui_chart(ui, 94, &explicit_clock_state, &explicit_clock, (cui_str){"Explicit clock", 14}));
+    (void)cui_end_frame(ui);
+    assert(explicit_clock_state.active_appear_key == explicit_clock.appear_key &&
+           explicit_clock_state.rendered_reveal_progress == 0);
+    cui_chart_options manual_progress = options;
+    manual_progress.reveal_enabled = true;
+    manual_progress.reveal_progress = .3f;
+    cui_chart_state manual_progress_state = {.pixels = default_appear_pixels,
+                                             .byte_capacity = sizeof default_appear_pixels,
+                                             .hovered = SIZE_MAX};
+    assert(cui_chart_render(&manual_progress_state, &manual_progress) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, .1f));
+    assert(cui_chart(ui, 95, &manual_progress_state, &manual_progress,
+                     (cui_str){"Manual progress", 15}));
+    (void)cui_end_frame(ui);
+    assert(!manual_progress_state.appear_started &&
+           manual_progress_state.rendered_reveal_progress == .3f);
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render_animated(ui, &state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));

@@ -241,6 +241,8 @@ typedef struct {
     uint64_t active_appear_key;
     double appear_started_at;
     bool appear_started;
+    double animated_at_time; /* private frame-clock stamp for explicit animation calls */
+    bool animated_at_valid;
     double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
     bool mark_clip_active;
     float rendered_reveal_progress;

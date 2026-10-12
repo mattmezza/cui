@@ -1118,7 +1118,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                                                        : padding;
     if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level) {
         cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
-        if (!isfinite(marker.width) || marker.width < 0)
+        if (!isfinite(marker.width) || marker.width < 0 || marker.width > 10000000)
             return false;
         left = fmaxf(left, marker.width + 8);
     }
@@ -1166,7 +1166,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                     end += cui_text_view_scalar(cui_text_view_rendered_text(s), end);
                 cui_size word_size =
                     measure(user, (cui_str){s->workspace.rendered + i, end - i}, size, flags);
-                if (!isfinite(word_size.width) || word_size.width < 0)
+                if (!isfinite(word_size.width) || word_size.width < 0 || word_size.width > 10000000)
                     return false;
                 if (word_size.width > available - cursor_x) {
                     cursor_x = 0;
@@ -1177,7 +1177,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
             }
             cui_size m = measure(user, (cui_str){s->workspace.rendered + segment, i + n - segment},
                                  size, flags);
-            if (!isfinite(m.width) || m.width < 0)
+            if (!isfinite(m.width) || m.width < 0 || m.width > 10000000)
                 return false;
             float advance = fmaxf(0, m.width - measured);
             if (cursor_x > 0 && cursor_x + advance > available) {
@@ -1187,7 +1187,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 measured = 0;
                 m = measure(user, (cui_str){s->workspace.rendered + i, n}, size, flags);
                 advance = m.width;
-                if (!isfinite(advance) || advance < 0)
+                if (!isfinite(advance) || advance < 0 || advance > 10000000)
                     return false;
             }
             if (s->glyph_count >= s->workspace.glyph_capacity)
@@ -1250,7 +1250,7 @@ static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, siz
     do {
         changed = false;
         for (unsigned c = 0; c < columns; ++c)
-            if (widths[c] == 0 && remaining * weights[c] / total < 64) {
+            if (widths[c] == 0 && remaining * (weights[c] / total) < 64) {
                 widths[c] = 64;
                 remaining -= 64;
                 total -= weights[c];
@@ -1260,7 +1260,7 @@ static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, siz
     float x = 0;
     for (unsigned c = 0; c < columns; ++c) {
         if (widths[c] == 0)
-            widths[c] = remaining * weights[c] / total;
+            widths[c] = remaining * (weights[c] / total);
         for (size_t i = first; i < end; ++i)
             if (s->workspace.blocks[i].column == c) {
                 s->workspace.blocks[i].bounds.x = x;
@@ -1272,11 +1272,13 @@ static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, siz
 }
 cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_layout_options o,
                                          cui_text_view_measure_fn measure, void *user) {
-    if (!s || !measure || !isfinite(o.width) || o.width <= 0 || !isfinite(o.font_size) ||
-        o.font_size <= 0 || !isfinite(o.line_height) || o.line_height <= 0 ||
-        !isfinite(o.paragraph_gap) || o.paragraph_gap < 0 || !isfinite(o.code_actions_height) ||
-        o.code_actions_height < 0 || !isfinite(o.table_actions_height) ||
-        o.table_actions_height < 0)
+    if (!s || !measure || !isfinite(o.width) || o.width <= 0 || o.width > 10000000 ||
+        !isfinite(o.font_size) || o.font_size <= 0 || o.font_size > 10000000 ||
+        !isfinite(o.line_height) || o.line_height <= 0 || o.line_height > 10000000 ||
+        !isfinite(o.paragraph_gap) || o.paragraph_gap < 0 || o.paragraph_gap > 10000000 ||
+        !isfinite(o.code_actions_height) || o.code_actions_height < 0 ||
+        o.code_actions_height > 10000000 || !isfinite(o.table_actions_height) ||
+        o.table_actions_height < 0 || o.table_actions_height > 10000000)
         return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;

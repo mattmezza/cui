@@ -4,6 +4,7 @@
 #include "cui/cui_components.h"
 #endif
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <string.h>
 static cui_str text(const char *s) {
@@ -281,6 +282,18 @@ static void test_proportional_table_defaults(void) {
     o.width = 100;
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.blocks[0].bounds.w == 64 && f.blocks[1].bounds.x == 64 && f.blocks[1].bounds.w == 64);
+    size_t glyph_count = f.state.glyph_count;
+    cui_rect bounds = f.blocks[0].bounds;
+    o.width = FLT_MAX;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_INVALID);
+    assert(f.state.glyph_count == glyph_count && f.blocks[0].bounds.w == bounds.w);
+    o.width = 10000000;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    for (size_t b = 0; b < f.state.block_count; ++b)
+        assert(isfinite(f.blocks[b].bounds.x) && isfinite(f.blocks[b].bounds.w));
+    o.table_actions_height = FLT_MAX;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_INVALID);
+    o.table_actions_height = 0;
     char source[256];
     memcpy(source, "| A | ", 6);
     memset(source + 6, 'x', 200);

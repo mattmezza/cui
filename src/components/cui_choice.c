@@ -972,6 +972,7 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
         !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
         options.popup.viewport.h <= 2 * theme->padding)
         return false;
+    state->drag_scroll = options.drag_scroll;
     bool activated =
         cui_base_menu_tree(ui, trigger, name, items, count, action, state, options.popup.disabled,
                            options.popup.dt, options.keep_open_checks);
@@ -995,6 +996,7 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
         !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
         options.popup.viewport.h <= 2 * theme->padding)
         return false;
+    state->drag_scroll = options.drag_scroll;
     bool activated =
         cui_base_context_menu(ui, target, items, count, action, state, options.popup.disabled,
                               options.popup.dt, options.keep_open_checks);
@@ -1171,6 +1173,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     if (options.inherit_action_size)
         options.size = options.action_size;
     options.selected = options.selected || (!options.hide_action && options.action_selected);
+    state->drag_scroll = options.menu.drag_scroll;
     result = cui_base_dropdown_button(
         ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
         menu_name, items, count, menu_action, state,

@@ -206,10 +206,14 @@ typedef struct {
     float row_height, padding; /* previous painted metrics for pointer hover */
     bool contextual;
     cui_rect anchor;
+    bool drag_scroll, scroll_pending, scroll_dragging;
+    size_t scroll_level;
+    float scroll_start_y, scroll_last_y;
 } cui_menu_tree_state;
 typedef struct {
     cui_choice_popup_options popup;
     bool keep_open_checks, checks_on_right;
+    bool drag_scroll; /* opt-in primary-pointer drag, usable by touch adapters */
 } cui_menu_tree_options;
 struct cui_tab_overflow {
     cui_menu_tree_state menu;

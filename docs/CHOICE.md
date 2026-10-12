@@ -535,6 +535,16 @@ its child panels, avoiding anchors to removed rows. Keyboard traversal still
 reveals the active row; wheel-then-release batches cannot activate stale rows.
 Tests cover child/root routing, disabled/separator skipping, clamp/fractional
 movement, Home/End reveal, outside/disabled input and stale-release suppression.
-Pointer drag/touch inertia and a visible Menu scrollbar remain gaps. The frozen
+Touch inertia and a visible Menu scrollbar remain gaps. The frozen
 source's submenu hover-out grace handling itself has a TODO; no full Menu parity
 is claimed.
+
+Opt-in Menu `drag_scroll` lets primary-pointer drags move the scrollable level
+where the press began. Movement beyond four pixels starts the gesture; fractional
+row travel accumulates, and the release cannot activate a menu row even across
+frames. Cancel, disabled/closed menus and disabling the option clear gesture
+state. Ordinary clicks below the threshold retain activation. The gesture also
+works for touch adapters that produce the same pointer events; CUI currently has
+no device discriminator, so this is not a claim of native touch inertia or
+multitouch. Tests cover parent/child gestures, held state, cancellation, sub-row
+movement, stale release and ordinary clicking.

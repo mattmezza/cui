@@ -2423,6 +2423,7 @@ static void test_dropdown_presentation_variants(void) {
         }
 }
 static cui_menu_entry scrolling_menu[12], scrolling_child[12];
+static bool menu_drag_enabled;
 static bool scrolling_menu_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *action,
                                  bool disabled) {
     cui_theme theme = cui_theme_light();
@@ -2430,6 +2431,7 @@ static bool scrolling_menu_scene(cui_context *ui, cui_menu_tree_state *state, cu
     bool result = cui_menu_tree(
         ui, 3000, &theme, cui_string("Scrollable"), scrolling_menu, 12, action, state,
         (cui_menu_tree_options){
+            .drag_scroll = menu_drag_enabled,
             .popup = {
                 .viewport = {0, 0, 640, 200}, .width = 180, .dt = .016f, .disabled = disabled}});
     cui_end_frame(ui);
@@ -2510,8 +2512,67 @@ static void test_hierarchical_menu_scroll(void) {
     assert(!state.overlay.open && !state.depth);
     cui_destroy(ui);
 }
+static void test_menu_pointer_drag_scroll(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 3300);
+    cui_id action = 0;
+    menu_drag_enabled = true;
+    scrolling_menu_scene(ui, &state, &action, false);
+    click(ui, 3000);
+    scrolling_menu_scene(ui, &state, &action, false);
+    cui_rect row = cui_bounds(ui, 3103);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = row.x + 3, .y = row.y + 3}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.scroll_pending && !state.scroll_dragging);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = row.x + 3, .y = row.y + 3 - 84}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.scroll_dragging && state.levels[0].first_visible == 2);
+    cui_rect moved = cui_bounds(ui, 3103);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = moved.x + 3, .y = moved.y + 3}));
+    assert(!scrolling_menu_scene(ui, &state, &action, false));
+    assert(!action && !state.scroll_dragging && !state.scroll_pending && state.overlay.open);
+    menu_wheel(ui, state.panels[0], 100);
+    scrolling_menu_scene(ui, &state, &action, false);
+    row = cui_bounds(ui, 3101);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = row.x + 3, .y = row.y + 3}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = row.x + 3, .y = row.y - 5}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.scroll_dragging && state.levels[0].first_visible == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(!state.scroll_pending && !state.scroll_dragging && !action);
+    click(ui, 3101);
+    assert(scrolling_menu_scene(ui, &state, &action, false));
+    assert(action == 3101 && !state.overlay.open);
+    action = 0;
+    click(ui, 3000);
+    scrolling_menu_scene(ui, &state, &action, false);
+    key(ui, CUI_KEY_RIGHT);
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.depth == 2);
+    row = cui_bounds(ui, 3203);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = row.x + 3, .y = row.y + 3}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = row.x + 3, .y = row.y + 3 - 84}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.scroll_dragging && state.scroll_level == 1 && state.levels[1].first_visible == 2 &&
+           state.levels[0].first_visible == 0);
+    scrolling_menu_scene(ui, &state, &action, true);
+    assert(!state.scroll_dragging && !state.scroll_pending && !state.overlay.open);
+    menu_drag_enabled = false;
+    cui_destroy(ui);
+}
 int main(void) {
     test_hierarchical_menu_scroll();
+    test_menu_pointer_drag_scroll();
     test_dropdown_presentation_variants();
     test_lists_and_popups();
     test_combobox();

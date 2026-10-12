@@ -739,7 +739,14 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
     for (size_t i = begin; i < begin + length; i++) {
         bool active = state->active == items[i].id || state->secondary_active == items[i].id;
         bool disabled = options.disabled || items[i].disabled;
-        cui_color background = active ? theme->primary : theme->surface;
+        bool checked = multiple_selected ? multiple_selected[i] : *selected == items[i].id;
+        cui_color background = {0};
+        if (!disabled) {
+            if (state->active == items[i].id)
+                background = theme->list_active_highlight ? theme->list_active : theme->accent;
+            else if (!active && !checked && cui_hovered(ui, items[i].id))
+                background = theme->list_hover;
+        }
         if (searchable || options.menu) {
             background = (cui_color){0};
             if (active && (searchable || !disabled))
@@ -757,19 +764,25 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                        .align_y = CUI_ALIGN_CENTER,
                        .gap = theme->gap,
                        .background = background,
-                       .border = cui_focused(ui) == items[i].id ? theme->focus : theme->surface,
-                       .border_width = cui_focused(ui) == items[i].id ? 1 : 0};
+                       .border = !searchable && !options.menu && !disabled &&
+                                         state->secondary_active == items[i].id
+                                     ? theme->selection
+                                     : theme->focus,
+                       .border_width = !searchable && !options.menu && !disabled &&
+                                               state->secondary_active == items[i].id
+                                           ? 1
+                                       : cui_focused(ui) == items[i].id ? 1
+                                                                        : 0};
         cui_begin_box(ui, items[i].id, box);
-        bool checked = multiple_selected ? multiple_selected[i] : *selected == items[i].id;
         cui_begin_box(ui, items[i].id ^ UINT64_C(0x9e3f5d2a91bca002),
                       (cui_box){.width = -1, .clip = true});
         if (options.render)
             options.render(ui, &items[i], i, options.render_user);
         else
             cui_text(ui, items[i].label, theme->font_size,
-                     disabled     ? theme->muted
-                     : searchable ? theme->text
-                     : active     ? (options.menu ? theme->accent_foreground : theme->on_primary)
+                     disabled                                       ? theme->muted
+                     : searchable                                   ? theme->text
+                     : active && options.menu                       ? theme->accent_foreground
                      : options.menu && cui_hovered(ui, items[i].id) ? theme->accent_foreground
                                                                     : theme->text);
         cui_end_box(ui);
@@ -875,7 +888,7 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
     cui_begin_portal(ui, state->overlay.id,
                      (cui_box){.padding = theme->padding,
                                .clip = true,
-                               .background = theme->surface,
+                               .background = theme->popover,
                                .border = theme->border,
                                .border_width = 1,
                                .radius = theme->radius},
@@ -985,7 +998,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     cui_begin_portal(ui, state->overlay.id,
                      (cui_box){.padding = theme->padding,
                                .clip = true,
-                               .background = theme->surface,
+                               .background = theme->popover,
                                .border = theme->border,
                                .border_width = 1,
                                .radius = theme->radius},
@@ -1103,7 +1116,7 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
     cui_begin_portal(ui, state->overlay.id,
                      (cui_box){.padding = theme->padding,
                                .clip = true,
-                               .background = theme->surface,
+                               .background = theme->popover,
                                .border = theme->border,
                                .border_width = 1,
                                .radius = theme->radius},
@@ -1194,7 +1207,7 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     cui_begin_portal(ui, state->overlay.id,
                      (cui_box){.padding = theme->padding,
                                .clip = true,
-                               .background = theme->surface,
+                               .background = theme->popover,
                                .border = theme->border,
                                .border_width = 1,
                                .radius = theme->radius},
@@ -1274,7 +1287,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     cui_begin_portal(ui, scope,
                      (cui_box){.padding = theme->padding,
                                .clip = true,
-                               .background = theme->surface,
+                               .background = theme->popover,
                                .border = theme->border,
                                .border_width = 1,
                                .radius = theme->radius},
@@ -1317,7 +1330,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         cui_color foreground = cui_menu_entry_is_disabled(entry) || options.popup.disabled
                                    ? theme->muted
                                : highlighted ? theme->accent_foreground
-                                             : theme->text;
+                                             : theme->popover_foreground;
         cui_begin_box(
             ui, entry->id,
             (cui_box){.height = theme->control_height,

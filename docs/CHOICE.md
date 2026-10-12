@@ -714,8 +714,13 @@ active or hovered rows; disabled rows suppress that highlight. Select and
 Combobox rows use accent for the active cursor while retaining the normal text
 foreground, and unselected enabled hover uses accent at 70% alpha. Other rows
 leave their background transparent. Routed keyboard tests inspect row fills
-and check/text tints. Ordinary List independent palette tokens, popover
-foreground, and full row density defaults remain separate source-parity work.
+and check/text tints. Ordinary List rows use list_active (or accent when list_active_highlight is
+false) for the active cursor, list_hover for inactive unconfirmed hover, and
+selection for the secondary-selected outline. Their foreground remains text;
+disabled rows use muted and suppress active/secondary paint. Popup panels use
+popover, and ordinary hierarchical menu labels use popover_foreground. These
+colors are independently configurable and tested with distinct token values.
+Full row density defaults remain separate source-parity work.
 
 Default and Underline bars paint their full-width one-pixel baseline as an
 anchored underlay, after the bar background and before tab children. Its width

@@ -3332,6 +3332,8 @@ static void test_dropdown_reference_metrics(void) {
 static cui_draw_list selection_menu_scene(cui_context *ui, cui_menu_tree_state *state,
                                           cui_menu_entry *entries, cui_id *action, bool right) {
     cui_theme theme = cui_theme_light();
+    theme.popover_foreground = (cui_color){13, 27, 41, 255};
+    theme.popover = (cui_color){231, 223, 217, 255};
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_menu_tree(ui, 2, &theme, cui_string("Selection"), entries, 4, action, state,
                   (cui_menu_tree_options){.popup = {.viewport = {0, 0, 640, 480}, .width = 240},
@@ -3369,6 +3371,59 @@ static bool row_fill(cui_context *ui, cui_draw_list draw, cui_id id, cui_color c
     }
     return false;
 }
+static cui_draw_list list_palette_scene(cui_context *ui, cui_theme *theme, cui_list_state *state,
+                                        cui_id *value, bool disabled) {
+    const cui_choice_item entries[] = {{10, {"One", 3}, false}, {20, {"Two", 3}, true}};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_begin_box(ui, 90, (cui_box){.width = 240});
+    cui_list(ui, 91, theme, entries, 2, value, state,
+             (cui_list_options){.disabled = disabled, .track_secondary = true});
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void test_list_source_palette(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    theme.list_active = (cui_color){11, 22, 33, 255};
+    theme.list_hover = (cui_color){44, 55, 66, 255};
+    theme.selection = (cui_color){77, 88, 99, 255};
+    theme.accent = (cui_color){100, 110, 120, 255};
+    cui_list_state state = {0};
+    cui_id value = 0;
+    list_palette_scene(ui, &theme, &state, &value, false);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_HOME);
+    cui_draw_list draw = list_palette_scene(ui, &theme, &state, &value, false);
+    assert(state.active == 10 && row_fill(ui, draw, 10, theme.list_active));
+    theme.list_active_highlight = false;
+    draw = list_palette_scene(ui, &theme, &state, &value, false);
+    assert(row_fill(ui, draw, 10, theme.accent));
+    cui_rect bounds = cui_bounds(ui, 10);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_SECONDARY,
+                                           .x = bounds.x + 2,
+                                           .y = bounds.y + 2}));
+    draw = list_palette_scene(ui, &theme, &state, &value, false);
+    assert(state.secondary_active == 10 && !value);
+    bool outline = false;
+    for (size_t i = 0; i < draw.count; i++) {
+        cui_draw_command command = draw.commands[i];
+        outline |= command.type == CUI_DRAW_BORDER && same_color(command.color, theme.selection);
+        if (command.type == CUI_DRAW_TEXT && command.text.length == 3 &&
+            !memcmp(command.text.data, "One", 3))
+            assert(same_color(command.color, theme.text));
+    }
+    assert(outline);
+    draw = list_palette_scene(ui, &theme, &state, &value, true);
+    assert(!row_fill(ui, draw, 10, theme.accent) && !row_fill(ui, draw, 10, theme.list_active));
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT)
+            assert(same_color(draw.commands[i].color, theme.muted));
+    cui_destroy(ui);
+}
 static void test_menu_check_glyphs(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
@@ -3403,6 +3458,18 @@ static void test_menu_check_glyphs(void) {
             assert(same_color(draw.commands[i].bitmap.tint, cui_theme_light().accent_foreground));
         }
     assert(active_check);
+    bool normal_label = false, panel_fill = false;
+    for (size_t i = 0; i < draw.count; i++) {
+        cui_draw_command command = draw.commands[i];
+        if (command.type == CUI_DRAW_TEXT && command.text.length == 9 &&
+            !memcmp(command.text.data, "Radio two", 9)) {
+            normal_label = true;
+            assert(same_color(command.color, (cui_color){13, 27, 41, 255}));
+        }
+        panel_fill |= command.type == CUI_DRAW_RECT &&
+                      same_color(command.color, (cui_color){231, 223, 217, 255});
+    }
+    assert(normal_label && panel_fill);
     key(ui, CUI_KEY_DOWN);
     draw = selection_menu_scene(ui, &state, entries, &action, false);
     assert(row_fill(ui, draw, 52, cui_theme_light().accent));
@@ -3578,6 +3645,7 @@ static void test_tab_current_frame_baseline(void) {
     }
 }
 int main(void) {
+    test_list_source_palette();
     test_tab_current_frame_baseline();
     test_choice_trailing_checks();
     test_menu_check_glyphs();

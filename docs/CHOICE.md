@@ -456,8 +456,8 @@ configured font measurer and asserts fewer than 64 total measurement calls while
 verifying the capped width and rendered ellipsis. Width search assumes monotonic
 prefix advances; advanced grapheme/bidi truncation remains a text-layer gap.
 
-DropdownButton also supports `CUI_DROPDOWN_BUTTON_XSMALL` at 0.625 of theme
-control metrics. `outline` is independent of primary, secondary or danger style:
+DropdownButton also supports `CUI_DROPDOWN_BUTTON_XSMALL` with the frozen
+20-logical-pixel control height. `outline` is independent of primary, secondary or danger style:
 it uses a low-opacity variant-colored surface, stronger hover/selected surfaces,
 variant-colored text/border and muted disabled styling. The existing OUTLINE
 variant remains available for the neutral outline. Tests cover the fourth size
@@ -516,7 +516,8 @@ portable `color`, `foreground`, `hover` and `active` colors shared by both halve
 selection and held pointer/Space capture use active. Custom normal uses color
 with .2 opacity; hover and active use the corresponding supplied colors, including
 when outlined. A custom content callback owns its
-label decoration; built-in Link labels and the menu indicator are underlined.
+label decoration; built-in Link action labels are underlined, while the caret
+retains its icon presentation.
 Custom shadows and rich gradient backgrounds remain unfinished.
 
 Link refines both halves to the Link semantic role while retaining the split
@@ -679,3 +680,18 @@ usable. Headless tests verify the custom callback runs during loading, layout
 width remains stable, built-in labels remain visible and action clicks are
 blocked. Existing icon-to-loader substitution and whole-subtree opacity for
 caller-colored custom bodies still need portable icon/opacity primitives.
+
+Dropdown now uses the frozen button metrics: XS/S/M/L heights 20/24/32/32,
+horizontal padding 4/8/10/12, fonts 12/14/14/16, content gaps 4/4/8/8, and
+caret areas 12/14/16/16. Public `cui_dropdown_button_size_metrics` exposes these
+logical metrics. `density` defaults to theme font_size/16; positive `height`
+overrides styled height while preserving caret/button widths and typography.
+Horizontal spacer padding avoids vertical padding, and labels reserve the source
+1.25 line height. Link/Text fit label/custom content and caret areas without
+padding or fixed height; a styled height override still applies to them.
+Tests cover every theme/variant/size combination, exact spacing/font/caret bounds,
+density and height overrides, and Link action routing. This changes a standard
+42px Button theme's Dropdown Medium height to 32px. Menu row metrics retain their
+supplied theme settings. The caret remains a text fallback pending a proper
+portable icon primitive; intrinsic custom-body sizing and built-in capped-label
+ellipsis remain separate presentation gaps.

@@ -56,6 +56,20 @@ void cui_tab_motion_step(cui_tab_motion *motion, float target_left, float target
     cui_tab_spring_axis(&motion->left, &motion->left_velocity, target_left, dt, settings);
     cui_tab_spring_axis(&motion->width, &motion->width_velocity, target_width, dt, settings);
 }
+cui_dropdown_button_metrics cui_dropdown_button_size_metrics(cui_dropdown_button_size size,
+                                                             float density) {
+    if (!isfinite(density) || density <= 0)
+        density = 1;
+    size_t index = size == CUI_DROPDOWN_BUTTON_XSMALL  ? 0
+                   : size == CUI_DROPDOWN_BUTTON_SMALL ? 1
+                   : size == CUI_DROPDOWN_BUTTON_LARGE ? 3
+                                                       : 2;
+    const float heights[] = {20, 24, 32, 32}, padding[] = {4, 8, 10, 12};
+    const float fonts[] = {12, 14, 14, 16}, gaps[] = {4, 4, 8, 8}, caret[] = {12, 14, 16, 16};
+    return (cui_dropdown_button_metrics){heights[index] * density, padding[index] * density,
+                                         fonts[index] * density, gaps[index] * density,
+                                         caret[index] * density};
+}
 static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, size_t from,
                                   cui_key key, bool vertical) {
     int direction = 0;

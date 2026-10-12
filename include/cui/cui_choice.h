@@ -323,6 +323,11 @@ typedef enum {
     CUI_DROPDOWN_BUTTON_LARGE,
     CUI_DROPDOWN_BUTTON_XSMALL
 } cui_dropdown_button_size;
+typedef struct {
+    float height, padding_x, font_size, gap, caret_size;
+} cui_dropdown_button_metrics;
+cui_dropdown_button_metrics cui_dropdown_button_size_metrics(cui_dropdown_button_size,
+                                                             float density);
 typedef enum {
     CUI_DROPDOWN_ANCHOR_TOP_RIGHT,
     CUI_DROPDOWN_ANCHOR_TOP_LEFT,
@@ -357,6 +362,8 @@ typedef struct {
     cui_str tooltip;
     cui_hover_state *tooltip_state;
     cui_hover_options tooltip_options;
+    float density; /* zero uses theme font_size/16 */
+    float height;  /* optional positive styled height override, including Link/Text */
 } cui_dropdown_button_options;
 typedef struct {
     bool action_activated, menu_activated;

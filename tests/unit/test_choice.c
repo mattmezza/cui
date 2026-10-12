@@ -1455,12 +1455,16 @@ static void test_dropdown_button(void) {
                 assert(!result.action_activated && !result.menu_activated &&
                        dropdown_custom_calls == 1);
                 cui_rect left = cui_bounds(ui, 2001), right = cui_bounds(ui, 2002);
-                float scale = size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
-                              : size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
-                              : size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
-                                                                  : 1;
-                assert(left.w == 120 && left.h == themes[t].control_height * scale &&
-                       right.h == left.h && left.x + left.w == right.x);
+                cui_dropdown_button_metrics metrics = cui_dropdown_button_size_metrics(
+                    (cui_dropdown_button_size)size, themes[t].font_size / 16);
+                bool no_padding =
+                    variant == CUI_DROPDOWN_BUTTON_LINK || variant == CUI_DROPDOWN_BUTTON_TEXT;
+                assert(left.w == 120 &&
+                       left.h ==
+                           (no_padding ? fmaxf(11, metrics.font_size * 1.25f) : metrics.height) &&
+                       right.h == (no_padding ? metrics.caret_size : metrics.height) &&
+                       right.w == (no_padding ? metrics.caret_size : metrics.height) &&
+                       left.x + left.w == right.x);
                 bool left_shape = false, right_shape = false, left_border = false,
                      right_border = false;
                 for (size_t d = 0; d < dropdown_draw.count; d++) {
@@ -1573,7 +1577,7 @@ static void test_dropdown_inheritance_and_ghost_pair(void) {
         .action_size = CUI_DROPDOWN_BUTTON_SMALL,
         .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
     dropdown_scene(ui, &state, &action, &theme, options);
-    assert(cui_bounds(ui, 2001).h == theme.control_height * .8f);
+    assert(cui_bounds(ui, 2001).h == 24);
     assert(cui_bounds(ui, 2002).h == cui_bounds(ui, 2001).h);
     assert(same_color(dropdown_surface(ui, 2001), theme.danger));
     assert(same_color(dropdown_surface(ui, 2002), theme.danger));
@@ -1581,7 +1585,7 @@ static void test_dropdown_inheritance_and_ghost_pair(void) {
     options.variant = CUI_DROPDOWN_BUTTON_GHOST;
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
     dropdown_scene(ui, &state, &action, &theme, options);
-    assert(cui_bounds(ui, 2001).h == theme.control_height);
+    assert(cui_bounds(ui, 2001).h == 32);
     assert(dropdown_surface(ui, 2001).a == 0 && dropdown_surface(ui, 2002).a == 0);
     for (cui_id id = 2001; id <= 2002; id++) {
         cui_rect bounds = cui_bounds(ui, id);
@@ -3259,7 +3263,72 @@ static void test_dropdown_loading_keeps_content(void) {
     assert(label);
     cui_destroy(ui);
 }
+static void test_dropdown_reference_metrics(void) {
+    const float heights[] = {32, 24, 32, 20}, padding[] = {10, 8, 12, 4};
+    const float fonts[] = {14, 14, 16, 12}, gaps[] = {8, 4, 8, 4}, carets[] = {16, 14, 16, 12};
+    for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_XSMALL; size++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        cui_menu_tree_state state;
+        cui_menu_tree_init(&state, 2200);
+        cui_id action = 0;
+        cui_dropdown_button_metrics metrics =
+            cui_dropdown_button_size_metrics((cui_dropdown_button_size)size, 1);
+        assert(metrics.height == heights[size] && metrics.padding_x == padding[size] &&
+               metrics.font_size == fonts[size] && metrics.gap == gaps[size] &&
+               metrics.caret_size == carets[size]);
+        cui_dropdown_button_options options = {
+            .size = (cui_dropdown_button_size)size, .leading = {"[", 1}, .trailing = {"]", 1}};
+        dropdown_scene(ui, &state, &action, &theme, options);
+        cui_rect button = cui_bounds(ui, 2001), trigger = cui_bounds(ui, 2002);
+        cui_rect body = cui_bounds(ui, 2001 ^ UINT64_C(0xc8134e39119b750d));
+        cui_rect leading =
+            cui_bounds(ui, 2001 ^ UINT64_C(0x4aef702b79ab3180) ^ UINT64_C(0xc8134e39119b750d));
+        cui_rect trailing =
+            cui_bounds(ui, 2001 ^ UINT64_C(0x4aef702b79ab3190) ^ UINT64_C(0xc8134e39119b750d));
+        cui_rect caret = cui_bounds(ui, 2002 ^ UINT64_C(0x4aef702b79ab3170));
+        assert(button.h == heights[size] && trigger.w == heights[size] &&
+               trigger.h == heights[size]);
+        assert(caret.w == carets[size] && caret.h == carets[size]);
+        assert(body.h == fonts[size] * 1.25f &&
+               fabsf(body.y - button.y - (button.h - body.h) * .5f) < .01f);
+        assert(fabsf(leading.x - button.x - padding[size]) < .01f &&
+               fabsf(body.x - leading.x - leading.w - gaps[size]) < .01f &&
+               fabsf(trailing.x - body.x - body.w - gaps[size]) < .01f &&
+               fabsf(button.x + button.w - trailing.x - trailing.w - padding[size]) < .01f);
+        bool text = false;
+        for (size_t i = 0; i < dropdown_draw.count; i++)
+            text |= dropdown_draw.commands[i].type == CUI_DRAW_TEXT &&
+                    dropdown_draw.commands[i].text.length == 4 &&
+                    dropdown_draw.commands[i].font_size == fonts[size];
+        assert(text);
+        options.density = 2;
+        options.height = 80;
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(cui_bounds(ui, 2001).h == 80 && cui_bounds(ui, 2002).h == 80 &&
+               cui_bounds(ui, 2002).w == heights[size] * 2 &&
+               cui_bounds(ui, 2002 ^ UINT64_C(0x4aef702b79ab3170)).w == carets[size] * 2);
+        options.density = 0;
+        options.height = 0;
+        options.variant = CUI_DROPDOWN_BUTTON_LINK;
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(cui_bounds(ui, 2001).h == fonts[size] * 1.25f &&
+               cui_bounds(ui, 2002).w == carets[size] && cui_bounds(ui, 2002).h == carets[size]);
+        leading =
+            cui_bounds(ui, 2001 ^ UINT64_C(0x4aef702b79ab3180) ^ UINT64_C(0xc8134e39119b750d));
+        assert(leading.x == cui_bounds(ui, 2001).x);
+        click(ui, 2001);
+        assert(dropdown_scene(ui, &state, &action, &theme, options).action_activated);
+        options.variant = CUI_DROPDOWN_BUTTON_TEXT;
+        dropdown_scene(ui, &state, &action, &theme, options);
+        assert(cui_bounds(ui, 2001).h == fonts[size] * 1.25f &&
+               cui_bounds(ui, 2002).h == carets[size]);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_dropdown_reference_metrics();
     test_dropdown_loading_keeps_content();
     test_first_tab_border_policy();
     test_tab_scroll_tail();

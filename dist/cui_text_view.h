@@ -66,7 +66,7 @@ typedef struct {
     cui_text_view_range list_marker;
     unsigned list_number;
     char marker_text[12];
-    bool table_header, image_ready;
+    bool table_header, image_ready, task, checked;
     cui_text_view_alignment alignment;
     cui_bitmap image;
     cui_rect bounds, table_frame;
@@ -201,6 +201,7 @@ bool cui_text_view(cui_context *, cui_id, const cui_theme *, cui_text_view_state
 
 #if defined(CUI_TEXT_VIEW_IMPLEMENTATION) && !defined(CUI_TEXT_VIEW_IMPLEMENTATION_ONCE)
 #define CUI_TEXT_VIEW_IMPLEMENTATION_ONCE
+#include "cui_components.h"
 /* src/base/cui_text_view.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -732,6 +733,17 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                 continue;
             }
         }
+        bool task = kind == CUI_TEXT_VIEW_LIST_ITEM && b - a >= 3 && p->input.data[a] == '[' &&
+                    p->input.data[a + 2] == ']' &&
+                    (a + 3 == b || p->input.data[a + 3] == ' ' || p->input.data[a + 3] == '\t') &&
+                    (p->input.data[a + 1] == ' ' || p->input.data[a + 1] == 'x' ||
+                     p->input.data[a + 1] == 'X');
+        bool checked = task && p->input.data[a + 1] != ' ';
+        if (task) {
+            a += 3;
+            if (a < b)
+                ++a;
+        }
         if (!cui_text_view_block_begin(p, kind, start, level))
             return;
         if (kind == CUI_TEXT_VIEW_LIST_ITEM && level) {
@@ -746,6 +758,8 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             prior_ordered = false;
         if (p->write) {
             cui_text_view_block *block = &p->state->workspace.blocks[p->block];
+            block->task = task;
+            block->checked = checked;
             block->list_marker = marker;
             block->list_number = list_number;
             if (kind == CUI_TEXT_VIEW_LIST_ITEM && level) {
@@ -1330,7 +1344,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                  : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
                  : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
                                                        : padding;
-    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level) {
+    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level && !b->task) {
         cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
         if (!isfinite(marker.width) || marker.width < 0 || marker.width > 10000000)
             return false;
@@ -1847,6 +1861,8 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
             else
                 cui_text_view_copy_literal(w, "-");
             cui_text_view_copy_literal(w, " ");
+            if (block->task)
+                cui_text_view_copy_literal(w, block->checked ? "[x] " : "[ ] ");
         }
         if (block->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
             cui_str t = {s->workspace.rendered + begin, end - begin};
@@ -1912,6 +1928,7 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
 
 /* src/components/cui_text_view.c */
 /* SPDX-License-Identifier: MIT */
+
 
 #include <math.h>
 #include <string.h>
@@ -2241,7 +2258,27 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
         else if (b->kind == CUI_TEXT_VIEW_RULE)
             cui_text_view_quad(ui, part, r, style.border);
-        else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
+        else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->task) {
+            cui_begin_absolute_box(
+                ui, part,
+                (cui_box){.width = 14,
+                          .height = 14,
+                          .border_width = 1,
+                          .border = style.foreground,
+                          .background = b->checked ? style.foreground : (cui_color){0},
+                          .padding = 1,
+                          .align_x = CUI_ALIGN_CENTER,
+                          .align_y = CUI_ALIGN_CENTER},
+                (cui_rect){r.x, r.y + fmaxf(0, (style.line_height - 14) * .5f), 14, 14});
+            if (b->checked) {
+                float brightness = style.foreground.r * .2126f + style.foreground.g * .7152f +
+                                   style.foreground.b * .0722f;
+                cui_checkmark(ui, 10,
+                              brightness > 128 ? (cui_color){0, 0, 0, 255}
+                                               : (cui_color){255, 255, 255, 255});
+            }
+            cui_end_box(ui);
+        } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
             cui_begin_absolute_box(
                 ui, part, (cui_box){0},
                 (cui_rect){r.x, r.y, fmaxf(16, b->text_inset - 8), style.line_height});

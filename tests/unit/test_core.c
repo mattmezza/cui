@@ -816,9 +816,34 @@ static void test_transient_clip_lifecycle(void) {
     cui_destroy(ui);
 }
 
+static void test_many_simultaneous_clips(void) {
+    cui_context *ui = cui_create(
+        (cui_config){.width = 300, .height = 200, .max_elements = 512, .max_commands = 1024});
+    assert(ui);
+    for (unsigned frame = 0; frame < 4; frame++) {
+        assert(cui_begin_frame(ui, 300, 200, .016f));
+        for (unsigned clip = 0; clip < 160; clip++) {
+            cui_id id = 5000 + frame * 400 + clip * 2;
+            cui_begin_box(ui, id,
+                          (cui_box){.width = 80, .height = 1, .clip = true, .offset_y = -2});
+            cui_begin_box(ui, id + 1,
+                          (cui_box){.width = 40, .height = 8, .background = {255, 0, 0, 255}});
+            cui_end_box(ui);
+            cui_end_box(ui);
+        }
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && list.count > 0);
+        cui_rect parent = cui_bounds(ui, 5000 + frame * 400);
+        cui_rect child = cui_bounds(ui, 5001 + frame * 400);
+        assert(child.y == parent.y - 2);
+    }
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
+    test_many_simultaneous_clips();
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();

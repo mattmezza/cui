@@ -45,6 +45,7 @@ struct cui_context {
     size_t *semantic_scopes, *previous_semantic_scopes;
     Clay_Context *clay;
     void *arena;
+    Clay__ScrollContainerDataInternal *clip_containers;
     cui_config config;
     cui_draw_command *commands;
     size_t count;
@@ -136,7 +137,8 @@ cui_context *cui_create(cui_config config) {
         config.max_elements > SIZE_MAX / sizeof(cui_id) ||
         config.max_elements > SIZE_MAX / sizeof(cui_core_box_node) ||
         config.max_elements > SIZE_MAX / sizeof(size_t) ||
-        config.max_elements > SIZE_MAX / sizeof(cui_rect)) {
+        config.max_elements > SIZE_MAX / sizeof(cui_rect) ||
+        config.max_elements > SIZE_MAX / sizeof(Clay__ScrollContainerDataInternal)) {
         free(ui);
         return NULL;
     }
@@ -152,6 +154,7 @@ cui_context *cui_create(cui_config config) {
     ui->previous_semantic_scopes =
         calloc(config.max_elements, sizeof(*ui->previous_semantic_scopes));
     ui->strings = malloc(config.frame_bytes);
+    ui->clip_containers = calloc(config.max_elements, sizeof(*ui->clip_containers));
     ui->nodes = calloc(config.max_elements, sizeof(*ui->nodes));
     ui->semantic_nodes = calloc(config.max_elements, sizeof(*ui->semantic_nodes));
     ui->previous_hits = calloc(config.max_elements, sizeof(*ui->previous_hits));
@@ -163,7 +166,8 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->commands || !ui->semantics || !ui->previous || !ui->ids || !ui->activations ||
         !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings || !ui->nodes ||
-        !ui->semantic_nodes || !ui->previous_hits || !ui->previous_layers || !ui->arena) {
+        !ui->semantic_nodes || !ui->previous_hits || !ui->previous_layers || !ui->clip_containers ||
+        !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -171,8 +175,14 @@ cui_context *cui_create(cui_config config) {
     ui->clay = Clay_Initialize(Clay_CreateArenaWithCapacityAndMemory(n, ui->arena),
                                (Clay_Dimensions){config.width, config.height},
                                (Clay_ErrorHandler){cui_core_clay_error, ui});
-    if (ui->clay)
+    if (ui->clay) {
+        /* The pinned Clay version defaults to only 100 scroll/clip containers.
+         * Replace its private array with bounded context-owned storage so clip
+         * capacity obeys CUI's configured element budget. */
+        ui->clay->scrollContainerDatas = (Clay__ScrollContainerDataInternalArray){
+            .capacity = (int32_t)config.max_elements, .internalArray = ui->clip_containers};
         Clay_SetMeasureTextFunction(cui_core_measure, ui);
+    }
     Clay_SetCurrentContext(saved);
     if (!ui->clay || ui->error) {
         cui_destroy(ui);
@@ -197,6 +207,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->ids);
     free(ui->activations);
     free(ui->strings);
+    free(ui->clip_containers);
     free(ui->arena);
     free(ui);
 }
@@ -425,6 +436,9 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
      * its ephemeral element storage is reset; CUI owns scrolling through box
      * child offsets, so do not feed Clay wheel deltas or enable drag momentum. */
     Clay_UpdateScrollContainers(false, (Clay_Vector2){0, 0}, 0);
+    /* CUI does not retain Clay scroll positions. Start registrations afresh so
+     * changing every clipped ID cannot temporarily consume two frames' budget. */
+    ui->clay->scrollContainerDatas.length = 0;
     Clay_BeginLayout();
     ui->config.width = w;
     ui->config.height = h;

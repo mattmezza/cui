@@ -314,26 +314,39 @@ def main():
                 page.wait_for_function('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', arg={'name':name,'role':role})
             def click_semantic(name, role=None):
                 canvas.scroll_into_view_if_needed()
-                for attempt in range(12):
-                    target = page.evaluate('''({name,role})=>{
-                        const e=cuiGallery.exports,canvas=document.querySelector('canvas');
-                        const index=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>
-                            (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&
-                            new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
-                        if(index===undefined)return null;
-                        const rect=canvas.getBoundingClientRect();
-                        const x=rect.left+e.gallery_semantic(index,1)+e.gallery_semantic(index,3)/2;
-                        const y=rect.top+e.gallery_semantic(index,2)+e.gallery_semantic(index,4)/2;
-                        const top=document.querySelector('header').getBoundingClientRect().bottom+8;
-                        const bottom=innerHeight-8;
-                        if(y<top){window.scrollBy(0,y-top);return null;}
-                        if(y>bottom){window.scrollBy(0,y-bottom);return null;}
-                        return document.elementFromPoint(x,y)===canvas?[x,y]:null;
-                    }''', {'name':name,'role':role})
-                    if target is not None:
-                        break
+                probe = '''({name,role})=>{
+                    const e=cuiGallery.exports,canvas=document.querySelector('canvas');
+                    const index=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>
+                        (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&
+                        new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
+                    if(index===undefined)return null;
+                    const rect=canvas.getBoundingClientRect();
+                    const x=rect.left+e.gallery_semantic(index,1)+e.gallery_semantic(index,3)/2;
+                    const y=rect.top+e.gallery_semantic(index,2)+e.gallery_semantic(index,4)/2;
+                    const top=document.querySelector('header').getBoundingClientRect().bottom+8;
+                    const bottom=innerHeight-8;
+                    if(y<top){window.scrollBy(0,y-top);return null;}
+                    if(y>bottom){window.scrollBy(0,y-bottom);return null;}
+                    return document.elementFromPoint(x,y)===canvas?
+                        [e.gallery_semantic_id(index),x,y,e.gallery_semantic(index,3),e.gallery_semantic(index,4),rect.left,rect.top]:null;
+                }'''
+                arg = {'name':name,'role':role}
+                first = page.evaluate(probe, arg)
+                target = page.evaluate(probe, arg)
+                if first is None or target != first:
+                    page.evaluate('delete window.__cuiClickSample')
+                    stable_probe = '''({name,role})=>{
+                        const target=(%s)({name,role});
+                        if(!target){window.__cuiClickSample=null;return false;}
+                        const signature=target.join(':');
+                        if(window.__cuiClickSample===signature)return target;
+                        window.__cuiClickSample=signature;
+                        return false;
+                    }''' % probe
+                    polling = 50 if page.evaluate('Boolean(window.__cuiHeldFrames)') else 'raf'
+                    target = page.wait_for_function(stable_probe, arg=arg, polling=polling).json_value()
                 assert target is not None, name
-                page.mouse.click(*target)
+                page.mouse.click(*target[1:3])
             def dropdown_select(control, value, role=None):
                 control_change('dropdown-'+control, value)
                 if role is not None:
@@ -355,6 +368,11 @@ def main():
             click_semantic('Workspace mode', 1)
             page.wait_for_function('cuiGallery.exports.gallery_settings_stats(9)===1')
             assert semantic_index('Focused') is not None
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            assert semantic_index('Focused') is not None, 'Settings popup closed without dismissal'
+            canvas.scroll_into_view_if_needed()
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            assert semantic_index('Focused') is not None, 'Settings popup closed after canvas scroll'
             click_semantic('Focused')
             page.wait_for_function('cuiGallery.exports.gallery_settings_stats(8)===1&&cuiGallery.exports.gallery_settings_stats(9)===0')
             click_semantic('Advanced', 23)

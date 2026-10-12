@@ -539,7 +539,33 @@ static void test_child_alignment(void) {
     cui_destroy(ui);
 }
 
+static void test_menu_check_radio_roles(void) {
+    cui_context *ui = make();
+    begin(ui);
+    cui_interact(ui, 10, CUI_ROLE_MENU, cui_string("menu"), false, false, 0);
+    cui_interact(ui, 11, CUI_ROLE_MENUITEMCHECKBOX, cui_string("check"), false, true, 0);
+    cui_interact(ui, 12, CUI_ROLE_MENUITEMRADIO, cui_string("radio"), false, true, 0);
+    cui_interact(ui, 13, CUI_ROLE_MENUITEMCHECKBOX, cui_string("disabled"), true, false, 0);
+    cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    assert(count == 4 && nodes[1].checked && nodes[2].checked && nodes[3].disabled);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 11);
+    cui_interact(ui, 11, CUI_ROLE_MENUITEMCHECKBOX, cui_string("check"), false, true, 0);
+    cui_interact(ui, 12, CUI_ROLE_MENUITEMRADIO, cui_string("radio"), false, true, 0);
+    cui_interact(ui, 13, CUI_ROLE_MENUITEMCHECKBOX, cui_string("disabled"), true, false, 0);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 12);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_menu_check_radio_roles();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

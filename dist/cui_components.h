@@ -7,6 +7,7 @@
 #include "cui_content.h"
 #include "cui_disclosure.h"
 #include "cui_numeric.h"
+#include "cui_picker.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -71,6 +72,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_NUMERIC_IMPLEMENTATION
 #endif
 #include "cui_numeric.h"
+#ifndef CUI_PICKER_IMPLEMENTATION
+#define CUI_PICKER_IMPLEMENTATION
+#endif
+#include "cui_picker.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

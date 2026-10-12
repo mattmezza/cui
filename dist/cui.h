@@ -87,7 +87,9 @@ typedef enum {
     CUI_ROLE_IMAGE,
     CUI_ROLE_PROGRESSBAR,
     CUI_ROLE_TREE,
-    CUI_ROLE_TREEITEM
+    CUI_ROLE_TREEITEM,
+    CUI_ROLE_MENUITEMCHECKBOX,
+    CUI_ROLE_MENUITEMRADIO
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -5472,6 +5474,8 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_TAB:
     case CUI_ROLE_OPTION:
     case CUI_ROLE_MENUITEM:
+    case CUI_ROLE_MENUITEMCHECKBOX:
+    case CUI_ROLE_MENUITEMRADIO:
     case CUI_ROLE_TREEITEM:
         return true;
     default:

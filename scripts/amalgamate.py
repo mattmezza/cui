@@ -3,7 +3,7 @@
 import argparse,difflib,re
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-MODULES={"cui_numeric": ["src/base/cui_numeric.c", "src/components/cui_numeric.c"], "cui_content": ["src/base/cui_content.c", "src/components/cui_content.c"], "cui_disclosure": ["src/base/cui_disclosure.c", "src/components/cui_disclosure.c"], "cui_choice": ["src/base/cui_choice.c", "src/components/cui_choice.c"], "cui_plot": ["src/base/cui_plot.c"],"cui": ["src/core/cui.c"],"cui_dock": ["src/base/cui_dock.c"],"cui_virtual": ["src/base/cui_virtual.c"],"cui_overlay": ["src/base/cui_overlay.c"],"cui_edit": ["src/base/cui_edit.c"],"cui_base": ["src/base/cui_base.c","src/base/cui_models.c"],"cui_theme": ["src/theme/cui_theme.c"],"cui_components": ["src/components/cui_components.c"]}
+MODULES={"cui_picker": ["src/base/cui_picker.c", "src/components/cui_picker.c"], "cui_numeric": ["src/base/cui_numeric.c", "src/components/cui_numeric.c"], "cui_content": ["src/base/cui_content.c", "src/components/cui_content.c"], "cui_disclosure": ["src/base/cui_disclosure.c", "src/components/cui_disclosure.c"], "cui_choice": ["src/base/cui_choice.c", "src/components/cui_choice.c"], "cui_plot": ["src/base/cui_plot.c"],"cui": ["src/core/cui.c"],"cui_dock": ["src/base/cui_dock.c"],"cui_virtual": ["src/base/cui_virtual.c"],"cui_overlay": ["src/base/cui_overlay.c"],"cui_edit": ["src/base/cui_edit.c"],"cui_base": ["src/base/cui_base.c","src/base/cui_models.c"],"cui_theme": ["src/theme/cui_theme.c"],"cui_components": ["src/components/cui_components.c"]}
 def generate(name,sources):
     declaration=(ROOT/"include/cui"/(name+".h")).read_text(encoding="utf-8")
     declaration=re.sub(r'#include "cui/([^"\n]+)"',r'#include "\1"',declaration)
@@ -15,7 +15,7 @@ def generate(name,sources):
     if name=="cui_components":
         lines += ['#ifndef CUI_THEME_IMPLEMENTATION','#define CUI_THEME_IMPLEMENTATION','#endif','#include "cui_theme.h"']
     if name=="cui_components":
-        for module in ["cui_content", "cui_disclosure", "cui_choice", "cui_numeric"]:
+        for module in ["cui_content", "cui_disclosure", "cui_choice", "cui_numeric", "cui_picker"]:
             macro_dependency = module.upper()+"_IMPLEMENTATION"
             lines += [f'#ifndef {macro_dependency}',f'#define {macro_dependency}', '#endif',f'#include "{module}.h"']
     for source in sources:

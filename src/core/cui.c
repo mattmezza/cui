@@ -209,6 +209,8 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_TAB:
     case CUI_ROLE_OPTION:
     case CUI_ROLE_MENUITEM:
+    case CUI_ROLE_MENUITEMCHECKBOX:
+    case CUI_ROLE_MENUITEMRADIO:
     case CUI_ROLE_TREEITEM:
         return true;
     default:

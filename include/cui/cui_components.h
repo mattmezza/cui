@@ -6,6 +6,7 @@
 #include "cui_content.h"
 #include "cui_disclosure.h"
 #include "cui_numeric.h"
+#include "cui_picker.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {

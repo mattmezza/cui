@@ -106,7 +106,7 @@ const snippets = {
  Toolbar:'cui_toolbar(ui, id, &theme, items, count, options);\n/* Items render commands, groups or an editor. */',
  TitleBar:'cui_title_bar(ui, id, &theme, &state, items, count, options);\n/* A portable host decides which window actions exist. */'
 };
-let wasm, catalog, selected, framePending=false, wakeTimer, lastTime=performance.now();
+let wasm, catalog, documents, selected, framePending=false, wakeTimer, lastTime=performance.now();
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 const systemDark=matchMedia('(prefers-color-scheme: dark)');
 function effectiveTheme(){return $('theme').value==='3'?(systemDark.matches?1:0):Number($('theme').value);}
@@ -249,13 +249,49 @@ function syncSemantics(){
  }
  for(const {el} of entries)if(el.getAttribute('role')==='treeitem'){const toggle=Array.from(el.children).find(child=>child.getAttribute('role')==='button'&&['Expand','Collapse'].includes(child.textContent));if(toggle)el.setAttribute('aria-expanded',String(toggle.textContent==='Collapse'));else el.removeAttribute('aria-expanded');}
 }
+function fuzzyScore(value,query){
+ const name=value.toLowerCase(),needle=query.trim().toLowerCase();if(!needle)return 0;
+ let cursor=0,score=0,previous=-2;
+ for(const character of needle){const found=name.indexOf(character,cursor);if(found<0)return -1;score+=found===previous+1?4:1;score+=found===0||' -_'.includes(name[found-1])?3:0;previous=found;cursor=found+1;}
+ return score-(name.length-needle.length)*.04;
+}
 function navigation(){
- const query=$('search').value.toLowerCase(), nav=$('catalog');nav.replaceChildren();let category='';
- for(const item of catalog.components.filter(item=>item.name.toLowerCase().includes(query))){
-  if(item.category!==category){category=item.category;const h=document.createElement('h3');h.textContent=category.replaceAll('_',' ');nav.append(h);}
+ const query=$('search').value, nav=$('catalog');nav.replaceChildren();let category='';
+ const results=catalog.components.map(item=>({item,score:fuzzyScore(item.name,query)})).filter(result=>result.score>=0);
+ if(query.trim())results.sort((a,b)=>b.score-a.score||a.item.name.localeCompare(b.item.name));
+ for(const {item} of results){
+  if(!query.trim()&&item.category!==category){category=item.category;const h=document.createElement('h3');h.textContent=category.replaceAll('_',' ');nav.append(h);}
   const a=document.createElement('a');a.href=`#${encodeURIComponent(item.name)}`;a.classList.toggle('active',selected?.name===item.name);if(selected?.name===item.name)a.setAttribute('aria-current','page');
   const text=document.createElement('span');text.textContent=item.name;const dot=document.createElement('span');dot.className=`dot ${item.name in stories?'live':''}`;dot.title=item.name in stories?'Live browser story':'Browser story pending';a.append(text,dot);nav.append(a);
  }
+ if(!results.length){const empty=document.createElement('p');empty.className='nav-empty';empty.textContent='No matching components';nav.append(empty);}
+}
+function docsNavigation(active){
+ const nav=$('docs-nav');nav.replaceChildren();
+ for(const category of ['Getting started','Guides','Components','Development']){
+  const entries=documents.filter(doc=>doc.category===category);if(!entries.length)continue;
+  const h=document.createElement('h3');h.textContent=category;nav.append(h);
+  for(const doc of entries){const link=document.createElement('a');link.href=`#docs/${doc.slug}`;link.textContent=doc.title;link.classList.toggle('active',doc.slug===active);if(doc.slug===active)link.setAttribute('aria-current','page');nav.append(link);}
+ }
+}
+function route(){
+ const raw=location.hash.slice(1);
+ if(!raw||raw==='home'){
+  selected=null;$('home-page').hidden=false;$('docs-page').hidden=true;$('gallery-page').hidden=true;$('catalog').hidden=false;$('docs-nav').hidden=true;
+  document.title='CUI · Portable C11 UI';navigation();document.body.classList.remove('menu-open');return;
+ }
+ if(raw.startsWith('docs/')){
+  const parts=raw.slice(5).split('/');let slug,anchor;
+  try{slug=decodeURIComponent(parts[0]);anchor=decodeURIComponent(parts.slice(1).join('/'));}catch{slug='getting-started';anchor='';}
+  const doc=documents.find(entry=>entry.slug===slug)||documents.find(entry=>entry.slug==='getting-started');
+  selected=null;$('home-page').hidden=true;$('docs-page').hidden=false;$('gallery-page').hidden=true;$('catalog').hidden=true;$('docs-nav').hidden=false;
+  $('docs-title').textContent=doc.title;$('docs-content').innerHTML=doc.html;$('docs-source').href=doc.source;
+  document.title=`${doc.title} · CUI`;docsNavigation(doc.slug);document.body.classList.remove('menu-open');
+  if(anchor)requestAnimationFrame(()=>document.getElementById(`doc-${anchor}`)?.scrollIntoView());else requestAnimationFrame(()=>window.scrollTo(0,0));
+  return;
+ }
+ $('home-page').hidden=true;$('docs-page').hidden=true;$('gallery-page').hidden=false;$('catalog').hidden=false;$('docs-nav').hidden=true;
+ selectComponent();requestAnimationFrame(()=>window.scrollTo(0,0));
 }
 function selectComponent(){
  let name='Button';try{name=decodeURIComponent(location.hash.slice(1))||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
@@ -349,7 +385,21 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
 });
 reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if($('theme').value==='3')requestFrame();});
-$('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog)selectComponent();});
+$('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});
+window.addEventListener('keydown',event=>{
+ const editing=event.target instanceof HTMLElement&&(event.target.matches('input,textarea,select')||event.target.isContentEditable);
+ if(event.key==='/'&&!editing&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();document.body.classList.add('menu-open');$('catalog').hidden=false;$('docs-nav').hidden=true;$('search').focus();$('search').select();}
+ if(event.key==='Enter'&&document.activeElement===$('search')){const first=$('catalog').querySelector('a');if(first){event.preventDefault();location.hash=first.getAttribute('href');$('search').value='';navigation();$('search').blur();}}
+ if(event.key==='Escape'&&document.activeElement===$('search')){$('search').value='';navigation();$('search').blur();}
+});
+async function copyCode(button,code){
+ const original=button.textContent;
+ try{await navigator.clipboard.writeText(code);button.textContent='Copied';}
+ catch{button.textContent='Copy unavailable';}
+ setTimeout(()=>button.textContent=original,1800);
+}
+$('copy-quickstart').addEventListener('click',()=>copyCode($('copy-quickstart'),$('quickstart-code').textContent));
+$('copy-snippet').addEventListener('click',()=>copyCode($('copy-snippet'),$('snippet').textContent));
 $('theme').addEventListener('change',syncTheme);
 for(const id of ['image-state','image-fit','image-grayscale','image-opacity','attachment-status','attachment-vertical'])$(id).addEventListener('change',requestFrame);
 for(const id of ['description-columns','description-size','description-vertical','description-plain','status-right','status-custom','resizable-vertical','resizable-disabled','icon-choice','icon-size','icon-rotate','icon-color'])$(id).addEventListener('change',requestFrame);
@@ -372,9 +422,9 @@ $('surface-variant').addEventListener('change',requestFrame);
 $('density').addEventListener('change',requestFrame);
 $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
 try{
- const [response,data]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json())]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;
+ const [response,data,docs]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json()),fetch('./docs.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch documentation');return r.json();})]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;documents=docs;
  const module=await WebAssembly.compile(await response.arrayBuffer());
  const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=`${size}px system-ui`;return ctx.measureText(stringAt(ptr,len)).width;}}};
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();if(!wasm.gallery_init())throw Error('CUI initialization failed');
- window.cuiGallery={exports:wasm,stories,catalog,render};selectComponent();
+ window.cuiGallery={exports:wasm,stories,catalog,documents,render};$('home-story-count').textContent=String(Object.keys(stories).length);route();
 }catch(error){fatal(error);}

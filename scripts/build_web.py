@@ -56,6 +56,7 @@ def main():
     (out / 'gallery.js').write_text(javascript, encoding='utf-8', newline='\n')
     manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8'))
     (out / 'catalog.json').write_text(json.dumps(manifest, indent=2)+'\n')
+    subprocess.run(['uv', 'run', str(ROOT / 'scripts/build_docs.py'), '--output', str(out)], check=True)
     notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\nNanoSVG\n=======\n' + (ROOT / 'third_party/nanosvg/LICENSE').read_text(encoding='utf-8') + '\n\nGPUI Kit icons\n==============\n' + (ROOT / 'third_party/gpui_icons/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
     (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
     (out / '.nojekyll').touch()

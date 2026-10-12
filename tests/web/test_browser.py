@@ -39,7 +39,43 @@ def main():
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
-            page.wait_for_function('window.cuiGallery && window.cuiGallery.exports.gallery_count() > 0')
+            page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
+            assert page.locator('#home-page').is_visible()
+            assert page.locator('#gallery-page').is_hidden()
+            assert 'Portable C11 UI' in page.title()
+            assert page.locator('#home-story-count').inner_text() == str(len(page.evaluate('Object.keys(cuiGallery.stories)')))
+            page.screenshot(path='/tmp/cui-web-home-light.png')
+            page.emulate_media(color_scheme='dark')
+            page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"')
+            page.screenshot(path='/tmp/cui-web-home-dark.png')
+            page.emulate_media(color_scheme='light')
+            page.set_viewport_size({'width':390,'height':844})
+            assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'), 'Homepage overflows mobile viewport'
+            page.locator('#menu').click()
+            assert page.locator('#sidebar').is_visible()
+            page.set_viewport_size({'width':1280,'height':900})
+            page.locator('#copy-quickstart').click()
+            page.wait_for_function('document.querySelector("#copy-quickstart").textContent==="Copied"')
+            assert '#include "cui/cui_components.h"' in page.evaluate('navigator.clipboard.readText()')
+            page.evaluate('location.hash="#docs/getting-started"')
+            page.wait_for_function('document.querySelector("#docs-page")&&!document.querySelector("#docs-page").hidden')
+            assert page.locator('#docs-content h1').first.inner_text() == 'CUI'
+            assert page.locator('#docs-content a[href="#docs/api"]').count() >= 1
+            assert page.locator('#docs-nav a').count() >= 40
+            page.wait_for_function('document.querySelector("#docs-content img")?.complete&&document.querySelector("#docs-content img")?.naturalWidth>0')
+            page.wait_for_function('window.scrollY===0')
+            page.screenshot(path='/tmp/cui-web-docs.png')
+            page.evaluate('location.hash="#docs/getting-started/build-and-run"')
+            page.wait_for_function('document.querySelector("#doc-build-and-run")?.getBoundingClientRect().top<200&&window.scrollY>0')
+            page.locator('#docs-content a[href="#docs/api"]').first.click()
+            page.wait_for_function('location.hash==="#docs/api"&&document.querySelector("#docs-title").textContent.includes("API")')
+            page.keyboard.press('/')
+            assert page.locator('#search').evaluate('(node)=>document.activeElement===node')
+            page.locator('#search').fill('bt')
+            assert page.locator('#catalog a').first.get_attribute('href') == '#Button'
+            page.keyboard.press('Enter')
+            page.wait_for_function('cuiGallery.renderedComponent==="Button"&&cuiGallery.exports.gallery_count()>0')
+            assert page.locator('#gallery-page').is_visible()
             def control_change(control, value):
                 before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
                 page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
@@ -63,6 +99,9 @@ def main():
             assert page.locator('#catalog a').count() == 78
             assert page.locator('#name').inner_text() == 'Button'
             assert page.locator('#accessible [role=link][aria-label="Link"]').count() == 1
+            page.locator('#copy-snippet').click()
+            page.wait_for_function('document.querySelector("#copy-snippet").textContent==="Copied"')
+            assert page.evaluate('navigator.clipboard.readText()') == page.locator('#snippet').inner_text()
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == 0
             assert page.locator('#accessible [aria-busy=true]').count() == 1
             canvas = page.locator('canvas')

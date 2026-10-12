@@ -1,0 +1,3 @@
+Source: 41de104
+Scope: sortable SVG header indicators and application-owned gallery row ordering.
+test_table: /home/matteo/.cache/cui-worktrees/table-gallery-sort/tests/unit/test_table.c:157: sort_header_graphics: Assertion `images == 1' failed.

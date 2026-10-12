@@ -1,22 +1,22 @@
 {
-  "source": "3d769d8",
+  "source": "ceb6f72",
   "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public 1b453ab has the verified 38-theme picker and 70 stories. Local Settings/Carousel stories bring implemented browser coverage to 72, but integration found an intermittent Carousel loop click and a Textarea Tab host interception; fixes and browser revalidation pending. Native 65/65, sanitizers 63/63 and WASI 55/55 passed the composed Settings, atomic Textarea indentation and consumed Surface event changes. Full parity remains unfinished.",
+  "summary": "Public 1b453ab retains verified 38-theme picker and 70 stories. Local Command and Root modules pass native69/69, sanitizers67/67 and WASI59/59 including pure-base tests. Root plugin ordering, lifecycle and Sheet-aware notifications are tested. Browser72 revalidation is running after Textarea Tab/history fixes and Carousel moving/settled navigation coverage. All78entries retained:4notstarted,4implementedpartial,70testedpartial,0verified. Full parity unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "3d769d8",
-      "passed": 55,
-      "total": 55,
-      "log": "wasi-3d769d8.txt"
+      "source": "ceb6f72",
+      "passed": 59,
+      "total": 59,
+      "log": "wasi-ceb6f72.txt"
     },
     {
       "name": "native",
-      "source": "3d769d8",
-      "passed": 65,
-      "total": 65,
-      "log": "native-3d769d8.txt"
+      "source": "ceb6f72",
+      "passed": 69,
+      "total": 69,
+      "log": "native-ceb6f72.txt"
     },
     {
       "name": "browser",
@@ -28,10 +28,10 @@
     },
     {
       "name": "sanitizers",
-      "source": "3d769d8",
-      "passed": 63,
-      "total": 63,
-      "log": "sanitizers-3d769d8.txt"
+      "source": "ceb6f72",
+      "passed": 67,
+      "total": 67,
+      "log": "sanitizers-ceb6f72.txt"
     }
   ],
   "previous_deployment": {

@@ -54,7 +54,7 @@ const snippets = {
  Toggle:'cui_toggle_group_ex(ui, group_id, &theme,\n    items, selected, 3, options);',
  Radio:'cui_radio_ex(ui, id, &theme, label, &selection, 1,\n    (cui_radio_options){.size = CUI_CONTROL_LARGE});',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
- Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.width = 280});',
+ Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.size = CUI_INPUT_SMALL,\n                                .width = 280});',
  Tag:'cui_tag(ui, id, &theme, cui_string("Workspace"), options);\n/* Rich children use cui_begin_tag / cui_end_tag. */',
  Notification:'/* Queue pushes after the frame; descriptors stay application-owned. */\ncui_notification_push(&state, descriptor, host_seconds);\ncui_notification_advance result = cui_notifications(\n    ui, id, &theme, &state, viewport, host_seconds);',
  Marker:'cui_marker(ui, id, &theme, &state, children, count, options);\n/* Schedule the deadline from cui_base_marker. */',
@@ -82,7 +82,7 @@ const snippets = {
  ColorPicker:'cui_color_picker(ui, id, &theme,\n    &state, &color, options);',
  TimeField:'cui_time_field(ui, id, &theme, label,\n    &state, &time, options);',
  Combobox:'cui_combobox(ui, id, &theme, label, query,\n    items, 4, scratch, 4, &selection,\n    &popup, options);',
- NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, options);',
+ NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, (cui_number_options){\n        .size = CUI_NUMBER_SMALL, .step = 1});',
  Pagination:'cui_pagination(ui, id, &theme,\n    &page, total_pages, true, false);',
  Rating:'cui_rating(ui, id, &theme, label,\n    &rating, options);',
  Stepper:'cui_stepper(ui, id, &theme, steps, 3,\n    &current_step, true, false);',
@@ -377,7 +377,7 @@ function selectComponent(){
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['message-alignment','message-variant','message-inset','message-avatar-control'])$(id).hidden=selected.name!=='Message';
  $('checkbox-state').hidden=selected.name!=='Checkbox';
- $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea'].includes(selected.name);
+ $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea','Input','NumberInput'].includes(selected.name);
  $('control-size').value='0';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
  for(const id of ['switch-side-control','switch-color-control'])$(id).hidden=selected.name!=='Switch';

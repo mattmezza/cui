@@ -1178,6 +1178,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .readonly = input_mode == 1,
                                          .required = input_mode == 2,
                                          .invalid = input_mode == 2,
+                                         .size = (cui_input_size)control_size,
                                          .width = width > 360 ? 280 : width - 48});
         break;
     case 60: {
@@ -2137,6 +2138,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                               .has_minimum = true,
                                               .has_maximum = true,
                                               .disabled = disabled,
+                                              .size = (cui_number_size)control_size,
                                               .width = width > 360 ? 280 : width - 48});
         char text[64];
         snprintf(text, sizeof(text), "Controlled value: %.2f", number);

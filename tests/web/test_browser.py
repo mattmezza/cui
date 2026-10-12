@@ -314,6 +314,31 @@ def main():
                 control_change('control-size', size)
                 heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Project notes', 6)))
             assert heights[-1] > heights[0], heights
+            for name, accessible_name in (('Input','Display name'),('NumberInput','Quantity')):
+                page.evaluate('(name)=>location.hash=name', name)
+                page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
+                assert page.locator('#control-size').is_visible(), name
+                measured=[]
+                for size, height in ((3,20),(1,24),(0,32),(2,44)):
+                    control_change('control-size', size)
+                    index=semantic_index(accessible_name)
+                    assert index is not None, (name,size)
+                    actual=page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,4)', index)
+                    assert abs(actual-(height if name=='Input' else height-2))<0.4, (name,size,actual,height)
+                    measured.append(actual)
+                assert measured==sorted(measured), (name,measured)
+                if name=='Input':
+                    painted=page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.from({length:e.gallery_count()},(_,i)=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))));}''')
+                    assert 'Display name' not in painted, 'Semantic Input label must not paint as another row'
+                    assert page.locator('#accessible [role=textbox][aria-label="Display name"]').count()==1
+                else:
+                    assert page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>e.gallery_command(i,0)).filter(type=>type===5).length;}''')>=2, 'Number step icons must be actual SVG bitmaps'
+                    before_value=page.evaluate('cuiGallery.exports.gallery_semantic(0,8)')
+                    click_semantic('Increment')
+                    page.wait_for_function('(value)=>cuiGallery.exports.gallery_semantic(0,8)===value+1', arg=before_value)
+                    click_semantic('Decrement')
+                    page.wait_for_function('(value)=>cuiGallery.exports.gallery_semantic(0,8)===value', arg=before_value)
+                    page.screenshot(path='/tmp/cui-web-number-input-sizes.png')
             for name in ('Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment'):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)

@@ -214,6 +214,38 @@ static void events(void) {
         cui_tree_destroy(model);
     }
 }
+static void disabled_hierarchy(void) {
+    cui_tree_node nodes[] = {{1, {"Root", 4}, 0, false},
+                             {2, {"Blocked", 7}, 1, true},
+                             {3, {"Grandchild", 10}, 2, false},
+                             {4, {"Enabled", 7}, 1, false}};
+    bool expanded[] = {true, true, false, false};
+    cui_tree_model *model = cui_tree_create(4);
+    assert(model && cui_tree_rebuild(model, nodes, expanded, 4) == CUI_TREE_OK);
+#ifdef CUI_TREE_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    cui_tree_state state = {0};
+    cui_id selected = 1;
+    cui_tree_options options = {.height = 240, .row_height = 32};
+    scene(ui, &theme, model, &state, &selected, options);
+    cui_focus(ui, cui_tree_row_id(10, 1));
+    key(ui, CUI_KEY_RIGHT);
+    scene(ui, &theme, model, &state, &selected, options);
+    assert(selected == 4);
+    cui_focus(ui, cui_tree_row_id(10, 3));
+    state.cursor = 3;
+    selected = 3;
+    key(ui, CUI_KEY_LEFT);
+    scene(ui, &theme, model, &state, &selected, options);
+    assert(selected == 1);
+    cui_destroy(ui);
+    cui_tree_destroy(model);
+}
 static void virtualization(void) {
     size_t count = 10000;
     cui_tree_model *model = cui_tree_create(count);
@@ -259,6 +291,7 @@ int main(void) {
     models();
     random_models();
     events();
+    disabled_hierarchy();
     virtualization();
     return 0;
 }

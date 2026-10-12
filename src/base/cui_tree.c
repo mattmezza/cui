@@ -312,19 +312,28 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                 if (cui_tree_is_branch(m, cursor) && m->expanded[cursor])
                     result.expansion_changed |= cui_tree_set_expanded(m, s->cursor, false);
                 else {
-                    size_t parent;
-                    if (cui_tree_parent(m, cursor, &parent) && !m->nodes[parent].disabled)
-                        next = m->banks[m->active].position[parent];
+                    size_t parent = cursor;
+                    while (cui_tree_parent(m, parent, &parent))
+                        if (!m->nodes[parent].disabled) {
+                            next = m->banks[m->active].position[parent];
+                            break;
+                        }
                 }
             } else if (key == CUI_KEY_RIGHT && cui_tree_is_branch(m, cursor)) {
                 if (!m->expanded[cursor])
                     result.expansion_changed |= cui_tree_set_expanded(m, s->cursor, true);
                 else {
-                    size_t candidate = cui_tree_enabled_position(m, position, 1);
-                    if (candidate != SIZE_MAX &&
-                        m->banks[m->active].parent[m->banks[m->active].visible[candidate]] ==
-                            cursor)
-                        next = candidate;
+                    for (size_t candidate = position + 1; candidate < m->visible_count;
+                         ++candidate) {
+                        size_t child = m->banks[m->active].visible[candidate];
+                        if (m->nodes[child].depth <= m->nodes[cursor].depth)
+                            break;
+                        if (m->banks[m->active].parent[child] == cursor &&
+                            !m->nodes[child].disabled) {
+                            next = candidate;
+                            break;
+                        }
+                    }
                 }
             }
         } else if (events[e].type == CUI_EVENT_TEXT) {
@@ -375,7 +384,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
         if (events[e].type == CUI_EVENT_SCROLL) {
             bool inside = cui_event_target(ui, e) == id;
             cui_rect bounds = cui_bounds(ui, id);
-            if (events[e].x >= bounds.x && events[e].y >= bounds.y &&
+            if (cui_hovered(ui, id) && events[e].x >= bounds.x && events[e].y >= bounds.y &&
                 events[e].x < bounds.x + bounds.w && events[e].y < bounds.y + bounds.h)
                 inside = true;
             if (inside && isfinite(events[e].dy))

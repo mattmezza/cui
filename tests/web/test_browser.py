@@ -45,6 +45,9 @@ def main():
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
             assert page.locator('#home-story-count').inner_text() == str(len(page.evaluate('Object.keys(cuiGallery.stories)')))
+            assert page.get_by_role('link', name='GitHub').count() == 1
+            assert page.locator('header a[href*="github.com"] svg[aria-hidden="true"]').count() == 1
+            assert page.locator('.search svg[aria-hidden="true"]').count() == 1
             page.screenshot(path='/tmp/cui-web-home-light.png')
             page.emulate_media(color_scheme='dark')
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"')
@@ -61,6 +64,7 @@ def main():
             page.evaluate('location.hash="#docs/getting-started"')
             page.wait_for_function('document.querySelector("#docs-page")&&!document.querySelector("#docs-page").hidden')
             assert page.locator('#docs-content h1').first.inner_text() == 'CUI'
+            assert page.get_by_role('link', name='View Markdown source').count() == 1
             assert page.locator('#docs-content a[href="#docs/api"]').count() >= 1
             assert page.locator('#docs-nav a').count() >= 40
             page.wait_for_function('document.querySelector("#docs-content img")?.complete&&document.querySelector("#docs-content img")?.naturalWidth>0')
@@ -155,6 +159,8 @@ def main():
             assert page.locator('#catalog a').count() == 78
             assert page.locator('#name').inner_text() == 'Button'
             assert page.locator('#accessible [role=link][aria-label="Link"]').count() == 1
+            assert page.get_by_role('link', name='View source').count() == 1
+            assert page.get_by_role('link', name='GPUI Kit 0.7.1 reference').count() == 1
             page.locator('#copy-snippet').click()
             page.wait_for_function('document.querySelector("#copy-snippet").textContent==="Copied"')
             assert page.evaluate('navigator.clipboard.readText()') == page.locator('#snippet').inner_text()

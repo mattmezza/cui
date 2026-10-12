@@ -421,6 +421,10 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->count = 0;
     cui_core_select_context(ui);
     Clay_SetLayoutDimensions((Clay_Dimensions){w, h});
+    /* Clay retains clipping containers between layouts. Reap absent IDs before
+     * its ephemeral element storage is reset; CUI owns scrolling through box
+     * child offsets, so do not feed Clay wheel deltas or enable drag momentum. */
+    Clay_UpdateScrollContainers(false, (Clay_Vector2){0, 0}, 0);
     Clay_BeginLayout();
     ui->config.width = w;
     ui->config.height = h;

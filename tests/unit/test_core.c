@@ -794,8 +794,31 @@ static void test_custom_shape_commands(void) {
     cui_destroy(ui);
 }
 
+static void test_transient_clip_lifecycle(void) {
+    cui_context *ui = make();
+    for (unsigned frame = 0; frame < 240; frame++) {
+        begin(ui);
+        for (unsigned clip = 0; clip < 4; clip++) {
+            cui_id parent = 1000 + frame * 8 + clip * 2;
+            cui_begin_box(ui, parent,
+                          (cui_box){.width = 80, .height = 30, .clip = true, .offset_y = -7});
+            cui_begin_box(ui, parent + 1,
+                          (cui_box){.width = 40, .height = 60, .background = {255, 0, 0, 255}});
+            cui_end_box(ui);
+            cui_end_box(ui);
+        }
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && list.count > 0);
+        cui_rect parent = cui_bounds(ui, 1000 + frame * 8);
+        cui_rect child = cui_bounds(ui, 1001 + frame * 8);
+        assert(child.y == parent.y - 7 && parent.h == 30 && child.h == 60);
+    }
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_custom_shape_commands();
+    test_transient_clip_lifecycle();
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();

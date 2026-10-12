@@ -1543,6 +1543,9 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_alert_attempts()===1')
             assert page.evaluate('cuiGallery.exports.gallery_surface_open(1)') == 1
             page.wait_for_function('document.querySelector("#accessible [role=alertdialog]")?.getAttribute("aria-description")?.includes("rejected once")')
+            # Rejection changes the centered content height. Allow the measured
+            # body and its corrected layout to render before clicking again.
+            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
             click_semantic('Delete')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===0')
             index = semantic_index('Delete workspace')

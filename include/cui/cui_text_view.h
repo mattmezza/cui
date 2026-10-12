@@ -9,6 +9,7 @@
 extern "C" {
 #endif
 #define CUI_TEXT_VIEW_BYTE_LIMIT 65536u
+#define CUI_TEXT_VIEW_LIST_DEPTH_LIMIT 32
 #define CUI_TEXT_VIEW_NODE_LIMIT 8192u
 typedef enum {
     CUI_TEXT_VIEW_MARKDOWN,
@@ -63,7 +64,8 @@ typedef struct {
     cui_text_view_range text, source, resource;
     unsigned level, table, row, column, table_columns;
     cui_text_view_range list_marker;
-    unsigned list_number;
+    unsigned list_number, list_start, list_depth, list_source_indent;
+    size_t list_parent;
     char marker_text[12], prefix_text[16];
     bool table_header, image_ready, task, checked;
     cui_text_view_alignment alignment;

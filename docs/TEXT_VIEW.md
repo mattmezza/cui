@@ -20,7 +20,7 @@ first-frame wrapping. Grow dimensions use retained bounds and a first-frame
 estimate (320 by 240); bounds changes schedule a follow-up measurement frame.
 
 Markdown handles headings, emphasis, strikethrough, inline/fenced code, links,
-entities, escaped punctuation, flat lists and passive task checkboxes with source starting numbers and consecutive numbering, rules, pipe tables and block images. Soft paragraph breaks join with spaces; two-space hard breaks retain line breaks.
+entities, escaped punctuation, bounded nested lists and passive task checkboxes with source starting numbers and consecutive numbering, rules, pipe tables and block images. Soft paragraph breaks join with spaces; two-space hard breaks retain line breaks.
 HTML handles the corresponding safe presentation tags and strips script/style
 bodies; it never executes markup or loads resources itself. Each rendered scalar
 maps to its original source bytes, including entity atoms, while block separators
@@ -120,7 +120,7 @@ uses a 14px foreground border box, a foreground fill when checked, and the share
 10px checkmark drawing helper; the indicator has no interactive semantics.
 The checkmark chooses black or white contrast against the supplied foreground,
 which preserves the source defaults while also supporting custom palettes.
-Nested lists and multi-paragraph list continuation remain parser limitations.
+Multi-paragraph list continuation and nested non-list blocks remain parser limitations.
 
 `cui_text_view_decode_resource` decodes the bounded parser entity subset and
 Markdown ASCII punctuation escapes into a separate caller buffer. HTML attribute
@@ -145,3 +145,13 @@ gesture; that bounded gesture refinement remains pending shared Scroll support. 
 itself disables persistent gesture locking on WASM. Ordinary vertical chaining is
 preserved. These remaining differences do not affect the implemented geometry,
 clipping, translated links or source-copy behavior.
+
+Markdown list item nesting is tracked with parent block indices, source starts,
+and independent per-level ordered counters. Nested ordered markers use uppercase
+letters at depth one and lowercase at deeper levels; zero-start lists retain
+numeric prefixes. Bullet shapes vary across five depths. Each rendered nesting
+level adds 16px, while partial Source copy uses parent marker widths to indent
+children and includes empty ancestor markers for a selection confined to children.
+The parser supports at most 32 list levels and rejects deeper input transactionally.
+It does not yet provide a complete list AST for multi-paragraph continuations,
+loose-list spacing, or nested tables/images/code/quotes.

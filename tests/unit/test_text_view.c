@@ -407,6 +407,54 @@ static void test_resource_decoding(void) {
                                          output, sizeof output, &length) == CUI_TEXT_VIEW_OK);
     assert(!strcmp(output, "x\\!&amp;y"));
 }
+static void test_nested_list_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state,
+               text("1. parent\n   4. child\n      2. grand\n   9. sibling\n9. next\n\nlast")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].list_parent == SIZE_MAX && f.blocks[1].list_parent == 0 &&
+           f.blocks[2].list_parent == 1 && f.blocks[3].list_parent == 0);
+    assert(f.blocks[1].list_depth == 1 && f.blocks[2].list_depth == 2);
+    assert(f.blocks[3].list_number == 5 && f.blocks[4].list_number == 2);
+    cui_text_view_layout_options o = {.width = 300, .font_size = 14, .line_height = 20};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[1].bounds.x == 16 && f.blocks[2].bounds.x == 32);
+    assert(!strcmp(f.blocks[1].prefix_text, "D. ") && !strcmp(f.blocks[2].prefix_text, "b. ") &&
+           !strcmp(f.blocks[3].prefix_text, "E. "));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_select(&f.state, f.blocks[2].text.begin, f.blocks[2].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "1. \n   4. \n      2. grand"));
+    assert(cui_text_view_select(&f.state, f.blocks[1].text.begin, f.blocks[3].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "1. \n   4. child\n      2. grand\n   5. sibling"));
+    assert(
+        cui_text_view_set_text(&f.state, text("- [x]\n  - child\n    0. zero\n       1. below")) ==
+        CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.blocks[1].prefix_text, "\xe2\x97\xa6 ") &&
+           !strcmp(f.blocks[2].prefix_text, "0. ") && !strcmp(f.blocks[3].prefix_text, "a. "));
+    assert(cui_text_view_select(&f.state, f.blocks[1].text.begin, f.blocks[1].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- [x]\n  - child"));
+    char nested[2048];
+    size_t at = 0;
+    for (unsigned depth = 0; depth <= CUI_TEXT_VIEW_LIST_DEPTH_LIMIT; ++depth) {
+        memset(nested + at, ' ', depth * 2);
+        at += depth * 2;
+        memcpy(nested + at, "- item\n", 7);
+        at += 7;
+    }
+    nested[at] = 0;
+    assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
+    assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -906,6 +954,25 @@ static void test_decoded_resource_callbacks(void) {
     assert(decoded_link_clicks == 1 && decoded_image_calls == 3);
     cui_destroy(ui);
 }
+static void test_nested_list_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("1. parent\n   4. child\n      2. grand")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_draw_list d = frame(ui, &f, cui_text_view_default());
+    bool upper = false, lower = false;
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 3) {
+            if (!memcmp(d.commands[i].text.data, "D. ", 3))
+                upper = d.commands[i].bounds.x == 16;
+            if (!memcmp(d.commands[i].text.data, "b. ", 3))
+                lower = d.commands[i].bounds.x == 32;
+        }
+    assert(upper && lower);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -989,6 +1056,7 @@ int main(void) {
     test_adaptive_table_model();
     test_task_list_model();
     test_resource_decoding();
+    test_nested_list_model();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1003,6 +1071,7 @@ int main(void) {
     test_horizontal_table_interaction();
     test_passive_task_paint();
     test_decoded_resource_callbacks();
+    test_nested_list_paint();
 #endif
     return 0;
 }

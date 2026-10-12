@@ -992,7 +992,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                  .kind = CUI_INPUT_GROUP_BUTTON,
                                                  .variant = CUI_INPUT_GROUP_PRIMARY,
                                                  .label = cui_string("Open address"),
-                                                 .width = 100,
+                                                 .width = 124,
                                                  .loading = group_mode == 3},
                                                 {.id = cui_id_from(ui, "group-title"),
                                                  .alignment = CUI_INPUT_GROUP_BLOCK_START,

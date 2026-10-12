@@ -565,6 +565,7 @@ def main():
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===0', arg=index)
             page.evaluate('location.hash="Input Group"')
             page.wait_for_function('cuiGallery.renderedComponent==="Input Group"')
+            assert page.evaluate('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Open address")}')
             group_input = page.locator('#accessible [role=textbox][aria-label="Workspace address"]')
             assert group_input.count() == 1
             action_count = page.evaluate('cuiGallery.exports.gallery_group_actions()')

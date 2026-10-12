@@ -7,31 +7,42 @@
       "reference_url": "https://gpui-kit.com/component/accordion/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_disclosure.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_disclosure.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Single/multiple controlled expansion, disabled triggers, keyboard traversal and semantic panel relationships tested. Animated reveal, custom header slots and complete upstream audit pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "single/multiple expanded items",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c"
+          ]
         },
         {
           "name": "controlled state and disabled items",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c"
+          ]
         },
         {
           "name": "keyboard focus and disclosure semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -52,7 +63,8 @@
           "With Custom Icons",
           "Nested Accordions"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "AlertDialog",
@@ -123,21 +135,28 @@
       "reference_url": "https://gpui-kit.com/component/alert/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Severity text, title/message, banner sizing and controlled dismissal tested. Independent success/warning theme colors, rich content/action slots and native accessibility announcement pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "severity variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "title/content/action slots",
@@ -148,6 +167,13 @@
           "name": "accessible announcement",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "controlled pointer dismissal and omitted subtree",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -173,7 +199,8 @@
           "Interactive Alert with Custom Action",
           "Multi-line Content with Formatting"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Attachment",
@@ -238,15 +265,20 @@
       "reference_url": "https://gpui-kit.com/component/avatar/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Named UTF-8 initials fallback, circular themed surface and explicit size tested. Image loading/failure state, avatar groups, custom icon slots and exact typographic centering pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -256,13 +288,22 @@
         },
         {
           "name": "size variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "image failures and accessible name",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "validated UTF-8 initials and named fallback",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -289,7 +330,8 @@
           "Anonymous User",
           "Avatar with Custom Colors"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Badge",
@@ -359,15 +401,20 @@
       "reference_url": "https://gpui-kit.com/component/bubble/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Seven themed composable surface variants tested. Parent owns alignment/wrapping; built-in reactions, footer and complete message slot API pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -382,8 +429,10 @@
         },
         {
           "name": "theme variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -407,7 +456,8 @@
           "`BubbleReactions`",
           "Related types"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Button",
@@ -612,31 +662,42 @@
       "reference_url": "https://gpui-kit.com/component/collapsible/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_disclosure.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_disclosure.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Controlled keyboard/pointer disclosure and panel semantics tested. Animated reveal and custom trigger slots pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "controlled disclosure",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c"
+          ]
         },
         {
           "name": "keyboard trigger",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c"
+          ]
         },
         {
           "name": "semantic expanded relation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_disclosure.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -648,7 +709,8 @@
           "Basic Use",
           "Animated reveal"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "DropdownButton",
@@ -693,15 +755,20 @@
       "reference_url": "https://gpui-kit.com/component/empty/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -711,13 +778,17 @@
         },
         {
           "name": "themed layout",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "accessible content",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -735,7 +806,8 @@
           "Constrained layouts",
           "Styling defaults"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Focus Trap",
@@ -811,31 +883,42 @@
       "reference_url": "https://gpui-kit.com/component/group-box/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Composable title/content, themed border/layout and group semantic snapshot tested. Complete upstream audit and native accessibility bridge pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "title/content slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "themed border/layout",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "group semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -863,33 +946,43 @@
           "Best Practices",
           "Related Components"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "HoverCard",
       "reference_url": "https://gpui-kit.com/component/hover-card/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_content.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "untested"
+      },
+      "limitations": [
+        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. Browser story, advanced focus ownership and complete native accessibility bridge pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "hover/focus delay",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "popup placement/collision",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "dismissal and accessible relationship",
@@ -918,7 +1011,8 @@
           "Best Practices",
           "Differences from [Popover]"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Icon",
@@ -1037,21 +1131,28 @@
       "reference_url": "https://gpui-kit.com/component/kbd/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Platform modifier formatting and styled UTF-8-safe hint tested. Action/keybinding lookup and grouped shortcut composition pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "platform key labels",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "grouped shortcut rendering",
@@ -1060,8 +1161,10 @@
         },
         {
           "name": "accessible description",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1088,7 +1191,8 @@
           "Text-Only Format",
           "Styling"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Label",
@@ -1696,21 +1800,28 @@
       "reference_url": "https://gpui-kit.com/component/skeleton/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Placeholder dimensions/radii, secondary opacity, phase pulse and reduced motion tested. Loading owner semantics and richer placeholder layouts pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "placeholder sizes/layout",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "loading semantics",
@@ -1719,8 +1830,10 @@
         },
         {
           "name": "theme/motion states",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1746,22 +1859,28 @@
           "Conditional Loading",
           "Theming"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Spinner",
       "reference_url": "https://gpui-kit.com/component/spinner/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_content.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Themed eight-dot ring, explicit clock phase, redraw invalidation, reduced motion and status snapshot tested. Scheduler deadlines and alternative icon geometry pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -1771,13 +1890,17 @@
         },
         {
           "name": "sizes and theme",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "reduced motion and status semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1807,7 +1930,8 @@
           "Loading with Text",
           "Overlay Loading"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Stepper",
@@ -2079,31 +2203,42 @@
       "reference_url": "https://gpui-kit.com/component/tooltip/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_content.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_content.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "untested"
+      },
+      "limitations": [
+        "Delayed pointer/focus opening, collision placement, viewport portals, Escape suppression, disabled omission and trigger description tested. Browser story, configurable layer policy and native accessibility bridge pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "hover/focus timing",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "popup collision",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         },
         {
           "name": "dismissal and accessible description",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2137,7 +2272,8 @@
           "Examples of Good Tooltip Content",
           "Examples to Avoid"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Calendar",
@@ -3994,31 +4130,42 @@
       "reference_url": "https://gpui-kit.com/component/tabs/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_choice.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_choice.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Controlled stable-ID selection, horizontal/vertical keyboard navigation, manual activation, five themed variants, roving Tab and panel relationships tested. Overflow menus, close buttons, drag reorder and custom tab slots pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "controlled selected tab",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "roving keyboard focus",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "tab/panel semantic relationship",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4050,7 +4197,8 @@
           "Tabs with Close Buttons",
           "Notes"
         ]
-      }
+      },
+      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
     },
     {
       "name": "Theme",

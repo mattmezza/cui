@@ -569,6 +569,26 @@ def main():
             control_change('chart-curve', '2')
             control_change('chart-dots', True)
             assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
+            page.evaluate('location.hash="Progress"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Progress"')
+            control_change('progress-mode', '1')
+            progress_probe = '''()=>{const e=cuiGallery.exports;
+                const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>
+                    e.gallery_command(i,0)===0&&Math.abs(e.gallery_command(i,3)-90)<.1&&e.gallery_command(i,4)===8);
+                return i===undefined?null:e.gallery_command(i,1);}'''
+            progress_x = page.evaluate(progress_probe)
+            assert progress_x is not None
+            page.wait_for_function('''(before)=>{const probe=(%s);return Math.abs(probe()-before)>5;}''' % progress_probe, arg=progress_x)
+            progress_frame = page.evaluate('cuiGallery.frame')
+            page.emulate_media(reduced_motion='reduce')
+            page.wait_for_function('(before)=>cuiGallery.frame>before&&cuiGallery.renderedReducedMotion===true', arg=progress_frame)
+            progress_x = page.evaluate(progress_probe)
+            assert page.locator('#accessible [role=progressbar][aria-busy=true]').count() == 1
+            page.wait_for_timeout(150)
+            assert page.evaluate(progress_probe) == progress_x
+            control_change('progress-mode', '0')
+            assert page.locator('#accessible [role=progressbar][aria-busy=true]').count() == 0
+            page.emulate_media(reduced_motion='no-preference')
             page.evaluate('location.hash="Speech"')
             page.wait_for_function('cuiGallery.renderedComponent==="Speech"')
             assert semantic_index('Start dictation', 1) is not None

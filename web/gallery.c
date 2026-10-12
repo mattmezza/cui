@@ -78,6 +78,7 @@ int gallery_theme_channel(int field, int channel) {
     return channel == 0 ? color.r : channel == 1 ? color.g : channel == 2 ? color.b : color.a;
 }
 static bool redraw, reduced_motion, compact_density;
+static bool progress_indeterminate;
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
 static const cui_semantic *semantics;
@@ -2675,8 +2676,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_badge(ui, cui_id_from(ui, "badge"), &t, cui_string("In review"));
         break;
     case 9:
-        cui_progress(ui, cui_id_from(ui, "progress"), &t, slider / 100,
-                     width > 360 ? 300 : width - 48);
+        cui_progress_ex(ui, cui_id_from(ui, "progress"), &t, slider / 100,
+                        width > 360 ? 300 : width - 48,
+                        (cui_progress_options){.indeterminate = progress_indeterminate,
+                                               .reduced_motion = reduced_motion,
+                                               .now_seconds = host_seconds});
         cui_slider(ui, cui_id_from(ui, "progress-control"), &t, cui_string("Progress"), &slider, 0,
                    100, 1, disabled);
         break;
@@ -4081,6 +4085,9 @@ uint64_t gallery_semantic_labelled_by(unsigned i) {
     return i < semantic_count ? semantics[i].details.labelled_by : 0;
 }
 
+void gallery_progress_mode(int mode) {
+    progress_indeterminate = mode != 0;
+}
 void gallery_shimmer_mode(int mode) {
     if (mode != shimmer_mode) {
         shimmer_mode = mode;

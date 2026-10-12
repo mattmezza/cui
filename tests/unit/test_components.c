@@ -875,7 +875,42 @@ static void test_button_hover_and_disabled_paint(void) {
     assert(!hovered_color && count == 1 && semantics[0].disabled);
     cui_destroy(ui);
 }
+static void test_progress_motion(void) {
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 40});
+    cui_theme theme = cui_theme_light();
+    const cui_id fill = 91 ^ UINT64_C(0x7129d4cd19342f11);
+    assert(ui);
+    for (unsigned frame = 0; frame < 5; ++frame) {
+        assert(cui_begin_frame(ui, 200, 40, .016f));
+        bool reduced = frame >= 3;
+        if (frame == 4)
+            cui_set_reduced_motion(ui, true);
+        bool moving = cui_progress_ex(ui, 91, &theme, .9f, 100,
+                                      (cui_progress_options){.indeterminate = true,
+                                                             .now_seconds = frame * .4,
+                                                             .reduced_motion = frame == 3});
+        cui_end_frame(ui);
+        cui_rect track = cui_bounds(ui, 91), segment = cui_bounds(ui, fill);
+        const float positions[] = {0, 35, 70, 35, 35};
+        assert(moving == !reduced);
+        assert(fabsf(segment.x - track.x - positions[frame]) < .01f);
+        assert(fabsf(segment.w - 30) < .01f && segment.h == 8);
+        assert(segment.x >= track.x && segment.x + segment.w <= track.x + track.w + .01f);
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        assert(count == 1 && sem[0].role == CUI_ROLE_PROGRESSBAR && sem[0].details.busy);
+    }
+    assert(cui_begin_frame(ui, 200, 40, .016f));
+    assert(!cui_progress_ex(ui, 91, &theme, 1.5f, 100, (cui_progress_options){.height = 12}));
+    cui_end_frame(ui);
+    assert(cui_bounds(ui, fill).w == 100 && cui_bounds(ui, fill).h == 12);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 1 && !sem[0].details.busy && sem[0].value == 1);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_progress_motion();
     test_button_hover_and_disabled_paint();
     test_button_paint_composition();
     test_button_loading_artwork();
@@ -906,7 +941,8 @@ int main(void) {
     assert(checked);
     size_t count;
     const cui_semantic *s = cui_semantics(ui, &count);
-    assert(count == 3);
+    assert(count == 4);
+    assert(s[3].role == CUI_ROLE_PROGRESSBAR && s[3].value == .5f);
     assert(s[1].role == CUI_ROLE_CHECKBOX && s[1].checked);
     assert(s[2].disabled && s[2].role == CUI_ROLE_SWITCH);
     assert(themes[0].radius != themes[3].radius && themes[0].primary.b != themes[3].primary.b);

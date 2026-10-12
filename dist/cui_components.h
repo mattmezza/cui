@@ -194,6 +194,16 @@ cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str nam
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);
 void cui_badge(cui_context *, cui_id, const cui_theme *, cui_str);
+typedef struct {
+    bool indeterminate, reduced_motion;
+    double now_seconds; /* Monotonic host clock; one back-and-forth cycle is 1.6s. */
+    float height;       /* Zero selects the default 8px track. */
+    cui_str name;       /* Zero selects "Progress". */
+} cui_progress_options;
+/* Returns true while indeterminate motion needs another frame. The application
+ * owns the fraction and clock; reduced motion shows a static centered segment. */
+bool cui_progress_ex(cui_context *, cui_id, const cui_theme *, float fraction, float width,
+                     cui_progress_options);
 void cui_progress(cui_context *, cui_id, const cui_theme *, float fraction, float width);
 void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #ifdef __cplusplus
@@ -1066,28 +1076,55 @@ void cui_badge(cui_context *ui, cui_id id, const cui_theme *t, cui_str label) {
     cui_text(ui, label, t->font_size * .8f, t->on_primary);
     cui_end_box(ui);
 }
-void cui_progress(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width) {
+bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width,
+                     cui_progress_options o) {
+    if (!ui || !t)
+        return false;
     if (!isfinite(fraction))
         fraction = 0;
     fraction = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
     if (width <= 0 || !isfinite(width))
         width = 160;
+    float height = isfinite(o.height) && o.height > 0 ? o.height : 8;
+    bool moving = o.indeterminate && !o.reduced_motion && !cui_reduced_motion(ui);
+    float offset = 0, fill_width = width * fraction;
+    if (o.indeterminate) {
+        double phase = .5;
+        if (moving && isfinite(o.now_seconds))
+            phase = .5 - .5 * cos(fmod(o.now_seconds, 1.6) * (6.283185307179586 / 1.6));
+        fill_width = width * .3f;
+        offset = (width - fill_width) * (float)phase;
+    }
     cui_begin_box(ui, id,
                   (cui_box){.width = width,
-                            .height = 8,
+                            .height = height,
                             .radius = t->radius,
                             .background = t->border,
                             .row = true});
-    if (fraction > 0) {
-        cui_id fill = id ^ UINT64_C(0x7129d4cd19342f11);
-        cui_begin_box(ui, fill,
-                      (cui_box){.width = width * fraction,
-                                .height = 8,
+    cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, o.name.length ? o.name : cui_string("Progress"),
+                 false, false, o.indeterminate ? 0 : fraction);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.minimum = 0, .maximum = 1, .busy = o.indeterminate});
+    if (offset > 0) {
+        cui_begin_box(ui, id ^ UINT64_C(0x1829d4cd19342f11),
+                      (cui_box){.width = offset, .height = height});
+        cui_end_box(ui);
+    }
+    if (fill_width > 0) {
+        cui_begin_box(ui, id ^ UINT64_C(0x7129d4cd19342f11),
+                      (cui_box){.width = fill_width,
+                                .height = height,
                                 .radius = t->radius,
                                 .background = t->primary});
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    if (moving)
+        cui_invalidate(ui);
+    return moving;
+}
+void cui_progress(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width) {
+    cui_progress_ex(ui, id, t, fraction, width, (cui_progress_options){0});
 }
 bool cui_slider(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
                 float min, float max, float step, bool disabled) {

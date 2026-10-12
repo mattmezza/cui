@@ -193,6 +193,16 @@ cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str nam
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);
 void cui_badge(cui_context *, cui_id, const cui_theme *, cui_str);
+typedef struct {
+    bool indeterminate, reduced_motion;
+    double now_seconds; /* Monotonic host clock; one back-and-forth cycle is 1.6s. */
+    float height;       /* Zero selects the default 8px track. */
+    cui_str name;       /* Zero selects "Progress". */
+} cui_progress_options;
+/* Returns true while indeterminate motion needs another frame. The application
+ * owns the fraction and clock; reduced motion shows a static centered segment. */
+bool cui_progress_ex(cui_context *, cui_id, const cui_theme *, float fraction, float width,
+                     cui_progress_options);
 void cui_progress(cui_context *, cui_id, const cui_theme *, float fraction, float width);
 void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #ifdef __cplusplus

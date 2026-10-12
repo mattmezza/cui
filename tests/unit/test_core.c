@@ -757,7 +757,45 @@ static void test_table_semantic_roles(void) {
     cui_destroy(ui);
 }
 
+static void test_custom_shape_commands(void) {
+    cui_context *ui = make();
+    begin(ui);
+    cui_begin_box(ui, 99,
+                  (cui_box){.width = 80,
+                            .height = 40,
+                            .radius = 9,
+                            .background = {10, 20, 30, 255},
+                            .border = {255, 0, 0, 255},
+                            .border_width = 3,
+                            .custom_corners = true,
+                            .corner_radii = {7, 0, 0, 11},
+                            .custom_border_edges = true,
+                            .border_edges = {0, 4, 2, 6}});
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    bool fill = false, border = false;
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *c = &list.commands[i];
+        if (c->type != CUI_DRAW_RECT && c->type != CUI_DRAW_BORDER)
+            continue;
+        assert(c->custom_corners && c->corner_radii.top_left == 7 &&
+               c->corner_radii.top_right == 0 && c->corner_radii.bottom_left == 0 &&
+               c->corner_radii.bottom_right == 11);
+        if (c->type == CUI_DRAW_RECT)
+            fill = true;
+        else {
+            border = true;
+            assert(c->custom_border_edges && c->border_edges.left == 0 &&
+                   c->border_edges.right == 4 && c->border_edges.top == 2 &&
+                   c->border_edges.bottom == 6);
+        }
+    }
+    assert(fill && border);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_custom_shape_commands();
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();

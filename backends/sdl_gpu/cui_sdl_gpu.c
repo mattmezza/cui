@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl_gpu.h"
+#include "../software/cui_shape.h"
 #include "shaders/generated.h"
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -11,7 +12,7 @@
 #define DRAWS 32768
 #define CLIPS 256
 typedef struct {
-    float bounds[4], viewport[4], color[4], shape[4], atlas[4];
+    float bounds[4], viewport[4], color[4], shape[4], atlas[4], radii[4], edges[4];
 } gpu_params;
 typedef struct {
     gpu_params params;
@@ -218,8 +219,8 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
     for (size_t i = 0; i < list->count; i++) {
         const cui_draw_command *c = &list->commands[i];
         if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
-            !isfinite(c->bounds.h) || !isfinite(c->radius) || !isfinite(c->stroke) ||
-            !isfinite(c->font_size) || fabsf(c->bounds.x) > 1048576 ||
+            !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
+            !isfinite(c->stroke) || !isfinite(c->font_size) || fabsf(c->bounds.x) > 1048576 ||
             fabsf(c->bounds.y) > 1048576 || c->bounds.w < 0 || c->bounds.h < 0 ||
             c->bounds.w > 1048576 || c->bounds.h > 1048576) {
             SDL_SetError("CUI GPU invalid command geometry");
@@ -227,9 +228,12 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
         }
         switch (c->type) {
         case CUI_DRAW_RECT:
-        case CUI_DRAW_BORDER:
-            append(r, c->bounds, c->color, c->radius, c->type == CUI_DRAW_BORDER ? c->stroke : 0);
-            break;
+        case CUI_DRAW_BORDER: {
+            gpu_draw *d =
+                append(r, c->bounds, c->color, c->radius, c->type == CUI_DRAW_BORDER ? 1 : 0);
+            if (d)
+                cui_shape_values(c, d->params.radii, d->params.edges);
+        } break;
         case CUI_DRAW_TEXT:
             r->ink = c->color;
             if (!r->font ||

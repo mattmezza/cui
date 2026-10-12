@@ -485,6 +485,18 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
+    cui_corner_radii cr = b.custom_corners
+                              ? b.corner_radii
+                              : (cui_corner_radii){b.radius, b.radius, b.radius, b.radius};
+    float *radii[] = {&cr.top_left, &cr.top_right, &cr.bottom_left, &cr.bottom_right};
+    for (size_t i = 0; i < 4; i++)
+        *radii[i] = isfinite(*radii[i]) ? fmaxf(0, *radii[i]) : 0;
+    Clay_BorderWidth edges = b.custom_border_edges
+                                 ? (Clay_BorderWidth){cui_core_scalar(b.border_edges.left),
+                                                      cui_core_scalar(b.border_edges.right),
+                                                      cui_core_scalar(b.border_edges.top),
+                                                      cui_core_scalar(b.border_edges.bottom), 0}
+                                 : (Clay_BorderWidth){bw, bw, bw, bw, 0};
     Clay__ConfigureOpenElement((Clay_ElementDeclaration){
         .layout = {.sizing = {cui_core_axis(b.width), cui_core_axis(b.height)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
@@ -497,7 +509,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                                          : CLAY_ALIGN_Y_TOP},
                    .layoutDirection = b.row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM},
         .backgroundColor = {b.background.r, b.background.g, b.background.b, b.background.a},
-        .cornerRadius = CLAY_CORNER_RADIUS(b.radius),
+        .cornerRadius = {cr.top_left, cr.top_right, cr.bottom_left, cr.bottom_right},
         .floating = {.offset = portal ? (Clay_Vector2){portal->x, portal->y} : (Clay_Vector2){0},
                      .zIndex = layer,
                      .attachTo = portal ? CLAY_ATTACH_TO_ROOT : CLAY_ATTACH_TO_NONE,
@@ -506,8 +518,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                  .vertical = b.clip,
                  .childOffset = {isfinite(b.offset_x) ? b.offset_x : 0,
                                  isfinite(b.offset_y) ? b.offset_y : 0}},
-        .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a},
-                   .width = {bw, bw, bw, bw, 0}}});
+        .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
     cui_core_begin_box(ui, id, b, NULL, 0);
@@ -691,12 +702,25 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.type = CUI_DRAW_RECT;
             d.color = cui_core_color(c->renderData.rectangle.backgroundColor);
             d.radius = c->renderData.rectangle.cornerRadius.topLeft;
+            d.corner_radii = (cui_corner_radii){c->renderData.rectangle.cornerRadius.topLeft,
+                                                c->renderData.rectangle.cornerRadius.topRight,
+                                                c->renderData.rectangle.cornerRadius.bottomLeft,
+                                                c->renderData.rectangle.cornerRadius.bottomRight};
+            d.custom_corners = true;
             break;
         case CLAY_RENDER_COMMAND_TYPE_BORDER:
             d.type = CUI_DRAW_BORDER;
             d.color = cui_core_color(c->renderData.border.color);
             d.radius = c->renderData.border.cornerRadius.topLeft;
             d.stroke = c->renderData.border.width.left;
+            d.corner_radii = (cui_corner_radii){c->renderData.border.cornerRadius.topLeft,
+                                                c->renderData.border.cornerRadius.topRight,
+                                                c->renderData.border.cornerRadius.bottomLeft,
+                                                c->renderData.border.cornerRadius.bottomRight};
+            d.border_edges = (cui_border_edges){
+                c->renderData.border.width.left, c->renderData.border.width.right,
+                c->renderData.border.width.top, c->renderData.border.width.bottom};
+            d.custom_corners = d.custom_border_edges = true;
             break;
         case CLAY_RENDER_COMMAND_TYPE_TEXT:
             d.type = CUI_DRAW_TEXT;

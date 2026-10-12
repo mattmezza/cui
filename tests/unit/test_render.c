@@ -67,7 +67,43 @@ static void test_text(void) {
     puts("HarfBuzz multilingual shaping and FreeType coverage passed");
 }
 #endif
+static void asymmetric_shapes(void) {
+    cui_software *r = cui_software_create(64, 64, NULL);
+    assert(r);
+    cui_draw_command c = {.type = CUI_DRAW_RECT,
+                          .bounds = {8, 8, 48, 48},
+                          .color = {255, 0, 0, 128},
+                          .custom_corners = true,
+                          .corner_radii = {12, 0, 0, 6},
+                          .custom_border_edges = true,
+                          .border_edges = {0, 4, 2, 6}};
+    cui_draw_list list = {&c, 1, 64, 64};
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    assert(pixel(r, 8, 8)[3] == 0 && pixel(r, 55, 8)[3] == 128 && pixel(r, 8, 55)[3] == 128 &&
+           pixel(r, 55, 55)[3] == 0);
+    c.type = CUI_DRAW_BORDER;
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    assert(pixel(r, 8, 32)[3] == 0 && pixel(r, 54, 32)[3] == 128 && pixel(r, 32, 8)[3] == 128 &&
+           pixel(r, 32, 54)[3] == 128 && pixel(r, 32, 32)[3] == 0);
+    cui_draw_command clipped[] = {
+        {.type = CUI_DRAW_CLIP_PUSH, .bounds = {32, 0, 32, 64}}, c, {.type = CUI_DRAW_CLIP_POP}};
+    cui_draw_list clip_list = {clipped, 3, 64, 64};
+    assert(cui_software_render(r, &clip_list, (cui_color){0}));
+    assert(pixel(r, 20, 8)[3] == 0 && pixel(r, 40, 8)[3] == 128);
+    c.border_edges = (cui_border_edges){0};
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    for (int y = 0; y < 64; y++)
+        for (int x = 0; x < 64; x++)
+            assert(pixel(r, x, y)[3] == 0);
+    c.corner_radii.top_left = NAN;
+    assert(!cui_software_render(r, &list, (cui_color){0}));
+    c.corner_radii.top_left = 12;
+    c.border_edges.bottom = INFINITY;
+    assert(!cui_software_render(r, &list, (cui_color){0}));
+    cui_software_destroy(r);
+}
 int main(void) {
+    asymmetric_shapes();
     cui_software *r = cui_software_create(16, 16, NULL);
     assert(r);
     cui_draw_command commands[] = {

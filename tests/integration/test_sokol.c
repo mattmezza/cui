@@ -116,6 +116,35 @@ int main(void) {
     assert(cui_sokol_render(r, &list, (cui_color){0}));
     readback();
     assert(pixel(32, 9)[3] == 255 && pixel(32, 32)[3] == 0);
+    commands[0] = (cui_draw_command){.type = CUI_DRAW_RECT,
+                                     .bounds = {8, 8, 48, 48},
+                                     .color = {255, 0, 0, 128},
+                                     .custom_corners = true,
+                                     .corner_radii = {12, 0, 0, 6},
+                                     .custom_border_edges = true,
+                                     .border_edges = {0, 4, 2, 6}};
+    assert(cui_sokol_render(r, &list, (cui_color){0}));
+    readback();
+    assert(pixel(8, 8)[3] == 0 && abs((int)pixel(55, 8)[3] - 128) <= 1 &&
+           abs((int)pixel(8, 55)[3] - 128) <= 1 && pixel(55, 55)[3] == 0);
+    commands[0].type = CUI_DRAW_BORDER;
+    assert(cui_sokol_render(r, &list, (cui_color){0}));
+    readback();
+    assert(pixel(8, 32)[3] == 0 && abs((int)pixel(54, 32)[3] - 128) <= 1 &&
+           abs((int)pixel(32, 8)[3] - 128) <= 1 && abs((int)pixel(32, 54)[3] - 128) <= 1 &&
+           pixel(32, 32)[3] == 0);
+    cui_draw_command shape_clip[] = {{.type = CUI_DRAW_CLIP_PUSH, .bounds = {32, 0, 32, 64}},
+                                     commands[0],
+                                     {.type = CUI_DRAW_CLIP_POP}};
+    cui_draw_list shape_clip_list = {shape_clip, 3, 64, 64};
+    assert(cui_sokol_render(r, &shape_clip_list, (cui_color){0}));
+    readback();
+    assert(pixel(20, 8)[3] == 0 && abs((int)pixel(40, 8)[3] - 128) <= 1);
+    commands[0].border_edges = (cui_border_edges){0};
+    assert(cui_sokol_render(r, &list, (cui_color){0}));
+    readback();
+    for (size_t i = 3; i < sizeof(pixels); i += 4)
+        assert(pixels[i] == 0);
     commands[0].type = CUI_DRAW_CLIP_POP;
     assert(!cui_sokol_render(r, &list, (cui_color){0}));
     commands[0] = (cui_draw_command){.type = CUI_DRAW_RECT, .bounds = {NAN, 0, 10, 10}};

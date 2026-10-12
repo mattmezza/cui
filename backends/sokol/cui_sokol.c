@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sokol.h"
+#include "../software/cui_shape.h"
 #define SOKOL_GLCORE
 #define SOKOL_VALIDATE_NON_FATAL
 #ifndef CUI_SOKOL_EXTERNAL_RUNTIME
@@ -21,7 +22,7 @@
 #define CUI_SOKOL_GLYPHS 256
 #define CUI_SOKOL_GLYPH_BYTES (4u * 1024u * 1024u)
 typedef struct {
-    float position[2], uv[2], color[4], shape[4], kind;
+    float position[2], uv[2], color[4], shape[4], kind, radii[4], edges[4];
 } vertex;
 typedef struct {
     sg_view texture;
@@ -73,29 +74,51 @@ static const char *vertex_source =
     "#version 330\n"
     "layout(location=0) in vec2 position; layout(location=1) in vec2 uv;\n"
     "layout(location=2) in vec4 color; layout(location=3) in vec4 shape; "
-    "layout(location=4) in float kind;\n"
+    "layout(location=4) in float kind; layout(location=5) in vec4 radii; layout(location=6) in "
+    "vec4 edges;\n"
     "uniform vec2 canvas; out vec2 v_uv; out vec4 v_color; out vec4 v_shape; "
-    "out float v_kind;\n"
+    "out float v_kind; out vec4 v_radii; out vec4 v_edges;\n"
     "void main(){ "
     "gl_Position=vec4(position.x/canvas.x*2.0-1.0,1.0-position.y/"
     "canvas.y*2.0,0.0,1.0);"
-    "v_uv=uv;v_color=color;v_shape=shape;v_kind=kind;}\n";
+    "v_uv=uv;v_color=color;v_shape=shape;v_kind=kind;v_radii=radii;v_edges=edges;}\n";
 static const char *fragment_source =
     "#version 330\n"
-    "in vec2 v_uv; in vec4 v_color; in vec4 v_shape; in float v_kind; uniform "
-    "sampler2D glyph; out vec4 frag_color;\n"
-    "void main(){float coverage; "
-    "if(v_kind>1.5){coverage=texture(glyph,v_uv).a;}else{"
-    "vec2 p=v_uv*v_shape.xy;float radius=v_shape.z;vec2 "
-    "q=abs(p-v_shape.xy*0.5)-v_shape.xy*0.5+radius;"
-    "float d=length(max(q,vec2(0.0)))+min(max(q.x,q.y),0.0)-radius;"
-    "float "
-    "aa=max(fwidth(d),0.001);coverage=radius<0.001?1.0:clamp(0.5-d/aa,0.0,1.0);"
-    "if(v_kind>0.5){if(radius<0.001){float "
-    "edge=min(min(p.x,p.y),min(v_shape.x-p.x,v_shape.y-p.y));coverage-=step(v_"
-    "shape.w,edge);}"
-    "else coverage-=clamp(0.5-(d+v_shape.w)/aa,0.0,1.0);}}"
-    "frag_color=vec4(v_color.rgb,v_color.a*coverage);}\n";
+    "in vec2 v_uv; in vec4 v_color; in vec4 v_shape; in float v_kind; in vec4 v_radii; in vec4 "
+    "v_edges; uniform sampler2D glyph; out vec4 frag_color;\n"
+    "float arcDistance(vec2 p,vec2 r) {\n"
+    "    if(r.x<=0.0||r.y<=0.0||p.x>=r.x||p.y>=r.y) return -min(p.x,p.y);\n"
+    "    return (length((p-r)/r)-1.0)*min(r.x,r.y);\n"
+    "}\n"
+    "float outline(vec2 p,vec2 size,vec4 rx,vec4 ry) {\n"
+    "    float d=-1e6;\n"
+    "    d=max(d,arcDistance(p,vec2(rx.x,ry.x)));\n"
+    "    d=max(d,arcDistance(vec2(size.x-p.x,p.y),vec2(rx.y,ry.y)));\n"
+    "    d=max(d,arcDistance(vec2(p.x,size.y-p.y),vec2(rx.z,ry.z)));\n"
+    "    return max(d,arcDistance(size-p,vec2(rx.w,ry.w)));\n"
+    "}\n"
+    "float shapeCoverage(vec2 p,vec2 size,vec4 radii,vec4 edges,float border) {\n"
+    "    float d=outline(p,size,radii,radii);\n"
+    "    float aa=max(fwidth(d),0.5);\n"
+    "    float alpha=1.0-smoothstep(-aa*0.5,aa*0.5,d); bool "
+    "curved=(p.x<radii.x&&p.y<radii.x)||(size.x-p.x<radii.y&&p.y<radii.y)||(p.x<radii.z&&size.y-p."
+    "y<radii.z)||(size.x-p.x<radii.w&&size.y-p.y<radii.w); if(!curved) alpha=1.0;\n"
+    "    if(border>0.5) { if(dot(edges,vec4(1))<=0.0) return 0.0;\n"
+    "        vec2 inner=size-vec2(edges.x+edges.y,edges.z+edges.w);\n"
+    "        if(inner.x>0.0&&inner.y>0.0) {\n"
+    "            vec4 rx=max(radii-vec4(edges.x,edges.y,edges.x,edges.y),vec4(0));\n"
+    "            vec4 ry=max(radii-vec4(edges.z,edges.z,edges.w,edges.w),vec4(0));\n"
+    "            vec2 ip=p-vec2(edges.x,edges.z); float "
+    "di=max(outline(ip,inner,rx,ry),max(max(-ip.x,-ip.y),max(ip.x-inner.x,ip.y-inner.y)));\n"
+    "            float ai=max(fwidth(di),0.5);\n"
+    "            alpha=max(0.0,alpha-(1.0-smoothstep(-ai*0.5,ai*0.5,di)));\n"
+    "        }\n"
+    "    }\n"
+    "    return alpha;\n"
+    "}\n"
+    "void main(){float "
+    "coverage=v_kind>1.5?texture(glyph,v_uv).a:shapeCoverage(v_uv*v_shape.xy,v_shape.xy,v_radii,v_"
+    "edges,v_kind);frag_color=vec4(v_color.rgb,v_color.a*coverage);}\n";
 static bool valid_target(cui_sokol_target t) {
     return t.width > 0 && t.height > 0 && t.width <= 16384 && t.height <= 16384;
 }
@@ -147,7 +170,9 @@ cui_sokol *cui_sokol_create(cui_sokol_config config) {
                   {.glsl_name = "uv"},
                   {.glsl_name = "color"},
                   {.glsl_name = "shape"},
-                  {.glsl_name = "kind"}},
+                  {.glsl_name = "kind"},
+                  {.glsl_name = "radii"},
+                  {.glsl_name = "edges"}},
         .uniform_blocks[0] = {.stage = SG_SHADERSTAGE_VERTEX,
                               .size = 2 * sizeof(float),
                               .layout = SG_UNIFORMLAYOUT_NATIVE,
@@ -174,7 +199,9 @@ cui_sokol *cui_sokol_create(cui_sokol_config config) {
                              {.format = SG_VERTEXFORMAT_FLOAT2},
                              {.format = SG_VERTEXFORMAT_FLOAT4},
                              {.format = SG_VERTEXFORMAT_FLOAT4},
-                             {.format = SG_VERTEXFORMAT_FLOAT}}},
+                             {.format = SG_VERTEXFORMAT_FLOAT},
+                             {.format = SG_VERTEXFORMAT_FLOAT4},
+                             {.format = SG_VERTEXFORMAT_FLOAT4}}},
         .depth.pixel_format = SG_PIXELFORMAT_NONE,
         .colors[0] = {.pixel_format = SG_PIXELFORMAT_RGBA8,
                       .blend = {.enabled = true,
@@ -271,7 +298,9 @@ static bool quad(cui_sokol *r, cui_rect bounds, cui_color color, float radius, f
             .color = {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f, color.a / 255.0f},
             .shape = {bounds.w, bounds.h, fminf(fmaxf(radius, 0), fminf(bounds.w, bounds.h) / 2),
                       fmaxf(stroke, 0)},
-            .kind = kind};
+            .kind = kind,
+            .radii = {radius, radius, radius, radius},
+            .edges = {stroke, stroke, stroke, stroke}};
     }
     r->draws[r->quads++] = (draw){texture, r->clip};
     return true;
@@ -406,17 +435,17 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
     for (size_t i = 0; i < list->count && r->ok; i++) {
         const cui_draw_command *c = &list->commands[i];
         if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
-            !isfinite(c->bounds.h) || !isfinite(c->radius) || !isfinite(c->stroke) ||
-            fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f || fabsf(c->bounds.w) > 16384 ||
-            fabsf(c->bounds.h) > 16384)
+            !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
+            !isfinite(c->stroke) || fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f ||
+            fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)
             return fail(r, "Invalid CUI Sokol geometry");
+        size_t before = r->quads;
         switch (c->type) {
         case CUI_DRAW_RECT:
             quad(r, c->bounds, c->color, c->radius, 0, 0, r->white_view);
             break;
         case CUI_DRAW_BORDER:
-            if (c->stroke > 0)
-                quad(r, c->bounds, c->color, c->radius, c->stroke, 1, r->white_view);
+            quad(r, c->bounds, c->color, c->radius, c->stroke, 1, r->white_view);
             break;
         case CUI_DRAW_CLIP_PUSH:
             if (depth == 64)
@@ -441,6 +470,14 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
             break;
         default:
             return fail(r, "Unknown CUI Sokol draw command");
+        }
+        if ((c->type == CUI_DRAW_RECT || c->type == CUI_DRAW_BORDER) && r->quads > before) {
+            float radii[4], edges[4];
+            cui_shape_values(c, radii, edges);
+            for (unsigned v = 0; v < 6; v++) {
+                memcpy(r->vertices[before * 6 + v].radii, radii, sizeof(radii));
+                memcpy(r->vertices[before * 6 + v].edges, edges, sizeof(edges));
+            }
         }
     }
     if (depth)

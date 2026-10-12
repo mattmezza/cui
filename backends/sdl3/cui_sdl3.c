@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
+#include "../software/cui_shape.h"
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdlib.h>
@@ -179,32 +180,33 @@ void cui_sdl3_size(cui_sdl3 *s, float *w, float *h) {
     *h = (float)y;
     SDL_SetRenderLogicalPresentation(s->renderer, x, y, SDL_LOGICAL_PRESENTATION_STRETCH);
 }
-static float inset(float radius, float y, float height) {
-    radius = fminf(fmaxf(0, radius), height / 2);
-    float d = radius - fminf(y, height - y);
-    return d > 0 ? radius - sqrtf(fmaxf(0, radius * radius - d * d)) : 0;
+static bool fill_span(cui_sdl3 *s, const cui_draw_command *c, float left, float right, float y,
+                      float height) {
+    float x0 = ceilf(c->bounds.x + left - .5f);
+    float x1 = ceilf(c->bounds.x + right - .5f);
+    if (x1 <= x0)
+        return true;
+    SDL_FRect span = {x0, c->bounds.y + y, x1 - x0, height};
+    return SDL_RenderFillRect(s->renderer, &span);
 }
 static bool rect(cui_sdl3 *s, const cui_draw_command *c) {
     SDL_SetRenderDrawColor(s->renderer, c->color.r, c->color.g, c->color.b, c->color.a);
-    float rad = fminf(c->radius, c->bounds.w / 2);
-    if (rad <= 0 && c->type == CUI_DRAW_RECT) {
-        SDL_FRect r = {c->bounds.x, c->bounds.y, c->bounds.w, c->bounds.h};
-        return SDL_RenderFillRect(s->renderer, &r);
+    float radii[4], edges[4];
+    cui_shape_values(c, radii, edges);
+    if (c->type == CUI_DRAW_RECT && radii[0] == 0 && radii[1] == 0 && radii[2] == 0 &&
+        radii[3] == 0) {
+        SDL_FRect box = {c->bounds.x, c->bounds.y, c->bounds.w, c->bounds.h};
+        return SDL_RenderFillRect(s->renderer, &box);
     }
     for (int y = 0; y < (int)ceilf(c->bounds.h); y++) {
-        float h = fminf(1, c->bounds.h - y), off = inset(rad, y + h / 2, c->bounds.h);
-        SDL_FRect r = {c->bounds.x + off, c->bounds.y + y, c->bounds.w - 2 * off, h};
-        if (c->type == CUI_DRAW_BORDER && y + h / 2 >= c->stroke &&
-            y + h / 2 < c->bounds.h - c->stroke && c->bounds.w > 2 * c->stroke) {
-            float inner = c->stroke + inset(fmaxf(0, rad - c->stroke), y + h / 2 - c->stroke,
-                                            c->bounds.h - 2 * c->stroke);
-            float edge = fmaxf(0, inner - off);
-            r.w = edge;
-            if (!SDL_RenderFillRect(s->renderer, &r))
+        float h = fminf(1, c->bounds.h - y), left, right, il, ir;
+        if (!cui_shape_span(c, radii, edges, false, y + h / 2, &left, &right))
+            continue;
+        if (c->type == CUI_DRAW_BORDER &&
+            cui_shape_span(c, radii, edges, true, y + h / 2, &il, &ir)) {
+            if (!fill_span(s, c, left, il, (float)y, h) || !fill_span(s, c, ir, right, (float)y, h))
                 return false;
-            r.x = c->bounds.x + c->bounds.w - inner;
-        }
-        if (!SDL_RenderFillRect(s->renderer, &r))
+        } else if (!fill_span(s, c, left, right, (float)y, h))
             return false;
     }
     return true;
@@ -328,9 +330,9 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
     for (size_t i = 0; i < list->count; i++) {
         const cui_draw_command *c = &list->commands[i];
         if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
-            !isfinite(c->bounds.h) || !isfinite(c->radius) || !isfinite(c->stroke) ||
-            fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f || fabsf(c->bounds.w) > 16384 ||
-            fabsf(c->bounds.h) > 16384)
+            !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
+            !isfinite(c->stroke) || fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f ||
+            fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)
             return false;
         switch (c->type) {
         case CUI_DRAW_RECT:

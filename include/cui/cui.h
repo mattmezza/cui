@@ -140,12 +140,24 @@ typedef struct {
 } cui_interaction;
 typedef enum { CUI_ALIGN_START, CUI_ALIGN_CENTER, CUI_ALIGN_END } cui_align;
 typedef struct {
+    float top_left, top_right, bottom_left, bottom_right;
+} cui_corner_radii;
+typedef struct {
+    float left, right, top, bottom;
+} cui_border_edges;
+typedef struct {
     float width, height, padding, gap, radius;
     bool row, clip;
     cui_color background, border;
     float border_width;
     cui_align align_x, align_y;
     float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges;
+    /* Flags preserve zero corners/edges. Radii are clamped to half the shorter
+     * side by adapters; border widths use the same integer layout units as
+     * border_width. Negative/nonfinite box values normalize to zero. */
+    bool custom_corners, custom_border_edges;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,
@@ -160,6 +172,9 @@ typedef struct {
     cui_color color;
     float radius, stroke, font_size;
     cui_str text;
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges;
+    bool custom_corners, custom_border_edges;
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;

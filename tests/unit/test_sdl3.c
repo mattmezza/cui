@@ -5,6 +5,50 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+static void shapes(cui_sdl3 *s) {
+    cui_draw_command c = {.type = CUI_DRAW_RECT,
+                          .bounds = {8, 8, 48, 48},
+                          .color = {255, 0, 0, 128},
+                          .custom_corners = true,
+                          .corner_radii = {12, 0, 0, 6},
+                          .custom_border_edges = true,
+                          .border_edges = {0, 4, 2, 6}};
+    cui_draw_list list = {&c, 1, 320, 160};
+    assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-shapes.bmp"));
+    SDL_Surface *surface = SDL_LoadBMP("sdl-shapes.bmp");
+    assert(surface);
+    Uint8 red, green, blue, alpha;
+    assert(SDL_ReadSurfacePixel(surface, 8, 8, &red, &green, &blue, &alpha) && red == 0);
+    assert(SDL_ReadSurfacePixel(surface, 55, 8, &red, &green, &blue, &alpha) &&
+           abs(red - 128) <= 1);
+    assert(SDL_ReadSurfacePixel(surface, 8, 55, &red, &green, &blue, &alpha) &&
+           abs(red - 128) <= 1);
+    assert(SDL_ReadSurfacePixel(surface, 55, 55, &red, &green, &blue, &alpha) && red == 0);
+    SDL_DestroySurface(surface);
+    c.type = CUI_DRAW_BORDER;
+    assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-shapes.bmp"));
+    surface = SDL_LoadBMP("sdl-shapes.bmp");
+    assert(surface);
+    assert(SDL_ReadSurfacePixel(surface, 8, 32, &red, &green, &blue, &alpha) && red == 0);
+    assert(SDL_ReadSurfacePixel(surface, 54, 32, &red, &green, &blue, &alpha) &&
+           abs(red - 128) <= 1);
+    assert(SDL_ReadSurfacePixel(surface, 32, 8, &red, &green, &blue, &alpha) &&
+           abs(red - 128) <= 1);
+    assert(SDL_ReadSurfacePixel(surface, 32, 54, &red, &green, &blue, &alpha) &&
+           abs(red - 128) <= 1);
+    assert(SDL_ReadSurfacePixel(surface, 32, 32, &red, &green, &blue, &alpha) && red == 0);
+    SDL_DestroySurface(surface);
+    cui_draw_command clipped[] = {
+        {.type = CUI_DRAW_CLIP_PUSH, .bounds = {32, 0, 32, 64}}, c, {.type = CUI_DRAW_CLIP_POP}};
+    cui_draw_list clip_list = {clipped, 3, 320, 160};
+    assert(cui_sdl3_render_capture(s, &clip_list, (cui_color){0, 0, 0, 255}, "sdl-shapes.bmp"));
+    surface = SDL_LoadBMP("sdl-shapes.bmp");
+    assert(surface);
+    assert(SDL_ReadSurfacePixel(surface, 20, 8, &red, &green, &blue, &alpha) && red == 0);
+    assert(SDL_ReadSurfacePixel(surface, 40, 8, &red, &green, &blue, &alpha) &&
+           abs(red - 128) <= 1);
+    SDL_DestroySurface(surface);
+}
 int main(int argc, char **argv) {
     if (argc > 2) {
         fprintf(stderr, "Usage: test_sdl3 [FONT]\n");
@@ -23,6 +67,7 @@ int main(int argc, char **argv) {
     }
     cui_sdl3 *s = cui_sdl3_create("CUI SDL adapter test", 320, 160, font);
     assert(s);
+    shapes(s);
     const char text[] = "repeat repeat caf\xc3\xa9";
     cui_draw_command commands[] = {
         {.type = CUI_DRAW_RECT, .bounds = {0, 0, 320, 160}, .color = {30, 40, 50, 255}},

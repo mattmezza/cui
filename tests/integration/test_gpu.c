@@ -10,6 +10,54 @@ static void pixel(const unsigned char *pixels, unsigned w, unsigned h, float x, 
     const unsigned char *p = pixels + ((size_t)py * w + px) * 3;
     assert(abs((int)p[0] - red) <= 1 && abs((int)p[1] - green) <= 1 && abs((int)p[2] - blue) <= 1);
 }
+static unsigned char *capture(cui_sdl_gpu *gpu, unsigned *w, unsigned *h) {
+    assert(cui_sdl_gpu_save_ppm(gpu, "gpu-shapes.ppm"));
+    FILE *f = fopen("gpu-shapes.ppm", "rb");
+    assert(f);
+    char magic[3];
+    unsigned max;
+    assert(fscanf(f, "%2s %u %u %u", magic, w, h, &max) == 4 && max == 255);
+    assert(fgetc(f) == '\n');
+    unsigned char *data = malloc((size_t)*w * *h * 3);
+    assert(data && fread(data, 3, (size_t)*w * *h, f) == (size_t)*w * *h);
+    assert(!fclose(f));
+    return data;
+}
+static void shapes(cui_sdl_gpu *gpu) {
+    cui_draw_command c = {.type = CUI_DRAW_RECT,
+                          .bounds = {8, 8, 48, 48},
+                          .color = {255, 0, 0, 128},
+                          .custom_corners = true,
+                          .corner_radii = {12, 0, 0, 6},
+                          .custom_border_edges = true,
+                          .border_edges = {0, 4, 2, 6}};
+    cui_draw_list list = {&c, 1, 200, 200};
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    unsigned w, h;
+    unsigned char *data = capture(gpu, &w, &h);
+    pixel(data, w, h, 8.5f / 200, 8.5f / 200, 0, 0, 0);
+    pixel(data, w, h, 55.5f / 200, 8.5f / 200, 128, 0, 0);
+    pixel(data, w, h, 8.5f / 200, 55.5f / 200, 128, 0, 0);
+    pixel(data, w, h, 55.5f / 200, 55.5f / 200, 0, 0, 0);
+    free(data);
+    c.type = CUI_DRAW_BORDER;
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    data = capture(gpu, &w, &h);
+    pixel(data, w, h, 8.5f / 200, 32.5f / 200, 0, 0, 0);
+    pixel(data, w, h, 54.5f / 200, 32.5f / 200, 128, 0, 0);
+    pixel(data, w, h, 32.5f / 200, 8.5f / 200, 128, 0, 0);
+    pixel(data, w, h, 32.5f / 200, 54.5f / 200, 128, 0, 0);
+    pixel(data, w, h, 32.5f / 200, 32.5f / 200, 0, 0, 0);
+    free(data);
+    cui_draw_command clipped[] = {
+        {.type = CUI_DRAW_CLIP_PUSH, .bounds = {32, 0, 32, 64}}, c, {.type = CUI_DRAW_CLIP_POP}};
+    cui_draw_list clip_list = {clipped, 3, 200, 200};
+    assert(cui_sdl_gpu_render(gpu, &clip_list, (cui_color){0, 0, 0, 255}));
+    data = capture(gpu, &w, &h);
+    pixel(data, w, h, 20.5f / 200, 8.5f / 200, 0, 0, 0);
+    pixel(data, w, h, 40.5f / 200, 8.5f / 200, 128, 0, 0);
+    free(data);
+}
 int main(void) {
     assert(SDL_Init(SDL_INIT_VIDEO));
     SDL_Window *window = SDL_CreateWindow("CUI GPU behavioral verification", 200, 200, 0);
@@ -48,6 +96,7 @@ int main(void) {
     pixel(pixels, w, h, .5f, .5f, 20, 40, 200);
     pixel(pixels, w, h, .25f, .25f, 138, 218, 148);
     free(pixels);
+    shapes(gpu);
     cui_draw_command malformed = {.type = CUI_DRAW_CLIP_POP};
     list = (cui_draw_list){&malformed, 1, 200, 200};
     assert(!cui_sdl_gpu_render(gpu, &list, (cui_color){0}));

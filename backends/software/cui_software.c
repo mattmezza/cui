@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_software.h"
+#include "cui_shape.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,28 +65,27 @@ static void blend(cui_software *r, int x, int y, cui_color c) {
             (unsigned char)((src[i] * c.a * 255u + p[i] * p[3] * (255u - c.a) + alpha / 2) / alpha);
     p[3] = (unsigned char)((alpha + 127) / 255);
 }
-static bool inside(cui_rect b, float rad, float x, float y) {
-    if (b.w <= 0 || b.h <= 0 || x < b.x || y < b.y || x >= b.x + b.w || y >= b.y + b.h)
-        return false;
-    rad = fminf(fmaxf(0, rad), fminf(b.w, b.h) * 0.5f);
-    float cx = fminf(fmaxf(x, b.x + rad), b.x + b.w - rad),
-          cy = fminf(fmaxf(y, b.y + rad), b.y + b.h - rad);
-    return (x - cx) * (x - cx) + (y - cy) * (y - cy) <= rad * rad;
-}
 static void rectangle(cui_software *r, const cui_draw_command *c) {
     cui_rect area = intersect(c->bounds, r->clip);
     if (area.w <= 0 || area.h <= 0)
         return;
     int x0 = (int)floorf(area.x), y0 = (int)floorf(area.y), x1 = (int)ceilf(area.x + area.w),
         y1 = (int)ceilf(area.y + area.h);
-    cui_rect inner = {c->bounds.x + c->stroke, c->bounds.y + c->stroke, c->bounds.w - 2 * c->stroke,
-                      c->bounds.h - 2 * c->stroke};
-    for (int y = y0; y < y1; y++)
-        for (int x = x0; x < x1; x++)
-            if (inside(c->bounds, c->radius, x + 0.5f, y + 0.5f) &&
-                (c->type != CUI_DRAW_BORDER ||
-                 !inside(inner, fmaxf(0, c->radius - c->stroke), x + 0.5f, y + 0.5f)))
+    float radii[4], edges[4];
+    cui_shape_values(c, radii, edges);
+    for (int y = y0; y < y1; y++) {
+        float left, right, il = 0, ir = 0;
+        float yy = y + .5f - c->bounds.y;
+        if (!cui_shape_span(c, radii, edges, false, yy, &left, &right))
+            continue;
+        bool inner =
+            c->type == CUI_DRAW_BORDER && cui_shape_span(c, radii, edges, true, yy, &il, &ir);
+        for (int x = x0; x < x1; x++) {
+            float xx = x + .5f - c->bounds.x;
+            if (xx >= left && xx < right && (!inner || xx < il || xx >= ir))
                 blend(r, x, y, c->color);
+        }
+    }
 }
 #ifdef CUI_HAS_TEXT
 static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsigned char *data) {
@@ -115,7 +115,8 @@ bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color c
     for (size_t i = 0; i < list->count; i++) {
         const cui_draw_command *c = &list->commands[i];
         if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
-            !isfinite(c->bounds.h) || !isfinite(c->radius) || !isfinite(c->stroke))
+            !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
+            !isfinite(c->stroke))
             return false;
         switch (c->type) {
         case CUI_DRAW_RECT:

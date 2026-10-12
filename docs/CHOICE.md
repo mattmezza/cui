@@ -403,7 +403,7 @@ pre-scroll geometry in a scrolling event batch. Standalone base users provide
 the state's viewport, receiving ID and maximum themselves. Built-in labels have
 immediate measured extents; custom bodies use previous-frame tab widths. Tests
 cover both axes, translation, fixed slots, selection preservation, clamps,
-disabled and off-viewport input and removing tabs while scrolled. Automatic reveal and native scrollbars remain gaps.
+disabled and off-viewport input and removing tabs while scrolled. Native scrollbars remain a gap.
 
 ## All-tabs overflow menu
 
@@ -473,3 +473,16 @@ is presentation only: it does not set checked, selected or toggled accessibility
 state on these action buttons. The menu trigger reports its actual expanded
 state independently. Tests inspect inherited appearance, independent foregrounds,
 outer outline precedence and expanded/unchecked semantics after pointer opening.
+
+Set scroll-state `reveal_id` to request revealing a stable tab ID on the next
+submission. The request uses measured content geometry, leaves selection alone,
+and clears once applied; an unknown ID clears without moving. Oversized tabs
+align their leading edge. Custom-body requests wait until a previous-frame width
+is available. `reveal_selected` optionally reveals selection changes after base
+input reduction and before painting, so keyboard/overflow activation reveals its
+new tab in the same frame. The default keeps manual scrolling independent of
+selection, matching the upstream explicit scroll-handle contract. A selection
+that stays unchanged never resets manual position. `cui_tab_scroll_reveal` also
+provides the portable headless geometry operation directly. Tests cover clamps,
+invalid geometry, explicit stable-ID reveal, default preservation, same-frame
+keyboard reveal and unchanged-selection/manual-offset preservation.

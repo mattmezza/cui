@@ -38,6 +38,7 @@ typedef struct {
     cui_rect viewport;
     cui_id receiving_id;
     bool changed;
+    cui_id reveal_id, last_selected; /* explicit reveal request and auto-reveal tracking */
 } cui_tab_scroll_state;
 typedef struct {
     bool vertical, disabled, manual_activation;
@@ -51,6 +52,7 @@ typedef struct {
     float bar_extent;             /* scroll viewport width, or height for vertical tabs */
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
     cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
+    bool reveal_selected;     /* opt in to reveal selection changes in a bounded strip */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -59,6 +61,8 @@ typedef void (*cui_tab_panel_fn)(cui_context *, size_t index, void *user);
 /* Selection is a stable item ID rather than a reorder-sensitive array index.
  * Zero means no selection. Invalid/disabled selections are left caller-owned;
  * they produce no visible panel. Base controls draw nothing. */
+/* Reveal content coordinates in an existing bounded scroll range. */
+bool cui_tab_scroll_reveal(cui_tab_scroll_state *, float start, float extent, float viewport);
 bool cui_base_tabs(cui_context *, const cui_choice_item *, size_t count, cui_id *selected,
                    cui_tabs_options);
 bool cui_base_toggle_group(cui_context *, const cui_choice_item *, size_t count, bool *selected,

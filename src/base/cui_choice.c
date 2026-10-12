@@ -24,6 +24,21 @@ static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, si
     }
     return count;
 }
+bool cui_tab_scroll_reveal(cui_tab_scroll_state *state, float start, float extent, float viewport) {
+    if (!state || !isfinite(start) || !isfinite(extent) || !isfinite(viewport) || start < 0 ||
+        extent < 0 || viewport <= 0 || !isfinite(start + extent) || !isfinite(state->maximum) ||
+        state->maximum < 0)
+        return false;
+    float before = state->offset;
+    float offset = isfinite(before) ? fminf(state->maximum, fmaxf(0, before)) : 0;
+    if (extent >= viewport || start < offset)
+        offset = start;
+    else if (start + extent > offset + viewport)
+        offset = start + extent - viewport;
+    state->offset = fminf(state->maximum, fmaxf(0, offset));
+    state->changed |= before != state->offset;
+    return before != state->offset;
+}
 void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger,
                            cui_menu_entry *entries, size_t capacity) {
     if (!state)

@@ -133,6 +133,40 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     } else
         options.scroll = NULL;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
+    if (scrollable) {
+        cui_tab_scroll_state *scroll = options.scroll;
+        if (options.reveal_selected && scroll->last_selected != *selected && !scroll->reveal_id)
+            scroll->reveal_id = *selected;
+        scroll->last_selected = *selected;
+        if (scroll->reveal_id) {
+            float start = 0;
+            bool found = false;
+            for (size_t i = 0; i < count; i++) {
+                float extent = options.vertical ? theme->control_height
+                               : options.render
+                                   ? cui_bounds(ui, items[i].id).w
+                                   : cui_measure_text(ui, items[i].label, theme->font_size).width +
+                                         2 * theme->padding;
+                if (!options.vertical && !options.render && options.max_width > 0 &&
+                    extent > options.max_width)
+                    extent = options.max_width;
+                if (items[i].id == scroll->reveal_id) {
+                    found = true;
+                    if (extent > 0 && isfinite(extent)) {
+                        if (cui_tab_scroll_reveal(scroll, start, extent, options.bar_extent))
+                            cui_invalidate(ui);
+                        scroll->reveal_id = 0;
+                    }
+                    break;
+                }
+                if (extent > 0 && isfinite(extent))
+                    start += extent + theme->gap;
+            }
+            if (!found)
+                scroll->reveal_id = 0;
+        }
+    }
+
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
     cui_interact(ui, list_id, CUI_ROLE_TABLIST, cui_string(""), options.disabled, false, 0);

@@ -2149,6 +2149,61 @@ static void test_dropdown_inner_button_presentation(void) {
     assert(expanded);
     cui_destroy(ui);
 }
+static bool reveal_tabs_scene(cui_context *ui, cui_tab_scroll_state *scroll, cui_id *value,
+                              bool automatic) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {{10, {"First long tab", 14}, false},
+                                       {20, {"Second long tab", 15}, false},
+                                       {30, {"Third long tab", 14}, false}};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    bool changed = cui_tabs(
+        ui, 1, &theme, entries, 3, value,
+        (cui_tabs_options){
+            .max_width = 100, .scroll = scroll, .bar_extent = 110, .reveal_selected = automatic},
+        NULL, NULL);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void test_tab_reveal_requests(void) {
+    cui_tab_scroll_state geometry = {.offset = 10, .maximum = 300};
+    assert(cui_tab_scroll_reveal(&geometry, 180, 50, 100) && geometry.offset == 130);
+    assert(!cui_tab_scroll_reveal(&geometry, 140, 20, 100) && geometry.offset == 130);
+    assert(cui_tab_scroll_reveal(&geometry, 20, 200, 100) && geometry.offset == 20);
+    assert(!cui_tab_scroll_reveal(&geometry, NAN, 20, 100) && geometry.offset == 20);
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_tab_scroll_state scroll = {0};
+    cui_id value = 10;
+    reveal_tabs_scene(ui, &scroll, &value, false);
+    scroll.reveal_id = 30;
+    reveal_tabs_scene(ui, &scroll, &value, false);
+    assert(!scroll.reveal_id && scroll.offset == scroll.maximum && value == 10);
+    cui_rect last = cui_bounds(ui, 30), viewport = cui_bounds(ui, scroll.receiving_id);
+    assert(last.x >= viewport.x && last.x + last.w <= viewport.x + viewport.w);
+    scroll.reveal_id = 10;
+    reveal_tabs_scene(ui, &scroll, &value, false);
+    assert(scroll.offset == 0);
+    value = 30;
+    reveal_tabs_scene(ui, &scroll, &value, false);
+    assert(scroll.offset == 0); /* Selection alone preserves manual position by default. */
+    value = 10;
+    reveal_tabs_scene(ui, &scroll, &value, true);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_END);
+    assert(reveal_tabs_scene(ui, &scroll, &value, true));
+    assert(value == 30 && scroll.offset == scroll.maximum);
+    last = cui_bounds(ui, 30);
+    viewport = cui_bounds(ui, scroll.receiving_id);
+    assert(last.x >= viewport.x && last.x + last.w <= viewport.x + viewport.w);
+    scroll.offset = 32;
+    reveal_tabs_scene(ui, &scroll, &value, true);
+    assert(scroll.offset == 32); /* No new selection means no automatic reveal. */
+    scroll.reveal_id = 9999;
+    reveal_tabs_scene(ui, &scroll, &value, false);
+    assert(!scroll.reveal_id && scroll.offset == 32);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -2180,6 +2235,7 @@ int main(void) {
     test_long_tab_label_measurement();
     test_dropdown_colored_outline();
     test_dropdown_inner_button_presentation();
+    test_tab_reveal_requests();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

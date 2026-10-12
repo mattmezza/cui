@@ -7,9 +7,9 @@
 #include "cui/cui_numeric.h"
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
-#include "cui/cui_virtual.h"
 #include "cui/cui_scroll.h"
 #include "cui/cui_table.h"
+#include "cui/cui_virtual.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,7 +84,9 @@ static cui_str table_label(void *user, size_t row, cui_id column) {
     (void)user;
     if (row >= 1000)
         return cui_string("");
-    return cui_string(column == 101 ? table_names[row] : column == 102 ? "Ready" : table_sizes[row]);
+    return cui_string(column == 101   ? table_names[row]
+                      : column == 102 ? "Ready"
+                                      : table_sizes[row]);
 }
 static cui_tree_model *tree;
 static cui_tree_state tree_state;
@@ -131,17 +133,20 @@ int gallery_init(void) {
     for (size_t i = 0; i < 3; i++)
         table_columns[i] = (cui_table_column){.key = 101 + i,
                                               .label = cui_string(column_names[i]),
-                                              .width = 150, .minimum = 80, .maximum = 300,
-                                              .sortable = true, .resizable = true, .movable = true};
+                                              .width = 150,
+                                              .minimum = 80,
+                                              .maximum = 300,
+                                              .sortable = true,
+                                              .resizable = true,
+                                              .movable = true};
     if (!table || cui_table_bind(table, table_rows, 1000, table_columns, 3) != CUI_TABLE_OK)
         return 0;
     tree = cui_tree_create(6);
     const char *tree_labels[6] = {"Workspace", "src", "core.c", "base.c", "docs", "README.md"};
     const unsigned tree_depths[6] = {0, 1, 2, 2, 1, 2};
     for (size_t i = 0; i < 6; i++)
-        tree_nodes[i] = (cui_tree_node){.key = i + 1,
-                                       .label = cui_string(tree_labels[i]),
-                                       .depth = tree_depths[i]};
+        tree_nodes[i] = (cui_tree_node){
+            .key = i + 1, .label = cui_string(tree_labels[i]), .depth = tree_depths[i]};
     if (!tree || cui_tree_rebuild(tree, tree_nodes, tree_expanded, 6) != CUI_TREE_OK)
         return 0;
     number_state.edit = cui_edit_create((cui_edit_config){.buffer = number_buffer,
@@ -172,7 +177,8 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
 }
 void gallery_scroll(float x, float y, float dx, float dy) {
     if (ui)
-        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dx = dx, .dy = dy});
+        cui_queue_event(ui,
+                        (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dx = dx, .dy = dy});
 }
 void gallery_text(const char *text, size_t length) {
     cui_event event = {.type = CUI_EVENT_TEXT};
@@ -261,9 +267,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                    disabled);
         break;
     case 6:
-        cui_input_ex(ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit,
-                     &input_state, (cui_input_options){.disabled = disabled,
-                                                       .width = width > 360 ? 280 : width - 48});
+        cui_input_ex(
+            ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit, &input_state,
+            (cui_input_options){.disabled = disabled, .width = width > 360 ? 280 : width - 48});
         break;
     case 7:
         cui_label(ui, &t, cui_string("A useful label, rendered by CUI."));
@@ -459,10 +465,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 44: {
-        cui_scroll_options options = {.width = width - 48, .height = 192,
-                                       .content_width = 500, .content_height = 640,
-                                       .horizontal = true, .vertical = true,
-                                       .disabled = disabled, .wheel_step = 32, .gap = 12};
+        cui_scroll_options options = {.width = width - 48,
+                                      .height = 192,
+                                      .content_width = 500,
+                                      .content_height = 640,
+                                      .horizontal = true,
+                                      .vertical = true,
+                                      .disabled = disabled,
+                                      .wheel_step = 32,
+                                      .gap = 12};
         if (cui_scrollable_begin(ui, cui_id_from(ui, "scrollable"), &t, &scroll_state, options)) {
             for (size_t i = 0; i < 16; i++) {
                 char text[32];
@@ -474,12 +485,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 45: {
-        cui_table_result result = cui_data_table(
-            ui, cui_id_from(ui, "data-table"), &t, table, &table_state,
-            (cui_table_options){.width = width - 48, .height = 224, .row_height = 32,
-                                .header_height = 32, .disabled = disabled, .striped = true,
-                                .bordered = true, .selection_mode = CUI_TABLE_SELECT_CELL},
-            table_label, NULL, NULL);
+        cui_table_result result =
+            cui_data_table(ui, cui_id_from(ui, "data-table"), &t, table, &table_state,
+                           (cui_table_options){.width = width - 48,
+                                               .height = 224,
+                                               .row_height = 32,
+                                               .header_height = 32,
+                                               .disabled = disabled,
+                                               .striped = true,
+                                               .bordered = true,
+                                               .selection_mode = CUI_TABLE_SELECT_CELL},
+                           table_label, NULL, NULL);
         char text[72];
         snprintf(text, sizeof(text), "1,000 rows / visible %zu-%zu / sort %d",
                  result.rows.begin + 1, result.rows.end, (int)table_state.sort);
@@ -499,10 +515,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 cui_table_begin_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT);
                 const char *headers[] = {"Name", "Status", "Size"};
                 cui_str label = r == 0 ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
-                cui_set_semantic_details(ui, cell_id, (cui_semantic_details){.parent = row_id,
-                                                                           .row_index = (unsigned)r,
-                                                                           .column_index = (unsigned)c + 1,
-                                                                           .description = label});
+                cui_set_semantic_details(ui, cell_id,
+                                         (cui_semantic_details){.parent = row_id,
+                                                                .row_index = (unsigned)r,
+                                                                .column_index = (unsigned)c + 1,
+                                                                .description = label});
                 cui_label(ui, &t, label);
                 cui_table_end(ui);
             }
@@ -513,8 +530,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 43: {
         cui_tree(ui, cui_id_from(ui, "tree"), &t, tree, &tree_state, &tree_selected,
-                 (cui_tree_options){.disabled = disabled, .width = width - 48,
-                                     .height = 192, .row_height = 32, .dt = host_dt});
+                 (cui_tree_options){.disabled = disabled,
+                                    .width = width - 48,
+                                    .height = 192,
+                                    .row_height = 32,
+                                    .dt = host_dt});
         break;
     }
     case 30:

@@ -1602,6 +1602,12 @@ def main():
             # Rejection changes the centered content height. Allow the measured
             # body and its corrected layout to render before clicking again.
             page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            rejected_bounds = page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+                return ['Surface content','Delete'].map(name=>{const i=Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
+                    .find(i=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
+                    return [1,2,3,4].map(f=>e.gallery_semantic(i,f));});}''')
+            assert rejected_bounds[1][0] >= rejected_bounds[0][0], rejected_bounds
+            assert rejected_bounds[1][0]+rejected_bounds[1][2] <= rejected_bounds[0][0]+rejected_bounds[0][2]+.1, rejected_bounds
             click_semantic('Delete')
             page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
             print('Alert second confirmation:', page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return {

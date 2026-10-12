@@ -1,0 +1,3 @@
+PASS test_text_view with 1 MiB stack
+PASS test_text_view_base with 1 MiB stack
+PASS test_chart with 1 MiB stack

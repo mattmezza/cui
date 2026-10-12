@@ -40,12 +40,12 @@ each clipped cell and can draw arbitrary content; the application must govern
 interactive children and disabled behavior consistently.
 
 Up/Down skip disabled rows, Left/Right skip disabled columns, and Home/End move to
-the first/last enabled row. Navigation does not wrap unless requested. Multiple
+the first/last enabled row. PageUp/PageDown move a viewport of physical rows and skip disabled destinations. Navigation does not wrap unless requested. Multiple
 events in one frame operate in queue order. Roving cell Tab focus follows the
-cursor; the first header is a separate Tab stop. Headers support Enter or pointer
+cursor; the header cursor is a separate Tab stop, with Left/Right/Home/End navigation skipping disabled columns. Headers support Enter or pointer
 sort activation, and Ctrl+Left/Right moves movable columns without crossing an
 immovable column. Resize grips accept pointer dragging and Left/Right in eight
-pixel increments. Widths clamp to configured bounds; secondary button gestures
+pixel increments. Secondary clicks return a contextual row/column request without changing selection; the application composes and controls the menu. Widths clamp to configured bounds; secondary button gestures
 do not resize. Manual selection moves the cursor without changing selection.
 Disabled state prevents reducer mutation.
 
@@ -68,7 +68,7 @@ both layout and reducer.
 
 This is not full GPUI family parity. Remaining features include pinned left
 columns, multi-selection/range selection,
-column drag reorder, context menus, asynchronous loading indicators, scrollbar
+column drag reorder, menu composition, asynchronous loading indicators, scrollbar
 chrome, variable row heights, Table cell spans/sections/captions, and row-header
 styling. Selection is a single controlled keyed item in each dimension. Caller
 sorting/filtering is supported but this module does not provide a comparator or

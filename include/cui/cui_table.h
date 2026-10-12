@@ -63,7 +63,7 @@ cui_table_view cui_table_column_viewport(const cui_table_model *, float scroll, 
                                          size_t overscan);
 typedef struct {
     cui_id row, column; /* Controlled selection; zero means none. */
-    cui_id cursor_row, cursor_column;
+    cui_id cursor_row, cursor_column, header_cursor;
     cui_id sort_column;
     cui_table_sort sort;
     float scroll_x, scroll_y;
@@ -80,7 +80,8 @@ typedef struct {
 } cui_table_options;
 typedef struct {
     bool selection_changed, sort_changed, columns_changed;
-    bool visible_rows_changed, visible_columns_changed, load_more;
+    bool visible_rows_changed, visible_columns_changed, load_more, context_requested;
+    cui_id context_row, context_column;
     cui_table_view rows, columns;
     cui_id activated_row, activated_column;
     cui_table_error error;

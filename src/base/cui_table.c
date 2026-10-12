@@ -298,6 +298,16 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                 break;
             }
     }
+    size_t header_column = column(m, s->header_cursor);
+    if (header_column == SIZE_MAX || m->cols[header_column].disabled) {
+        s->header_cursor = 0;
+        for (size_t p = 0; p < m->columns; p++)
+            if (!m->cols[p].disabled) {
+                s->header_cursor = m->cols[p].key;
+                break;
+            }
+    }
+    bool reveal_header = false;
     size_t count;
     const cui_event *ev = cui_frame_events(ui, &count);
     cui_id previous = 0;
@@ -350,7 +360,42 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                     }
         }
         if (hit && hc < m->columns && !m->cols[hc].disabled) {
+            if (ev[e].type == CUI_EVENT_POINTER_DOWN &&
+                ev[e].pointer_button == CUI_POINTER_SECONDARY &&
+                (header || !m->rows[hr].disabled)) {
+                out.context_requested = true;
+                out.context_column = m->cols[hc].key;
+                out.context_row = header ? 0 : m->rows[hr].key;
+            }
             if (header) {
+                if (previous != target)
+                    s->header_cursor = m->cols[hc].key;
+                previous = target;
+                if (ev[e].type == CUI_EVENT_KEY_DOWN && !(ev[e].modifiers & CUI_MOD_CTRL)) {
+                    size_t current = column(m, s->header_cursor), next = SIZE_MAX;
+                    if (ev[e].key == CUI_KEY_LEFT || ev[e].key == CUI_KEY_RIGHT)
+                        next = enabled_col(m, current, ev[e].key == CUI_KEY_LEFT ? -1 : 1,
+                                           o.loop_selection);
+                    else if (ev[e].key == CUI_KEY_HOME || ev[e].key == CUI_KEY_END) {
+                        for (size_t p = 0; p < m->columns; p++) {
+                            size_t n = ev[e].key == CUI_KEY_HOME ? p : m->columns - 1 - p;
+                            if (!m->cols[n].disabled) {
+                                next = n;
+                                break;
+                            }
+                        }
+                    }
+                    if (next != SIZE_MAX) {
+                        s->header_cursor = m->cols[next].key;
+                        reveal_header = true;
+                        cui_focus(ui, cui_table_header_id(id, s->header_cursor));
+                        if (!o.manual_selection && o.selection_mode == CUI_TABLE_SELECT_COLUMN)
+                            select(s, o, 0, s->header_cursor);
+                    }
+                }
+                if (activation == target &&
+                    (ev[e].type == CUI_EVENT_KEY_DOWN || ev[e].type == CUI_EVENT_KEY_UP))
+                    hc = column(m, s->header_cursor);
                 if (activation == target && o.selection_mode == CUI_TABLE_SELECT_COLUMN)
                     select(s, o, 0, m->cols[hc].key);
                 if (activation == target && m->cols[hc].sortable) {
@@ -386,6 +431,20 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                             enabled_row(m, r, ev[e].key == CUI_KEY_UP ? -1 : 1, o.loop_selection);
                         if (n != SIZE_MAX)
                             nr = n;
+                    }
+                    if (ev[e].key == CUI_KEY_PAGEUP || ev[e].key == CUI_KEY_PAGEDOWN) {
+                        size_t page = (size_t)fmaxf(
+                            1, fminf((float)m->count, floorf(height(o) / row_height(o))));
+                        nr = ev[e].key == CUI_KEY_PAGEUP
+                                 ? (r > page ? r - page : 0)
+                                 : (page > m->count - 1 - r ? m->count - 1 : r + page);
+                        if (m->rows[nr].disabled) {
+                            size_t n =
+                                enabled_row(m, nr, ev[e].key == CUI_KEY_PAGEUP ? -1 : 1, false);
+                            if (n == SIZE_MAX)
+                                n = enabled_row(m, nr, ev[e].key == CUI_KEY_PAGEUP ? 1 : -1, false);
+                            nr = n == SIZE_MAX ? r : n;
+                        }
                     }
                     if (ev[e].key == CUI_KEY_LEFT || ev[e].key == CUI_KEY_RIGHT) {
                         size_t n =
@@ -446,6 +505,18 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                 s->scroll_x = left + m->cols[c].width - width;
         }
     }
+    if (reveal_header) {
+        size_t hc = column(m, s->header_cursor);
+        float left = 0;
+        for (size_t p = 0; p < hc && p < m->columns; p++)
+            left += m->cols[p].width;
+        if (hc < m->columns) {
+            if (left < s->scroll_x)
+                s->scroll_x = left;
+            else if (left + m->cols[hc].width > s->scroll_x + width)
+                s->scroll_x = left + m->cols[hc].width - width;
+        }
+    }
     s->scroll_y = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), o.overscan).scroll;
     out.rows = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), 0);
     out.columns = cui_table_column_viewport(m, s->scroll_x, width, 0);
@@ -490,12 +561,21 @@ void cui_table_submit_header(cui_context *ui, cui_id id, cui_table_model *m, cui
     if (!ui || !m || !s)
         return;
     cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, o.width, o.column_overscan);
+    size_t tab = column(m, s->header_cursor);
+    if (tab < columns.begin || tab >= columns.end || m->cols[tab].disabled) {
+        tab = SIZE_MAX;
+        for (size_t c = columns.begin; c < columns.end; c++)
+            if (!m->cols[c].disabled) {
+                tab = c;
+                break;
+            }
+    }
     for (size_t c = columns.begin; c < columns.end; c++) {
         cui_id cid = cui_table_header_id(id, m->cols[c].key);
         bool disabled = o.disabled || m->cols[c].disabled;
         cui_interact(ui, cid, CUI_ROLE_COLUMNHEADER, m->cols[c].label, disabled, false,
                      s->sort_column == m->cols[c].key ? (float)s->sort : 0);
-        cui_set_tab_stop(ui, cid, c == columns.begin);
+        cui_set_tab_stop(ui, cid, c == tab);
         cui_set_semantic_details(
             ui, cid,
             (cui_semantic_details){.parent = id,

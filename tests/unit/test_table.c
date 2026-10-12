@@ -11,14 +11,15 @@ static void models(void) {
     assert(rows);
     for (size_t i = 0; i < 10000; i++)
         rows[i] = (cui_table_row){.key = i + 1, .label = {"Value", 5}};
-    cui_table_column cols[] = {{.key = 10,
-                                .label = {"Name", 4},
-                                .width = 120,
-                                .minimum = 40,
-                                .maximum = 200,
-                                .resizable = true,
-                                .movable = true},
-                               {.key = 20, .label = {"Value", 5}, .width = 100, .movable = true}};
+    cui_table_column cols[] = {
+        {.key = 10,
+         .label = {"Name", 4},
+         .width = 120,
+         .minimum = 40,
+         .maximum = 200,
+         .resizable = true,
+         .movable = true},
+        {.key = 20, .label = {"Value", 5}, .width = 100, .movable = true, .sortable = true}};
     assert(cui_table_bind(m, rows, 10000, cols, 2) == CUI_TABLE_OK);
     size_t ix;
     assert(cui_table_row_index(m, 9999, &ix) && ix == 9998);
@@ -134,7 +135,7 @@ static void events(void) {
          .movable = true,
          .sortable = true},
         {.key = 20, .label = {"Disabled", 8}, .width = 100, .disabled = true, .movable = true},
-        {.key = 30, .label = {"Value", 5}, .width = 100, .movable = true}};
+        {.key = 30, .label = {"Value", 5}, .width = 100, .movable = true, .sortable = true}};
     assert(cui_table_bind(m, rows, 4, cols, 3) == CUI_TABLE_OK);
     cui_table_state state = {0};
     cui_table_options o = {.width = 360, .height = 160, .selection_mode = CUI_TABLE_SELECT_CELL};
@@ -150,6 +151,12 @@ static void events(void) {
     key(ui, CUI_KEY_HOME, 0);
     scene(ui, m, &state, o);
     assert(state.row == 1 && state.column == 30);
+    key(ui, CUI_KEY_PAGEDOWN, 0);
+    scene(ui, m, &state, o);
+    assert(state.row == 4);
+    key(ui, CUI_KEY_PAGEUP, 0);
+    scene(ui, m, &state, o);
+    assert(state.row == 1);
     o.manual_selection = true;
     key(ui, CUI_KEY_DOWN, 0);
     scene(ui, m, &state, o);
@@ -169,11 +176,25 @@ static void events(void) {
     key(ui, CUI_KEY_ENTER, 0);
     scene(ui, m, &state, o);
     assert(state.sort == CUI_TABLE_SORT_DEFAULT);
+    cols[2].sortable = true;
+    key(ui, CUI_KEY_RIGHT, 0);
+    key(ui, CUI_KEY_ENTER, 0);
+    assert(scene(ui, m, &state, o).sort_changed && state.header_cursor == 30 &&
+           state.sort_column == 30);
+    cui_focus(ui, cui_table_header_id(10, 10));
     key(ui, CUI_KEY_RIGHT, CUI_MOD_CTRL);
     assert(scene(ui, m, &state, o).columns_changed && cols[1].key == 10);
     cui_focus(ui, cui_table_resize_id(10, 10));
     key(ui, CUI_KEY_RIGHT, 0);
     assert(scene(ui, m, &state, o).columns_changed && cols[1].width == 128);
+    cui_rect target = cui_bounds(ui, cui_table_cell_id(10, 1, 10));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = target.x + 8,
+                                           .y = target.y + 8,
+                                           .pointer_button = CUI_POINTER_SECONDARY}));
+    cui_table_result request = scene(ui, m, &state, o);
+    assert(request.context_requested && request.context_row == 1 && request.context_column == 10 &&
+           !request.selection_changed);
     size_t n;
     const cui_semantic *sem = cui_semantics(ui, &n);
     bool found = false;

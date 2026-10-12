@@ -138,7 +138,7 @@ typedef struct {
     unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;
     bool hide_x_axis, show_y_axis, y_axis_inside, grid_solid;
-    float value_axis_gutter; /* measured outside y-axis width; zero uses legacy 50px */
+    float value_axis_gutter; /* measured outside y-axis width; zero uses 32px */
     bool custom_horizontal_bar_gutters;
     float bar_category_gutter, bar_value_end_gutter; /* measured logical pixels */
     bool custom_y_padding; /* line/area value scale; defaults source 10px top, 0 bottom */

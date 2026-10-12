@@ -78,6 +78,12 @@ typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
+typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
+typedef size_t (*cui_chart_tooltip_value_fn)(const cui_chart_datum *, size_t index, size_t series,
+                                             double value, char *buffer, size_t capacity,
+                                             void *user);
+typedef cui_color (*cui_chart_tooltip_value_color_fn)(const cui_chart_datum *, size_t index,
+                                                      size_t series, double value, void *user);
 typedef struct {
     cui_chart_kind kind;
     const cui_chart_datum *data;
@@ -101,6 +107,9 @@ typedef struct {
     void *format_user;
     cui_chart_tooltip_fn tooltip_content; /* replaces default hover title and rows */
     void *tooltip_user;
+    cui_chart_tooltip_title_fn tooltip_title;
+    cui_chart_tooltip_value_fn tooltip_value;
+    cui_chart_tooltip_value_color_fn tooltip_value_color;
     bool has_domain;
     double domain_min, domain_max;
     double inner_radius;     /* pie/donut pixels */

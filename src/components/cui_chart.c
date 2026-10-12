@@ -344,7 +344,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (o->tooltip_content) {
             o->tooltip_content(ui, id, state->hovered, &o->data[state->hovered], o->tooltip_user);
         } else {
-            cui_str title = o->data[state->hovered].label;
+            const cui_chart_datum *datum = &o->data[state->hovered];
+            cui_str title = o->tooltip_title
+                                ? o->tooltip_title(datum, state->hovered, o->tooltip_user)
+                                : datum->label;
             if (title.length && title.data) {
                 cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
                                        (cui_box){.width = 72,
@@ -369,8 +372,15 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                            : d->close;
                 }
                 char value[48];
-                cui_str formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
-                                                     o->format_user);
+                cui_str formatted;
+                if (o->tooltip_value) {
+                    size_t written = o->tooltip_value(datum, state->hovered, series, number, value,
+                                                      sizeof value, o->tooltip_user);
+                    formatted =
+                        (cui_str){value, written < sizeof value ? written : sizeof value - 1};
+                } else
+                    formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
+                                                 o->format_user);
                 if (!formatted.length)
                     continue;
                 char row[52];
@@ -400,6 +410,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     if (direction.a)
                         text_color = direction;
                 }
+                if (o->tooltip_value_color)
+                    text_color = o->tooltip_value_color(datum, state->hovered, series, number,
+                                                        o->tooltip_user);
                 cui_text(ui, label, 11, text_color);
                 cui_end_box(ui);
             }

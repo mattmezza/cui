@@ -58,6 +58,25 @@ static size_t format_q(double value, char *buffer, size_t capacity, void *user) 
         buffer[0] = 'Q';
     return capacity ? 1 : 0;
 }
+static cui_str tooltip_title_override(const cui_chart_datum *datum, size_t index, void *user) {
+    (void)user;
+    assert(datum && index == 0);
+    return (cui_str){"Price", 5};
+}
+static size_t tooltip_value_override(const cui_chart_datum *datum, size_t index, size_t series,
+                                     double value, char *buffer, size_t capacity, void *user) {
+    (void)user;
+    assert(datum && index == 0 && series < 4 && isfinite(value));
+    if (capacity)
+        buffer[0] = 'V';
+    return capacity ? 1 : 0;
+}
+static cui_color tooltip_color_override(const cui_chart_datum *datum, size_t index, size_t series,
+                                        double value, void *user) {
+    (void)user;
+    assert(datum && index == 0 && series < 4 && isfinite(value));
+    return (cui_color){3, 210, 4, 255};
+}
 static void custom_tooltip(cui_context *ui, cui_id id, size_t index, const cui_chart_datum *datum,
                            void *user) {
     size_t *calls = user;
@@ -641,6 +660,24 @@ int main(void) {
         }
     assert(tooltip_calls == 1 && custom && !default_ohlc);
     options.tooltip_content = NULL;
+    options.tooltip_title = tooltip_title_override;
+    options.tooltip_value = tooltip_value_override;
+    options.tooltip_value_color = tooltip_color_override;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    draw = cui_end_frame(ui);
+    bool overridden_title = false, overridden_value = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str label = draw.commands[i].text;
+            overridden_title |= label.length == 5 && memcmp(label.data, "Price", 5) == 0;
+            overridden_value |= label.length == 4 && memcmp(label.data, "O: V", 4) == 0 &&
+                                draw.commands[i].color.g == 210;
+        }
+    assert(overridden_title && overridden_value);
+    options.tooltip_title = NULL;
+    options.tooltip_value = NULL;
+    options.tooltip_value_color = NULL;
     options.pie_show_labels = true;
     options.pie_outer_radius = 20;
     options.pie_label_gap = 5;

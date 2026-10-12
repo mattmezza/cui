@@ -339,6 +339,7 @@ int main(void) {
     cui_chart_sankey_node nodes[4];
     assert(cui_chart_sankey_layout(&flow_options, nodes, 3) == CUI_PLOT_CAPACITY);
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    assert(fabsf(nodes[0].x0) < .01f && fabsf(nodes[3].x1 - flow_options.width) < .01f);
     double first_center = (nodes[0].y0 + nodes[0].y1) / 2;
     double second_center = (nodes[1].y0 + nodes[1].y1) / 2;
     assert(fabs(first_center - 48) < .01 && second_center > first_center + .5);
@@ -348,9 +349,11 @@ int main(void) {
     float no_margin_left = nodes[0].x0, no_margin_right = nodes[3].x0;
     flow_options.sankey_margins = (cui_chart_sankey_margins){20, 20, 40, 4};
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
-    assert(nodes[0].x0 >= no_margin_left + 19 && nodes[3].x0 <= no_margin_right - 19);
+    assert(fabsf(nodes[0].x0 - 20) < .01f &&
+           fabsf(nodes[3].x1 - (flow_options.width - 20)) < .01f &&
+           nodes[0].x0 >= no_margin_left + 19 && nodes[3].x0 <= no_margin_right - 19);
     for (size_t i = 0; i < 4; i++)
-        assert(nodes[i].y0 >= 47 && nodes[i].y1 <= 84.01);
+        assert(nodes[i].y0 >= 40 && nodes[i].y1 <= 92.01);
     cui_chart_sankey_node margin_nodes[4];
     memcpy(margin_nodes, nodes, sizeof nodes);
     flow_options.sankey_margins.left = NAN;
@@ -431,7 +434,7 @@ int main(void) {
     flow_options.sankey_iterations = 6;
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
     for (size_t i = 0; i < 4; i++) {
-        assert(nodes[i].y0 >= 8 && nodes[i].y1 <= flow_options.height - 8);
+        assert(nodes[i].y0 >= 0 && nodes[i].y1 <= flow_options.height);
         for (size_t j = i + 1; j < 4; j++)
             if (nodes[i].layer == nodes[j].layer)
                 assert(nodes[i].y1 + 15 <= nodes[j].y0 || nodes[j].y1 + 15 <= nodes[i].y0);

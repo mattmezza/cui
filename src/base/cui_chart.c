@@ -1129,10 +1129,10 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
     }
     double width = o->node_width ? o->node_width : 10;
     double padding = o->node_padding ? o->node_padding : 16;
-    double plot_left = 8 + o->sankey_margins.left;
-    double plot_right = o->width - 8 - o->sankey_margins.right;
-    double plot_top = 8 + o->sankey_margins.top;
-    double plot_bottom = o->height - 8 - o->sankey_margins.bottom;
+    double plot_left = o->sankey_margins.left;
+    double plot_right = o->width - o->sankey_margins.right;
+    double plot_top = o->sankey_margins.top;
+    double plot_bottom = o->height - o->sankey_margins.bottom;
     double plot_height = plot_bottom - plot_top;
     if (width >= plot_right - plot_left || plot_height <= 0)
         return CUI_PLOT_INVALID;
@@ -1186,8 +1186,8 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
 }
 static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
                                                 cui_chart_sankey_node *nodes, size_t layers) {
-    double top = 8 + o->sankey_margins.top;
-    double bottom = o->height - 8 - o->sankey_margins.bottom;
+    double top = o->sankey_margins.top;
+    double bottom = o->height - o->sankey_margins.bottom;
     double lo[256], hi[256], height[256] = {0};
     size_t count[256] = {0}, single[256] = {0};
     for (size_t layer = 0; layer < layers; layer++) {
@@ -1426,8 +1426,8 @@ static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_
                         }
                     }
                 }
-                cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8 + o->sankey_margins.top,
-                                         o->height - 8 - o->sankey_margins.bottom, beta);
+                cui_chart_sankey_resolve(nodes, o->count, layer, padding, o->sankey_margins.top,
+                                         o->height - o->sankey_margins.bottom, beta);
             }
     }
 }

@@ -1458,7 +1458,7 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_message.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_message.c"
       ],
@@ -1524,7 +1524,10 @@
           "Related types"
         ]
       },
-      "last_tested_commit": "47dfd82"
+      "last_tested_commit": "47dfd82",
+      "evidence": [
+        "tests/web/test_browser.py"
+      ]
     },
     {
       "name": "MessageScroller",
@@ -1532,7 +1535,7 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_message.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_message.c"
       ],
@@ -1598,7 +1601,10 @@
           "`MessageScroller`"
         ]
       },
-      "last_tested_commit": "47dfd82"
+      "last_tested_commit": "47dfd82",
+      "evidence": [
+        "tests/web/test_browser.py"
+      ]
     },
     {
       "name": "Notification",

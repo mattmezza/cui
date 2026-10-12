@@ -1,81 +1,43 @@
 {
-  "source": "47dfd82",
+  "source": "b640c26492aa058fca03c064f3a93d692a1af180",
   "published_source": "edea48411392b0f0069f7b035bc32f07bb42f4b4",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Source47dfd82 passed native49/49, ASan/UBSan47/47, WASI40/40 and Chromium58 real-story gates, including standalone Shimmer, Message/MessageScroller, exact Tab sizes and disclosure animation. Publishededea484 has57 stories with six CI jobs and Pages successful, confirmed by an actual HTTPS Notification click. The58-story Pages attempt a96fd34 failed a Dialog readiness test; the corrected regression is integrated locally. Public site remains57 stories pending the next validated deployment. All78 entries remain; full parity is unfinished.",
+  "summary": "Source b640c26 passes native51/51, ASan/UBSan49/49, WASI42/42 and Chromium60-story gates. Real Checkbox/Radio glyphs and all native bitmap adapters, system-theme default/live changes, Message/MessageScroller and Image/Attachment headless modules are integrated. Public edea484 remains57 stories until this deployment succeeds. All78 entries retained;16 not started,4 implemented partial,58 tested partial,zero verified. Full parity remains unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "47dfd82",
-      "passed": 49,
-      "total": 49,
-      "log": "gcc-58.txt"
+      "source": "1c52388",
+      "passed": 51,
+      "total": 51,
+      "log": "gcc-60.txt"
     },
     {
       "name": "sanitizers",
-      "source": "47dfd82",
-      "passed": 47,
-      "total": 47,
-      "log": "asan-58.txt"
+      "source": "1c52388",
+      "passed": 49,
+      "total": 49,
+      "log": "asan-60.txt"
     },
     {
       "name": "WASI",
-      "source": "47dfd82",
-      "passed": 40,
-      "total": 40,
-      "log": "wasi-58.txt"
+      "source": "1c52388",
+      "passed": 42,
+      "total": 42,
+      "log": "wasi-60.txt"
     },
     {
       "name": "browser",
-      "source": "47dfd82",
-      "stories": 58,
+      "source": "5910467",
+      "stories": 60,
       "catalog_entries": 78,
-      "log": "browser-58-integrated.txt"
-    },
-    {
-      "name": "previous framework CI",
-      "source": "daf43b9",
-      "conclusion": "success",
-      "log": "ci-daf43b9.json"
-    },
-    {
-      "name": "previous Pages attempt",
-      "source": "daf43b9",
-      "conclusion": "failure",
-      "log": "pages-daf43b9.json"
-    },
-    {
-      "name": "published gallery pipeline",
-      "source": "0e61b2f",
-      "stories": 56,
-      "catalog_entries": 78,
-      "log": "pages-0e61b2f.json"
-    },
-    {
-      "name": "published HTTPS browser",
-      "source": "0e61b2f",
-      "log": "published-0e61b2f.txt"
-    },
-    {
-      "name": "published framework CI",
-      "source": "0e61b2f",
-      "log": "ci-0e61b2f.json"
-    },
-    {
-      "name": "published57 framework CI",
-      "source": "edea484",
-      "log": "ci-edea484.json"
-    },
-    {
-      "name": "published57 gallery pipeline",
-      "source": "edea484",
-      "stories": 57,
-      "log": "pages-edea484.json"
-    },
-    {
-      "name": "published57 HTTPS browser",
-      "source": "edea484",
-      "log": "published-edea484.txt"
+      "log": "browser-60.txt",
+      "note": "Behavioral browser gate preceded formatting-only web/gallery.c normalization; final artifact is checked again by Pages CI."
     }
-  ]
+  ],
+  "previous_deployment": {
+    "source": "a96fd34",
+    "status": "failed",
+    "reason": "Dialog readiness race in browser test; deterministic repair integrated",
+    "log": "pages-a96fd34-failure.txt"
+  }
 }

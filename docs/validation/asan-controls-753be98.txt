@@ -1,0 +1,289 @@
+-- Configuring done (1.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/matteo/dev/cui/build-asan
+[1/183] Building C object CMakeFiles/cui.dir/src/base/cui_disclosure.c.o
+[2/183] Building C object CMakeFiles/cui.dir/src/base/cui_content.c.o
+[3/183] Building C object CMakeFiles/cui.dir/src/theme/cui_theme.c.o
+[4/183] Building C object CMakeFiles/cui.dir/src/base/cui_models.c.o
+[5/183] Building C object CMakeFiles/cui.dir/src/base/cui_base.c.o
+[6/183] Building C object CMakeFiles/cui.dir/src/base/cui_overlay.c.o
+[7/183] Building C object CMakeFiles/cui.dir/src/base/cui_edit.c.o
+[8/183] Building C object CMakeFiles/cui.dir/src/components/cui_disclosure.c.o
+[9/183] Building C object CMakeFiles/cui.dir/src/components/cui_content.c.o
+[10/183] Building C object CMakeFiles/cui.dir/src/components/cui_numeric.c.o
+[11/183] Building C object CMakeFiles/cui.dir/src/components/cui_scroll.c.o
+[12/183] Building C object CMakeFiles/cui.dir/src/components/cui_components.c.o
+[13/183] Building C object CMakeFiles/cui.dir/src/components/cui_tree.c.o
+[14/183] Building C object CMakeFiles/cui.dir/src/base/cui_scroll.c.o
+[15/183] Building C object CMakeFiles/cui.dir/src/components/cui_picker.c.o
+[16/183] Building C object CMakeFiles/cui.dir/src/components/cui_surface.c.o
+[17/183] Building C object CMakeFiles/cui.dir/src/base/cui_numeric.c.o
+[18/183] Building C object CMakeFiles/cui.dir/src/components/cui_table.c.o
+[19/183] Building C object CMakeFiles/cui.dir/src/components/cui_otp.c.o
+[20/183] Building C object CMakeFiles/cui.dir/src/base/cui_surface.c.o
+[21/183] Building C object CMakeFiles/cui.dir/src/base/cui_dock.c.o
+[22/183] Building C object CMakeFiles/cui.dir/src/base/cui_otp.c.o
+[23/183] Building C object CMakeFiles/cui.dir/src/base/cui_form.c.o
+[24/183] Building C object CMakeFiles/cui.dir/src/components/cui_form.c.o
+[25/183] Building C object CMakeFiles/cui.dir/src/base/cui_status.c.o
+[26/183] Building C object CMakeFiles/cui_text.dir/src/text/cui_text.c.o
+[27/183] Building C object CMakeFiles/cui.dir/src/base/cui_tree.c.o
+[28/183] Building C object CMakeFiles/cui.dir/src/base/cui_media.c.o
+[29/183] Building C object CMakeFiles/cui.dir/src/base/cui_picker.c.o
+[30/183] Building C object CMakeFiles/cui.dir/src/components/cui_message.c.o
+[31/183] Building C object CMakeFiles/test_bootstrap.dir/tests/unit/test_bootstrap.c.o
+[32/183] Building C object CMakeFiles/hello_world.dir/examples/hello_world/main.c.o
+[33/183] Building C object CMakeFiles/cui_gallery.dir/gallery/main.c.o
+[34/183] Building C object CMakeFiles/cui.dir/src/base/cui_message.c.o
+[35/183] Building C object CMakeFiles/cui_software.dir/backends/software/cui_software.c.o
+[36/183] Building C object CMakeFiles/cui_sokol_demo.dir/examples/renderer_swap/sokol.c.o
+[37/183] Building C object CMakeFiles/cui_sdl3.dir/backends/sdl3/cui_sdl3.c.o
+[38/183] Building C object CMakeFiles/test_base.dir/tests/unit/test_base.c.o
+[39/183] Building C object CMakeFiles/cui.dir/src/components/cui_choice.c.o
+[40/183] Building C object CMakeFiles/test_components.dir/tests/unit/test_components.c.o
+[41/183] Building C object CMakeFiles/cui.dir/src/base/cui_table.c.o
+[42/183] Building C object CMakeFiles/test_edit.dir/tests/unit/test_edit.c.o
+[43/183] Building C object CMakeFiles/test_render.dir/tests/unit/test_render.c.o
+[44/183] Building C object CMakeFiles/cui.dir/src/base/cui_choice.c.o
+[45/183] Building C object CMakeFiles/cui.dir/src/components/cui_status.c.o
+[46/183] Building C object CMakeFiles/test_sokol.dir/tests/integration/test_sokol.c.o
+[47/183] Building C object CMakeFiles/test_overlay.dir/tests/unit/test_overlay.c.o
+[48/183] Building C object CMakeFiles/test_input.dir/tests/unit/test_input.c.o
+[49/183] Building C object CMakeFiles/cui_sdl_gpu.dir/backends/sdl_gpu/cui_sdl_gpu.c.o
+[50/183] Building C object CMakeFiles/test_numeric.dir/tests/unit/test_numeric.c.o
+[51/183] Building C object CMakeFiles/test_dock.dir/tests/unit/test_dock.c.o
+[52/183] Building C object CMakeFiles/cui.dir/src/components/cui_media.c.o
+[53/183] Building C object CMakeFiles/test_scroll.dir/tests/unit/test_scroll.c.o
+[54/183] Building C object CMakeFiles/test_disclosure.dir/tests/unit/test_disclosure.c.o
+[55/183] Building C object CMakeFiles/styled_settings.dir/examples/styled_settings/main.c.o
+[56/183] Building C object CMakeFiles/test_picker.dir/tests/unit/test_picker.c.o
+[57/183] Building C object CMakeFiles/unstyled.dir/examples/unstyled/main.c.o
+[58/183] Building C object CMakeFiles/test_form.dir/tests/unit/test_form.c.o
+[59/183] Building C object CMakeFiles/cui_bench.dir/tests/benchmarks/bench.c.o
+[60/183] Building C object CMakeFiles/test_core.dir/tests/unit/test_core.c.o
+[61/183] Building C object CMakeFiles/test_content.dir/tests/unit/test_content.c.o
+[62/183] Building C object CMakeFiles/test_tree.dir/tests/unit/test_tree.c.o
+[63/183] Building C object CMakeFiles/test_message.dir/tests/unit/test_message.c.o
+[64/183] Building C object CMakeFiles/test_otp.dir/tests/unit/test_otp.c.o
+[65/183] Building CXX object CMakeFiles/cpp_embedding.dir/examples/embedding/consumer.cpp.o
+[66/183] Building C object CMakeFiles/test_surface.dir/tests/unit/test_surface.c.o
+[67/183] Building C object CMakeFiles/dist_multi.dir/tests/distribution/consumer.c.o
+[68/183] Building C object CMakeFiles/cui_gpu_demo.dir/examples/renderer_swap/gpu.c.o
+[69/183] Building C object CMakeFiles/test_sdl3.dir/tests/unit/test_sdl3.c.o
+[70/183] Building C object CMakeFiles/test_table.dir/tests/unit/test_table.c.o
+[71/183] Building C object CMakeFiles/test_media.dir/tests/unit/test_media.c.o
+[72/183] Building C object CMakeFiles/test_status.dir/tests/unit/test_status.c.o
+[73/183] Building C object CMakeFiles/test_gallery.dir/tests/integration/test_gallery.c.o
+[74/183] Building C object CMakeFiles/test_gpu.dir/tests/integration/test_gpu.c.o
+[75/183] Building C object CMakeFiles/test_picker_base.dir/src/base/cui_overlay.c.o
+[76/183] Building C object CMakeFiles/test_picker_base.dir/src/base/cui_models.c.o
+[77/183] Building C object CMakeFiles/test_numeric_base.dir/src/base/cui_numeric.c.o
+[78/183] Building C object CMakeFiles/test_picker_base.dir/tests/unit/test_picker.c.o
+[79/183] Building C object CMakeFiles/test_tree_base.dir/tests/unit/test_tree.c.o
+[80/183] Building C object CMakeFiles/test_numeric_base.dir/src/base/cui_edit.c.o
+[81/183] Building C object CMakeFiles/test_numeric_base.dir/tests/unit/test_numeric.c.o
+[82/183] Building C object CMakeFiles/test_input_base.dir/src/base/cui_base.c.o
+[83/183] Building C object CMakeFiles/test_picker_base.dir/src/base/cui_picker.c.o
+[84/183] Building C object CMakeFiles/test_input_base.dir/tests/unit/test_input.c.o
+[85/183] Building C object CMakeFiles/test_table_base.dir/tests/unit/test_table.c.o
+[86/183] Building C object CMakeFiles/test_input_base.dir/src/base/cui_edit.c.o
+[87/183] Building C object CMakeFiles/test_table_base.dir/src/base/cui_scroll.c.o
+[88/183] Building C object CMakeFiles/test_scroll_base.dir/tests/unit/test_scroll.c.o
+[89/183] Building C object CMakeFiles/test_scroll_base.dir/src/base/cui_scroll.c.o
+[90/183] Building C object CMakeFiles/test_choice.dir/tests/unit/test_choice.c.o
+[91/183] Building C object CMakeFiles/test_surface_base.dir/src/base/cui_models.c.o
+[92/183] Building C object CMakeFiles/test_surface_base.dir/tests/unit/test_surface.c.o
+[93/183] Building C object CMakeFiles/test_surface_base.dir/src/base/cui_overlay.c.o
+[94/183] Building C object CMakeFiles/test_tree_base.dir/src/base/cui_tree.c.o
+[95/183] Building C object CMakeFiles/test_surface_base.dir/src/base/cui_surface.c.o
+[96/183] Building C object CMakeFiles/test_table_base.dir/src/base/cui_table.c.o
+[97/183] Building C object CMakeFiles/test_form_base.dir/tests/unit/test_form.c.o
+[98/183] Building C object CMakeFiles/test_form_base.dir/src/base/cui_base.c.o
+[99/183] Building C object CMakeFiles/test_otp_base.dir/tests/unit/test_otp.c.o
+[100/183] Building C object CMakeFiles/test_form_base.dir/src/base/cui_form.c.o
+[101/183] Building C object CMakeFiles/test_form_base.dir/src/base/cui_edit.c.o
+[102/183] Building C object CMakeFiles/test_otp_base.dir/src/base/cui_edit.c.o
+[103/183] Building C object CMakeFiles/cui.dir/src/core/cui.c.o
+[104/183] Building C object CMakeFiles/test_status_base.dir/tests/unit/test_status.c.o
+[105/183] Building C object CMakeFiles/test_otp_base.dir/src/base/cui_otp.c.o
+[106/183] Linking C static library libcui.a
+[107/183] Linking C static library libcui_text.a
+[108/183] Linking C static library libcui_software.a
+[109/183] Building C object CMakeFiles/cui_sokol.dir/backends/sokol/cui_sokol.c.o
+[110/183] Linking C static library libcui_sdl3.a
+[111/183] Linking C static library libcui_sokol.a
+[112/183] Linking C static library libcui_sdl_gpu.a
+[113/183] Building C object CMakeFiles/test_status_base.dir/src/base/cui_status.c.o
+[114/183] Building C object CMakeFiles/test_numeric_base.dir/src/core/cui.c.o
+[115/183] Building C object CMakeFiles/test_message_base.dir/tests/unit/test_message.c.o
+[116/183] Building C object CMakeFiles/test_message_base.dir/src/base/cui_scroll.c.o
+[117/183] Building C object CMakeFiles/test_picker_base.dir/src/core/cui.c.o
+[118/183] Building C object CMakeFiles/test_media_base.dir/tests/unit/test_media.c.o
+[119/183] Building C object CMakeFiles/test_table_base.dir/src/core/cui.c.o
+[120/183] Building C object CMakeFiles/test_scroll_base.dir/src/core/cui.c.o
+[121/183] Linking C executable hello_world
+[122/183] Building C object CMakeFiles/test_media_base.dir/src/base/cui_media.c.o
+[123/183] Building C object CMakeFiles/test_core_embed.dir/tests/unit/test_core_embed.c.o
+[124/183] Linking C executable test_sokol
+[125/183] Linking C executable cui_gallery
+[126/183] Linking C executable cui_sokol_demo
+[127/183] Linking C executable test_bootstrap
+[128/183] Linking C executable test_render
+[129/183] Linking C executable test_components
+[130/183] Linking C executable test_edit
+[131/183] Linking C executable test_overlay
+[132/183] Linking C executable test_virtual
+[133/183] Linking C executable test_core
+[134/183] Building C object CMakeFiles/test_message_base.dir/src/base/cui_message.c.o
+[135/183] Linking C executable test_plot
+[136/183] Linking C executable test_dock
+[137/183] Linking C executable test_base
+[138/183] Linking C executable test_disclosure
+[139/183] Linking C executable test_choice
+[140/183] Building C object CMakeFiles/test_input_base.dir/src/core/cui.c.o
+[141/183] Linking C executable test_picker
+[142/183] Linking C executable test_tree
+[143/183] Linking C executable test_table
+[144/183] Linking C executable test_input
+[145/183] Linking C executable test_scroll
+[146/183] Linking C executable test_numeric
+[147/183] Linking C executable test_surface
+[148/183] Linking C executable test_otp
+[149/183] Linking C executable test_form
+[150/183] Linking C executable test_message
+[151/183] Linking C executable test_status
+[152/183] Linking C executable styled_settings
+[153/183] Linking C executable test_media
+[154/183] Linking C executable cui_bench
+[155/183] Linking C executable test_content
+[156/183] Linking C executable test_sdl3
+[157/183] Linking C executable test_gpu
+[158/183] Linking C executable test_core_embed
+[159/183] Linking C executable test_numeric_base
+[160/183] Building C object CMakeFiles/test_tree_base.dir/src/core/cui.c.o
+[161/183] Linking C executable test_gallery
+[162/183] Linking C executable unstyled
+[163/183] Linking C executable cui_gpu_demo
+[164/183] Linking C executable test_picker_base
+[165/183] Linking C executable test_media_base
+[166/183] Linking CXX executable cpp_embedding
+[167/183] Linking C executable test_scroll_base
+[168/183] Linking C executable test_tree_base
+[169/183] Linking C executable test_input_base
+[170/183] Linking C executable test_status_base
+[171/183] Linking C executable test_table_base
+[172/183] Building C object CMakeFiles/test_form_base.dir/src/core/cui.c.o
+[173/183] Linking C executable test_form_base
+[174/183] Building C object CMakeFiles/test_surface_base.dir/src/core/cui.c.o
+[175/183] Linking C executable test_surface_base
+[176/183] Building C object CMakeFiles/test_otp_base.dir/src/core/cui.c.o
+[177/183] Linking C executable test_otp_base
+[178/183] Building C object CMakeFiles/test_message_base.dir/src/core/cui.c.o
+[179/183] Linking C executable test_message_base
+[180/183] Building C object CMakeFiles/dist_single.dir/tests/distribution/single.c.o
+[181/183] Linking C executable dist_single
+[182/183] Building C object CMakeFiles/dist_multi.dir/tests/distribution/implementation.c.o
+[183/183] Linking C executable dist_multi
+Test project /home/matteo/dev/cui/build-asan
+      Start  1: bootstrap
+ 1/49 Test  #1: bootstrap ........................   Passed    0.03 sec
+      Start  2: core
+ 2/49 Test  #2: core .............................   Passed    0.09 sec
+      Start  3: base
+ 3/49 Test  #3: base .............................   Passed    0.02 sec
+      Start  4: components
+ 4/49 Test  #4: components .......................   Passed    0.09 sec
+      Start  5: render
+ 5/49 Test  #5: render ...........................   Passed    0.04 sec
+      Start  6: edit
+ 6/49 Test  #6: edit .............................   Passed    0.06 sec
+      Start  7: overlay
+ 7/49 Test  #7: overlay ..........................   Passed    0.03 sec
+      Start  8: virtual
+ 8/49 Test  #8: virtual ..........................   Passed    0.14 sec
+      Start  9: dock
+ 9/49 Test  #9: dock .............................   Passed    0.97 sec
+      Start 10: plot
+10/49 Test #10: plot .............................   Passed    0.03 sec
+      Start 11: content
+11/49 Test #11: content ..........................   Passed    0.04 sec
+      Start 12: disclosure
+12/49 Test #12: disclosure .......................   Passed    0.06 sec
+      Start 13: choice
+13/49 Test #13: choice ...........................   Passed    1.34 sec
+      Start 14: numeric
+14/49 Test #14: numeric ..........................   Passed    0.08 sec
+      Start 15: picker
+15/49 Test #15: picker ...........................   Passed    0.26 sec
+      Start 16: tree
+16/49 Test #16: tree .............................   Passed    0.09 sec
+      Start 17: input
+17/49 Test #17: input ............................   Passed    0.05 sec
+      Start 18: table
+18/49 Test #18: table ............................   Passed    0.12 sec
+      Start 19: scroll
+19/49 Test #19: scroll ...........................   Passed    0.05 sec
+      Start 20: surface
+20/49 Test #20: surface ..........................   Passed    0.20 sec
+      Start 21: form
+21/49 Test #21: form .............................   Passed    0.07 sec
+      Start 22: otp
+22/49 Test #22: otp ..............................   Passed    0.07 sec
+      Start 23: status
+23/49 Test #23: status ...........................   Passed    0.12 sec
+      Start 24: message
+24/49 Test #24: message ..........................   Passed    0.09 sec
+      Start 25: media
+25/49 Test #25: media ............................   Passed    0.09 sec
+      Start 26: example_unstyled
+26/49 Test #26: example_unstyled .................   Passed    0.02 sec
+      Start 27: example_styled_settings
+27/49 Test #27: example_styled_settings ..........   Passed    0.03 sec
+      Start 28: manifest
+28/49 Test #28: manifest .........................   Passed    0.14 sec
+      Start 29: licenses
+29/49 Test #29: licenses .........................   Passed    0.16 sec
+      Start 30: distribution
+30/49 Test #30: distribution .....................   Passed    0.19 sec
+      Start 31: cpp_embedding
+31/49 Test #31: cpp_embedding ....................   Passed    0.03 sec
+      Start 32: distribution_single
+32/49 Test #32: distribution_single ..............   Passed    0.03 sec
+      Start 33: distribution_multi
+33/49 Test #33: distribution_multi ...............   Passed    0.03 sec
+      Start 34: sdl3_services
+34/49 Test #34: sdl3_services ....................   Passed    0.89 sec
+      Start 35: gallery_layout
+35/49 Test #35: gallery_layout ...................   Passed    0.05 sec
+      Start 36: gallery_capture
+36/49 Test #36: gallery_capture ..................   Passed    0.30 sec
+      Start 37: implementation_embedding
+37/49 Test #37: implementation_embedding .........   Passed    0.03 sec
+      Start 38: numeric_base_only
+38/49 Test #38: numeric_base_only ................   Passed    0.07 sec
+      Start 39: picker_base_only
+39/49 Test #39: picker_base_only .................   Passed    0.14 sec
+      Start 40: tree_base_only
+40/49 Test #40: tree_base_only ...................   Passed    0.08 sec
+      Start 41: input_base_only
+41/49 Test #41: input_base_only ..................   Passed    0.03 sec
+      Start 42: table_base_only
+42/49 Test #42: table_base_only ..................   Passed    0.06 sec
+      Start 43: scroll_base_only
+43/49 Test #43: scroll_base_only .................   Passed    0.05 sec
+      Start 44: surface_base_only
+44/49 Test #44: surface_base_only ................   Passed    0.16 sec
+      Start 45: form_base_only
+45/49 Test #45: form_base_only ...................   Passed    0.03 sec
+      Start 46: otp_base_only
+46/49 Test #46: otp_base_only ....................   Passed    0.03 sec
+      Start 47: status_base_only
+47/49 Test #47: status_base_only .................   Passed    0.02 sec
+      Start 48: message_base_only
+48/49 Test #48: message_base_only ................   Passed    0.03 sec
+      Start 49: media_base_only
+49/49 Test #49: media_base_only ..................   Passed    0.02 sec
+
+100% tests passed out of 49
+
+Total Test time (real) =   6.87 sec

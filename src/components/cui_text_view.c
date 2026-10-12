@@ -378,7 +378,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_paint_list_prefix(ui, part, b, r, b->text_inset, style);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);
-            (void)cui_paint_bitmap(ui, part ^ 1,
+            (void)cui_paint_bitmap(ui, part ^ UINT64_C(0x696d616765000000),
                                    (cui_bitmap_paint){.bitmap = b->image, .opacity = 1},
                                    (cui_box){.width = r.w, .height = r.h});
             cui_end_box(ui);
@@ -507,9 +507,11 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                       first->font_size, color, first->line_height,
                       cui_text_view_text_style(first->flags));
         if (is_link)
-            cui_text_view_quad(ui, leaf ^ 1, (cui_rect){0, r.h - 2, r.w, 1}, color);
+            cui_text_view_quad(ui, leaf ^ UINT64_C(0x756e646572000000),
+                               (cui_rect){0, r.h - 2, r.w, 1}, color);
         if (first->flags & CUI_TEXT_VIEW_STRIKE)
-            cui_text_view_quad(ui, leaf ^ 2, (cui_rect){0, r.h * .5f, r.w, 1}, color);
+            cui_text_view_quad(ui, leaf ^ UINT64_C(0x737472696b000000),
+                               (cui_rect){0, r.h * .5f, r.w, 1}, color);
         cui_end_box(ui);
         if (cell)
             cui_end_box(ui);

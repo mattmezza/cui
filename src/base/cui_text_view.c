@@ -623,23 +623,6 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             ((p->input.data[a] == '-' && cui_text_view_table_separator(p->input, a, b)) ||
              !memcmp(p->input.data + a, "***", 3)))
             kind = CUI_TEXT_VIEW_RULE;
-        if (b - a >= 4 && p->input.data[a] == '!' && p->input.data[a + 1] == '[') {
-            size_t close = cui_text_view_find(p->input, a + 2, b, "](", 2),
-                   last = close == SIZE_MAX ? SIZE_MAX
-                                            : cui_text_view_find(p->input, close + 2, b, ")", 1);
-            if (last != SIZE_MAX) {
-                list_count = 0;
-                if (!cui_text_view_block_begin(p, CUI_TEXT_VIEW_IMAGE, start, 0))
-                    return;
-                if (p->write)
-                    p->state->workspace.blocks[p->block].resource =
-                        (cui_text_view_range){close + 2, last};
-                cui_text_view_inline(p, a + 2, close, 0, (cui_text_view_range){0}, 0);
-                cui_text_view_block_end(p, next, true);
-                a = next;
-                continue;
-            }
-        }
         size_t marker_content = a;
         bool task = kind == CUI_TEXT_VIEW_LIST_ITEM && b - a >= 3 && p->input.data[a] == '[' &&
                     p->input.data[a + 2] == ']' &&
@@ -651,6 +634,14 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             a += 3;
             if (a < b)
                 ++a;
+        }
+        size_t image_close = SIZE_MAX, image_last = SIZE_MAX;
+        if (b - a >= 4 && p->input.data[a] == '!' && p->input.data[a + 1] == '[') {
+            image_close = cui_text_view_find(p->input, a + 2, b, "](", 2);
+            if (image_close != SIZE_MAX)
+                image_last = cui_text_view_find(p->input, image_close + 2, b, ")", 1);
+            if (image_last != SIZE_MAX && kind == CUI_TEXT_VIEW_PARAGRAPH)
+                kind = CUI_TEXT_VIEW_IMAGE;
         }
         unsigned depth = 0, list_start = 0, copy_indent = 0;
         size_t parent = SIZE_MAX;
@@ -701,11 +692,11 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             list_number = lists[depth].number;
         } else {
             while ((kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_HEADING ||
-                    kind == CUI_TEXT_VIEW_QUOTE) &&
+                    kind == CUI_TEXT_VIEW_QUOTE || kind == CUI_TEXT_VIEW_IMAGE) &&
                    list_count > 1 && indent < lists[list_count - 1].content_indent)
                 --list_count;
             if ((kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_HEADING ||
-                 kind == CUI_TEXT_VIEW_QUOTE) &&
+                 kind == CUI_TEXT_VIEW_QUOTE || kind == CUI_TEXT_VIEW_IMAGE) &&
                 list_count && indent >= lists[list_count - 1].content_indent) {
                 depth = list_count - 1;
                 parent = lists[depth].item;
@@ -761,6 +752,17 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                 block->marker_text[count] = '.';
                 block->marker_text[count + 1] = 0;
             }
+        }
+        if (image_last != SIZE_MAX) {
+            if (p->write) {
+                cui_text_view_block *block = &p->state->workspace.blocks[p->block];
+                block->kind = CUI_TEXT_VIEW_IMAGE;
+                block->resource = (cui_text_view_range){image_close + 2, image_last};
+            }
+            cui_text_view_inline(p, a + 2, image_close, 0, (cui_text_view_range){0}, 0);
+            cui_text_view_block_end(p, next, true);
+            a = next;
+            continue;
         }
         if (kind == CUI_TEXT_VIEW_LIST_ITEM && b - a >= 3 &&
             (!memcmp(p->input.data + a, "```", 3) || !memcmp(p->input.data + a, "~~~", 3))) {
@@ -1701,7 +1703,7 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             if (!cui_text_view_layout_block(s, b, indent, y, fmaxf(1, o.width - indent), o, measure,
                                             user))
                 return CUI_TEXT_VIEW_INVALID;
-            y += block->bounds.h;
+            y += block->list_item ? fmaxf(block->bounds.h, o.line_height) : block->bounds.h;
             if (b + 1 < s->block_count && ((!block->list_item && !block->list_continuation) ||
                                            (!s->workspace.blocks[b + 1].list_item &&
                                             !s->workspace.blocks[b + 1].list_continuation)))

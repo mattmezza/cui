@@ -455,6 +455,29 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_list_image_structure(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("10. ![alt](asset)\n    - child\n\n    ![second](asset)\n11. next")) ==
+        CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 4 && f.blocks[0].kind == CUI_TEXT_VIEW_IMAGE &&
+           f.blocks[0].list_item && f.blocks[0].list_ordered && f.blocks[0].list_number == 10);
+    assert(f.blocks[1].list_parent == 0 && f.blocks[2].kind == CUI_TEXT_VIEW_IMAGE &&
+           f.blocks[2].list_continuation && f.blocks[2].list_parent == 0 &&
+           f.blocks[3].list_number == 11);
+    assert(cui_text_view_select(&f.state, 0, f.blocks[3].text.end));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "10. ![alt](asset)\n    ![second](asset)\n    - child\n11. next"));
+    assert(cui_text_view_select(&f.state, f.blocks[2].text.begin, f.blocks[2].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "10. ![second](asset)"));
+}
 static void test_quote_paragraph_lines(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1226,6 +1249,83 @@ static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *th
                       (cui_button_options){.size = CUI_CONTROL_SMALL}))
         ++action_clicks;
 }
+static void test_wrapped_link_decoration_ids(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("~~[abc](https://x.test)~~")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 9;
+    o.on_link = link_clicked;
+    o.link_user = &clicks;
+    cui_draw_list d = frame(ui, &f, o);
+    unsigned text_lines = 0, decorations = 0;
+    for (size_t i = 0; i < d.count; ++i) {
+        text_lines += d.commands[i].type == CUI_DRAW_TEXT;
+        if (d.commands[i].type == CUI_DRAW_RECT && d.commands[i].bounds.h == 1)
+            ++decorations;
+    }
+    assert(text_lines == 3 && decorations == 6 && f.blocks[0].bounds.h == 60);
+    frame(ui, &f, o);
+    unsigned before = clicks;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = 4,
+                                           .y = 30}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = 4,
+                                           .y = 30}));
+    frame(ui, &f, o);
+    assert(clicks == before + 1);
+    cui_destroy(ui);
+}
+static void test_list_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("10. ![alt](asset)\n    - child\n\n    ![second](asset)\n11. next")) ==
+        CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 400;
+    o.image = image_loaded;
+    cui_draw_list d = frame(ui, &f, o);
+    unsigned images = 0;
+    bool first = false, continuation = false, marker = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *command = &d.commands[i];
+        if (command->type == CUI_DRAW_IMAGE) {
+            ++images;
+            assert(command->bitmap.bitmap.width == 2 && command->bitmap.bitmap.height == 1 &&
+                   command->bounds.w == 2 && command->bounds.h == 1);
+            assert(command->bitmap.bitmap.pixels[0] == 255 &&
+                   command->bitmap.bitmap.pixels[5] == 255);
+            first |= command->bounds.x == f.blocks[0].list_prefix_width && command->bounds.y == 0;
+            continuation |= command->bounds.x == 16;
+        }
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 4 &&
+            !memcmp(command->text.data, "10. ", 4))
+            marker = command->bounds.x == 0;
+    }
+    assert(images == 2 && first && continuation && marker && f.blocks[1].bounds.y == 20);
+    o.image = NULL;
+    d = frame(ui, &f, o);
+    bool alt = false;
+    images = 0;
+    for (size_t i = 0; i < d.count; ++i) {
+        images += d.commands[i].type == CUI_DRAW_IMAGE;
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 3 &&
+            !memcmp(d.commands[i].text.data, "alt", 3))
+            alt = d.commands[i].bounds.x == f.blocks[0].list_prefix_width;
+    }
+    assert(!images && alt && !f.blocks[0].image_ready && f.blocks[3].list_number == 11);
+    cui_destroy(ui);
+}
 static void test_quote_paragraph_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1582,6 +1682,7 @@ int main(void) {
     test_first_list_fence();
     test_list_nonparagraph_blocks();
     test_quote_paragraph_lines();
+    test_list_image_structure();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1603,6 +1704,8 @@ int main(void) {
     test_first_list_fence_paint();
     test_list_nonparagraph_paint();
     test_quote_paragraph_paint();
+    test_list_image_paint();
+    test_wrapped_link_decoration_ids();
     test_horizontal_table_gesture();
 #endif
     return 0;

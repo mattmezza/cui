@@ -163,7 +163,7 @@ Fences written directly after a list marker are real code blocks with independen
 list-item metadata: the marker or passive task indicator occupies a separate
 column, outside the code background. Such code blocks own nested-list ancestry and
 keep exact source mappings for literal backslashes and subsequent lines. Loose-list
-spacing and nested tables/images or multi-paragraph quote containers are not yet a
+spacing and nested tables or multi-paragraph quote containers are not yet a
 complete list AST. First-child headings and single-paragraph quotes use real block
 styles with a separate normal-size list marker column. Following indented headings
 and quotes remain children of the enclosing item. List ordering is independent of
@@ -189,3 +189,21 @@ list-item quotes and indented list continuation quotes. Partial Source copy
 repeats the quote prefix after a hard break and keeps any surrounding list indent.
 Blank quote paragraphs, lazy unprefixed quote continuation, and nested quote
 containers remain outside this bounded paragraph representation.
+
+Standalone host images in list items retain parent ancestry, ordered counters and
+Source-copy grouping. The first image shares a row with a separate list prefix;
+its borrowed RGBA bitmap keeps its aspect ratio and a short first row reserves
+the marker line height. Removing the host image callback restores alt text without
+retaining the prior bitmap. These images remain standalone blocks with alt-text
+ranges, rather than mixed inline objects in a paragraph.
+
+Exact source inline image flow requires styled font ascent, descent and baseline
+metrics. In frozen `inline_flow.rs`, each line starts with the body's baseline
+and descent. An image baseline is clamped to its height from
+`height / 2 + body_baseline - line_height / 2`; line ascent and descent expand
+with that baseline, and the image paints at `line_y + line_ascent - baseline`.
+The shared size-only styled text measurement callback cannot supply these metrics.
+A future portable styled font metrics callback and matching Canvas/native adapters
+are required; this implementation does not substitute a size-derived baseline.
+Mixed image/text wrapping, inline image object selection, titles/links and explicit
+image attributes also remain outside the standalone block representation.

@@ -42,8 +42,11 @@ completion. Image callbacks run during submission and may report not ready until
 a later frame. The application schedules invalidation when asynchronous work
 completes. Actual bitmap drawing uses Core clipping and the renderer adapters.
 Code and table action callbacks receive a unique action container ID and compose
-real controls in explicit reserved heights. Callbacks must not end the owning
-container. The optional code highlighter supplies foreground colors per code byte.
+real controls. Code actions overlay the top right with 8px insets and a fitting
+opaque background, after document text paints. They do not enlarge code blocks.
+Table actions occupy a full-width footer separated by 4px. Callback heights are
+explicit; callbacks must not end the owning container. Interactive action controls
+keep their own pointer gestures and do not start document selection. The optional code highlighter supplies foreground colors per code byte.
 
 Scrollable views compose the real Scroll component, including scrollbars and
 consumed-event handling. Reveal requests retain only the latest range, expire
@@ -75,7 +78,8 @@ available width equally rather than measuring intrinsic column widths. These
 limitations must not be presented as full source parity.
 
 Headless tests cover transactional bounded parsing and randomized syntax, Unicode
-mapping/selection, edit tracking, entities, safe HTML, tables, clipping, fade state,
+mapping/selection, edit tracking, entities, safe HTML, tables, clipping, fade state, composed action geometry and clicks,
+fence lengths and code content,
 real styled draw commands, separate-frame selection and focus, primary/secondary
 link callbacks, drag suppression, bitmap drawing and invalid geometry.
 

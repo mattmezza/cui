@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_text_view.h"
+#ifndef CUI_TEXT_VIEW_BASE_ONLY
+#include "cui/cui_components.h"
+#endif
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -236,6 +239,33 @@ static void test_table_copy_alignment(void) {
                                         &length) == CUI_TEXT_VIEW_OK);
     assert(!strcmp(output, "|  |  |  |\n| :-- | :-: | --: |\n|  | y |  |"));
 }
+static void test_fenced_code_content(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("```` c metadata\na\n```\nb\n````")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && f.blocks[0].kind == CUI_TEXT_VIEW_CODE_BLOCK);
+    cui_text_view_range r = f.blocks[0].text;
+    assert(r.end - r.begin == 7 && !memcmp(f.rendered + r.begin, "a\n```\nb", 7));
+    r = f.blocks[0].resource;
+    assert(r.end - r.begin == 1 && f.source[r.begin] == 'c');
+    assert(cui_text_view_select(&f.state, 0, f.blocks[0].text.end));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "````c\na\n```\nb\n````"));
+    assert(cui_text_view_set_text(&f.state, text("```c\na\n```")) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].text.end - f.blocks[0].text.begin == 1);
+    assert(cui_text_view_layout(&f.state,
+                                (cui_text_view_layout_options){.width = 200,
+                                                               .font_size = 14,
+                                                               .line_height = 20,
+                                                               .paragraph_gap = 16,
+                                                               .code_actions_height = 32},
+                                measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.h == 44 && f.glyphs[0].font_size == 14);
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -434,6 +464,72 @@ static bool clipboard_write(void *user, cui_str value) {
     clipboard_text[value.length] = 0;
     return true;
 }
+static cui_id action_buttons[4];
+static unsigned action_count, action_clicks;
+static void code_controls(cui_context *ui, cui_id id, const cui_theme *theme, cui_str code,
+                          cui_str language, void *user) {
+    (void)user;
+    assert(code.length == 1 && language.length == 1 && language.data[0] == 'c');
+    assert(action_count < 4);
+    cui_id button = id ^ UINT64_C(0x91831);
+    action_buttons[action_count++] = button;
+    if (cui_button_ex(ui, button, theme, text("Copy"),
+                      (cui_button_options){.size = CUI_CONTROL_SMALL}))
+        ++action_clicks;
+}
+static void table_controls(cui_context *ui, cui_id id, const cui_theme *theme,
+                           const cui_text_view_state *state, unsigned table, void *user) {
+    (void)state;
+    (void)table;
+    (void)user;
+    assert(action_count < 4);
+    cui_id button = id ^ UINT64_C(0x91831);
+    action_buttons[action_count++] = button;
+    if (cui_button_ex(ui, button, theme, text("Save"),
+                      (cui_button_options){.size = CUI_CONTROL_SMALL}))
+        ++action_clicks;
+}
+static void test_action_composition(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state,
+               text("```c\na\n```\n\n```c\nb\n```\n\n| A | B |\n| --- | --- |\n| x | y |")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.code_actions = code_controls;
+    o.table_actions = table_controls;
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(action_count == 3 && action_buttons[0] != action_buttons[1] &&
+           action_buttons[1] != action_buttons[2]);
+    cui_rect button = cui_bounds(ui, action_buttons[0]);
+    assert(fabsf(button.y - (f.state.viewport.y + 8)) < .01f);
+    assert(fabsf(button.x + button.w - (f.state.viewport.x + 192)) < .01f);
+    assert(f.blocks[0].bounds.h == 44);
+    cui_rect footer = cui_bounds(ui, action_buttons[2]);
+    assert(fabsf(footer.y -
+                 (f.state.viewport.y + f.blocks[5].bounds.y + f.blocks[5].bounds.h + 4)) < .01f);
+    float x = button.x + button.w * .5f, y = button.y + button.h * .5f;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(!f.state.selecting);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(action_clicks == 1 && !f.state.selecting);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -513,6 +609,7 @@ int main(void) {
     test_unicode_ranges_and_stream();
     test_html();
     test_source_copy();
+    test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
     test_bounded_parser();
@@ -521,6 +618,7 @@ int main(void) {
     test_styled_selection();
     test_links_and_images();
     test_theme_scroll_and_reveal();
+    test_action_composition();
 #endif
     return 0;
 }

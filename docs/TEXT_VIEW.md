@@ -99,3 +99,13 @@ Default table cells use 8px horizontal and 4px vertical padding, normal inherite
 text weight, clipped content, and one border at each shared edge. Header backgrounds
 use the code background, body cells use the theme surface. TextView links follow
 the frozen text style's primary color mapping rather than the general link token.
+
+The pure layout API additionally exposes `table_mode` (`WRAP` by default,
+`ADAPTIVE`, or `NOWRAP`). Adaptive columns measure each trimmed cell line using
+its styled spans, retain a 48px minimum, and shrink to content-dependent floors
+between 160px and 480px (never above the measured content). Nowrap columns keep
+single-line content widths. Both account for 16px horizontal padding, shared
+1px column borders, and the 2px outer frame. Extra viewport space grows columns
+in proportion to measured widths. This model currently supplies geometry only;
+the styled component still uses default wrap mode until horizontal scrolling is
+connected. It must not be described as an interactive scrolling implementation.

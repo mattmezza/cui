@@ -136,12 +136,18 @@ cui_text_view_error cui_text_view_reveal(cui_text_view_state *, cui_text_view_ra
 /* Paint clock is application-driven. Returns true while animation/reveal needs a frame. */
 bool cui_text_view_advance(cui_text_view_state *, float dt);
 typedef cui_size (*cui_text_view_measure_fn)(void *, cui_str, float font_size, unsigned flags);
+typedef enum {
+    CUI_TEXT_VIEW_TABLE_WRAP,
+    CUI_TEXT_VIEW_TABLE_ADAPTIVE,
+    CUI_TEXT_VIEW_TABLE_NOWRAP
+} cui_text_view_table_mode;
 /* Layout dimensions and measured text widths are bounded to 10,000,000 logical pixels. */
 typedef struct {
     float width, font_size, line_height, paragraph_gap;
     float code_actions_height, table_actions_height;
     size_t max_lines;
     bool scrollable;
+    cui_text_view_table_mode table_mode;
 } cui_text_view_layout_options;
 cui_text_view_error cui_text_view_layout(cui_text_view_state *, cui_text_view_layout_options,
                                          cui_text_view_measure_fn, void *);

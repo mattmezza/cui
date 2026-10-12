@@ -303,6 +303,44 @@ static void test_proportional_table_defaults(void) {
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(fabsf(f.blocks[0].bounds.w - (2000.f * 5 / 155)) < .01f);
 }
+static cui_size table_measure(void *user, cui_str str, float font, unsigned flags) {
+    (void)user;
+    (void)font;
+    float width = 0;
+    for (size_t i = 0; i < str.length; ++i)
+        width += str.data[i] == 'W' ? 100 : 1;
+    if (flags & CUI_TEXT_VIEW_BOLD)
+        width *= 2;
+    return (cui_size){width, 20};
+}
+static void test_adaptive_table_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("| WWWW | iiii |\n| --- | --- |\n| x | y |")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_text_view_layout_options o = {.width = 100,
+                                      .font_size = 14,
+                                      .line_height = 20,
+                                      .table_mode = CUI_TEXT_VIEW_TABLE_ADAPTIVE};
+    assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.w == 208.5f && f.blocks[1].bounds.w == 48);
+    assert(f.blocks[0].bounds.h > 28);
+    o.width = 1000;
+    assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(fabsf(f.blocks[0].bounds.w - 998.f * 417 / 465) < .01f);
+    assert(fabsf(f.blocks[1].bounds.x + f.blocks[1].bounds.w - 998) < .01f);
+    o.width = 100;
+    o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.w == 417 && f.blocks[1].bounds.w == 48);
+    assert(f.blocks[0].bounds.h == 28);
+    assert(cui_text_view_set_text(&f.state, text("| **WWWW** | iiii |\n| --- | --- |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.w == 817);
+    o.table_mode = (cui_text_view_table_mode)-1;
+    assert(cui_text_view_layout(&f.state, o, table_measure, NULL) == CUI_TEXT_VIEW_INVALID);
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -688,6 +726,7 @@ int main(void) {
     test_html();
     test_source_copy();
     test_proportional_table_defaults();
+    test_adaptive_table_model();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();

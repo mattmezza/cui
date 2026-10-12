@@ -1159,7 +1159,9 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
             bool word = s->workspace.rendered[i] != ' ' && s->workspace.rendered[i] != '\t' &&
                         (i == r->text.begin || s->workspace.rendered[i - 1] == ' ' ||
                          s->workspace.rendered[i - 1] == '\n');
-            if (word && cursor_x > 0) {
+            if (word && cursor_x > 0 &&
+                !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                  o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
                 size_t end = i;
                 while (end < r->text.end && s->workspace.rendered[end] != ' ' &&
                        s->workspace.rendered[end] != '\t' && s->workspace.rendered[end] != '\n')
@@ -1180,7 +1182,9 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
             if (!isfinite(m.width) || m.width < 0 || m.width > 10000000)
                 return false;
             float advance = fmaxf(0, m.width - measured);
-            if (cursor_x > 0 && cursor_x + advance > available) {
+            if (cursor_x > 0 && cursor_x + advance > available &&
+                !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                  o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
                 cursor_x = 0;
                 cursor_y += line;
                 segment = i;
@@ -1223,36 +1227,87 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     b->bounds = (cui_rect){x, y, width, cursor_y + line + padding * 2};
     return true;
 }
-static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, size_t end,
-                                       float width) {
-    float weights[CUI_TEXT_VIEW_NODE_LIMIT], widths[CUI_TEXT_VIEW_NODE_LIMIT];
+static bool cui_text_view_table_widths(cui_text_view_state *s, size_t first, size_t end,
+                                       cui_text_view_layout_options o,
+                                       cui_text_view_measure_fn measure, void *user) {
+    float weights[CUI_TEXT_VIEW_NODE_LIMIT], widths[CUI_TEXT_VIEW_NODE_LIMIT],
+        floors[CUI_TEXT_VIEW_NODE_LIMIT];
     unsigned columns = 0;
     for (size_t i = first; i < end; ++i)
         if (s->workspace.blocks[i].column + 1 > columns)
             columns = s->workspace.blocks[i].column + 1;
+    bool adaptive = o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP;
     for (unsigned c = 0; c < columns; ++c) {
-        weights[c] = 5;
+        weights[c] = adaptive ? 48 : 5;
         widths[c] = 0;
+        floors[c] = 64;
     }
     for (size_t i = first; i < end; ++i) {
         const cui_text_view_block *cell = &s->workspace.blocks[i];
-        unsigned count = 0;
-        for (size_t j = cell->text.begin; j < cell->text.end && count < 150; ++j)
-            if (((unsigned char)s->workspace.rendered[j] & 0xc0) != 0x80)
-                ++count;
-        if ((float)count > weights[cell->column])
-            weights[cell->column] = (float)count;
+        if (!adaptive) {
+            unsigned count = 0;
+            for (size_t j = cell->text.begin; j < cell->text.end && count < 150; ++j)
+                if (((unsigned char)s->workspace.rendered[j] & 0xc0) != 0x80)
+                    ++count;
+            weights[cell->column] = fmaxf(weights[cell->column], (float)count);
+            continue;
+        }
+        float maximum = 0;
+        for (size_t line = cell->text.begin; line < cell->text.end;) {
+            size_t end_line = line;
+            while (end_line < cell->text.end && s->workspace.rendered[end_line] != '\n')
+                ++end_line;
+            size_t begin = line, finish = end_line;
+            while (begin < finish &&
+                   (s->workspace.rendered[begin] == ' ' || s->workspace.rendered[begin] == '\t'))
+                ++begin;
+            while (finish > begin && (s->workspace.rendered[finish - 1] == ' ' ||
+                                      s->workspace.rendered[finish - 1] == '\t'))
+                --finish;
+            float width = 0;
+            for (size_t j = 0; j < s->span_count; ++j) {
+                const cui_text_view_span *span = &s->workspace.spans[j];
+                if (span->block != i || span->text.end <= begin || span->text.begin >= finish)
+                    continue;
+                size_t start = span->text.begin > begin ? span->text.begin : begin,
+                       stop = span->text.end < finish ? span->text.end : finish;
+                float size = o.font_size * ((span->flags & CUI_TEXT_VIEW_CODE) ? .875f : 1);
+                cui_size measured =
+                    measure(user, (cui_str){s->workspace.rendered + start, stop - start}, size,
+                            span->flags);
+                if (!isfinite(measured.width) || measured.width < 0 || measured.width > 10000000)
+                    return false;
+                width += measured.width;
+                if (span->flags & CUI_TEXT_VIEW_CODE)
+                    width += 4;
+            }
+            if (!isfinite(width) || width > 10000000)
+                return false;
+            maximum = fmaxf(maximum, width);
+            line = end_line + (end_line < cell->text.end);
+        }
+        weights[cell->column] =
+            fmaxf(weights[cell->column], maximum + 16 + (cell->column + 1 < columns ? 1 : 0));
     }
-    float remaining = fmaxf(width, (float)columns * 64), total = 0;
-    for (unsigned c = 0; c < columns; ++c)
+    float total = 0, minimum = 0;
+    for (unsigned c = 0; c < columns; ++c) {
+        if (adaptive)
+            floors[c] = o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP
+                            ? weights[c]
+                            : fminf(weights[c], fminf(480, fmaxf(160, weights[c] * .5f)));
         total += weights[c];
+        minimum += floors[c];
+    }
+    float remaining = fmaxf(adaptive ? fmaxf(0, o.width - 2) : o.width, minimum);
+    if (!isfinite(remaining) || remaining > 10000000 || total > 10000000)
+        return false;
     bool changed;
     do {
         changed = false;
         for (unsigned c = 0; c < columns; ++c)
-            if (widths[c] == 0 && remaining * (weights[c] / total) < 64) {
-                widths[c] = 64;
-                remaining -= 64;
+            if (widths[c] == 0 && remaining * (weights[c] / total) < floors[c]) {
+                widths[c] = floors[c];
+                remaining -= floors[c];
                 total -= weights[c];
                 changed = true;
             }
@@ -1269,6 +1324,7 @@ static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, siz
             }
         x += widths[c];
     }
+    return true;
 }
 cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_layout_options o,
                                          cui_text_view_measure_fn measure, void *user) {
@@ -1278,7 +1334,8 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         !isfinite(o.paragraph_gap) || o.paragraph_gap < 0 || o.paragraph_gap > 10000000 ||
         !isfinite(o.code_actions_height) || o.code_actions_height < 0 ||
         o.code_actions_height > 10000000 || !isfinite(o.table_actions_height) ||
-        o.table_actions_height < 0 || o.table_actions_height > 10000000)
+        o.table_actions_height < 0 || o.table_actions_height > 10000000 ||
+        o.table_mode < CUI_TEXT_VIEW_TABLE_WRAP || o.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
         return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;
@@ -1295,7 +1352,8 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
                        s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
                        s->workspace.blocks[end].table == table)
                     ++end;
-                cui_text_view_table_widths(s, b, end, o.width);
+                if (!cui_text_view_table_widths(s, b, end, o, measure, user))
+                    return CUI_TEXT_VIEW_INVALID;
             }
             float height = 0;
             size_t first = b;

@@ -144,6 +144,11 @@ static void test_bitmap_pixels(void) {
     assert(cui_software_render(r, &list, (cui_color){0}));
     assert(pixel(r, 0, 0)[3] == 0);
     assert(pixel(r, 4, 4)[0] == 182 && pixel(r, 4, 4)[1] == 182);
+    d.bitmap.grayscale = false;
+    d.bitmap.custom_tint = true;
+    d.bitmap.tint = (cui_color){255, 100, 255, 128};
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    assert(pixel(r, 4, 4)[1] == 100 && pixel(r, 4, 4)[3] == 32);
     d.bitmap.source.w = 2;
     assert(!cui_software_render(r, &list, (cui_color){0}));
     cui_software_destroy(r);

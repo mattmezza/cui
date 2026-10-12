@@ -48,9 +48,21 @@ typedef struct {
 } cui_button_options;
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
+typedef struct {
+    cui_control_size size;
+    bool disabled, required, invalid, skip_tab, hide_focus_ring;
+    cui_str accessibility_label;
+    cui_button_content_fn content;
+    void *content_user;
+} cui_checkbox_options;
+bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
+                     cui_checkbox_options);
 bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 bool cui_toggle(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+typedef cui_checkbox_options cui_radio_options;
+bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                  cui_radio_options);
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);

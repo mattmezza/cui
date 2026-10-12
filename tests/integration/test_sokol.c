@@ -16,6 +16,31 @@ static void readback(void) {
     glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     assert(glGetError() == GL_NO_ERROR);
 }
+static void bitmap_pixels(cui_sokol *r) {
+    unsigned char data[] = {255, 0, 0, 255, 0, 255, 0, 128};
+    cui_draw_command c = {
+        .type = CUI_DRAW_IMAGE,
+        .bounds = {0, 0, 40, 20},
+        .bitmap = {.bitmap = {data, 2, 1, 8, 1}, .source = {0, 0, 2, 1}, .opacity = 1}};
+    cui_draw_list list = {&c, 1, 64, 64};
+    for (int i = 0; i < 3; i++) {
+        if (i == 2) {
+            data[0] = 0;
+            data[2] = 255;
+            c.bitmap.bitmap.revision++;
+        }
+        assert(cui_sokol_render(r, &list, (cui_color){0, 0, 0, 255}));
+        readback();
+        assert(i == 2 ? pixel(5, 5)[2] == 255 : pixel(5, 5)[0] == 255);
+        assert(abs(pixel(30, 5)[1] - 128) <= 1);
+    }
+    c.bitmap.source = (cui_rect){1, 0, 1, 1};
+    c.bitmap.grayscale = true;
+    c.radius = 10;
+    assert(cui_sokol_render(r, &list, (cui_color){0, 0, 0, 255}));
+    readback();
+    assert(pixel(0, 0)[0] == 0 && abs(pixel(20, 10)[0] - 91) <= 1);
+}
 static cui_font *find_font(void) {
 #ifdef CUI_HAS_TEXT
     const char *paths[] = {getenv("CUI_TEST_FONT"), "/usr/share/fonts/noto/NotoSans-Regular.ttf",
@@ -187,6 +212,7 @@ int main(void) {
     printf("Sokol GLCORE; vendor=%s; renderer=%s; nested clip, blend, rounded "
            "geometry/readback and runtime ownership passed\n",
            glGetString(GL_VENDOR), glGetString(GL_RENDERER));
+    bitmap_pixels(r);
     cui_sokol_destroy(r);
     assert(!sg_isvalid());
 #ifdef CUI_HAS_TEXT

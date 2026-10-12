@@ -23,6 +23,36 @@ static unsigned char *capture(cui_sdl_gpu *gpu, unsigned *w, unsigned *h) {
     assert(!fclose(f));
     return data;
 }
+static void bitmap_pixels(cui_sdl_gpu *gpu) {
+    unsigned char data[] = {255, 0, 0, 255, 0, 255, 0, 128};
+    cui_draw_command c = {
+        .type = CUI_DRAW_IMAGE,
+        .bounds = {0, 0, 40, 20},
+        .bitmap = {.bitmap = {data, 2, 1, 8, 1}, .source = {0, 0, 2, 1}, .opacity = 1}};
+    cui_draw_list list = {&c, 1, 200, 200};
+    for (int i = 0; i < 3; i++) {
+        if (i == 2) {
+            data[0] = 0;
+            data[2] = 255;
+            c.bitmap.bitmap.revision++;
+        }
+        assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+        unsigned w, h;
+        unsigned char *p = capture(gpu, &w, &h);
+        pixel(p, w, h, 5.5f / 200, 5.5f / 200, i == 2 ? 0 : 255, 0, i == 2 ? 255 : 0);
+        pixel(p, w, h, 30.5f / 200, 5.5f / 200, 0, 128, 0);
+        free(p);
+    }
+    c.bitmap.source = (cui_rect){1, 0, 1, 1};
+    c.bitmap.grayscale = true;
+    c.radius = 10;
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    unsigned w, h;
+    unsigned char *p = capture(gpu, &w, &h);
+    pixel(p, w, h, .5f / 200, .5f / 200, 0, 0, 0);
+    pixel(p, w, h, 20.5f / 200, 10.5f / 200, 91, 91, 91);
+    free(p);
+}
 static void shapes(cui_sdl_gpu *gpu) {
     cui_draw_command c = {.type = CUI_DRAW_RECT,
                           .bounds = {8, 8, 48, 48},
@@ -97,6 +127,7 @@ int main(void) {
     pixel(pixels, w, h, .25f, .25f, 138, 218, 148);
     free(pixels);
     shapes(gpu);
+    bitmap_pixels(gpu);
     cui_draw_command malformed = {.type = CUI_DRAW_CLIP_POP};
     list = (cui_draw_list){&malformed, 1, 200, 200};
     assert(!cui_sdl_gpu_render(gpu, &list, (cui_color){0}));

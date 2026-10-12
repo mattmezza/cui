@@ -118,6 +118,12 @@ static bool bitmap(cui_software *r, const cui_draw_command *c) {
             if (p->grayscale)
                 color.r = color.g = color.b =
                     (unsigned char)lroundf(.2126f * color.r + .7152f * color.g + .0722f * color.b);
+            if (p->custom_tint) {
+                color.r = (unsigned char)((unsigned)color.r * p->tint.r / 255);
+                color.g = (unsigned char)((unsigned)color.g * p->tint.g / 255);
+                color.b = (unsigned char)((unsigned)color.b * p->tint.b / 255);
+                color.a = (unsigned char)((unsigned)color.a * p->tint.a / 255);
+            }
             blend(r, x, y, color);
         }
     }

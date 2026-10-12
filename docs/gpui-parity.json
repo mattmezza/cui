@@ -610,7 +610,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Binary and mixed base state tested; styled mixed state, real check geometry and validation states pending."
+        "Styled checked/unchecked geometry, four sizes, disabled colors, labels, custom content, and keyboard activation tested. Checkbox also exposes mixed state. Spring mark animation, wrapped inherited text styling, tooltip integration and exact pointer focus behavior remain pending; not full parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1816,7 +1816,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Selection/exclusivity tested; full radio-group roving focus and arrow navigation pending."
+        "Styled checked/unchecked geometry, four sizes, disabled colors, labels, custom content, and keyboard activation tested. Checkbox also exposes mixed state. Spring mark animation, wrapped inherited text styling, tooltip integration and exact pointer focus behavior remain pending; not full parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

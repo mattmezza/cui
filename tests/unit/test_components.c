@@ -205,7 +205,104 @@ static void test_semantic_theme_contrast(void) {
         }
     }
 }
+static void test_checkbox_geometry(void) {
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_check_state value = CUI_CHECK_CHECKED;
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    assert(!cui_checkbox_ex(ui, 99, &theme, cui_string("Choice"), &value,
+                            (cui_checkbox_options){.required = true}));
+    cui_draw_list list = cui_end_frame(ui);
+    unsigned images = 0, labels = 0;
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *c = &list.commands[i];
+        if (c->type == CUI_DRAW_IMAGE) {
+            images++;
+            assert(c->bounds.w == 12 && c->bounds.h == 12 && c->bitmap.custom_tint);
+            unsigned partial = 0, opaque = 0;
+            for (unsigned j = 0; j < 256; j++) {
+                unsigned a = c->bitmap.bitmap.pixels[j * 4 + 3];
+                partial += a > 0 && a < 255;
+                opaque += a == 255;
+            }
+            assert(partial && opaque);
+        }
+        if (c->type == CUI_DRAW_TEXT) {
+            labels++;
+            assert(c->text.length == 6 && !memcmp(c->text.data, "Choice", 6));
+        }
+    }
+    assert(images == 1 && labels == 1);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 1 && sem[0].checked && sem[0].details.required);
+    cui_focus(ui, 99);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    assert(
+        cui_checkbox_ex(ui, 99, &theme, cui_string("Choice"), &value, (cui_checkbox_options){0}));
+    assert(value == CUI_CHECK_UNCHECKED);
+    cui_end_frame(ui);
+    value = CUI_CHECK_MIXED;
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    assert(!cui_checkbox_ex(
+        ui, 99, &theme, cui_string("Choice"), &value,
+        (cui_checkbox_options){.disabled = true, .invalid = true, .size = CUI_CONTROL_LARGE}));
+    list = cui_end_frame(ui);
+    for (size_t i = 0; i < list.count; i++)
+        assert(list.commands[i].type != CUI_DRAW_IMAGE);
+    sem = cui_semantics(ui, &count);
+    assert(count == 1 && sem[0].value == CUI_CHECK_MIXED && sem[0].disabled &&
+           sem[0].details.invalid);
+    cui_destroy(ui);
+}
+static void test_radio_geometry(void) {
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
+    cui_theme theme = cui_theme_light();
+    int selected = 1;
+    for (int size = CUI_CONTROL_MEDIUM; size <= CUI_CONTROL_XSMALL; size++) {
+        assert(cui_begin_frame(ui, 200, 100, .016f));
+        assert(
+            !cui_radio_ex(ui, 91, &theme, cui_string("Radio"), &selected, 1,
+                          (cui_radio_options){.size = (cui_control_size)size, .disabled = true}));
+        cui_draw_list list = cui_end_frame(ui);
+        unsigned images = 0, labels = 0, circles = 0;
+        float side = size == CUI_CONTROL_XSMALL  ? 12
+                     : size == CUI_CONTROL_SMALL ? 14
+                     : size == CUI_CONTROL_LARGE ? 18
+                                                 : 16;
+        for (size_t i = 0; i < list.count; i++) {
+            const cui_draw_command *c = &list.commands[i];
+            if (c->type == CUI_DRAW_IMAGE) {
+                images++;
+                assert(c->bounds.w == side - 4 && c->bitmap.tint.a == theme.on_primary.a / 2);
+            }
+            if (c->type == CUI_DRAW_RECT && c->bounds.w == side && c->bounds.h == side) {
+                circles++;
+                assert(c->corner_radii.top_left == side / 2 && c->color.a == theme.primary.a / 2);
+            }
+            if (c->type == CUI_DRAW_TEXT) {
+                labels++;
+                assert(c->text.length == 5 && !memcmp(c->text.data, "Radio", 5));
+            }
+        }
+        assert(images == 1 && labels == 1 && circles == 1);
+    }
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    cui_radio(ui, 91, &theme, cui_string("Radio"), &selected, 2, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 91);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER});
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    assert(cui_radio(ui, 91, &theme, cui_string("Radio"), &selected, 2, false));
+    assert(selected == 2);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_checkbox_geometry();
+    test_radio_geometry();
     test_semantic_theme_contrast();
     test_button_intent_outlines();
     test_button_palette_overrides();

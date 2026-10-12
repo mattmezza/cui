@@ -195,6 +195,8 @@ typedef struct {
     cui_rect source;
     float opacity;
     bool grayscale;
+    cui_color tint;
+    bool custom_tint;
 } cui_bitmap_paint;
 bool cui_bitmap_valid(cui_bitmap);
 /* A zero source rectangle selects the whole bitmap. Opacity is explicitly 0..1.

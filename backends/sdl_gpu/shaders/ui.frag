@@ -32,6 +32,7 @@ float shapeCoverage(vec2 p,vec2 size,vec4 radii,vec4 edges,float border) {
     return alpha;
 }
 void main() {
+    if(p.shape.z<0) { result=texture(glyphs,uv)*p.color; return; }
     float alpha;
     if(p.atlas.z>0) alpha=texture(glyphs,p.atlas.xy+uv*p.atlas.zw).r;
     else alpha=shapeCoverage(uv*p.bounds.zw,p.bounds.zw,p.radii,p.edges,p.shape.w);

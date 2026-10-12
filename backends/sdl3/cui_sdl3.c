@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
-#include "../software/cui_shape.h"
+#include "../software/cui_bitmap.h"
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdlib.h>
@@ -13,6 +13,13 @@ typedef struct {
     int w, h;
     uint64_t hash, used;
 } glyph_entry;
+#define BITMAP_SLOTS 64
+#define BITMAP_BYTES (64u * 1024u * 1024u)
+typedef struct {
+    SDL_Texture *texture;
+    cui_bitmap_key key;
+    uint64_t used;
+} bitmap_entry;
 struct cui_sdl3 {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -20,6 +27,8 @@ struct cui_sdl3 {
     cui_color ink;
     bool quit, glyph_ok;
     glyph_entry glyphs[GLYPH_CACHE_SLOTS];
+    bitmap_entry bitmaps[BITMAP_SLOTS];
+    size_t bitmap_bytes;
     size_t glyph_bytes;
     uint64_t clock, hits, misses;
     char *clipboard;
@@ -52,6 +61,8 @@ void cui_sdl3_destroy(cui_sdl3 *s) {
         SDL_DestroyTexture(s->glyphs[i].texture);
         free(s->glyphs[i].coverage);
     }
+    for (size_t i = 0; i < BITMAP_SLOTS; i++)
+        SDL_DestroyTexture(s->bitmaps[i].texture);
     SDL_free(s->clipboard);
     SDL_DestroyRenderer(s->renderer);
     SDL_DestroyWindow(s->window);
@@ -315,6 +326,58 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
         !SDL_SetTextureAlphaMod(t, s->ink.a) || !SDL_RenderTexture(s->renderer, t, NULL, &r))
         s->glyph_ok = false;
 }
+static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c) {
+    if (c->bounds.w <= 0 || c->bounds.h <= 0)
+        return true;
+    cui_bitmap_key key;
+    if (!cui_bitmap_key_make(c, &key))
+        return false;
+    size_t bytes = (size_t)key.width * key.height * 4;
+    if (bytes > BITMAP_BYTES)
+        return false;
+    bitmap_entry *entry = NULL;
+    for (size_t i = 0; i < BITMAP_SLOTS; i++)
+        if (s->bitmaps[i].texture && cui_bitmap_key_equal(&key, &s->bitmaps[i].key)) {
+            entry = &s->bitmaps[i];
+            break;
+        }
+    if (!entry) {
+        for (;;) {
+            bitmap_entry *oldest = &s->bitmaps[0], *empty = NULL;
+            for (size_t i = 0; i < BITMAP_SLOTS; i++) {
+                if (!s->bitmaps[i].texture)
+                    empty = &s->bitmaps[i];
+                else if (!oldest->texture || s->bitmaps[i].used < oldest->used)
+                    oldest = &s->bitmaps[i];
+            }
+            if (empty && s->bitmap_bytes + bytes <= BITMAP_BYTES) {
+                entry = empty;
+                break;
+            }
+            s->bitmap_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
+            SDL_DestroyTexture(oldest->texture);
+            *oldest = (bitmap_entry){0};
+        }
+        unsigned char *rgba = cui_bitmap_raster(&key, BITMAP_BYTES);
+        if (!rgba)
+            return false;
+        SDL_Surface *surface = SDL_CreateSurfaceFrom(
+            (int)key.width, (int)key.height, SDL_PIXELFORMAT_RGBA32, rgba, (int)key.width * 4);
+        SDL_Texture *texture = surface ? SDL_CreateTextureFromSurface(s->renderer, surface) : NULL;
+        SDL_DestroySurface(surface);
+        free(rgba);
+        if (!texture)
+            return false;
+        *entry = (bitmap_entry){.texture = texture, .key = key};
+        s->bitmap_bytes += bytes;
+    }
+    entry->used = ++s->clock;
+    SDL_FRect bounds = {c->bounds.x, c->bounds.y, c->bounds.w, c->bounds.h};
+    return SDL_SetTextureBlendMode(entry->texture, SDL_BLENDMODE_BLEND) &&
+           SDL_SetTextureScaleMode(entry->texture, SDL_SCALEMODE_NEAREST) &&
+           SDL_SetTextureAlphaModFloat(entry->texture, c->bitmap.opacity) &&
+           SDL_RenderTexture(s->renderer, entry->texture, NULL, &bounds);
+}
 bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color clear,
                              const char *path) {
     if (!s || !list || (!list->commands && list->count) || !isfinite(list->width) ||
@@ -335,6 +398,10 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
             fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)
             return false;
         switch (c->type) {
+        case CUI_DRAW_IMAGE:
+            if (!bitmap_draw(s, c))
+                return false;
+            break;
         case CUI_DRAW_RECT:
         case CUI_DRAW_BORDER:
             if (!rect(s, c))

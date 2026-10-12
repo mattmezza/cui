@@ -116,9 +116,7 @@ static bool cui_components_binary_control(cui_context *ui, cui_id id, const cui_
     cui_box b = cui_components_control(t, disabled, kind == 2 && *value);
     cui_components_focus(ui, id, t, &b);
     cui_begin_box(ui, id, b);
-    const char *indicator = kind == 0   ? (*value ? "[x]" : "[ ]")
-                            : kind == 1 ? (*value ? "ON" : "OFF")
-                                        : (*value ? "+" : "-");
+    const char *indicator = kind == 1 ? (*value ? "ON" : "OFF") : (*value ? "+" : "-");
     cui_components_mark(ui, t, indicator, kind == 2 && *value, disabled);
     cui_text(ui, name, t->font_size,
              disabled              ? t->muted
@@ -127,8 +125,148 @@ static bool cui_components_binary_control(cui_context *ui, cui_id id, const cui_
     cui_end_box(ui);
     return changed;
 }
-bool cui_checkbox(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v, bool d) {
-    return cui_components_binary_control(u, i, t, n, v, d, 0);
+static const unsigned char cui_components_check_pixels[16 * 16 * 4] = {
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 80,  255, 255, 255,
+    80,  255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 96,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 96,  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 96,  255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 48,  255, 255, 255, 239, 255, 255, 255, 255, 255, 255, 255, 128, 255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 207, 255, 255, 255, 207, 255, 255, 255, 16,  255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 48,  255, 255, 255, 239, 255, 255, 255, 255, 255, 255,
+    255, 159, 255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 207, 255, 255, 255, 255, 255, 255, 255, 207,
+    255, 255, 255, 16,  255, 255, 255, 0,   255, 255, 255, 48,  255, 255, 255, 239, 255, 255, 255,
+    255, 255, 255, 255, 159, 255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 16,  255,
+    255, 255, 207, 255, 255, 255, 255, 255, 255, 255, 207, 255, 255, 255, 32,  255, 255, 255, 239,
+    255, 255, 255, 255, 255, 255, 255, 159, 255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 16,  255, 255, 255, 207, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 207, 255, 255, 255, 16,  255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 16,  255, 255, 255, 207, 255, 255, 255, 255, 255, 255, 255, 207, 255, 255, 255, 16,  255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 16,  255, 255, 255, 128, 255, 255,
+    255, 16,  255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255,
+    255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255,
+    255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+    255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
+    0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,
+};
+bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
+                     cui_check_state *value, cui_checkbox_options options) {
+    if (!ui || !t || !value)
+        return false;
+    cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
+    bool changed = cui_base_check(ui, id, name, value, options.disabled);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.required = options.required, .invalid = options.invalid});
+    cui_set_tab_stop(ui, id, !options.skip_tab);
+    float density = t->font_size / 16;
+    float size = (options.size == CUI_CONTROL_XSMALL  ? 12
+                  : options.size == CUI_CONTROL_SMALL ? 14
+                  : options.size == CUI_CONTROL_LARGE ? 18
+                                                      : 16) *
+                 density;
+    float font = (options.size == CUI_CONTROL_XSMALL  ? 12
+                  : options.size == CUI_CONTROL_SMALL ? 14
+                                                      : 16) *
+                 density;
+    bool selected = *value != CUI_CHECK_UNCHECKED;
+    cui_color border = options.invalid ? t->danger : selected ? t->primary : t->input;
+    cui_color background = selected ? t->primary : t->input_background;
+    cui_color foreground = t->on_primary;
+    if (options.disabled) {
+        border.a /= 2;
+        if (selected)
+            background.a /= 2;
+        foreground.a /= 2;
+    }
+    cui_box outer = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
+    if (!options.hide_focus_ring && cui_focused(ui) == id) {
+        outer.border = t->focus;
+        outer.border_width = 2;
+    }
+    cui_begin_box(ui, id, outer);
+    cui_begin_box(ui, 0, (cui_box){.width = size, .gap = 0});
+    if (label.length || options.content) {
+        cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = size,
+                            .height = size,
+                            .background = background,
+                            .border = border,
+                            .border_width = 1,
+                            .radius = fminf(t->radius, 4 * density),
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER});
+    if (*value == CUI_CHECK_CHECKED) {
+        cui_paint_bitmap(ui, 0,
+                         (cui_bitmap_paint){.bitmap = {cui_components_check_pixels, 16, 16, 64, 1},
+                                            .opacity = 1,
+                                            .custom_tint = true,
+                                            .tint = foreground},
+                         (cui_box){.width = size - 4 * density, .height = size - 4 * density});
+    } else if (*value == CUI_CHECK_MIXED) {
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = size - 6 * density,
+                                .height = 2 * density,
+                                .radius = density,
+                                .background = foreground});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    cui_end_box(ui);
+    if (label.length || options.content) {
+        cui_begin_box(ui, 0, (cui_box){.gap = 4 * density});
+        if (label.length)
+            cui_text(ui, label, font, options.disabled ? t->muted : t->text);
+        if (options.content)
+            options.content(ui, options.content_user);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return changed;
+}
+bool cui_checkbox(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool *value,
+                  bool disabled) {
+    if (!value)
+        return false;
+    cui_check_state state = *value ? CUI_CHECK_CHECKED : CUI_CHECK_UNCHECKED;
+    bool changed =
+        cui_checkbox_ex(ui, id, t, name, &state, (cui_checkbox_options){.disabled = disabled});
+    *value = state == CUI_CHECK_CHECKED;
+    return changed;
 }
 bool cui_switch(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v, bool d) {
     return cui_components_binary_control(u, i, t, n, v, d, 1);
@@ -136,18 +274,79 @@ bool cui_switch(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v
 bool cui_toggle(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v, bool d) {
     return cui_components_binary_control(u, i, t, n, v, d, 2);
 }
-bool cui_radio(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value, int option,
-               bool disabled) {
-    if (!value)
+bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
+                  int option, cui_radio_options options) {
+    if (!ui || !t || !value)
         return false;
-    bool changed = cui_base_radio(ui, id, name, value, option, disabled);
-    cui_box b = cui_components_control(t, disabled, false);
-    cui_components_focus(ui, id, t, &b);
-    cui_begin_box(ui, id, b);
-    cui_components_mark(ui, t, *value == option ? "(*)" : "( )", false, disabled);
-    cui_text(ui, name, t->font_size, disabled ? t->muted : t->text);
+    cui_str accessible = options.accessibility_label.length ? options.accessibility_label : name;
+    bool changed = cui_base_radio(ui, id, accessible, value, option, options.disabled);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.required = options.required, .invalid = options.invalid});
+    cui_set_tab_stop(ui, id, !options.skip_tab);
+    float density = t->font_size / 16;
+    float size = (options.size == CUI_CONTROL_XSMALL  ? 12
+                  : options.size == CUI_CONTROL_SMALL ? 14
+                  : options.size == CUI_CONTROL_LARGE ? 18
+                                                      : 16) *
+                 density;
+    float font = (options.size == CUI_CONTROL_XSMALL  ? 12
+                  : options.size == CUI_CONTROL_SMALL ? 14
+                                                      : 16) *
+                 density;
+    bool selected = *value == option;
+    cui_color ink = options.invalid ? t->danger : selected ? t->primary : t->input;
+    cui_color dot = t->on_primary;
+    cui_color background = selected ? t->primary : t->input_background;
+    if (options.disabled) {
+        ink.a /= 2;
+        dot.a /= 2;
+        if (selected)
+            background.a /= 2;
+    }
+    cui_box outer = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
+    if (!options.hide_focus_ring && cui_focused(ui) == id) {
+        outer.border = t->focus;
+        outer.border_width = 2;
+    }
+    cui_begin_box(ui, id, outer);
+    cui_begin_box(ui, 0, (cui_box){.width = size});
+    if (name.length || options.content) {
+        cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = size,
+                            .height = size,
+                            .radius = size / 2,
+                            .border_width = 1,
+                            .border = ink,
+                            .background = background,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER});
+    if (selected) {
+        cui_paint_bitmap(ui, 0,
+                         (cui_bitmap_paint){.bitmap = {cui_components_check_pixels, 16, 16, 64, 1},
+                                            .opacity = 1,
+                                            .custom_tint = true,
+                                            .tint = dot},
+                         (cui_box){.width = size - 4 * density, .height = size - 4 * density});
+    }
+    cui_end_box(ui);
+    cui_end_box(ui);
+    if (name.length || options.content) {
+        cui_begin_box(ui, 0, (cui_box){.gap = 4 * density});
+        if (name.length)
+            cui_text(ui, name, font, options.disabled ? t->muted : t->text);
+        if (options.content)
+            options.content(ui, options.content_user);
+        cui_end_box(ui);
+    }
     cui_end_box(ui);
     return changed;
+}
+bool cui_radio(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value, int option,
+               bool disabled) {
+    return cui_radio_ex(ui, id, t, name, value, option, (cui_radio_options){.disabled = disabled});
 }
 void cui_label(cui_context *ui, const cui_theme *t, cui_str label) {
     cui_text(ui, label, t->font_size, t->text);

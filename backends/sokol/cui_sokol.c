@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sokol.h"
-#include "../software/cui_shape.h"
+#include "../software/cui_bitmap.h"
 #define SOKOL_GLCORE
 #define SOKOL_VALIDATE_NON_FATAL
 #ifndef CUI_SOKOL_EXTERNAL_RUNTIME
@@ -35,6 +35,14 @@ typedef struct {
     int w, h;
     uint64_t hash, used, frame;
 } cached_glyph;
+#define CUI_SOKOL_BITMAPS 64
+#define CUI_SOKOL_BITMAP_BYTES (64u * 1024u * 1024u)
+typedef struct {
+    sg_image image;
+    sg_view view;
+    cui_bitmap_key key;
+    uint64_t used, frame;
+} cached_bitmap;
 struct cui_sokol {
     cui_sokol_config config;
     vertex *vertices;
@@ -47,6 +55,8 @@ struct cui_sokol {
     sg_image white;
     sg_view white_view;
     cached_glyph glyphs[CUI_SOKOL_GLYPHS];
+    cached_bitmap bitmaps[CUI_SOKOL_BITMAPS];
+    size_t bitmap_bytes;
     size_t glyph_bytes;
     uint64_t clock, frame, hits, misses;
     bool owns_runtime, ok, rendered, listening;
@@ -116,7 +126,7 @@ static const char *fragment_source =
     "    }\n"
     "    return alpha;\n"
     "}\n"
-    "void main(){float "
+    "void main(){if(v_kind>2.5){frag_color=texture(glyph,v_uv)*v_color;return;}float "
     "coverage=v_kind>1.5?texture(glyph,v_uv).a:shapeCoverage(v_uv*v_shape.xy,v_shape.xy,v_radii,v_"
     "edges,v_kind);frag_color=vec4(v_color.rgb,v_color.a*coverage);}\n";
 static bool valid_target(cui_sokol_target t) {
@@ -257,6 +267,10 @@ void cui_sokol_destroy(cui_sokol *r) {
             sg_remove_commit_listener((sg_commit_listener){committed, r});
         for (size_t i = 0; i < CUI_SOKOL_GLYPHS; i++)
             evict(r, &r->glyphs[i]);
+        for (size_t i = 0; i < CUI_SOKOL_BITMAPS; i++) {
+            sg_destroy_view(r->bitmaps[i].view);
+            sg_destroy_image(r->bitmaps[i].image);
+        }
         sg_destroy_view(r->white_view);
         sg_destroy_image(r->white);
         sg_destroy_sampler(r->sampler);
@@ -414,6 +428,72 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch,
         quad(r, (cui_rect){(float)x, (float)y, (float)w, (float)h}, r->ink, 0, 0, 2, texture);
 }
 #endif
+static sg_view bitmap_view(cui_sokol *r, const cui_draw_command *c) {
+    cui_bitmap_key key;
+    if (!cui_bitmap_key_make(c, &key)) {
+        fail(r, "Invalid CUI Sokol bitmap");
+        return (sg_view){0};
+    }
+    size_t bytes = (size_t)key.width * key.height * 4;
+    if (bytes > CUI_SOKOL_BITMAP_BYTES) {
+        fail(r, "CUI Sokol bitmap exceeds cache budget");
+        return (sg_view){0};
+    }
+    cached_bitmap *entry = NULL;
+    for (size_t i = 0; i < CUI_SOKOL_BITMAPS; i++)
+        if (r->bitmaps[i].image.id && cui_bitmap_key_equal(&key, &r->bitmaps[i].key)) {
+            entry = &r->bitmaps[i];
+            break;
+        }
+    if (!entry) {
+        for (;;) {
+            cached_bitmap *oldest = NULL, *empty = NULL;
+            for (size_t i = 0; i < CUI_SOKOL_BITMAPS; i++) {
+                cached_bitmap *b = &r->bitmaps[i];
+                if (!b->image.id)
+                    empty = b;
+                else if (b->frame != r->frame && (!oldest || b->used < oldest->used))
+                    oldest = b;
+            }
+            if (empty && r->bitmap_bytes + bytes <= CUI_SOKOL_BITMAP_BYTES) {
+                entry = empty;
+                break;
+            }
+            if (!oldest) {
+                fail(r, "CUI Sokol frame exceeds bitmap cache capacity");
+                return (sg_view){0};
+            }
+            r->bitmap_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
+            sg_destroy_view(oldest->view);
+            sg_destroy_image(oldest->image);
+            *oldest = (cached_bitmap){0};
+        }
+        unsigned char *rgba = cui_bitmap_raster(&key, CUI_SOKOL_BITMAP_BYTES);
+        if (!rgba) {
+            fail(r, "CUI Sokol bitmap allocation failed");
+            return (sg_view){0};
+        }
+        sg_image image = sg_make_image(&(sg_image_desc){.width = (int)key.width,
+                                                        .height = (int)key.height,
+                                                        .pixel_format = SG_PIXELFORMAT_RGBA8,
+                                                        .data.mip_levels[0] = {rgba, bytes},
+                                                        .label = "CUI RGBA bitmap"});
+        free(rgba);
+        sg_view view = sg_make_view(&(sg_view_desc){.texture.image = image});
+        if (sg_query_image_state(image) != SG_RESOURCESTATE_VALID ||
+            sg_query_view_state(view) != SG_RESOURCESTATE_VALID) {
+            sg_destroy_view(view);
+            sg_destroy_image(image);
+            fail(r, "CUI Sokol bitmap upload failed");
+            return (sg_view){0};
+        }
+        *entry = (cached_bitmap){.image = image, .view = view, .key = key};
+        r->bitmap_bytes += bytes;
+    }
+    entry->used = ++r->clock;
+    entry->frame = r->frame;
+    return entry->view;
+}
 bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list)
         return false;
@@ -441,6 +521,16 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
             return fail(r, "Invalid CUI Sokol geometry");
         size_t before = r->quads;
         switch (c->type) {
+        case CUI_DRAW_IMAGE:
+            if (c->bounds.w > 0 && c->bounds.h > 0) {
+                sg_view view = bitmap_view(r, c);
+                if (!view.id)
+                    return false;
+                quad(r, c->bounds,
+                     (cui_color){255, 255, 255, (uint8_t)lroundf(c->bitmap.opacity * 255)}, 0, 0, 3,
+                     view);
+            }
+            break;
         case CUI_DRAW_RECT:
             quad(r, c->bounds, c->color, c->radius, 0, 0, r->white_view);
             break;
@@ -549,7 +639,8 @@ static void destroy(void *r) {
     cui_sokol_destroy(r);
 }
 cui_renderer cui_sokol_interface(cui_sokol *r) {
-    unsigned capabilities = CUI_RENDER_ACCELERATED | CUI_RENDER_ROUNDED | CUI_RENDER_CLIP;
+    unsigned capabilities =
+        CUI_RENDER_ACCELERATED | CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE;
 #ifdef CUI_HAS_TEXT
     if (r && r->config.font)
         capabilities |= CUI_RENDER_TEXT;

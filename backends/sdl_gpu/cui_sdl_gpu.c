@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl_gpu.h"
-#include "../software/cui_shape.h"
+#include "../software/cui_bitmap.h"
 #include "shaders/generated.h"
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -17,11 +17,19 @@ typedef struct {
 typedef struct {
     gpu_params params;
     SDL_Rect clip;
+    SDL_GPUTexture *texture;
 } gpu_draw;
 typedef struct {
     uint64_t hash;
     int x, y, w, h;
 } gpu_glyph;
+#define BITMAPS 64
+#define BITMAP_BUDGET (64u * 1024u * 1024u)
+typedef struct {
+    SDL_GPUTexture *texture;
+    cui_bitmap_key key;
+    uint64_t used, frame;
+} gpu_bitmap;
 struct cui_sdl_gpu {
     SDL_GPUDevice *device;
     SDL_Window *window;
@@ -33,6 +41,9 @@ struct cui_sdl_gpu {
     unsigned char *pixels;
     gpu_glyph glyphs[GLYPHS];
     size_t glyph_count;
+    gpu_bitmap bitmaps[BITMAPS];
+    size_t bitmap_bytes;
+    uint64_t frame, clock;
     gpu_draw *draws;
     size_t draw_count;
     int shelf_x, shelf_y, shelf_h;
@@ -126,6 +137,9 @@ void cui_sdl_gpu_destroy(cui_sdl_gpu *r) {
         return;
     if (r->pipeline)
         SDL_ReleaseGPUGraphicsPipeline(r->device, r->pipeline);
+    for (size_t i = 0; i < BITMAPS; i++)
+        if (r->bitmaps[i].texture)
+            SDL_ReleaseGPUTexture(r->device, r->bitmaps[i].texture);
     if (r->atlas)
         SDL_ReleaseGPUTexture(r->device, r->atlas);
     if (r->surface)
@@ -153,6 +167,95 @@ static gpu_draw *append(cui_sdl_gpu *r, cui_rect rect, cui_color color, float ra
            (float[]){color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f}, 16);
     memcpy(d->params.shape, (float[]){rect.w, rect.h, radius, stroke}, 16);
     return d;
+}
+static SDL_GPUTexture *bitmap_texture(cui_sdl_gpu *r, const cui_draw_command *c) {
+    cui_bitmap_key key;
+    if (!cui_bitmap_key_make(c, &key))
+        return NULL;
+    size_t bytes = (size_t)key.width * key.height * 4;
+    if (bytes > BITMAP_BUDGET)
+        return NULL;
+    gpu_bitmap *entry = NULL;
+    for (size_t i = 0; i < BITMAPS; i++)
+        if (r->bitmaps[i].texture && cui_bitmap_key_equal(&key, &r->bitmaps[i].key)) {
+            entry = &r->bitmaps[i];
+            break;
+        }
+    if (!entry) {
+        for (;;) {
+            gpu_bitmap *oldest = NULL, *empty = NULL;
+            for (size_t i = 0; i < BITMAPS; i++) {
+                gpu_bitmap *b = &r->bitmaps[i];
+                if (!b->texture)
+                    empty = b;
+                else if (b->frame != r->frame && (!oldest || b->used < oldest->used))
+                    oldest = b;
+            }
+            if (empty && r->bitmap_bytes + bytes <= BITMAP_BUDGET) {
+                entry = empty;
+                break;
+            }
+            if (!oldest)
+                return NULL;
+            r->bitmap_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
+            SDL_ReleaseGPUTexture(r->device, oldest->texture);
+            *oldest = (gpu_bitmap){0};
+        }
+        unsigned char *rgba = cui_bitmap_raster(&key, BITMAP_BUDGET);
+        if (!rgba)
+            return NULL;
+        SDL_GPUTexture *texture = SDL_CreateGPUTexture(
+            r->device, &(SDL_GPUTextureCreateInfo){.type = SDL_GPU_TEXTURETYPE_2D,
+                                                   .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                                                   .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                                                   .width = key.width,
+                                                   .height = key.height,
+                                                   .layer_count_or_depth = 1,
+                                                   .num_levels = 1});
+        SDL_GPUTransferBuffer *upload = SDL_CreateGPUTransferBuffer(
+            r->device, &(SDL_GPUTransferBufferCreateInfo){
+                           .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = (Uint32)bytes});
+        void *mapped = upload ? SDL_MapGPUTransferBuffer(r->device, upload, false) : NULL;
+        if (!texture || !mapped) {
+            if (mapped)
+                SDL_UnmapGPUTransferBuffer(r->device, upload);
+            if (upload)
+                SDL_ReleaseGPUTransferBuffer(r->device, upload);
+            if (texture)
+                SDL_ReleaseGPUTexture(r->device, texture);
+            free(rgba);
+            return NULL;
+        }
+        memcpy(mapped, rgba, bytes);
+        free(rgba);
+        SDL_UnmapGPUTransferBuffer(r->device, upload);
+        SDL_GPUCommandBuffer *cb = SDL_AcquireGPUCommandBuffer(r->device);
+        if (!cb) {
+            SDL_ReleaseGPUTransferBuffer(r->device, upload);
+            SDL_ReleaseGPUTexture(r->device, texture);
+            return NULL;
+        }
+        SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cb);
+        SDL_UploadToGPUTexture(
+            copy,
+            &(SDL_GPUTextureTransferInfo){.transfer_buffer = upload,
+                                          .pixels_per_row = key.width,
+                                          .rows_per_layer = key.height},
+            &(SDL_GPUTextureRegion){.texture = texture, .w = key.width, .h = key.height, .d = 1},
+            false);
+        SDL_EndGPUCopyPass(copy);
+        bool submitted = SDL_SubmitGPUCommandBuffer(cb);
+        SDL_ReleaseGPUTransferBuffer(r->device, upload);
+        if (!submitted) {
+            SDL_ReleaseGPUTexture(r->device, texture);
+            return NULL;
+        }
+        *entry = (gpu_bitmap){.texture = texture, .key = key};
+        r->bitmap_bytes += bytes;
+    }
+    entry->used = ++r->clock;
+    entry->frame = r->frame;
+    return entry->texture;
 }
 static bool matches(cui_sdl_gpu *r, gpu_glyph g, int pitch, const unsigned char *p) {
     for (int j = 0; j < g.h; j++)
@@ -212,6 +315,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
     SDL_Rect stack[CLIPS];
     size_t depth = 0;
     r->draw_count = 0;
+    r->frame++;
     r->failed = false;
     r->logical_w = list->width;
     r->logical_h = list->height;
@@ -227,6 +331,21 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
             return false;
         }
         switch (c->type) {
+        case CUI_DRAW_IMAGE: {
+            if (c->bounds.w <= 0 || c->bounds.h <= 0)
+                break;
+            SDL_GPUTexture *texture = bitmap_texture(r, c);
+            if (!texture)
+                return false;
+            gpu_draw *d =
+                append(r, c->bounds,
+                       (cui_color){255, 255, 255, (uint8_t)lroundf(c->bitmap.opacity * 255)}, 0, 0);
+            if (d) {
+                d->texture = texture;
+                d->params.shape[2] = -1;
+            }
+            break;
+        }
         case CUI_DRAW_RECT:
         case CUI_DRAW_BORDER: {
             gpu_draw *d =
@@ -333,6 +452,9 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
         float sx = w / list->width, sy = h / list->height;
         SDL_Rect clip = {(int)floorf(d->clip.x * sx), (int)floorf(d->clip.y * sy),
                          (int)ceilf(d->clip.w * sx), (int)ceilf(d->clip.h * sy)};
+        SDL_BindGPUFragmentSamplers(
+            pass, 0,
+            &(SDL_GPUTextureSamplerBinding){d->texture ? d->texture : r->atlas, r->sampler}, 1);
         SDL_SetGPUScissor(pass, &clip);
         SDL_PushGPUVertexUniformData(cb, 0, &d->params, sizeof(d->params));
         SDL_PushGPUFragmentUniformData(cb, 0, &d->params, sizeof(d->params));

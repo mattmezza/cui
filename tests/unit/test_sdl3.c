@@ -5,6 +5,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+static void bitmap_pixels(cui_sdl3 *s) {
+    unsigned char pixels[] = {255, 0, 0, 255, 0, 255, 0, 128};
+    cui_draw_command c = {
+        .type = CUI_DRAW_IMAGE,
+        .bounds = {0, 0, 40, 20},
+        .bitmap = {.bitmap = {pixels, 2, 1, 8, 1}, .source = {0, 0, 2, 1}, .opacity = 1}};
+    cui_draw_list list = {&c, 1, 320, 160};
+    for (int pass = 0; pass < 3; pass++) {
+        if (pass == 2) {
+            pixels[0] = 0;
+            pixels[2] = 255;
+            c.bitmap.bitmap.revision++;
+        }
+        assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-bitmap.bmp"));
+        SDL_Surface *surface = SDL_LoadBMP("sdl-bitmap.bmp");
+        assert(surface);
+        Uint8 red, green, blue, alpha;
+        assert(SDL_ReadSurfacePixel(surface, 5, 5, &red, &green, &blue, &alpha));
+        assert(pass == 2 ? blue == 255 && red == 0 : red == 255 && blue == 0);
+        assert(SDL_ReadSurfacePixel(surface, 30, 5, &red, &green, &blue, &alpha));
+        assert(abs(green - 128) <= 1);
+        SDL_DestroySurface(surface);
+    }
+    c.bitmap.source = (cui_rect){1, 0, 1, 1};
+    c.bitmap.grayscale = true;
+    c.radius = 10;
+    assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-bitmap.bmp"));
+    SDL_Surface *surface = SDL_LoadBMP("sdl-bitmap.bmp");
+    assert(surface);
+    Uint8 red, green, blue, alpha;
+    assert(SDL_ReadSurfacePixel(surface, 0, 0, &red, &green, &blue, &alpha) && red == 0);
+    assert(SDL_ReadSurfacePixel(surface, 20, 10, &red, &green, &blue, &alpha));
+    assert(abs(red - 91) <= 1 && red == green && green == blue);
+    SDL_DestroySurface(surface);
+}
 static void shapes(cui_sdl3 *s) {
     cui_draw_command c = {.type = CUI_DRAW_RECT,
                           .bounds = {8, 8, 48, 48},
@@ -68,6 +103,7 @@ int main(int argc, char **argv) {
     cui_sdl3 *s = cui_sdl3_create("CUI SDL adapter test", 320, 160, font);
     assert(s);
     shapes(s);
+    bitmap_pixels(s);
     const char text[] = "repeat repeat caf\xc3\xa9";
     cui_draw_command commands[] = {
         {.type = CUI_DRAW_RECT, .bounds = {0, 0, 320, 160}, .color = {30, 40, 50, 255}},

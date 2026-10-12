@@ -102,6 +102,9 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1')
             assert page.locator('#accessible [role=dialog][aria-modal=true]').count() == 1
             assert page.locator('#accessible [role=dialog]').get_attribute('aria-labelledby')
+            dialog_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Notification preferences'))
+            footer_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Save changes'))
+            assert footer_bounds[1] + footer_bounds[3] <= dialog_bounds[1] + dialog_bounds[3]
             click_semantic('Save changes')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
             index = semantic_index('Edit preferences')
@@ -164,6 +167,24 @@ def main():
                     assert abs(bounds[1]) < 1 and abs(bounds[2] - canvas_width) < 1
                 else:
                     assert abs(bounds[1] + bounds[3] - canvas_height) < 1
+                handle_name = 'Sheet width' if edge < 2 else 'Sheet height'
+                handle = semantic_index(handle_name)
+                assert page.locator('#accessible [role=slider]').get_attribute('aria-orientation') == ('horizontal' if edge < 2 else 'vertical')
+                click_semantic(handle_name)
+                page.keyboard.press('End')
+                page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===cuiGallery.exports.gallery_semantic(i,13)', arg=handle)
+                page.keyboard.press('Home')
+                page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===100', arg=handle)
+                handle_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', handle)
+                rectangle = canvas.bounding_box()
+                x = rectangle['x'] + handle_bounds[0] + handle_bounds[2]/2
+                y = rectangle['y'] + handle_bounds[1] + handle_bounds[3]/2
+                delta = 26 if edge in (0,2) else -26
+                page.mouse.move(x,y)
+                page.mouse.down()
+                page.mouse.move(x + (delta if edge < 2 else 0),y + (delta if edge >= 2 else 0),steps=5)
+                page.mouse.up()
+                page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)>120', arg=handle)
                 page.keyboard.press('Escape')
                 page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===0')
                 index = semantic_index('Open settings sheet')

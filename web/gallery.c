@@ -596,9 +596,6 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_id nested_trigger = cui_id_from(ui, "nested-trigger");
             if (cui_button(ui, nested_trigger, &t, cui_string("Advanced preferences"), false))
                 cui_surface_open(ui, &nested_surface, nested_trigger);
-            if (cui_button(ui, cui_id_from(ui, "dialog-save"), &t, cui_string("Save changes"),
-                           false))
-                cui_surface_close(ui, &dialog_surface, CUI_SURFACE_ACCEPTED);
             if (cui_surface_begin(ui, &t, &nested_surface, cui_string("Advanced preferences"),
                                   cui_string("Escape returns to the parent dialog."),
                                   (cui_surface_options){.viewport = {0, 0, width, height},
@@ -610,6 +607,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                              cui_string("Preview releases"), &popover_updates, false);
                 cui_surface_end(ui);
             }
+            cui_begin_box(ui, 0, (cui_box){.height = 300});
+            cui_label(ui, &t, cui_string("Long body content remains clipped above the footer."));
+            cui_end_box(ui);
+            cui_surface_footer_begin(ui, &t);
+            if (cui_button(ui, cui_id_from(ui, "dialog-save"), &t, cui_string("Save changes"),
+                           false))
+                cui_surface_close(ui, &dialog_surface, CUI_SURFACE_ACCEPTED);
             cui_surface_end(ui);
         }
         break;
@@ -645,7 +649,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_surface_options options = {.viewport = {0, 0, width, height},
                                        .width = width > 520 ? 320 : width * .72f,
                                        .height = height * .62f,
-                                       .edge = edge};
+                                       .edge = edge,
+                                       .sheet_minimum = 100,
+                                       .sheet_maximum =
+                                           edge < CUI_SHEET_TOP ? width - 48 : height - 32};
         if (cui_surface_begin(ui, &t, &sheet_surface, cui_string("Workspace settings"),
                               cui_string("The same composed surface supports all four edges."),
                               options)) {
@@ -1114,6 +1121,8 @@ void gallery_table_pin(int pinned) {
         table_pinned = pinned != 0;
 }
 void gallery_surface_variant(int variant) {
+    if (surface_variant != variant)
+        sheet_surface.sheet_size = 0;
     surface_variant = variant;
 }
 int gallery_surface_open(int surface) {

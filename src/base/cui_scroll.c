@@ -43,8 +43,10 @@ cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float
     }
     return track;
 }
-static bool cui_scroll_bar(cui_context *ui, cui_id root, cui_scroll_state *s,
-                           cui_scroll_geometry geometry, cui_scroll_options o, bool vertical) {
+bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
+                        cui_scroll_geometry geometry, cui_scroll_options o, bool vertical) {
+    if (!ui || !root || !s)
+        return false;
     cui_id id = cui_scrollbar_id(root, vertical);
     float *value = vertical ? &s->y : &s->x;
     bool *dragging = vertical ? &s->dragging_y : &s->dragging_x;
@@ -135,9 +137,9 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
         }
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Scrollable content"), o.disabled, false, 0);
     if (o.horizontal)
-        cui_scroll_bar(ui, id, s, g, o, false);
+        cui_base_scrollbar(ui, id, s, g, o, false);
     if (o.vertical)
-        cui_scroll_bar(ui, id, s, g, o, true);
+        cui_base_scrollbar(ui, id, s, g, o, true);
     cui_set_semantic_details(ui, id,
                              (cui_semantic_details){.scrollable = !o.disabled,
                                                     .scroll_x = s->x,

@@ -31,9 +31,10 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
                   .gap = isfinite(o.gap) && o.gap > 0 ? o.gap : 0});
     return true;
 }
-static void cui_scroll_component_bar(cui_context *ui, cui_id id, const cui_theme *t,
-                                     const cui_scroll_state *s, cui_scroll_geometry g,
-                                     cui_scroll_options o, bool vertical) {
+void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scroll_state *s,
+                   cui_scroll_geometry g, cui_scroll_options o, bool vertical) {
+    if (!ui || !id || !t || !s)
+        return;
     float width = cui_scroll_component_positive(o.width, 320);
     float height = cui_scroll_component_positive(o.height, 240);
     float bar = vertical ? width - g.viewport.width : height - g.viewport.height;
@@ -70,9 +71,9 @@ void cui_scrollable_end(cui_context *ui, cui_id id, const cui_theme *t, const cu
     cui_end_box(ui); /* content */
     cui_end_box(ui); /* viewport */
     if (o.vertical)
-        cui_scroll_component_bar(ui, id, t, s, g, o, true);
+        cui_scrollbar(ui, id, t, s, g, o, true);
     cui_end_box(ui); /* body row */
     if (o.horizontal)
-        cui_scroll_component_bar(ui, id, t, s, g, o, false);
+        cui_scrollbar(ui, id, t, s, g, o, false);
     cui_end_box(ui); /* root */
 }

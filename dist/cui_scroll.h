@@ -22,6 +22,12 @@ typedef struct {
 cui_scroll_geometry cui_scroll_layout(cui_scroll_options);
 /* Drawing-free, ordered wheel reduction and scrollbar semantics/behavior. */
 bool cui_base_scrollable(cui_context *, cui_id, cui_scroll_state *, cui_scroll_options);
+/* Compose a scrollbar for an existing scroll owner without registering another group. */
+bool cui_base_scrollbar(cui_context *, cui_id, cui_scroll_state *, cui_scroll_geometry,
+                        cui_scroll_options, bool vertical);
+/* Drawing only; call the base helper before painting the owner. */
+void cui_scrollbar(cui_context *, cui_id, const cui_theme *, const cui_scroll_state *,
+                   cui_scroll_geometry, cui_scroll_options, bool vertical);
 cui_id cui_scrollbar_id(cui_id, bool vertical);
 cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float content,
                              bool vertical);
@@ -83,8 +89,10 @@ cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float
     }
     return track;
 }
-static bool cui_scroll_bar(cui_context *ui, cui_id root, cui_scroll_state *s,
-                           cui_scroll_geometry geometry, cui_scroll_options o, bool vertical) {
+bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
+                        cui_scroll_geometry geometry, cui_scroll_options o, bool vertical) {
+    if (!ui || !root || !s)
+        return false;
     cui_id id = cui_scrollbar_id(root, vertical);
     float *value = vertical ? &s->y : &s->x;
     bool *dragging = vertical ? &s->dragging_y : &s->dragging_x;
@@ -175,9 +183,9 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
         }
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Scrollable content"), o.disabled, false, 0);
     if (o.horizontal)
-        cui_scroll_bar(ui, id, s, g, o, false);
+        cui_base_scrollbar(ui, id, s, g, o, false);
     if (o.vertical)
-        cui_scroll_bar(ui, id, s, g, o, true);
+        cui_base_scrollbar(ui, id, s, g, o, true);
     cui_set_semantic_details(ui, id,
                              (cui_semantic_details){.scrollable = !o.disabled,
                                                     .scroll_x = s->x,
@@ -221,9 +229,10 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
                   .gap = isfinite(o.gap) && o.gap > 0 ? o.gap : 0});
     return true;
 }
-static void cui_scroll_component_bar(cui_context *ui, cui_id id, const cui_theme *t,
-                                     const cui_scroll_state *s, cui_scroll_geometry g,
-                                     cui_scroll_options o, bool vertical) {
+void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scroll_state *s,
+                   cui_scroll_geometry g, cui_scroll_options o, bool vertical) {
+    if (!ui || !id || !t || !s)
+        return;
     float width = cui_scroll_component_positive(o.width, 320);
     float height = cui_scroll_component_positive(o.height, 240);
     float bar = vertical ? width - g.viewport.width : height - g.viewport.height;
@@ -260,10 +269,10 @@ void cui_scrollable_end(cui_context *ui, cui_id id, const cui_theme *t, const cu
     cui_end_box(ui); /* content */
     cui_end_box(ui); /* viewport */
     if (o.vertical)
-        cui_scroll_component_bar(ui, id, t, s, g, o, true);
+        cui_scrollbar(ui, id, t, s, g, o, true);
     cui_end_box(ui); /* body row */
     if (o.horizontal)
-        cui_scroll_component_bar(ui, id, t, s, g, o, false);
+        cui_scrollbar(ui, id, t, s, g, o, false);
     cui_end_box(ui); /* root */
 }
 

@@ -21,6 +21,12 @@ typedef struct {
 cui_scroll_geometry cui_scroll_layout(cui_scroll_options);
 /* Drawing-free, ordered wheel reduction and scrollbar semantics/behavior. */
 bool cui_base_scrollable(cui_context *, cui_id, cui_scroll_state *, cui_scroll_options);
+/* Compose a scrollbar for an existing scroll owner without registering another group. */
+bool cui_base_scrollbar(cui_context *, cui_id, cui_scroll_state *, cui_scroll_geometry,
+                        cui_scroll_options, bool vertical);
+/* Drawing only; call the base helper before painting the owner. */
+void cui_scrollbar(cui_context *, cui_id, const cui_theme *, const cui_scroll_state *,
+                   cui_scroll_geometry, cui_scroll_options, bool vertical);
 cui_id cui_scrollbar_id(cui_id, bool vertical);
 cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float content,
                              bool vertical);

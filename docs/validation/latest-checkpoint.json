@@ -1,22 +1,22 @@
 {
-  "source": "d972c06",
-  "published_source": "611631b70491e69614d3fc55eb9aa40e1ccf9776",
+  "source": "bb4d462",
+  "published_source": "d552763b35a9efd915a59834c70688d81d982bba",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "74 real WASM stories pass Chromium, including Root plugin overlays, automatic Dialog/Sheet/notification mounting and actual interaction. Portable Speech and Chart/TextView fidelity changes passed native75/sanitizers73/WASI65. Public611631b remains verified until deployment succeeds. Full78-entry parity remains unfinished.",
+  "summary": "Public d552763 is deployed and passed the full HTTPS 74-story suite. Local Chart motion, Sankey, TextView actions and Speech reduced-motion updates pass native75, sanitizers73 and WASI65. An intermittent Command second-Escape issue in repeated worker browser runs remains under investigation. Full 78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "e5b414b",
+      "source": "bb4d462",
       "passed": 65,
       "total": 65,
-      "log": "wasi-e5b414b.txt"
+      "log": "wasi-bb4d462.txt"
     },
     {
       "name": "native",
-      "source": "e5b414b",
+      "source": "bb4d462",
       "passed": 75,
       "total": 75,
-      "log": "native-e5b414b.txt"
+      "log": "native-bb4d462.txt"
     },
     {
       "name": "browser",
@@ -28,10 +28,10 @@
     },
     {
       "name": "sanitizers",
-      "source": "e5b414b",
+      "source": "bb4d462",
       "passed": 73,
       "total": 73,
-      "log": "sanitizers-e5b414b.txt"
+      "log": "sanitizers-bb4d462.txt"
     }
   ],
   "previous_deployment": {
@@ -40,12 +40,12 @@
     "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
     "run": 38273904793
   },
-  "published_evidence": "published-611631b.txt",
+  "published_evidence": "published-d552763.txt",
   "deployment": {
-    "source": "611631b70491e69614d3fc55eb9aa40e1ccf9776",
+    "source": "d552763b35a9efd915a59834c70688d81d982bba",
     "status": "success",
-    "pages_run": 38277123604,
-    "ci_run": 38277123588
+    "pages_run": 38279129813,
+    "ci_run": 38279129759
   },
   "targeted_checks": [
     {

@@ -162,6 +162,7 @@ typedef struct {
     /* Primary pointer activation without opting into focus or keyboard activation. */
     bool pointer_activatable;
     cui_cursor cursor;
+    bool no_focus; /* Suppress role-default focus; pointer activation remains opt-in. */
 } cui_semantic_details;
 typedef struct {
     cui_id id;

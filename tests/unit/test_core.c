@@ -895,6 +895,51 @@ static bool pointer_card(cui_context *ui, bool disabled) {
     cui_end_box(ui);
     return activated;
 }
+
+static bool proxy_button_scene(cui_context *ui) {
+    cui_begin_box(ui, 70, (cui_box){.width = 100, .height = 30});
+    bool activated =
+        cui_interact(ui, 70, CUI_ROLE_BUTTON, cui_string("Increment"), false, false, 0).activated;
+    cui_set_semantic_details(
+        ui, 70,
+        (cui_semantic_details){.no_focus = true, .pointer_activatable = true, .focus_target = 71});
+    cui_end_box(ui);
+    control(ui, 71, false);
+    return activated;
+}
+static void test_nonfocusable_proxy_button(void) {
+    cui_context *ui = make();
+    begin(ui);
+    proxy_button_scene(ui);
+    cui_end_frame(ui);
+    cui_focus(ui, 70);
+    assert(!cui_focused(ui));
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 71);
+    assert(!proxy_button_scene(ui));
+    cui_focus(ui, 70);
+    assert(cui_focused(ui) == 71);
+    cui_end_frame(ui);
+    cui_focus(ui, 0);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 71 && cui_event_target(ui, 0) == 70);
+    assert(!proxy_button_scene(ui));
+    cui_end_frame(ui);
+    assert(cui_pressed(ui, 70));
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    begin(ui);
+    assert(proxy_button_scene(ui));
+    cui_end_frame(ui);
+    assert(!cui_pressed(ui, 70) && cui_focused(ui) == 71);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    assert(!proxy_button_scene(ui));
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void test_pointer_only_container(void) {
     cui_context *ui = make();
     begin(ui);
@@ -2027,6 +2072,7 @@ int main(void) {
     test_dominant_axis_scroll();
     test_perceptual_color_mix();
     test_focusable_container();
+    test_nonfocusable_proxy_button();
     test_pointer_only_container();
     test_underlay_order_and_layout();
     test_underlay_capacity_and_hidden();

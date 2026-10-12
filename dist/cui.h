@@ -163,6 +163,7 @@ typedef struct {
     /* Primary pointer activation without opting into focus or keyboard activation. */
     bool pointer_activatable;
     cui_cursor cursor;
+    bool no_focus; /* Suppress role-default focus; pointer activation remains opt-in. */
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -5800,7 +5801,7 @@ static bool cui_core_inside(cui_rect r, float x, float y) {
     return r.w > 0 && r.h > 0 && x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
 }
 static bool cui_core_focusable(const cui_semantic *s) {
-    if (s->disabled)
+    if (s->disabled || s->details.no_focus)
         return false;
     if (s->details.focusable)
         return true;
@@ -6048,14 +6049,15 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
-            bool pointer_only = false;
+            bool pointer_only = false, pointer_activation = false;
             for (size_t n = 0; n < ui->previous_count; n++)
                 if (ui->previous[n].id == hit) {
                     target = cui_core_pointer_focus_target(ui, n);
-                    pointer_only = !target && ui->previous[n].details.pointer_activatable;
+                    pointer_activation = ui->previous[n].details.pointer_activatable;
+                    pointer_only = !target && pointer_activation;
                     break;
                 }
-            ui->capture = pointer_only || target == hit ? hit : 0;
+            ui->capture = pointer_activation || target == hit ? hit : 0;
             if (!pointer_only) {
                 if (hit || ui->previous_top_modal == SIZE_MAX)
                     ui->focus = target;
@@ -6851,6 +6853,22 @@ cui_id cui_focused(cui_context *ui) {
 }
 void cui_focus(cui_context *ui, cui_id id) {
     if (ui && !cui_core_inert(ui)) {
+        if (id) {
+            const cui_semantic *items = ui->in_frame ? ui->semantics : ui->previous;
+            size_t count = ui->in_frame ? ui->semantic_count : ui->previous_count;
+            bool found = false;
+            for (size_t i = 0; i < count; ++i)
+                if (items[i].id == id) {
+                    if (items[i].details.no_focus)
+                        return;
+                    found = true;
+                    break;
+                }
+            if (ui->in_frame && !found)
+                for (size_t i = 0; i < ui->previous_count; ++i)
+                    if (ui->previous[i].id == id && ui->previous[i].details.no_focus)
+                        return;
+        }
         ui->focus = id;
         ui->focus_visible = true;
         ui->dirty = true;

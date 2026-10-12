@@ -2130,7 +2130,10 @@ def main():
             click_semantic('Submit', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(1)===1&&cuiGallery.exports.gallery_questionnaire_stats(6)===2')
             assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(11)') == 1
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))==="Responses submitted")')
             click_semantic('Start over', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===0&&cuiGallery.exports.gallery_questionnaire_stats(9)===0&&cuiGallery.exports.gallery_questionnaire_stats(1)===0')
+            wait_semantic('Question 1 of 2', 21)
             control_change('questionnaire-numbers', False)
             canvas.focus()
             page.evaluate('(i)=>cuiGallery.exports.gallery_focus(i)', semantic_index('Build a native app', 4))

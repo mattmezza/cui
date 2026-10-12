@@ -2646,3 +2646,186 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     output[w.length] = 0;
     return CUI_TEXT_VIEW_OK;
 }
+
+bool cui_text_view_selection_init(cui_text_view_selection *m,
+                                  cui_text_view_selection_member *members, size_t capacity) {
+    if (!m || !members || !capacity || capacity > CUI_TEXT_VIEW_NODE_LIMIT)
+        return false;
+    *m = (cui_text_view_selection){.members = members, .capacity = capacity};
+    return true;
+}
+void cui_text_view_selection_clear(cui_text_view_selection *m) {
+    if (!m)
+        return;
+    for (size_t i = 0; i < m->count; ++i) {
+        cui_text_view_state *s = m->members[i].state;
+        (void)cui_text_view_select(s, s->cursor, s->cursor);
+        s->selecting = s->dragged = false;
+    }
+    m->active = m->dragging = m->dragged = false;
+    m->owner = m->scope = 0;
+}
+bool cui_text_view_selection_register(cui_text_view_selection *m,
+                                      cui_text_view_selection_member member) {
+    if (!m || !m->members || !member.state || !member.id || !member.scope ||
+        member.table_mode < CUI_TEXT_VIEW_TABLE_WRAP ||
+        member.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
+        return false;
+    for (size_t i = 0; i < m->count; ++i) {
+        if (m->members[i].id == member.id) {
+            if (m->members[i].state != member.state)
+                return false;
+            m->members[i] = member;
+            if (!member.enabled) {
+                (void)cui_text_view_select(member.state, member.state->cursor,
+                                           member.state->cursor);
+                if (m->owner == member.id)
+                    cui_text_view_selection_clear(m);
+            }
+            return true;
+        }
+        if (m->members[i].state == member.state)
+            return false;
+    }
+    if (m->count == m->capacity)
+        return false;
+    m->members[m->count++] = member;
+    return true;
+}
+bool cui_text_view_selection_remove(cui_text_view_selection *m, cui_id id) {
+    if (!m)
+        return false;
+    for (size_t i = 0; i < m->count; ++i)
+        if (m->members[i].id == id) {
+            if (m->owner == id)
+                cui_text_view_selection_clear(m);
+            cui_text_view_state *s = m->members[i].state;
+            (void)cui_text_view_select(s, s->cursor, s->cursor);
+            s->selecting = s->dragged = false;
+            memmove(m->members + i, m->members + i + 1, (m->count - i - 1) * sizeof *m->members);
+            --m->count;
+            return true;
+        }
+    return false;
+}
+static bool cui_text_view_selection_band(cui_rect r, float ax, float ay, float bx, float by) {
+    float top = fminf(ay, by), bottom = fmaxf(ay, by), x = r.x + r.w / 2;
+    if (r.y + r.h <= top || r.y > bottom)
+        return false;
+    bool a = ay >= r.y && ay < r.y + r.h, b = by >= r.y && by < r.y + r.h;
+    if (a && b)
+        return x >= fminf(ax, bx) && x <= fmaxf(ax, bx);
+    float tx = ay < by ? ax : bx, ty = fminf(ay, by), lx = ay < by ? bx : ax, ly = fmaxf(ay, by);
+    if (ty >= r.y && ty < r.y + r.h)
+        return x >= tx;
+    if (ly >= r.y && ly < r.y + r.h)
+        return x <= lx;
+    return true;
+}
+bool cui_text_view_selection_project(cui_text_view_selection *m, cui_id scope, float ax, float ay,
+                                     float bx, float by) {
+    if (!m || !isfinite(ax) || !isfinite(ay) || !isfinite(bx) || !isfinite(by))
+        return false;
+    bool changed = false;
+    m->scope = scope;
+    m->anchor_x = ax;
+    m->anchor_y = ay;
+    m->cursor_x = bx;
+    m->cursor_y = by;
+    m->active = true;
+    bool forward = ay < by || (ay == by && ax <= bx);
+    for (size_t i = 0; i < m->count; ++i) {
+        cui_text_view_selection_member *p = &m->members[i];
+        cui_text_view_state *s = p->state;
+        if (p->scope != scope)
+            continue;
+        size_t first = SIZE_MAX, last = 0;
+        if (p->enabled && p->scope == scope)
+            for (size_t j = 0; j < s->glyph_count; ++j) {
+                cui_text_view_glyph *g = &s->workspace.glyphs[j];
+                if (g->flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+                    continue;
+                cui_rect r = g->bounds;
+                r.x += s->viewport.x;
+                r.y += s->viewport.y - s->scroll.y;
+                if (p->table_mode != CUI_TEXT_VIEW_TABLE_WRAP &&
+                    s->workspace.blocks[g->block].kind == CUI_TEXT_VIEW_TABLE_CELL)
+                    r.x -= s->workspace.blocks[g->block].table_scroll.x;
+                if (r.y + r.h <= s->viewport.y || r.y >= s->viewport.y + s->viewport.h ||
+                    r.x + r.w <= s->viewport.x || r.x >= s->viewport.x + s->viewport.w)
+                    continue;
+                if (cui_text_view_selection_band(r, ax, ay, bx, by)) {
+                    if (first == SIZE_MAX)
+                        first = g->text.begin;
+                    last = g->text.end;
+                }
+            }
+        size_t a = first == SIZE_MAX ? s->cursor : forward ? first : last;
+        size_t b = first == SIZE_MAX ? s->cursor : forward ? last : first;
+        changed |= cui_text_view_select(s, a, b);
+    }
+    return changed;
+}
+static bool cui_text_view_selection_has_copy(const cui_text_view_state *s,
+                                             cui_text_view_copy_format format) {
+    size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
+           b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    for (size_t i = a; i < b; ++i) {
+        if (s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            if (format == CUI_TEXT_VIEW_COPY_SOURCE && s->format == CUI_TEXT_VIEW_MARKDOWN)
+                return true;
+        } else if (!strchr(" \t\n\r\f\v", s->workspace.rendered[i]))
+            return true;
+    }
+    return false;
+}
+cui_text_view_error cui_text_view_selection_copy(const cui_text_view_selection *m,
+                                                 cui_text_view_copy_format format, char *out,
+                                                 size_t capacity, size_t *length) {
+    if (!m || format < CUI_TEXT_VIEW_COPY_PLAIN || format > CUI_TEXT_VIEW_COPY_SOURCE ||
+        (!out && capacity))
+        return CUI_TEXT_VIEW_INVALID;
+    size_t total = 0, selected = 0;
+    for (size_t i = 0; i < m->count; ++i) {
+        const cui_text_view_selection_member *p = &m->members[i];
+        if (!p->enabled || p->scope != m->scope ||
+            !cui_text_view_selection_has_copy(p->state, format))
+            continue;
+        size_t n = 0;
+        cui_text_view_error error = cui_text_view_copy_selection(p->state, format, NULL, 0, &n);
+        if (error != CUI_TEXT_VIEW_CAPACITY)
+            return error;
+        if (n > SIZE_MAX - total - (selected != 0))
+            return CUI_TEXT_VIEW_CAPACITY;
+        total += n + (selected++ != 0);
+    }
+    if (length)
+        *length = total;
+    if (capacity <= total)
+        return CUI_TEXT_VIEW_CAPACITY;
+    size_t written = 0, previous = SIZE_MAX;
+    for (size_t ordinal = 0; ordinal < selected; ++ordinal) {
+        size_t next = SIZE_MAX;
+        for (size_t i = 0; i < m->count; ++i) {
+            const cui_text_view_selection_member *p = &m->members[i];
+            if (!p->enabled || p->scope != m->scope ||
+                !cui_text_view_selection_has_copy(p->state, format))
+                continue;
+            if (previous != SIZE_MAX &&
+                (p->document_order < m->members[previous].document_order ||
+                 (p->document_order == m->members[previous].document_order && i <= previous)))
+                continue;
+            if (next == SIZE_MAX || p->document_order < m->members[next].document_order)
+                next = i;
+        }
+        if (ordinal)
+            out[written++] = '\n';
+        size_t n;
+        (void)cui_text_view_copy_selection(m->members[next].state, format, out + written,
+                                           capacity - written, &n);
+        written += n;
+        previous = next;
+    }
+    out[written] = 0;
+    return CUI_TEXT_VIEW_OK;
+}

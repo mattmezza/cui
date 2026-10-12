@@ -167,6 +167,33 @@ typedef enum {
     CUI_TEXT_VIEW_TABLE_ADAPTIVE,
     CUI_TEXT_VIEW_TABLE_NOWRAP
 } cui_text_view_table_mode;
+/* Application-owned shared selection. Registered states/workspaces must remain alive until
+ * removed. Registration storage remains alive until the manager is discarded. */
+typedef struct {
+    cui_text_view_state *state;
+    cui_id id, scope;
+    uint64_t document_order;
+    cui_text_view_table_mode table_mode;
+    bool enabled;
+} cui_text_view_selection_member;
+typedef struct {
+    cui_text_view_selection_member *members;
+    size_t count, capacity;
+    cui_id owner, scope;
+    float anchor_x, anchor_y, cursor_x, cursor_y;
+    bool active, dragging, dragged;
+} cui_text_view_selection;
+bool cui_text_view_selection_init(cui_text_view_selection *, cui_text_view_selection_member *,
+                                  size_t capacity);
+bool cui_text_view_selection_register(cui_text_view_selection *, cui_text_view_selection_member);
+bool cui_text_view_selection_remove(cui_text_view_selection *, cui_id);
+void cui_text_view_selection_clear(cui_text_view_selection *);
+/* Projects retained window-space points through current viewport/scroll geometry. */
+bool cui_text_view_selection_project(cui_text_view_selection *, cui_id scope, float anchor_x,
+                                     float anchor_y, float cursor_x, float cursor_y);
+cui_text_view_error cui_text_view_selection_copy(const cui_text_view_selection *,
+                                                 cui_text_view_copy_format, char *, size_t,
+                                                 size_t *length);
 /* Layout dimensions and measured text widths are bounded to 10,000,000 logical pixels. */
 typedef struct {
     float width, font_size, line_height, paragraph_gap;
@@ -216,8 +243,14 @@ typedef struct {
     void *highlighter_user;
     void (*on_reveal)(cui_rect window_line, void *);
     void *reveal_user;
+    cui_text_view_selection *shared_selection;
 } cui_text_view_options;
 cui_text_view_options cui_text_view_default(void);
+/* Call once after begin_frame and before any member is painted. Uses retained layout;
+ * first-frame members cannot be hit until they have submitted geometry. Clipboard options
+ * are read from options; member selection flags/lifetimes come from registration. */
+bool cui_text_view_selection_update(cui_context *, cui_text_view_selection *,
+                                    cui_text_view_options);
 /* Retained per-view selection and document render. Shared window selection,
  * touch handles and complete CommonMark/HTML5 parsing are tracked separately. */
 bool cui_text_view(cui_context *, cui_id, const cui_theme *, cui_text_view_state *,

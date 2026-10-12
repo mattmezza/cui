@@ -301,3 +301,40 @@ images or ends at the last text byte before trailing images. Selecting only a
 middle portion of that text does not include the boundary images. This follows
 the frozen paragraph's pending-image rule while leaving Plain output and raw
 selection coordinates unchanged.
+
+Optional shared selection uses an application-owned `cui_text_view_selection`
+and a fixed `cui_text_view_selection_member` array. Initialize the manager, then
+register each live state with its unique view ID, nonzero scope, stable logical
+`document_order`, table mode and enabled flag. Registration order does not control
+copy order. Duplicate state ownership and replacement of a live ID with a different
+state are rejected. Remove a member **before** destroying its state or workspace;
+removal clears its selection and removes the retained pointer. The array and
+manager must also outlive all uses. Re-registering the same ID/state updates its
+options; disabling the owner clears the active shared selection.
+
+For each frame, open the application's nonmodal focus scope matching the member
+scope, call `cui_text_view_selection_update` once before painting any members,
+then submit those views with `options.shared_selection` set to the manager and
+close the application scope. This preserves one event reduction and lets every
+member paint the same projection. Initial hit testing uses the previous clipped
+semantic ownership; member geometry becomes available after its first submitted
+frame. Do not update a scope before its modal/ancestor guards have been submitted.
+Registration does not create UI or make a disabled member selectable.
+
+A cross-view drag retains window anchor/cursor points and projects their row band
+through each member's retained viewport, vertical scroll and horizontal table
+scroll. Glyph midpoints follow the frozen window selection band rule. Image slots
+are not independently selected by this shared projection; text on both sides can
+still select their Source syntax. Other scopes are not projected. Ctrl+C joins
+nonempty selected participants with a newline in document order; Source copy uses
+each document's existing reconstruction. Caller copy storage is recommended for
+large multi-view selections; capacity failure leaves the clipboard unchanged.
+Standalone views retain their existing behavior when the manager is absent.
+
+Remaining shared-selection gaps include touch handles, multi-click granularity,
+content-key resolution across dynamic renderers, cross-view automatic scrolling,
+and individual text-run ranges when one participant contains spatially disjoint
+runs. Projection currently records one coordinate range per view and clips to its
+viewport, rather than maintaining the source window manager's full per-run state.
+Applications must refresh registration enabled flags and call the update before
+painting; there is no implicit window registry or stale-participant eviction.

@@ -119,6 +119,87 @@ static bool cui_text_view_selection_target(const cui_text_view_state *s, cui_id 
     }
     return false;
 }
+bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
+                                    cui_text_view_options o) {
+    if (!ui || !m)
+        return false;
+    bool changed = false;
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i) {
+        const cui_event *e = &events[i];
+        if (e->type == CUI_EVENT_CANCEL) {
+            m->dragging = m->dragged = false;
+            continue;
+        }
+        if (cui_event_consumed(ui, i)) {
+            if (e->type == CUI_EVENT_POINTER_UP && e->pointer_button == CUI_POINTER_PRIMARY)
+                m->dragging = false;
+            continue;
+        }
+        if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY) {
+            for (size_t j = 0; j < m->count; ++j) {
+                cui_text_view_selection_member *p = &m->members[j];
+                if (!p->enabled || !cui_event_hit_within_scope(ui, i, p->scope) ||
+                    !cui_text_view_selection_target(p->state, p->id, cui_event_target(ui, i)))
+                    continue;
+                cui_text_view_selection_clear(m);
+                changed = true;
+                m->owner = p->id;
+                changed |= cui_text_view_selection_project(m, p->scope, e->x, e->y, e->x, e->y);
+                m->dragging = true;
+                cui_focus(ui, p->id);
+                break;
+            }
+        } else if (m->dragging && (e->type == CUI_EVENT_POINTER_MOVE ||
+                                   (e->type == CUI_EVENT_POINTER_UP &&
+                                    e->pointer_button == CUI_POINTER_PRIMARY))) {
+            if (!cui_pointer_scope_allowed(ui, m->scope)) {
+                m->dragging = false;
+                continue;
+            }
+            if (fabsf(e->x - m->anchor_x) > 2 || fabsf(e->y - m->anchor_y) > 2)
+                m->dragged = true;
+            if (m->dragged) {
+                changed |= cui_text_view_selection_project(m, m->scope, m->anchor_x, m->anchor_y,
+                                                           e->x, e->y);
+                (void)cui_cancel_event_activation(ui, i);
+                (void)cui_consume_event(ui, i);
+            }
+            if (e->type == CUI_EVENT_POINTER_UP)
+                m->dragging = false;
+        } else if (e->type == CUI_EVENT_KEY_DOWN && m->active && cui_focused(ui) == m->owner &&
+                   cui_focus_within(ui, m->scope)) {
+            bool handled = false;
+            if ((e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) && e->key == CUI_KEY_C) {
+                char scratch[CUI_TEXT_VIEW_BYTE_LIMIT];
+                char *buffer = o.copy_buffer ? o.copy_buffer : scratch;
+                size_t capacity = o.copy_buffer ? o.copy_capacity : sizeof scratch, length;
+                if (o.clipboard && (o.clipboard->capabilities & CUI_PLATFORM_CLIPBOARD) &&
+                    o.clipboard->clipboard_set &&
+                    cui_text_view_selection_copy(m, o.copy_format, buffer, capacity, &length) ==
+                        CUI_TEXT_VIEW_OK &&
+                    length)
+                    (void)o.clipboard->clipboard_set(o.clipboard->user, (cui_str){buffer, length});
+                handled = true;
+            } else if ((e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) && e->key == CUI_KEY_A) {
+                for (size_t j = 0; j < m->count; ++j)
+                    if (m->members[j].enabled && m->members[j].scope == m->scope)
+                        changed |= cui_text_view_select(m->members[j].state, 0,
+                                                        m->members[j].state->text_length);
+                handled = true;
+            } else if (e->key == CUI_KEY_ESCAPE) {
+                cui_text_view_selection_clear(m);
+                changed = handled = true;
+            }
+            if (handled)
+                (void)cui_consume_event(ui, i);
+        }
+    }
+    if (changed)
+        cui_invalidate(ui);
+    return changed;
+}
 static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state *s,
                                  cui_text_view_options o) {
     if (!o.selectable || o.disabled) {
@@ -143,8 +224,9 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                        e->type == CUI_EVENT_POINTER_UP;
         bool owned = pointer && cui_event_within_scope(ui, i, id) &&
                      cui_text_view_selection_target(s, id, cui_event_target(ui, i));
-        if (pointer && ((e->type == CUI_EVENT_POINTER_DOWN && owned) ||
-                        (s->selecting && cui_pointer_scope_allowed(ui, id)))) {
+        if (!o.shared_selection && pointer &&
+            ((e->type == CUI_EVENT_POINTER_DOWN && owned) ||
+             (s->selecting && cui_pointer_scope_allowed(ui, id)))) {
             size_t at = cui_text_view_pointer_hit(s, e->x - s->viewport.x,
                                                   e->y - s->viewport.y + s->scroll.y, o.table_mode);
             if (at == SIZE_MAX)

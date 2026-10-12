@@ -1535,6 +1535,18 @@ static void test_absolute_boxes(void) {
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
     begin(ui);
+    cui_begin_box(ui, 901, (cui_box){.width = 160, .height = 120, .padding = 20});
+    cui_begin_box(ui, 902, (cui_box){.width = -1, .height = -1, .clip = true});
+    cui_begin_absolute_box(ui, 903, (cui_box){.background = {1, 2, 3, 255}},
+                           (cui_rect){4, 0, 9, -1});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    bounds = cui_bounds(ui, 903);
+    assert(bounds.x == 24 && bounds.y == 20 && bounds.w == 9 && bounds.h == 80);
+    assert(cui_last_error(ui) == CUI_OK);
+    begin(ui);
     cui_begin_absolute_box(ui, 900, (cui_box){0}, (cui_rect){0, 0, 10, 10});
     cui_end_box(ui);
     assert(cui_end_frame(ui).count == 0);

@@ -260,6 +260,7 @@ typedef struct {
 bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corner_radii);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Zero-flow child at parent-relative bounds, inheriting clipping and layer.
+ * A width/height of -1 fills the corresponding parent extent; zero is fixed.
  * Must be nested in a box. End with cui_end_box, including invalid bounds. */
 void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bounds);
 /* Floating viewport coordinates, independent of ancestor clipping/layout.

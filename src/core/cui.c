@@ -752,14 +752,16 @@ void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bo
     if (!ui || !ui->in_frame)
         return;
     if (!ui->depth || !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) ||
-        !isfinite(bounds.h) || bounds.w < 0 || bounds.h < 0) {
+        !isfinite(bounds.h) || (bounds.w < 0 && bounds.w != -1) ||
+        (bounds.h < 0 && bounds.h != -1)) {
         /* Reuse the balanced malformed-portal suppression path. */
         cui_begin_portal(ui, id, box, (cui_rect){0, 0, -1, 0}, 1);
         return;
     }
     box.width = bounds.w;
     box.height = bounds.h;
-    box.fixed_width = box.fixed_height = true;
+    box.fixed_width = bounds.w >= 0;
+    box.fixed_height = bounds.h >= 0;
     cui_core_begin_box(ui, id, box, &bounds, 0, true);
 }
 void cui_end_box(cui_context *ui) {

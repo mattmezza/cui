@@ -448,7 +448,8 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
  if(e.key==='Tab'){
   const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&(interactiveRoles.includes(wasm.gallery_semantic(i,0))||wasm.gallery_semantic(i,33)));
   const focused=enabled.findIndex(i=>wasm.gallery_semantic(i,7));
-  if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
+  const focusedHandlesTab=focused>=0&&wasm.gallery_semantic(enabled[focused],35);
+  if(!focusedHandlesTab&&!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
  if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
  if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Input Group'||selected.name==='OtpInput'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||selected.name==='Toolbar'||selected.name==='Textarea'||selected.name==='Settings'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){

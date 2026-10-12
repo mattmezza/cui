@@ -801,7 +801,7 @@ int gallery_init(void) {
     textarea_edit = cui_edit_create((cui_edit_config){.buffer = textarea_buffer,
                                                       .capacity = sizeof(textarea_buffer),
                                                       .multiline = true,
-                                                      .history_bytes = 8192,
+                                                      .history_bytes = 32768,
                                                       .max_history_steps = 64});
     if (!textarea_edit)
         return 0;
@@ -2835,6 +2835,8 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.focusable;
     case 34:
         return s->details.pointer_activatable;
+    case 35:
+        return s->details.handles_tab;
     default:
         return 0;
     }

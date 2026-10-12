@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
 #include "cui/cui_base.h"
+#include "cui/cui_components.h"
 #include <math.h>
 static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                                bool selected, bool disabled, cui_tab_variant variant,
@@ -267,6 +268,7 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
     cui_set_semantic_details(
         ui, state->overlay.id,
         (cui_semantic_details){.labelled_by = trigger,
+                               .orientation = CUI_ORIENTATION_VERTICAL,
                                .scrollable = count > rows,
                                .scroll_y = state->list.first_visible * theme->control_height,
                                .scroll_max_y =
@@ -293,6 +295,15 @@ bool cui_menu(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str n
                                    options, true);
 }
 
+static void cui_choice_paint_query(cui_context *ui, cui_id input, const cui_theme *theme,
+                                   cui_str name, cui_edit *query, cui_choice_popup *state,
+                                   bool disabled, cui_edit_result error) {
+    cui_input_state paint_state = {.behavior = state->query_behavior,
+                                   .scroll_x = state->query_scroll_x};
+    cui_input_paint(ui, input, theme, name, query, &paint_state,
+                    (cui_input_options){.disabled = disabled, .invalid = error != CUI_EDIT_OK});
+    state->query_scroll_x = paint_state.scroll_x;
+}
 cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme *theme,
                                  cui_str name, cui_edit *query, const cui_choice_item *items,
                                  size_t count, cui_choice_item *filtered, size_t capacity,
@@ -309,21 +320,12 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
         result.error = capacity < count ? CUI_EDIT_CAPACITY : CUI_EDIT_INVALID_ARGUMENT;
         return result;
     }
+    state->query_viewport = cui_bounds(ui, cui_input_viewport_id(input));
+    state->query_font_size = theme->font_size;
     result = cui_base_combobox(ui, input, name, query, items, count, filtered, capacity, selected,
                                state, options.disabled);
-    cui_box input_box = {.width = 280,
-                         .padding = theme->padding,
-                         .gap = theme->gap,
-                         .radius = theme->radius,
-                         .background = theme->surface,
-                         .border = cui_focused(ui) == input ? theme->focus : theme->border,
-                         .border_width = cui_focused(ui) == input ? 2 : 1};
-    cui_begin_box(ui, input, input_box);
-    cui_text(ui, name, theme->font_size * .8f, theme->muted);
+    cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error);
     cui_str text = cui_edit_get_text(query);
-    cui_text(ui, text.length ? text : cui_string(" "), theme->font_size,
-             options.disabled ? theme->muted : theme->text);
-    cui_end_box(ui);
     if (!state->overlay.open)
         return result;
     size_t matched = result.matching_count;
@@ -375,6 +377,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     cui_set_semantic_details(
         ui, state->overlay.id,
         (cui_semantic_details){.labelled_by = input,
+                               .orientation = CUI_ORIENTATION_VERTICAL,
                                .scrollable = matched > rows,
                                .scroll_y = state->list.first_visible * theme->control_height,
                                .scroll_max_y =
@@ -524,22 +527,12 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
         result.error = capacity < count ? CUI_EDIT_CAPACITY : CUI_EDIT_INVALID_ARGUMENT;
         return result;
     }
+    state->query_viewport = cui_bounds(ui, cui_input_viewport_id(input));
+    state->query_font_size = theme->font_size;
     result =
         cui_base_combobox_multi(ui, input, name, query, items, count, filtered, filtered_selected,
                                 capacity, selected, state, options.disabled);
-    cui_box input_box = {.width = 280,
-                         .padding = theme->padding,
-                         .gap = theme->gap,
-                         .radius = theme->radius,
-                         .background = theme->surface,
-                         .border = cui_focused(ui) == input ? theme->focus : theme->border,
-                         .border_width = cui_focused(ui) == input ? 2 : 1};
-    cui_begin_box(ui, input, input_box);
-    cui_text(ui, name, theme->font_size * .8f, theme->muted);
-    cui_str text = cui_edit_get_text(query);
-    cui_text(ui, text.length ? text : cui_string(" "), theme->font_size,
-             options.disabled ? theme->muted : theme->text);
-    cui_end_box(ui);
+    cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error);
     result.changed |= cui_choice_chips(ui, input, theme, items, count, selected, options.disabled);
     if (!state->overlay.open)
         return result;

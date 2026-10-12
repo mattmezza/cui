@@ -1053,6 +1053,118 @@ static void test_nested_list_wheel_routing(void) {
     cui_destroy(ui);
 }
 
+static cui_draw_list combo_edit_scene(cui_context *ui, unsigned multi, cui_edit *query,
+                                      cui_choice_popup *state, const cui_theme *theme) {
+    cui_choice_item filtered[3];
+    bool filtered_selected[3], chosen[3] = {false};
+    cui_id selected = 0;
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    cui_choice_popup_options options = {.viewport = {0, 0, 640, 540}};
+    cui_combobox_result result;
+    if (multi)
+        result = cui_combobox_multi(ui, 2, theme, cui_string("Editor combo"), query, items, 3,
+                                    filtered, filtered_selected, 3, chosen, state, options);
+    else
+        result = cui_combobox(ui, 2, theme, cui_string("Editor combo"), query, items, 3, filtered,
+                              3, &selected, state, options);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && result.error == CUI_EDIT_OK);
+    return draw;
+}
+static bool same_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static void test_combo_editor_paint_and_hit(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (unsigned multi = 0; multi < 2; multi++) {
+        for (size_t t = 0; t < 4; t++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            assert(ui);
+            char text[256] = "";
+            cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
+                                                                .capacity = sizeof(text),
+                                                                .history_bytes = 2048,
+                                                                .max_history_steps = 16});
+            assert(query);
+            cui_choice_popup state;
+            cui_choice_popup_init(&state, 800);
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            click(ui, 2);
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "abécd"}));
+            cui_draw_list draw = combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            assert(cui_edit_get_text(query).length == 6 && memcmp(text, "abécd", 6) == 0);
+            bool caret = false;
+            for (size_t i = 0; i < draw.count; i++)
+                caret |= draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 1 &&
+                         same_color(draw.commands[i].color, themes[t].text);
+            assert(caret);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_A,
+                                                   .modifiers = CUI_MOD_CTRL}));
+            draw = combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            cui_edit_state selection = cui_edit_get_state(query);
+            assert(selection.anchor == 0 && selection.cursor == 6);
+            bool highlighted = false;
+            for (size_t i = 0; i < draw.count; i++)
+                highlighted |= draw.commands[i].type == CUI_DRAW_TEXT &&
+                               draw.commands[i].text.length == 6 &&
+                               same_color(draw.commands[i].color, themes[t].on_primary);
+            assert(highlighted);
+            cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(2));
+            float start_x =
+                viewport.x + cui_measure_text(ui, cui_string("a"), themes[t].font_size).width;
+            float end_x =
+                viewport.x + cui_measure_text(ui, cui_string("abé"), themes[t].font_size).width;
+            float y = viewport.y + viewport.h * .5f;
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = start_x, .y = y}));
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = end_x, .y = y}));
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = end_x, .y = y}));
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            selection = cui_edit_get_state(query);
+            assert(selection.anchor == 1 && selection.cursor == 4 &&
+                   !state.query_behavior.dragging);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "X"}));
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            assert(cui_edit_get_text(query).length == 4 && memcmp(text, "aXcd", 4) == 0);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_Z,
+                                                   .modifiers = CUI_MOD_CTRL}));
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            assert(cui_edit_get_text(query).length == 6 && memcmp(text, "abécd", 6) == 0);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_A,
+                                                   .modifiers = CUI_MOD_CTRL}));
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_TEXT,
+                                .text = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"}));
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            assert(cui_edit_get_text(query).length == 52 && state.query_scroll_x > 0);
+            viewport = cui_bounds(ui, cui_input_viewport_id(2));
+            cui_input_hit_geometry geometry = {ui, viewport, themes[t].font_size,
+                                               state.query_scroll_x};
+            size_t expected = cui_base_input_hit_test(&geometry, cui_edit_get_text(query),
+                                                      viewport.x + 1, viewport.y + viewport.h / 2);
+            assert(expected > 0 && expected < 52);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                   .x = viewport.x + 1,
+                                                   .y = viewport.y + viewport.h / 2}));
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                                   .x = viewport.x + 1,
+                                                   .y = viewport.y + viewport.h / 2}));
+            combo_edit_scene(ui, multi, query, &state, &themes[t]);
+            selection = cui_edit_get_state(query);
+            assert(selection.anchor == expected && selection.cursor == expected);
+            cui_edit_destroy(query);
+            cui_destroy(ui);
+        }
+    }
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -1136,6 +1248,7 @@ int main(void) {
     test_scroll_activation_order();
     test_custom_tabs();
     test_nested_list_wheel_routing();
+    test_combo_editor_paint_and_hit();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

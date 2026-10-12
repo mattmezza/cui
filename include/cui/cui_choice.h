@@ -77,6 +77,9 @@ typedef struct {
     cui_overlay overlay;
     cui_list_state list;
     size_t visible_rows; /* previous styled popup rows, used for ordered Combo scrolling */
+    cui_input_behavior_state query_behavior;
+    float query_scroll_x, query_font_size;
+    cui_rect query_viewport; /* previous painted geometry for measured pointer selection */
 } cui_choice_popup;
 typedef struct {
     bool disabled;

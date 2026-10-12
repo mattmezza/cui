@@ -155,7 +155,15 @@ matching (other bytes match exactly). The input keeps focus while Up/Down and
 Home/End move the suggestion cursor; Enter commits that cursor. Disabled options
 are skipped. Pointer activation commits a suggestion and restores input focus.
 Escape or outside clicks dismiss without committing, and an empty filtered result
-renders an explicit message. The query remains independent of the committed ID;
+renders an explicit message. Single and multi Combobox reuse the Input painter after reducing editor events
+once. The query shows a measured caret and selected text, clips long content and
+retains horizontal scrolling. Primary pointer presses and drags map to UTF-8 byte
+boundaries using the previous painted viewport and scroll offset; keyboard select
+all, replacement and undo continue to use the editor. Tests cover both modes in
+all four themes, selected colors, Unicode drag ranges, one-time text insertion,
+undo and pointer mapping after horizontal scrolling.
+
+The query remains independent of the committed ID;
 selection does not overwrite the query or destroy its undo history. Callers may
 replace/select editor text using the editor API when their product needs that.
 
@@ -167,7 +175,7 @@ activation reports. Two same-frame Collapsible activations both take effect.
 
 Combobox supports single and multiple selection. Remote query delegates,
 query/label synchronization policies, Unicode collation, IME,
-painted caret and selection, and the OS accessibility bridge remain incomplete.
+and the OS accessibility bridge remain incomplete.
 The current suggestion reducer applies edits before filtering for the frame;
 interleaving text edits with commits in a single batch remains an ordering gap.
 Wheel navigation and keyboard commits are reduced in event order; a pointer

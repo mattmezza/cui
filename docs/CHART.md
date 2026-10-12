@@ -12,6 +12,8 @@ For Line and Area, grid ticks, value-axis labels, and pointer hit testing cover 
 
 Default Cartesian tick labels follow the pinned formatter: whole numbers without decimals and other values to one decimal place. Unformatted tooltip and value-label numbers use the shortest fixed decimal that round-trips within the bounded C buffer; extreme magnitudes fall back to scientific notation. The source uses its host number formatter for those extremes.
 
+The 38 named GPUI Kit theme presets now carry their eight pinned Chart colors: five series colors, bullish, bearish, and grid. `cui_chart_theme` uses `chart_2` for Line, Area, Bar, and Pie, cycles `chart_1` through `chart_5` for Radar and Sankey, and honors caller color overrides. The four independent CUI built-in themes provide their own chart-token defaults.
+
 This remains partial against the pinned GPUI Kit source. The method audit below lists the remaining gaps in labels, fills, axes, Sankey options, and hover effects. Outside value-axis gutters can be measured before rasterization with the helper above. `cui_plot` remains available for independent scales, ticks, pan/zoom, and clipping.
 
 ## Frozen source method audit

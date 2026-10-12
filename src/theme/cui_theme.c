@@ -13,6 +13,14 @@ static cui_color cui_theme_opacity(cui_color c, float opacity) {
     return c;
 }
 static cui_theme cui_theme_control_defaults(cui_theme t) {
+    t.chart_1 = t.primary;
+    t.chart_2 = t.primary;
+    t.chart_3 = t.primary;
+    t.chart_4 = t.primary;
+    t.chart_5 = t.primary;
+    t.chart_bullish = t.success;
+    t.chart_bearish = t.danger;
+    t.chart_grid = cui_theme_opacity(t.border, .6f);
     cui_color secondary = {(uint8_t)((3 * t.surface.r + t.border.r) / 4),
                            (uint8_t)((3 * t.surface.g + t.border.g) / 4),
                            (uint8_t)((3 * t.surface.b + t.border.b) / 4), 255};
@@ -219,6 +227,15 @@ bool cui_theme_preset_get(size_t index, cui_theme *output) {
     for (size_t i = record->begin; i < record->begin + record->count; ++i)
         cui_theme_preset_assign(&theme, cui_theme_preset_colors[i].field,
                                 cui_theme_preset_colors[i].color);
+    const cui_color *chart = cui_theme_chart_presets[index];
+    theme.chart_1 = chart[0];
+    theme.chart_2 = chart[1];
+    theme.chart_3 = chart[2];
+    theme.chart_4 = chart[3];
+    theme.chart_5 = chart[4];
+    theme.chart_bullish = chart[5];
+    theme.chart_bearish = chart[6];
+    theme.chart_grid = chart[7];
     *output = theme;
     return true;
 }

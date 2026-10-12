@@ -320,16 +320,17 @@ cui_chart_options cui_chart_theme(cui_chart_options o, const cui_theme *theme) {
     if (!o.foreground.a)
         o.foreground = theme->text;
     if (!o.grid.a)
-        o.grid = theme->border;
-    cui_color colors[8] = {theme->primary, theme->success, theme->warning, theme->danger,
-                           theme->info,    theme->accent,  theme->muted,   theme->text};
+        o.grid = theme->chart_grid;
+    cui_color palette[5] = {theme->chart_1, theme->chart_2, theme->chart_3, theme->chart_4,
+                            theme->chart_5};
     for (size_t i = 0; i < 8; i++)
         if (!o.series[i].a)
-            o.series[i] = colors[i];
+            o.series[i] = o.kind == CUI_CHART_RADAR || o.kind == CUI_CHART_SANKEY ? palette[i % 5]
+                                                                                  : theme->chart_2;
     if (!o.bullish.a)
-        o.bullish = theme->success;
+        o.bullish = theme->chart_bullish;
     if (!o.bearish.a)
-        o.bearish = theme->danger;
+        o.bearish = theme->chart_bearish;
     return o;
 }
 cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *state,

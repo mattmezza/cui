@@ -57,6 +57,8 @@ typedef struct {
     cui_color muted_background;
     bool hide_focus_ring; /* Keep focused borders while suppressing outside bands. */
     bool dark;            /* Explicit palette mode; independent of individual color luminance. */
+    cui_color chart_1, chart_2, chart_3, chart_4, chart_5;
+    cui_color chart_bullish, chart_bearish, chart_grid;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

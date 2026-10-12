@@ -1048,6 +1048,44 @@ int main(void) {
     assert(state.revision == old_revision && memcmp(pixels, saved, sizeof pixels) == 0);
     state.byte_capacity = sizeof pixels;
 #ifndef CUI_CHART_BASE_ONLY
+    cui_theme source_light;
+    assert(cui_theme_preset_count() == 38 && cui_theme_preset_get(0, &source_light));
+    cui_chart_options source_line_theme =
+        cui_chart_theme((cui_chart_options){.kind = CUI_CHART_LINE}, &source_light);
+    assert(source_line_theme.series[0].r == 59 && source_line_theme.series[0].g == 130 &&
+           source_line_theme.series[0].b == 246);
+    cui_chart_options source_radar_theme =
+        cui_chart_theme((cui_chart_options){.kind = CUI_CHART_RADAR}, &source_light);
+    assert(source_radar_theme.series[0].r == 147 && source_radar_theme.series[0].g == 197 &&
+           source_radar_theme.series[0].b == 253 && source_radar_theme.series[1].r == 59);
+    assert(source_light.chart_grid.r == 229 && source_light.chart_grid.a == 153 &&
+           source_light.chart_bullish.g == 163 && source_light.chart_bearish.r == 220);
+    assert(source_line_theme.grid.r == source_light.chart_grid.r &&
+           source_line_theme.grid.a == source_light.chart_grid.a &&
+           source_line_theme.bullish.g == source_light.chart_bullish.g);
+    cui_chart_options source_area_theme =
+        cui_chart_theme((cui_chart_options){.kind = CUI_CHART_AREA}, &source_light);
+    assert(source_area_theme.series[0].r == 59 && source_area_theme.series[1].r == 59);
+    cui_chart_options source_sankey_theme =
+        cui_chart_theme((cui_chart_options){.kind = CUI_CHART_SANKEY}, &source_light);
+    assert(source_sankey_theme.series[0].r == 147 && source_sankey_theme.series[5].r == 147);
+    cui_chart_options custom_theme = cui_chart_theme(
+        (cui_chart_options){
+            .kind = CUI_CHART_LINE, .grid = {1, 2, 3, 255}, .series = {{4, 5, 6, 255}}},
+        &source_light);
+    assert(custom_theme.grid.r == 1 && custom_theme.series[0].r == 4);
+    for (size_t preset = 0; preset < cui_theme_preset_count(); preset++) {
+        cui_theme chart_preset;
+        assert(cui_theme_preset_get(preset, &chart_preset));
+        assert(chart_preset.chart_1.a && chart_preset.chart_2.a && chart_preset.chart_3.a &&
+               chart_preset.chart_4.a && chart_preset.chart_5.a && chart_preset.chart_bullish.a &&
+               chart_preset.chart_bearish.a && chart_preset.chart_grid.a);
+    }
+    cui_theme tokyo_theme;
+    assert(cui_theme_preset_get(35, &tokyo_theme));
+    assert(tokyo_theme.chart_1.r == 255 && tokyo_theme.chart_2.r == 192 &&
+           tokyo_theme.chart_grid.r == 34 && tokyo_theme.chart_grid.g == 35 &&
+           tokyo_theme.chart_grid.b == 50);
     for (int t = 0; t < 4; t++) {
         cui_theme theme = t == 0   ? cui_theme_light()
                           : t == 1 ? cui_theme_dark()

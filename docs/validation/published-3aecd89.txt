@@ -1,0 +1,2 @@
+Installed 4 packages in 19ms
+PASS: 78 catalog entries, 77 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting

@@ -1,8 +1,8 @@
 {
-  "source": "6061cc5",
-  "published_source": "55a0b6a614f9398e281d8d2e2ef62a68cd55fbd1",
+  "source": "53be96f",
+  "published_source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local77-story WASM gallery passed full Chromium suite, including explicitly scripted Speech provider lifecycle and waveform. Public55a0b6a remains verified76-story release pending deployment. All78 manifest entries retain partial implementation status; full parity remains unfinished.",
+  "summary": "Published 77-story WASM gallery passed the full HTTPS Chromium suite, including scripted Speech provider lifecycle and waveform. Main additionally integrates Chart hover/fills/Sankey refinements and TextView table edge trapping/nested lists, validated by 77 native tests and quality gates. All 78 manifest entries remain partial; full parity is unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -13,10 +13,10 @@
     },
     {
       "name": "native",
-      "source": "6061cc5",
+      "source": "9769858",
       "passed": 77,
       "total": 77,
-      "log": "native-6061cc5.txt"
+      "log": "native-9769858.txt"
     },
     {
       "name": "browser",
@@ -40,12 +40,12 @@
     "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
     "run": 38273904793
   },
-  "published_evidence": "published-55a0b6a.txt",
+  "published_evidence": "published-3aecd89.txt",
   "deployment": {
-    "source": "55a0b6a614f9398e281d8d2e2ef62a68cd55fbd1",
+    "source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
     "status": "success",
-    "pages_run": 38283360036,
-    "ci_run": 38283359981
+    "pages_run": 38284537052,
+    "ci_run": 38284537054
   },
   "targeted_checks": [
     {

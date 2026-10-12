@@ -1,8 +1,8 @@
 {
-  "source": "f100df2",
+  "source": "c56fdb0",
   "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public remains 1b453ab: 70 stories and 38 themes. The Carousel drag-scoping repair and styled text pipeline pass all local gates: 69 native, 67 sanitizer, 59 WASI suites and 72 browser stories. Full 78-entry parity remains unfinished.",
+  "summary": "73 real WASM stories pass Chromium, including Command, Settings, Carousel and Textarea indentation. Carousel drag-scoping and Root plugin overlay fixes are integrated. Public remains 1b453ab until deployment succeeds. Full 78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -13,18 +13,18 @@
     },
     {
       "name": "native",
-      "source": "f100df2",
+      "source": "5ccee5a",
       "passed": 69,
       "total": 69,
-      "log": "native-f100df2.txt"
+      "log": "native-root-overlay-5ccee5a.txt"
     },
     {
       "name": "browser",
-      "source": "f100df2",
-      "passed": 72,
-      "total": 72,
+      "source": "c56fdb0",
+      "passed": 73,
+      "total": 73,
       "palettes": 38,
-      "log": "browser-f100df2.txt"
+      "log": "browser-c56fdb0.txt"
     },
     {
       "name": "sanitizers",
@@ -46,5 +46,14 @@
     "status": "success",
     "pages_run": 38270795919,
     "ci_run": 38270795856
-  }
+  },
+  "targeted_checks": [
+    {
+      "name": "Root overlay sanitizers",
+      "source": "5ccee5a",
+      "passed": 2,
+      "total": 2,
+      "log": "sanitizers-root-overlay-5ccee5a.txt"
+    }
+  ]
 }

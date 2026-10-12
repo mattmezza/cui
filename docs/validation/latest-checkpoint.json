@@ -1,37 +1,37 @@
 {
-  "source": "c56fdb0",
+  "source": "71f6695",
   "published_source": "ab46d9d558a776f1d220ccc3bd2e4e87fc994e18",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public ab46d9d: 73 real WASM stories; full HTTPS Chromium suite passed after successful CI and Pages deployment. TextView and Chart are integrated locally with further source fidelity work ongoing. Full 78-entry parity remains unfinished.",
+  "summary": "Chart and TextView are integrated as explicitly partial implementations. Native73, sanitizers71, WASI63 and browser73 all pass; Canvas styled text measurement/painting is verified. Public ab46d9d remains verified with73stories until the next deployment. Full78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "f100df2",
-      "passed": 59,
-      "total": 59,
-      "log": "wasi-f100df2.txt"
+      "source": "71f6695",
+      "passed": 63,
+      "total": 63,
+      "log": "wasi-71f6695.txt"
     },
     {
       "name": "native",
-      "source": "5ccee5a",
-      "passed": 69,
-      "total": 69,
-      "log": "native-root-overlay-5ccee5a.txt"
+      "source": "71f6695",
+      "passed": 73,
+      "total": 73,
+      "log": "native-71f6695.txt"
     },
     {
       "name": "browser",
-      "source": "c56fdb0",
+      "source": "71f6695",
       "passed": 73,
       "total": 73,
       "palettes": 38,
-      "log": "browser-c56fdb0.txt"
+      "log": "browser-71f6695.txt"
     },
     {
       "name": "sanitizers",
-      "source": "f100df2",
-      "passed": 67,
-      "total": 67,
-      "log": "sanitizers-f100df2.txt"
+      "source": "71f6695",
+      "passed": 71,
+      "total": 71,
+      "log": "sanitizers-71f6695.txt"
     }
   ],
   "previous_deployment": {

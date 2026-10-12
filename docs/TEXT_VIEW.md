@@ -182,3 +182,10 @@ Without an opt-in frontmatter parser, a leading horizontal rule followed by a
 Setext heading retains Markdown meaning; YAML frontmatter plugins remain absent.
 Prepared glyph lines use core's explicit no-wrap text leaf so Clay cannot wrap a
 measured line a second time because of fractional font measurements.
+
+Consecutive explicitly prefixed quote lines form one paragraph, with soft lines
+joined and two-space hard breaks preserved. This works for root quotes, first
+list-item quotes and indented list continuation quotes. Partial Source copy
+repeats the quote prefix after a hard break and keeps any surrounding list indent.
+Blank quote paragraphs, lazy unprefixed quote continuation, and nested quote
+containers remain outside this bounded paragraph representation.

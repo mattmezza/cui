@@ -455,6 +455,38 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_quote_paragraph_lines(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "> first  \n> second\n> third\n\noutside";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 2 && f.blocks[0].kind == CUI_TEXT_VIEW_QUOTE);
+    assert(!memcmp(f.rendered, "first\nsecond third", 18));
+    assert(cui_text_view_select(&f.state, 0, f.blocks[0].text.end));
+    cui_text_view_range selected;
+    assert(cui_text_view_selected_source_range(&f.state, &selected));
+    assert(selected.begin == 2 && selected.end == (size_t)(strstr(source, "third") - source) + 5);
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "> first  \n> second third"));
+    assert(cui_text_view_set_text(&f.state, text("- > first  \n  > second\n  > third\n- next")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 2 && f.blocks[0].list_item &&
+           f.blocks[0].kind == CUI_TEXT_VIEW_QUOTE);
+    assert(cui_text_view_select(&f.state, 0, f.blocks[0].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- > first  \n  > second third"));
+    assert(cui_text_view_set_text(&f.state, text("- parent\n\n  > first  \n  > second")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 2 && f.blocks[1].list_continuation);
+    assert(cui_text_view_select(&f.state, 0, f.blocks[1].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- parent\n  > first  \n  > second"));
+}
 static void test_list_nonparagraph_blocks(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1194,6 +1226,33 @@ static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *th
                       (cui_button_options){.size = CUI_CONTROL_SMALL}))
         ++action_clicks;
 }
+static void test_quote_paragraph_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("> first  \n> second\n> third\n\noutside")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 400;
+    cui_draw_list d = frame(ui, &f, o);
+    bool first = false, continuation = false, border = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *command = &d.commands[i];
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 5 &&
+            !memcmp(command->text.data, "first", 5))
+            first = command->bounds.x == 12 && command->bounds.y < 2;
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 12 &&
+            !memcmp(command->text.data, "second third", 12))
+            continuation =
+                command->bounds.x == 12 && command->bounds.y >= 20 && command->bounds.y < 22;
+        if (command->type == CUI_DRAW_RECT && command->bounds.x == 0 && command->bounds.w == 3 &&
+            command->bounds.h == 40)
+            border = true;
+    }
+    assert(first && continuation && border && f.blocks[1].bounds.y == 56);
+    cui_destroy(ui);
+}
 static void test_list_nonparagraph_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1522,6 +1581,7 @@ int main(void) {
     test_nested_fenced_continuation();
     test_first_list_fence();
     test_list_nonparagraph_blocks();
+    test_quote_paragraph_lines();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1542,6 +1602,7 @@ int main(void) {
     test_nested_fenced_paint();
     test_first_list_fence_paint();
     test_list_nonparagraph_paint();
+    test_quote_paragraph_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

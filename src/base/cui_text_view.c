@@ -791,12 +791,14 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         if (kind != CUI_TEXT_VIEW_RULE) {
             size_t inline_end = b;
-            if ((kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_LIST_ITEM) &&
+            if ((kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_LIST_ITEM ||
+                 kind == CUI_TEXT_VIEW_QUOTE) &&
                 b >= a + 2 && p->input.data[b - 1] == ' ' && p->input.data[b - 2] == ' ')
                 inline_end -= 2;
             cui_text_view_inline(p, a, inline_end, 0, (cui_text_view_range){0}, 0);
         }
-        if (kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_LIST_ITEM) {
+        if (kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_LIST_ITEM ||
+            kind == CUI_TEXT_VIEW_QUOTE) {
             while (next < p->input.length) {
                 size_t end = cui_text_view_line_end(p->input, next), first = next;
                 unsigned next_indent = 0;
@@ -806,10 +808,20 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                         p->input.data[first] == '\t' ? (next_indent + 4) & ~3u : next_indent + 1;
                     ++first;
                 }
-                if (continuation && next_indent < lists[depth].content_indent)
+                if ((continuation || (kind == CUI_TEXT_VIEW_QUOTE && list_count)) &&
+                    next_indent < lists[depth].content_indent)
                     break;
                 if (first == end)
                     break;
+                if (kind == CUI_TEXT_VIEW_QUOTE) {
+                    if (p->input.data[first] != '>')
+                        break;
+                    ++first;
+                    if (first < end && p->input.data[first] == ' ')
+                        ++first;
+                    if (first == end)
+                        break;
+                }
                 unsigned setext = kind == CUI_TEXT_VIEW_PARAGRAPH && !continuation
                                       ? cui_text_view_setext(p->input, next, end)
                                       : 0;
@@ -1741,14 +1753,21 @@ typedef struct {
     size_t length;
     bool flatten, indent_pending;
     unsigned newline_indent;
+    const char *newline_prefix;
 } cui_text_view_copy_writer;
 static void cui_text_view_copy_write(cui_text_view_copy_writer *w, cui_str t) {
-    if (w->newline_indent && !w->flatten) {
+    if ((w->newline_indent || w->newline_prefix) && !w->flatten) {
         for (size_t i = 0; i < t.length; ++i) {
             if (w->indent_pending) {
                 if (w->output)
                     memset(w->output + w->length, ' ', w->newline_indent);
                 w->length += w->newline_indent;
+                if (w->newline_prefix) {
+                    size_t prefix_length = strlen(w->newline_prefix);
+                    if (w->output)
+                        memcpy(w->output + w->length, w->newline_prefix, prefix_length);
+                    w->length += prefix_length;
+                }
                 w->indent_pending = false;
             }
             if (w->output)
@@ -2048,7 +2067,10 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
                     (block->list_ordered ? (unsigned)strlen(block->marker_text) + 1 : 2);
             else if (block->list_continuation)
                 w->newline_indent = block->list_source_indent;
+            if (block->kind == CUI_TEXT_VIEW_QUOTE)
+                w->newline_prefix = "> ";
             cui_text_view_copy_inline(s, w, (cui_text_view_range){begin, end}, i);
+            w->newline_prefix = NULL;
             w->newline_indent = 0;
             w->indent_pending = false;
         }

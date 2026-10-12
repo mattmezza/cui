@@ -428,6 +428,14 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(memcmp(bottom_bars, pixels, sizeof pixels) != 0);
     options.bar_alignment = CUI_CHART_BAR_LEFT;
+    options.show_y_axis = false;
+    cui_plot_rect no_axis_bar;
+    assert(cui_chart_bar_bounds(&options, 2, &no_axis_bar) == CUI_PLOT_OK);
+    options.show_y_axis = true;
+    cui_plot_rect outside_axis_bar;
+    assert(cui_chart_bar_bounds(&options, 2, &outside_axis_bar) == CUI_PLOT_OK);
+    assert(outside_axis_bar.y_max < no_axis_bar.y_max);
+    options.show_y_axis = false;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(memcmp(bottom_bars, pixels, sizeof pixels) != 0);
     assert(cui_chart_hit_test(&options, 20, 15).valid);
@@ -713,6 +721,26 @@ int main(void) {
         }
     assert(formatted && per_bar_color);
     options.bar_label_color_fn = NULL;
+    options.bar_alignment = CUI_CHART_BAR_LEFT;
+    options.show_y_axis = true;
+    state.hovered = SIZE_MAX;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    float first_tick_x = INFINITY, last_tick_x = -INFINITY;
+    unsigned horizontal_ticks = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].text.data[0] == 'Q' && draw.commands[i].bounds.y >= 13 &&
+            draw.commands[i].bounds.y <= 17) {
+            horizontal_ticks++;
+            first_tick_x = fminf(first_tick_x, draw.commands[i].bounds.x);
+            last_tick_x = fmaxf(last_tick_x, draw.commands[i].bounds.x);
+        }
+    assert(horizontal_ticks >= 4 && last_tick_x - first_tick_x > 30);
+    options.bar_alignment = CUI_CHART_BAR_BOTTOM;
+    options.show_y_axis = false;
     options.kind = CUI_CHART_CANDLESTICK;
     options.tooltip_format = NULL;
     assert(cui_begin_frame(ui, 256, 256, 0));

@@ -45,6 +45,8 @@ static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
 }
 float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_options *o) {
     if (!ui || !o || !o->show_y_axis || o->y_axis_inside || !o->data || !o->count ||
+        (o->kind == CUI_CHART_BAR &&
+         (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT)) ||
         o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_RADAR || o->kind == CUI_CHART_SANKEY)
         return 0;
     double lo, hi;
@@ -280,6 +282,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
             unsigned visible = count < 32 ? count : 32;
+            bool horizontal_bar =
+                o->kind == CUI_CHART_BAR &&
+                (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT);
             bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
             double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 12;
             double bottom = point_chart
@@ -291,13 +296,27 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
                 double pixel_y = top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
-                (void)cui_plot_inverse(&scale, pixel_y, &value);
+                if (horizontal_bar)
+                    value = lo + (hi - lo) * tick / (count - 1);
+                else
+                    (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label =
                     cui_chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
                 float y = (float)(pixel_y * h / o->height);
                 float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 50;
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;
                 float label_width = o->y_axis_inside ? 48 : gutter - 4;
+                if (horizontal_bar) {
+                    float left = 24 * w / o->width;
+                    float right = (o->width - 12) * w / o->width;
+                    float fraction = (float)tick / (count - 1);
+                    x = (o->bar_alignment == CUI_CHART_BAR_LEFT
+                             ? left + (right - left) * fraction
+                             : right - (right - left) * fraction) -
+                        24;
+                    y = o->y_axis_inside ? h - 14 : h - 28;
+                    label_width = 48;
+                }
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
                                        (cui_box){.width = label_width,
                                                  .height = 12,

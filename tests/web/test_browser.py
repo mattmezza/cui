@@ -40,19 +40,22 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.exports.gallery_count() > 0')
+            def control_change(control, value):
+                before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
+                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
             assert page.locator('#theme').input_value() == '3'
             assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
             light_canvas = page.evaluate('Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5))')
             page.emulate_media(color_scheme='dark')
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"&&cuiGallery.exports.gallery_command(0,0)===0')
             page.wait_for_function('(light)=>Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5)).some((value,i)=>value!==light[i])', arg=light_canvas)
-            page.locator('#theme').select_option('0')
+            control_change('theme', '0')
             assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
             page.wait_for_function('(light)=>Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5)).every((value,i)=>value===light[i])', arg=light_canvas)
             page.emulate_media(color_scheme='light')
             page.emulate_media(color_scheme='dark')
             assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
-            page.locator('#theme').select_option('3')
+            control_change('theme', '3')
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"')
             page.emulate_media(color_scheme='light')
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="light"')
@@ -72,18 +75,18 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_clicks() === 1')
             page.keyboard.press('Enter')
             page.wait_for_function('cuiGallery.exports.gallery_clicks() === 2')
-            page.locator('#disabled').check()
+            control_change('disabled', True)
             page.wait_for_function('cuiGallery.exports.gallery_semantic(0,5) === 1')
             page.mouse.click(box['x'] + bounds[0] + bounds[2]/2, box['y'] + bounds[1] + bounds[3]/2)
             page.wait_for_timeout(80)
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == 2
             height = page.evaluate('cuiGallery.exports.gallery_semantic(0,4)')
-            page.locator('#density').select_option('1')
+            control_change('density', '1')
             page.wait_for_function('(height)=>cuiGallery.exports.gallery_semantic(0,4)<height', arg=height)
-            page.locator('#density').select_option('0')
+            control_change('density', '0')
             assert page.locator('#features tr').count() > 0
             assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
-            page.locator('#theme').select_option('1')
+            control_change('theme', '1')
             assert page.locator('body.dark').count() == 1
             page.evaluate('location.hash="Theme"')
             page.wait_for_function('cuiGallery.renderedComponent==="Theme"')
@@ -129,28 +132,23 @@ def main():
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
             def dropdown_select(control, value, role=None):
-                before = page.evaluate('({control,value})=>{const node=document.querySelector("#dropdown-"+control);node.value=value;node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control': control, 'value': value})
-                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
+                control_change('dropdown-'+control, value)
                 if role is not None:
                     page.wait_for_function('(role)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Export options")', arg=role)
             def dropdown_check(control):
-                before = page.evaluate('(control)=>{const node=document.querySelector("#dropdown-"+control);node.checked=true;node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', control)
-                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
-            def control_change(control, value):
-                before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
-                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
+                control_change('dropdown-'+control, True)
             page.evaluate('location.hash="Notification"')
             page.wait_for_function('cuiGallery.renderedComponent==="Notification"')
-            page.locator('#notification-autohide').uncheck()
+            control_change('notification-autohide', False)
             close_count = page.evaluate('cuiGallery.exports.gallery_notification_stats(3)')
             click_semantic('Add notification', 1)
             page.wait_for_function('cuiGallery.exports.gallery_notification_stats(0)===1&&cuiGallery.exports.gallery_notification_entry(0,0)===1')
             def notification_bounds(index=0):
                 return page.evaluate('(i)=>[2,3,4,5].map(f=>cuiGallery.exports.gallery_notification_entry(i,f))', index)
             for anchor in range(8):
-                page.locator('#notification-anchor').select_option(str(anchor))
+                control_change('notification-anchor', str(anchor))
                 page.wait_for_function('anchor=>{const e=cuiGallery.exports,c=document.querySelector("canvas"),x=e.gallery_notification_entry(0,2),y=e.gallery_notification_entry(0,3),w=e.gallery_notification_entry(0,4),h=e.gallery_notification_entry(0,5);const expectedX=[0,3,6].includes(anchor)?16:[1,4].includes(anchor)?(c.clientWidth-w)/2:c.clientWidth-w-16;const expectedY=anchor<3?164:anchor<6?c.clientHeight-h-16:(c.clientHeight-h)/2;return Math.abs(x-expectedX)<.2&&Math.abs(y-expectedY)<.2;}', arg=anchor)
-            page.locator('#notification-anchor').select_option('2')
+            control_change('notification-anchor', '2')
             page.wait_for_function('cuiGallery.exports.gallery_notification_entry(0,3)===164')
             action_count = page.evaluate('cuiGallery.exports.gallery_notification_stats(2)')
             click_semantic('Review', 1)
@@ -174,7 +172,7 @@ def main():
             assert page.locator('#accessible button[aria-label="Close"]').count() == 3
             click_semantic('Dismiss alerts', 1)
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_notification_stats(0)===0&&cuiGallery.exports.gallery_notification_stats(3)===n+4', arg=close_count)
-            page.locator('#notification-autohide').check()
+            control_change('notification-autohide', True)
             click_semantic('Add notification', 1)
             page.wait_for_function('cuiGallery.exports.gallery_notification_entry(0,0)===1')
             b = notification_bounds()
@@ -195,7 +193,7 @@ def main():
             page.locator('#notification-anchor').focus()
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===0', arg=pin_index)
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_notification_stats(0)===0&&cuiGallery.exports.gallery_notification_stats(3)===n+5', arg=close_count, timeout=10000)
-            page.locator('#notification-autohide').uncheck()
+            control_change('notification-autohide', False)
             click_count = page.evaluate('cuiGallery.exports.gallery_notification_stats(1)')
             for button in ['left','middle']:
                 click_semantic('Add notification', 1)
@@ -210,14 +208,14 @@ def main():
             page.wait_for_function('cuiGallery.renderedComponent==="Shimmer"')
             assert page.locator('#accessible [role=status][aria-label="Preparing your workspace"]').count() == 1
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
-            page.locator('#shimmer-mode').select_option('1')
+            control_change('shimmer-mode', '1')
             page.wait_for_function('cuiGallery.exports.gallery_shimmer_phase()>.8')
             phase = page.evaluate('cuiGallery.exports.gallery_shimmer_phase()')
             page.wait_for_function('(p)=>cuiGallery.exports.gallery_shimmer_phase()<p-.05', arg=phase)
-            page.locator('#shimmer-mode').select_option('2')
+            control_change('shimmer-mode', '2')
             page.wait_for_function('cuiGallery.exports.gallery_shimmer_phase()===1&&cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
             page.emulate_media(reduced_motion='reduce')
-            page.locator('#shimmer-mode').select_option('3')
+            control_change('shimmer-mode', '3')
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
             page.emulate_media(reduced_motion='no-preference')
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
@@ -249,12 +247,12 @@ def main():
             control_change('message-inset', '1')
             assert abs(message_text_x('Alex Morgan')-start_x-12) < .2
             frame = page.evaluate('cuiGallery.frame')
-            page.locator('#message-alignment').select_option('1')
+            control_change('message-alignment', '1')
             page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
             assert message_text_x('Alex Morgan') > start_x+100
             for variant in map(str,range(7)):
                 frame = page.evaluate('cuiGallery.frame')
-                page.locator('#message-variant').select_option(variant)
+                control_change('message-variant', variant)
                 page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
                 assert page.evaluate('cuiGallery.exports.gallery_error()') == 0
             page.evaluate('location.hash="MessageScroller"')
@@ -263,7 +261,7 @@ def main():
             assert 0 < page.evaluate('cuiGallery.exports.gallery_conversation(7)') < 32
             log = semantic_index('Conversation', 38)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,33)', log) == 1
-            page.locator('#message-scrollbar').uncheck()
+            control_change('message-scrollbar', False)
             page.wait_for_function('!document.querySelector(`#accessible [role=scrollbar]`)')
             log = semantic_index('Conversation', 38)
             # Programmatic focus enters the real native Log; keyboard behavior remains in CUI.
@@ -310,31 +308,31 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_image_stats(3)===1', timeout=2000)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap_revision(i,0)', image_command()) == 2
             page.emulate_media(reduced_motion='reduce')
-            page.locator('#image-state').select_option('1')
+            control_change('image-state', '1')
             page.wait_for_function('cuiGallery.exports.gallery_image_stats(1)===0')
-            page.locator('#image-state').select_option('0')
-            page.wait_for_function('cuiGallery.exports.gallery_image_stats(3)===0')
+            control_change('image-state', '0')
+            page.wait_for_function('()=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return e.gallery_image_stats(1)===1&&e.gallery_image_stats(3)===0&&i!==undefined&&e.gallery_bitmap_revision(i,0)===1;}')
             image_width = page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', image_command())
-            page.locator('#image-fit').select_option('1')
+            control_change('image-fit', '1')
             page.wait_for_function('(w)=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return e.gallery_command(i,3)>w;}', arg=image_width)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap(i,6)', image_command()) < 4
             for fit in ('2','3','4','0'):
-                page.locator('#image-fit').select_option(fit)
+                control_change('image-fit', fit)
                 page.wait_for_function('cuiGallery.exports.gallery_error()===0')
-            page.locator('#image-grayscale').check()
+            control_change('image-grayscale', True)
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_bitmap(i,8)===1', arg=image_command())
             def image_sample():
                 return page.evaluate('''()=>{const e=cuiGallery.exports,c=document.querySelector('canvas'),ctx=c.getContext('2d'),i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5),scale=c.width/c.clientWidth,x=e.gallery_command(i,1)+e.gallery_command(i,3)/2,y=e.gallery_command(i,2)+e.gallery_command(i,4)/2;return [Array.from(ctx.getImageData(Math.round(x*scale),Math.round(y*scale),1,1).data),Array.from(ctx.getImageData(2,2,1,1).data)];}''')
             opaque, background = image_sample()
             assert max(opaque[:3])-min(opaque[:3]) <= 2, opaque
-            page.locator('#image-opacity').check()
+            control_change('image-opacity', True)
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_bitmap(i,7)===.5', arg=image_command())
             half, _ = image_sample()
             assert all(abs(value-(opaque[channel]+background[channel])/2)<=3 for channel,value in enumerate(half[:3])), (opaque,half,background)
-            page.locator('#image-state').select_option('1')
+            control_change('image-state', '1')
             page.wait_for_function('cuiGallery.exports.gallery_image_stats(1)===0&&cuiGallery.exports.gallery_image_stats(2)===1')
             assert page.locator('#accessible [aria-label="Workspace preview image"]').count() == 1
-            page.locator('#image-state').select_option('2')
+            control_change('image-state', '2')
             page.wait_for_function('cuiGallery.exports.gallery_image_stats(1)===2')
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))==="Image failed")')
             page.emulate_media(reduced_motion='no-preference')
@@ -348,12 +346,12 @@ def main():
             click_semantic('Attachment 1', 9)
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_attachment_stats(0)===n+1', arg=clicks)
             for status in ('0','1','2','3','4'):
-                page.locator('#attachment-status').select_option(status)
+                control_change('attachment-status', status)
                 page.wait_for_function('(status)=>cuiGallery.exports.gallery_attachment_stats(9)===Number(status)', arg=status)
-            page.locator('#attachment-vertical').check()
+            control_change('attachment-vertical', True)
             page.wait_for_function('cuiGallery.exports.gallery_error()===0')
-            page.locator('#attachment-vertical').uncheck()
-            page.locator('#attachment-status').select_option('3')
+            control_change('attachment-vertical', False)
+            control_change('attachment-status', '3')
             page.wait_for_function('document.querySelectorAll(`#accessible [aria-label="Retry attachment"]`).length>0')
             retries = page.evaluate('cuiGallery.exports.gallery_attachment_stats(2)')
             click_semantic('Retry attachment', 1)
@@ -393,12 +391,12 @@ def main():
             page.keyboard.press('Space')
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Getting started"]`)?.getAttribute("aria-expanded")==="true"')
             assert details.get_attribute('aria-expanded') == 'false'
-            page.locator('#disabled').check()
+            control_change('disabled', True)
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible button")).every(e=>e.disabled)')
             click_semantic('Getting started', 1)
             page.wait_for_timeout(40)
             assert started.get_attribute('aria-expanded') == 'true'
-            page.locator('#disabled').uncheck()
+            control_change('disabled', False)
             page.evaluate('location.hash="Collapsible"')
             page.wait_for_function('cuiGallery.renderedComponent==="Collapsible"')
             trigger = page.locator('#accessible button[aria-label="Show details"]')
@@ -411,7 +409,7 @@ def main():
             page.keyboard.press('Space')
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Show details"]`)?.getAttribute("aria-expanded")==="false"')
             assert panel.count() == 0
-            page.locator('#disclosure-mode').select_option('1')
+            control_change('disclosure-mode', '1')
             page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===0')
             click_semantic('Show details', 1)
             page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)>0&&cuiGallery.exports.gallery_disclosure_progress(0)<1')
@@ -445,19 +443,19 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===0')
             assert page.locator('#accessible button[aria-label="Apply panel"]').count() == 0
             page.emulate_media(reduced_motion='no-preference')
-            page.locator('#disclosure-mode').select_option('2')
+            control_change('disclosure-mode', '2')
             page.wait_for_function(texts+'.includes(" (custom)")')
             click_semantic('Show details', 1)
             page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===1')
             page.evaluate('location.hash="Accordion"')
             page.wait_for_function('cuiGallery.renderedComponent==="Accordion"')
-            page.locator('#disclosure-mode').select_option('2')
-            page.locator('#disclosure-multiple').check()
+            control_change('disclosure-mode', '2')
+            control_change('disclosure-multiple', True)
             click_semantic('Configuration', 1)
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Getting started"]`)?.getAttribute("aria-expanded")==="true"&&document.querySelector(`#accessible button[aria-label="Configuration"]`)?.getAttribute("aria-expanded")==="true"')
             assert page.locator('#accessible [role=group][aria-label="Getting started"]').count() == 1
             assert page.locator('#accessible [role=group][aria-label="Configuration"]').count() == 1
-            page.locator('#theme').select_option('0')
+            control_change('theme', '0')
             page.evaluate('location.hash="Tag"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tag"')
             page.mouse.move(0,0)
@@ -467,38 +465,38 @@ def main():
             assert page.locator('#accessible button[aria-label="Workspace"]').count() == 0
             assert page.locator('#tag-color option').count() == 21
             tag_draw = """({index,kind})=>{const e=cuiGallery.exports;for(let i=0;i<e.gallery_count();i++){if(e.gallery_command(i,0)!==kind)continue;if([1,2,3,4].every(f=>Math.abs(e.gallery_command(i,f)-e.gallery_semantic(index,f))<.01))return {rgba:[5,6,7,8].map(f=>e.gallery_command(i,f)),radius:e.gallery_command(i,13),height:e.gallery_command(i,4)};}return null;}"""
-            page.locator('#tag-variant').select_option('7')
+            control_change('tag-variant', '7')
             page.wait_for_function('args=>('+tag_draw+')(args)?.rgba.join(",")==="239,246,255,255"', arg={'index':tag_index,'kind':0})
             tag_bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', tag_index)
             rect = canvas.bounding_box()
             page.mouse.move(rect['x']+tag_bounds[0]+tag_bounds[2]/2,rect['y']+tag_bounds[1]+tag_bounds[3]/2)
             page.wait_for_function('args=>('+tag_draw+')(args)?.rgba[3]===229', arg={'index':tag_index,'kind':0})
             page.mouse.move(0,0)
-            page.locator('#tag-outline').check()
+            control_change('tag-outline', True)
             page.wait_for_function('args=>('+tag_draw+')(args)===null', arg={'index':tag_index,'kind':0})
             assert page.evaluate(tag_draw, {'index':tag_index,'kind':1})['rgba'] == [191,219,254,255]
-            page.locator('#tag-outline').uncheck()
-            page.locator('#tag-pill').check()
+            control_change('tag-outline', False)
+            control_change('tag-pill', True)
             page.wait_for_function('args=>{const c=('+tag_draw+')(args);return c&&c.radius>=c.height/2;}', arg={'index':tag_index,'kind':0})
-            page.locator('#theme').select_option('1')
+            control_change('theme', '1')
             page.wait_for_function('args=>('+tag_draw+')(args)?.rgba.join(",")==="23,37,84,127"', arg={'index':tag_index,'kind':0})
-            page.locator('#theme').select_option('0')
+            control_change('theme', '0')
             page.evaluate('location.hash="Marker"')
             page.wait_for_function('cuiGallery.renderedComponent==="Marker"')
             assert page.locator('#accessible [role=status][aria-label="Workspace synchronization"]').count() == 1
             marker_lines = '()=>Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===0&&cuiGallery.exports.gallery_command(i,4)===1&&cuiGallery.exports.gallery_command(i,3)>20).length'
-            page.locator('#marker-variant').select_option('1')
+            control_change('marker-variant', '1')
             page.wait_for_function('('+marker_lines+')()===2')
-            page.locator('#marker-alignment').select_option('1')
+            control_change('marker-alignment', '1')
             page.wait_for_function('('+marker_lines+')()===1')
-            page.locator('#marker-variant').select_option('2')
+            control_change('marker-variant', '2')
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>{let e=cuiGallery.exports;return e.gallery_command(i,0)===1&&e.gallery_command(i,17)===1&&e.gallery_command(i,21)===1&&[18,19,20].every(f=>e.gallery_command(i,f)===0);})')
-            page.locator('#marker-loading').select_option('1')
+            control_change('marker-loading', '1')
             page.wait_for_function('document.querySelector(`#accessible [role=status][aria-label="Loading"]`)!==null')
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
-            page.locator('#marker-icon').check()
+            control_change('marker-icon', True)
             page.wait_for_function('document.querySelector(`#accessible [role=status][aria-label="Loading"]`)===null&&cuiGallery.exports.gallery_next_wake()===0')
-            page.locator('#marker-loading').select_option('2')
+            control_change('marker-loading', '2')
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===3)')
             page.emulate_media(reduced_motion='reduce')
@@ -507,7 +505,7 @@ def main():
             page.wait_for_timeout(100)
             assert page.evaluate('cuiGallery.frame') == frame
             page.emulate_media(reduced_motion='no-preference')
-            page.locator('#marker-loading').select_option('0')
+            control_change('marker-loading', '0')
             page.evaluate('location.hash="OtpInput"')
             page.wait_for_function('cuiGallery.renderedComponent==="OtpInput"')
             otp = page.locator('#accessible [role=textbox][aria-label="Verification code"]')
@@ -517,7 +515,7 @@ def main():
             cells = otp_cells()
             assert len(cells) == 6, cells
             assert [round(cells[i+1]-cells[i]) for i in range(5)] == [36,36,52,36,36]
-            page.locator('#otp-groups').select_option('3')
+            control_change('otp-groups', '3')
             page.wait_for_timeout(40)
             cells = otp_cells()
             assert [round(cells[i+1]-cells[i]) for i in range(5)] == [36,52,36,52,36]
@@ -546,21 +544,21 @@ def main():
             page.keyboard.type('7')
             page.wait_for_timeout(40)
             assert page.evaluate('cuiGallery.exports.gallery_otp_completions()') == before + 1
-            page.locator('#otp-mask').check()
+            control_change('otp-mask', True)
             page.wait_for_timeout(40)
             texts = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i))))')
             assert texts.count('*') == 6 and not any(t in ['1','2','3','4','5','6'] for t in texts), texts
             click_semantic('Verification code', 6)
             page.keyboard.press('Backspace')
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===5', arg=index)
-            page.locator('#disabled').check()
+            control_change('disabled', True)
             page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Verification code"]`)?.disabled===true')
             click_semantic('Verification code', 6)
             page.keyboard.type('9')
             page.wait_for_timeout(40)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', index) == 5
             assert page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
-            page.locator('#disabled').uncheck()
+            control_change('disabled', False)
             click_semantic('Clear code')
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===0', arg=index)
             page.evaluate('location.hash="Input Group"')
@@ -590,7 +588,7 @@ def main():
             page.wait_for_function('document.querySelector("#accessible [role=status]")?.getAttribute("aria-label")?.includes("https://studio.example.com")')
             click_semantic('Open address')
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_group_actions()===n+1', arg=action_count)
-            page.locator('#group-mode').select_option('1')
+            control_change('group-mode', '1')
             page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Workspace address"]`)?.getAttribute("aria-readonly")==="true"')
             click_semantic('Workspace address', 6)
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=group_index)
@@ -601,16 +599,16 @@ def main():
             # Read-only editors leave application actions available.
             click_semantic('Open address')
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_group_actions()===n+2', arg=action_count)
-            page.locator('#group-mode').select_option('3')
+            control_change('group-mode', '3')
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Open address"]`)?.disabled===true')
             assert page.locator('#accessible button[aria-label="Open address"]').get_attribute('aria-busy') == 'true'
             click_semantic('Open address')
             page.wait_for_timeout(40)
             assert page.evaluate('cuiGallery.exports.gallery_group_actions()') == action_count + 2
-            page.locator('#group-mode').select_option('2')
+            control_change('group-mode', '2')
             page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Workspace address"]`)?.disabled===true')
             assert page.locator('#accessible button[aria-label="Open address"]').is_disabled()
-            page.locator('#group-mode').select_option('0')
+            control_change('group-mode', '0')
             page.evaluate('location.hash="Form"')
             page.wait_for_function('cuiGallery.renderedComponent==="Form"')
             assert page.locator('#accessible [role=textbox]').count() == 2
@@ -624,7 +622,7 @@ def main():
             click_semantic('Save profile')
             page.wait_for_function('(count)=>cuiGallery.exports.gallery_form_submissions()===count+1', arg=count)
             assert 'Profile saved' in page.locator('#accessible [role=status]').get_attribute('aria-label')
-            page.locator('#form-mode').select_option('1')
+            control_change('form-mode', '1')
             email = page.locator('#accessible [role=textbox][aria-label="Work email"]')
             page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Work email"]`)?.getAttribute("aria-invalid")==="true"')
             assert 'containing @' in email.get_attribute('aria-description')
@@ -637,7 +635,7 @@ def main():
             page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Work email"]`)?.getAttribute("aria-invalid")==="false"')
             click_semantic('Save profile')
             page.wait_for_function('(count)=>cuiGallery.exports.gallery_form_submissions()===count+2', arg=count)
-            page.locator('#form-mode').select_option('2')
+            control_change('form-mode', '2')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=textbox]")).every(e=>e.getAttribute("aria-readonly")==="true")')
             email_index = semantic_index('Work email', 6)
             email_length = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', email_index)
@@ -647,10 +645,10 @@ def main():
             page.wait_for_timeout(40)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', email_index) == email_length
             assert email.get_attribute('aria-invalid') == 'false'
-            page.locator('#form-mode').select_option('0')
+            control_change('form-mode', '0')
             click_semantic('Save profile')
             page.wait_for_function('(count)=>cuiGallery.exports.gallery_form_submissions()===count+3', arg=count)
-            page.locator('#form-mode').select_option('3')
+            control_change('form-mode', '3')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=textbox]")).every(e=>e.disabled)')
             assert page.locator('#accessible button[aria-label="Save profile"]').is_disabled()
             page.evaluate('location.hash="Dialog"')
@@ -741,7 +739,7 @@ def main():
             page.evaluate('location.hash="Sheet"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sheet"')
             for edge in range(4):
-                page.locator('#surface-variant').select_option(str(edge))
+                control_change('surface-variant', str(edge))
                 click_semantic('Open settings sheet')
                 page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===1')
                 dialog = page.locator('#accessible [role=dialog]')
@@ -817,14 +815,14 @@ def main():
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == count + 1
             index = semantic_index('Export options')
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
-            page.locator('#disabled').check()
+            control_change('disabled', True)
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible button")).filter(e=>["Export workspace","Export options"].includes(e.textContent)).every(e=>e.disabled)')
             click_semantic('Export workspace')
             click_semantic('Export options')
             page.wait_for_timeout(40)
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == count + 1
             assert page.evaluate('cuiGallery.exports.gallery_modal()') == 0
-            page.locator('#disabled').uncheck()
+            control_change('disabled', False)
             for variant in map(str, range(12)):
                 frame = page.evaluate('cuiGallery.frame')
                 dropdown_select('variant', variant)
@@ -937,7 +935,7 @@ def main():
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=menuitemradio]")).some(e=>e.textContent==="Compact"&&e.getAttribute("aria-checked")==="true")')
             page.keyboard.press('Escape')
             page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
-            page.locator('#menu-kind').select_option('1')
+            control_change('menu-kind', '1')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=button]")).some(e=>e.getAttribute("aria-label")==="Right-click this area")')
             click_semantic('Right-click this area')
             page.wait_for_timeout(50)
@@ -978,7 +976,7 @@ def main():
             assert page.locator('#accessible [role=gridcell][aria-selected=true]').get_attribute('aria-rowindex') == '2'
             page.keyboard.press('Home')
             page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 0002"')
-            page.locator('#table-selection').select_option('0')
+            control_change('table-selection', '0')
             canvas.focus()
             page.keyboard.press('End')
             page.wait_for_function('document.querySelector("#accessible [role=row][aria-selected=true]")?.getAttribute("aria-rowindex")==="1000"')
@@ -987,7 +985,7 @@ def main():
             page.wait_for_function('document.querySelector("#accessible [role=row][aria-selected=true]")?.getAttribute("aria-rowindex")==="1"')
             page.keyboard.press('Escape')
             page.wait_for_function('!document.querySelector("#accessible [aria-selected=true]")')
-            page.locator('#table-selection').select_option('2')
+            control_change('table-selection', '2')
             click_semantic('Name')
             page.wait_for_function('document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")==="ascending"')
             page.keyboard.press('ArrowRight')
@@ -1008,7 +1006,7 @@ def main():
             page.mouse.move(x+24,y,steps=6)
             page.mouse.up()
             page.wait_for_function('(before)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===5&&cuiGallery.exports.gallery_semantic(i,8)>before)', arg=width_before)
-            page.locator('#selection-mode').select_option('1')
+            control_change('selection-mode', '1')
             page.wait_for_function('document.querySelector("#accessible [role=grid]")?.getAttribute("aria-multiselectable")==="true"')
             click_semantic('File 0001')
             page.keyboard.press('Shift+ArrowDown')
@@ -1017,13 +1015,13 @@ def main():
             click_semantic('File 0004')
             page.keyboard.up('Control')
             page.wait_for_function('document.querySelectorAll("#accessible [role=gridcell][aria-selected=true]").length===3')
-            page.locator('#selection-mode').select_option('0')
+            control_change('selection-mode', '0')
             canvas.scroll_into_view_if_needed()
             rectangle = canvas.bounding_box()
             page.mouse.move(rectangle['x']+100,rectangle['y']+140)
             page.mouse.wheel(0,160)
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,17)&&cuiGallery.exports.gallery_semantic(i,19)>0)')
-            page.locator('#table-mode').select_option('1')
+            control_change('table-mode', '1')
             page.wait_for_function('document.querySelectorAll("#accessible [role=rowheader]").length>0')
             assert page.locator('#accessible [role=rowgroup]').count() > 0
             assert page.locator('#accessible [role=scrollbar]').count() > 0
@@ -1037,10 +1035,10 @@ def main():
             click_semantic('File 0001')
             page.wait_for_function('document.querySelector("#table-selection").value==="0"')
             page.wait_for_function('document.querySelector("#accessible [role=rowheader][aria-selected=true]")?.getAttribute("aria-rowindex")==="1"')
-            page.locator('#table-mode').select_option('2')
+            control_change('table-mode', '2')
             page.wait_for_function(table_texts + '.some(s=>s.includes("Loading file metadata"))')
             assert page.locator('#accessible [role=gridcell]').count() == 0
-            page.locator('#table-mode').select_option('3')
+            control_change('table-mode', '3')
             page.wait_for_function('document.querySelector("#accessible [role=grid]")?.getAttribute("aria-rowcount")==="0"')
             page.wait_for_function(table_texts + '.some(s=>s==="No files in this table.")')
             assert page.locator('#accessible [role=gridcell]').count() == 0
@@ -1098,7 +1096,7 @@ def main():
             page.evaluate('location.hash="Select"')
             page.wait_for_function('document.querySelector("#name").textContent==="Select" && cuiGallery.renderedComponent==="Select"')
             page.wait_for_timeout(80)
-            page.locator('#selection-mode').select_option('1')
+            control_change('selection-mode', '1')
             page.wait_for_timeout(60)
             click_semantic('Delivery')
             page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
@@ -1203,27 +1201,27 @@ def main():
             page.keyboard.press('Tab')
             page.keyboard.press('ArrowRight')
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)===8 && e.gallery_semantic(i,11) && new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==="Activity";}).some(Boolean)')
-            page.locator('#tabs-manual').check()
+            control_change('tabs-manual', True)
             click_semantic('Overview', 8)
             page.keyboard.press('ArrowRight')
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=semantic_index('Activity', 8))
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,11)', semantic_index('Overview', 8)) == 1
             page.keyboard.press('Enter')
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,11)===1', arg=semantic_index('Activity', 8))
-            page.locator('#tabs-manual').uncheck()
+            control_change('tabs-manual', False)
             for variant in ['0','1','2','3','4']:
-                page.locator('#tabs-variant').select_option(variant)
+                control_change('tabs-variant', variant)
                 heights = []
                 for size in ['3','1','0','2']:
                     frame = page.evaluate('cuiGallery.frame')
-                    page.locator('#tabs-size').select_option(size)
+                    control_change('tabs-size', size)
                     page.wait_for_function('(old)=>cuiGallery.frame>old', arg=frame)
                     heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Overview', 8)))
                 assert heights == sorted(heights) and heights[0] < heights[-1], (variant, heights)
-            page.locator('#tabs-variant').select_option('1')
-            page.locator('#tabs-size').select_option('0')
+            control_change('tabs-variant', '1')
+            control_change('tabs-size', '0')
             for mode in ['1','2']:
-                page.locator('#tabs-mode').select_option(mode)
+                control_change('tabs-mode', mode)
                 page.wait_for_function('cuiGallery.exports.gallery_tabs_scroll(1)>0')
                 click_semantic('Reveal last tab', 1)
                 page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,11)===1', arg=semantic_index('Audit history', 8))
@@ -1257,7 +1255,7 @@ def main():
                 page.mouse.move(rect['x']+bar[0]+bar[2]-2,rect['y']+bar[1]+bar[3]-2,steps=4)
                 page.mouse.up()
                 page.wait_for_function('cuiGallery.exports.gallery_tabs_scroll(0)>0')
-            page.locator('#tabs-mode').select_option('0')
+            control_change('tabs-mode', '0')
             for name, expected in [('Dock', '2 tab regions'), ('Plot', '16.67')]:
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
@@ -1297,7 +1295,7 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_semantic(0,6) === 1')
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).includes(5)')
             assert page.locator('#accessible [role=checkbox]').get_attribute('aria-checked') == 'true'
-            page.locator('#checkbox-state').select_option('2')
+            control_change('checkbox-state', '2')
             page.wait_for_function('document.querySelector(`#accessible [role=checkbox]`).getAttribute("aria-checked")==="mixed"')
             assert page.evaluate('cuiGallery.exports.gallery_semantic(0,8)') == 2
             page.keyboard.press('Space')
@@ -1408,14 +1406,14 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)!==cuiGallery.exports.gallery_input_selection(1)')
             page.keyboard.type('Q')
             page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)===cuiGallery.exports.gallery_input_selection(1)')
-            page.locator('#input-mode').select_option('1')
+            control_change('input-mode', '1')
             page.wait_for_function('document.querySelector("#accessible [role=textbox]")?.getAttribute("aria-readonly")==="true"')
             length = page.evaluate('cuiGallery.exports.gallery_input_selection(2)')
             canvas.focus()
             page.keyboard.type('R')
             page.wait_for_timeout(50)
             assert page.evaluate('cuiGallery.exports.gallery_input_selection(2)') == length
-            page.locator('#input-mode').select_option('2')
+            control_change('input-mode', '2')
             page.wait_for_function('document.querySelector("#accessible [role=textbox]")?.getAttribute("aria-invalid")==="true"')
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-required') == 'true'
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-readonly') == 'false'
@@ -1458,7 +1456,7 @@ def main():
             assert not overflow, overflow
             page.evaluate('location.hash="DataTable"')
             page.wait_for_function('cuiGallery.renderedComponent==="DataTable"')
-            page.locator('#table-pin').select_option('1')
+            control_change('table-pin', '1')
             page.wait_for_timeout(50)
             index = semantic_index('Name')
             fixed_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', index)

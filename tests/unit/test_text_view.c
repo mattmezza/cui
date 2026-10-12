@@ -261,6 +261,38 @@ static void test_html(void) {
                measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.blocks[2].table_header && f.blocks[3].table_header && !f.blocks[4].table_header);
 }
+static void test_table_highlight_edits_and_nested_html(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, (cui_str){0}) == CUI_TEXT_VIEW_OK);
+    const char *table = "| A | B |\n| --- | --- |\n| x | y |\n| m | n |";
+    assert(cui_text_view_set_text(&f.state, text(table)) == CUI_TEXT_VIEW_OK);
+    cui_text_view_highlight h[6];
+    for (size_t i = 0; i < 6; ++i)
+        h[i] = (cui_text_view_highlight){.range = f.blocks[i].text, .background = {255, 0, 0, 100}};
+    assert(cui_text_view_set_highlights(&f.state, h, 6) == CUI_TEXT_VIEW_OK);
+    assert(
+        cui_text_view_set_text(&f.state, text("| A | B |\n| --- | --- |\n| X | y |\n| m | n |")) ==
+        CUI_TEXT_VIEW_OK);
+    assert(f.state.highlight_count == 2);
+    assert(f.highlights[0].range.begin == f.blocks[0].text.begin &&
+           f.highlights[1].range.begin == f.blocks[1].text.begin);
+    assert(cui_text_view_set_text(
+               &f.state, text("intro\n\n| A | B |\n| --- | --- |\n| X | y |\n| m | n |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.highlight_count == 2 && f.highlights[0].range.begin == f.blocks[1].text.begin);
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(cui_text_view_set_text(
+               &f.state,
+               text("<strong>a<strong>b</strong>c</strong>d<SCRIPT>secret</SCRIPT ><p>safe</p>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(strstr(f.rendered, "abcd") && strstr(f.rendered, "safe") &&
+           !strstr(f.rendered, "secret"));
+    assert(f.mapping[0].flags & CUI_TEXT_VIEW_BOLD);
+    assert(f.mapping[1].flags & CUI_TEXT_VIEW_BOLD);
+    assert(f.mapping[2].flags & CUI_TEXT_VIEW_BOLD);
+    assert(!(f.mapping[3].flags & CUI_TEXT_VIEW_BOLD));
+}
 static void test_bounded_parser(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -484,6 +516,7 @@ int main(void) {
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
     test_bounded_parser();
+    test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
     test_links_and_images();

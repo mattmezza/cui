@@ -615,9 +615,51 @@ static cui_text_view_range cui_text_view_attribute(cui_str input, size_t a, size
     }
     return (cui_text_view_range){0};
 }
+static void cui_text_view_html_style(unsigned *flags, unsigned *depth, unsigned flag,
+                                     bool closing) {
+    if (closing) {
+        if (*depth)
+            --*depth;
+    } else
+        ++*depth;
+    if (*depth)
+        *flags |= flag;
+    else
+        *flags &= ~flag;
+}
+static size_t cui_text_view_html_skip_raw(cui_str input, size_t start, cui_str tag) {
+    for (size_t i = start; i + 2 < input.length; ++i) {
+        if (input.data[i] != '<' || input.data[i + 1] != '/')
+            continue;
+        size_t a = i + 2, end = a;
+        while (end < input.length && input.data[end] != '>' && input.data[end] != ' ' &&
+               input.data[end] != '\t' && input.data[end] != '\n' && input.data[end] != '\r')
+            ++end;
+        if (end - a != tag.length)
+            continue;
+        bool equal = true;
+        for (size_t j = 0; j < tag.length; ++j) {
+            char x = input.data[a + j], y = tag.data[j];
+            if (x >= 'A' && x <= 'Z')
+                x = (char)(x + 32);
+            if (y >= 'A' && y <= 'Z')
+                y = (char)(y + 32);
+            if (x != y) {
+                equal = false;
+                break;
+            }
+        }
+        if (equal) {
+            size_t close = cui_text_view_find(input, end, input.length, ">", 1);
+            return close == SIZE_MAX ? input.length : close + 1;
+        }
+    }
+    return input.length;
+}
 static void cui_text_view_html(cui_text_view_parser *p) {
     size_t a = 0;
     unsigned flags = 0, table = 0, row = 0, col = 0;
+    unsigned bold_depth = 0, italic_depth = 0, code_depth = 0, strike_depth = 0, mark_depth = 0;
     cui_text_view_range link = {0};
     bool active = false, pre = false;
     while (a < p->input.length && !p->error) {
@@ -635,22 +677,19 @@ static void cui_text_view_html(cui_text_view_parser *p) {
                 cui_str name = {p->input.data + begin, name_end - begin};
                 if (!closing &&
                     (cui_text_view_name(name, "script") || cui_text_view_name(name, "style"))) {
-                    const char *tag = cui_text_view_name(name, "script") ? "</script>" : "</style>";
-                    size_t close =
-                        cui_text_view_find(p->input, end + 1, p->input.length, tag, strlen(tag));
-                    a = close == SIZE_MAX ? p->input.length : close + strlen(tag);
+                    a = cui_text_view_html_skip_raw(p->input, end + 1, name);
                     continue;
                 }
                 if (cui_text_view_name(name, "strong") || cui_text_view_name(name, "b"))
-                    flags = closing ? flags & ~CUI_TEXT_VIEW_BOLD : flags | CUI_TEXT_VIEW_BOLD;
+                    cui_text_view_html_style(&flags, &bold_depth, CUI_TEXT_VIEW_BOLD, closing);
                 else if (cui_text_view_name(name, "em") || cui_text_view_name(name, "i"))
-                    flags = closing ? flags & ~CUI_TEXT_VIEW_ITALIC : flags | CUI_TEXT_VIEW_ITALIC;
+                    cui_text_view_html_style(&flags, &italic_depth, CUI_TEXT_VIEW_ITALIC, closing);
                 else if (cui_text_view_name(name, "code"))
-                    flags = closing ? flags & ~CUI_TEXT_VIEW_CODE : flags | CUI_TEXT_VIEW_CODE;
+                    cui_text_view_html_style(&flags, &code_depth, CUI_TEXT_VIEW_CODE, closing);
                 else if (cui_text_view_name(name, "s") || cui_text_view_name(name, "del"))
-                    flags = closing ? flags & ~CUI_TEXT_VIEW_STRIKE : flags | CUI_TEXT_VIEW_STRIKE;
+                    cui_text_view_html_style(&flags, &strike_depth, CUI_TEXT_VIEW_STRIKE, closing);
                 else if (cui_text_view_name(name, "mark"))
-                    flags = closing ? flags & ~CUI_TEXT_VIEW_MARK : flags | CUI_TEXT_VIEW_MARK;
+                    cui_text_view_html_style(&flags, &mark_depth, CUI_TEXT_VIEW_MARK, closing);
                 else if (cui_text_view_name(name, "a"))
                     link = closing ? (cui_text_view_range){0}
                                    : cui_text_view_attribute(p->input, name_end, end, "href");
@@ -815,6 +854,39 @@ static bool cui_text_view_remap_source(cui_text_view_range *r, size_t prefix, si
     }
     return false;
 }
+static bool cui_text_view_table_highlight_stable(const cui_text_view_state *s,
+                                                 cui_text_view_range range, size_t prefix,
+                                                 size_t suffix, bool append) {
+    if (append)
+        return true;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        const cui_text_view_block *cell = &s->workspace.blocks[i];
+        if (cell->kind != CUI_TEXT_VIEW_TABLE_CELL || cell->text.end <= range.begin ||
+            cell->text.begin >= range.end)
+            continue;
+        size_t first = i, last = i;
+        while (first && s->workspace.blocks[first - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+               s->workspace.blocks[first - 1].table == cell->table)
+            --first;
+        while (last + 1 < s->block_count &&
+               s->workspace.blocks[last + 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+               s->workspace.blocks[last + 1].table == cell->table)
+            ++last;
+        if (s->workspace.blocks[first].source.begin >= s->source_length - suffix)
+            continue;
+        size_t table_end = cui_text_view_next_line(
+            cui_text_view_source(s),
+            cui_text_view_line_end(cui_text_view_source(s), s->workspace.blocks[last].source.end));
+        if (prefix >= table_end)
+            continue;
+        size_t row_end = cui_text_view_next_line(
+            cui_text_view_source(s),
+            cui_text_view_line_end(cui_text_view_source(s), cell->source.end));
+        if (row_end > prefix)
+            return false;
+    }
+    return true;
+}
 cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input) {
     if (!s || !s->workspace.source || !cui_text_view_valid(input))
         return CUI_TEXT_VIEW_INVALID;
@@ -825,7 +897,7 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     if (dry.error)
         return dry.error;
     bool append = input.length >= s->source_length &&
-                  !memcmp(input.data, s->workspace.source, s->source_length);
+                  (!s->source_length || !memcmp(input.data, s->workspace.source, s->source_length));
     if (input.length == s->source_length && append)
         return CUI_TEXT_VIEW_OK;
     size_t prefix = 0, suffix = 0;
@@ -846,7 +918,8 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     for (size_t i = 0; i < s->highlight_count; ++i) {
         cui_text_view_highlight h = s->workspace.highlights[i];
         cui_text_view_range source;
-        if (!cui_text_view_source_of_range(s, h.range, &source) ||
+        if (!cui_text_view_table_highlight_stable(s, h.range, prefix, suffix, append) ||
+            !cui_text_view_source_of_range(s, h.range, &source) ||
             !cui_text_view_remap_source(&source, prefix, suffix, s->source_length, input.length))
             continue;
         h.range = source;

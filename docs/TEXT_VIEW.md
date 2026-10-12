@@ -53,7 +53,10 @@ host callback. Max-lines fit mode clips oversized content and drops ordinary lin
 that straddle the cap. Streaming append fades last 350 ms; replacement is immediate
 and reduced motion disables animation. Ordered highlights paint in request order,
 then selection above them. Unchanged source prefixes/suffixes retain highlights
-through edits.
+through edits. A replacement inside a table drops highlights from the edited row
+and subsequent rows because their cell positions may change; earlier unchanged
+rows and tables shifted as an unchanged suffix retain highlights. Nested HTML
+emphasis preserves outer styles after an inner close.
 
 `src/base/cui_text_view.c` links with the C math library only. Styled presentation
 requires Core, Theme and Scroll (base and components), plus portable platform
@@ -65,7 +68,7 @@ Remaining frozen-source gaps are tracked explicitly: complete CommonMark/HTML5
 and nested lists, inline/linked images, MDX/plugins/YAML front matter, image
 alignment/error UI, global selection spanning multiple views, touch selection menus
 and handles, grapheme/BiDi shaping, inherited parent foreground palettes, adaptive
-horizontal table scrolling/actions styling, table-row-specific highlight removal,
+horizontal table scrolling/actions styling,
 custom word/CJK stagger and easing, automatic enclosing-list reveal, background
 syntax styles, cached/asynchronous parsing and layout. Current tables divide the
 available width equally rather than measuring intrinsic column widths. These

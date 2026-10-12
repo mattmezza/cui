@@ -1,0 +1,36 @@
+{
+  "source": "b582fde",
+  "published_source": "8d670694cb63d7074c1f59ec717bccf848d45ac1",
+  "gallery_url": "https://matteo.merola.co/cui/",
+  "summary": "Native strict GCC31/31 (including GPU/readback and picker base-only), source b582fde; instrumented ASan/UBSan29/29 and WASI22/22 at picker integration6bbb664; actual Chromium39-story gallery passed against b582fde with the same production sources. Earlier optimized Release24/24 applies before picker additions. See validation logs for exact scope. Full78-family feature parity remains unfinished.",
+  "checks": [
+    {
+      "name": "native",
+      "source": "b582fde",
+      "passed": 31,
+      "total": 31,
+      "log": "gcc-offset.txt"
+    },
+    {
+      "name": "sanitizers",
+      "source": "6bbb664",
+      "passed": 29,
+      "total": 29,
+      "log": "sanitizers-pickers.txt"
+    },
+    {
+      "name": "WASI",
+      "source": "6bbb664",
+      "passed": 22,
+      "total": 22,
+      "log": "wasi-pickers.txt"
+    },
+    {
+      "name": "browser",
+      "source": "b582fde",
+      "stories": 39,
+      "catalog_entries": 78,
+      "log": "browser-39.txt"
+    }
+  ]
+}

@@ -50,3 +50,5 @@ remain required. This avoids briefly forcing focus back into a closing popup.
 Boxes expose portable `align_x`/`align_y` start, center and end values. They align
 children inside the available content area after sizing/padding; default start
 alignment preserves existing layout behavior.
+
+Clipped boxes accept `offset_x`/`offset_y` to translate children while preserving the box viewport and ancestor clips; negative offsets scroll content forward. Fractional offsets are retained. Secondary/middle pointer events carry `pointer_button`, hit-route to previous regions, and never change ordinary primary capture/focus/activation. SDL3 maps all three buttons.

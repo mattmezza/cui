@@ -1,0 +1,56 @@
+CUI source revision: cdda934b390fe55414a2d8f085a7830bc5e17072
+Portable source SHA256: c93865ac2d225b28d98a2a562ef853d219504e7b9a4ba419dcaa4345047adf65
+Tracked source modifications: present
+Target: wasm32-wasi (WASI Preview 1), Zig 0.16.0, wasmtime 49.0.0
+Optional adapters disabled: SDL, GPU, FreeType, HarfBuzz; no browser host tested.
+Assertions enabled. Virtual clock() compatibility uses wall time; benchmarks not invoked.
+PASS bootstrap (0.42s)
+core tests passed
+PASS core (0.93s)
+PASS base (0.45s)
+PASS components (0.51s)
+software renderer geometry, nested clipping and straight alpha passed
+PASS render (0.23s)
+edit tests passed
+PASS edit (0.47s)
+PASS overlay (0.37s)
+virtual tests passed
+PASS virtual (0.21s)
+dock tests passed
+PASS dock (0.93s)
+PASS plot (0.18s)
+PASS content (0.48s)
+PASS disclosure (0.41s)
+PASS choice (0.60s)
+Assertion failed: strcmp(localeconv()->decimal_point, ".") (/home/matteo/dev/cui/tests/unit/test_numeric.c: decimal_locale: 17)
+FAIL numeric: numeric trapped or exited unsuccessfully: error while executing at wasm backtrace:
+    0:   0x4c34 - numeric.wasm!abort
+    1:   0x4c7c - numeric.wasm!__assert_fail
+    2:  0x388a7 - numeric.wasm!__original_main
+    3:    0x36c - numeric.wasm!_start
+note: using the `WASMTIME_BACKTRACE_DETAILS=1` environment variable may show more debugging information
+
+Caused by:
+    wasm trap: wasm `unreachable` instruction executed
+
+Assertion failed: strcmp(localeconv()->decimal_point, ".") (/home/matteo/dev/cui/tests/unit/test_numeric.c: decimal_locale: 17)
+FAIL numeric_base_only: numeric_base_only trapped or exited unsuccessfully: error while executing at wasm backtrace:
+    0:   0x4bf8 - numeric_base_only.wasm!abort
+    1:   0x4c40 - numeric_base_only.wasm!__assert_fail
+    2:   0x9018 - numeric_base_only.wasm!__original_main
+    3:    0x330 - numeric_base_only.wasm!_start
+note: using the `WASMTIME_BACKTRACE_DETAILS=1` environment variable may show more debugging information
+
+Caused by:
+    wasm trap: wasm `unreachable` instruction executed
+
+PASS implementation_embedding (4.50s)
+unstyled frame 0: 3 commands, checked=0
+unstyled frame 1: 3 commands, checked=1
+PASS example_unstyled (0.31s)
+settings: 32 draw commands
+PASS example_styled_settings (0.34s)
+PASS distribution_single (6.82s)
+PASS distribution_multi (6.98s)
+WASI runtime suites: 18/20 passed
+Failed suites: numeric, numeric_base_only

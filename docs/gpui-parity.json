@@ -475,7 +475,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Activation, focus and disabled states tested; variants/sizes/icons/loading/error/slots remain incomplete."
+        "Six variants, three sizes, controlled selected/loading/disabled states, text adornments and presentation slots tested. SVG icons, per-component token overrides, complete upstream interactions and native accessibility bridge pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -503,6 +503,13 @@
           "name": "variants/sizes/icons/slots",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "six themed variants, three densities and loading suppression",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -955,17 +962,17 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_content.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_content.c"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "wasm_browser": "untested"
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. Browser story, advanced focus ownership and complete native accessibility bridge pending."
+        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1497,31 +1504,43 @@
       "reference_url": "https://gpui-kit.com/component/pagination/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_numeric.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_numeric.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. Responsive wrapping, configurable label slots and arbitrary page budgets pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "controlled page bounds",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "keyboard and disabled actions",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "page-count/ellipsis presentation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1543,7 +1562,8 @@
           "With State Management",
           "Large Dataset Pagination"
         ]
-      }
+      },
+      "last_tested_commit": "cdda934b390fe55414a2d8f085a7830bc5e17072"
     },
     {
       "name": "Progress",
@@ -1689,31 +1709,43 @@
       "reference_url": "https://gpui-kit.com/component/rating/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_numeric.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_numeric.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Independent keyboard/pointer half-step values, controlled clearing, readonly/disabled and range semantics tested. SVG masks/custom icons/color and hover preview pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "pointer and keyboard value",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "read-only/disabled states",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "fractional values and semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1736,7 +1768,8 @@
           "Interactive Rating with State",
           "Large Rating with Custom Color"
         ]
-      }
+      },
+      "last_tested_commit": "cdda934b390fe55414a2d8f085a7830bc5e17072"
     },
     {
       "name": "Shimmer",
@@ -1938,21 +1971,29 @@
       "reference_url": "https://gpui-kit.com/component/stepper/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_numeric.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_numeric.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Controlled current index, explicit pending/active/completed/error states, pointer/keyboard navigation and semantic snapshots tested. Validation callbacks, connectors/custom icons and exact density variants pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "steps/current/completed state",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "navigation/validation",
@@ -1961,8 +2002,10 @@
         },
         {
           "name": "keyboard and semantic progress",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1984,7 +2027,8 @@
           "Multi-step Form",
           "Disabled Individual Steps"
         ]
-      }
+      },
+      "last_tested_commit": "cdda934b390fe55414a2d8f085a7830bc5e17072"
     },
     {
       "name": "Switch",
@@ -2204,17 +2248,17 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_content.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_content.c"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "wasm_browser": "untested"
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Delayed pointer/focus opening, collision placement, viewport portals, Escape suppression, disabled omission and trigger description tested. Browser story, configurable layer policy and native accessibility bridge pending."
+        "Delayed pointer/focus opening, collision placement, viewport portals, Escape suppression, disabled omission and trigger description tested. configurable layer policy and native accessibility bridge pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2280,36 +2324,62 @@
       "reference_url": "https://gpui-kit.com/component/calendar/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": "include/cui/cui_base.h",
-      "sample": null,
+      "public_header": "include/cui/cui_picker.h",
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_base.c"
+        "tests/unit/test_picker.c"
       ],
       "status": "tested",
       "platforms": {
-        "linux_x11": "tested_partial",
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasi": "tested_partial",
+        "wasm_browser": "partial_model_story"
       },
       "limitations": [
-        "Base Gregorian date arithmetic only. No calendar widget, range selection, locale or keyboard grid."
+        "Actual one-to-three month Gregorian grid, ordered keyboard navigation, controlled date/range selection, disabled/min/max predicates and roving semantic days tested. Locale labels, week numbers, today markers, hover range previews and neighboring-day interaction remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "date/leap-year/month geometry",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         },
         {
           "name": "min/max bounds and range selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         },
         {
           "name": "keyboard/localized semantics",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "Gregorian grid geometry over forty years",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "bounded controlled range selection and disabled dates",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "ordered keyboard navigation and roving day semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2346,7 +2416,7 @@
           "Availability Calendar"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -2356,31 +2426,54 @@
       "reference_url": "https://gpui-kit.com/component/color-picker/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_picker.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_picker.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasi": "tested_partial"
+      },
+      "limitations": [
+        "Actual HSV plane, hue/alpha/RGBA sliders and palettes; pointer capture, keyboard edits, disabled/readonly and 20,000 conversion/hex round trips tested. Editable text channels, continuous gradients, eyedropper and popup presentation remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "color-space model and conversion",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         },
         {
           "name": "picker geometry and pointer drag",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         },
         {
           "name": "keyboard/validation/theme",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "HSV and hex byte-exact round trips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "SV pointer capture and palette/channel keyboard controls",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2415,22 +2508,29 @@
           "Color Palette Builder",
           "With Color Validation"
         ]
-      }
+      },
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
     },
     {
       "name": "Combobox",
       "reference_url": "https://gpui-kit.com/component/combobox/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_choice.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_choice.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Editable UTF-8 query, ASCII filtering, single/multiple selection, removable protected chips, filtered masks preserving hidden selections, ordered activations and popup dismissal tested. Remote data, Unicode case folding and fully interleaved text/activation reduction remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -2440,13 +2540,24 @@
         },
         {
           "name": "active descendant and keyboard",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "popup focus/dismissal/accessibility",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "ordered multiple selection and disabled-protected removable chips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2473,28 +2584,36 @@
           "Keyboard Shortcuts",
           "Theming"
         ]
-      }
+      },
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
     },
     {
       "name": "DatePicker",
       "reference_url": "https://gpui-kit.com/component/date-picker/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_picker.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_picker.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasi": "tested_partial"
+      },
+      "limitations": [
+        "Real collision-placed calendar portal, date/range selection, trapped Tab and same-frame focus restoration tested. Editable date masks, custom formats/locales, clear controls, presets and responsive scrolling remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "calendar popup composition",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         },
         {
           "name": "parse/format and bounds",
@@ -2505,6 +2624,20 @@
           "name": "keyboard/localization/accessibility",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "calendar portal placement and range selection",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "modal Tab and synchronous dismissal focus restoration",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2543,7 +2676,8 @@
           "Booking System Date Range",
           "Financial Period Selector"
         ]
-      }
+      },
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
     },
     {
       "name": "Editor",
@@ -2551,14 +2685,15 @@
       "category": "forms",
       "base_behavior": [],
       "public_header": "include/cui/cui_edit.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_edit.c"
       ],
       "status": "implemented",
       "platforms": {
         "linux_x11": "tested_partial",
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Reusable bounded UTF-8 scalar editing model exists. No source editor, gutter, highlighting, diagnostics, grapheme editing or200K-line validation."
@@ -2822,31 +2957,43 @@
       "reference_url": "https://gpui-kit.com/component/number-input/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_numeric.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_numeric.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Independent headless and styled finite numeric editing, draft validation, CJK normalization, locale-aware ASCII parsing/formatting, bounds, steps, readonly/disabled and semantics tested. Thousands separators, full custom pattern/appearance, caret/selection painting, pointer positioning and IME pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "numeric parsing and bounds",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "increment/decrement/step",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         },
         {
           "name": "keyboard/disabled/semantic value",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_numeric.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2880,7 +3027,8 @@
           "Floating Point Input",
           "Best Practices"
         ]
-      }
+      },
+      "last_tested_commit": "cdda934b390fe55414a2d8f085a7830bc5e17072"
     },
     {
       "name": "OtpInput",
@@ -3013,31 +3161,50 @@
       "reference_url": "https://gpui-kit.com/component/select/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_choice.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_choice.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Controlled single/multiple selection, removable protected chips, ordered activations, keyboard/typeahead, collision placement and modal focus/restore tested. Custom option slots, remote loading, pointer wheel scrolling and full virtualization remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "single/multiple controlled selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "keyboard active descendant",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "popup dismissal/focus restoration",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "ordered multiple selection and disabled-protected removable chips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3067,7 +3234,8 @@
           "Keyboard Shortcuts",
           "Theming"
         ]
-      }
+      },
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
     },
     {
       "name": "Slider",
@@ -3250,21 +3418,28 @@
       "reference_url": "https://gpui-kit.com/component/time-field/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_picker.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_picker.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasi": "tested_partial"
+      },
+      "limitations": [
+        "Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "segmented hour/minute/second model",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         },
         {
           "name": "parse/validation/localization",
@@ -3273,8 +3448,24 @@
         },
         {
           "name": "keyboard/semantic segments",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "segmented 12/24-hour keyboard and persistent digits",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "strict HH:MM[:SS] model parse/format",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3290,7 +3481,8 @@
           "Handle Changes",
           "Keyboard"
         ]
-      }
+      },
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
     },
     {
       "name": "Carousel",
@@ -3484,13 +3676,14 @@
         "cui_dock_restore"
       ],
       "public_header": "include/cui/cui_dock.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_dock.c"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Retained split/tab tree, stable keys, constrained geometry and transactional versioned persistence tested. Styled Dock, drag/drop, resize gestures, floating windows and keyboard/focus integration pending."
@@ -3544,31 +3737,50 @@
       "reference_url": "https://gpui-kit.com/component/list/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_choice.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_choice.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Stable keyed single/multiple selection, per-event activations, roving keyboard/typeahead, disabled items, semantic options and bounded visible window tested. Mouse wheel scrolling, remote data, custom rows and full virtualization remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "selection and item keys",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "keyboard navigation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "item rendering and semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "ordered multiple selection and disabled-protected removable chips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3594,28 +3806,37 @@
           "File Browser List",
           "Contact List with Sections"
         ]
-      }
+      },
+      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
     },
     {
       "name": "Menu",
       "reference_url": "https://gpui-kit.com/component/menu/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_choice.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_choice.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Flat portal menu actions, keyboard/typeahead, collision placement, outside/Escape dismissal, disabled controls and immediate focus restoration tested. Nested submenus, separators, check/radio items and custom rows pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "roving item focus/actions",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "nested popup collision",
@@ -3624,8 +3845,10 @@
         },
         {
           "name": "dismissal/restore/disabled semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3659,7 +3882,8 @@
           "Keyboard Shortcuts",
           "Best Practices"
         ]
-      }
+      },
+      "last_tested_commit": "cdda934b390fe55414a2d8f085a7830bc5e17072"
     },
     {
       "name": "Popover",
@@ -4436,7 +4660,7 @@
         "cui_virtual_restore_anchor"
       ],
       "public_header": "include/cui/cui_virtual.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_virtual.c",
         "tests/unit/test_base.c"
@@ -4444,7 +4668,8 @@
       "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Retained keyed variable-height Fenwick model tested including anchor restoration. No styled scroll/focus/navigation widget yet."
@@ -4735,13 +4960,14 @@
         "cui_plot_project_bar"
       ],
       "public_header": "include/cui/cui_plot.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_plot.c"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Allocation-free linear/log scales, inverse mapping, ticks, pan/anchored zoom and clipped line/bar geometry tested. Band/ordinal/category/time scales, retained series, axes/labels/legend, missing-data segmentation, stacks, hover/selection, styled output and chart accessibility pending."

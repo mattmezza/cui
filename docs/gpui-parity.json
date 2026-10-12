@@ -513,7 +513,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Six variants, three sizes, controlled selected/loading/disabled states, text adornments and presentation slots tested. SVG icons, per-component token overrides, complete upstream interactions and native accessibility bridge pending."
+        "Nine variants, four sizes, colored outlines, controlled selected/loading/disabled states, text adornments and presentation slots tested. Selected styling stays distinct from toggle semantics. SVG icons, explicit independent toggle metadata, per-component token overrides, full reference interactions and native accessibility bridge remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -547,6 +547,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_components.c"
+          ]
+        },
+        {
+          "name": "Semantic intent variants, orthogonal outlines and selected presentation semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c",
+            "docs/validation/gcc-button-intents.txt"
           ]
         }
       ],
@@ -776,7 +784,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Split actions, optional halves, delayed tooltip, inner style inheritance, ghost shared state, corner anchors and asymmetric joined geometry tested. Full inherited Button semantic color variants and styling surface remain under reference audit."
+        "Split actions, optional halves, tooltip, inner style inheritance, shared ghost state, corner anchors, joined geometry and eight semantic variants/four sizes tested. Remaining inherited Button style/metadata surface is under reference audit."
       ],
       "owner": "compound-controls",
       "last_verified_commit": null,
@@ -2843,15 +2851,16 @@
         "Passive field/control semantic association"
       ],
       "public_header": "include/cui/cui_form.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_form.c"
+        "tests/unit/test_form.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {},
       "limitations": [
         "Validation, submission and responsive column counts are application-owned as in the frozen reference.",
-        "Gallery integration and feature-level reference audit remain in progress; inherited Input text/IME/native accessibility limitations remain."
+        "Feature-level reference audit remains in progress; inherited Input text/IME/native accessibility limitations remain."
       ],
       "owner": "forms",
       "last_verified_commit": null,
@@ -3033,14 +3042,15 @@
       "category": "forms",
       "base_behavior": [],
       "public_header": "include/cui/cui_form.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_form.c"
+        "tests/unit/test_form.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {},
       "limitations": [
-        "Reference audit and real gallery integration remain in progress.",
+        "Reference audit remains in progress; actual gallery composition and state tests exist.",
         "Uses retained single-line Input; multiline, IME, grapheme and native accessibility limitations remain."
       ],
       "owner": "forms",
@@ -3162,31 +3172,42 @@
       "reference_url": "https://gpui-kit.com/component/otp-input/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_otp.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
+      "tests": [
+        "tests/unit/test_otp.c"
+      ],
+      "status": "tested",
       "platforms": {},
       "limitations": [
-        "Full documented behavior pending implementation and audit."
+        "Actual gallery integration and feature-level audit remain in progress.",
+        "Host schedules caret blink deadlines. OS OTP autofill and IME bridges are absent. Frozen source does not provide bulk paste or caret-arrow editing; CUI does not infer these features."
       ],
-      "owner": "unassigned",
+      "owner": "forms",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "segmented input focus",
-          "status": "not_started",
-          "evidence": []
+          "name": "Borrowed UTF-8 state, programmatic value updates and bounded cells/groups",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_otp.c",
+            "docs/OTP.md"
+          ]
         },
         {
-          "name": "paste and validation",
-          "status": "not_started",
-          "evidence": []
+          "name": "Digit/fullwidth keyboard input, Backspace, focus and Change/Complete events",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_otp.c",
+            "docs/validation/gcc-otp.txt"
+          ]
         },
         {
-          "name": "keyboard/accessible labels",
-          "status": "not_started",
-          "evidence": []
+          "name": "Themed masking, disabled state and host-clock caret blink deadlines",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_otp.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3221,7 +3242,8 @@
           "Clear on Focus",
           "Resend Code Timer"
         ]
-      }
+      },
+      "last_tested_commit": "d7e0e18"
     },
     {
       "name": "Questionnaire",
@@ -4629,7 +4651,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled stable-ID selection, keyboard navigation, five variants, custom tab/strip slots, custom close composition, measured UTF-8 ellipsis, bounded wheel scrolling, overflow menu and application-applied drag reorder requests tested. Automatic selected-tab reveal, native scrollbar presentation and full custom-body width constraints remain pending."
+        "Stable-ID selection, keyboard navigation, five variants, custom slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Full custom-body width constraints, grapheme/bidi ellipsis and cross-strip/autoscroll drag behavior remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4661,6 +4683,14 @@
           "evidence": [
             "tests/unit/test_choice.c",
             "docs/validation/gcc-integrated-51.txt"
+          ]
+        },
+        {
+          "name": "Stable-ID reveal requests and accessible pointer/keyboard scrollbars",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-tabs-scrollbar.txt"
           ]
         }
       ],

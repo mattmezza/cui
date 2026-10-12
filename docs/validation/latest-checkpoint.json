@@ -1,36 +1,36 @@
 {
-  "source": "ed10ae5",
+  "source": "d7e0e18",
   "published_source": "afca0334247cb18f66c25a869f32f63b4ab82ab3",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Integrated native GCC43/43, ASan/UBSan41/41, WASI34/34 and Chromium51 real WASM stories passed. Includes Form composition, measured Surface body scrolling, fixed footers, Sheet resizing, table composition and choice/disclosure improvements. Full78-family parity remains unfinished. Published afca033 passed all six CI jobs and Pages build/deploy; its 51-story live gallery was checked in Chromium. Subsequent layout measurement and InputGroup changes passed native43/43; broader follow-up checks pending.",
+  "summary": "Native GCC45/45, ASan/UBSan43/43, WASI36/36 and Chromium53 real WASM stories passed for integrated OTP, Form/InputGroup, tab scrollbars, semantic Button/Dropdown variants and inert/layout-only core measurement. Published afca033 has51 stories with six CI jobs and Pages green; this53-story update awaits deployment. Full78-family parity remains unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "ed10ae5",
-      "passed": 43,
-      "total": 43,
-      "log": "gcc-form.txt"
+      "source": "d7e0e18",
+      "passed": 45,
+      "total": 45,
+      "log": "gcc-otp.txt"
     },
     {
       "name": "sanitizers",
-      "source": "ed10ae5",
-      "passed": 41,
-      "total": 41,
-      "log": "asan-form.txt"
+      "source": "d7e0e18",
+      "passed": 43,
+      "total": 43,
+      "log": "asan-otp.txt"
     },
     {
       "name": "WASI",
-      "source": "ed10ae5",
-      "passed": 34,
-      "total": 34,
-      "log": "wasi-form.txt"
+      "source": "d7e0e18",
+      "passed": 36,
+      "total": 36,
+      "log": "wasi-otp.txt"
     },
     {
       "name": "browser",
-      "source": "ed10ae5",
-      "stories": 51,
+      "source": "d7e0e18",
+      "stories": 53,
       "catalog_entries": 78,
-      "log": "browser-51-integrated.txt"
+      "log": "browser-53-integrated.txt"
     },
     {
       "name": "published CI",

@@ -27,3 +27,6 @@ Current integration: `ed10ae5` adds Form/Field composition and standalone base t
 
 
 Deployment `afca033` is confirmed: all six framework CI jobs and Pages build/deploy succeeded. Direct HTTPS Chromium verification opened Dialog via its actual canvas button, observed 51 registered stories and no page errors; capture: `docs/screenshots/web-gallery-surfaces.png`. Subsequent local InputGroup and exact-zero/layout-only measurement updates pass native 43/43. Manifest now records 25 not started, 4 implemented partial, 49 tested partial, zero verified. No family is complete merely from the story count.
+
+
+Integration `d7e0e18`: native45/45, ASan/UBSan43/43, WASI36/36 and Chromium53-story runtime gates passed. Form/InputGroup are real gallery stories; OTP APIs and tests integrated, with gallery work underway. Inert painted subtrees support safe exits, independent layout-only measurement supports natural body sizing, and Tabs have accessible scrollbars/reveal requests. Manifest: 24 not started, 4 implemented partial, 50 tested partial, zero verified. Active worker ownership: Choice/Disclosure; Gallery; new status module Tag/Marker/Notification (former forms worker). All workers remain Sol6.1low. Work continues toward full parity.

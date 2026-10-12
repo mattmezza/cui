@@ -18,11 +18,10 @@ if (cui_button_ex(ui, save_id, &theme, cui_string("Save changes"),
 Loading suppresses activation and focus, draws a textual loading mark, and exposes
 an accessible description. Disabled text/background preserve theme contrast;
 hover/pressed states tint enabled surfaces and keyboard focus has a distinct border.
-Selected is app-owned presentation and semantic pressed state, not an internal
-toggle model. For value toggling use `cui_toggle` or the controlled toggle group.
+Selected is application-owned presentation; it does not imply a semantic pressed state. For value toggling use `cui_toggle` or the controlled toggle group.
 
-Headless tests exercise all six variants, three sizes and four themes, measured
-bounds, adornments, content callbacks, semantic names/selected state and keyboard
+Headless tests exercise all nine variants, four sizes and four themes, measured
+bounds, adornments, content callbacks, semantic names and ordinary push-button state and keyboard
 suppression while loading. SVG icons, custom palettes and animation are separate
 pending capabilities; a text adornment does not implement the Icon catalog family.
 

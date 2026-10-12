@@ -1,6 +1,12 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `27f0751a88334a2c57ca5bcda4529fc10c9e691f`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `d6aa5bd`. See swarm-status.md for branch promotion and push/CI observations.
+
+## Current release candidate
+
+Alignment and SVG release:59/59 native,57/57 sanitizer,49/49 WASI and68-story Chromium checks pass; logs are in validation/latest-checkpoint.json. Public deployment is still e49dc95/62 stories until CI/Pages and actual HTTPS verification succeed. Buttons now use source XS/S/M/L metrics and centered line boxes, Canvas uses a matching alphabetic baseline, and gallery size controls expose supported variants. Theme SVG providers and icon-only buttons replace more text stand-ins, including dialog and attachment controls.
+
+Sidebar and Textarea have isolated worker checkpoints awaiting root integration. Homepage,51-page browsable docs,slash-key fuzzy search and copyable usage examples are active website work. Full78-family parity remains unfinished.
 
 ## Working architecture
 

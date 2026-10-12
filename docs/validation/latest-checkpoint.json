@@ -1,36 +1,36 @@
 {
-  "source": "71a64d5",
+  "source": "d6aa5bd",
   "published_source": "e49dc95e0de9602ed1e4f4afe76f93a309e239ae",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Recovery candidate71a64d5 passes56/56 native,54/54 sanitizer,47/47 WASI and62 real Chromium gallery stories. Four additional families (DescriptionList, StatusBar, Resizable, Icon) now have tested partial C implementations; their browser stories are in progress. Publice49dc95 now serves62 stories: all six CI jobs and Pages passed; actual HTTPS verifies system dark/light and real Radio/Checkbox/Image/Attachment without page errors. Pages9e72440 failed stale Image readiness; the repair also fixes physical clicks hidden beneath the fixed header. All78 entries retained;12 not started,4 implemented partial,62 tested partial,zero verified. Full parity unfinished.",
+  "summary": "Local alignment/icon release passes59/59 native,57/57 sanitizers,49/49 WASI and68 real Chromium stories. Canvas baseline and source Button XS/S/M/L metrics are tested in light/dark, size controls expanded, built-in SVG migration and theme-provided custom artwork integrated. Public remains e49dc95/62 stories until deployment verification. All78entries retained:10notstarted,4implementedpartial,64testedpartial,0verified. Sidebar/Textarea worker checkpoints await integration; homepage/docs/search/copy-code site work continues. Full parity unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "71a64d5",
-      "passed": 56,
-      "total": 56,
-      "log": "native-71a64d5.txt"
+      "source": "7970367",
+      "passed": 59,
+      "total": 59,
+      "log": "native-7970367.txt"
     },
     {
       "name": "sanitizers",
-      "source": "71a64d5",
-      "passed": 54,
-      "total": 54,
-      "log": "asan-71a64d5.txt"
+      "source": "7970367",
+      "passed": 57,
+      "total": 57,
+      "log": "asan-7970367.txt"
     },
     {
       "name": "WASI",
-      "source": "71a64d5",
-      "passed": 47,
-      "total": 47,
-      "log": "wasi-71a64d5.txt"
+      "source": "7970367",
+      "passed": 49,
+      "total": 49,
+      "log": "wasi-7970367.txt"
     },
     {
       "name": "browser",
-      "source": "71a64d5",
-      "stories": 62,
+      "source": "d6aa5bd",
+      "stories": 68,
       "catalog_entries": 78,
-      "log": "browser-71a64d5.txt"
+      "log": "browser-d6aa5bd.txt"
     }
   ],
   "previous_deployment": {

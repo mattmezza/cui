@@ -293,6 +293,13 @@
             "tests/unit/test_media.c",
             "tests/web/test_browser.py"
           ]
+        },
+        {
+          "name": "SVG remove, retry and rejection artwork",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -320,7 +327,7 @@
           "Related types"
         ]
       },
-      "last_tested_commit": "88511a4",
+      "last_tested_commit": "7970367",
       "evidence": [
         "tests/unit/test_media.c",
         "tests/web/test_browser.py",
@@ -542,7 +549,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Nine variants, four sizes, colored outlines, controlled selected/loading/disabled states, text adornments and presentation slots tested. Selected styling stays distinct from toggle semantics. SVG icons, explicit independent toggle metadata, per-component token overrides, full reference interactions and native accessibility bridge remain pending."
+        "Nine variants and source XS/S/M/L metrics, centered labels, SVG icon slots and icon-only buttons, controlled selected/loading/disabled states, text adornments and presentation callbacks are tested. Theme SVG providers can replace bundled artwork. Compact/custom variants, all upstream styling/tooltip interactions, exact loading presentation and native accessibility remain partial."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -572,7 +579,7 @@
           "evidence": []
         },
         {
-          "name": "six themed variants, three densities and loading suppression",
+          "name": "nine themed variants, four source sizes and loading suppression",
           "status": "tested",
           "evidence": [
             "tests/unit/test_components.c"
@@ -584,6 +591,15 @@
           "evidence": [
             "tests/unit/test_components.c",
             "docs/validation/gcc-button-intents.txt"
+          ]
+        },
+        {
+          "name": "centered label geometry and customizable SVG/icon-only buttons",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c",
+            "tests/unit/test_icon.c",
+            "docs/BUTTON.md"
           ]
         }
       ],
@@ -610,7 +626,7 @@
           "Custom Children"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "5fb6c11",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -1169,6 +1185,14 @@
           "name": "accessible/decorative distinction",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "theme SVG provider, revision invalidation and bundled fallback",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon.c",
+            "docs/ICON.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1205,7 +1229,8 @@
           "Custom Icon from Assets",
           "Notes"
         ]
-      }
+      },
+      "last_tested_commit": "200caf1"
     },
     {
       "name": "Image",

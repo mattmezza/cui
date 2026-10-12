@@ -58,6 +58,13 @@ typedef void (*cui_chart_radar_label_paint_fn)(cui_context *, cui_id, const cui_
 typedef size_t (*cui_chart_sankey_labels_fn)(const cui_chart_datum *, size_t index,
                                              double raw_throughput, cui_chart_sankey_label *out,
                                              size_t capacity, void *user);
+/* Caller-defined content removes the fixed line count. Set both callbacks; size is in chart
+ * logical pixels and must be finite, nonnegative, and no larger than 16384 per dimension. */
+typedef cui_size (*cui_chart_sankey_label_measure_fn)(cui_context *, const cui_chart_datum *,
+                                                      size_t index, double raw_throughput,
+                                                      void *user);
+typedef void (*cui_chart_sankey_label_paint_fn)(cui_context *, cui_id, const cui_chart_datum *,
+                                                size_t index, double raw_throughput, void *user);
 typedef struct {
     cui_str text;
     float edge_x, edge_y, anchor_x, anchor_y, text_x, text_y;
@@ -200,6 +207,9 @@ typedef struct {
     float sankey_font_size;                   /* zero selects source 10px */
     cui_chart_sankey_labels_fn sankey_labels; /* overrides simple value/name lines */
     void *sankey_labels_user;
+    cui_chart_sankey_label_measure_fn sankey_label_measure;
+    cui_chart_sankey_label_paint_fn sankey_label_paint;
+    void *sankey_label_user; /* measured/painted CUI content takes precedence over lines */
     cui_chart_sankey_margins sankey_margins; /* measured before layout; zero preserves legacy */
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */

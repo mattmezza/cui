@@ -167,6 +167,33 @@ static cui_size custom_tooltip_measure(cui_context *ui, size_t index, const cui_
     assert(ui && index == 0 && datum->label.length == 1);
     return custom_tooltip_size;
 }
+typedef struct {
+    size_t measured, painted;
+    bool invalid;
+} sankey_content_calls;
+static cui_size sankey_content_measure(cui_context *ui, const cui_chart_datum *datum, size_t index,
+                                       double throughput, void *user) {
+    sankey_content_calls *calls = user;
+    assert(ui && datum && index < 3 && throughput >= 0);
+    calls->measured++;
+    return calls->invalid ? (cui_size){NAN, 40} : (cui_size){40, 40};
+}
+static void sankey_content_paint(cui_context *ui, cui_id id, const cui_chart_datum *datum,
+                                 size_t index, double throughput, void *user) {
+    sankey_content_calls *calls = user;
+    assert(ui && id && datum && index < 3 && throughput >= 0);
+    calls->painted++;
+    for (size_t line = 0; line < 20; line++) {
+        cui_begin_absolute_box(ui, id ^ (UINT64_C(0x349ace170000) + line),
+                               (cui_box){.width = 3,
+                                         .height = 2,
+                                         .fixed_width = true,
+                                         .fixed_height = true,
+                                         .background = {40, 120, 200, 255}},
+                               (cui_rect){0, (float)line * 2, 3, 2});
+        cui_end_box(ui);
+    }
+}
 #endif
 int main(void) {
     cui_chart_datum points[] = {
@@ -1377,6 +1404,33 @@ int main(void) {
     cui_chart_sankey_margins unchanged = custom_margins;
     assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_INVALID);
     assert(memcmp(&unchanged, &custom_margins, sizeof unchanged) == 0);
+    sankey_content_calls content_calls = {0};
+    options.sankey_label_measure = sankey_content_measure;
+    options.sankey_label_paint = sankey_content_paint;
+    options.sankey_label_user = &content_calls;
+    assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_OK);
+    assert(content_calls.measured == options.count && custom_margins.left > 0 &&
+           custom_margins.right > 0);
+    options.sankey_margins = custom_margins;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Flow", 4}));
+    draw = cui_end_frame(ui);
+    size_t custom_pieces = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.g == 120 &&
+            fabsf(draw.commands[i].bounds.h - 2) < .01f)
+            custom_pieces++;
+    assert(content_calls.painted == options.count && custom_pieces >= 20);
+    content_calls.invalid = true;
+    unchanged = custom_margins;
+    assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_INVALID);
+    assert(memcmp(&unchanged, &custom_margins, sizeof unchanged) == 0);
+    content_calls.invalid = false;
+    options.sankey_label_paint = NULL;
+    assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_INVALID);
+    options.sankey_label_measure = NULL;
+    options.sankey_label_user = NULL;
     options.sankey_labels = NULL;
     options.sankey_labels_user = NULL;
     options.sankey_margins = (cui_chart_sankey_margins){0};

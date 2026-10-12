@@ -166,6 +166,36 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 cui_end_box(ui);
             }
     }
+    if (o->kind == CUI_CHART_BAR && o->show_bar_values && o->count <= 128) {
+        cui_color color = o->bar_label_color.a ? o->bar_label_color : o->foreground;
+        for (size_t i = 0; i < o->count; i++) {
+            cui_plot_rect bar;
+            if (cui_chart_bar_bounds(o, i, &bar) != CUI_PLOT_OK)
+                continue;
+            char value[48];
+            cui_str label = cui_chart_number(value, sizeof value, o->data[i].value,
+                                             o->bar_label_format, o->format_user);
+            if (!label.length)
+                continue;
+            float x, y;
+            bool negative = o->data[i].value < 0;
+            if (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT) {
+                bool right = (o->bar_alignment == CUI_CHART_BAR_LEFT) != negative;
+                x = (float)((right ? bar.x_max + 2 : bar.x_min - 66) * w / o->width);
+                y = (float)(((bar.y_min + bar.y_max) / 2 - 6) * h / o->height);
+            } else {
+                bool above = (o->bar_alignment == CUI_CHART_BAR_BOTTOM) != negative;
+                x = (float)(((bar.x_min + bar.x_max) / 2 - 32) * w / o->width);
+                y = (float)((above ? bar.y_min - 12 : bar.y_max + 2) * h / o->height);
+            }
+            cui_begin_absolute_box(
+                ui, id ^ (UINT64_C(0x81ce703914b50000) + i),
+                (cui_box){.width = 64, .height = 12, .fixed_width = true, .fixed_height = true},
+                (cui_rect){x, y, 64, 12});
+            cui_text(ui, label, 10, color);
+            cui_end_box(ui);
+        }
+    }
     if (!o->hide_legend && o->kind == CUI_CHART_PIE && w >= 100 && h >= 40) {
         size_t limit = o->count < 6 ? o->count : 6;
         for (size_t i = 0; i < limit; i++) {

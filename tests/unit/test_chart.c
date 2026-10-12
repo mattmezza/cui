@@ -134,6 +134,55 @@ int main(void) {
     options.extra_series_count = 0;
     options.kind = CUI_CHART_BAR;
     options.bar_alignment = CUI_CHART_BAR_BOTTOM;
+    cui_plot_rect first_bar, second_bar;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
+    assert(cui_chart_bar_bounds(&options, 1, &second_bar) == CUI_PLOT_OK);
+    assert(first_bar.x_min > 24 && first_bar.x_max < second_bar.x_min);
+    assert(fabs((first_bar.x_max - first_bar.x_min) - 18.4) < .01);
+    options.point_count = 5;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
+    assert(fabs((first_bar.x_max - first_bar.x_min) - 11.04) < .01);
+    options.point_count = 0;
+    options.custom_bar_padding = true;
+    options.bar_padding_inner = 0;
+    options.bar_padding_outer = 0;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
+    assert(first_bar.x_min == 24 && first_bar.x_max - first_bar.x_min == 30);
+    options.max_bar_width = 4;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
+    assert(first_bar.x_max - first_bar.x_min == 4);
+    options.max_bar_width = 0;
+    options.custom_bar_padding = false;
+    points[0].value = 0;
+    options.min_bar_length = 3;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
+    assert(first_bar.y_max - first_bar.y_min >= 3);
+    options.min_bar_length = 0;
+    points[0].value = 20;
+    cui_plot_rect sentinel = {-1, -1, -1, -1};
+    options.bar_padding_inner = NAN;
+    assert(cui_chart_bar_bounds(&options, 0, &sentinel) == CUI_PLOT_INVALID);
+    assert(sentinel.x_min == -1 && sentinel.y_min == -1);
+    options.bar_padding_inner = 0;
+    options.has_domain = true;
+    options.domain_min = -50;
+    options.domain_max = 50;
+    points[0].value = -.001;
+    options.min_bar_length = 3;
+    const cui_chart_bar_alignment alignments[] = {CUI_CHART_BAR_BOTTOM, CUI_CHART_BAR_TOP,
+                                                  CUI_CHART_BAR_LEFT, CUI_CHART_BAR_RIGHT};
+    for (size_t i = 0; i < 4; i++) {
+        options.bar_alignment = alignments[i];
+        assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
+        if (i < 2)
+            assert(first_bar.y_max - first_bar.y_min >= 3);
+        else
+            assert(first_bar.x_max - first_bar.x_min >= 3);
+    }
+    options.bar_alignment = CUI_CHART_BAR_BOTTOM;
+    options.min_bar_length = 0;
+    options.has_domain = false;
+    points[0].value = 20;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     unsigned char bottom_bars[sizeof pixels];
     memcpy(bottom_bars, pixels, sizeof pixels);
@@ -233,6 +282,20 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     (void)cui_end_frame(ui);
     assert(state.hovered < options.count);
+    options.kind = CUI_CHART_BAR;
+    options.show_bar_values = true;
+    options.show_y_axis = false;
+    options.bar_label_format = format_q;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    formatted = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].text.data[0] == 'Q')
+            formatted = true;
+    assert(formatted);
     cui_destroy(ui);
 #endif
     points[0].value = -DBL_MAX;

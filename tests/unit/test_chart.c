@@ -836,7 +836,7 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     cui_draw_list draw = cui_end_frame(ui);
     bool image = false, text = false, formatted = false, hover_crosshair = false,
-         hover_halo = false;
+         hover_halo = false, eased_crosshair = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_IMAGE) {
             image = true;
@@ -848,9 +848,13 @@ int main(void) {
                 formatted = true;
         } else if (draw.commands[i].type == CUI_DRAW_RECT) {
             hover_crosshair |= draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20;
+            if (draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20)
+                eased_crosshair |=
+                    fabsf(draw.commands[i].color.a -
+                          (options.grid.a ? options.grid.a : 150) * state.tooltip_focus) <= 1;
             hover_halo |= draw.commands[i].bounds.w == 10 && draw.commands[i].bounds.h == 10;
         }
-    assert(image && text && formatted && hover_crosshair && hover_halo);
+    assert(image && text && formatted && hover_crosshair && hover_halo && eased_crosshair);
     assert(state.hover_progress > 0 && state.hover_progress < 1);
     options.reduced_motion = true;
     assert(cui_begin_frame(ui, 256, 256, .04));
@@ -1134,6 +1138,7 @@ int main(void) {
     assert(state.hovered == SIZE_MAX && state.emphasis_focus > 0 && state.emphasis_focus < 1 &&
            state.pie_lift[1] > 0 && state.pie_lift[1] < 1);
     assert(state.tooltip_visual_index == 1 && state.tooltip_focus > .5f && state.tooltip_focus < 1);
+    assert(fabsf(state.emphasis_focus - state.tooltip_focus) < .0001f);
     options.pie_show_labels = false;
     options.pie_outer_radius = 0;
     options.pie_label_gap = 0;
@@ -1326,6 +1331,7 @@ int main(void) {
     draw = cui_end_frame(ui);
     assert(state.tooltip_phase > .49f && state.tooltip_phase < .51f &&
            state.tooltip_focus > state.tooltip_phase && state.tooltip_focus < 1);
+    assert(fabsf(state.emphasis_focus - state.tooltip_focus) < .0001f);
     bool faded_tooltip = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w >= 150 &&

@@ -301,12 +301,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         float dt = cui_frame_delta(ui);
         if (!isfinite(dt) || dt < 0)
             dt = 0;
-        if (dt == 0 && active && state->emphasis_focus == 0)
+        if (dt == 0 && active && !instant)
             dt = 1.f / 60;
         dt = fminf(dt, .25f);
-        state->emphasis_focus =
-            instant ? (active ? 1 : 0)
-                    : fmaxf(0, fminf(1, state->emphasis_focus + (active ? dt : -dt) / duration));
+        state->emphasis_focus = state->tooltip_focus;
         bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
         if (o->kind == CUI_CHART_BAR && active) {
             float target;
@@ -446,8 +444,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 state->hover_visual_started = false;
         }
         if (state->hover_visual_started && state->hover_progress > 0) {
-            float progress = state->hover_progress;
-            float opacity = progress * progress * (3 - 2 * progress);
+            float opacity = state->tooltip_focus;
             float x = state->hover_x;
             float top = (o->custom_y_padding ? o->y_padding_top : 10) * h / o->height;
             float bottom =

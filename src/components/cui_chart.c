@@ -77,9 +77,12 @@ static void cui_chart_hover_dot(cui_context *ui, cui_id id, float x, float y, cu
     cui_end_box(ui);
 }
 static void cui_chart_horizontal_bar_extent(const cui_chart_options *o, float *left, float *right) {
-    float category_gap = o->hide_x_axis ? 0 : 24;
-    *left = o->bar_alignment == CUI_CHART_BAR_LEFT ? category_gap : 12;
-    *right = o->width - (o->bar_alignment == CUI_CHART_BAR_RIGHT ? category_gap : 12);
+    float category_gap = o->hide_x_axis                     ? 0
+                         : o->custom_horizontal_bar_gutters ? o->bar_category_gutter
+                                                            : 24;
+    float value_end = o->custom_horizontal_bar_gutters ? o->bar_value_end_gutter : 12;
+    *left = o->bar_alignment == CUI_CHART_BAR_LEFT ? category_gap : value_end;
+    *right = o->width - (o->bar_alignment == CUI_CHART_BAR_RIGHT ? category_gap : value_end);
 }
 static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
                                          const cui_chart_sankey_node *node, size_t index,
@@ -133,6 +136,45 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
             gutter = fmaxf(gutter, measured.width + 4);
     }
     return gutter;
+}
+cui_plot_result cui_chart_measure_horizontal_bar_gutters(cui_context *ui,
+                                                         const cui_chart_options *o,
+                                                         float *category, float *value_end) {
+    if (!ui || !o || !category || !value_end || o->kind != CUI_CHART_BAR ||
+        (o->bar_alignment != CUI_CHART_BAR_LEFT && o->bar_alignment != CUI_CHART_BAR_RIGHT) ||
+        !o->data || !o->count || o->count > 4096 || !o->width || !o->height)
+        return CUI_PLOT_INVALID;
+    float measured_category = 0, measured_end = o->show_bar_values ? 0 : 8;
+    for (size_t i = 0; i < o->count; i++) {
+        cui_str label = o->data[i].label;
+        if ((label.length && !label.data) || !isfinite(o->data[i].value))
+            return CUI_PLOT_INVALID;
+        if (!o->hide_x_axis) {
+            cui_size size = cui_measure_text(ui, label, 10);
+            if (!isfinite(size.width) || size.width < 0)
+                return CUI_PLOT_INVALID;
+            measured_category = fmaxf(measured_category, size.width);
+        }
+        if (o->show_bar_values) {
+            char buffer[48];
+            cui_str value = cui_chart_number(buffer, sizeof buffer, o->data[i].value,
+                                             o->bar_label_format, o->format_user);
+            cui_size size = cui_measure_text(ui, value, 10);
+            if (!isfinite(size.width) || size.width < 0)
+                return CUI_PLOT_INVALID;
+            measured_end = fmaxf(measured_end, size.width);
+        }
+    }
+    if (!o->hide_x_axis)
+        measured_category += 4;
+    if (o->show_bar_values)
+        measured_end += 4;
+    if (!isfinite(measured_category) || !isfinite(measured_end) ||
+        measured_category + measured_end >= o->width)
+        return CUI_PLOT_EMPTY;
+    *category = measured_category;
+    *value_end = measured_end;
+    return CUI_PLOT_OK;
 }
 cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_chart_options *o,
                                                  cui_chart_sankey_margins *out) {

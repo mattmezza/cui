@@ -139,7 +139,9 @@ typedef struct {
     bool hide_grid, hide_axes, hide_legend, noninteractive;
     bool hide_x_axis, show_y_axis, y_axis_inside, grid_solid;
     float value_axis_gutter; /* measured outside y-axis width; zero uses legacy 50px */
-    bool custom_y_padding;   /* line/area value scale; defaults source 10px top, 0 bottom */
+    bool custom_horizontal_bar_gutters;
+    float bar_category_gutter, bar_value_end_gutter; /* measured logical pixels */
+    bool custom_y_padding; /* line/area value scale; defaults source 10px top, 0 bottom */
     float y_padding_top, y_padding_bottom;
     const double *reference_values;
     size_t reference_count; /* at most 16 */
@@ -268,6 +270,10 @@ cui_plot_result cui_chart_render_animated(cui_context *, cui_chart_state *,
 /* Measure source's max(32px, widest visible tick + 4px) before render; copy
  * result to options.value_axis_gutter for consistent paint and hit geometry. */
 float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options *);
+/* Measure horizontal Bar category/value-end label gutters before rasterization.
+ * Copy the result to options and set custom_horizontal_bar_gutters. */
+cui_plot_result cui_chart_measure_horizontal_bar_gutters(cui_context *, const cui_chart_options *,
+                                                         float *category, float *value_end);
 /* Measures source-style label margins using the host's text metrics. Call before
  * render, assign the result to options.sankey_margins, then reuse those options
  * for layout, hit testing, and styled painting. Output is unchanged on failure. */

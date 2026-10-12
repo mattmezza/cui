@@ -909,6 +909,70 @@ int main(void) {
     }
     cui_context *ui = cui_create((cui_config){.width = 256, .height = 256});
     assert(ui);
+    cui_str saved_category = points[1].label;
+    points[1].label = (cui_str){"An exceptionally long category", 30};
+    cui_chart_options measured_bar = {.kind = CUI_CHART_BAR,
+                                      .data = points,
+                                      .count = 3,
+                                      .width = 512,
+                                      .height = 96,
+                                      .bar_alignment = CUI_CHART_BAR_LEFT};
+    float category_gap = -1, value_end_gap = -1;
+    assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
+                                                    &value_end_gap) == CUI_PLOT_OK);
+    assert(category_gap > 24 && value_end_gap == 8);
+    measured_bar.custom_horizontal_bar_gutters = true;
+    measured_bar.bar_category_gutter = category_gap;
+    measured_bar.bar_value_end_gutter = value_end_gap;
+    cui_plot_rect measured_left;
+    assert(cui_chart_bar_bounds(&measured_bar, 0, &measured_left) == CUI_PLOT_OK);
+    assert(fabs(measured_left.x_min - category_gap) < .01);
+    measured_bar.bar_alignment = CUI_CHART_BAR_RIGHT;
+    cui_plot_rect measured_right;
+    assert(cui_chart_bar_bounds(&measured_bar, 0, &measured_right) == CUI_PLOT_OK);
+    assert(fabs(measured_right.x_max - (512 - category_gap)) < .01);
+    measured_bar.hide_x_axis = true;
+    assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
+                                                    &value_end_gap) == CUI_PLOT_OK);
+    assert(category_gap == 0);
+    measured_bar.hide_x_axis = false;
+    measured_bar.show_bar_values = true;
+    measured_bar.bar_label_format = format_wide_tick;
+    assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
+                                                    &value_end_gap) == CUI_PLOT_OK);
+    assert(value_end_gap > 8);
+    float old_category = category_gap, old_end = value_end_gap;
+    points[1].value = NAN;
+    assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
+                                                    &value_end_gap) == CUI_PLOT_INVALID);
+    assert(category_gap == old_category && value_end_gap == old_end);
+    points[1].value = 40;
+    measured_bar.width = 32;
+    assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
+                                                    &value_end_gap) == CUI_PLOT_EMPTY);
+    assert(category_gap == old_category && value_end_gap == old_end);
+    points[1].label = saved_category;
+    measured_bar.width = 128;
+    measured_bar.show_bar_values = false;
+    measured_bar.bar_label_format = NULL;
+    assert(cui_chart_measure_horizontal_bar_gutters(ui, &measured_bar, &category_gap,
+                                                    &value_end_gap) == CUI_PLOT_OK);
+    measured_bar.bar_category_gutter = category_gap;
+    measured_bar.bar_value_end_gutter = value_end_gap;
+    measured_bar.data_revision = 77;
+    assert(cui_chart_render(&state, &measured_bar) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    measured_bar.bar_category_gutter += 10;
+    assert(cui_chart_render(&state, &measured_bar) == CUI_PLOT_OK);
+    assert(state.revision == old_revision + 1 && memcmp(saved, pixels, sizeof pixels) != 0);
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    measured_bar.bar_category_gutter = NAN;
+    assert(cui_chart_render(&state, &measured_bar) == CUI_PLOT_INVALID);
+    cui_plot_rect invalid_gutter_bar;
+    assert(cui_chart_bar_bounds(&measured_bar, 0, &invalid_gutter_bar) == CUI_PLOT_INVALID);
+    assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     options.kind = CUI_CHART_LINE;
     options.show_y_axis = true;
     options.x_tick_count = 2;

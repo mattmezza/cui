@@ -78,6 +78,11 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
         o->logical_height < 0 || !isfinite(o->value_axis_gutter) || o->value_axis_gutter < 0 ||
         o->value_axis_gutter >= o->width || !isfinite(o->y_padding_top) ||
+        !isfinite(o->bar_category_gutter) || !isfinite(o->bar_value_end_gutter) ||
+        o->bar_category_gutter < 0 || o->bar_value_end_gutter < 0 ||
+        (o->custom_horizontal_bar_gutters &&
+         (double)(o->hide_x_axis ? 0 : o->bar_category_gutter) + o->bar_value_end_gutter >=
+             o->width) ||
         !isfinite(o->y_padding_bottom) || o->y_padding_top < 0 || o->y_padding_bottom < 0 ||
         (o->custom_y_padding && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) &&
          (double)o->y_padding_top + o->y_padding_bottom >= o->height - (o->hide_x_axis ? 0 : 20)) ||
@@ -239,8 +244,13 @@ static double cui_chart_plot_left(const cui_chart_options *o) {
                    ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 32)
                    : 0;
     if (o->kind == CUI_CHART_BAR &&
-        (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT))
-        return o->bar_alignment == CUI_CHART_BAR_LEFT ? (o->hide_x_axis ? 0 : 24) : 12;
+        (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT)) {
+        double category = o->hide_x_axis                     ? 0
+                          : o->custom_horizontal_bar_gutters ? o->bar_category_gutter
+                                                             : 24;
+        double value_end = o->custom_horizontal_bar_gutters ? o->bar_value_end_gutter : 12;
+        return o->bar_alignment == CUI_CHART_BAR_LEFT ? category : value_end;
+    }
     return o->show_y_axis && !o->y_axis_inside
                ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
                : 24;
@@ -249,7 +259,11 @@ static double cui_chart_plot_right(const cui_chart_options *o, double left) {
     if (o->kind == CUI_CHART_CANDLESTICK)
         return o->width;
     if (o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_RIGHT)
-        return o->width - (o->hide_x_axis ? 0 : 24);
+        return o->width - (o->hide_x_axis                     ? 0
+                           : o->custom_horizontal_bar_gutters ? o->bar_category_gutter
+                                                              : 24);
+    if (o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_LEFT)
+        return o->width - (o->custom_horizontal_bar_gutters ? o->bar_value_end_gutter : 12);
     return o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA
                ? o->width - left
                : (o->width > 36 ? o->width - 12 : left);
@@ -388,7 +402,12 @@ cui_plot_result cui_chart_bar_bounds(const cui_chart_options *o, size_t index, c
         !isfinite(o->max_bar_width) || !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 ||
         o->bar_padding_inner > 1 || o->bar_padding_outer < 0 || o->bar_padding_outer > 1 ||
         o->max_bar_width < 0 || o->min_bar_length < 0 || !isfinite(o->value_axis_gutter) ||
-        o->value_axis_gutter < 0 || o->value_axis_gutter >= o->width)
+        o->value_axis_gutter < 0 || o->value_axis_gutter >= o->width ||
+        !isfinite(o->bar_category_gutter) || !isfinite(o->bar_value_end_gutter) ||
+        o->bar_category_gutter < 0 || o->bar_value_end_gutter < 0 ||
+        (o->custom_horizontal_bar_gutters &&
+         (double)(o->hide_x_axis ? 0 : o->bar_category_gutter) + o->bar_value_end_gutter >=
+             o->width))
         return CUI_PLOT_INVALID;
     double lo, hi;
     if (!cui_chart_value_domain(o, &lo, &hi))
@@ -406,7 +425,12 @@ cui_plot_result cui_chart_bar_band_center(const cui_chart_options *o, size_t ind
         o->bar_padding_outer > 1 || !isfinite(o->bar_ratio) || o->bar_ratio < 0 ||
         o->bar_ratio > 1 || !isfinite(o->max_bar_width) || o->max_bar_width < 0 ||
         !isfinite(o->value_axis_gutter) || o->value_axis_gutter < 0 ||
-        o->value_axis_gutter >= o->width)
+        o->value_axis_gutter >= o->width || !isfinite(o->bar_category_gutter) ||
+        !isfinite(o->bar_value_end_gutter) || o->bar_category_gutter < 0 ||
+        o->bar_value_end_gutter < 0 ||
+        (o->custom_horizontal_bar_gutters &&
+         (double)(o->hide_x_axis ? 0 : o->bar_category_gutter) + o->bar_value_end_gutter >=
+             o->width))
         return CUI_PLOT_INVALID;
     bool horizontal =
         o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
@@ -1585,6 +1609,9 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->custom_bar_padding);
     h = cui_chart_mix(h, o->show_dots);
     h = cui_chart_mix(h, cui_chart_bits(o->value_axis_gutter));
+    h = cui_chart_mix(h, o->custom_horizontal_bar_gutters);
+    h = cui_chart_mix(h, cui_chart_bits(o->bar_category_gutter));
+    h = cui_chart_mix(h, cui_chart_bits(o->bar_value_end_gutter));
     h = cui_chart_mix(h, o->custom_y_padding);
     h = cui_chart_mix(h, cui_chart_bits(o->y_padding_top));
     h = cui_chart_mix(h, cui_chart_bits(o->y_padding_bottom));

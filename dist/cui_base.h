@@ -39,6 +39,7 @@ typedef struct {
     const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */
     cui_input_hit_test_fn hit_test; /* UTF-8 byte offset in current text. */
     void *hit_test_user;
+    bool delegate_home_end; /* Composite popup owns these keys; editor leaves them untouched. */
 } cui_base_input_options;
 cui_input_result cui_base_input_ex(cui_context *, cui_id, cui_str, cui_edit *,
                                    cui_input_behavior_state *, cui_base_input_options);
@@ -216,8 +217,12 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
             state->dragging = false;
         if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
             continue;
+        if (options.delegate_home_end && event.type == CUI_EVENT_KEY_DOWN &&
+            (event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
+            continue;
         if (event.type == CUI_EVENT_KEY_DOWN &&
-            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT))
+            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_HOME ||
+             event.key == CUI_KEY_END))
             cui_consume_event(ui, i);
         cui_edit_result error = CUI_EDIT_OK;
         bool primary = event.pointer_button == CUI_POINTER_PRIMARY;

@@ -49,7 +49,48 @@ static void pointer(cui_event_type type, float x) {
     cui_rect b = cui_bounds(ui, id);
     assert(cui_queue_event(ui, (cui_event){.type = type, .x = b.x + x, .y = b.y + 10}));
 }
+
+static void editor_navigation_consumption(void) {
+    for (unsigned mode = 0; mode < 4; ++mode) {
+        cui_context *ctx = cui_create((cui_config){.width = 200, .height = 100});
+        char text[16] = "abcdef";
+        cui_edit *edit =
+            cui_edit_create((cui_edit_config){.buffer = text, .capacity = sizeof text});
+        cui_input_behavior_state state = {0};
+        assert(ctx && edit && cui_begin_frame(ctx, 200, 100, 0));
+        cui_begin_box(ctx, 400, (cui_box){.width = 180, .height = 32});
+        cui_interact(ctx, 400, CUI_ROLE_TEXTBOX, cui_string("Editor"), false, false, 0);
+        cui_end_box(ctx);
+        cui_end_frame(ctx);
+        cui_focus(ctx, 400);
+        for (unsigned end = 0; end < 2; ++end) {
+            assert(cui_edit_select(edit, 3, 3) == CUI_EDIT_OK);
+            assert(cui_queue_event(ctx, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                    .key = end ? CUI_KEY_END : CUI_KEY_HOME}));
+            assert(cui_begin_frame(ctx, 200, 100, 0));
+            cui_begin_box(ctx, 400, (cui_box){.width = 180, .height = 32});
+            if (mode == 0) {
+                cui_interact(ctx, 400, CUI_ROLE_TEXTBOX, cui_string("Editor"), false, false, 0);
+                assert(cui_edit_apply_events(edit, ctx, 400, false) == CUI_EDIT_OK);
+            } else {
+                cui_input_result result =
+                    cui_base_input_ex(ctx, 400, cui_string("Editor"), edit, &state,
+                                      (cui_base_input_options){.readonly = mode == 2,
+                                                               .delegate_home_end = mode == 3});
+                assert(result.error == CUI_EDIT_OK);
+            }
+            assert(cui_edit_get_state(edit).cursor == (mode == 3 ? 3 : (end ? 6 : 0)));
+            assert(cui_event_consumed(ctx, 0) ==
+                   (mode != 3)); /* Ancestor carousel must not also navigate. */
+            cui_end_box(ctx);
+            cui_end_frame(ctx);
+        }
+        cui_edit_destroy(edit);
+        cui_destroy(ctx);
+    }
+}
 int main(void) {
+    editor_navigation_consumption();
     ui = cui_create((cui_config){.width = 400, .height = 200});
     assert(ui);
     assert(!frame(0));

@@ -447,7 +447,8 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
         if (cui_event_consumed(ui, i) || cui_event_target(ui, i) != id)
             continue;
         if (events[i].type == CUI_EVENT_KEY_DOWN &&
-            (events[i].key == CUI_KEY_LEFT || events[i].key == CUI_KEY_RIGHT))
+            (events[i].key == CUI_KEY_LEFT || events[i].key == CUI_KEY_RIGHT ||
+             events[i].key == CUI_KEY_HOME || events[i].key == CUI_KEY_END))
             cui_consume_event(ui, i);
         cui_edit_result r = cui_edit_apply_event(e, events[i]);
         if (first == CUI_EDIT_OK && r != CUI_EDIT_OK)

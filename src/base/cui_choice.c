@@ -863,6 +863,7 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
     cui_input_result input_result = cui_base_input_ex(
         ui, input, name, query, &state->query_behavior,
         (cui_base_input_options){.disabled = disabled,
+                                 .delegate_home_end = state->overlay.open,
                                  .hit_test =
                                      state->query_font_size > 0 ? cui_base_input_hit_test : NULL,
                                  .hit_test_user = &hit});
@@ -937,6 +938,7 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
         if (next != matched) {
             active = next;
             state->list.active = filtered[active].id;
+            cui_consume_event(ui, e);
         }
         if (events[e].key == CUI_KEY_ENTER && !events[e].repeat) {
             bool later_text = false;

@@ -69,3 +69,7 @@ Published e49dc95 confirmed: all six CI jobs and Pages build/deploy succeeded. A
 
 
 Release candidate `d6aa5bd`: root59/59 native,57/57 ASAN/UBSAN,49/49 WASI and68-story Chromium pass. Source button metrics/centering, Canvas baseline, expanded four-size selectors, theme SVG providers and icon-only dialog/attachment controls are integrated. Native/WASI source7970367, browserd6aa5bd; exact logs in validation/latest-checkpoint.json. Public62-story deployment remains e49dc95 until next release verification. Sidebar2247631 and Textarea0622a2d await root integration; workers continue Carousel,Settings and homepage/docs/search/copy-code.
+
+### Isolated next integration: 75ef24f
+
+Chart source plot extents/dashed hover guides and marks, TextView atomic inline Markdown/HTML images and linked-image selection/copy, and Questionnaire semantic containers plus badge background corrections are combined on `integration/next-parity`. Native 77/77, ASan/UBSan 75/75, and quality gates pass. WASI is still running; browser and publication remain pending. This branch is not the published site and does not establish full feature parity. Main remains held for the separate physical-click helper release repair.

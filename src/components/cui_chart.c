@@ -387,8 +387,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 }
             }
             if (o->kind == CUI_CHART_BAR) {
-                cui_plot_rect bar;
-                if (cui_chart_bar_bounds(o, i, &bar) == CUI_PLOT_OK) {
+                float band_center;
+                if (cui_chart_bar_band_center(o, i, &band_center) == CUI_PLOT_OK) {
                     double lo, hi;
                     if (!cui_chart_value_domain(o, &lo, &hi))
                         continue;
@@ -401,9 +401,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                          w / o->width;
                         box_x = o->bar_alignment == CUI_CHART_BAR_LEFT ? baseline - 2 - box_width
                                                                        : baseline + 2;
-                        y = (float)((bar.y_min + bar.y_max) * h / (2 * o->height) - box_height / 2);
+                        y = band_center * h / o->height - box_height / 2;
                     } else {
-                        x = (float)((bar.x_min + bar.x_max) * w / (2 * o->width));
+                        x = band_center * w / o->width;
                         box_x = x - box_width / 2;
                         float top = 12 * h / o->height;
                         float bottom = (o->height > 32 ? o->height - 20 : 12) * h / o->height;

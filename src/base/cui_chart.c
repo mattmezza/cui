@@ -384,6 +384,44 @@ cui_plot_result cui_chart_bar_bounds(const cui_chart_options *o, size_t index, c
         return CUI_PLOT_INVALID;
     return cui_chart_bar_bounds_domain(o, index, lo, hi, out);
 }
+cui_plot_result cui_chart_bar_band_center(const cui_chart_options *o, size_t index, float *center) {
+    if (!o || !center || o->kind != CUI_CHART_BAR || !o->data || !o->count ||
+        o->count > CUI_CHART_MAX_ITEMS || index >= o->count || !o->width || !o->height ||
+        o->width > 4096 || o->height > 4096 || o->bar_alignment < CUI_CHART_BAR_BOTTOM ||
+        o->bar_alignment > CUI_CHART_BAR_RIGHT ||
+        (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
+        !isfinite(o->bar_padding_inner) || !isfinite(o->bar_padding_outer) ||
+        o->bar_padding_inner < 0 || o->bar_padding_inner > 1 || o->bar_padding_outer < 0 ||
+        o->bar_padding_outer > 1 || !isfinite(o->bar_ratio) || o->bar_ratio < 0 ||
+        o->bar_ratio > 1 || !isfinite(o->max_bar_width) || o->max_bar_width < 0 ||
+        !isfinite(o->value_axis_gutter) || o->value_axis_gutter < 0 ||
+        o->value_axis_gutter >= o->width)
+        return CUI_PLOT_INVALID;
+    bool horizontal =
+        o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
+    double top = 12, bottom = cui_chart_plot_bottom(o);
+    double start = horizontal ? top : left;
+    double extent = horizontal ? bottom - top : right - left;
+    if (extent <= 0)
+        return CUI_PLOT_EMPTY;
+    size_t slots = o->point_count ? o->point_count : o->count;
+    double inner = o->custom_bar_padding ? o->bar_padding_inner : .4;
+    double outer = o->custom_bar_padding ? o->bar_padding_outer : .2;
+    double average = extent / slots;
+    double outer_width = average * outer;
+    double band_width = average * (o->bar_ratio ? o->bar_ratio : 1 - inner);
+    band_width = fmin(band_width, o->max_bar_width > 0 ? o->max_bar_width : 30);
+    double display = (extent - 2 * outer_width) / slots;
+    double step = slots > 1 ? display * (1 + inner / (slots - 1)) : extent;
+    double band_start =
+        slots > 1 ? start + index * step + outer_width : start + (extent - band_width) / 2;
+    double result = band_start + band_width / 2;
+    if (!isfinite(result) || result < -4096 || result > 8192)
+        return CUI_PLOT_OVERFLOW;
+    *center = (float)result;
+    return CUI_PLOT_OK;
+}
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *o, size_t index,
                                         cui_chart_candle_geometry *out) {
     if (!o || !out || o->kind != CUI_CHART_CANDLESTICK || !o->data || !o->count ||

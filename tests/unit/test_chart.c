@@ -439,6 +439,15 @@ int main(void) {
     cui_plot_rect first_bar, second_bar;
     assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
     assert(cui_chart_bar_bounds(&options, 1, &second_bar) == CUI_PLOT_OK);
+    float first_band_center = 0, empty_band_center = 0;
+    assert(cui_chart_bar_band_center(&options, 0, &first_band_center) == CUI_PLOT_OK);
+    assert(fabs(first_band_center - (first_bar.x_min + first_bar.x_max) / 2) < .01);
+    points[0].value = 0;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_EMPTY);
+    assert(cui_chart_bar_band_center(&options, 0, &empty_band_center) == CUI_PLOT_OK);
+    assert(fabs(first_band_center - empty_band_center) < .01);
+    points[0].value = 20;
+    assert(cui_chart_bar_bounds(&options, 0, &first_bar) == CUI_PLOT_OK);
     assert(first_bar.x_min > 24 && first_bar.x_max < second_bar.x_min);
     assert(fabs((first_bar.x_max - first_bar.x_min) - 18.4) < .01);
     options.point_count = 5;
@@ -860,6 +869,17 @@ int main(void) {
         }
     assert(isfinite(negative_label_y) && isfinite(positive_label_y) &&
            negative_label_y < positive_label_y);
+    points[0].value = 0;
+    assert(cui_begin_frame(ui, 256, 256, .07));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool zero_category = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].text.data[0] == 'A')
+            zero_category = true;
+    assert(zero_category);
     points[0].value = 20;
     options.kind = CUI_CHART_CANDLESTICK;
     options.tooltip_format = NULL;

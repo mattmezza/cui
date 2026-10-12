@@ -517,15 +517,21 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             (o->radar_outer_radius > 0 ? o->radar_outer_radius : o->height * .4) * h / o->height;
         for (size_t i = 0; i < o->count; i++) {
             cui_str label = o->data[i].label;
-            if (!label.length || !label.data)
+            bool custom = o->radar_label_measure && o->radar_label_paint;
+            if (!custom && (!label.length || !label.data))
                 continue;
             double angle = -3.14159265358979323846 / 2 + 2 * 3.14159265358979323846 * i / o->count;
             float gap = o->radar_label_gap > 0 ? o->radar_label_gap : 10;
             float x = (float)(cx + (radius + gap) * cos(angle));
             float y = (float)(cy + (radius + gap) * sin(angle));
-            cui_size measured = cui_measure_text(ui, label, 10);
+            cui_size measured =
+                custom ? o->radar_label_measure(ui, &o->data[i], i, o->radar_label_user)
+                       : cui_measure_text(ui, label, 10);
+            if (!isfinite(measured.width) || !isfinite(measured.height) || measured.width <= 0 ||
+                measured.height <= 0)
+                continue;
             float label_width = fmaxf(1, fminf(w, measured.width));
-            float label_height = fmaxf(12, measured.height);
+            float label_height = custom ? fminf(h, measured.height) : fmaxf(12, measured.height);
             float left = fmaxf(0, fminf(w - label_width, x - label_width / 2));
             float top = fmaxf(0, fminf(h - label_height, y - label_height / 2));
             cui_begin_absolute_box(ui, id ^ (UINT64_C(0x25a41f7c9d310000) + i),
@@ -534,7 +540,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                              .fixed_width = true,
                                              .fixed_height = true},
                                    (cui_rect){left, top, label_width, label_height});
-            cui_text(ui, label, 10, o->radar_label_color.a ? o->radar_label_color : o->foreground);
+            if (custom)
+                o->radar_label_paint(ui, id ^ (UINT64_C(0x35a41f7c9d310000) + i), &o->data[i], i,
+                                     o->radar_label_user);
+            else
+                cui_text(ui, label, 10,
+                         o->radar_label_color.a ? o->radar_label_color : o->foreground);
             cui_end_box(ui);
         }
     }

@@ -49,6 +49,11 @@ typedef struct {
     cui_color color; /* alpha zero uses chart foreground */
     float font_size; /* zero uses source 10px */
 } cui_chart_sankey_label;
+/* Styled Radar dimension content. Measure before placement; paint within that box. */
+typedef cui_size (*cui_chart_radar_label_measure_fn)(cui_context *, const cui_chart_datum *,
+                                                     size_t index, void *user);
+typedef void (*cui_chart_radar_label_paint_fn)(cui_context *, cui_id, const cui_chart_datum *,
+                                               size_t index, void *user);
 /* At most 16 lines per node; return a count no larger than capacity. */
 typedef size_t (*cui_chart_sankey_labels_fn)(const cui_chart_datum *, size_t index,
                                              double raw_throughput, cui_chart_sankey_label *out,
@@ -168,6 +173,9 @@ typedef struct {
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     float radar_label_gap;                      /* zero selects source 10px */
     cui_color radar_label_color;
+    cui_chart_radar_label_measure_fn radar_label_measure;
+    cui_chart_radar_label_paint_fn radar_label_paint;
+    void *radar_label_user; /* both callbacks set to override text labels */
     cui_chart_sankey_align sankey_align;
     cui_chart_sankey_value_scale sankey_value_scale;
     unsigned sankey_iterations;  /* zero selects six relaxation passes; maximum 100 */

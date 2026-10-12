@@ -67,6 +67,24 @@ static cui_color pie_green_line(const cui_chart_datum *datum, size_t index, void
     return index == 0 ? (cui_color){0, 230, 0, 255} : (cui_color){0, 0, 0, 0};
 }
 #ifndef CUI_CHART_BASE_ONLY
+typedef struct {
+    unsigned measured, painted;
+    bool invalid;
+} radar_label_calls;
+static cui_size measure_radar_label(cui_context *ui, const cui_chart_datum *datum, size_t index,
+                                    void *user) {
+    (void)ui;
+    assert(datum && index < 3);
+    radar_label_calls *calls = user;
+    calls->measured++;
+    return calls->invalid ? (cui_size){NAN, 11} : (cui_size){19, 11};
+}
+static void paint_radar_label(cui_context *ui, cui_id id, const cui_chart_datum *datum,
+                              size_t index, void *user) {
+    assert(ui && id && datum && index < 3);
+    ((radar_label_calls *)user)->painted++;
+    cui_text(ui, (cui_str){"R", 1}, 9, (cui_color){7, 199, 8, 255});
+}
 static size_t format_q(double value, char *buffer, size_t capacity, void *user) {
     (void)value;
     (void)user;
@@ -1005,6 +1023,37 @@ int main(void) {
             radar_hover_dot = true;
     assert(radar_colored_label);
     assert(radar_hover_dot);
+    radar_label_calls custom_labels = {0};
+    options.radar_label_measure = measure_radar_label;
+    options.radar_label_paint = paint_radar_label;
+    options.radar_label_user = &custom_labels;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Radar", 5}));
+    draw = cui_end_frame(ui);
+    assert(custom_labels.measured == options.count && custom_labels.painted == options.count);
+    bool custom_radar_content = false, old_radar_label = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1) {
+            custom_radar_content |= draw.commands[i].text.data[0] == 'R' &&
+                                    draw.commands[i].color.g == 199 &&
+                                    draw.commands[i].bounds.x >= 0 &&
+                                    draw.commands[i].bounds.x < options.logical_width &&
+                                    draw.commands[i].bounds.y >= 0 &&
+                                    draw.commands[i].bounds.y < options.logical_height;
+            old_radar_label |= draw.commands[i].color.r == 220 && draw.commands[i].color.g == 10;
+        }
+    assert(custom_radar_content && !old_radar_label);
+    custom_labels.invalid = true;
+    custom_labels.measured = custom_labels.painted = 0;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Radar", 5}));
+    (void)cui_end_frame(ui);
+    assert(custom_labels.measured == options.count && custom_labels.painted == 0);
+    options.radar_label_measure = NULL;
+    options.radar_label_paint = NULL;
+    options.radar_label_user = NULL;
     options.radar_label_gap = 0;
     options.radar_label_color = (cui_color){0};
     options.kind = CUI_CHART_SANKEY;

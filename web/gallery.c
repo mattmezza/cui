@@ -1145,9 +1145,26 @@ static cui_str table_label(void *user, size_t row, cui_id column) {
     (void)user;
     if (row >= 1000)
         return cui_string("");
-    return cui_string(column == 101   ? table_names[row]
+    size_t record = (size_t)table_rows[row].key - 1;
+    return cui_string(column == 101   ? table_names[record]
                       : column == 102 ? "Ready"
-                                      : table_sizes[row]);
+                                      : table_sizes[record]);
+}
+static int table_compare_rows(const void *left, const void *right) {
+    const cui_table_row *a = left, *b = right;
+    int order = (a->key > b->key) - (a->key < b->key);
+    /* Name is zero-padded and Size is numeric; Status ties preserve original key order. */
+    if (table_state.sort == CUI_TABLE_SORT_DESCENDING && table_state.sort_column != 102)
+        order = -order;
+    return order;
+}
+static bool gallery_apply_table_sort(void) {
+    for (size_t c = 0; c < 3; c++)
+        if (!cui_table_get_column(table, c, &table_columns[c]))
+            return false;
+    qsort(table_rows, 1000, sizeof(*table_rows), table_compare_rows);
+    return cui_table_bind(table, table_rows, table_mode == 3 ? 0 : 1000, table_columns, 3) ==
+           CUI_TABLE_OK;
 }
 static void table_row_hook(cui_context *context, const cui_theme *theme, void *user, size_t row) {
     (void)context;
@@ -2963,6 +2980,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             table_label, NULL, NULL);
         if (result.selection_mode_requested) {
             table_selection_mode = result.requested_selection_mode;
+            redraw = true;
+        }
+        if (result.sort_changed && gallery_apply_table_sort()) {
+            cui_invalidate(ui);
             redraw = true;
         }
         char text[72];

@@ -27,7 +27,7 @@ column/direction, horizontal/vertical scroll and transient resize gesture. Row,
 column and cell selection use the same state; zero keys mean no selection. The
 reducer returns change flags and activated keys. Sort activation cycles default,
 ascending and descending; a newly activated column starts ascending. Sorting is
-requested by the result, without rearranging caller data automatically.
+requested by the result, without rearranging caller data automatically. On `sort_changed`, sort your application records, reorder the borrowed row array, then call `cui_table_bind` and invalidate the UI. Resolve cell labels from the newly ordered row keys, rather than from the original position. The gallery demonstrates ascending/descending/default ordering for Name and numeric Size, with stable key order for equal Status values.
 
 The pure base API separates input reduction from semantic submission. A custom
 renderer can call `cui_table_reduce`, submit the root outside clip scopes, submit
@@ -35,7 +35,7 @@ headers inside their pane clips, and submit body semantics inside its translated
 body clip. Per-column/row/cell submission helpers support distinct pinned and scrolling clip scopes. Lay out the public stable header, resize, row and cell IDs. The
 `cui_base_data_table` convenience registers all semantics without drawing; it
 links only core and table base. `cui_data_table` performs that separation and
-paints the fixed header and virtual rows using theme tokens. A label callback
+paints the fixed header and virtual rows using theme tokens. Sortable headers show SVG indicators for unsorted/ascending/descending states, with centered labels and a pointer cursor. The icons use the theme icon loader, so applications can replace their SVGs. A label callback
 supplies borrowed accessible cell names. An optional render callback runs inside
 each clipped cell and can draw arbitrary content; the application must govern
 interactive children and disabled behavior consistently.

@@ -1807,6 +1807,15 @@ def main():
             control_change('table-selection', '2')
             click_semantic('Name')
             page.wait_for_function('document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")==="ascending"')
+            for expected_sort, first_file in [('descending','File 1000'), ('none','File 0001'), ('ascending','File 0001')]:
+                click_semantic('Name')
+                page.wait_for_function('(sort)=>document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")===sort', arg=expected_sort)
+                page.wait_for_function('(label)=>document.querySelector(`#accessible [role=gridcell][aria-colindex="1"]`)?.textContent===label', arg=first_file)
+            assert page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+                const commands=Array.from({length:e.gallery_count()},(_,i)=>i);
+                return commands.filter(i=>e.gallery_command(i,0)===5).length>=3&&
+                    !commands.some(i=>e.gallery_command(i,0)===2&&['^','v'].includes(d.decode(new Uint8Array(
+                        e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))))); }''')
             page.keyboard.press('ArrowRight')
             page.keyboard.press('Enter')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).some(e=>e.getAttribute("aria-label")==="Status"&&e.getAttribute("aria-sort")==="ascending")')

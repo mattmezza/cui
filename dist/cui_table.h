@@ -3,6 +3,7 @@
 #ifndef CUI_TABLE_H
 #define CUI_TABLE_H
 #include "cui.h"
+#include "cui_icon.h"
 #include "cui_scroll.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
@@ -1191,6 +1192,7 @@ void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model 
         ui, cid,
         (cui_semantic_details){.parent = id,
                                .column_index = (unsigned)c + 1,
+                               .cursor = disabled ? CUI_CURSOR_NOT_ALLOWED : CUI_CURSOR_POINTER,
                                .selected = o.selection_mode == CUI_TABLE_SELECT_COLUMN &&
                                            cui_table_is_selected(s, o, 0, m->cols[c].key)});
     if (m->cols[c].resizable) {
@@ -1346,6 +1348,7 @@ bool cui_table_span_width(const float *widths, size_t count, size_t start, size_
 /* src/components/cui_table.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
 #include <stdio.h>
 static cui_id style_id(cui_id id, unsigned part) {
@@ -1460,15 +1463,34 @@ static void header_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_tabl
     cui_begin_box(ui, style_id(cid, 1),
                   (cui_box){.width = fmaxf(1, col.width - 8 - grip),
                             .height = fmaxf(1, header - 8),
+                            .row = true,
+                            .gap = 4,
+                            .align_x = align(col.align),
+                            .align_y = CUI_ALIGN_CENTER});
+    cui_begin_box(ui, style_id(cid, 2),
+                  (cui_box){.width = -1,
+                            .height = -1,
+                            .clip = true,
                             .align_x = align(col.align),
                             .align_y = CUI_ALIGN_CENTER});
     if (o.render_header)
         o.render_header(ui, t, o.render_userdata, col.key);
     else
         cui_text(ui, col.label, t->font_size, col.disabled || o.disabled ? t->muted : t->text);
-    if (s->sort_column == col.key && s->sort != CUI_TABLE_SORT_DEFAULT)
-        cui_text(ui, cui_string(s->sort == CUI_TABLE_SORT_ASCENDING ? "^" : "v"), t->font_size,
-                 t->primary);
+    cui_end_box(ui);
+    if (col.sortable) {
+        bool sorted = s->sort_column == col.key && s->sort != CUI_TABLE_SORT_DEFAULT;
+        cui_str icon = cui_string(!sorted                               ? "chevrons-up-down"
+                                  : s->sort == CUI_TABLE_SORT_ASCENDING ? "arrow-up"
+                                                                        : "arrow-down");
+        cui_icon_named(ui, style_id(cid, 3), t, icon,
+                       (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                          .custom_size = fmaxf(1, fminf(header - 8, t->font_size)),
+                                          .custom_color = true,
+                                          .color = col.disabled || o.disabled ? t->muted
+                                                   : sorted                   ? t->primary
+                                                                              : t->muted});
+    }
     cui_end_box(ui);
     if (col.resizable) {
         cui_begin_box(ui, cui_table_resize_id(id, col.key),

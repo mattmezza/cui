@@ -125,6 +125,51 @@ static cui_str label(void *data, size_t row, cui_id column) {
     return cui_string("Accessible value");
 }
 #ifndef CUI_TABLE_BASE_ONLY
+static void sort_header_graphics(void) {
+    cui_context *ui = cui_create((cui_config){.width = 300, .height = 200});
+    cui_table_model *model = cui_table_create(1);
+    cui_table_row row = {.key = 1};
+    cui_table_column column = {.key = 20, .label = {"Name", 4}, .width = 150, .sortable = true};
+    cui_table_state state = {.sort_column = 20};
+    cui_theme theme = cui_theme_light();
+    assert(ui && model && cui_table_bind(model, &row, 1, &column, 1) == CUI_TABLE_OK);
+    for (unsigned sort = 0; sort < 3; sort++) {
+        state.sort = (cui_table_sort)sort;
+        assert(cui_begin_frame(ui, 300, 200, .016f));
+        assert(cui_data_table(ui, 10, &theme, model, &state,
+                              (cui_table_options){.width = 200, .height = 160, .header_height = 32},
+                              label, NULL, NULL)
+                   .error == CUI_TABLE_OK);
+        cui_draw_list draw = cui_end_frame(ui);
+        cui_rect header = cui_bounds(ui, cui_table_header_id(10, 20));
+        unsigned images = 0;
+        assert(header.h == 32);
+        for (size_t i = 0; i < draw.count; i++) {
+            const cui_draw_command *c = &draw.commands[i];
+            assert(c->type != CUI_DRAW_TEXT || c->text.length != 1 ||
+                   (c->text.data[0] != '^' && c->text.data[0] != 'v'));
+            if (c->type == CUI_DRAW_IMAGE) {
+                images++;
+                assert(cui_bitmap_valid(c->bitmap.bitmap));
+                assert(c->bounds.x >= header.x && c->bounds.x + c->bounds.w <= header.x + header.w);
+                assert(fabsf(c->bounds.y + c->bounds.h / 2 - header.y - header.h / 2) < .5f);
+            }
+        }
+        assert(images == 1);
+        size_t count;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        bool clickable = false;
+        for (size_t i = 0; i < count; i++)
+            if (semantics[i].id == cui_table_header_id(10, 20)) {
+                clickable = true;
+                assert(semantics[i].details.cursor == CUI_CURSOR_POINTER);
+            }
+        assert(clickable && cui_last_error(ui) == CUI_OK);
+    }
+    cui_table_destroy(model);
+    cui_destroy(ui);
+}
+
 static void cell(cui_context *ui, const cui_theme *t, void *data, size_t row, cui_id column) {
     rendered++;
     cui_text(ui, label(data, row, column), t->font_size, t->text);
@@ -838,6 +883,7 @@ int main(void) {
     scrollbars();
 #ifndef CUI_TABLE_BASE_ONLY
     composed_data_table();
+    sort_header_graphics();
     static_tables();
     virtual_scene();
     pointer_resize();

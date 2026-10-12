@@ -994,6 +994,7 @@ void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model 
         ui, cid,
         (cui_semantic_details){.parent = id,
                                .column_index = (unsigned)c + 1,
+                               .cursor = disabled ? CUI_CURSOR_NOT_ALLOWED : CUI_CURSOR_POINTER,
                                .selected = o.selection_mode == CUI_TABLE_SELECT_COLUMN &&
                                            cui_table_is_selected(s, o, 0, m->cols[c].key)});
     if (m->cols[c].resizable) {

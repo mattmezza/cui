@@ -2,6 +2,7 @@
 #ifndef CUI_TABLE_H
 #define CUI_TABLE_H
 #include "cui.h"
+#include "cui_icon.h"
 #include "cui_scroll.h"
 #include "cui_theme.h"
 #ifdef __cplusplus

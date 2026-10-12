@@ -34,6 +34,14 @@ typedef struct {
 } cui_tab_metrics;
 /* Frozen logical-pixel metrics scaled by positive density (invalid uses1). */
 cui_tab_metrics cui_tab_size_metrics(cui_tab_variant, cui_tab_size, float density);
+/* Caller-owned indicator spring; zero initialization snaps to the first target.
+ * Position and velocity survive subsequent target changes. */
+typedef struct {
+    float left, width, left_velocity, width_velocity;
+    bool initialized;
+} cui_tab_motion;
+void cui_tab_motion_step(cui_tab_motion *, float target_left, float target_width, float dt,
+                         cui_spring_settings, bool reduced_motion);
 typedef struct {
     cui_id candidate, before, moved;
     float start_x, start_y;

@@ -2963,7 +2963,48 @@ static void test_tab_independent_palette(void) {
         cui_destroy(ui);
     }
 }
+static void test_tab_retained_spring(void) {
+    cui_spring_settings settings = cui_theme_light().spring_move;
+    for (int regime = 0; regime < 3; regime++) {
+        settings.damping = regime == 0 ? .85f : regime == 1 ? 1 : 1.5f;
+        settings.epsilon = .001f;
+        cui_tab_motion motion = {0};
+        cui_tab_motion_step(&motion, 10, 40, 0, settings, false);
+        assert(motion.initialized && motion.left == 10 && motion.width == 40);
+        cui_tab_motion whole = motion;
+        cui_tab_motion_step(&whole, 200, 80, .04f, settings, false);
+        cui_tab_motion_step(&motion, 200, 80, .02f, settings, false);
+        cui_tab_motion_step(&motion, 200, 80, .02f, settings, false);
+        assert(fabsf(motion.left - whole.left) < .001f &&
+               fabsf(motion.width - whole.width) < .001f &&
+               fabsf(motion.left_velocity - whole.left_velocity) < .01f);
+        assert(motion.left > 10 && motion.left < 200 && motion.left_velocity > 0);
+        float left = motion.left, velocity = motion.left_velocity;
+        cui_tab_motion_step(&motion, -20, 25, 0, settings, false);
+        assert(motion.left == left && motion.left_velocity == velocity);
+        cui_tab_motion_step(&motion, -20, 25, .001f, settings, false);
+        assert(motion.left > left); /* in-flight velocity survives reverse retarget */
+        for (int i = 0; i < 1000; i++)
+            cui_tab_motion_step(&motion, -20, 25, .016f, settings, false);
+        assert(motion.left == -20 && motion.width == 25 && motion.left_velocity == 0 &&
+               motion.width_velocity == 0);
+        cui_tab_motion_step(&motion, 300, 90, .016f, settings, true);
+        assert(motion.left == 300 && motion.width == 90 && motion.left_velocity == 0);
+        settings.travel = false;
+        cui_tab_motion_step(&motion, 100, 10, .016f, settings, false);
+        assert(motion.left == 100 && motion.width == 10);
+        settings.travel = true;
+        settings.response = 0;
+        cui_tab_motion_step(&motion, 0, 5, .016f, settings, false);
+        assert(motion.left == 0 && motion.width == 5);
+        settings = cui_theme_light().spring_move;
+        cui_tab_motion_step(&motion, NAN, 20, .016f, settings, false);
+        cui_tab_motion_step(&motion, 20, -1, .016f, settings, false);
+        assert(motion.left == 0 && motion.width == 5);
+    }
+}
 int main(void) {
+    test_tab_retained_spring();
     test_tab_independent_palette();
     test_tab_reference_size_metrics();
     test_list_confirmation_contract();

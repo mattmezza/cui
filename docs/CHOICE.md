@@ -635,3 +635,13 @@ bodies paint an inset background with size-specific radius. A pointer-routed
 headless test customizes tokens and checks normal, hover, selected and disabled
 foregrounds for every variant. Segmented raised shadows still require a renderer
 primitive; this does not close animated indicator or text-fade parity.
+
+Caller-owned `cui_tab_motion` and `cui_tab_motion_step` provide the retained
+left/width springs used by the frozen indicator. Pass `theme.spring_move` and
+frame delta; first layout snaps, later targets retain both velocities, and
+reduced motion, disabled travel or response zero snaps. Invalid geometry leaves
+state untouched. Exact analytic steps handle under-, critically- and overdamped
+settings without frame-subdivision dependence. This primitive is not yet wired
+to Tabs painting: an absolute child that inherits clipping and paints below tab
+labels is required before the shared animated indicator can replace static
+selected visuals. Segmented shadows and Pill foreground fade remain gaps.

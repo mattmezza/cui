@@ -2,6 +2,60 @@
 #include "cui/cui_choice.h"
 #include "cui/cui_base.h"
 #include <math.h>
+static void cui_tab_spring_axis(float *position, float *velocity, float target, float dt,
+                                cui_spring_settings settings) {
+    double omega = 6.28318530717958647692 / settings.response;
+    double damping = settings.damping, displacement = *position - target;
+    double speed = *velocity, time = dt, next, next_speed;
+    if (fabs(damping - 1) < .0001) {
+        double sum = speed + omega * displacement, decay = exp(-omega * time);
+        next = (displacement + sum * time) * decay;
+        next_speed = (speed - omega * sum * time) * decay;
+    } else if (damping < 1) {
+        double frequency = omega * sqrt(1 - damping * damping);
+        double decay = exp(-damping * omega * time);
+        double sine = sin(frequency * time), cosine = cos(frequency * time);
+        next = decay * (displacement * cosine +
+                        (speed + damping * omega * displacement) / frequency * sine);
+        next_speed =
+            decay * (speed * cosine -
+                     (damping * omega * speed + omega * omega * displacement) / frequency * sine);
+    } else {
+        double factor = damping + sqrt(damping * damping - 1);
+        double slow = -omega / factor, fast = -omega * factor;
+        double first = (speed - fast * displacement) / (slow - fast);
+        double second = displacement - first;
+        next = first * exp(slow * time) + second * exp(fast * time);
+        next_speed = slow * first * exp(slow * time) + fast * second * exp(fast * time);
+    }
+    *position = (float)(target + next);
+    *velocity = (float)next_speed;
+    if (fabs(next) < settings.epsilon && fabs(next_speed) < settings.epsilon) {
+        *position = target;
+        *velocity = 0;
+    }
+}
+void cui_tab_motion_step(cui_tab_motion *motion, float target_left, float target_width, float dt,
+                         cui_spring_settings settings, bool reduced_motion) {
+    if (!motion || !isfinite(target_left) || !isfinite(target_width) || target_width < 0)
+        return;
+    if (!isfinite(settings.response) || settings.response < 0)
+        settings.response = .28f;
+    if (!isfinite(settings.damping) || settings.damping < 0)
+        settings.damping = .85f;
+    if (!isfinite(settings.epsilon) || settings.epsilon <= 0)
+        settings.epsilon = .1f;
+    if (!motion->initialized || reduced_motion || !settings.travel || settings.response == 0 ||
+        !isfinite(motion->left) || !isfinite(motion->width) || !isfinite(motion->left_velocity) ||
+        !isfinite(motion->width_velocity)) {
+        *motion = (cui_tab_motion){.left = target_left, .width = target_width, .initialized = true};
+        return;
+    }
+    if (!isfinite(dt) || dt <= 0)
+        return;
+    cui_tab_spring_axis(&motion->left, &motion->left_velocity, target_left, dt, settings);
+    cui_tab_spring_axis(&motion->width, &motion->width_velocity, target_width, dt, settings);
+}
 static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, size_t from,
                                   cui_key key, bool vertical) {
     int direction = 0;

@@ -228,6 +228,11 @@ typedef struct {
     cui_choice_content_fn content;
     void *content_user;
     cui_menu_tree_options menu;
+    /* When an outer property is unset, inherit the action button's property
+     * for both halves. Zero-initialized options keep the existing defaults. */
+    bool inherit_action_variant, inherit_action_size;
+    cui_dropdown_button_variant action_variant;
+    cui_dropdown_button_size action_size;
 } cui_dropdown_button_options;
 typedef struct {
     bool action_activated, menu_activated;

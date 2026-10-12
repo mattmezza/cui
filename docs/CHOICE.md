@@ -335,3 +335,19 @@ context-menu gesture are not implemented.
 Headless tests cover secondary press/release routing, primary activation,
 coordinate placement, reanchoring, nested action dispatch and focus restoration,
 as well as custom row drawing, right-side checks and preferred popup placement.
+
+## DropdownButton property inheritance and ghost surface
+
+`inherit_action_variant` and `inherit_action_size` mark the corresponding outer
+property as unset. Both halves then use `action_variant` and `action_size`.
+With these flags false, the outer `variant` and `size` take precedence, including
+when explicitly set to the zero-valued defaults. Existing zero-initialized options
+retain their original defaults.
+
+A ghost pair surfaces both enabled halves when either half is hovered and retains
+that surface while its menu is open. The hovered half receives the stronger hover
+color. Escape restores the transparent resting appearance when the pointer has
+left. Disabled pairs remain transparent. Headless tests inspect the draw list after
+real pointer movement, menu activation and Escape, and verify inheritance and
+outer overrides. Optional halves, action tooltip composition, independent corner
+geometry and the complete upstream anchor-corner contract remain parity gaps.

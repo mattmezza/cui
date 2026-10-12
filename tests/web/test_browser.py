@@ -136,6 +136,9 @@ def main():
             def dropdown_check(control):
                 before = page.evaluate('(control)=>{const node=document.querySelector("#dropdown-"+control);node.checked=true;node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', control)
                 page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
+            def control_change(control, value):
+                before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
+                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
             page.evaluate('location.hash="Notification"')
             page.wait_for_function('cuiGallery.renderedComponent==="Notification"')
             page.locator('#notification-autohide').uncheck()
@@ -1287,11 +1290,77 @@ def main():
             page.keyboard.press('Space')
             page.wait_for_function('document.querySelector(`#accessible [role=checkbox]`).getAttribute("aria-checked")==="true"')
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===2).every(i=>!/[x✓]/.test(new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))))')
+            glyph_widths = []
+            for size in ['3','1','0','2']:
+                control_change('control-size', size)
+                assert page.locator('#accessible [role=checkbox]').count() == 1
+                glyph_widths.append(page.evaluate('()=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return i===undefined?0:e.gallery_command(i,3)}'))
+            assert glyph_widths == sorted(glyph_widths) and len(set(glyph_widths)) == 4, glyph_widths
+            control_change('choice-required', True)
+            control_change('choice-invalid', True)
+            assert page.locator('#accessible [role=checkbox]').get_attribute('aria-required') == 'true'
+            assert page.locator('#accessible [role=checkbox]').get_attribute('aria-invalid') == 'true'
+            control_change('choice-skip-tab', True)
+            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,9)') == -1
+            control_change('choice-skip-tab', False)
+            control_change('disabled', True)
+            before = page.evaluate('cuiGallery.exports.gallery_semantic(0,8)')
+            click_semantic('Receive updates', 2)
+            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,8)') == before
+            control_change('disabled', False)
             page.evaluate('location.hash="Radio"')
             page.wait_for_function('cuiGallery.renderedComponent==="Radio"')
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===2).every(i=>!/[()*]/.test(new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))))')
             click_semantic('Priority', 4)
             page.wait_for_function('document.querySelector(`#accessible [role=radio][aria-label=Priority]`).getAttribute("aria-checked")==="true"')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).includes(5)')
+            assert page.locator('#accessible [role=radio][aria-label=Priority]').get_attribute('aria-required') == 'true'
+            assert page.locator('#accessible [role=radio][aria-label=Priority]').get_attribute('aria-invalid') == 'true'
+            control_change('choice-skip-tab', True)
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>cuiGallery.exports.gallery_semantic(i,9)).every(n=>n===-1)')
+            control_change('choice-skip-tab', False)
+            control_change('choice-required', False)
+            control_change('choice-invalid', False)
+            page.evaluate('location.hash="Switch"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Switch"')
+            assert page.locator('#accessible [role=switch]').get_attribute('aria-checked') == 'true'
+            control_change('switch-color', True)
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===0&&[5,6,7].every((f,j)=>e.gallery_command(i,f)===[180,74,44][j]);})')
+            assert page.evaluate('()=>{const e=cuiGallery.exports,c=document.querySelector("canvas"),s=c.width/c.clientWidth,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===0&&[5,6,7].every((f,j)=>e.gallery_command(i,f)===[180,74,44][j]));if(i===undefined)return false;const x=Math.floor((e.gallery_command(i,1)+5)*s),y=Math.floor((e.gallery_command(i,2)+e.gallery_command(i,4)/2)*s),p=c.getContext("2d").getImageData(x,y,1,1).data;return Math.abs(p[0]-180)<3&&Math.abs(p[1]-74)<3&&Math.abs(p[2]-44)<3;}')
+            control_change('switch-side', True)
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Notifications"&&e.gallery_command(i,1)<e.gallery_semantic(0,1)+e.gallery_semantic(0,3)/2;})')
+            click_semantic('Notifications', 3)
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(1)===0')
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(0)===0')
+            assert page.locator('#accessible [role=switch]').get_attribute('aria-checked') == 'false'
+            page.emulate_media(reduced_motion='reduce')
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(2)===0')
+            click_semantic('Notifications', 3)
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(1)>0')
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(0)') == page.evaluate('cuiGallery.exports.gallery_control_stats(1)')
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(2)') == 0
+            page.emulate_media(reduced_motion='no-preference')
+            page.evaluate('location.hash="Toggle"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Toggle"')
+            assert page.locator('#accessible [role=toolbar][aria-label="Formatting options"]').count() == 1
+            assert page.locator('#accessible button[aria-label="Bold"]').get_attribute('aria-pressed') == 'true'
+            click_semantic('Pin this item', 1)
+            page.wait_for_function('document.querySelector(`#accessible button[aria-label="Pin this item"]`).getAttribute("aria-pressed")==="true"')
+            click_semantic('Italic', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(4)===0&&cuiGallery.exports.gallery_control_stats(5)===1')
+            control_change('toggle-selection', '1')
+            click_semantic('Underline', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(5)===1&&cuiGallery.exports.gallery_control_stats(6)===1')
+            control_change('toggle-segmented', True)
+            control_change('toggle-variant', '1')
+            assert page.locator('#accessible button[aria-label="Underline"]').get_attribute('aria-pressed') == 'true'
+            control_change('disabled', True)
+            click_semantic('Bold', 1)
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(4)') == 0
+            control_change('disabled', False)
+            control_change('toggle-selection', '0')
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(5)') == 1
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(6)') == 0
             page.evaluate('location.hash="Slider"')
             page.wait_for_function('document.querySelector("#name").textContent==="Slider" && cuiGallery.renderedComponent==="Slider"')
             page.wait_for_timeout(60)

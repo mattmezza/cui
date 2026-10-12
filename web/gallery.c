@@ -37,6 +37,30 @@ static const cui_semantic *semantics;
 static size_t semantic_count;
 static bool checked, enabled = true, toggled;
 static cui_check_state check_state;
+static int control_size, choice_required, choice_invalid, choice_skip_tab;
+static int switch_label_left, switch_custom_color, toggle_variant, toggle_segmented,
+    toggle_selection_mode;
+static cui_switch_state gallery_switch_state;
+static bool toggle_group_values[3] = {true, false, false}, toggle_group_requested[3];
+static unsigned toggle_group_changes;
+static void gallery_toggle_group_change(void *user, const bool *requested, size_t count) {
+    (void)user;
+    if (count != 3)
+        return;
+    toggle_group_changes++;
+    if (toggle_selection_mode) {
+        memcpy(toggle_group_values, requested, count * sizeof(*requested));
+    } else {
+        for (size_t i = 0; i < count; i++)
+            if (requested[i] && !toggle_group_values[i]) {
+                for (size_t j = 0; j < count; j++)
+                    toggle_group_values[j] = j == i;
+                return;
+            }
+        if (requested[0] || requested[1] || requested[2])
+            memcpy(toggle_group_values, requested, count * sizeof(*requested));
+    }
+}
 static const unsigned char image_story_pixels[80] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
@@ -673,20 +697,64 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 1:
         cui_checkbox_ex(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"),
-                        &check_state, (cui_checkbox_options){.disabled = disabled});
+                        &check_state,
+                        (cui_checkbox_options){.size = (cui_control_size)control_size,
+                                               .disabled = disabled,
+                                               .required = choice_required != 0,
+                                               .invalid = choice_invalid != 0,
+                                               .skip_tab = choice_skip_tab != 0});
         break;
-    case 2:
-        cui_switch(ui, cui_id_from(ui, "switch"), &t, cui_string("Notifications"), &enabled,
-                   disabled);
+    case 2: {
+        cui_switch_options options = cui_switch_options_default();
+        options.size = (cui_control_size)control_size;
+        options.disabled = disabled;
+        options.label_left = switch_label_left != 0;
+        options.custom_color = switch_custom_color != 0;
+        options.color = (cui_color){180, 74, 44, 255};
+        options.now_seconds = host_seconds;
+        options.reduced_motion = reduced_motion;
+        cui_switch_ex(ui, cui_id_from(ui, "switch"), &t, cui_string("Notifications"), &enabled,
+                      &gallery_switch_state, options);
+        next_wake = gallery_switch_state.next_wake_seconds;
         break;
-    case 3:
-        cui_toggle(ui, cui_id_from(ui, "toggle"), &t, cui_string("Pin this item"), &toggled,
-                   disabled);
+    }
+    case 3: {
+        cui_toggle_options standalone = cui_toggle_options_default();
+        standalone.size = (cui_control_size)control_size;
+        standalone.variant = (cui_toggle_variant)toggle_variant;
+        standalone.disabled = disabled;
+        standalone.focus_ring = true;
+        cui_toggle_ex(ui, cui_id_from(ui, "toggle"), &t, cui_string("Pin this item"), &toggled,
+                      NULL, standalone);
+        cui_toggle_item items[3] = {
+            {.id = cui_id_from(ui, "toggle-bold"), .label = cui_string("Bold")},
+            {.id = cui_id_from(ui, "toggle-italic"), .label = cui_string("Italic")},
+            {.id = cui_id_from(ui, "toggle-underline"), .label = cui_string("Underline")}};
+        cui_toggle_group_style_options group = {.size = (cui_control_size)control_size,
+                                                .variant = (cui_toggle_variant)toggle_variant,
+                                                .disabled = disabled,
+                                                .segmented = toggle_segmented != 0,
+                                                .accessibility_label =
+                                                    cui_string("Formatting options"),
+                                                .on_change = gallery_toggle_group_change,
+                                                .requested_values = toggle_group_requested,
+                                                .requested_capacity = 3};
+        cui_toggle_group_ex(ui, cui_id_from(ui, "toggle-group"), &t, items, toggle_group_values, 3,
+                            group);
         break;
-    case 4:
-        cui_radio(ui, cui_id_from(ui, "radio-a"), &t, cui_string("Standard"), &radio, 0, disabled);
-        cui_radio(ui, cui_id_from(ui, "radio-b"), &t, cui_string("Priority"), &radio, 1, disabled);
+    }
+    case 4: {
+        cui_radio_options options = {.size = (cui_control_size)control_size,
+                                     .disabled = disabled,
+                                     .required = choice_required != 0,
+                                     .invalid = choice_invalid != 0,
+                                     .skip_tab = choice_skip_tab != 0};
+        cui_radio_ex(ui, cui_id_from(ui, "radio-a"), &t, cui_string("Standard"), &radio, 0,
+                     options);
+        cui_radio_ex(ui, cui_id_from(ui, "radio-b"), &t, cui_string("Priority"), &radio, 1,
+                     options);
         break;
+    }
     case 5:
         cui_slider(ui, cui_id_from(ui, "slider"), &t, cui_string("Volume"), &slider, 0, 100, 1,
                    disabled);
@@ -2343,6 +2411,46 @@ int gallery_checkbox_state(int state) {
     if (state >= CUI_CHECK_UNCHECKED && state <= CUI_CHECK_MIXED)
         check_state = (cui_check_state)state;
     return check_state;
+}
+void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
+                             int custom_color, int variant, int segmented, int multiple) {
+    control_size = size;
+    choice_required = required;
+    choice_invalid = invalid;
+    choice_skip_tab = skip_tab;
+    switch_label_left = label_left;
+    switch_custom_color = custom_color;
+    toggle_variant = variant;
+    toggle_segmented = segmented;
+    if (toggle_selection_mode && !multiple) {
+        bool selected = false;
+        for (size_t i = 0; i < 3; i++) {
+            bool retain = toggle_group_values[i] && !selected;
+            toggle_group_values[i] = retain;
+            selected |= retain;
+        }
+    }
+    toggle_selection_mode = multiple;
+}
+double gallery_control_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return gallery_switch_state.position;
+    case 1:
+        return gallery_switch_state.target;
+    case 2:
+        return gallery_switch_state.next_wake_seconds;
+    case 3:
+        return toggle_group_changes;
+    case 4:
+        return toggle_group_values[0];
+    case 5:
+        return toggle_group_values[1];
+    case 6:
+        return toggle_group_values[2];
+    default:
+        return 0;
+    }
 }
 void gallery_image_options(int mode, int fit, int grayscale, int half_opacity) {
     image_mode = mode;

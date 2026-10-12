@@ -15,6 +15,8 @@ All 78 reference catalog entries appear in searchable navigation, with per-featu
 
 Use pointer input or focus the preview and use Tab, Enter/Space and arrow keys. Input routes UTF-8 text into the shared editor model. Disabled, comfortable/compact density, single/multiple selection where supported and theme options rebuild actual CUI draw lists. The site follows the system light/dark preference by default, including later changes; a manual Light, Dark or High contrast choice overrides it until System is selected again. Canvas draws at the browser device pixel ratio; CUI receives logical CSS pixels. Browser fonts are measured and painted with the same system font settings. RGBA8 bitmap commands support source crops, opacity, grayscale, tint, rounded corners and nested clips.
 
+Checkbox and Radio demonstrate four sizes, required and invalid semantics, skipped Tab stops, disabled behavior, and graphical selection marks. Switch demonstrates label placement, a custom active color, spring travel and reduced-motion settling. Toggle includes standalone selection and a three-item toolbar with single or multiple selection, segmented edges, and ghost or outline styling.
+
 Run the meaningful browser checks with pinned Playwright 1.58.0:
 
 ```sh

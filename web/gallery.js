@@ -37,10 +37,10 @@ const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
- Checkbox:'cui_checkbox(ui, id, &theme,\n    cui_string("Receive updates"),\n    &checked, false);',
- Switch:'cui_switch(ui, id, &theme,\n    cui_string("Notifications"),\n    &enabled, false);',
- Toggle:'cui_toggle(ui, id, &theme,\n    cui_string("Pin this item"),\n    &pinned, false);',
- Radio:'cui_radio(ui, id, &theme,\n    cui_string("Priority"),\n    &selection, 1, false);',
+ Checkbox:'cui_checkbox_ex(ui, id, &theme, label, &state,\n    (cui_checkbox_options){.size = CUI_CONTROL_SMALL,\n                           .required = true});',
+ Switch:'cui_switch_ex(ui, id, &theme, label, &enabled,\n    &spring, (cui_switch_options){.now_seconds = now});',
+ Toggle:'cui_toggle_group_ex(ui, group_id, &theme,\n    items, selected, 3, options);',
+ Radio:'cui_radio_ex(ui, id, &theme, label, &selection, 1,\n    (cui_radio_options){.size = CUI_CONTROL_LARGE});',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
  Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.width = 280});',
  Tag:'cui_tag(ui, id, &theme, cui_string("Workspace"), options);\n/* Rich children use cui_begin_tag / cui_end_tag. */',
@@ -121,6 +121,7 @@ function render(){
  wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
  wasm.gallery_image_options(Number($('image-state').value),Number($('image-fit').value),Number($('image-grayscale').checked),Number($('image-opacity').checked));
  wasm.gallery_attachment_options(Number($('attachment-status').value),Number($('attachment-vertical').checked));
+ wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
  wasm.gallery_dropdown_options(...['variant','size','halves','action','anchor'].map(k=>Number($('dropdown-'+k).value)),Number($('dropdown-outline').checked),Number($('dropdown-selected').checked));
  wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
@@ -175,7 +176,7 @@ async function clipboardAction(action){
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 const semanticNodes = new Map();
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log'];
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar'];
 const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
@@ -195,6 +196,8 @@ function syncSemantics(){
   if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{e.stopPropagation();wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
   else el.setAttribute('aria-label',name);
   if(['checkbox','switch','radio','menuitemcheckbox','menuitemradio'].includes(role))el.setAttribute('aria-checked',role==='checkbox'&&f(8)===2?'mixed':String(Boolean(f(6))));
+  if(['checkbox','radio'].includes(role)){el.setAttribute('aria-required',String(Boolean(f(27))));el.setAttribute('aria-invalid',String(Boolean(f(28))));}
+  if(role==='button'&&selected.name==='Toggle')el.setAttribute('aria-pressed',String(Boolean(f(6))));else el.removeAttribute('aria-pressed');
   el.setAttribute('aria-busy',String(Boolean(f(14))));
   if(['listbox','tree','grid'].includes(role))el.setAttribute('aria-multiselectable',String(Boolean(f(15))));
   if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));if(f(31))el.setAttribute('aria-posinset',String(f(31)));if(f(32))el.setAttribute('aria-setsize',String(f(32)));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
@@ -250,6 +253,10 @@ function selectComponent(){
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['message-alignment','message-variant','message-inset','message-avatar-control'])$(id).hidden=selected.name!=='Message';
  $('checkbox-state').hidden=selected.name!=='Checkbox';
+ $('control-size').hidden=!['Checkbox','Radio','Switch','Toggle'].includes(selected.name);
+ for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
+ for(const id of ['switch-side-control','switch-color-control'])$(id).hidden=selected.name!=='Switch';
+ for(const id of ['toggle-variant','toggle-segmented-control','toggle-selection'])$(id).hidden=selected.name!=='Toggle';
  for(const id of ['image-state','image-fit','image-grayscale-control','image-opacity-control'])$(id).hidden=selected.name!=='Image';
  for(const id of ['attachment-status','attachment-vertical-control'])$(id).hidden=selected.name!=='Attachment';
  $('message-scrollbar-control').hidden=selected.name!=='MessageScroller';
@@ -306,6 +313,7 @@ systemDark.addEventListener('change',()=>{if($('theme').value==='3')requestFrame
 $('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog)selectComponent();});
 $('theme').addEventListener('change',syncTheme);
 for(const id of ['image-state','image-fit','image-grayscale','image-opacity','attachment-status','attachment-vertical'])$(id).addEventListener('change',requestFrame);
+for(const id of ['control-size','choice-required','choice-invalid','choice-skip-tab','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);

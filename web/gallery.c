@@ -1421,7 +1421,28 @@ int gallery_init(void) {
     return ui && edit && group_edit && form_name_edit && form_email_edit && dock && query &&
            number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
+static int gallery_last_key_down, gallery_last_key_up;
+static unsigned gallery_key_down_count, gallery_key_up_count;
+int gallery_key_identity(int character) {
+    return character >= 0 && character <= 127 ? (int)cui_key_from_character((char)character) : 0;
+}
+int gallery_key_character(int key) {
+    return (int)cui_key_character((cui_key)key);
+}
+int gallery_key_stats(int field) {
+    return field == 0   ? gallery_last_key_down
+           : field == 1 ? gallery_last_key_up
+           : field == 2 ? (int)gallery_key_down_count
+                        : (int)gallery_key_up_count;
+}
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
+    if (type == CUI_EVENT_KEY_DOWN) {
+        gallery_last_key_down = key;
+        gallery_key_down_count++;
+    } else if (type == CUI_EVENT_KEY_UP) {
+        gallery_last_key_up = key;
+        gallery_key_up_count++;
+    }
     if (ui)
         cui_queue_event(ui, (cui_event){.type = (cui_event_type)type,
                                         .x = x,

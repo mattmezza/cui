@@ -81,6 +81,25 @@ def main():
             page.keyboard.press('Enter')
             page.wait_for_function('cuiGallery.renderedComponent==="Button"&&cuiGallery.exports.gallery_count()>0')
             assert page.locator('#gallery-page').is_visible()
+            key_delivery = page.evaluate('''() => {
+                const e=cuiGallery.exports, canvas=document.querySelector('canvas');
+                const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                const seen=new Set();
+                for(const character of chars){
+                    const expected=e.gallery_key_identity(character.charCodeAt(0));
+                    if(!expected || e.gallery_key_character(expected)!==character.toUpperCase().charCodeAt(0))
+                        throw Error(`bad key identity: ${character}`);
+                    canvas.dispatchEvent(new KeyboardEvent('keydown',{key:character,bubbles:true}));
+                    if(e.gallery_key_stats(0)!==expected)throw Error(`lost keydown: ${character}`);
+                    canvas.dispatchEvent(new KeyboardEvent('keyup',{key:character,bubbles:true}));
+                    if(e.gallery_key_stats(1)!==expected)throw Error(`lost keyup: ${character}`);
+                    seen.add(expected);
+                }
+                if(e.gallery_key_identity('!'.charCodeAt(0))!==0||seen.size!==36)
+                    throw Error('shortcut identity collision or punctuation mapping');
+                return [e.gallery_key_stats(2),e.gallery_key_stats(3),seen.size];
+            }''')
+            assert key_delivery == [62,62,36], key_delivery
             def control_change(control, value):
                 before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
                 page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)

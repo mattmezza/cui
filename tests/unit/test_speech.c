@@ -256,6 +256,31 @@ static cui_draw_list frame(cui_context *ui, fixture *f, cui_speech_button_option
     assert(cui_last_error(ui) == CUI_OK);
     return draw;
 }
+static void waveform_motion(void) {
+    fixture f;
+    init(&f);
+    assert(cui_speech_start(&f.state));
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
+    cui_theme theme = cui_theme_light();
+    for (int reduced = 0; reduced < 2; reduced++) {
+        cui_set_reduced_motion(ui, reduced != 0);
+        for (int frame = 0; frame < 2; frame++) {
+            assert(cui_begin_frame(ui, 200, 100, .016f));
+            assert(
+                cui_speech_waveform(ui, 55, &theme, &f.state, (cui_speech_waveform_options){0}, 1));
+            (void)cui_end_frame(ui);
+        }
+        assert(cui_needs_redraw(ui) == (reduced == 0));
+    }
+    cui_set_reduced_motion(ui, false);
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    assert(cui_speech_waveform(ui, 55, &theme, &f.state,
+                               (cui_speech_waveform_options){.reduced_motion = true}, 1));
+    (void)cui_end_frame(ui);
+    assert(!cui_needs_redraw(ui));
+    cui_destroy(ui);
+    cui_speech_dispose(&f.state);
+}
 static void styled(void) {
     fixture f;
     init(&f);
@@ -320,6 +345,7 @@ int main(void) {
     waveform_geometry();
 #ifndef CUI_SPEECH_BASE_ONLY
     styled();
+    waveform_motion();
 #endif
     return 0;
 }

@@ -492,6 +492,26 @@ static void test_scope_dismissal(void) {
     cui_destroy(ui);
 }
 
+static void test_invalid_portal_at_depth_limit(void) {
+    cui_context *ui = cui_create(
+        (cui_config){.width = 200, .height = 200, .max_elements = 512, .max_commands = 1024});
+    assert(ui && cui_begin_frame(ui, 200, 200, .016f));
+    for (cui_id id = 1; id <= 256; id++)
+        cui_begin_box(ui, id, (cui_box){.width = 200, .height = 200});
+    cui_begin_portal(ui, 300, (cui_box){0}, (cui_rect){0, 0, -1, 10}, 1);
+    cui_end_box(ui);
+    cui_text(ui, cui_string("retained parent"), 12, (cui_color){255, 255, 255, 255});
+    for (size_t i = 0; i < 256; i++)
+        cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    bool retained = false;
+    for (size_t i = 0; i < list.count; i++)
+        if (list.commands[i].type == CUI_DRAW_TEXT && list.commands[i].text.length == 15)
+            retained = true;
+    assert(retained && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_input();
     test_strings_and_draw();
@@ -501,6 +521,7 @@ int main(void) {
     test_creation_overflow();
     test_focus_scopes();
     test_portals();
+    test_invalid_portal_at_depth_limit();
     test_scope_dismissal();
     test_semantic_details_and_roving();
     puts("core tests passed");

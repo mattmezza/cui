@@ -5723,8 +5723,11 @@ void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, 
     if (!isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
         bounds.w < 0 || bounds.h < 0 || layer <= 0) {
         /* Preserve the begin/end stack contract while suppressing malformed content. */
+        if (!cui_core_active(ui))
+            return;
+        size_t previous_depth = ui->depth;
         cui_begin_box(ui, id, (cui_box){0});
-        if (ui && ui->depth && ui->opened[ui->depth - 1]) {
+        if (!ui->overflow_depth && ui->depth > previous_depth && ui->opened[ui->depth - 1]) {
             Clay__CloseElement();
             ui->opened[ui->depth - 1] = false;
         }

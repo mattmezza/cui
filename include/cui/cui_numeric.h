@@ -90,6 +90,8 @@ typedef struct {
  */
 bool cui_base_stepper(cui_context *, cui_id, const cui_step *, size_t count, size_t *current,
                       bool disabled);
+/* The selected index determines the visible Current step. Other items retain explicit
+ * complete/error statuses; an inactive ACTIVE status is painted as Pending. */
 bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_step *steps,
                  size_t count, size_t *current, bool vertical, bool disabled);
 #ifdef __cplusplus

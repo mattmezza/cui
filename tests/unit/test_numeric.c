@@ -482,6 +482,37 @@ static void number_sizes_and_icons(void) {
 }
 #endif
 #ifndef CUI_NUMERIC_BASE_ONLY
+static void stepper_visible_selection(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    cui_theme theme = cui_theme_light();
+    size_t selected = 0;
+    const cui_step steps[] = {{.title = cui_string("Details"), .status = CUI_STEP_COMPLETE},
+                              {.title = cui_string("Review"), .status = CUI_STEP_ACTIVE},
+                              {.title = cui_string("Finish"), .status = CUI_STEP_PENDING}};
+    assert(ui);
+    for (size_t frame = 0; frame < 3; frame++) {
+        if (frame)
+            click(ui, cui_bounds(ui, named(ui, frame == 1 ? "Finish" : "Details")), .5f);
+        assert(cui_begin_frame(ui, 600, 400, .016f));
+        cui_stepper(ui, 103, &theme, steps, 3, &selected, false, false);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(selected == (frame == 1 ? 2 : 0));
+        cui_rect active = cui_bounds(ui, named(ui, frame == 1 ? "Finish" : "Details"));
+        unsigned current_labels = 0;
+        for (size_t i = 0; i < list.count; i++) {
+            const cui_draw_command *command = &list.commands[i];
+            if (command->type == CUI_DRAW_TEXT && command->text.length == 7 &&
+                !memcmp(command->text.data, "Current", 7)) {
+                current_labels++;
+                assert(command->bounds.x >= active.x && command->bounds.x < active.x + active.w);
+            }
+        }
+        assert(current_labels == 1);
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
+
 static void rating_star_graphics(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     cui_theme theme = cui_theme_light();
@@ -516,6 +547,7 @@ int main(void) {
 #ifndef CUI_NUMERIC_BASE_ONLY
     number_sizes_and_icons();
     rating_star_graphics();
+    stepper_visible_selection();
 #endif
     decimal_locale();
     models();

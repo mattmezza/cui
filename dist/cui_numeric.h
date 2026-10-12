@@ -91,6 +91,8 @@ typedef struct {
  */
 bool cui_base_stepper(cui_context *, cui_id, const cui_step *, size_t count, size_t *current,
                       bool disabled);
+/* The selected index determines the visible Current step. Other items retain explicit
+ * complete/error statuses; an inactive ACTIVE status is painted as Pending. */
 bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_step *steps,
                  size_t count, size_t *current, bool vertical, bool disabled);
 #ifdef __cplusplus
@@ -904,13 +906,17 @@ bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *t, const cui_step 
     bool changed = cui_base_stepper(ui, id, steps, count, current, disabled);
     cui_begin_box(ui, id, (cui_box){.row = !vertical, .gap = t->gap});
     for (size_t i = 0; i < count; ++i) {
-        const char *status = steps[i].status == CUI_STEP_ERROR      ? "Error"
+        bool selected = i == *current;
+        const char *status = selected                               ? "Current"
+                             : steps[i].status == CUI_STEP_ERROR    ? "Error"
                              : steps[i].status == CUI_STEP_COMPLETE ? "Complete"
-                             : steps[i].status == CUI_STEP_ACTIVE   ? "Current"
                                                                     : "Pending";
         cui_begin_box(ui, cui_numeric_part_id(id, 100 + (unsigned)i), (cui_box){.gap = t->gap});
-        cui_numeric_paint_button(ui, cui_numeric_part_id(id, 1 + (unsigned)i), t, steps[i].title,
-                                 disabled || steps[i].disabled);
+        cui_button_paint(
+            ui, cui_numeric_part_id(id, 1 + (unsigned)i), t, steps[i].title,
+            (cui_button_options){.variant = selected ? CUI_BUTTON_PRIMARY : CUI_BUTTON_OUTLINE,
+                                 .disabled = disabled || steps[i].disabled,
+                                 .selected = selected});
         cui_text(ui, cui_string(status), t->font_size * .8f,
                  steps[i].status == CUI_STEP_ERROR ? t->danger : t->muted);
         if (steps[i].description.length)

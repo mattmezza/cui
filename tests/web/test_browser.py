@@ -1944,6 +1944,25 @@ def main():
                 page.keyboard.press('Tab')
                 page.keyboard.press(key)
                 page.wait_for_function('(expected)=>cuiGallery.exports.gallery_semantic(0,8)===expected', arg=expected)
+            page.evaluate('location.hash="Stepper"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Stepper"')
+            page.wait_for_timeout(80)
+            for step_name, selected in [('Finish', 2), ('Details', 0)]:
+                bounds = page.evaluate('''(name)=>{const e=cuiGallery.exports;
+                    const i=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>
+                        new TextDecoder().decode(new Uint8Array(e.memory.buffer,
+                            e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
+                    return [1,2,3,4].map(f=>e.gallery_semantic(i,f));}''', step_name)
+                box = canvas.bounding_box()
+                page.mouse.click(box['x']+bounds[0]+bounds[2]/2, box['y']+bounds[1]+bounds[3]/2)
+                page.wait_for_function('(index)=>cuiGallery.exports.gallery_semantic(0,8)===index', arg=selected)
+                current = page.evaluate('''()=>{const e=cuiGallery.exports;
+                    return Array.from({length:e.gallery_count()},(_,i)=>i).filter(i=>
+                        e.gallery_command(i,0)===2 && new TextDecoder().decode(new Uint8Array(
+                            e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Current')
+                        .map(i=>[1,2,3,4].map(f=>e.gallery_command(i,f)));}''')
+                assert len(current) == 1
+                assert bounds[1] < current[0][1] < bounds[1] + bounds[3] + 40
             page.evaluate('location.hash="Combobox"')
             page.wait_for_function('document.querySelector("#name").textContent==="Combobox" && cuiGallery.renderedComponent==="Combobox"')
             page.wait_for_timeout(80)

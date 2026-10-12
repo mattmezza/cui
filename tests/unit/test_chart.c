@@ -1007,10 +1007,25 @@ int main(void) {
     assert(state.hovered == 1 && state.emphasis_focus == 1);
     bool hover_band = false;
     for (size_t i = 0; i < draw.count; i++)
-        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.h == 32 &&
-            draw.commands[i].color.a > 0 && draw.commands[i].color.a <= 25)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.y == 0 &&
+            draw.commands[i].bounds.h == 38 && draw.commands[i].color.a > 0 &&
+            draw.commands[i].color.a <= 25)
             hover_band = true;
     assert(hover_band);
+    options.bar_alignment = CUI_CHART_BAR_TOP;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 1;
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool top_hover_band = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.y == 10 &&
+            draw.commands[i].bounds.h == 38 && draw.commands[i].color.a > 0 &&
+            draw.commands[i].color.a <= 25)
+            top_hover_band = true;
+    assert(top_hover_band);
+    options.bar_alignment = CUI_CHART_BAR_BOTTOM;
     options.reduced_motion = false;
     float old_band_center = state.emphasis_center;
     assert(cui_chart_bar_bounds(&options, 0, &hovered_bar) == CUI_PLOT_OK);

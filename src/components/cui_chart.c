@@ -405,9 +405,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float band_x = horizontal ? 24 * w / o->width
                                       : state->emphasis_center * w / o->width - thickness / 2;
             float band_y = horizontal ? state->emphasis_center * h / o->height - thickness / 2
-                                      : 12 * h / o->height;
+                           : o->bar_alignment == CUI_CHART_BAR_TOP && !o->hide_x_axis
+                               ? 20 * h / o->height
+                               : 0;
             float band_w = horizontal ? (o->width - 36) * w / o->width : thickness;
-            float band_h = horizontal ? thickness : (o->height - 32) * h / o->height;
+            float band_h = horizontal ? thickness : h - (o->hide_x_axis ? 0 : 20 * h / o->height);
             cui_color band = o->foreground.a ? o->foreground : (cui_color){32, 32, 32, 255};
             band.a = (unsigned char)lroundf(band.a * .08f * state->emphasis_focus);
             if (band.a && band_w > 0 && band_h > 0) {

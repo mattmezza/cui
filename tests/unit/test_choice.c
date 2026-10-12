@@ -924,6 +924,74 @@ static void test_scroll_activation_order(void) {
     }
 }
 
+static unsigned tab_prefix_count, tab_suffix_count;
+static void tab_prefix(cui_context *ui, void *user) {
+    assert(user == &tab_prefix_count);
+    tab_prefix_count++;
+    cui_theme theme = cui_theme_light();
+    cui_button(ui, 700, &theme, cui_string("Before tabs"), false);
+}
+static void tab_suffix(cui_context *ui, void *user) {
+    assert(user == &tab_prefix_count);
+    tab_suffix_count++;
+    cui_theme theme = cui_theme_light();
+    cui_button(ui, 701, &theme, cui_string("After tabs"), false);
+}
+static bool custom_tabs_scene(cui_context *ui, cui_id *value, cui_tab_variant variant,
+                              const cui_theme *theme) {
+    choice_rendered = 0;
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    bool changed = cui_tabs(ui, 1, theme, items, 3, value,
+                            (cui_tabs_options){.variant = variant,
+                                               .render = custom_choice_row,
+                                               .render_user = &choice_rendered,
+                                               .prefix = tab_prefix,
+                                               .suffix = tab_suffix,
+                                               .content_user = &tab_prefix_count},
+                            panel, NULL);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && choice_rendered == 3);
+    return changed;
+}
+static void test_custom_tabs(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t t = 0; t < 4; t++) {
+        for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            assert(ui);
+            cui_id value = 10;
+            tab_prefix_count = tab_suffix_count = 0;
+            custom_tabs_scene(ui, &value, variant, &themes[t]);
+            assert(tab_prefix_count == 1 && tab_suffix_count == 1 && visible == 0);
+            cui_rect prefix = cui_bounds(ui, 700), first = cui_bounds(ui, 10),
+                     last = cui_bounds(ui, 30), suffix = cui_bounds(ui, 701);
+            assert(prefix.x + prefix.w <= first.x && last.x + last.w <= suffix.x);
+            size_t count = 0;
+            const cui_semantic *semantics = cui_semantics(ui, &count);
+            bool named = false, disabled = false;
+            for (size_t i = 0; i < count; i++) {
+                if (semantics[i].id == 10)
+                    named = semantics[i].role == CUI_ROLE_TAB && semantics[i].name.length == 5 &&
+                            semantics[i].details.selected;
+                if (semantics[i].id == 20)
+                    disabled = semantics[i].disabled;
+            }
+            assert(named && disabled);
+            click(ui, 700);
+            assert(!custom_tabs_scene(ui, &value, variant, &themes[t]) && value == 10);
+            click(ui, 701);
+            assert(!custom_tabs_scene(ui, &value, variant, &themes[t]) && value == 10);
+            cui_focus(ui, 10);
+            key(ui, CUI_KEY_RIGHT);
+            key(ui, CUI_KEY_ENTER);
+            assert(custom_tabs_scene(ui, &value, variant, &themes[t]) && value == 30 &&
+                   visible == 2);
+            cui_destroy(ui);
+        }
+    }
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -1005,6 +1073,7 @@ int main(void) {
     test_choice_scrolling();
     test_list_scroll_modal_guard();
     test_scroll_activation_order();
+    test_custom_tabs();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

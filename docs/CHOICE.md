@@ -26,7 +26,13 @@ Home/End, disabled-item skipping, click/Enter/released Space selection and autom
 or manual activation. Manual mode moves focus using arrows and requires activation
 to select a panel. Default, underline, pill, outline and segmented styles derive
 colors and metrics from the supplied theme. The underline variant draws a bottom
-line independently of the focus outline.
+line independently of the focus outline. `options.render` paints a custom body
+for each tab, retaining its accessible label and interaction. It can compose icons
+and content within the theme's control height. `prefix` and `suffix` callbacks add
+application controls before and after the tab list in its orientation. Those
+controls retain their own IDs and behavior and do not select a tab automatically.
+Headless tests exercise custom bodies and both controls in all five variants and
+all four themes, including disabled semantics and ordered keyboard selection.
 
 ToggleGroup accepts a caller-owned boolean per item. Options choose single or
 multiple selection, whether the final selected item can be cleared, orientation,
@@ -51,7 +57,7 @@ Labels are frame-copied by the core, and callbacks must not retain draw-list str
 orientation, wrapping, disabled controls, ID-stable reorder, invalid selection,
 toggle selection rules, and all five tab variants in all four themes. This is a
 portable C11 vertical slice. GPUI Kit's overflow menu, drag reordering, close
-buttons, maximum label width/ellipsis, icon/custom child tabs, prefix/suffix hooks,
+buttons and maximum label width/ellipsis,
 and gallery stories remain pending. Composing those controls beside this tab list
 is possible, but is not claimed as equivalent built-in support. Full family parity
 is not yet verified.

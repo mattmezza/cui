@@ -2,8 +2,9 @@
 #include "cui/cui_choice.h"
 #include "cui/cui_base.h"
 #include <math.h>
-static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
-                            bool selected, bool disabled, cui_tab_variant variant) {
+static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
+                               bool selected, bool disabled, cui_tab_variant variant,
+                               cui_choice_render_fn render, size_t index, void *render_user) {
     cui_box box = {.height = theme->control_height,
                    .padding = theme->padding,
                    .radius = theme->radius,
@@ -34,11 +35,14 @@ static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const 
         cui_begin_box(ui, 0,
                       (cui_box){.height = theme->control_height > 2 ? theme->control_height - 2 : 0,
                                 .padding = theme->padding});
-    cui_text(ui, item->label, theme->font_size,
-             disabled ? theme->muted
-             : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
-                 ? theme->on_primary
-                 : theme->text);
+    if (render)
+        render(ui, item, index, render_user);
+    else
+        cui_text(ui, item->label, theme->font_size,
+                 disabled ? theme->muted
+                 : selected && variant != CUI_TAB_UNDERLINE && variant != CUI_TAB_OUTLINE
+                     ? theme->on_primary
+                     : theme->text);
     if (variant == CUI_TAB_UNDERLINE) {
         cui_end_box(ui);
         cui_begin_box(ui, 0,
@@ -48,6 +52,10 @@ static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const 
         cui_end_box(ui);
     }
     cui_end_box(ui);
+}
+static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
+                            bool selected, bool disabled, cui_tab_variant variant) {
+    cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL);
 }
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
@@ -64,10 +72,13 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                                                : CUI_ORIENTATION_HORIZONTAL});
     cui_begin_box(ui, container ^ UINT64_C(0xcda0312561f50cab),
                   (cui_box){.row = !options.vertical, .gap = theme->gap});
+    if (options.prefix)
+        options.prefix(ui, options.content_user);
     size_t active = count;
     for (size_t i = 0; i < count; ++i) {
-        cui_choice_draw(ui, &items[i], theme, items[i].id == *selected,
-                        options.disabled || items[i].disabled, options.variant);
+        cui_choice_draw_ex(ui, &items[i], theme, items[i].id == *selected,
+                           options.disabled || items[i].disabled, options.variant, options.render,
+                           i, options.render_user);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.selected = items[i].id == *selected,
@@ -76,6 +87,8 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         if (items[i].id == *selected && !items[i].disabled)
             active = i;
     }
+    if (options.suffix)
+        options.suffix(ui, options.content_user);
     cui_end_box(ui);
     if (active != count && panel) {
         cui_id panel_id = items[active].id ^ UINT64_C(0x691a17db80e22f45);

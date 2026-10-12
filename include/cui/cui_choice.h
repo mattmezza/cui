@@ -14,6 +14,11 @@ typedef struct {
     cui_str label;
     bool disabled;
 } cui_choice_item;
+/* Styled row body; semantic name/disabled/selection remain supplied by item.
+ * index is relative to the displayed array, including filtered Combobox arrays. */
+typedef void (*cui_choice_render_fn)(cui_context *, const cui_choice_item *, size_t index,
+                                     void *user);
+typedef void (*cui_choice_content_fn)(cui_context *, void *user);
 typedef enum {
     CUI_TAB_DEFAULT,
     CUI_TAB_UNDERLINE,
@@ -24,6 +29,10 @@ typedef enum {
 typedef struct {
     bool vertical, disabled, manual_activation;
     cui_tab_variant variant;
+    cui_choice_render_fn render; /* optional tab body, preserving the label semantics */
+    void *render_user;
+    cui_choice_content_fn prefix, suffix;
+    void *content_user;
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -51,10 +60,6 @@ typedef struct {
     float scroll_remainder; /* fractional wheel rows carried across frames */
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
-/* Styled row body; semantic name/disabled/selection remain supplied by item.
- * index is relative to the displayed array, including filtered Combobox arrays. */
-typedef void (*cui_choice_render_fn)(cui_context *, const cui_choice_item *, size_t index,
-                                     void *user);
 typedef struct {
     bool disabled, menu;
     float dt;

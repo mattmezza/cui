@@ -70,32 +70,57 @@
       "name": "AlertDialog",
       "reference_url": "https://gpui-kit.com/component/alert-dialog/",
       "category": "fundamentals",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "application-owned open state and persistent decision result",
+        "ordered activation/dismissal policy reduction",
+        "modal focus isolation and trigger restoration"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_surface.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_surface.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "modal focus trap and restore",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         },
         {
           "name": "confirm/cancel actions",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         },
         {
           "name": "dismissal policies and semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
+        },
+        {
+          "name": "composed themed body, title and copied description",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -128,7 +153,11 @@
           "Best Practices",
           "Related Components"
         ]
-      }
+      },
+      "last_tested_commit": "675c0b0ecf5f5eae6946055317235a97afffeadc",
+      "evidence": [
+        "Native styled and independent base-only surface tests; this does not prove full family parity."
+      ]
     },
     {
       "name": "Alert",
@@ -2531,8 +2560,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Editable UTF-8 query, ASCII filtering, single/multiple selection, removable protected chips, filtered masks preserving hidden selections, ordered activations and popup dismissal tested. Remote data, Unicode case folding and fully interleaved text/activation reduction remain pending.",
-        "Same-frame wheel+Enter and text+activation event ordering are still being completed; no full interaction parity claim."
+        "Editable UTF-8 query with measured caret, selection, pointer placement and horizontal scrolling; ASCII filtering; single/multiple selection; protected removable chips; and ordered text/activation/wheel commits are tested. Remote data, Unicode case folding, rich IME/grapheme editing and complete upstream behavior remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2568,6 +2596,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "same-frame text/Enter and wheel/Enter event ordering",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-surfaces-choice.txt"
           ]
         }
       ],
@@ -3641,32 +3677,54 @@
       "name": "Dialog",
       "reference_url": "https://gpui-kit.com/component/dialog/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "application-owned open state and persistent decision result",
+        "ordered activation/dismissal policy reduction",
+        "modal focus isolation and trigger restoration"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_surface.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_surface.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "modal overlay/dismissal",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         },
         {
           "name": "focus trap/restore",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         },
         {
           "name": "title/description/action slots",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "composed themed body, title and copied description",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3706,7 +3764,11 @@
           "Content Builder Function",
           "Best Practices"
         ]
-      }
+      },
+      "last_tested_commit": "675c0b0ecf5f5eae6946055317235a97afffeadc",
+      "evidence": [
+        "Native styled and independent base-only surface tests; this does not prove full family parity."
+      ]
     },
     {
       "name": "Dock",
@@ -3950,13 +4012,18 @@
       "name": "Popover",
       "reference_url": "https://gpui-kit.com/component/popover/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": "include/cui/cui_overlay.h",
+      "base_behavior": [
+        "application-owned open state and persistent decision result",
+        "ordered activation/dismissal policy reduction",
+        "modal focus isolation and trigger restoration"
+      ],
+      "public_header": "include/cui/cui_surface.h",
       "sample": null,
       "tests": [
         "tests/unit/test_overlay.c",
         "tests/unit/test_core.c",
-        "tests/unit/test_base.c"
+        "tests/unit/test_base.c",
+        "tests/unit/test_surface.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3964,7 +4031,8 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Base collision placement and popup dismissal reducer only. No styled portal/anchor UI or semantic relationship."
+        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.",
+        "Current side-based flip/clamp differs from upstream anchor-only clamp. Complete anchor/offset/arrow, right-click trigger and accessible trigger relationships are pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3976,13 +4044,24 @@
         },
         {
           "name": "controlled open/dismissal",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         },
         {
           "name": "focus and accessible relationship",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "composed themed body, title and copied description",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4003,9 +4082,9 @@
           "Custom Trigger"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "675c0b0ecf5f5eae6946055317235a97afffeadc",
       "evidence": [
-        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+        "Native styled and independent base-only surface tests; this does not prove full family parity."
       ]
     },
     {
@@ -4110,9 +4189,10 @@
       "category": "layout",
       "base_behavior": [],
       "public_header": "include/cui/cui_scroll.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_scroll.c"
+        "tests/unit/test_scroll.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
@@ -4262,16 +4342,25 @@
       "name": "Sheet",
       "reference_url": "https://gpui-kit.com/component/sheet/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "application-owned open state and persistent decision result",
+        "ordered activation/dismissal policy reduction",
+        "modal focus isolation and trigger restoration"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_surface.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_surface.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.",
+        "Sheet edge resizing and animated/reduced-motion transitions are pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -4281,13 +4370,24 @@
         },
         {
           "name": "focus trap/restore/dismissal",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         },
         {
           "name": "theme/reduced motion",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "four edge placement and themed header close",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surfaces.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4320,7 +4420,11 @@
           "Help Panel",
           "Best Practices"
         ]
-      }
+      },
+      "last_tested_commit": "675c0b0ecf5f5eae6946055317235a97afffeadc",
+      "evidence": [
+        "Native styled and independent base-only surface tests; this does not prove full family parity."
+      ]
     },
     {
       "name": "Sidebar",
@@ -4981,16 +5085,17 @@
       "category": "advanced",
       "base_behavior": [],
       "public_header": "include/cui/cui_table.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_table.c"
+        "tests/unit/test_table.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Actual keyed rows/columns, controlled sort and selection, pointer/keyboard resize/reorder, frozen headers, row/column virtualization, stable context requests and load-range signaling tested. Pinned columns, multiple selection, remote data adapters and complete upstream behavior remain pending."
+        "Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling and loading/empty composition tested. Group headers, row/trailing customization, remote adapters and complete upstream behavior remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5138,16 +5243,17 @@
       "category": "advanced",
       "base_behavior": [],
       "public_header": "include/cui/cui_table.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_table.c"
+        "tests/unit/test_table.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Real themed semantic table/row/cell composition and associated data-table behavior tested. Section/caption/span primitives, exhaustive sizing and complete upstream composition remain pending."
+        "Real themed rows/cells, static header/body/footer sections, captions and validated spans plus associated data-table behavior tested. Exhaustive alignment/sizing/style composition and complete upstream scope remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

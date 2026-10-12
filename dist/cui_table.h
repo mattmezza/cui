@@ -1067,7 +1067,8 @@ void cui_table_submit_body_root(cui_context *ui, cui_id id, cui_table_model *m, 
     if (!ui || !m || !s)
         return;
     cui_id body = cui_table_body_id(id);
-    cui_interact(ui, body, CUI_ROLE_GROUP, cui_string("Rows"), o.disabled || o.loading, false, 0);
+    cui_interact(ui, body, CUI_ROLE_ROWGROUP, cui_string("Rows"), o.disabled || o.loading, false,
+                 0);
     cui_set_tab_stop(ui, body, false);
     cui_table_view allrows = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), 0);
     cui_table_view allcols = cui_table_column_viewport(m, s->scroll_x, viewport_width(o), 0);
@@ -1100,7 +1101,7 @@ void cui_table_submit_row(cui_context *ui, cui_id id, cui_table_model *m, cui_ta
                                            cui_table_is_selected(s, o, m->rows[r].key, 0)});
     if (o.row_header) {
         cui_id header = cui_table_row_header_id(id, m->rows[r].key);
-        cui_interact(ui, header, CUI_ROLE_BUTTON,
+        cui_interact(ui, header, CUI_ROLE_ROWHEADER,
                      m->rows[r].label.length ? m->rows[r].label : cui_string("Select row"),
                      o.disabled || m->rows[r].disabled, false, (float)r + 1);
         cui_set_tab_stop(ui, header, false);
@@ -1237,7 +1238,7 @@ void cui_table_begin_section(cui_context *ui, cui_id id, const cui_theme *t,
                              cui_table_section section) {
     if (!ui || !t)
         return;
-    cui_interact(ui, id, CUI_ROLE_GROUP,
+    cui_interact(ui, id, CUI_ROLE_ROWGROUP,
                  cui_string(section == CUI_TABLE_SECTION_HEADER   ? "Table header"
                             : section == CUI_TABLE_SECTION_FOOTER ? "Table footer"
                                                                   : "Table body"),

@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `6657425da5342f14664e945c133ffdcef13d03bd`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `ef2464225a800f8192d10fdff78cbb291dabc4ec`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -12,21 +12,22 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 
 | Status | Families |
 |---|---:|
-| not_started | 22 |
+| not_started | 21 |
 | scaffolded | 0 |
 | implemented | 4 |
-| tested | 52 |
+| tested | 53 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-Native GCC47/47, ASan/UBSan45/45, WASI38/38 and Chromium56 real WASM stories passed for Tag/Marker, OTP, configurable button palettes, animated disclosures and same-frame InputGroup focus routing. WASI Choice exhausted its former instruction budget; the identical module and full rerun pass with a finite30-billion budget, with the initial failure preserved. Source daf43b9 passed six framework CI jobs but Pages failed the InputGroup focus race; core routing and a held-frame browser regression now address it. Published afca033 still has51 stories pending a successful new deployment. All78 entries remain; full parity is unfinished.
+Integrated Notification, perceptual Marker shimmer, independent popover tokens, container focus, dominant-axis wheel routing and configurable Disclosure/Dropdown behavior passed native47/47, ASan/UBSan45/45, WASI38/38 and Chromium57 live-story gates. Public source0e61b2f has56 stories with six CI jobs and Pages successful; direct HTTPS OTP/Tag/Marker validation passed. This57-story checkpoint awaits deployment. All78 entries remain; full parity is unfinished.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
 - [asan-56.txt](validation/asan-56.txt)
+- [asan-57.txt](validation/asan-57.txt)
 - [asan-form.txt](validation/asan-form.txt)
 - [asan-measurement-input-group.txt](validation/asan-measurement-input-group.txt)
 - [asan-otp.txt](validation/asan-otp.txt)
@@ -41,11 +42,13 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [browser-51.txt](validation/browser-51.txt)
 - [browser-53-integrated.txt](validation/browser-53-integrated.txt)
 - [browser-56-integrated.txt](validation/browser-56-integrated.txt)
+- [browser-57-integrated.txt](validation/browser-57-integrated.txt)
 - [browser-pre-surfaces.txt](validation/browser-pre-surfaces.txt)
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
 - [clang-zig-headless.txt](validation/clang-zig-headless.txt)
 - [deployed-42.txt](validation/deployed-42.txt)
 - [gcc-56.txt](validation/gcc-56.txt)
+- [gcc-57.txt](validation/gcc-57.txt)
 - [gcc-button-intents.txt](validation/gcc-button-intents.txt)
 - [gcc-choice-wheel.txt](validation/gcc-choice-wheel.txt)
 - [gcc-clip-lifecycle.txt](validation/gcc-clip-lifecycle.txt)
@@ -85,6 +88,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [gcc-wheel.txt](validation/gcc-wheel.txt)
 - [gcc-xorg.txt](validation/gcc-xorg.txt)
 - [pages-daf43b9-failure.txt](validation/pages-daf43b9-failure.txt)
+- [published-0e61b2f.txt](validation/published-0e61b2f.txt)
 - [release-headless.txt](validation/release-headless.txt)
 - [release-resumed.txt](validation/release-resumed.txt)
 - [sanitizers-input-tree.txt](validation/sanitizers-input-tree.txt)
@@ -95,6 +99,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [sokol-asan-xorg.txt](validation/sokol-asan-xorg.txt)
 - [wasi-56-fuel-limit.txt](validation/wasi-56-fuel-limit.txt)
 - [wasi-56.txt](validation/wasi-56.txt)
+- [wasi-57.txt](validation/wasi-57.txt)
 - [wasi-form.txt](validation/wasi-form.txt)
 - [wasi-initial.txt](validation/wasi-initial.txt)
 - [wasi-input-tree.txt](validation/wasi-input-tree.txt)
@@ -157,7 +162,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 
 | Family | Current partial status | Remaining work |
 |---|---|---|
-| Accordion | tested | Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Theme spring configuration and complete inherited styling audit remain pending. |
+| Accordion | tested | Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending. |
 | AlertDialog | tested | Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending. |
 | Alert | tested | Severity text, title/message, banner sizing and controlled dismissal tested. Independent success/warning theme colors, rich content/action slots and native accessibility announcement pending. |
 | Attachment | not_started | Full documented behavior pending implementation and audit. |
@@ -167,7 +172,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Button | tested | Nine variants, four sizes, colored outlines, controlled selected/loading/disabled states, text adornments and presentation slots tested. Selected styling stays distinct from toggle semantics. SVG icons, explicit independent toggle metadata, per-component token overrides, full reference interactions and native accessibility bridge remain pending. |
 | Checkbox | tested | Binary and mixed base state tested; styled mixed state, real check geometry and validation states pending. |
 | Clipboard | tested | SDL native/dummy roundtrip and optional capability adapter tested; core input paste/cut integration pending. |
-| Collapsible | tested | Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Theme spring configuration and complete inherited styling audit remain pending. |
+| Collapsible | tested | Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending. |
 | DropdownButton | tested | Split actions, optional halves, tooltip, inner style inheritance, shared ghost state, corner anchors, joined geometry and eight semantic variants/four sizes tested. Remaining inherited Button style/metadata surface is under reference audit. |
 | Empty | tested | Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending. |
 | Focus Trap | tested | Core nested modal scopes and overlay state tested. No OS accessibility bridge or full modal relationship semantics. |
@@ -177,10 +182,10 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Image | not_started | Full documented behavior pending implementation and audit. |
 | Kbd | tested | Platform modifier formatting and styled UTF-8-safe hint tested. Action/keybinding lookup and grouped shortcut composition pending. |
 | Label | implemented | Text wrapper renders, but control association and standalone semantic labeling pending. |
-| Marker | tested | Text wrapping, inherited font styling, arbitrary separator styling and the default Oklab highlight blend remain incomplete. Custom child widths/layout and exact highlight colors are application supplied. |
+| Marker | tested | Text wrapping, inherited font styling and arbitrary separator styling remain incomplete. Custom child widths/layout are application supplied. Default shimmer now uses alpha-aware Oklab and the source lightness fallback. |
 | Message | not_started | Full documented behavior pending implementation and audit. |
 | MessageScroller | not_started | Full documented behavior pending implementation and audit. |
-| Notification | not_started | Full documented behavior pending implementation and audit. |
+| Notification | tested | Native OS delivery adapters remain absent; portable host callbacks are opt-in. Shadows approximate blur with bounded rounded layers; intent icons are text symbols and title font weight is not independently styled. Custom content and action descriptors remain borrowed through lifecycle callbacks. |
 | Pagination | tested | Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. Responsive wrapping, configurable label slots and arbitrary page budgets pending. |
 | Progress | implemented | Determinate bar renders/clamps. Indeterminate motion, semantic values and dedicated story tests pending. |
 | Radio | tested | Selection/exclusivity tested; full radio-group roving focus and arrow navigation pending. |
@@ -223,7 +228,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Sheet | tested | Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending. |
 | Sidebar | not_started | Full documented behavior pending implementation and audit. |
 | StatusBar | not_started | Full documented behavior pending implementation and audit. |
-| Tabs | tested | Stable-ID selection, keyboard navigation, five variants, custom slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom-body width constraints, structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source. |
+| Tabs | tested | Stable-ID selection, keyboard navigation, five variants, custom body slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom body width caps preserve short content and clip oversized bodies from the first frame. Structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source. |
 | Theme | tested | Four runtime token structs tested; system integration, comprehensive tokens and reduced motion pending. |
 | TitleBar | not_started | Full documented behavior pending implementation and audit. |
 | Toolbar | not_started | Full documented behavior pending implementation and audit. |

@@ -129,8 +129,7 @@ platform, renderer, or default-theme implementation is required by the base.
 Renderer limits remain explicit: shadows are two bounded eight-layer rounded
 rect approximations of the reference blur/spread/offset, intent icons use portable
 text symbols and title font weight uses the current core font. Custom content can supply more
-specific icons/typography. Core text wrapping refinements
-mixing remain limitations described above; this does not establish full native
+specific icons/typography. Core text wrapping refinements remain limitations described above; this does not establish full native
 platform or renderer parity.
 
 Notification cards consume independent `theme.popover` and `theme.radius_lg` tokens for card fill, corners and shadow shape. Marker default highlight now uses the frozen perceptual blend and lightness fallback; exact custom highlight remains supported.

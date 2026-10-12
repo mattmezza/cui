@@ -1,36 +1,36 @@
 {
-  "source": "6657425",
-  "published_source": "afca0334247cb18f66c25a869f32f63b4ab82ab3",
+  "source": "ef24642",
+  "published_source": "0e61b2f9f508c38e28b323a47ccbd9481da85208",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Native GCC47/47, ASan/UBSan45/45, WASI38/38 and Chromium56 real WASM stories passed for Tag/Marker, OTP, configurable button palettes, animated disclosures and same-frame InputGroup focus routing. WASI Choice exhausted its former instruction budget; the identical module and full rerun pass with a finite30-billion budget, with the initial failure preserved. Source daf43b9 passed six framework CI jobs but Pages failed the InputGroup focus race; core routing and a held-frame browser regression now address it. Published afca033 still has51 stories pending a successful new deployment. All78 entries remain; full parity is unfinished.",
+  "summary": "Integrated Notification, perceptual Marker shimmer, independent popover tokens, container focus, dominant-axis wheel routing and configurable Disclosure/Dropdown behavior passed native47/47, ASan/UBSan45/45, WASI38/38 and Chromium57 live-story gates. Public source0e61b2f has56 stories with six CI jobs and Pages successful; direct HTTPS OTP/Tag/Marker validation passed. This57-story checkpoint awaits deployment. All78 entries remain; full parity is unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "6657425",
+      "source": "ef24642",
       "passed": 47,
       "total": 47,
-      "log": "gcc-56.txt"
+      "log": "gcc-57.txt"
     },
     {
       "name": "sanitizers",
-      "source": "6657425",
+      "source": "ef24642",
       "passed": 45,
       "total": 45,
-      "log": "asan-56.txt"
+      "log": "asan-57.txt"
     },
     {
       "name": "WASI",
-      "source": "6657425",
+      "source": "ef24642",
       "passed": 38,
       "total": 38,
-      "log": "wasi-56.txt"
+      "log": "wasi-57.txt"
     },
     {
       "name": "browser",
-      "source": "6657425",
-      "stories": 56,
+      "source": "ef24642",
+      "stories": 57,
       "catalog_entries": 78,
-      "log": "browser-56-integrated.txt"
+      "log": "browser-57-integrated.txt"
     },
     {
       "name": "previous framework CI",
@@ -46,10 +46,20 @@
     },
     {
       "name": "published gallery pipeline",
-      "source": "afca033",
-      "stories": 51,
+      "source": "0e61b2f",
+      "stories": 56,
       "catalog_entries": 78,
-      "log": "pages-afca033.json"
+      "log": "pages-0e61b2f.json"
+    },
+    {
+      "name": "published HTTPS browser",
+      "source": "0e61b2f",
+      "log": "published-0e61b2f.txt"
+    },
+    {
+      "name": "published framework CI",
+      "source": "0e61b2f",
+      "log": "ci-0e61b2f.json"
     }
   ]
 }

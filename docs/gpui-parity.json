@@ -18,7 +18,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Theme spring configuration and complete inherited styling audit remain pending."
+        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -734,7 +734,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Theme spring configuration and complete inherited styling audit remain pending."
+        "Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1375,7 +1375,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Text wrapping, inherited font styling, arbitrary separator styling and the default Oklab highlight blend remain incomplete. Custom child widths/layout and exact highlight colors are application supplied."
+        "Text wrapping, inherited font styling and arbitrary separator styling remain incomplete. Custom child widths/layout are application supplied. Default shimmer now uses alpha-aware Oklab and the source lightness fallback."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1551,31 +1551,54 @@
       "reference_url": "https://gpui-kit.com/component/notification/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_status.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_status.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Native OS delivery adapters remain absent; portable host callbacks are opt-in. Shadows approximate blur with bounded rounded layers; intent icons are text symbols and title font weight is not independently styled. Custom content and action descriptors remain borrowed through lifecycle callbacks."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "toast queue/lifetimes",
-          "status": "not_started",
-          "evidence": []
+          "name": "bounded typed-ID manager, replacement, auto-hide and exit callbacks",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
-          "name": "actions/dismissal",
-          "status": "not_started",
-          "evidence": []
+          "name": "eight placements, measured stacks, hover/focus pause and spring motion",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
-          "name": "accessible live region",
-          "status": "not_started",
-          "evidence": []
+          "name": "body/action/close/middle activation and semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py"
+          ]
+        },
+        {
+          "name": "portable transactional system delivery hooks and bounded registry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "tests/web/test_browser.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1604,7 +1627,8 @@
           "Batch Operation Complete",
           "Interactive Confirmation"
         ]
-      }
+      },
+      "last_tested_commit": "ef24642"
     },
     {
       "name": "Pagination",
@@ -4705,7 +4729,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Stable-ID selection, keyboard navigation, five variants, custom slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom-body width constraints, structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source."
+        "Stable-ID selection, keyboard navigation, five variants, custom body slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom body width caps preserve short content and clip oversized bodies from the first frame. Structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

@@ -33,3 +33,9 @@ Integration `d7e0e18`: native45/45, ASan/UBSan43/43, WASI36/36 and Chromium53-st
 
 
 Integration `6657425`: native47/47, ASan/UBSan45/45, WASI38/38 and Chromium56-story gates passed. Tag/Marker and OTP have actual interactive gallery coverage. The expanded Choice suite required a finite30-billion instruction budget; the10-billion exhaustion log is preserved. Source daf43b9 passed six CI jobs but Pages failed same-frame InputGroup typing; focus proxies and a held-frame browser regression fix that route. The public site remains afca033/51 stories until deployment succeeds. Manifest:22 not started,4 implemented partial,52 tested partial,zero verified,all78 retained. Notification checkpoint and further Choice/Disclosure work continue on isolated Sol6.1low workers.
+
+
+Deployment `0e61b2f` succeeded:56 live WASM stories and all78 catalog entries are publicly available. Direct HTTPS Chromium rendered OTP, Tag and Marker without page errors; screenshot `screenshots/web-gallery-marker.png`. Pages metadata and browser evidence are retained. Notification integration passes47 native tests; Message/MessageScroller, advanced gallery coverage and Choice/Disclosure refinements continue.
+
+
+Integration `ef24642` passes47 native tests,45 ASan/UBSan tests,38 WASI suites and57 real Chromium stories. Notification is now a tested partial family with host delivery callbacks and real timer/stack browser tests. Core adds opt-in container focus, dominant-axis wheel routing and alpha-aware Oklab color interpolation; Notification and Marker consume corrected theme/color behavior. Manifest:21 not started,4 implemented partial,53 tested partial,zero verified. Public0e61b2f/56-story deployment and all six CI jobs passed;57-story deployment follows.

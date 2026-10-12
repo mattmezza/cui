@@ -97,6 +97,15 @@ thousands of offscreen controls. It is separate from the retained variable-heigh
 VirtualList model. Callers rendering a standalone list can set `visible_count` and
 `visible_begin`; `state.first_visible` returns the window after cursor navigation.
 
+List and popup options accept a `render(ui, item, index, user)` row-body callback.
+It replaces the default label painting while retaining the item's accessible name,
+disabled state, selected state, keyboard behavior and primary pointer activation.
+The callback can compose icons, descriptions or other content within the fixed
+theme control height. Multiple selection still paints its check indicator. The
+index refers to the displayed array, including filtered Combobox arrays; use the
+stable item ID to look up source data. The callback must not alter the borrowed
+arrays or add separately activatable menu actions.
+
 The popup ID is reserved for its scope and floating root; its internal list ID is
 that ID XOR `0xd1bc905ee4216f11`. Item IDs must be globally unique and not overlap
 trigger, popup or internal IDs. The API borrows all arrays and state for the call;
@@ -106,7 +115,7 @@ The headless choice test verifies selection, repeated menu dispatch, clipping
 escape, synchronous focus restoration, outside/Escape dismissal, empty lists,
 ASCII typeahead and keyboard paging over forty items with disabled endpoints.
 Hierarchical descriptors and multiple selection are documented below. Remaining
-list gaps include wheel/touch scrolling, arbitrary item delegates, searchable
+list gaps include wheel/touch scrolling, variable-height item delegates, searchable
 Select, Unicode normalization/case folding and OS accessibility adapters. Tab currently stays in the open popup rather than dismissing and
 advancing to the next background control. These are tracked parity gaps; rendering
 and keyboard selection of the implemented subset are real.
@@ -261,4 +270,3 @@ context-menu gesture are not implemented.
 Headless tests cover secondary press/release routing, primary activation,
 coordinate placement, reanchoring, nested action dispatch and focus restoration,
 as well as custom row drawing, right-side checks and preferred popup placement.
-

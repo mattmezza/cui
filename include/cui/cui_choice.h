@@ -50,12 +50,18 @@ typedef struct {
     size_t first_visible;
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
+/* Styled row body; semantic name/disabled/selection remain supplied by item.
+ * index is relative to the displayed array, including filtered Combobox arrays. */
+typedef void (*cui_choice_render_fn)(cui_context *, const cui_choice_item *, size_t index,
+                                     void *user);
 typedef struct {
     bool disabled, menu;
     float dt;
     size_t visible_begin, visible_count;  /* count=0 submits all items */
     cui_choice_activation_fn on_activate; /* synchronous, in event order */
     void *activation_user;
+    cui_choice_render_fn render;
+    void *render_user;
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -65,7 +71,9 @@ typedef struct {
     bool disabled;
     cui_rect viewport;
     float width, dt;
-    cui_popup_side side; /* preferred anchor side; defaults below */
+    cui_popup_side side;         /* preferred anchor side; defaults below */
+    cui_choice_render_fn render; /* optional fixed-height option body */
+    void *render_user;
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */

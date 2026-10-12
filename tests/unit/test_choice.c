@@ -654,6 +654,98 @@ static void test_context_modal_guard(void) {
     }
 }
 
+static size_t choice_rendered;
+static cui_id choice_rendered_ids[3];
+static size_t choice_rendered_indices[3];
+static void custom_choice_row(cui_context *ui, const cui_choice_item *item, size_t index,
+                              void *user) {
+    assert(user == &choice_rendered);
+    assert(index < 3 && choice_rendered < 3);
+    choice_rendered_indices[choice_rendered] = index;
+    choice_rendered_ids[choice_rendered++] = item->id;
+    cui_text(ui, cui_string("Custom option body"), 13, (cui_color){20, 30, 40, 255});
+}
+static bool custom_choices_scene(cui_context *ui, unsigned mode, cui_edit *query,
+                                 cui_choice_popup *state, cui_id *value, bool *chosen) {
+    cui_theme theme = cui_theme_light();
+    cui_choice_item filtered[3];
+    bool filtered_selected[3];
+    choice_rendered = 0;
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    cui_choice_popup_options options = {
+        .viewport = {0, 0, 640, 540}, .render = custom_choice_row, .render_user = &choice_rendered};
+    bool changed;
+    if (mode == 0)
+        changed = cui_list(
+            ui, 90, &theme, items, 3, value, &state->list,
+            (cui_list_options){.render = custom_choice_row, .render_user = &choice_rendered});
+    else if (mode == 1)
+        changed = cui_select(ui, 2, &theme, cui_string("Custom choices"), cui_string("Choose"),
+                             items, 3, value, state, options);
+    else if (mode == 2)
+        changed = cui_select_multi(ui, 2, &theme, cui_string("Custom choices"),
+                                   cui_string("Choose"), items, 3, chosen, state, options);
+    else if (mode == 3)
+        changed = cui_combobox(ui, 2, &theme, cui_string("Custom choices"), query, items, 3,
+                               filtered, 3, value, state, options)
+                      .changed;
+    else
+        changed = cui_combobox_multi(ui, 2, &theme, cui_string("Custom choices"), query, items, 3,
+                                     filtered, filtered_selected, 3, chosen, state, options)
+                      .changed;
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void test_custom_choice_rows(void) {
+    for (unsigned mode = 0; mode < 5; mode++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        assert(ui);
+        char text[32] = "";
+        cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
+                                                            .capacity = sizeof(text),
+                                                            .history_bytes = 512,
+                                                            .max_history_steps = 8});
+        assert(query);
+        cui_choice_popup state;
+        cui_choice_popup_init(&state, 800);
+        cui_id value = 0;
+        bool chosen[3] = {false, false, false};
+        custom_choices_scene(ui, mode, query, &state, &value, chosen);
+        if (mode) {
+            click(ui, 2);
+            custom_choices_scene(ui, mode, query, &state, &value, chosen);
+        }
+        assert(choice_rendered == 3 && choice_rendered_ids[0] == 10 &&
+               choice_rendered_ids[1] == 20 && choice_rendered_ids[2] == 30);
+        size_t count = 0;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        bool labelled = false, disabled = false;
+        for (size_t i = 0; i < count; i++) {
+            if (semantics[i].id == 10)
+                labelled = semantics[i].role == CUI_ROLE_OPTION && semantics[i].name.length == 5 &&
+                           memcmp(semantics[i].name.data, "First", 5) == 0;
+            if (semantics[i].id == 20)
+                disabled = semantics[i].disabled;
+        }
+        assert(labelled && disabled);
+        if (mode >= 3) {
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "las"}));
+            custom_choices_scene(ui, mode, query, &state, &value, chosen);
+            assert(choice_rendered == 1 && choice_rendered_ids[0] == 30 &&
+                   choice_rendered_indices[0] == 0);
+        }
+        click(ui, 30);
+        assert(custom_choices_scene(ui, mode, query, &state, &value, chosen));
+        if (mode == 2 || mode == 4)
+            assert(chosen[2] && state.overlay.open);
+        else
+            assert(value == 30 && (!mode || !state.overlay.open));
+        cui_edit_destroy(query);
+        cui_destroy(ui);
+    }
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -731,6 +823,7 @@ int main(void) {
     test_menu_depth_bound();
     test_context_menu();
     test_context_modal_guard();
+    test_custom_choice_rows();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

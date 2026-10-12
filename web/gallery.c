@@ -33,10 +33,19 @@
 #if defined(__wasm__)
 __attribute__((import_module("host"), import_name("measure"))) extern float
 host_measure(const char *, size_t, float);
+__attribute__((import_module("host"), import_name("measure_styled"))) extern float
+host_measure_styled(const char *, size_t, float, int, int, int);
 #else
 static float host_measure(const char *s, size_t n, float size) {
     (void)s;
     return n * size * .6f;
+}
+static float host_measure_styled(const char *s, size_t n, float size, int weight, int italic,
+                                 int monospace) {
+    (void)weight;
+    (void)italic;
+    (void)monospace;
+    return host_measure(s, n, size);
 }
 #endif
 static cui_context *ui;
@@ -835,6 +844,12 @@ static cui_size measure(void *user, cui_str text, float size) {
     (void)user;
     return (cui_size){host_measure(text.data, text.length, size), size * 1.25f};
 }
+static cui_size measure_styled(void *user, cui_str text, float size, cui_text_style style) {
+    (void)user;
+    return (cui_size){host_measure_styled(text.data, text.length, size, style.weight, style.italic,
+                                          style.monospace),
+                      size * 1.25f};
+}
 int gallery_init(void) {
     if (ui)
         return 1;
@@ -860,7 +875,8 @@ int gallery_init(void) {
                                  .max_elements = 512,
                                  .max_commands = 2048,
                                  .frame_bytes = 65536,
-                                 .measure = measure});
+                                 .measure = measure,
+                                 .measure_styled = measure_styled});
     edit = cui_edit_create((cui_edit_config){.buffer = input_buffer,
                                              .capacity = sizeof(input_buffer),
                                              .history_bytes = 8192,
@@ -1833,6 +1849,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     case 11:
         cui_label(ui, &t, cui_string("Semantic tokens and runtime themes"));
+        cui_text_ex(ui, cui_string("Semibold heading"), 24, t.text, 30,
+                    (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD});
+        cui_text_ex(ui, cui_string("Italic emphasis"), 14, t.muted, 20,
+                    (cui_text_style){.italic = true});
+        cui_text_ex(ui, cui_string("Monospace code"), 14, t.text, 20,
+                    (cui_text_style){.monospace = true});
         cui_button(ui, cui_id_from(ui, "theme-button"), &t, cui_string("Primary action"), disabled);
         cui_badge(ui, cui_id_from(ui, "theme-badge"), &t, cui_string("Surface / primary"));
         cui_begin_box(ui, cui_id_from(ui, "shape-sample"),
@@ -2814,6 +2836,12 @@ float gallery_command(unsigned i, unsigned field) {
         return c->border_edges.top;
     case 21:
         return c->border_edges.bottom;
+    case 22:
+        return c->text_style.weight;
+    case 23:
+        return c->text_style.italic;
+    case 24:
+        return c->text_style.monospace;
     default:
         return 0;
     }

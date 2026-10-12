@@ -48,6 +48,8 @@ DropdownButton demonstrates independently focusable primary export and options-m
 
 Canvas consumes independent corner radii and edge widths from the public draw commands. Theme includes an asymmetric shape sample; Chromium pixel assertions verify square and rounded corners, unequal border widths and explicit absent edges at device scale two.
 
+Canvas also reads each text command's weight, italic and monospace flags. The browser's styled measurement callback and paint use the same CSS font specification and a style-keyed baseline cache. Theme includes semibold, italic and monospace samples; Chromium checks both their actual Canvas font selection and measured layout widths.
+
 Form composes application-owned name/email editors with required labels, descriptions, validation errors and a Save footer. Its responsive grid switches between two columns and one; valid, email-error, read-only and disabled variants retain genuine input behavior and semantic associations. The sample validates a nonempty name and an email containing @ and a dot; submission and validation belong to the application.
 
 The Input Group story uses the retained editor with inline and block addons, an actual action button, and read-only, disabled and loading variants. The application owns the address and action count.

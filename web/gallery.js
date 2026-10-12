@@ -3,16 +3,21 @@ const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
 const textBaselineOffsets=new Map();
-function textBaselineOffset(size){
- let offset=textBaselineOffsets.get(size);
+function canvasFont(size,weight=0,italic=false,monospace=false){
+ const family=monospace?'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace':'system-ui';
+ return `${italic?'italic ':''}${[400,500,600,700][weight]||400} ${size}px ${family}`;
+}
+function textBaselineOffset(size,weight=0,italic=false,monospace=false){
+ const key=`${size}:${weight}:${Number(italic)}:${Number(monospace)}`;
+ let offset=textBaselineOffsets.get(key);
  if(offset!==undefined)return offset;
- ctx.font=`${size}px system-ui`;ctx.textBaseline='alphabetic';
+ ctx.font=canvasFont(size,weight,italic,monospace);ctx.textBaseline='alphabetic';
  const metrics=ctx.measureText('Hg');
  const ascent=Number.isFinite(metrics.fontBoundingBoxAscent)?metrics.fontBoundingBoxAscent:metrics.actualBoundingBoxAscent||size*.8;
  const descent=Number.isFinite(metrics.fontBoundingBoxDescent)?metrics.fontBoundingBoxDescent:metrics.actualBoundingBoxDescent||size*.2;
  // CUI already moves explicit line-height commands into their natural text line box.
  offset=(size*1.25-ascent-descent)/2+ascent;
- textBaselineOffsets.set(size,offset);return offset;
+ textBaselineOffsets.set(key,offset);return offset;
 }
 const bitmapCache=new Map();let bitmapCacheBytes=0;
 function cacheBitmap(key,bitmap,bytes){
@@ -189,7 +194,7 @@ function requestFrame(){if(framePending||!wasm)return;framePending=true;requestA
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?360:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?420:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -233,7 +238,7 @@ function render(){
   if(type===3){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();clips++;continue;}
   if(type===4){if(clips){ctx.restore();clips--;}continue;}
   ctx.fillStyle=ctx.strokeStyle=`rgba(${f(5)},${f(6)},${f(7)},${f(8)/255})`;
-  if(type===2){const size=f(11);ctx.font=`${size}px system-ui`;ctx.textBaseline='alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+textBaselineOffset(size));}
+  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24);ctx.font=canvasFont(size,weight,italic,monospace);ctx.textBaseline='alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+textBaselineOffset(size,weight,italic,monospace));}
   else if(w>0&&h>0){
    const radii=(f(12)?[f(13),f(14),f(16),f(15)]:[f(9),f(9),f(9),f(9)]).map(r=>Math.min(Math.max(0,r),Math.min(w,h)/2));
    if(type===5){paintBitmap(i,x,y,w,h,radii);continue;}
@@ -512,7 +517,7 @@ $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>docu
 try{
  const [response,data,docs,presets]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json()),fetch('./docs.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch documentation');return r.json();}),fetch('./themes.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch themes');return r.json();})]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;documents=docs;themes=presets;
  const module=await WebAssembly.compile(await response.arrayBuffer());
- const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=`${size}px system-ui`;return ctx.measureText(stringAt(ptr,len)).width;}}};
+ const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=canvasFont(size);return ctx.measureText(stringAt(ptr,len)).width;},measure_styled:(ptr,len,size,weight,italic,monospace)=>{ctx.font=canvasFont(size,weight,!!italic,!!monospace);return ctx.measureText(stringAt(ptr,len)).width;}}};
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();if(!wasm.gallery_init())throw Error('CUI initialization failed');
  let saved;try{saved=localStorage.getItem('cui.theme');}catch{}themeChoice=saved==='system'||saved==='high-contrast'||themes.some(theme=>theme.id===saved)?saved:'system';buildPaletteMenu();syncTheme();
  window.cuiGallery={exports:wasm,stories,catalog,documents,themes,render,get themeChoice(){return themeChoice;}};$('home-story-count').textContent=String(Object.keys(stories).length);route();

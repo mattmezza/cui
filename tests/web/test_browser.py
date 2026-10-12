@@ -217,8 +217,19 @@ def main():
             assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
             control_change('theme', '1')
             assert page.locator('body.dark').count() == 1
+            page.evaluate('''()=>{window.styledTextFonts={};const original=CanvasRenderingContext2D.prototype.fillText;window.restoreFillText=()=>{CanvasRenderingContext2D.prototype.fillText=original};CanvasRenderingContext2D.prototype.fillText=function(value,...args){if(['Semibold heading','Italic emphasis','Monospace code'].includes(value))window.styledTextFonts[value]=this.font;return original.call(this,value,...args)}}''')
             page.evaluate('location.hash="Theme"')
             page.wait_for_function('cuiGallery.renderedComponent==="Theme"')
+            page.wait_for_function('Object.keys(window.styledTextFonts).length===3')
+            fonts = page.evaluate('window.styledTextFonts')
+            assert '600' in fonts['Semibold heading'], fonts
+            assert 'italic' in fonts['Italic emphasis'], fonts
+            assert 'monospace' in fonts['Monospace code'], fonts
+            page.evaluate('window.restoreFillText()')
+            styled = page.evaluate('''()=>{const e=cuiGallery.exports,labels=['Semibold heading','Italic emphasis','Monospace code'];return labels.map(label=>{const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===label);return i===undefined?null:[22,23,24].map(f=>e.gallery_command(i,f))})}''')
+            assert styled == [[2,0,0],[0,1,0],[0,0,1]], styled
+            widths = page.evaluate('''(fonts)=>{const e=cuiGallery.exports,ctx=document.querySelector('canvas').getContext('2d');return Object.entries(fonts).map(([label,font])=>{const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===label);ctx.font=font;return [label,e.gallery_command(i,3),ctx.measureText(label).width]})}''', fonts)
+            assert all(abs(bounds_width-measured_width)<2 for _,bounds_width,measured_width in widths), widths
             shape = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===0&&e.gallery_command(i,5)===29&&e.gallery_command(i,6)===100;})')
             assert shape is not None
             assert page.evaluate('(i)=>Array.from({length:5},(_,j)=>cuiGallery.exports.gallery_command(i,12+j))', shape) == [1,24,0,0,18]

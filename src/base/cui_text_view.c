@@ -1196,11 +1196,18 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                  : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
                  : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
                                                        : padding;
-    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level && !b->task) {
-        cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
+    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && !b->task) {
+        if (b->level) {
+            size_t length = strlen(b->marker_text);
+            memcpy(b->prefix_text, b->marker_text, length);
+            b->prefix_text[length] = ' ';
+            b->prefix_text[length + 1] = 0;
+        } else
+            memcpy(b->prefix_text, "\xe2\x80\xa2 ", 5);
+        cui_size marker = measure(user, (cui_str){b->prefix_text, strlen(b->prefix_text)}, font, 0);
         if (!isfinite(marker.width) || marker.width < 0 || marker.width > 10000000)
             return false;
-        left = fmaxf(left, marker.width + 8);
+        left = marker.width;
     }
     b->text_inset = left;
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));

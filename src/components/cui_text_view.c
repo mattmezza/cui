@@ -358,13 +358,10 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             }
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
-            cui_begin_absolute_box(
-                ui, part, (cui_box){0},
-                (cui_rect){r.x, r.y, fmaxf(16, b->text_inset - 8), style.line_height});
-            cui_text_ex(ui,
-                        b->level ? (cui_str){b->marker_text, strlen(b->marker_text)}
-                                 : (cui_str){"\xe2\x80\xa2", 3},
-                        style.font_size, style.foreground, style.line_height, (cui_text_style){0});
+            cui_begin_absolute_box(ui, part, (cui_box){0},
+                                   (cui_rect){r.x, r.y, b->text_inset, style.line_height});
+            cui_text_ex(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
+                        style.foreground, style.line_height, (cui_text_style){0});
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);

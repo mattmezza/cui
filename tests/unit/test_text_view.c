@@ -162,7 +162,7 @@ static void test_paragraphs_and_numbered_markers(void) {
                (cui_text_view_layout_options){
                    .width = 160, .font_size = 14, .line_height = 20, .paragraph_gap = 16},
                measure, NULL) == CUI_TEXT_VIEW_OK);
-    assert(f.blocks[1].text_inset == 29 && f.blocks[2].text_inset == 29);
+    assert(f.blocks[1].text_inset == 28 && f.blocks[2].text_inset == 28);
     char output[256];
     size_t length;
     assert(cui_text_view_select(&f.state, 0, f.blocks[0].text.end));
@@ -373,6 +373,7 @@ static void test_task_list_model(void) {
                (cui_text_view_layout_options){.width = 200, .font_size = 14, .line_height = 20},
                measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.blocks[2].text_inset == 20);
+    assert(f.blocks[3].text_inset == 14 && !strcmp(f.blocks[3].prefix_text, "\xe2\x80\xa2 "));
 }
 static void test_resource_decoding(void) {
     fixture f;

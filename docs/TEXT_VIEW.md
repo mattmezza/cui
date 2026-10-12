@@ -131,3 +131,9 @@ Source copy retains original source spelling. Complete HTML5 named entity and UR
 normalization behavior remains part of the full parser gap. Resource callbacks
 use at most 64KiB of temporary stack storage, reused across images; entity lookup
 scans no more than 17 bytes per candidate.
+
+List prefix spacing follows measured text, including the trailing space from the
+source prefix helper. Ordinary markers reserve their full measured prefix width;
+they do not impose a synthetic minimum or extra gap. Task indicators retain their
+separate 14px box plus 6px gap. Prefix bytes live in the caller block workspace so
+draw-command text remains valid through renderer completion.

@@ -1,36 +1,43 @@
 {
-  "source": "25b84dc",
+  "source": "f248d6e",
   "published_source": "2be466c922bc396250781de5cc3e972256ec0357",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published 2be466c passed all 78 actual HTTPS gallery stories and seven deployed asset hashes match the Pages artifact. Portable source 25b84dc and gallery 94503eb passed native 77, sanitizers 75, WASI 67, quality and strict web build. A subsequent isolated animation/selection/focus-ring integration is undergoing full gates. Full 78-entry feature parity remains incomplete.",
+  "summary": "Integration f248d6e adds automatic Chart appearance and Sankey margins, shared and block-aware TextView copy/selection, and source Questionnaire focus rings. Native77, sanitizers75, WASI67, browser78 and quality checks pass. Subsequent web22061e5 compiles all78 displayed usage excerpts and strict web build passes. This integration awaits publication; published2be466c remains HTTPS78 and seven-asset verified. Full78-entry parity remains incomplete.",
   "checks": [
     {
       "name": "native",
-      "source": "25b84dc",
+      "source": "f248d6e",
       "passed": 77,
       "total": 77,
-      "log": "native-25b84dc.txt"
+      "log": "native-f248d6e.txt"
     },
     {
       "name": "sanitizers",
-      "source": "25b84dc",
+      "source": "f248d6e",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-25b84dc.txt"
+      "log": "sanitizers-f248d6e.txt"
     },
     {
       "name": "WASI",
-      "source": "25b84dc",
+      "source": "f248d6e",
       "passed": 67,
       "total": 67,
-      "log": "wasi-25b84dc.txt"
+      "log": "wasi-f248d6e.txt"
     },
     {
       "name": "browser",
-      "source": "94503eb",
+      "source": "f248d6e",
       "passed": 78,
       "total": 78,
-      "log": "browser-94503eb.txt"
+      "log": "browser-f248d6e.txt"
+    },
+    {
+      "name": "Compiled gallery usage excerpts",
+      "source": "22061e5",
+      "passed": 78,
+      "total": 78,
+      "log": "snippets-22061e5.txt"
     }
   ],
   "previous_deployment": {
@@ -139,5 +146,5 @@
       "log": "sanitizers-882a5af.txt"
     }
   ],
-  "web_source": "94503eb"
+  "web_source": "22061e5"
 }

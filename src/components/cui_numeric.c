@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
+#include "cui/cui_components.h"
 #include <float.h>
 #include <math.h>
 #include <stdio.h>

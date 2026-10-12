@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_NUMERIC_H
 #define CUI_NUMERIC_H
-#include "cui_components.h"
+#include "cui_base.h"
+#include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

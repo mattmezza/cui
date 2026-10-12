@@ -3,6 +3,7 @@
 #define CUI_CHOICE_H
 #include "cui.h"
 #include "cui_base.h"
+#include "cui_content.h"
 #include "cui_edit.h"
 #include "cui_overlay.h"
 #include "cui_theme.h"
@@ -243,6 +244,12 @@ typedef struct {
     cui_dropdown_button_anchor anchor; /* popup corner; default top right */
     cui_dropdown_button_variant action_variant;
     cui_dropdown_button_size action_size;
+    /* Optional action tooltip composition; ID must be globally unique and state
+     * persists across frames. Its trigger is always the action-half ID. */
+    cui_id tooltip_id;
+    cui_str tooltip;
+    cui_hover_state *tooltip_state;
+    cui_hover_options tooltip_options;
 } cui_dropdown_button_options;
 typedef struct {
     bool action_activated, menu_activated;

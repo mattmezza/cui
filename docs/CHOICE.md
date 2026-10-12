@@ -349,8 +349,7 @@ that surface while its menu is open. The hovered half receives the stronger hove
 color. Escape restores the transparent resting appearance when the pointer has
 left. Disabled pairs remain transparent. Headless tests inspect the draw list after
 real pointer movement, menu activation and Escape, and verify inheritance and
-outer overrides. Action tooltip composition, independent corner
-geometry remain parity gaps.
+outer overrides. Independent joining-corner geometry remains a parity gap.
 
 `hide_action` or `hide_menu` omits that half from rendering, semantics and focus
 registration. At least one half must remain visible. Hiding the menu half closes
@@ -367,3 +366,12 @@ the viewport when the preferred corner cannot fit. The menu's `popup.side` is
 superseded by this explicit corner. General menu trees can independently request
 right-edge alignment through `popup.align_end`. Four-corner pointer-opening
 headless tests verify the resulting popup rectangles.
+
+Set `tooltip_id`, `tooltip`, `tooltip_state` and `tooltip_options` to retain an
+action-half tooltip alongside the split menu. The tooltip shares the existing
+Tooltip delayed hover/focus lifecycle and Escape suppression; its trigger is
+set internally to the action ID. Loading, disabled or omitted action halves and
+an open split menu suppress it. State remains application-owned. Tests cover
+real hover delay, painted tooltip text, Escape, keyboard focus and loading/menu
+suppression. This reuses the Tooltip component rather than introducing a second
+hover state machine.

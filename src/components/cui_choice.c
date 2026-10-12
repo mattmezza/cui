@@ -901,6 +901,13 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         cui_update_semantic(ui, trigger_id, options.selected, options.selected);
     state->row_height = theme->control_height;
     state->padding = theme->padding;
+    if (options.tooltip_id && options.tooltip_state) {
+        cui_hover_options tooltip = options.tooltip_options;
+        tooltip.trigger = action_id;
+        tooltip.disabled =
+            tooltip.disabled || action_disabled || options.hide_action || state->overlay.open;
+        cui_tooltip(ui, options.tooltip_id, theme, options.tooltip_state, options.tooltip, tooltip);
+    }
     options.menu.popup.side = options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_RIGHT ||
                                       options.anchor == CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT
                                   ? CUI_POPUP_ABOVE

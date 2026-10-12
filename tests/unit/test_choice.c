@@ -1642,6 +1642,57 @@ static void test_dropdown_anchor_corners(void) {
     }
     cui_destroy(ui);
 }
+static void test_dropdown_action_tooltip(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_hover_state tooltip = {0};
+    cui_id action = 0;
+    cui_dropdown_button_options options = {
+        .tooltip_id = 2300,
+        .tooltip = {"Save the document", 17},
+        .tooltip_state = &tooltip,
+        .tooltip_options = {.viewport = {0, 0, 640, 480},
+                            .width = 180,
+                            .height = 40,
+                            .dt = .016f,
+                            .open_delay = .032f},
+        .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+    dropdown_scene(ui, &state, &action, &theme, options);
+    cui_rect bounds = cui_bounds(ui, 2001);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = bounds.x + 2, .y = bounds.y + 2}));
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!tooltip.open && tooltip.pending);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(tooltip.open);
+    bool text = false;
+    for (size_t i = 0; i < dropdown_draw.count; i++) {
+        cui_draw_command command = dropdown_draw.commands[i];
+        text |= command.type == CUI_DRAW_TEXT && command.text.length == options.tooltip.length &&
+                memcmp(command.text.data, options.tooltip.data, options.tooltip.length) == 0;
+    }
+    assert(text);
+    key(ui, CUI_KEY_ESCAPE);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!tooltip.open);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
+    dropdown_scene(ui, &state, &action, &theme, options);
+    cui_focus(ui, 2001);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(tooltip.open);
+    options.action_loading = true;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!tooltip.open);
+    options.action_loading = false;
+    click(ui, 2002);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(state.overlay.open && !tooltip.open);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1665,6 +1716,7 @@ int main(void) {
     test_dropdown_inheritance_and_ghost_pair();
     test_dropdown_optional_halves();
     test_dropdown_anchor_corners();
+    test_dropdown_action_tooltip();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

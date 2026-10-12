@@ -860,6 +860,16 @@ static void cui_status_shimmer(cui_context *ui, cui_id id, cui_rect b, cui_str t
         cui_end_box(ui);
     }
 }
+static float cui_status_lightness(cui_color c) {
+    float lo = fminf(c.r, fminf(c.g, c.b)), hi = fmaxf(c.r, fmaxf(c.g, c.b));
+    return (lo + hi) / 510;
+}
+static cui_color cui_status_highlight(const cui_theme *t, bool dark) {
+    cui_color target = dark ? t->text : t->background;
+    if (fabsf(cui_status_lightness(target) - cui_status_lightness(t->muted)) < .1f)
+        target = dark ? t->background : t->text;
+    return cui_color_mix_oklab(t->muted, target, .8f);
+}
 bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state *state,
                 const cui_marker_child *children, size_t count, cui_marker_options o) {
     cui_marker_plan p;
@@ -938,7 +948,7 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
         if (c->kind == CUI_MARKER_TEXT && o.loading && !o.reduced_motion &&
             o.loading_style == CUI_MARKER_SHIMMER) {
             bool dark = t->background.r + t->background.g + t->background.b < 384;
-            cui_color highlight = o.custom_highlight ? o.highlight : dark ? t->text : t->background;
+            cui_color highlight = o.custom_highlight ? o.highlight : cui_status_highlight(t, dark);
             cui_status_shimmer(ui, cui_status_child_id(child, 50), state->text_bounds[i], c->text,
                                font, highlight, p.phase, o.shimmer_spread, o.absolute_spread, dark);
         }
@@ -981,6 +991,7 @@ static cui_theme cui_status_notification_theme(const cui_theme *t, float alpha) 
     cui_theme copy = *t;
     copy.background = cui_status_notification_color(copy.background, alpha);
     copy.surface = cui_status_notification_color(copy.surface, alpha);
+    copy.popover = cui_status_notification_color(copy.popover, alpha);
     copy.text = cui_status_notification_color(copy.text, alpha);
     copy.muted = cui_status_notification_color(copy.muted, alpha);
     copy.border = cui_status_notification_color(copy.border, alpha);
@@ -1202,15 +1213,15 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                     ui, cui_status_child_id(card, 320),
                     (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
                                e->motion_width, heights[position]},
-                    t->radius, alpha * alpha * alpha, (int16_t)(21 + position));
+                    t->radius_lg, alpha * alpha * alpha, (int16_t)(21 + position));
             cui_begin_portal(ui, card,
                              (cui_box){.width = e->motion_width,
                                        .height = n.height,
                                        .padding = 14,
                                        .gap = 0,
                                        .row = true,
-                                       .radius = t->radius,
-                                       .background = theme.surface,
+                                       .radius = t->radius_lg,
+                                       .background = theme.popover,
                                        .border = theme.border,
                                        .border_width = 1,
                                        .layout_only = hidden && e->visibility == 0,

@@ -40,8 +40,7 @@ spinner loading; direct children do not. Typed text shimmer uses twelve nested
 clipped glyph overlays, matching the frozen source's twelve-layer feathered band.
 Relative spread defaults to 0.3 and clamps to 0.05–1; absolute spread clamps to at
 least 1px. Duration defaults to two seconds, with a minimum 1ms. Reverse and once
-are supported. The default highlight uses the theme's foreground/background endpoint;
-applications can supply exact custom highlight colors. Rich-only content receives
+are supported. The default highlight mixes 20% muted text with 80% of the light/dark theme endpoint in alpha-premultiplied Oklab. If the endpoint has similar HSL lightness, it switches to the opposite endpoint. Applications can override the highlight color. Rich-only content receives
 its 0.6–1 opacity pulse in the callback; apply it to that content's paint alpha.
 Direct children and icon slots receive opacity 1. Reduced motion paints static text
 and provides no animation wake deadline. The base plan returns the next absolute
@@ -129,8 +128,9 @@ existing components buttons, content spinner, and status base. No allocation,
 platform, renderer, or default-theme implementation is required by the base.
 Renderer limits remain explicit: shadows are two bounded eight-layer rounded
 rect approximations of the reference blur/spread/offset, intent icons use portable
-text symbols, title font weight and theme popover/radius-large tokens fall back
-to the current core font and theme surface/radius. Custom content can supply more
-specific icons/typography. Core text wrapping refinements and Oklab shimmer color
+text symbols and title font weight uses the current core font. Custom content can supply more
+specific icons/typography. Core text wrapping refinements
 mixing remain limitations described above; this does not establish full native
 platform or renderer parity.
+
+Notification cards consume independent `theme.popover` and `theme.radius_lg` tokens for card fill, corners and shadow shape. Marker default highlight now uses the frozen perceptual blend and lightness fallback; exact custom highlight remains supported.

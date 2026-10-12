@@ -36,6 +36,46 @@ static void marker_models(void) {
     assert(!cui_base_marker(o, &text, CUI_MARKER_MAX_CHILDREN + 1, &p));
 }
 #ifndef CUI_STATUS_BASE_ONLY
+static void marker_highlight_colors(void) {
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 300});
+    assert(ui);
+    for (int mode = 0; mode < 3; mode++) {
+        cui_theme t = cui_theme_light();
+        t.background = (cui_color){255, 255, 255, 255};
+        t.text = (cui_color){0, 0, 0, 255};
+        t.muted = mode == 1 ? t.background : t.text;
+        cui_marker_state state = {0};
+        cui_marker_options o = cui_marker_options_default();
+        o.loading = true;
+        o.loading_style = CUI_MARKER_SHIMMER;
+        o.now_seconds = 1;
+        o.custom_highlight = mode == 2;
+        o.highlight = (cui_color){17, 99, 201, 255};
+        cui_marker_child child = {.kind = CUI_MARKER_TEXT, .text = {"Wait", 4}};
+        for (int frame = 0; frame < 2; frame++) {
+            assert(cui_begin_frame(ui, 500, 300, .016f));
+            assert(cui_marker(ui, 95, &t, &state, &child, 1, o));
+            cui_draw_list draw = cui_end_frame(ui);
+            if (frame == 1) {
+                size_t overlays = 0;
+                for (size_t i = 0; i < draw.count; i++)
+                    if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].color.a < 255) {
+                        cui_color c = draw.commands[i].color;
+                        if (mode == 2)
+                            assert(c.r == 17 && c.g == 99 && c.b == 201);
+                        else if (mode == 1)
+                            assert(c.r >= 21 && c.r <= 23 && c.g == c.r && c.b == c.r);
+                        else
+                            assert(c.r >= 189 && c.r <= 191 && c.g == c.r && c.b == c.r);
+                        overlays++;
+                    }
+                assert(overlays == 12);
+            }
+        }
+    }
+    cui_destroy(ui);
+}
+
 static void marker_render(void) {
     cui_context *ui = cui_create((cui_config){.width = 500, .height = 300});
     assert(ui);
@@ -253,6 +293,36 @@ static void notification_sized_content(cui_context *ui, cui_id id, void *user, f
     cui_begin_box(ui, id, (cui_box){.width = 30, .height = *(float *)user, .background = color});
     cui_end_box(ui);
 }
+static void notification_theme_tokens(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    theme.popover = (cui_color){11, 77, 133, 255};
+    theme.radius_lg = 13;
+    cui_notification_entry entries[1];
+    cui_notification_state state;
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    assert(cui_notification_init(&state, entries, 1, settings, (cui_notification_host){0}));
+    cui_notification n = cui_notification_default();
+    n.id.key = 1;
+    n.message = cui_string("Independent popover styling");
+    n.autohide = false;
+    assert(cui_notification_push(&state, n, 0));
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_notifications(ui, 900, &theme, &state, (cui_rect){0, 0, 600, 400}, .4);
+    cui_draw_list list = cui_end_frame(ui);
+    bool found = false;
+    for (size_t i = 0; i < list.count; i++)
+        if (list.commands[i].type == CUI_DRAW_RECT &&
+            equal(list.commands[i].color, theme.popover)) {
+            assert(list.commands[i].radius == 13);
+            found = true;
+        }
+    assert(found && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void notification_autoheight(void) {
     cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
     assert(ui);
@@ -520,9 +590,11 @@ int main(void) {
     notification_models();
 #ifndef CUI_STATUS_BASE_ONLY
     marker_render();
+    marker_highlight_colors();
     notification_render();
     notification_interactions();
     notification_autoheight();
+    notification_theme_tokens();
     notification_motion();
 #endif
 #ifdef CUI_STATUS_BASE_ONLY

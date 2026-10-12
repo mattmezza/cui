@@ -107,6 +107,10 @@ size_t cui_questionnaire_total(const cui_questionnaire_state *);
 size_t cui_questionnaire_position(
     const cui_questionnaire_state *); /* zero based among enabled, or SIZE_MAX */
 bool cui_questionnaire_choice_selected(const cui_questionnaire_state *, size_t item, size_t choice);
+/* One-based position among enabled choices. Disabled/unknown choices return
+ * false and leave both required output pointers unchanged. */
+bool cui_questionnaire_choice_position(const cui_questionnaire_state *, size_t item, size_t choice,
+                                       size_t *position, size_t *total);
 cui_str cui_questionnaire_freeform(const cui_questionnaire_state *, size_t item);
 cui_questionnaire_status cui_questionnaire_item_status(const cui_questionnaire_state *,
                                                        size_t item);
@@ -306,6 +310,26 @@ bool cui_questionnaire_choice_selected(const cui_questionnaire_state *s, size_t 
         return false;
     cui_questionnaire_choice_runtime r = s->storage.choices[s->storage.items[i].choice_offset + c];
     return r.selected && !r.disabled;
+}
+bool cui_questionnaire_choice_position(const cui_questionnaire_state *s, size_t item, size_t choice,
+                                       size_t *position, size_t *total) {
+    if (!position || !total || !cui_questionnaire_valid(s, item) ||
+        choice >= s->items[item].choice_count || s->storage.items[item].disabled)
+        return false;
+    const cui_questionnaire_choice_runtime *choices =
+        s->storage.choices + s->storage.items[item].choice_offset;
+    if (choices[choice].disabled)
+        return false;
+    size_t count = 0, index = 0;
+    for (size_t i = 0; i < s->items[item].choice_count; i++) {
+        if (!choices[i].disabled)
+            count++;
+        if (i == choice)
+            index = count;
+    }
+    *position = index;
+    *total = count;
+    return true;
 }
 cui_str cui_questionnaire_freeform(const cui_questionnaire_state *s, size_t i) {
     if (!cui_questionnaire_valid(s, i) || s->storage.items[i].disabled ||
@@ -818,6 +842,7 @@ bool cui_questionnaire_activate_shortcut(cui_questionnaire_state *s, char key, b
 /* SPDX-License-Identifier: MIT */
 
 
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 typedef struct {
@@ -952,10 +977,16 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
     }
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
     bool invalid = cui_questionnaire_item_error(s, item).kind != CUI_QUESTIONNAIRE_VALID;
-    cui_set_semantic_details(ui, id,
-                             (cui_semantic_details){.invalid = invalid,
-                                                    .required = d->required,
-                                                    .pointer_activatable = true});
+    size_t position = 0, total = 0;
+    (void)cui_questionnaire_choice_position(s, item, choice, &position, &total);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.invalid = invalid,
+                               .required = d->required,
+                               .description = c->description,
+                               .pos_in_set = position <= UINT_MAX ? (unsigned)position : 0,
+                               .set_size = total <= UINT_MAX ? (unsigned)total : 0,
+                               .pointer_activatable = true});
     char key = cui_questionnaire_shortcut(s, item, choice, o.numeric_shortcuts);
     cui_questionnaire_choice_view view = {.item = item,
                                           .choice = choice,

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_questionnaire.h"
 #include "cui/cui_components.h"
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 typedef struct {
@@ -135,10 +136,16 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
     }
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
     bool invalid = cui_questionnaire_item_error(s, item).kind != CUI_QUESTIONNAIRE_VALID;
-    cui_set_semantic_details(ui, id,
-                             (cui_semantic_details){.invalid = invalid,
-                                                    .required = d->required,
-                                                    .pointer_activatable = true});
+    size_t position = 0, total = 0;
+    (void)cui_questionnaire_choice_position(s, item, choice, &position, &total);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.invalid = invalid,
+                               .required = d->required,
+                               .description = c->description,
+                               .pos_in_set = position <= UINT_MAX ? (unsigned)position : 0,
+                               .set_size = total <= UINT_MAX ? (unsigned)total : 0,
+                               .pointer_activatable = true});
     char key = cui_questionnaire_shortcut(s, item, choice, o.numeric_shortcuts);
     cui_questionnaire_choice_view view = {.item = item,
                                           .choice = choice,

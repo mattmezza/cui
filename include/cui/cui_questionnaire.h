@@ -106,6 +106,10 @@ size_t cui_questionnaire_total(const cui_questionnaire_state *);
 size_t cui_questionnaire_position(
     const cui_questionnaire_state *); /* zero based among enabled, or SIZE_MAX */
 bool cui_questionnaire_choice_selected(const cui_questionnaire_state *, size_t item, size_t choice);
+/* One-based position among enabled choices. Disabled/unknown choices return
+ * false and leave both required output pointers unchanged. */
+bool cui_questionnaire_choice_position(const cui_questionnaire_state *, size_t item, size_t choice,
+                                       size_t *position, size_t *total);
 cui_str cui_questionnaire_freeform(const cui_questionnaire_state *, size_t item);
 cui_questionnaire_status cui_questionnaire_item_status(const cui_questionnaire_state *,
                                                        size_t item);

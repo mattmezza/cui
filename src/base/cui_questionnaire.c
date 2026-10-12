@@ -59,6 +59,26 @@ bool cui_questionnaire_choice_selected(const cui_questionnaire_state *s, size_t 
     cui_questionnaire_choice_runtime r = s->storage.choices[s->storage.items[i].choice_offset + c];
     return r.selected && !r.disabled;
 }
+bool cui_questionnaire_choice_position(const cui_questionnaire_state *s, size_t item, size_t choice,
+                                       size_t *position, size_t *total) {
+    if (!position || !total || !cui_questionnaire_valid(s, item) ||
+        choice >= s->items[item].choice_count || s->storage.items[item].disabled)
+        return false;
+    const cui_questionnaire_choice_runtime *choices =
+        s->storage.choices + s->storage.items[item].choice_offset;
+    if (choices[choice].disabled)
+        return false;
+    size_t count = 0, index = 0;
+    for (size_t i = 0; i < s->items[item].choice_count; i++) {
+        if (!choices[i].disabled)
+            count++;
+        if (i == choice)
+            index = count;
+    }
+    *position = index;
+    *total = count;
+    return true;
+}
 cui_str cui_questionnaire_freeform(const cui_questionnaire_state *s, size_t i) {
     if (!cui_questionnaire_valid(s, i) || s->storage.items[i].disabled ||
         s->items[i].input_disabled)

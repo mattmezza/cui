@@ -515,7 +515,55 @@ static void composable_containers(void) {
         cui_destroy(ui);
     }
 }
+static void choice_accessibility(void) {
+    for (int multiple = 0; multiple < 2; multiple++) {
+        cui_context *ui = cui_create((cui_config){.max_elements = 128});
+        assert(ui);
+        cui_questionnaire_choice choices[] = {
+            {.value = cui_string("a"), .description = cui_string("First answer")},
+            {.value = cui_string("b"), .disabled = true},
+            {.value = cui_string("c"), .description = cui_string("Last answer")}};
+        cui_questionnaire_item item = {.name = cui_string("answers"),
+                                       .choices = choices,
+                                       .choice_count = 3,
+                                       .multiple = multiple != 0};
+        cui_questionnaire_item_runtime runtime;
+        cui_questionnaire_choice_runtime selected[3];
+        cui_questionnaire_state state = {0};
+        assert(cui_questionnaire_init(&state, &item, 1,
+                                      (cui_questionnaire_workspace){.items = &runtime,
+                                                                    .item_capacity = 1,
+                                                                    .choices = selected,
+                                                                    .choice_capacity = 3},
+                                      NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+        for (int phase = 0; phase < 3; phase++) {
+            if (phase == 1)
+                assert(cui_questionnaire_disable_choice(&state, 0, 1, false) ==
+                       CUI_QUESTIONNAIRE_OK);
+            if (phase == 2)
+                assert(cui_questionnaire_disable_choice(&state, 0, 0, true) ==
+                       CUI_QUESTIONNAIRE_OK);
+            radio_frame(ui, &state);
+            for (size_t i = 0; i < 3; i++) {
+                const cui_semantic *semantic = container_semantic(ui, 22 + i);
+                assert(semantic &&
+                       semantic->role == (multiple ? CUI_ROLE_CHECKBOX : CUI_ROLE_RADIO));
+                assert(semantic->details.description.length == choices[i].description.length);
+                if (choices[i].description.length)
+                    assert(!memcmp(semantic->details.description.data, choices[i].description.data,
+                                   choices[i].description.length));
+                bool disabled = (phase == 0 && i == 1) || (phase == 2 && i == 0);
+                unsigned total = phase == 1 ? 3 : 2;
+                unsigned position = phase == 0 ? (i == 2 ? 2 : 1) : phase == 1 ? i + 1 : i;
+                assert(semantic->details.pos_in_set == (disabled ? 0 : position));
+                assert(semantic->details.set_size == (disabled ? 0 : total));
+            }
+        }
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    choice_accessibility();
     composable_containers();
     custom_choice_slots();
     source_card_styles();

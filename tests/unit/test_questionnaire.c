@@ -160,11 +160,46 @@ static void test_schema_and_shortcuts(void) {
     assert(cui_questionnaire_disable_choice(&s, 0, 1, false) == CUI_QUESTIONNAIRE_OK);
     assert(cui_questionnaire_choice_selected(&s, 0, 1));
 }
+static void test_choice_positions(void) {
+    cui_questionnaire_choice choices[] = {
+        {.value = str("a"), .disabled = true}, {.value = str("b")}, {.value = str("c")}};
+    cui_questionnaire_item item = {.name = str("item"), .choices = choices, .choice_count = 3};
+    cui_questionnaire_item_runtime runtime;
+    cui_questionnaire_choice_runtime selected[3];
+    cui_questionnaire_state state = {0};
+    size_t position = 91, total = 92;
+    assert(!cui_questionnaire_choice_position(NULL, 0, 0, &position, &total));
+    assert(!cui_questionnaire_choice_position(&state, 0, 0, &position, &total));
+    assert(position == 91 && total == 92);
+    assert(cui_questionnaire_init(&state, &item, 1,
+                                  (cui_questionnaire_workspace){.items = &runtime,
+                                                                .item_capacity = 1,
+                                                                .choices = selected,
+                                                                .choice_capacity = 3},
+                                  NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    assert(!cui_questionnaire_choice_position(&state, 0, 0, &position, &total));
+    assert(!cui_questionnaire_choice_position(&state, 1, 1, &position, &total));
+    assert(!cui_questionnaire_choice_position(&state, 0, 3, &position, &total));
+    assert(!cui_questionnaire_choice_position(&state, 0, 1, NULL, &total));
+    assert(!cui_questionnaire_choice_position(&state, 0, 1, &position, NULL));
+    assert(position == 91 && total == 92);
+    assert(cui_questionnaire_choice_position(&state, 0, 1, &position, &total));
+    assert(position == 1 && total == 2);
+    assert(cui_questionnaire_choice_position(&state, 0, 2, &position, &total));
+    assert(position == 2 && total == 2);
+    assert(cui_questionnaire_disable_choice(&state, 0, 0, false) == CUI_QUESTIONNAIRE_OK);
+    assert(cui_questionnaire_choice_position(&state, 0, 2, &position, &total));
+    assert(position == 3 && total == 3);
+    assert(cui_questionnaire_disable_item(&state, 0, true) == CUI_QUESTIONNAIRE_OK);
+    assert(!cui_questionnaire_choice_position(&state, 0, 2, &position, &total));
+    assert(position == 3 && total == 3);
+}
 int main(void) {
     test_disabled_retained_answer_preserves_pending();
     test_validation_skip_completion_order();
     test_input_draft_reset_and_capacity();
     test_schema_and_shortcuts();
+    test_choice_positions();
     puts("questionnaire tests passed");
     return 0;
 }

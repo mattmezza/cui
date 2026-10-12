@@ -24,6 +24,7 @@
 #include "cui/cui_status.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
+#include "cui/cui_text_view.h"
 #include "cui/cui_textarea.h"
 #include "cui/cui_toolbar.h"
 #include "cui/cui_virtual.h"
@@ -102,6 +103,17 @@ static int command_modal, command_loading, command_filterable = 1;
 static unsigned command_actions, command_confirms, command_cancels;
 static cui_command_index command_last;
 static bool command_focus_pending;
+static cui_text_view_state text_view_state;
+static char text_view_source[4096], text_view_rendered[4096], text_view_document[4096];
+static cui_text_view_mapping text_view_mapping[4096];
+static cui_text_view_span text_view_spans[512];
+static cui_text_view_block text_view_blocks[256];
+static cui_text_view_glyph text_view_glyphs[4096];
+static cui_text_view_highlight text_view_highlights[32];
+static int text_view_format, text_view_scrollable, text_view_fade;
+static int text_view_links;
+static cui_text_view_error text_view_error;
+static bool gallery_text_view_load(void);
 typedef struct {
     unsigned builds, prepares, styles, overlays, content, dialogs, sheets, notices;
 } gallery_root_counts;
@@ -966,6 +978,80 @@ static cui_size measure_styled(void *user, cui_str text, float size, cui_text_st
                                           style.monospace),
                       size * 1.25f};
 }
+static void gallery_text_view_link(cui_str url, const cui_event *event, void *user) {
+    (void)url;
+    (void)event;
+    (void)user;
+    text_view_links++;
+}
+void gallery_text_view_options(int format, int scrollable, int fade) {
+    if (format < 0 || format > 2)
+        format = 0;
+    if (format != text_view_format) {
+        text_view_format = format;
+        gallery_text_view_load();
+    }
+    text_view_scrollable = scrollable != 0;
+    text_view_fade = fade != 0;
+    redraw = true;
+}
+int gallery_text_view_stats(int field) {
+    return field == 0   ? (int)text_view_state.text_length
+           : field == 1 ? (int)text_view_state.block_count
+           : field == 2 ? (int)text_view_state.cursor
+           : field == 3 ? (int)text_view_state.anchor
+           : field == 4 ? text_view_links
+           : field == 5 ? (int)text_view_error
+           : field == 6 ? (int)text_view_state.scroll.y
+                        : (int)text_view_state.highlight_count;
+}
+static bool gallery_text_view_load(void) {
+    static const char *documents[] = {
+        "# Project notes\n\nA **bold** idea with *emphasis* and `inline code`. "
+        "Read the [CUI guide](https://example.com/cui).\n\n"
+        "- First task\n- Second task\n\n"
+        "> A portable interface starts with clear content.\n\n"
+        "| Stage | Owner |\n| --- | --- |\n| Design | Ada |\n| Test | Lin |\n\n"
+        "```c\ncui_text_view(ui, id, theme, &state, options);\n```",
+        "<h1>Project notes</h1><p>A <strong>bold</strong> idea with <em>emphasis</em> "
+        "and <code>inline code</code>. Read the <a href=\"https://example.com/cui\">CUI "
+        "guide</a>.</p>"
+        "<ul><li>First task</li><li>Second task</li></ul>",
+        "Project notes\nA bold idea with emphasis and inline code.\nFirst task\nSecond task"};
+    if (!cui_text_view_init(
+            &text_view_state,
+            (cui_text_view_workspace){.source = text_view_source,
+                                      .rendered = text_view_rendered,
+                                      .source_capacity = sizeof(text_view_source),
+                                      .rendered_capacity = sizeof(text_view_rendered),
+                                      .mapping = text_view_mapping,
+                                      .mapping_capacity = 4096,
+                                      .spans = text_view_spans,
+                                      .span_capacity = 512,
+                                      .blocks = text_view_blocks,
+                                      .block_capacity = 256,
+                                      .glyphs = text_view_glyphs,
+                                      .glyph_capacity = 4096,
+                                      .highlights = text_view_highlights,
+                                      .highlight_capacity = 32},
+            (cui_text_view_format)text_view_format))
+        return false;
+    snprintf(text_view_document, sizeof(text_view_document), "%s", documents[text_view_format]);
+    text_view_error = cui_text_view_set_text(&text_view_state, cui_string(text_view_document));
+    if (text_view_error != CUI_TEXT_VIEW_OK)
+        return false;
+    if (text_view_format == CUI_TEXT_VIEW_MARKDOWN) {
+        cui_str rendered = cui_text_view_rendered_text(&text_view_state);
+        const char *hit = strstr(rendered.data, "bold");
+        if (hit) {
+            cui_text_view_highlight highlight = {
+                .range = {(size_t)(hit - rendered.data), (size_t)(hit - rendered.data) + 4},
+                .background = {230, 190, 70, 90}};
+            text_view_error = cui_text_view_set_highlights(&text_view_state, &highlight, 1);
+        }
+    }
+    return text_view_error == CUI_TEXT_VIEW_OK;
+}
 int gallery_init(void) {
     if (ui)
         return 1;
@@ -1127,6 +1213,8 @@ int gallery_init(void) {
     if (!cui_notification_init(&root_notices, root_notice_entries, 4, root_notice_settings,
                                (cui_notification_host){0}) ||
         !cui_root_bind_facilities(&root_view, root_dialog_slots, 2, &root_notices))
+        return 0;
+    if (!gallery_text_view_load())
         return 0;
     return ui && edit && group_edit && form_name_edit && form_email_edit && dock && query &&
            number_state.edit && rebuilt == CUI_VIRTUAL_OK;
@@ -1568,6 +1656,35 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                               (cui_rect){0, 0, width, height}, NULL, gallery_root_content, NULL,
                               host_seconds);
         break;
+    case 76: {
+        if (cui_button(ui, cui_id_from(ui, "text-view-append"), &t, cui_string("Append update"),
+                       disabled)) {
+            size_t length = strlen(text_view_document);
+            const char *suffix = text_view_format == CUI_TEXT_VIEW_HTML
+                                     ? "<p>Update: review completed.</p>"
+                                     : "\n\nUpdate: review completed.";
+            size_t extra = strlen(suffix);
+            if (length + extra < sizeof(text_view_document)) {
+                memcpy(text_view_document + length, suffix, extra + 1);
+                text_view_error =
+                    cui_text_view_set_text(&text_view_state, cui_string(text_view_document));
+            }
+        }
+        cui_text_view_options options = cui_text_view_default();
+        options.width = width - 48;
+        options.height = text_view_scrollable ? 320 : -1;
+        options.dt = host_dt;
+        options.scrollable = text_view_scrollable != 0;
+        options.stream_fade = text_view_fade != 0;
+        options.reduced_motion = reduced_motion;
+        options.disabled = disabled != 0;
+        options.code_actions_height = 0;
+        options.table_actions_height = 0;
+        options.on_link = gallery_text_view_link;
+        (void)cui_text_view(ui, cui_id_from(ui, "text-view-preview"), &t, &text_view_state,
+                            options);
+        break;
+    }
     case 0: {
         char label[64];
         if (cui_button_ex(

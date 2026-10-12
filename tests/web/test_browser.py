@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 74
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 75
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -361,11 +361,13 @@ def main():
             assert semantic_index('Command palette', 6) is not None
             page.keyboard.type('save')
             page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===4&&cuiGallery.exports.gallery_command_palette_stats(1)===1')
+            command_frame = page.evaluate('cuiGallery.frame')
             page.keyboard.press('Escape')
-            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===0&&cuiGallery.exports.gallery_command_palette_stats(8)===1')
+            page.wait_for_function('(before)=>cuiGallery.frame>before&&cuiGallery.exports.gallery_command_palette_stats(5)===0&&cuiGallery.exports.gallery_command_palette_stats(8)===1', arg=command_frame)
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===6&&cuiGallery.exports.gallery_semantic(i,7)===1&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Command palette")')
+            command_frame = page.evaluate('cuiGallery.frame')
             page.keyboard.press('Escape')
-            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(8)===0&&cuiGallery.exports.gallery_command_palette_stats(4)>=1')
+            page.wait_for_function('(before)=>cuiGallery.frame>before&&cuiGallery.exports.gallery_command_palette_stats(8)===0&&cuiGallery.exports.gallery_command_palette_stats(4)>=1', arg=command_frame)
             page.evaluate('location.hash="Root View"')
             page.wait_for_function('cuiGallery.renderedComponent==="Root View"')
             assert page.evaluate('cuiGallery.exports.gallery_root_stats(0)') == 1
@@ -393,6 +395,37 @@ def main():
             click_semantic('Open root dialog', 1)
             assert page.evaluate('cuiGallery.exports.gallery_root_stats(8)') == 0
             control_change('disabled', False)
+            page.evaluate('location.hash="TextView"')
+            page.wait_for_function('cuiGallery.renderedComponent==="TextView"')
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(0)') > 100
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(1)') >= 7
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(7)') == 1
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===2&&cuiGallery.exports.gallery_command(i,22)===3)')
+            assert semantic_index('CUI guide', 36) is not None
+            click_semantic('CUI guide', 36)
+            page.wait_for_function('cuiGallery.exports.gallery_text_view_stats(4)===1')
+            text_view_group = page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_semantic(i,0)===9&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i))).startsWith("Project notes"))')
+            assert text_view_group is not None
+            page.evaluate('(index)=>cuiGallery.exports.gallery_focus(index)', text_view_group)
+            canvas.focus()
+            page.keyboard.press('Control+a')
+            page.wait_for_function('cuiGallery.exports.gallery_text_view_stats(2)===cuiGallery.exports.gallery_text_view_stats(0)&&cuiGallery.exports.gallery_text_view_stats(3)===0')
+            control_change('text-view-format', '1')
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(1)') >= 3
+            control_change('text-view-format', '2')
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(7)') == 0
+            control_change('text-view-format', '0')
+            control_change('text-view-scroll', True)
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
+            control_change('text-view-fade', True)
+            text_before = page.evaluate('cuiGallery.exports.gallery_text_view_stats(0)')
+            click_semantic('Append update', 1)
+            page.wait_for_function('(before)=>cuiGallery.exports.gallery_text_view_stats(0)>before', arg=text_before)
+            assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
+            control_change('text-view-scroll', False)
             page.evaluate('location.hash="Sidebar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
             assert semantic_index('Workspace sidebar', 9) is not None
@@ -2014,7 +2047,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 74 real WASM stories, Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 75 real WASM stories, TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

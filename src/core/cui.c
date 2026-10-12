@@ -1910,6 +1910,29 @@ bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
     return true;
 }
 
+cui_key cui_key_from_character(char character) {
+    static const cui_key letters[] = {
+        CUI_KEY_A, CUI_KEY_B, CUI_KEY_C, CUI_KEY_D, CUI_KEY_E, CUI_KEY_F, CUI_KEY_G,
+        CUI_KEY_H, CUI_KEY_I, CUI_KEY_J, CUI_KEY_K, CUI_KEY_L, CUI_KEY_M, CUI_KEY_N,
+        CUI_KEY_O, CUI_KEY_P, CUI_KEY_Q, CUI_KEY_R, CUI_KEY_S, CUI_KEY_T, CUI_KEY_U,
+        CUI_KEY_V, CUI_KEY_W, CUI_KEY_X, CUI_KEY_Y, CUI_KEY_Z};
+    if (character >= 'a' && character <= 'z')
+        character = (char)(character - 'a' + 'A');
+    if (character >= 'A' && character <= 'Z')
+        return letters[character - 'A'];
+    if (character >= '0' && character <= '9')
+        return (cui_key)(CUI_KEY_0 + character - '0');
+    return CUI_KEY_NONE;
+}
+char cui_key_character(cui_key key) {
+    if (key >= CUI_KEY_0 && key <= CUI_KEY_9)
+        return (char)('0' + key - CUI_KEY_0);
+    for (char c = 'A'; c <= 'Z'; c++)
+        if (cui_key_from_character(c) == key)
+            return c;
+    return 0;
+}
+
 bool cui_scroll_gesture_filter(cui_scroll_gesture *state, cui_event *event, double now) {
     if (!state || !event || event->type != CUI_EVENT_SCROLL || !isfinite(now) ||
         !isfinite(event->dx) || !isfinite(event->dy) ||

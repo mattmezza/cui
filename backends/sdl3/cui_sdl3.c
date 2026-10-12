@@ -115,7 +115,7 @@ static cui_key key(SDL_Keycode k) {
     case SDLK_PAGEDOWN:
         return CUI_KEY_PAGEDOWN;
     default:
-        return CUI_KEY_NONE;
+        return k <= 127 ? cui_key_from_character((char)k) : CUI_KEY_NONE;
     }
 }
 bool cui_sdl3_set_cursor(cui_sdl3 *s, cui_cursor cursor) {

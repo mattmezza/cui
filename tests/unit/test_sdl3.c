@@ -152,6 +152,25 @@ int main(int argc, char **argv) {
     } else {
         assert(!cui_sdl3_set_cursor(s, CUI_CURSOR_RESIZE_HORIZONTAL));
     }
+    /* Every alphanumeric shortcut survives the native host translation. */
+    const char *shortcut_chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    for (size_t i = 0; shortcut_chars[i]; i++) {
+        SDL_Event shortcut = {.type = SDL_EVENT_KEY_DOWN};
+        shortcut.key.key = (SDL_Keycode)shortcut_chars[i];
+        assert(SDL_PushEvent(&shortcut));
+    }
+    assert(cui_sdl3_poll(s, ui));
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    size_t shortcut_count, shortcut_index = 0;
+    const cui_event *shortcut_events = cui_frame_events(ui, &shortcut_count);
+    for (size_t i = 0; i < shortcut_count; i++)
+        if (shortcut_events[i].type == CUI_EVENT_KEY_DOWN) {
+            assert(shortcut_index < strlen(shortcut_chars));
+            assert(shortcut_events[i].key ==
+                   cui_key_from_character(shortcut_chars[shortcut_index++]));
+        }
+    assert(shortcut_index == strlen(shortcut_chars));
+    cui_end_frame(ui);
     SDL_Event event = {0};
     event.type = SDL_EVENT_KEY_DOWN;
     event.key.key = SDLK_TAB;

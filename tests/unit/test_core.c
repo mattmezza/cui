@@ -1196,6 +1196,22 @@ static void gesture_event(cui_context *ui, float x, float dx, float dy, cui_scro
                                            .scroll_phase = phase,
                                            .scroll_precise = precise}));
 }
+static void test_shortcut_key_characters(void) {
+    /* Existing host numeric key mappings retain their original identities. */
+    assert(CUI_KEY_A == 13 && CUI_KEY_PAGEDOWN == 20);
+    for (char c = 'A'; c <= 'Z'; c++) {
+        cui_key k = cui_key_from_character(c);
+        assert(k != CUI_KEY_NONE && cui_key_character(k) == c);
+        assert(cui_key_from_character((char)(c - 'A' + 'a')) == k);
+    }
+    for (char c = '0'; c <= '9'; c++)
+        assert(cui_key_character(cui_key_from_character(c)) == c);
+    assert(cui_key_from_character('!') == CUI_KEY_NONE);
+    assert(cui_key_from_character((char)0xff) == CUI_KEY_NONE);
+    assert(!cui_key_character(CUI_KEY_ENTER));
+    assert(!cui_key_character((cui_key)-1));
+    assert(!cui_key_character((cui_key)999));
+}
 static void test_persistent_scroll_routing(void) {
     cui_context *ui = make();
     begin(ui);
@@ -2233,6 +2249,7 @@ int main(void) {
     test_nested_wheel_routing();
     test_dominant_axis_scroll();
     test_persistent_scroll_routing();
+    test_shortcut_key_characters();
     test_perceptual_color_mix();
     test_focusable_container();
     test_nonfocusable_proxy_button();

@@ -161,7 +161,9 @@ cui_context *cui_create(cui_config config) {
     ui->previous_layers = calloc(config.max_elements, sizeof(*ui->previous_layers));
     Clay_Context *saved = Clay_GetCurrentContext();
     Clay_SetCurrentContext(NULL);
-    Clay_SetMaxElementCount((int32_t)(config.max_elements + 32));
+    /* Clay's ID map retains the prior layout until EndLayout retires old IDs.
+     * Reserve both generations while CUI's own limits bound current elements. */
+    Clay_SetMaxElementCount((int32_t)(config.max_elements * 2 + 32));
     size_t n = Clay_MinMemorySize();
     ui->arena = malloc(n);
     if (!ui->commands || !ui->semantics || !ui->previous || !ui->ids || !ui->activations ||

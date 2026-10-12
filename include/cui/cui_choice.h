@@ -49,10 +49,13 @@ typedef struct {
     float search_time;
     size_t first_visible;
 } cui_list_state;
+typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
 typedef struct {
     bool disabled, menu;
     float dt;
-    size_t visible_begin, visible_count; /* count=0 submits all items */
+    size_t visible_begin, visible_count;  /* count=0 submits all items */
+    cui_choice_activation_fn on_activate; /* synchronous, in event order */
+    void *activation_user;
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -80,6 +83,17 @@ bool cui_select(cui_context *, cui_id trigger, const cui_theme *, cui_str name, 
 bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
               const cui_choice_item *, size_t count, cui_id *action, cui_choice_popup *,
               cui_choice_popup_options);
+bool cui_base_selection_remove(cui_context *, cui_id chip, cui_str name, bool *selected,
+                               bool disabled);
+bool cui_base_list_multi(cui_context *, const cui_choice_item *, size_t count, bool *selected,
+                         cui_list_state *, cui_list_options);
+bool cui_list_multi(cui_context *, cui_id container, const cui_theme *, const cui_choice_item *,
+                    size_t count, bool *selected, cui_list_state *, cui_list_options);
+/* Multi-select keeps the popup open while toggling options; Escape/outside
+ * dismiss. The selected summary and chips remain caller-controlled. */
+bool cui_select_multi(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
+                      cui_str placeholder, const cui_choice_item *, size_t count, bool *selected,
+                      cui_choice_popup *, cui_choice_popup_options);
 typedef struct {
     bool changed, query_changed;
     size_t matching_count;
@@ -96,6 +110,16 @@ cui_combobox_result cui_combobox(cui_context *, cui_id input, const cui_theme *,
                                  cui_edit *query, const cui_choice_item *, size_t count,
                                  cui_choice_item *filtered, size_t filtered_capacity,
                                  cui_id *selected, cui_choice_popup *, cui_choice_popup_options);
+cui_combobox_result cui_base_combobox_multi(cui_context *, cui_id input, cui_str name, cui_edit *,
+                                            const cui_choice_item *, size_t count,
+                                            cui_choice_item *filtered, bool *filtered_selected,
+                                            size_t filtered_capacity, bool *selected,
+                                            cui_choice_popup *, bool disabled);
+cui_combobox_result cui_combobox_multi(cui_context *, cui_id input, const cui_theme *, cui_str name,
+                                       cui_edit *, const cui_choice_item *, size_t count,
+                                       cui_choice_item *filtered, bool *filtered_selected,
+                                       size_t filtered_capacity, bool *selected, cui_choice_popup *,
+                                       cui_choice_popup_options);
 #ifdef __cplusplus
 }
 #endif

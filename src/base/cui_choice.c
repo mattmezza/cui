@@ -186,6 +186,8 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             size_t chosen = events[e].type == CUI_EVENT_POINTER_UP ? target : from;
             *selected = state->active = items[chosen].id;
             activated = true;
+            if (options.on_activate)
+                options.on_activate(items[chosen].id, options.activation_user);
         }
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             size_t next = cui_choice_navigate(items, count, from, events[e].key, true);
@@ -348,10 +350,12 @@ static bool cui_choice_contains(cui_str label, cui_str query) {
     }
     return false;
 }
-cui_combobox_result cui_base_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit *query,
-                                      const cui_choice_item *items, size_t count,
-                                      cui_choice_item *filtered, size_t capacity, cui_id *selected,
-                                      cui_choice_popup *state, bool disabled) {
+static cui_combobox_result
+cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit *query,
+                           const cui_choice_item *items, size_t count, cui_choice_item *filtered,
+                           size_t capacity, cui_id *selected, cui_choice_popup *state,
+                           bool disabled, bool keep_open, cui_choice_activation_fn commit_fn,
+                           void *commit_user) {
     cui_combobox_result result = {.error = CUI_EDIT_OK};
     if (!query || !selected || !state || !state->overlay.id || (!items && count) ||
         (!filtered && capacity) || capacity < count || cui_edit_get_state(query).multiline) {
@@ -418,17 +422,105 @@ cui_combobox_result cui_base_combobox(cui_context *ui, cui_id input, cui_str nam
             active = next;
             state->list.active = filtered[active].id;
         }
-        if (events[e].key == CUI_KEY_ENTER && !events[e].repeat && active != matched)
+        if (events[e].key == CUI_KEY_ENTER && !events[e].repeat && active != matched) {
+            cui_id old = *selected;
+            *selected = filtered[active].id;
+            state->list.active = *selected;
+            if (commit_fn)
+                commit_fn(*selected, commit_user);
+            result.changed |= keep_open || old != *selected;
             commit = true;
+            if (!keep_open)
+                break;
+        }
     }
-    if (commit) {
-        cui_id old = *selected;
-        *selected = state->list.active;
+    if (commit && !keep_open) {
         cui_overlay_close(ui, &state->overlay);
         cui_set_semantic_details(
             ui, input, (cui_semantic_details){.controls = state->overlay.id, .description = text});
-        result.changed = old != *selected;
+    }
+    return result;
+}
+
+typedef struct {
+    const cui_choice_item *items;
+    size_t count;
+    bool *selected;
+    cui_choice_activation_fn external;
+    void *external_user;
+} cui_choice_multi_reducer;
+static void cui_choice_multi_activate(cui_id item, void *user) {
+    cui_choice_multi_reducer *reducer = user;
+    for (size_t i = 0; i < reducer->count; i++)
+        if (reducer->items[i].id == item) {
+            reducer->selected[i] = !reducer->selected[i];
+            break;
+        }
+    if (reducer->external)
+        reducer->external(item, reducer->external_user);
+}
+bool cui_base_list_multi(cui_context *ui, const cui_choice_item *items, size_t count,
+                         bool *selected, cui_list_state *state, cui_list_options options) {
+    if (!items || !state || !selected || !count)
+        return false;
+    cui_choice_multi_reducer reducer = {items, count, selected, options.on_activate,
+                                        options.activation_user};
+    options.on_activate = cui_choice_multi_activate;
+    options.activation_user = &reducer;
+    cui_id action = 0;
+    bool activated = cui_base_list(ui, items, count, &action, state, options);
+    for (size_t i = 0; i < count; i++) {
+        cui_update_semantic(ui, items[i].id, selected[i], (float)i);
+        cui_set_semantic_details(ui, items[i].id, (cui_semantic_details){.selected = selected[i]});
+    }
+    return activated;
+}
+
+bool cui_base_selection_remove(cui_context *ui, cui_id chip, cui_str name, bool *selected,
+                               bool disabled) {
+    if (!selected)
+        return false;
+    cui_interact(ui, chip, CUI_ROLE_BUTTON, name, disabled, false, 0);
+    cui_set_semantic_details(
+        ui, chip, (cui_semantic_details){.description = cui_string("Remove selected option")});
+    size_t event_count = 0;
+    cui_frame_events(ui, &event_count);
+    if (!disabled && *selected)
+        for (size_t e = 0; e < event_count; e++)
+            if (cui_event_activation(ui, e) == chip) {
+                *selected = false;
+                return true;
+            }
+    return false;
+}
+
+cui_combobox_result cui_base_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit *query,
+                                      const cui_choice_item *items, size_t count,
+                                      cui_choice_item *filtered, size_t capacity, cui_id *selected,
+                                      cui_choice_popup *state, bool disabled) {
+    return cui_choice_reduce_combobox(ui, input, name, query, items, count, filtered, capacity,
+                                      selected, state, disabled, false, NULL, NULL);
+}
+cui_combobox_result cui_base_combobox_multi(cui_context *ui, cui_id input, cui_str name,
+                                            cui_edit *query, const cui_choice_item *items,
+                                            size_t count, cui_choice_item *filtered,
+                                            bool *filtered_selected, size_t capacity,
+                                            bool *selected, cui_choice_popup *state,
+                                            bool disabled) {
+    if (!selected || (!filtered_selected && capacity))
+        return (cui_combobox_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_choice_multi_reducer reducer = {items, count, selected, NULL, NULL};
+    cui_id action = 0;
+    cui_combobox_result result = cui_choice_reduce_combobox(
+        ui, input, name, query, items, count, filtered, capacity, &action, state, disabled, true,
+        cui_choice_multi_activate, &reducer);
+    if (result.error != CUI_EDIT_OK)
         return result;
+    size_t source = 0;
+    for (size_t i = 0; i < result.matching_count; i++) {
+        while (source < count && items[source].id != filtered[i].id)
+            source++;
+        filtered_selected[i] = source < count ? selected[source++] : false;
     }
     return result;
 }

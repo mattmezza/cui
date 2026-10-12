@@ -232,9 +232,135 @@ static void test_combobox(void) {
     cui_edit_destroy(query);
     cui_destroy(ui);
 }
+
+static size_t action_count;
+static void record_action(cui_id id, void *user) {
+    (void)user;
+    assert(id == 10 || id == 30);
+    action_count++;
+}
+static bool multi_scene(cui_context *ui, bool *chosen, cui_choice_popup *popup, bool standalone) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    bool changed;
+    if (standalone)
+        changed = cui_list_multi(ui, 90, &theme, items, 3, chosen, &popup->list,
+                                 (cui_list_options){.on_activate = record_action});
+    else
+        changed = cui_select_multi(ui, 2, &theme, cui_string("Accounts"),
+                                   cui_string("Choose accounts"), items, 3, chosen, popup,
+                                   (cui_choice_popup_options){.viewport = {0, 0, 640, 480}});
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void test_multi_select(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    bool chosen[3] = {false, false, false};
+    cui_choice_popup popup;
+    cui_choice_popup_init(&popup, 800);
+    multi_scene(ui, chosen, &popup, true);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_ENTER);
+    key(ui, CUI_KEY_ENTER);
+    assert(multi_scene(ui, chosen, &popup, true));
+    assert(!chosen[0] && action_count == 2);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(multi_scene(ui, chosen, &popup, true));
+    assert(chosen[2] && action_count == 3);
+    chosen[2] = false;
+    multi_scene(ui, chosen, &popup, false);
+    click(ui, 2);
+    multi_scene(ui, chosen, &popup, false);
+    assert(popup.overlay.open && cui_focused(ui) == 10);
+    key(ui, CUI_KEY_ENTER);
+    assert(multi_scene(ui, chosen, &popup, false));
+    assert(chosen[0] && popup.overlay.open);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(multi_scene(ui, chosen, &popup, false));
+    assert(chosen[0] && chosen[2] && !chosen[1] && popup.overlay.open);
+    size_t n = 0;
+    const cui_semantic *s = cui_semantics(ui, &n);
+    bool first = false, last = false;
+    for (size_t i = 0; i < n; i++) {
+        if (s[i].id == 10)
+            first = s[i].details.selected && s[i].checked;
+        if (s[i].id == 30)
+            last = s[i].details.selected && s[i].checked;
+    }
+    assert(first && last);
+    key(ui, CUI_KEY_ESCAPE);
+    assert(!multi_scene(ui, chosen, &popup, false));
+    assert(!popup.overlay.open && cui_focused(ui) == 2);
+    cui_id chip = 10 ^ UINT64_C(0x45f2b82e6c9bf447);
+    click(ui, chip);
+    assert(multi_scene(ui, chosen, &popup, false));
+    assert(!chosen[0] && chosen[2] && cui_focused(ui) == 2);
+    cui_destroy(ui);
+}
+
+static cui_combobox_result combo_multi_scene(cui_context *ui, cui_edit *query,
+                                             cui_choice_popup *popup, bool *chosen,
+                                             cui_choice_item *scratch, bool *scratch_selected) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_combobox_result result = cui_combobox_multi(
+        ui, 2, &theme, cui_string("Search accounts"), query, items, 3, scratch, scratch_selected, 3,
+        chosen, popup, (cui_choice_popup_options){.viewport = {0, 0, 640, 480}});
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_multi_combobox(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    char text[64] = "";
+    cui_edit *query = cui_edit_create((cui_edit_config){
+        .buffer = text, .capacity = sizeof(text), .history_bytes = 1024, .max_history_steps = 16});
+    assert(query);
+    bool chosen[3] = {false, false, false}, scratch_selected[3];
+    cui_choice_item scratch[3];
+    cui_choice_popup popup;
+    cui_choice_popup_init(&popup, 900);
+    combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    click(ui, 2);
+    combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(popup.overlay.open && cui_focused(ui) == 2);
+    key(ui, CUI_KEY_ENTER);
+    key(ui, CUI_KEY_ENTER);
+    cui_combobox_result result =
+        combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(result.changed && !chosen[0] && popup.overlay.open && cui_focused(ui) == 2);
+    key(ui, CUI_KEY_ENTER);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    result = combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(result.changed && chosen[0] && chosen[2] && !chosen[1] && popup.overlay.open);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "fir"}));
+    result = combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(result.matching_count == 1 && scratch[0].id == 10 && scratch_selected[0]);
+    /* Selecting one filtered item preserves selections filtered out of view. */
+    click(ui, 10);
+    result = combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(result.changed && !chosen[0] && chosen[2] && popup.overlay.open);
+    key(ui, CUI_KEY_ESCAPE);
+    result = combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(!popup.overlay.open && chosen[2]);
+    cui_id chip = 30 ^ UINT64_C(0x45f2b82e6c9bf447);
+    click(ui, chip);
+    result = combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
+    assert(result.changed && !chosen[2] && cui_focused(ui) == 2);
+    cui_edit_destroy(query);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
+    test_multi_select();
+    test_multi_combobox();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

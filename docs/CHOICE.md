@@ -136,8 +136,40 @@ Up/Down plus Enter in one event batch. List, Tabs, ToggleGroup and Accordion als
 have batched navigation-plus-activation tests using the core's validated per-event
 activation reports. Two same-frame Collapsible activations both take effect.
 
-This initial Combobox is single selection. Chips, multiple selection, remote
-query delegates, query/label synchronization policies, Unicode collation, IME,
+Combobox supports single and multiple selection. Remote query delegates,
+query/label synchronization policies, Unicode collation, IME,
 painted caret and selection, and the OS accessibility bridge remain incomplete.
 The current suggestion reducer applies edits before filtering for the frame;
 interleaving text edits and commits in a single batch is a remaining ordering gap.
+
+
+## Multiple selection
+
+`cui_base_list_multi`, `cui_list_multi`, `cui_select_multi`,
+`cui_base_combobox_multi` and `cui_combobox_multi` use a caller-owned boolean per
+source item. Multi Select and Combobox keep their popup open while toggling choices.
+Each visible option exposes its selected state and a checked visual indicator.
+Escape/outside dismissal preserves the selected set. Selected values render as
+pill buttons; activating a pill removes that enabled choice and returns focus to
+the trigger/input. Disabled choices cannot be selected or removed by interaction.
+
+Multi Combobox additionally takes a `bool *filtered_selected` scratch array with
+the same capacity as its filtered item array. Filtering preserves selected choices
+outside the current query, and toggling a filtered option modifies only its source
+item. Query text and committed values remain independent application state. There
+are no implicit string concatenations or hidden allocation limits on the source
+set; visible popup windows are bounded as for single selection.
+
+List options can supply a synchronous `on_activate(item_id, user)` callback. It
+runs for every validated activation in input order, including repeated activation
+of one item in a frame. Multi reducers use this ordered callback so two queued
+activations toggle twice. Do not change the borrowed item arrays or their count
+inside the callback. A true return value reports an activation even when two
+toggles return the selected set to its prior value.
+
+Tests cover repeated toggles, selection of multiple enabled items, accessible
+selected flags, persistent popup state, removing chips, query filtering that hides
+selected choices, pointer toggling of filtered suggestions and focus restoration.
+The chip ID is its source item ID XOR `0x45f2b82e6c9bf447`; the chip container is
+the trigger/input ID XOR `0x97c22bb751e0d56a`. Multi Select's outer container uses
+`0x471d50d3bf973ac9`. Reserve those IDs as with other component internals.

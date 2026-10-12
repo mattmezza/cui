@@ -1,0 +1,3 @@
+Portable source: 593bbb1
+Scope: centered AlertDialog content and small-panel overflow scrolling.
+test_surface: /home/matteo/.cache/cui-worktrees/alert-content/tests/unit/test_surface.c:287: styled_confirmation: Assertion `fabsf(content.y + content.h / 2 - panel.y - panel.h / 2) < .01f' failed.

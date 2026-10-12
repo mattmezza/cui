@@ -1,8 +1,8 @@
 {
   "source": "996e356",
-  "published_source": "edea48411392b0f0069f7b035bc32f07bb42f4b4",
+  "published_source": "59a0988ecf432f371378e1398193587de6806fb3",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Recovery source 996e356 passes native51/51, sanitizers49/49, WASI42/42 and Chromium60 stories. Includes graphical Checkbox/Radio/Switch and Choice checks, automatic system theme, and deterministic Dropdown browser frame readiness. Public remains edea484 pending deployment. All78 entries retained; full parity unfinished.",
+  "summary": "Recovery source 996e356 passes native51/51, sanitizers49/49, WASI42/42 and Chromium60 stories. Includes graphical Checkbox/Radio/Switch and Choice checks, automatic system theme, and deterministic Dropdown browser frame readiness. Public59a0988 verified: all six CI jobs and Pages passed, HTTPS Chromium verified system-theme changes and graphical controls. All78 entries retained; full parity unfinished.",
   "checks": [
     {
       "name": "native",
@@ -38,5 +38,6 @@
     "status": "failed",
     "reason": "Dropdown browser test read stale frame after changing options; natural-frame readiness repair integrated",
     "log": "pages-157961a-failure.txt"
-  }
+  },
+  "published_evidence": "published-59a0988.txt"
 }

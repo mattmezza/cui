@@ -1,0 +1,4 @@
+Checkbox rendered 4 draw commands
+Radio rendered 8 draw commands
+Switch rendered 7 draw commands
+Public59a0988: system dark default and live light change; Checkbox/Radio/Switch rendered;78 catalog entries; no page errors

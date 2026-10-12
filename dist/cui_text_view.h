@@ -69,7 +69,9 @@ typedef struct {
     bool table_header, image_ready;
     cui_text_view_alignment alignment;
     cui_bitmap image;
-    cui_rect bounds;
+    cui_rect bounds, table_frame;
+    float table_track_width;
+    cui_scroll_state table_scroll;
     float actions_height, text_inset;
 } cui_text_view_block;
 typedef struct {
@@ -161,6 +163,7 @@ cui_text_view_style cui_text_view_style_default(void);
 cui_text_view_style cui_text_view_style_from_theme(const cui_theme *);
 typedef struct {
     float width, height, dt;
+    cui_text_view_table_mode table_mode;
     float code_actions_height, table_actions_height;
     bool selectable, scrollable, disabled, stream_fade, reduced_motion;
     size_t max_lines;
@@ -330,9 +333,19 @@ static bool cui_text_view_block_begin(cui_text_view_parser *p, cui_text_view_blo
         return false;
     }
     p->block = p->blocks++;
-    if (p->write)
-        p->state->workspace.blocks[p->block] = (cui_text_view_block){
-            .kind = kind, .text = {p->text, p->text}, .source = {start, start}, .level = level};
+    if (p->write) {
+        cui_scroll_state scroll = {0};
+        if (kind == CUI_TEXT_VIEW_TABLE_CELL && p->block < p->state->block_count) {
+            const cui_text_view_block *old = &p->state->workspace.blocks[p->block];
+            if (old->kind == kind && old->source.begin == start)
+                scroll = old->table_scroll;
+        }
+        p->state->workspace.blocks[p->block] = (cui_text_view_block){.kind = kind,
+                                                                     .text = {p->text, p->text},
+                                                                     .source = {start, start},
+                                                                     .level = level,
+                                                                     .table_scroll = scroll};
+    }
     p->last.text.end = SIZE_MAX;
     return true;
 }
@@ -1542,12 +1555,17 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         return CUI_TEXT_VIEW_CAPACITY;
     s->glyph_count = 0;
     float y = 0;
+    size_t table_first = 0;
     for (size_t b = 0; b < s->block_count;) {
         cui_text_view_block *block = &s->workspace.blocks[b];
         if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
             unsigned table = block->table, row = block->row;
             if (b == 0 || s->workspace.blocks[b - 1].kind != CUI_TEXT_VIEW_TABLE_CELL ||
                 s->workspace.blocks[b - 1].table != table) {
+                table_first = b;
+                s->workspace.blocks[b].table_frame = (cui_rect){0, y, o.width, 0};
+                if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+                    y += 1;
                 size_t end = b + 1;
                 while (end < s->block_count &&
                        s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
@@ -1561,6 +1579,8 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             while (b < s->block_count && s->workspace.blocks[b].kind == CUI_TEXT_VIEW_TABLE_CELL &&
                    s->workspace.blocks[b].table == table && s->workspace.blocks[b].row == row) {
                 float x = s->workspace.blocks[b].bounds.x, w = s->workspace.blocks[b].bounds.w;
+                if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+                    x += 1;
                 if (!cui_text_view_layout_block(s, b, x, y, w, o, measure, user))
                     return CUI_TEXT_VIEW_INVALID;
                 if (s->workspace.blocks[b].bounds.h > height)
@@ -1572,7 +1592,18 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             y += height;
             if (b == s->block_count || s->workspace.blocks[b].kind != CUI_TEXT_VIEW_TABLE_CELL ||
                 s->workspace.blocks[b].table != table) {
-                s->workspace.blocks[b - 1].actions_height = o.table_actions_height;
+                cui_text_view_block *first_cell = &s->workspace.blocks[table_first];
+                cui_text_view_block *last_cell = &s->workspace.blocks[b - 1];
+                if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+                    y += 1;
+                first_cell->table_frame.h = y - first_cell->table_frame.y;
+                float track_end = 0;
+                for (size_t cell = table_first; cell < b; ++cell)
+                    track_end = fmaxf(track_end, s->workspace.blocks[cell].bounds.x +
+                                                     s->workspace.blocks[cell].bounds.w);
+                first_cell->table_track_width =
+                    track_end + (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
+                last_cell->actions_height = o.table_actions_height;
                 y +=
                     o.paragraph_gap + (o.table_actions_height > 0 ? o.table_actions_height + 4 : 0);
             }
@@ -1953,10 +1984,30 @@ static size_t cui_text_view_next(cui_str text, size_t at) {
     }
     return at;
 }
+static size_t cui_text_view_pointer_hit(const cui_text_view_state *s, float x, float y,
+                                        cui_text_view_table_mode mode) {
+    if (mode != CUI_TEXT_VIEW_TABLE_WRAP)
+        for (size_t i = 0; i < s->block_count; ++i) {
+            const cui_text_view_block *b = &s->workspace.blocks[i];
+            if (b->kind != CUI_TEXT_VIEW_TABLE_CELL ||
+                (i && s->workspace.blocks[i - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                 s->workspace.blocks[i - 1].table == b->table))
+                continue;
+            if (y >= b->table_frame.y && y < b->table_frame.y + b->table_frame.h) {
+                x += b->table_scroll.x;
+                break;
+            }
+        }
+    return cui_text_view_hit(s, x, y);
+}
 static bool cui_text_view_selection_target(const cui_text_view_state *s, cui_id root,
                                            cui_id target) {
     if (target == root || target == (root ^ UINT64_C(0x891dd9c052ad9f04)))
         return true;
+    for (size_t i = 0; i < s->block_count; ++i)
+        if (s->workspace.blocks[i].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+            target == (root ^ UINT64_C(0x9c7a1d9300000000) ^ (uint64_t)i))
+            return true;
     for (size_t i = 0; i < s->glyph_count; ++i) {
         const cui_text_view_glyph *g = &s->workspace.glyphs[i];
         const cui_text_view_span *span = &s->workspace.spans[g->span];
@@ -2002,8 +2053,8 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                      cui_text_view_selection_target(s, id, cui_event_target(ui, i));
         if (pointer && ((e->type == CUI_EVENT_POINTER_DOWN && owned) ||
                         (s->selecting && cui_pointer_scope_allowed(ui, id)))) {
-            size_t at =
-                cui_text_view_hit(s, e->x - s->viewport.x, e->y - s->viewport.y + s->scroll.y);
+            size_t at = cui_text_view_pointer_hit(s, e->x - s->viewport.x,
+                                                  e->y - s->viewport.y + s->scroll.y, o.table_mode);
             if (at == SIZE_MAX)
                 continue;
             if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY) {
@@ -2145,15 +2196,21 @@ static void cui_text_view_link(cui_context *ui, cui_id id, cui_text_view_state *
         }
     }
 }
-static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *theme,
-                                cui_text_view_state *s, cui_text_view_style style,
-                                cui_text_view_options o, float viewport) {
+static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_theme *theme,
+                                      cui_text_view_state *s, cui_text_view_style style,
+                                      cui_text_view_options o, float viewport, size_t begin,
+                                      size_t finish, float origin_x, float origin_y,
+                                      bool actions_only) {
     float scroll = o.scrollable ? s->scroll.y : 0;
-    for (size_t i = 0; i < s->block_count; ++i) {
+    for (size_t i = begin; i < finish; ++i) {
         cui_text_view_block *b = &s->workspace.blocks[i];
+        if (actions_only)
+            continue;
         cui_rect r = b->bounds;
         if (r.y + r.h <= scroll || r.y >= scroll + viewport)
             continue;
+        r.x -= origin_x;
+        r.y -= origin_y;
         cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
         if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
             cui_text_view_quad(ui, part, r, style.code_background);
@@ -2161,16 +2218,24 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
             if (s->clamped && r.y + 4 + style.line_height > s->height &&
                 style.line_height <= s->height)
                 continue;
-            cui_begin_absolute_box(ui, part,
-                                   (cui_box){.background = b->table_header ? style.code_background
-                                                                           : style.table_background,
-                                             .border = style.border,
-                                             .custom_border_edges = true,
-                                             .border_edges = {.left = b->column == 0 ? 1 : 0,
-                                                              .right = 1,
-                                                              .top = b->row == 0 ? 1 : 0,
-                                                              .bottom = 1}},
-                                   r);
+            cui_begin_absolute_box(
+                ui, part,
+                (cui_box){
+                    .background = b->table_header ? style.code_background : style.table_background,
+                    .border = style.border,
+                    .custom_border_edges = true,
+                    .border_edges =
+                        {.left = o.table_mode == CUI_TEXT_VIEW_TABLE_WRAP && b->column == 0 ? 1 : 0,
+                         .right = o.table_mode == CUI_TEXT_VIEW_TABLE_WRAP ||
+                                          b->column + 1 < b->table_columns
+                                      ? 1
+                                      : 0,
+                         .top = o.table_mode == CUI_TEXT_VIEW_TABLE_WRAP && b->row == 0 ? 1 : 0,
+                         .bottom = o.table_mode == CUI_TEXT_VIEW_TABLE_WRAP ||
+                                           b->row < s->workspace.blocks[finish - 1].row
+                                       ? 1
+                                       : 0}},
+                r);
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_QUOTE)
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
@@ -2198,6 +2263,10 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
     for (size_t i = 0; i < s->glyph_count;) {
         cui_text_view_glyph *first = &s->workspace.glyphs[i];
         cui_text_view_span *span = &s->workspace.spans[first->span];
+        if (actions_only || first->block < begin || first->block >= finish) {
+            ++i;
+            continue;
+        }
         if (span->link.begin == span->link.end ||
             !cui_text_view_visible(s, first->bounds, scroll, viewport)) {
             ++i;
@@ -2219,11 +2288,16 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                          ((uint64_t)first->text.begin << 24);
         cui_text_view_block *block = &s->workspace.blocks[first->block];
         bool cell = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        r.x -= origin_x;
+        r.y -= origin_y;
+        cui_rect cell_bounds = block->bounds;
+        cell_bounds.x -= origin_x;
+        cell_bounds.y -= origin_y;
         if (cell) {
             cui_begin_absolute_box(ui, link_id ^ UINT64_C(0x63a471cf00000000),
-                                   (cui_box){.clip = true}, block->bounds);
-            r.x -= block->bounds.x;
-            r.y -= block->bounds.y;
+                                   (cui_box){.clip = true}, cell_bounds);
+            r.x -= cell_bounds.x;
+            r.y -= cell_bounds.y;
         }
         cui_interaction interaction = cui_interact(
             ui, link_id, CUI_ROLE_LINK,
@@ -2242,7 +2316,8 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                                      s->anchor > s->cursor ? s->anchor : s->cursor};
     for (size_t i = 0; i < s->glyph_count;) {
         cui_text_view_glyph *first = &s->workspace.glyphs[i];
-        if (!cui_text_view_visible(s, first->bounds, scroll, viewport)) {
+        if (actions_only || first->block < begin || first->block >= finish ||
+            !cui_text_view_visible(s, first->bounds, scroll, viewport)) {
             ++i;
             continue;
         }
@@ -2278,11 +2353,16 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         bool is_link = span->link.end > span->link.begin;
         cui_text_view_block *block = &s->workspace.blocks[first->block];
         bool cell = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        r.x -= origin_x;
+        r.y -= origin_y;
+        cui_rect cell_bounds = block->bounds;
+        cell_bounds.x -= origin_x;
+        cell_bounds.y -= origin_y;
         if (cell) {
             cui_begin_absolute_box(ui, leaf ^ UINT64_C(0x63a471cf00000000), (cui_box){.clip = true},
-                                   block->bounds);
-            r.x -= block->bounds.x;
-            r.y -= block->bounds.y;
+                                   cell_bounds);
+            r.x -= cell_bounds.x;
+            r.y -= cell_bounds.y;
         }
         if (first->flags & CUI_TEXT_VIEW_CODE)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x719ccbbb), r, style.code_background);
@@ -2311,17 +2391,21 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         i = end;
     }
     /* Actions paint after document glyphs so the code overlay covers underlying text. */
-    for (size_t i = 0; i < s->block_count; ++i) {
+    for (size_t i = begin; i < finish; ++i) {
         cui_text_view_block *b = &s->workspace.blocks[i];
         cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
         if (b->actions_height > 0 && ((b->kind == CUI_TEXT_VIEW_CODE_BLOCK && o.code_actions) ||
                                       (b->kind == CUI_TEXT_VIEW_TABLE_CELL && o.table_actions))) {
             bool code = b->kind == CUI_TEXT_VIEW_CODE_BLOCK;
-            float y = code ? b->bounds.y + 8 : b->bounds.y + b->bounds.h + 4;
+            float y = code ? b->bounds.y + 8
+                           : b->bounds.y + b->bounds.h + 4 +
+                                 (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
             cui_rect action_bounds = {code ? 8 : 0, y, code ? fmaxf(1, s->width - 16) : s->width,
                                       b->actions_height};
             if (action_bounds.y + action_bounds.h <= scroll || action_bounds.y >= scroll + viewport)
                 continue;
+            action_bounds.x -= origin_x;
+            action_bounds.y -= origin_y;
             cui_id action_id = part ^ UINT64_C(0x513b5e17);
             cui_begin_absolute_box(ui, action_id,
                                    (cui_box){.align_x = code ? CUI_ALIGN_END : CUI_ALIGN_START},
@@ -2341,6 +2425,63 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                 cui_end_box(ui);
             cui_end_box(ui);
         }
+    }
+}
+static cui_id cui_text_view_table_scroll_id(cui_id id, size_t first) {
+    return id ^ UINT64_C(0x9c7a1d9300000000) ^ (uint64_t)first;
+}
+static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *theme,
+                                cui_text_view_state *s, cui_text_view_style style,
+                                cui_text_view_options o, float viewport) {
+    if (o.table_mode == CUI_TEXT_VIEW_TABLE_WRAP) {
+        cui_text_view_paint_range(ui, id, theme, s, style, o, viewport, 0, s->block_count, 0, 0,
+                                  false);
+        return;
+    }
+    for (size_t first = 0; first < s->block_count;) {
+        size_t end = first + 1;
+        cui_text_view_block *block = &s->workspace.blocks[first];
+        bool table = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        while (end < s->block_count &&
+               (table ? s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                            s->workspace.blocks[end].table == block->table
+                      : s->workspace.blocks[end].kind != CUI_TEXT_VIEW_TABLE_CELL))
+            ++end;
+        if (!table) {
+            cui_text_view_paint_range(ui, id, theme, s, style, o, viewport, first, end, 0, 0,
+                                      false);
+        } else {
+            cui_rect frame = block->table_frame;
+            cui_id scroll_id = cui_text_view_table_scroll_id(id, first);
+            cui_begin_absolute_box(ui, scroll_id ^ UINT64_C(0x26ad123),
+                                   (cui_box){.clip = true,
+                                             .background = style.table_background,
+                                             .border = style.border,
+                                             .border_width = 1,
+                                             .padding = 1,
+                                             .radius = theme->radius},
+                                   frame);
+            cui_scroll_options scroll = {.width = fmaxf(1, frame.w - 2),
+                                         .height = fmaxf(1, frame.h - 2),
+                                         .content_width = fmaxf(1, block->table_track_width - 2),
+                                         .content_height = fmaxf(1, frame.h - 2),
+                                         .horizontal = true,
+                                         .hide_scrollbars = true,
+                                         .axis_lock = true,
+                                         .disabled = o.disabled};
+            cui_theme scroll_theme = *theme;
+            scroll_theme.surface = style.table_background;
+            if (cui_scrollable_begin(ui, scroll_id, &scroll_theme, &block->table_scroll, scroll)) {
+                cui_text_view_options body = o;
+                body.table_actions = NULL;
+                cui_text_view_paint_range(ui, id, theme, s, style, body, viewport, first, end,
+                                          frame.x + 1, frame.y + 1, false);
+                cui_scrollable_end_ex(ui, scroll_id, &scroll_theme, &block->table_scroll, scroll);
+            }
+            cui_end_box(ui);
+            cui_text_view_paint_range(ui, id, theme, s, style, o, viewport, first, end, 0, 0, true);
+        }
+        first = end;
     }
 }
 bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_view_state *s,
@@ -2374,6 +2515,7 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 .paragraph_gap = style.paragraph_gap,
                 .max_lines = o.max_lines,
                 .scrollable = o.scrollable,
+                .table_mode = o.table_mode,
                 .code_actions_height = o.code_actions ? o.code_actions_height : 0,
                 .table_actions_height = o.table_actions ? o.table_actions_height : 0},
             cui_text_view_core_measure, ui) != CUI_TEXT_VIEW_OK)
@@ -2415,6 +2557,33 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                     break;
                 }
             }
+        if (found && o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
+            for (size_t first = 0; first < s->block_count;) {
+                cui_text_view_block *b = &s->workspace.blocks[first];
+                if (b->kind != CUI_TEXT_VIEW_TABLE_CELL) {
+                    ++first;
+                    continue;
+                }
+                size_t end = first + 1;
+                while (end < s->block_count &&
+                       s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                       s->workspace.blocks[end].table == b->table)
+                    ++end;
+                if (s->reveal.begin >= b->text.begin &&
+                    s->reveal.begin <= s->workspace.blocks[end - 1].text.end) {
+                    float x = r.x - b->table_frame.x - 1,
+                          viewport_width = fmaxf(1, b->table_frame.w - 2);
+                    if (x < b->table_scroll.x)
+                        b->table_scroll.x = x;
+                    else if (x + r.w > b->table_scroll.x + viewport_width)
+                        b->table_scroll.x = x + r.w - viewport_width;
+                    b->table_scroll.x = fminf(fmaxf(0, b->table_scroll.x),
+                                              fmaxf(0, b->table_track_width - b->table_frame.w));
+                    r.x -= b->table_scroll.x;
+                    break;
+                }
+                first = end;
+            }
         if (found && o.scrollable) {
             if (r.y < s->scroll.y)
                 s->scroll.y = r.y;
@@ -2435,8 +2604,9 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
         float before = s->scroll.y;
         s->scroll.y = fminf(fmaxf(0, s->scroll.y + speed * o.dt), fmaxf(0, s->height - viewport));
         if (before != s->scroll.y) {
-            size_t at = cui_text_view_hit(s, s->pointer_x - s->viewport.x,
-                                          s->pointer_y - s->viewport.y + s->scroll.y);
+            size_t at =
+                cui_text_view_pointer_hit(s, s->pointer_x - s->viewport.x,
+                                          s->pointer_y - s->viewport.y + s->scroll.y, o.table_mode);
             if (at != SIZE_MAX)
                 (void)cui_text_view_select(s, s->anchor, at);
             cui_invalidate(ui);

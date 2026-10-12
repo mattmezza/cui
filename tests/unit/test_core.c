@@ -734,6 +734,57 @@ static void test_nested_wheel_routing(void) {
     cui_destroy(ui);
 }
 
+static void test_dominant_axis_scroll(void) {
+    cui_context *ui = make();
+    for (int horizontal = 0; horizontal < 2; horizontal++) {
+        begin(ui);
+        scroll_regions(ui, 50, false);
+        assert(cui_set_semantic_role(ui, 20, CUI_ROLE_LOG));
+        cui_set_semantic_details(ui, 10,
+                                 (cui_semantic_details){.scrollable = true,
+                                                        .scroll_x = 50,
+                                                        .scroll_y = 50,
+                                                        .scroll_max_x = 100,
+                                                        .scroll_max_y = 100});
+        cui_set_semantic_details(
+            ui, 20,
+            (cui_semantic_details){.scrollable = true,
+                                   .scroll_axis_lock = true,
+                                   .orientation = horizontal ? CUI_ORIENTATION_HORIZONTAL
+                                                             : CUI_ORIENTATION_VERTICAL,
+                                   .scroll_x = 50,
+                                   .scroll_y = 50,
+                                   .scroll_max_x = 100,
+                                   .scroll_max_y = 100});
+        cui_end_frame(ui);
+        const float dx[] = {-4, -1, -2, 0};
+        const float dy[] = {-1, -4, -2, 0};
+        for (size_t i = 0; i < 4; i++)
+            assert(cui_queue_event(
+                ui,
+                (cui_event){.type = CUI_EVENT_SCROLL, .x = 20, .y = 20, .dx = dx[i], .dy = dy[i]}));
+        begin(ui);
+        assert(cui_event_target(ui, 0) == (horizontal ? 20 : 10));
+        assert(cui_event_target(ui, 1) == (horizontal ? 10 : 20));
+        assert(cui_event_target(ui, 2) == (horizontal ? 10 : 20));
+        assert(!cui_event_target(ui, 3));
+        scroll_regions(ui, 0, false);
+        assert(cui_set_semantic_role(ui, 20, CUI_ROLE_LISTITEM));
+        cui_set_semantic_details(ui, 20,
+                                 (cui_semantic_details){.scrollable = true,
+                                                        .scroll_axis_lock = true,
+                                                        .orientation = CUI_ORIENTATION_VERTICAL,
+                                                        .scroll_max_y = 100});
+        cui_end_frame(ui);
+        wheel(ui, 20, 20, 1);
+        begin(ui);
+        assert(cui_event_target(ui, 0) == 10); /* Axis lock preserves edge chaining. */
+        cui_end_frame(ui);
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void test_table_semantic_roles(void) {
     cui_context *ui = make();
     begin(ui);
@@ -1171,6 +1222,7 @@ int main(void) {
     test_clipped_child_translation();
     test_pointer_scope_guard();
     test_nested_wheel_routing();
+    test_dominant_axis_scroll();
     test_table_semantic_roles();
     test_input();
     test_strings_and_draw();

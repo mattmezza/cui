@@ -97,3 +97,5 @@ sized boxes when positive and finite. Caps constrain a fixed minimum as well;
 short natural content stays short, and an explicit zero dimension stays zero.
 Nonpositive/nonfinite caps mean unbounded. Combine a cap with `clip` to bound
 arbitrary custom children without a previous-frame measurement flash.
+
+`CUI_ROLE_LISTITEM` and `CUI_ROLE_LOG` describe passive list entries and append-oriented logs without adding automatic Tab stops. Optional `scroll_axis_lock` in semantic details uses the declared orientation to accept only dominant-axis wheel motion (ties count as vertical). Unlocked routing is unchanged; a locked region at its boundary still chains to a movable ancestor. Event deltas remain intact for the recipient.

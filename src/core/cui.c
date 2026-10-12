@@ -312,6 +312,16 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
             (event.dx > 0 && d.scroll_x > 0) || (event.dx < 0 && d.scroll_x < d.scroll_max_x);
         bool can_y =
             (event.dy > 0 && d.scroll_y > 0) || (event.dy < 0 && d.scroll_y < d.scroll_max_y);
+        if (d.scroll_axis_lock) {
+            bool vertical = fabsf(event.dy) >= fabsf(event.dx);
+            if (d.orientation == CUI_ORIENTATION_VERTICAL) {
+                can_x = false;
+                can_y = can_y && vertical;
+            } else if (d.orientation == CUI_ORIENTATION_HORIZONTAL) {
+                can_x = can_x && !vertical;
+                can_y = false;
+            }
+        }
         if (!node->disabled && d.scrollable && (can_x || can_y) &&
             ui->previous_layers[i] >= layer) {
             hit = node->id;
@@ -1086,7 +1096,7 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
-        role > CUI_ROLE_LINK)
+        role > CUI_ROLE_LOG)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {

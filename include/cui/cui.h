@@ -108,7 +108,9 @@ typedef enum {
     CUI_ROLE_ROWHEADER,
     CUI_ROLE_ROWGROUP,
     CUI_ROLE_ALERTDIALOG,
-    CUI_ROLE_LINK
+    CUI_ROLE_LINK,
+    CUI_ROLE_LISTITEM,
+    CUI_ROLE_LOG
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -127,6 +129,8 @@ typedef struct {
     unsigned level, pos_in_set, set_size;
     unsigned row_index, column_index, row_count, column_count;
     float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
+    /* Route only dominant-axis wheel motion for the declared orientation. */
+    bool scroll_axis_lock;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

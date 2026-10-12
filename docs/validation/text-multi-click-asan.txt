@@ -1,0 +1,9 @@
+Test project /tmp/cui-text-multiclick/build-asan
+    Start 37: text_view
+1/2 Test #37: text_view ........................   Passed    0.16 sec
+    Start 70: text_view_base_only
+2/2 Test #70: text_view_base_only ..............   Passed    0.10 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   0.26 sec

@@ -118,7 +118,8 @@ typedef struct {
     cui_text_view_format format;
     size_t source_length, text_length, span_count, block_count, glyph_count, highlight_count;
     size_t anchor, cursor;
-    bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected;
+    bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected,
+        selection_override, multi_click_release;
     float pointer_x, pointer_y, press_x, press_y, selection_x, selection_y;
     cui_id secondary_link;
     float time, fade_duration, width, height;
@@ -141,6 +142,11 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *,
                                                   cui_text_view_range source, char *output,
                                                   size_t capacity, size_t *length);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
+/* Frozen multi-click granularity: 2 selects a bounded word, >=3 a logical line.
+ * Offsets clip left to UTF-8 boundaries, and image-separated text runs are isolated.
+ * Counts below 2, image offsets and empty ranges return false without writing out. */
+bool cui_text_view_selection_range_at(const cui_text_view_state *, size_t offset,
+                                      unsigned click_count, cui_text_view_range *out);
 /* Borrowed coordinate slice from workspace.rendered, valid until the next text mutation.
  * Includes one-byte image slots; use copy_selection(PLAIN) for image-free text output. */
 cui_str cui_text_view_selected_text(const cui_text_view_state *);

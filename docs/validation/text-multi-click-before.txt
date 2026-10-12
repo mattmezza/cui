@@ -1,0 +1,1 @@
+cui-text-before-multi: tests/unit/test_text_view.c:2911: multi_click_glyph: Assertion `!f->state.selecting' failed.

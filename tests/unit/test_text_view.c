@@ -46,6 +46,28 @@ static cui_size measure(void *u, cui_str t, float font, unsigned flags) {
             ++count;
     return (cui_size){(float)count * font * .5f, font};
 }
+static void test_multi_click_ranges(void) {
+    static fixture f;
+    setup(&f, CUI_TEXT_VIEW_PLAIN);
+    assert(cui_text_view_set_text(&f.state, text("héllo_world  tail!\nnext")) == CUI_TEXT_VIEW_OK);
+    cui_text_view_range r = {123, 456};
+    assert(!cui_text_view_selection_range_at(&f.state, 2, 1, &r) && r.begin == 123 && r.end == 456);
+    assert(cui_text_view_selection_range_at(&f.state, 2, 2, &r) && r.begin == 0 && r.end == 12);
+    assert(cui_text_view_selection_range_at(&f.state, 12, 2, &r) && r.begin == 12 && r.end == 14);
+    assert(cui_text_view_selection_range_at(&f.state, 18, 2, &r) && r.begin == 18 && r.end == 19);
+    assert(cui_text_view_selection_range_at(&f.state, 2, 4, &r) && r.begin == 0 && r.end == 19);
+    assert(!cui_text_view_selection_range_at(&f.state, SIZE_MAX, 2, &r));
+    char long_word[301];
+    memset(long_word, 'a', 300);
+    long_word[300] = 0;
+    assert(cui_text_view_set_text(&f.state, text(long_word)) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_selection_range_at(&f.state, 150, 2, &r) && r.begin == 22 && r.end == 279);
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("left![alt](asset)right")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_selection_range_at(&f.state, 2, 2, &r) && r.begin == 0 && r.end == 4);
+    assert(!cui_text_view_selection_range_at(&f.state, 4, 2, &r));
+    assert(cui_text_view_selection_range_at(&f.state, 6, 2, &r) && r.begin == 5 && r.end == 10);
+}
 static void test_inline_image_objects(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1837,6 +1859,54 @@ static void shared_selection_frame(cui_context *ui, fixture *a, fixture *b,
     (void)cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
 }
+static void test_shared_multi_click(void) {
+    static fixture a, b;
+    setup(&a, CUI_TEXT_VIEW_MARKDOWN);
+    setup(&b, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&a.state, text("**first** word")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_set_text(&b.state, text("second")) == CUI_TEXT_VIEW_OK);
+    cui_text_view_selection_member storage[2];
+    cui_text_view_selection manager;
+    assert(cui_text_view_selection_init(&manager, storage, 2));
+    assert(cui_text_view_selection_register(
+        &manager,
+        (cui_text_view_selection_member){&a.state, 77, 900, 10, CUI_TEXT_VIEW_TABLE_WRAP, true}));
+    assert(cui_text_view_selection_register(
+        &manager,
+        (cui_text_view_selection_member){&b.state, 78, 900, 20, CUI_TEXT_VIEW_TABLE_WRAP, true}));
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options options = cui_text_view_default();
+    options.width = 200;
+    shared_selection_frame(ui, &a, &b, &manager, options);
+    cui_rect g = a.glyphs[1].bounds;
+    float x = a.state.viewport.x + g.x + g.w * .2f, y = a.state.viewport.y + g.y + g.h * .5f;
+    for (unsigned count = 2; count <= 3; ++count) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                               .pointer_button = CUI_POINTER_PRIMARY,
+                                               .x = x,
+                                               .y = y,
+                                               .click_count = count}));
+        shared_selection_frame(ui, &a, &b, &manager, options);
+        assert(manager.active && !manager.dragging && manager.owner == 77 && cui_focused(ui) == 77);
+        assert(b.state.anchor == b.state.cursor);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                               .pointer_button = CUI_POINTER_PRIMARY,
+                                               .x = x,
+                                               .y = y,
+                                               .click_count = count}));
+        shared_selection_frame(ui, &a, &b, &manager, options);
+        char copy[128];
+        size_t length;
+        assert(cui_text_view_selection_copy(&manager, CUI_TEXT_VIEW_COPY_PLAIN, copy, sizeof copy,
+                                            &length) == CUI_TEXT_VIEW_OK);
+        assert(!strcmp(copy, count == 2 ? "first" : "first word"));
+        assert(cui_text_view_selection_copy(&manager, CUI_TEXT_VIEW_COPY_SOURCE, copy, sizeof copy,
+                                            &length) == CUI_TEXT_VIEW_OK);
+        assert(!strcmp(copy, count == 2 ? "**first**" : "**first** word"));
+    }
+    cui_destroy(ui);
+}
 static void test_shared_selection_events(void) {
     static fixture a, b;
     setup(&a, CUI_TEXT_VIEW_MARKDOWN);
@@ -2827,6 +2897,66 @@ static void test_horizontal_table_gesture(void) {
     assert(f.blocks[0].table_scroll.x == x + 2);
     cui_destroy(ui);
 }
+static void multi_click_glyph(cui_context *ui, fixture *f, cui_text_view_options o, size_t glyph,
+                              unsigned count) {
+    cui_rect r = f->glyphs[glyph].bounds;
+    float x = f->state.viewport.x + r.x + r.w * .2f;
+    float y = f->state.viewport.y + r.y + r.h * .5f;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y,
+                                           .click_count = count}));
+    frame(ui, f, o);
+    assert(!f->state.selecting);
+    size_t anchor = f->state.anchor, cursor = f->state.cursor;
+    assert(anchor != cursor);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y,
+                                           .click_count = count}));
+    frame(ui, f, o);
+    assert(f->state.anchor == anchor && f->state.cursor == cursor && !f->state.selecting);
+}
+static void test_styled_multi_click(void) {
+    static fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("**bold** tail")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 300;
+    frame(ui, &f, o);
+    multi_click_glyph(ui, &f, o, 1, 2);
+    char copy[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, copy, sizeof copy,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(copy, "bold"));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, copy, sizeof copy,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(copy, "**bold**"));
+    multi_click_glyph(ui, &f, o, 1, 3);
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, copy, sizeof copy,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(copy, "bold tail"));
+    assert(cui_text_view_set_text(&f.state, text("left![alt](asset)right tail")) ==
+           CUI_TEXT_VIEW_OK);
+    frame(ui, &f, o);
+    multi_click_glyph(ui, &f, o, 6, 2);
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, copy, sizeof copy,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(copy, "right"));
+    multi_click_glyph(ui, &f, o, 6, 3);
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, copy, sizeof copy,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(copy, "leftright tail"));
+    assert(cui_text_view_set_text(&f.state, text("changed")) == CUI_TEXT_VIEW_OK);
+    assert(!f.state.selection_override && !f.state.multi_click_release &&
+           !f.state.selection_projected);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -2902,6 +3032,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_multi_click_ranges();
     test_document_plain_copy();
     test_shared_disjoint_cells();
     test_shared_selection_model();
@@ -2941,9 +3072,11 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_styled_multi_click();
     test_document_plain_clipboard();
     test_shared_disjoint_cells_paint();
     test_shared_selection_events();
+    test_shared_multi_click();
     test_image_plain_clipboard();
     test_standalone_markdown_object();
     test_linked_image_paint();

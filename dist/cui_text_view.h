@@ -119,7 +119,8 @@ typedef struct {
     cui_text_view_format format;
     size_t source_length, text_length, span_count, block_count, glyph_count, highlight_count;
     size_t anchor, cursor;
-    bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected;
+    bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected,
+        selection_override, multi_click_release;
     float pointer_x, pointer_y, press_x, press_y, selection_x, selection_y;
     cui_id secondary_link;
     float time, fade_duration, width, height;
@@ -142,6 +143,11 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *,
                                                   cui_text_view_range source, char *output,
                                                   size_t capacity, size_t *length);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
+/* Frozen multi-click granularity: 2 selects a bounded word, >=3 a logical line.
+ * Offsets clip left to UTF-8 boundaries, and image-separated text runs are isolated.
+ * Counts below 2, image offsets and empty ranges return false without writing out. */
+bool cui_text_view_selection_range_at(const cui_text_view_state *, size_t offset,
+                                      unsigned click_count, cui_text_view_range *out);
 /* Borrowed coordinate slice from workspace.rendered, valid until the next text mutation.
  * Includes one-byte image slots; use copy_selection(PLAIN) for image-free text output. */
 cui_str cui_text_view_selected_text(const cui_text_view_state *);
@@ -1812,7 +1818,7 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     s->span_count = actual.spans;
     s->block_count = actual.blocks;
     s->glyph_count = 0;
-    s->selection_projected = false;
+    s->selection_projected = s->selection_override = s->multi_click_release = false;
     s->workspace.rendered[s->text_length] = 0;
     s->highlight_count = 0;
     for (size_t i = 0; i < kept; ++i) {
@@ -1839,10 +1845,94 @@ bool cui_text_view_select(cui_text_view_state *s, size_t a, size_t c) {
         !cui_text_view_boundary(cui_text_view_rendered_text(s), c))
         return false;
     bool changed = s->anchor != a || s->cursor != c || s->selection_projected;
-    s->selection_projected = false;
+    s->selection_projected = s->selection_override = s->multi_click_release = false;
     s->anchor = a;
     s->cursor = c;
     return changed;
+}
+static unsigned cui_text_view_codepoint(cui_str text, size_t offset) {
+    size_t n = cui_text_view_scalar(text, offset);
+    unsigned value = n == 1 ? (unsigned char)text.data[offset]
+                            : (unsigned char)text.data[offset] & (n == 2   ? 31u
+                                                                  : n == 3 ? 15u
+                                                                           : 7u);
+    for (size_t i = 1; i < n; ++i)
+        value = (value << 6) | ((unsigned char)text.data[offset + i] & 63u);
+    return value;
+}
+static unsigned cui_text_view_character_kind(unsigned c) {
+    if (c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+        (c >= 0xc0 && c <= 0x24f) || (c >= 0x400 && c <= 0x4ff) || (c >= 0x1e00 && c <= 0x1eff) ||
+        (c >= 0x300 && c <= 0x36f))
+        return 1;
+    if (c == '\n' || c == '\r')
+        return 3;
+    if ((c >= 9 && c <= 13) || c == 32 || c == 0x85 || c == 0xa0 || c == 0x1680 ||
+        (c >= 0x2000 && c <= 0x200a) || c == 0x2028 || c == 0x2029 || c == 0x202f || c == 0x205f ||
+        c == 0x3000)
+        return 2;
+    return 4;
+}
+bool cui_text_view_selection_range_at(const cui_text_view_state *s, size_t offset, unsigned clicks,
+                                      cui_text_view_range *out) {
+    if (!s || clicks < 2)
+        return false;
+    cui_str text = cui_text_view_rendered_text(s);
+    if (offset > text.length)
+        offset = text.length;
+    while (!cui_text_view_boundary(text, offset))
+        --offset;
+    size_t begin = SIZE_MAX, end = 0;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        cui_text_view_range r = s->workspace.blocks[i].text;
+        if (offset >= r.begin && offset < r.end) {
+            begin = r.begin;
+            end = r.end;
+            break;
+        }
+    }
+    if (begin == SIZE_MAX || (s->workspace.mapping[offset].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+        return false;
+    for (size_t i = begin; i < end; ++i)
+        if (s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            if (i < offset)
+                begin = i + 1;
+            else {
+                end = i;
+                break;
+            }
+        }
+    size_t a = offset, b = offset;
+    if (clicks == 2) {
+        size_t n = cui_text_view_scalar(text, offset);
+        unsigned kind = cui_text_view_character_kind(cui_text_view_codepoint(text, offset));
+        b += n;
+        if (kind == 1 || kind == 2) {
+            for (unsigned count = 0; count < 128 && a > begin; ++count) {
+                size_t previous = a - 1;
+                while (!cui_text_view_boundary(text, previous))
+                    --previous;
+                if (cui_text_view_character_kind(cui_text_view_codepoint(text, previous)) != kind)
+                    break;
+                a = previous;
+            }
+            for (unsigned count = 0; count < 128 && b < end; ++count) {
+                if (cui_text_view_character_kind(cui_text_view_codepoint(text, b)) != kind)
+                    break;
+                b += cui_text_view_scalar(text, b);
+            }
+        }
+    } else {
+        while (a > begin && text.data[a - 1] != '\n')
+            --a;
+        while (b < end && text.data[b] != '\n')
+            ++b;
+    }
+    if (a == b)
+        return false;
+    if (out)
+        *out = (cui_text_view_range){a, b};
+    return true;
 }
 cui_str cui_text_view_selected_text(const cui_text_view_state *s) {
     if (!s)
@@ -2950,6 +3040,10 @@ static void cui_text_view_copy_plain_document(const cui_text_view_state *s,
                                               cui_text_view_copy_writer *w) {
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    if (s->selection_override) {
+        cui_text_view_copy_plain(s, w, a, b);
+        return;
+    }
     for (size_t i = 0; i < s->block_count; ++i) {
         const cui_text_view_block *block = &s->workspace.blocks[i];
         cui_text_view_range r = cui_text_view_block_selection(s, i, a, b);
@@ -3337,6 +3431,66 @@ static bool cui_text_view_selection_target(const cui_text_view_state *s, cui_id 
     }
     return false;
 }
+static bool cui_text_view_multi_click(cui_text_view_state *s, cui_text_view_table_mode mode,
+                                      const cui_event *event) {
+    size_t at = cui_text_view_pointer_hit(s, event->x - s->viewport.x,
+                                          event->y - s->viewport.y + s->scroll.y, mode);
+    if (at == SIZE_MAX || event->click_count < 2)
+        return false;
+    size_t hit = SIZE_MAX;
+    float x = event->x - s->viewport.x, y = event->y - s->viewport.y + s->scroll.y;
+    for (size_t i = 0; i < s->glyph_count; ++i) {
+        const cui_text_view_glyph *g = &s->workspace.glyphs[i];
+        float gx = g->bounds.x;
+        if (mode != CUI_TEXT_VIEW_TABLE_WRAP &&
+            s->workspace.blocks[g->block].kind == CUI_TEXT_VIEW_TABLE_CELL)
+            gx -= s->workspace.blocks[g->block].table_scroll.x;
+        if (x >= gx && x < gx + g->bounds.w && y >= g->bounds.y && y < g->bounds.y + g->bounds.h) {
+            hit = i;
+            break;
+        }
+    }
+    if (hit == SIZE_MAX || (s->workspace.glyphs[hit].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+        return false;
+    const cui_text_view_glyph *g = &s->workspace.glyphs[hit];
+    const cui_text_view_block *block = &s->workspace.blocks[g->block];
+    bool flow = false;
+    for (size_t i = 0; i < s->span_count; ++i)
+        if ((s->workspace.spans[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) &&
+            s->workspace.spans[i].text.begin >= block->text.begin &&
+            s->workspace.spans[i].text.end <= block->text.end)
+            flow = true;
+    cui_text_view_range range;
+    if (event->click_count == 3 && flow) {
+        size_t first = SIZE_MAX, last = 0;
+        for (size_t i = 0; i < s->glyph_count; ++i) {
+            const cui_text_view_glyph *other = &s->workspace.glyphs[i];
+            if (other->block == g->block && other->line_top == g->line_top &&
+                !(other->flags & CUI_TEXT_VIEW_INLINE_IMAGE)) {
+                if (first == SIZE_MAX)
+                    first = other->text.begin;
+                last = other->text.end;
+            }
+        }
+        if (first == SIZE_MAX)
+            return false;
+        (void)cui_text_view_select(s, first, last);
+        for (size_t i = 0; i < s->block_count; ++i)
+            s->workspace.blocks[i].projected_selection = (cui_text_view_range){0};
+        s->workspace.blocks[g->block].projected_selection = (cui_text_view_range){first, last};
+        s->selection_projected = true;
+    } else {
+        if (event->click_count == 3)
+            range = block->text;
+        else if (!cui_text_view_selection_range_at(s, at, event->click_count, &range))
+            return false;
+        (void)cui_text_view_select(s, range.begin, range.end);
+        s->selection_override = event->click_count <= 3;
+    }
+    s->selecting = s->dragged = false;
+    s->multi_click_release = true;
+    return true;
+}
 bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
                                     cui_text_view_options o) {
     if (!ui || !m)
@@ -3365,6 +3519,14 @@ bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
                 cui_text_view_selection_clear(m);
                 changed = true;
                 m->owner = p->id;
+                if (e->click_count >= 2) {
+                    m->scope = p->scope;
+                    m->active = cui_text_view_multi_click(p->state, p->table_mode, e);
+                    m->dragging = false;
+                    if (m->active)
+                        cui_focus(ui, p->id);
+                    break;
+                }
                 changed |= cui_text_view_selection_project(m, p->scope, e->x, e->y, e->x, e->y);
                 m->dragging = true;
                 cui_focus(ui, p->id);
@@ -3446,6 +3608,13 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                 s->selecting = false;
             continue;
         }
+        if (e->type == CUI_EVENT_POINTER_UP && e->pointer_button == CUI_POINTER_PRIMARY &&
+            s->multi_click_release && cui_pointer_scope_allowed(ui, id)) {
+            s->multi_click_release = false;
+            (void)cui_cancel_event_activation(ui, i);
+            (void)cui_consume_event(ui, i);
+            continue;
+        }
         bool pointer = e->type == CUI_EVENT_POINTER_DOWN || e->type == CUI_EVENT_POINTER_MOVE ||
                        e->type == CUI_EVENT_POINTER_UP;
         bool owned = pointer && cui_event_within_scope(ui, i, id) &&
@@ -3458,6 +3627,13 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
             if (at == SIZE_MAX)
                 continue;
             if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY) {
+                if (e->click_count >= 2) {
+                    (void)cui_text_view_select(s, at, at);
+                    if (cui_text_view_multi_click(s, o.table_mode, e))
+                        cui_focus(ui, id);
+                    cui_invalidate(ui);
+                    continue;
+                }
                 s->selecting = true;
                 s->dragged = false;
                 s->pointer_x = s->press_x = e->x;

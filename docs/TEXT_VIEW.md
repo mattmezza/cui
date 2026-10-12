@@ -332,7 +332,7 @@ each document's existing reconstruction. Caller copy storage is recommended for
 large multi-view selections; capacity failure leaves the clipboard unchanged.
 Standalone views retain their existing behavior when the manager is absent.
 
-Remaining shared-selection gaps include touch handles, multi-click granularity,
+Remaining shared-selection gaps include touch handles, comprehensive multi-click coverage across every block kind,
 content-key resolution across dynamic renderers, cross-view automatic scrolling,
 and individual image-separated text-run ranges within a paragraph. Projection
 retains a range for each block/table cell and clips to its viewport, rather than
@@ -375,3 +375,5 @@ an image slot by itself; that does not describe the styled pointer behavior.
 HTML Source fallback to Plain and unavailable HTML source offsets match the frozen
 implementation's `effective_format` contract and html5ever's absent source spans;
 they are not missing HTML reconstruction features promised by that source.
+
+Mouse multi-click selection now uses the pinned source character classes and 128-scalar word boundary limit. Double-click selects a word without splitting UTF-8 or crossing image runs; triple-click selects an ordinary paragraph or the visual row in an image-flow paragraph. Higher counts use logical-line boundaries. Plain multi-click copy preserves the chosen text override while Source copy retains Markdown markup. Shared selection clears other members, retains focus ownership and preserves the selection after release. Headless tests cover bounded long words, UTF-8 offsets, whitespace/punctuation, image boundaries, paragraph/row copy, text mutation and shared view ownership. Touch gesture selection and complete coverage of every block/run kind remain unfinished.

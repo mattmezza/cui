@@ -119,6 +119,66 @@ static bool cui_text_view_selection_target(const cui_text_view_state *s, cui_id 
     }
     return false;
 }
+static bool cui_text_view_multi_click(cui_text_view_state *s, cui_text_view_table_mode mode,
+                                      const cui_event *event) {
+    size_t at = cui_text_view_pointer_hit(s, event->x - s->viewport.x,
+                                          event->y - s->viewport.y + s->scroll.y, mode);
+    if (at == SIZE_MAX || event->click_count < 2)
+        return false;
+    size_t hit = SIZE_MAX;
+    float x = event->x - s->viewport.x, y = event->y - s->viewport.y + s->scroll.y;
+    for (size_t i = 0; i < s->glyph_count; ++i) {
+        const cui_text_view_glyph *g = &s->workspace.glyphs[i];
+        float gx = g->bounds.x;
+        if (mode != CUI_TEXT_VIEW_TABLE_WRAP &&
+            s->workspace.blocks[g->block].kind == CUI_TEXT_VIEW_TABLE_CELL)
+            gx -= s->workspace.blocks[g->block].table_scroll.x;
+        if (x >= gx && x < gx + g->bounds.w && y >= g->bounds.y && y < g->bounds.y + g->bounds.h) {
+            hit = i;
+            break;
+        }
+    }
+    if (hit == SIZE_MAX || (s->workspace.glyphs[hit].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+        return false;
+    const cui_text_view_glyph *g = &s->workspace.glyphs[hit];
+    const cui_text_view_block *block = &s->workspace.blocks[g->block];
+    bool flow = false;
+    for (size_t i = 0; i < s->span_count; ++i)
+        if ((s->workspace.spans[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) &&
+            s->workspace.spans[i].text.begin >= block->text.begin &&
+            s->workspace.spans[i].text.end <= block->text.end)
+            flow = true;
+    cui_text_view_range range;
+    if (event->click_count == 3 && flow) {
+        size_t first = SIZE_MAX, last = 0;
+        for (size_t i = 0; i < s->glyph_count; ++i) {
+            const cui_text_view_glyph *other = &s->workspace.glyphs[i];
+            if (other->block == g->block && other->line_top == g->line_top &&
+                !(other->flags & CUI_TEXT_VIEW_INLINE_IMAGE)) {
+                if (first == SIZE_MAX)
+                    first = other->text.begin;
+                last = other->text.end;
+            }
+        }
+        if (first == SIZE_MAX)
+            return false;
+        (void)cui_text_view_select(s, first, last);
+        for (size_t i = 0; i < s->block_count; ++i)
+            s->workspace.blocks[i].projected_selection = (cui_text_view_range){0};
+        s->workspace.blocks[g->block].projected_selection = (cui_text_view_range){first, last};
+        s->selection_projected = true;
+    } else {
+        if (event->click_count == 3)
+            range = block->text;
+        else if (!cui_text_view_selection_range_at(s, at, event->click_count, &range))
+            return false;
+        (void)cui_text_view_select(s, range.begin, range.end);
+        s->selection_override = event->click_count <= 3;
+    }
+    s->selecting = s->dragged = false;
+    s->multi_click_release = true;
+    return true;
+}
 bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
                                     cui_text_view_options o) {
     if (!ui || !m)
@@ -147,6 +207,14 @@ bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
                 cui_text_view_selection_clear(m);
                 changed = true;
                 m->owner = p->id;
+                if (e->click_count >= 2) {
+                    m->scope = p->scope;
+                    m->active = cui_text_view_multi_click(p->state, p->table_mode, e);
+                    m->dragging = false;
+                    if (m->active)
+                        cui_focus(ui, p->id);
+                    break;
+                }
                 changed |= cui_text_view_selection_project(m, p->scope, e->x, e->y, e->x, e->y);
                 m->dragging = true;
                 cui_focus(ui, p->id);
@@ -228,6 +296,13 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                 s->selecting = false;
             continue;
         }
+        if (e->type == CUI_EVENT_POINTER_UP && e->pointer_button == CUI_POINTER_PRIMARY &&
+            s->multi_click_release && cui_pointer_scope_allowed(ui, id)) {
+            s->multi_click_release = false;
+            (void)cui_cancel_event_activation(ui, i);
+            (void)cui_consume_event(ui, i);
+            continue;
+        }
         bool pointer = e->type == CUI_EVENT_POINTER_DOWN || e->type == CUI_EVENT_POINTER_MOVE ||
                        e->type == CUI_EVENT_POINTER_UP;
         bool owned = pointer && cui_event_within_scope(ui, i, id) &&
@@ -240,6 +315,13 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
             if (at == SIZE_MAX)
                 continue;
             if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY) {
+                if (e->click_count >= 2) {
+                    (void)cui_text_view_select(s, at, at);
+                    if (cui_text_view_multi_click(s, o.table_mode, e))
+                        cui_focus(ui, id);
+                    cui_invalidate(ui);
+                    continue;
+                }
                 s->selecting = true;
                 s->dragged = false;
                 s->pointer_x = s->press_x = e->x;

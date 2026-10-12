@@ -1539,7 +1539,7 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     s->span_count = actual.spans;
     s->block_count = actual.blocks;
     s->glyph_count = 0;
-    s->selection_projected = false;
+    s->selection_projected = s->selection_override = s->multi_click_release = false;
     s->workspace.rendered[s->text_length] = 0;
     s->highlight_count = 0;
     for (size_t i = 0; i < kept; ++i) {
@@ -1566,10 +1566,94 @@ bool cui_text_view_select(cui_text_view_state *s, size_t a, size_t c) {
         !cui_text_view_boundary(cui_text_view_rendered_text(s), c))
         return false;
     bool changed = s->anchor != a || s->cursor != c || s->selection_projected;
-    s->selection_projected = false;
+    s->selection_projected = s->selection_override = s->multi_click_release = false;
     s->anchor = a;
     s->cursor = c;
     return changed;
+}
+static unsigned cui_text_view_codepoint(cui_str text, size_t offset) {
+    size_t n = cui_text_view_scalar(text, offset);
+    unsigned value = n == 1 ? (unsigned char)text.data[offset]
+                            : (unsigned char)text.data[offset] & (n == 2   ? 31u
+                                                                  : n == 3 ? 15u
+                                                                           : 7u);
+    for (size_t i = 1; i < n; ++i)
+        value = (value << 6) | ((unsigned char)text.data[offset + i] & 63u);
+    return value;
+}
+static unsigned cui_text_view_character_kind(unsigned c) {
+    if (c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+        (c >= 0xc0 && c <= 0x24f) || (c >= 0x400 && c <= 0x4ff) || (c >= 0x1e00 && c <= 0x1eff) ||
+        (c >= 0x300 && c <= 0x36f))
+        return 1;
+    if (c == '\n' || c == '\r')
+        return 3;
+    if ((c >= 9 && c <= 13) || c == 32 || c == 0x85 || c == 0xa0 || c == 0x1680 ||
+        (c >= 0x2000 && c <= 0x200a) || c == 0x2028 || c == 0x2029 || c == 0x202f || c == 0x205f ||
+        c == 0x3000)
+        return 2;
+    return 4;
+}
+bool cui_text_view_selection_range_at(const cui_text_view_state *s, size_t offset, unsigned clicks,
+                                      cui_text_view_range *out) {
+    if (!s || clicks < 2)
+        return false;
+    cui_str text = cui_text_view_rendered_text(s);
+    if (offset > text.length)
+        offset = text.length;
+    while (!cui_text_view_boundary(text, offset))
+        --offset;
+    size_t begin = SIZE_MAX, end = 0;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        cui_text_view_range r = s->workspace.blocks[i].text;
+        if (offset >= r.begin && offset < r.end) {
+            begin = r.begin;
+            end = r.end;
+            break;
+        }
+    }
+    if (begin == SIZE_MAX || (s->workspace.mapping[offset].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+        return false;
+    for (size_t i = begin; i < end; ++i)
+        if (s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            if (i < offset)
+                begin = i + 1;
+            else {
+                end = i;
+                break;
+            }
+        }
+    size_t a = offset, b = offset;
+    if (clicks == 2) {
+        size_t n = cui_text_view_scalar(text, offset);
+        unsigned kind = cui_text_view_character_kind(cui_text_view_codepoint(text, offset));
+        b += n;
+        if (kind == 1 || kind == 2) {
+            for (unsigned count = 0; count < 128 && a > begin; ++count) {
+                size_t previous = a - 1;
+                while (!cui_text_view_boundary(text, previous))
+                    --previous;
+                if (cui_text_view_character_kind(cui_text_view_codepoint(text, previous)) != kind)
+                    break;
+                a = previous;
+            }
+            for (unsigned count = 0; count < 128 && b < end; ++count) {
+                if (cui_text_view_character_kind(cui_text_view_codepoint(text, b)) != kind)
+                    break;
+                b += cui_text_view_scalar(text, b);
+            }
+        }
+    } else {
+        while (a > begin && text.data[a - 1] != '\n')
+            --a;
+        while (b < end && text.data[b] != '\n')
+            ++b;
+    }
+    if (a == b)
+        return false;
+    if (out)
+        *out = (cui_text_view_range){a, b};
+    return true;
 }
 cui_str cui_text_view_selected_text(const cui_text_view_state *s) {
     if (!s)
@@ -2677,6 +2761,10 @@ static void cui_text_view_copy_plain_document(const cui_text_view_state *s,
                                               cui_text_view_copy_writer *w) {
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    if (s->selection_override) {
+        cui_text_view_copy_plain(s, w, a, b);
+        return;
+    }
     for (size_t i = 0; i < s->block_count; ++i) {
         const cui_text_view_block *block = &s->workspace.blocks[i];
         cui_text_view_range r = cui_text_view_block_selection(s, i, a, b);

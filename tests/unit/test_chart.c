@@ -342,6 +342,20 @@ int main(void) {
             if (nodes[i].layer == nodes[j].layer)
                 assert(nodes[i].y1 + 15 <= nodes[j].y0 || nodes[j].y1 + 15 <= nodes[i].y0);
     }
+    cui_chart_link reordered_crossing[] = {
+        {0, 3, 30, {0}}, {0, 2, 1, {0}}, {1, 2, 30, {0}}, {1, 3, 1, {0}}};
+    cui_chart_options slot_flow = flow_options;
+    slot_flow.links = reordered_crossing;
+    slot_flow.link_count = 4;
+    slot_flow.width = 200;
+    slot_flow.height = 120;
+    slot_flow.sankey_iterations = 1;
+    assert(cui_chart_sankey_layout(&slot_flow, nodes, 4) == CUI_PLOT_OK);
+    assert(nodes[1].y1 < nodes[0].y0 && nodes[2].y1 < nodes[3].y0);
+    cui_chart_sankey_link_geometry slot_ribbons[4];
+    assert(cui_chart_sankey_link_bounds(&slot_flow, nodes, slot_ribbons, 4) == CUI_PLOT_OK);
+    assert(fabs(slot_ribbons[0].source_y - slot_ribbons[0].target_y) < 1);
+    assert(fabs(slot_ribbons[2].source_y - slot_ribbons[2].target_y) < 1);
     flow_options.sankey_iterations = 101;
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_INVALID);
     flow_options.sankey_iterations = 0;

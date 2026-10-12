@@ -29,6 +29,8 @@ SOURCES = (
     "src/components/cui_components.c",
     "src/base/cui_table.c",
     "src/components/cui_table.c",
+    "src/base/cui_toolbar.c",
+    "src/components/cui_toolbar.c",
     "src/base/cui_icon.c",
     "src/components/cui_icon.c",
     "src/base/cui_resizable.c",
@@ -65,7 +67,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -187,6 +189,7 @@ def main() -> int:
         targets += [("input_base_only", ["tests/unit/test_input.c", "src/core/cui.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_INPUT_BASE_ONLY=1"])]
         targets += [("table_base_only", ["tests/unit/test_table.c", "src/core/cui.c", "src/base/cui_table.c", "src/base/cui_scroll.c"], False, ["-DCUI_TABLE_BASE_ONLY=1"])]
         targets += [("scroll_base_only", ["tests/unit/test_scroll.c", "src/core/cui.c", "src/base/cui_scroll.c"], False, ["-DCUI_SCROLL_BASE_ONLY=1"])]
+        targets += [("toolbar_base_only", ["tests/unit/test_toolbar.c", "src/core/cui.c", "src/base/cui_toolbar.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_TOOLBAR_BASE_ONLY=1"])]
         targets += [("resizable_base_only", ["tests/unit/test_resizable.c", "src/core/cui.c", "src/base/cui_resizable.c"], False, ["-DCUI_RESIZABLE_BASE_ONLY=1"])]
         targets += [("media_base_only", ["tests/unit/test_media.c", "src/base/cui_media.c"], False, ["-DCUI_MEDIA_BASE_ONLY=1"])]
         targets += [("message_base_only", ["tests/unit/test_message.c", "src/base/cui_message.c", "src/base/cui_virtual.c", "src/base/cui_scroll.c", "src/core/cui.c"], False, ["-DCUI_MESSAGE_BASE_ONLY=1"])]

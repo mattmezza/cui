@@ -19,6 +19,7 @@
 #include "cui_surface.h"
 #include "cui_table.h"
 #include "cui_theme.h"
+#include "cui_toolbar.h"
 #include "cui_tree.h"
 #ifdef __cplusplus
 extern "C" {
@@ -247,6 +248,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_ICON_IMPLEMENTATION
 #endif
 #include "cui_icon.h"
+#ifndef CUI_TOOLBAR_IMPLEMENTATION
+#define CUI_TOOLBAR_IMPLEMENTATION
+#endif
+#include "cui_toolbar.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

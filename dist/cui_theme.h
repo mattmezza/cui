@@ -44,6 +44,8 @@ typedef struct {
     bool list_active_highlight;
     cui_color description_list_label, description_list_label_foreground;
     cui_color status_bar, status_bar_border;
+    cui_color sidebar, sidebar_foreground, sidebar_border, sidebar_accent,
+        sidebar_accent_foreground;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -134,6 +136,13 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
     t.description_list_label_foreground = t.muted;
     t.status_bar = t.background;
     t.status_bar_border = t.border;
+    t.sidebar = (cui_color){(uint8_t)((85u * t.background.r + 15u * t.border.r) / 100u),
+                            (uint8_t)((85u * t.background.g + 15u * t.border.g) / 100u),
+                            (uint8_t)((85u * t.background.b + 15u * t.border.b) / 100u), 255};
+    t.sidebar_foreground = t.text;
+    t.sidebar_border = t.border;
+    t.sidebar_accent = t.accent;
+    t.sidebar_accent_foreground = t.accent_foreground;
     t.spring_move =
         (cui_spring_settings){.response = .28f, .damping = .85f, .epsilon = .1f, .travel = true};
     return t;

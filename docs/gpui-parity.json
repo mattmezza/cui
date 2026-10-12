@@ -5085,31 +5085,41 @@
       "reference_url": "https://gpui-kit.com/component/toolbar/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_toolbar.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_toolbar.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Source audit corrects initial left/center/right-slot assumption: Toolbar provides ordered sized/unsized children and labelled groups. Scoped wrapping arrow navigation, ordinary Tab, nested consumption and hosted Input caret tested. Callbacks receive explicit preparation metrics; custom-box replacement substitutes full Styled refinement; caller owns icon paint/tooltips. Browser/native visual audit pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "left/center/right slots",
-          "status": "not_started",
-          "evidence": []
+          "name": "ordered sized/unsized controls and labelled groups",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_toolbar.c"
+          ]
         },
         {
           "name": "keyboard group navigation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_toolbar.c"
+          ]
         },
         {
           "name": "size/theme variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_toolbar.c"
+          ]
         }
       ],
       "upstream_doc": {

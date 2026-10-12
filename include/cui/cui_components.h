@@ -18,6 +18,7 @@
 #include "cui_surface.h"
 #include "cui_table.h"
 #include "cui_theme.h"
+#include "cui_toolbar.h"
 #include "cui_tree.h"
 #ifdef __cplusplus
 extern "C" {

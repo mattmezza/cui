@@ -324,6 +324,11 @@ typedef enum {
     CUI_DROPDOWN_BUTTON_LARGE,
     CUI_DROPDOWN_BUTTON_XSMALL
 } cui_dropdown_button_size;
+typedef struct {
+    float height, padding_x, font_size, gap, caret_size;
+} cui_dropdown_button_metrics;
+cui_dropdown_button_metrics cui_dropdown_button_size_metrics(cui_dropdown_button_size,
+                                                             float density);
 typedef enum {
     CUI_DROPDOWN_ANCHOR_TOP_RIGHT,
     CUI_DROPDOWN_ANCHOR_TOP_LEFT,
@@ -358,6 +363,8 @@ typedef struct {
     cui_str tooltip;
     cui_hover_state *tooltip_state;
     cui_hover_options tooltip_options;
+    float density; /* zero uses theme font_size/16 */
+    float height;  /* optional positive styled height override, including Link/Text */
 } cui_dropdown_button_options;
 typedef struct {
     bool action_activated, menu_activated;
@@ -438,6 +445,20 @@ void cui_tab_motion_step(cui_tab_motion *motion, float target_left, float target
         return;
     cui_tab_spring_axis(&motion->left, &motion->left_velocity, target_left, dt, settings);
     cui_tab_spring_axis(&motion->width, &motion->width_velocity, target_width, dt, settings);
+}
+cui_dropdown_button_metrics cui_dropdown_button_size_metrics(cui_dropdown_button_size size,
+                                                             float density) {
+    if (!isfinite(density) || density <= 0)
+        density = 1;
+    size_t index = size == CUI_DROPDOWN_BUTTON_XSMALL  ? 0
+                   : size == CUI_DROPDOWN_BUTTON_SMALL ? 1
+                   : size == CUI_DROPDOWN_BUTTON_LARGE ? 3
+                                                       : 2;
+    const float heights[] = {20, 24, 32, 32}, padding[] = {4, 8, 10, 12};
+    const float fonts[] = {12, 14, 14, 16}, gaps[] = {4, 4, 8, 8}, caret[] = {12, 14, 16, 16};
+    return (cui_dropdown_button_metrics){heights[index] * density, padding[index] * density,
+                                         fonts[index] * density, gaps[index] * density,
+                                         caret[index] * density};
 }
 static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, size_t from,
                                   cui_key key, bool vertical) {
@@ -3313,11 +3334,10 @@ static cui_theme_button_kind cui_dropdown_kind(cui_dropdown_button_variant varia
 }
 static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_theme *theme,
                                        cui_dropdown_button_options options, bool trigger,
-                                       bool disabled, bool pair_surfaced, cui_color *foreground) {
-    float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
-                  : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
-                  : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
-                                                              : 1;
+                                       bool disabled, bool pair_surfaced, cui_color *foreground,
+                                       const cui_dropdown_button_metrics *metrics) {
+    bool no_padding =
+        options.variant == CUI_DROPDOWN_BUTTON_LINK || options.variant == CUI_DROPDOWN_BUTTON_TEXT;
     bool loading = !trigger && options.action_loading && !options.action_disabled &&
                    !options.disabled && !options.menu.popup.disabled;
     bool inactive = disabled && !loading;
@@ -3327,8 +3347,11 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     bool outlined = options.outline || options.variant == CUI_DROPDOWN_BUTTON_OUTLINE;
     cui_theme_button_kind kind = cui_dropdown_kind(options.variant);
     cui_theme_button_colors colors = theme->buttons[kind];
-    cui_box box = {.height = theme->control_height * scale,
-                   .padding = theme->padding * scale,
+    cui_box box = {.height = isfinite(options.height) && options.height > 0 ? options.height
+                             : no_padding                                   ? 0
+                                                                            : metrics->height,
+                   .width = trigger ? (no_padding ? metrics->caret_size : metrics->height) : 0,
+                   .padding = 0,
                    .row = true,
                    .align_x = CUI_ALIGN_CENTER,
                    .align_y = CUI_ALIGN_CENTER,
@@ -3413,16 +3436,16 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
 
 static void cui_dropdown_label(cui_context *ui, cui_id id, cui_str text, float size,
                                cui_color color, bool underline) {
-    if (underline)
-        cui_begin_box(ui, id ^ UINT64_C(0xc8134e39119b750d), (cui_box){0});
+    cui_begin_box(ui, id ^ UINT64_C(0xc8134e39119b750d),
+                  (cui_box){.height = size * 1.25f, .align_y = CUI_ALIGN_CENTER});
     cui_text(ui, text, size, color);
     if (underline) {
         cui_size measured = cui_measure_text(ui, text, size);
         cui_begin_box(ui, id ^ UINT64_C(0xc8134e39119b751d),
                       (cui_box){.width = measured.width, .height = 1, .background = color});
         cui_end_box(ui);
-        cui_end_box(ui);
     }
+    cui_end_box(ui);
 }
 cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container, cui_id action_id,
                                                cui_id trigger_id, const cui_theme *theme,
@@ -3461,37 +3484,63 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                          (!options.hide_action && cui_hovered(ui, action_id)) ||
                          (!options.hide_menu && cui_hovered(ui, trigger_id));
     cui_color trigger_foreground, action_foreground;
-    float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
-                  : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
-                  : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
-                                                              : 1;
-    cui_begin_box(ui, container, (cui_box){.row = true, .gap = 0});
+    float density =
+        isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16;
+    cui_dropdown_button_metrics metrics = cui_dropdown_button_size_metrics(options.size, density);
+    bool no_padding =
+        options.variant == CUI_DROPDOWN_BUTTON_LINK || options.variant == CUI_DROPDOWN_BUTTON_TEXT;
+    float padding = no_padding ? 0 : metrics.padding_x;
+    cui_begin_box(ui, container, (cui_box){.row = true, .gap = 0, .align_y = CUI_ALIGN_CENTER});
     if (!options.hide_action) {
         cui_dropdown_button_options action_options = options;
         action_options.outline = options.outline || options.action_outline;
         cui_box action_box =
             cui_dropdown_button_box(ui, action_id, theme, action_options, false, action_disabled,
-                                    pair_surfaced, &action_foreground);
+                                    pair_surfaced, &action_foreground, &metrics);
         cui_begin_box(ui, action_id, action_box);
+        if (padding > 0) {
+            cui_begin_box(ui, 0, (cui_box){.width = padding});
+            cui_end_box(ui);
+        }
+        cui_begin_box(
+            ui, action_id ^ UINT64_C(0x4aef702b79ab3160),
+            (cui_box){.row = true,
+                      .gap = metrics.gap,
+                      .max_width = options.width > 0 ? fmaxf(0, options.width - 2 * padding) : 0,
+                      .clip = true,
+                      .align_y = CUI_ALIGN_CENTER});
         {
             if (options.leading.length)
-                cui_text(ui, options.leading, theme->font_size * scale, action_foreground);
+                cui_dropdown_label(ui, action_id ^ UINT64_C(0x4aef702b79ab3180), options.leading,
+                                   metrics.font_size, action_foreground, false);
             if (options.content)
                 options.content(ui, options.content_user);
             else
-                cui_dropdown_label(ui, action_id, action_name, theme->font_size * scale,
-                                   action_foreground, options.variant == CUI_DROPDOWN_BUTTON_LINK);
+                cui_dropdown_label(ui, action_id, action_name, metrics.font_size, action_foreground,
+                                   options.variant == CUI_DROPDOWN_BUTTON_LINK);
             if (options.trailing.length)
-                cui_text(ui, options.trailing, theme->font_size * scale, action_foreground);
+                cui_dropdown_label(ui, action_id ^ UINT64_C(0x4aef702b79ab3190), options.trailing,
+                                   metrics.font_size, action_foreground, false);
+        }
+        cui_end_box(ui);
+        if (padding > 0) {
+            cui_begin_box(ui, 0, (cui_box){.width = padding});
+            cui_end_box(ui);
         }
         cui_end_box(ui);
     }
     if (!options.hide_menu) {
-        cui_box trigger_box = cui_dropdown_button_box(
-            ui, trigger_id, theme, options, true, all_disabled, pair_surfaced, &trigger_foreground);
+        cui_box trigger_box =
+            cui_dropdown_button_box(ui, trigger_id, theme, options, true, all_disabled,
+                                    pair_surfaced, &trigger_foreground, &metrics);
         cui_begin_box(ui, trigger_id, trigger_box);
-        cui_dropdown_label(ui, trigger_id, cui_string("v"), theme->font_size * scale,
-                           trigger_foreground, options.variant == CUI_DROPDOWN_BUTTON_LINK);
+        cui_begin_box(ui, trigger_id ^ UINT64_C(0x4aef702b79ab3170),
+                      (cui_box){.width = metrics.caret_size,
+                                .height = metrics.caret_size,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
+        cui_text(ui, cui_string("v"), metrics.caret_size, trigger_foreground);
+        cui_end_box(ui);
         cui_end_box(ui);
     }
     cui_end_box(ui);

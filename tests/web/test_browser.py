@@ -96,6 +96,61 @@ def main():
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.evaluate('location.hash="OtpInput"')
+            page.wait_for_function('cuiGallery.renderedComponent==="OtpInput"')
+            otp = page.locator('#accessible [role=textbox][aria-label="Verification code"]')
+            assert otp.count() == 1
+            def otp_cells():
+                return page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===0&&e.gallery_command(i,3)===32&&e.gallery_command(i,4)===32;}).map(i=>cuiGallery.exports.gallery_command(i,1))')
+            cells = otp_cells()
+            assert len(cells) == 6, cells
+            assert [round(cells[i+1]-cells[i]) for i in range(5)] == [36,36,52,36,36]
+            page.locator('#otp-groups').select_option('3')
+            page.wait_for_timeout(40)
+            cells = otp_cells()
+            assert [round(cells[i+1]-cells[i]) for i in range(5)] == [36,52,36,52,36]
+            click_semantic('Verification code', 6)
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
+            page.wait_for_timeout(80)
+            visible = page.evaluate('cuiGallery.exports.gallery_otp_cursor()')
+            frame = page.evaluate('cuiGallery.frame')
+            page.wait_for_timeout(100)
+            assert page.evaluate('cuiGallery.frame') == frame
+            page.wait_for_function('(v)=>cuiGallery.exports.gallery_otp_cursor()!==v', arg=visible)
+            assert page.evaluate('cuiGallery.frame') <= frame + 3
+            before = page.evaluate('cuiGallery.exports.gallery_otp_completions()')
+            page.keyboard.type('a1')
+            # Chromium's key dispatcher supplies the fullwidth layout key.
+            key_session = page.context.new_cdp_session(page)
+            key_session.send('Input.dispatchKeyEvent', {'type':'keyDown','key':'２','code':'Digit2','text':'２'})
+            key_session.send('Input.dispatchKeyEvent', {'type':'keyUp','key':'２','code':'Digit2'})
+            key_session.detach()
+            page.keyboard.type('3456')
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_otp_completions()===n+1', arg=before)
+            index = semantic_index('Verification code', 6)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', index) == 6
+            assert '6 of 6 digits' in page.locator('#accessible [role=status]').get_attribute('aria-label')
+            assert page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
+            page.keyboard.type('7')
+            page.wait_for_timeout(40)
+            assert page.evaluate('cuiGallery.exports.gallery_otp_completions()') == before + 1
+            page.locator('#otp-mask').check()
+            page.wait_for_timeout(40)
+            texts = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i))))')
+            assert texts.count('*') == 6 and not any(t in ['1','2','3','4','5','6'] for t in texts), texts
+            click_semantic('Verification code', 6)
+            page.keyboard.press('Backspace')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===5', arg=index)
+            page.locator('#disabled').check()
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Verification code"]`)?.disabled===true')
+            click_semantic('Verification code', 6)
+            page.keyboard.type('9')
+            page.wait_for_timeout(40)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', index) == 5
+            assert page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
+            page.locator('#disabled').uncheck()
+            click_semantic('Clear code')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===0', arg=index)
             page.evaluate('location.hash="Input Group"')
             page.wait_for_function('cuiGallery.renderedComponent==="Input Group"')
             group_input = page.locator('#accessible [role=textbox][aria-label="Workspace address"]')
@@ -740,7 +795,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 53 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 54 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

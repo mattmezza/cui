@@ -6,6 +6,7 @@
 #include "cui/cui_dock.h"
 #include "cui/cui_form.h"
 #include "cui/cui_numeric.h"
+#include "cui/cui_otp.h"
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_scroll.h"
@@ -82,6 +83,11 @@ static cui_input_state input_state;
 static int input_mode;
 static int form_mode, form_submissions;
 static int group_mode, group_actions;
+static cui_otp_state otp_state;
+static char otp_buffer[32];
+static int otp_completions, otp_groups = 2;
+static double next_wake;
+static bool otp_masked;
 static char group_buffer[128] = "cui";
 static cui_edit *group_edit;
 static cui_input_group_state group_state;
@@ -210,6 +216,8 @@ int gallery_init(void) {
                                                         .capacity = sizeof(form_email_buffer),
                                                         .history_bytes = 2048,
                                                         .max_history_steps = 16});
+    if (cui_otp_init(&otp_state, otp_buffer, sizeof(otp_buffer), 6) != CUI_EDIT_OK)
+        return 0;
     group_edit = cui_edit_create((cui_edit_config){.buffer = group_buffer,
                                                    .capacity = sizeof(group_buffer),
                                                    .history_bytes = 2048,
@@ -336,6 +344,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         previous_story = story;
     }
     redraw = false;
+    next_wake = 0;
     current_theme = t;
     cui_begin_frame(ui, width, height, host_dt);
     cui_begin_box(ui, cui_id_from(ui, "preview"),
@@ -399,6 +408,32 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 55: {
+        cui_label(ui, &t, cui_string("Enter a six-digit verification code."));
+        otp_state.masked = otp_masked;
+        cui_otp_result result =
+            cui_otp(ui, cui_id_from(ui, "verification-code"), &t, &otp_state,
+                    (cui_otp_options){.name = cui_string("Verification code"),
+                                      .groups = (size_t)otp_groups,
+                                      .size = compact_density ? CUI_OTP_SMALL : CUI_OTP_MEDIUM,
+                                      .disabled = disabled,
+                                      .now_seconds = host_seconds});
+        next_wake = result.next_wake_seconds;
+        otp_completions += (int)result.complete_count;
+        if (cui_button(ui, cui_id_from(ui, "otp-reset"), &t, cui_string("Clear code"), disabled)) {
+            cui_otp_set_value(&otp_state, cui_string(""));
+            redraw = true;
+        }
+        char status[96];
+        snprintf(status, sizeof(status), "%zu of 6 digits; completions: %d",
+                 cui_otp_count(&otp_state), otp_completions);
+        cui_id status_id = cui_id_from(ui, "otp-status");
+        cui_begin_box(ui, status_id, (cui_box){.width = -1});
+        cui_interact(ui, status_id, CUI_ROLE_STATUS, cui_string(status), false, false, 0);
+        cui_label(ui, &t, cui_string(status));
+        cui_end_box(ui);
+        break;
+    }
     case 54: {
         cui_id action = cui_id_from(ui, "group-open");
         const cui_input_group_addon addons[] = {{.id = cui_id_from(ui, "group-prefix"),
@@ -1348,6 +1383,19 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_otp_options(int groups, int masked) {
+    otp_groups = groups >= 1 && groups <= 3 ? groups : 2;
+    otp_masked = masked != 0;
+}
+int gallery_otp_completions(void) {
+    return otp_completions;
+}
+int gallery_otp_cursor(void) {
+    return otp_state.cursor_visible;
+}
+double gallery_next_wake(void) {
+    return next_wake;
 }
 void gallery_group_mode(int mode) {
     if (mode >= 0 && mode <= 3)

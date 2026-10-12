@@ -2464,7 +2464,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (!instant && state->tooltip_phase < 1)
             cui_invalidate(ui);
     }
-    if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) {
+    if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY ||
+        o->kind == CUI_CHART_CANDLESTICK) {
         bool active = !o->noninteractive && state->hovered < o->count;
         if (active)
             state->emphasis_visual_index = state->hovered;
@@ -2481,6 +2482,21 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (o->kind == CUI_CHART_BAR && active) {
             float target;
             if (cui_chart_bar_band_center(o, state->hovered, &target) == CUI_PLOT_OK) {
+                if (!state->emphasis_started || instant) {
+                    state->emphasis_center = target;
+                    state->emphasis_velocity = 0;
+                    state->emphasis_started = true;
+                } else
+                    cui_chart_hover_spring(&state->emphasis_center, &state->emphasis_velocity,
+                                           target, dt, duration);
+                moving |= fabsf(state->emphasis_center - target) > .1f ||
+                          fabsf(state->emphasis_velocity) > .1f;
+            }
+        }
+        if (o->kind == CUI_CHART_CANDLESTICK && active) {
+            cui_chart_candle_geometry candle;
+            if (cui_chart_candle_bounds(o, state->hovered, &candle) == CUI_PLOT_OK) {
+                float target = (float)candle.wick.x_min;
                 if (!state->emphasis_started || instant) {
                     state->emphasis_center = target;
                     state->emphasis_velocity = 0;
@@ -2510,13 +2526,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->emphasis_visual_index = SIZE_MAX;
         if (!instant && moving)
             cui_invalidate(ui);
-        cui_chart_options frame = *o;
-        if (!frame.reveal_enabled && state->appear_started && state->rendered_reveal_progress < 1) {
-            frame.reveal_enabled = true;
-            frame.reveal_progress = state->rendered_reveal_progress;
+        if (o->kind != CUI_CHART_CANDLESTICK) {
+            cui_chart_options frame = *o;
+            if (!frame.reveal_enabled && state->appear_started &&
+                state->rendered_reveal_progress < 1) {
+                frame.reveal_enabled = true;
+                frame.reveal_progress = state->rendered_reveal_progress;
+            }
+            if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
+                return false;
         }
-        if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
-            return false;
     }
     cui_begin_box(
         ui, id,
@@ -2553,6 +2572,29 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                                  .fixed_height = true,
                                                  .background = band},
                                        (cui_rect){band_x, band_y, band_w, band_h});
+                cui_end_box(ui);
+            }
+        }
+    }
+    if (o->kind == CUI_CHART_CANDLESTICK && !o->noninteractive && state->emphasis_focus > 0 &&
+        state->emphasis_visual_index < o->count) {
+        cui_chart_candle_geometry candle;
+        if (cui_chart_candle_bounds(o, state->emphasis_visual_index, &candle) == CUI_PLOT_OK) {
+            float ratio = o->candle_body_ratio > 0 ? o->candle_body_ratio : .8f;
+            float thickness =
+                (float)((candle.body.x_max - candle.body.x_min) / ratio * w / o->width);
+            float x = state->emphasis_center * w / o->width - thickness / 2;
+            float height = h - (o->hide_x_axis ? 0 : 20 * h / o->height);
+            cui_color band = o->foreground.a ? o->foreground : (cui_color){32, 32, 32, 255};
+            band.a = (unsigned char)lroundf(band.a * .08f * state->emphasis_focus);
+            if (band.a && thickness > 0 && height > 0) {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x0d239bcd14a60001),
+                                       (cui_box){.width = thickness,
+                                                 .height = height,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = band},
+                                       (cui_rect){x, 0, thickness, height});
                 cui_end_box(ui);
             }
         }

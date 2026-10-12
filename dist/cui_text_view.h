@@ -72,7 +72,7 @@ typedef struct {
         list_repeat_marker;
     cui_text_view_alignment alignment;
     cui_bitmap image;
-    cui_rect bounds, table_frame;
+    cui_rect bounds, table_frame, image_line;
     float table_track_width;
     cui_scroll_state table_scroll;
     float actions_height, text_inset, list_prefix_width;
@@ -160,6 +160,8 @@ typedef struct {
     size_t max_lines;
     bool scrollable;
     cui_text_view_table_mode table_mode;
+    bool font_metrics_available;
+    cui_font_metrics body_metrics;
 } cui_text_view_layout_options;
 cui_text_view_error cui_text_view_layout(cui_text_view_state *, cui_text_view_layout_options,
                                          cui_text_view_measure_fn, void *);
@@ -1680,6 +1682,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         left = content_inset;
     }
     b->text_inset = left;
+    b->image_line = (cui_rect){0};
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
     float cursor_x = 0, cursor_y = 0;
     size_t first_glyph = s->glyph_count;
@@ -1689,7 +1692,20 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     }
     if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready && b->image.width && b->image.height) {
         float w = fminf(width, (float)b->image.width);
-        b->bounds = (cui_rect){x, y, w, w * b->image.height / b->image.width};
+        float height = w * b->image.height / b->image.width;
+        b->bounds = (cui_rect){x, y, w, height};
+        b->image_line = b->bounds;
+        if (o.font_metrics_available) {
+            float baseline =
+                (o.line_height - o.body_metrics.ascent - o.body_metrics.descent) * .5f +
+                o.body_metrics.ascent;
+            float image_baseline =
+                fminf(height, fmaxf(0, height * .5f + baseline - o.line_height * .5f));
+            float ascent = fmaxf(baseline, image_baseline);
+            float descent = fmaxf(o.line_height - baseline, height - image_baseline);
+            b->bounds.y += ascent - image_baseline;
+            b->image_line.h = ascent + descent;
+        }
         return true;
     }
     for (size_t span = 0; span < s->span_count; ++span) {
@@ -1894,6 +1910,14 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         o.table_actions_height < 0 || o.table_actions_height > 10000000 ||
         o.table_mode < CUI_TEXT_VIEW_TABLE_WRAP || o.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
         return CUI_TEXT_VIEW_INVALID;
+    if (o.font_metrics_available &&
+        (!isfinite(o.body_metrics.ascent) || !isfinite(o.body_metrics.descent) ||
+         !isfinite(o.body_metrics.line_height) || o.body_metrics.ascent < 0 ||
+         o.body_metrics.descent < 0 || o.body_metrics.line_height <= 0 ||
+         o.body_metrics.line_height > 10000000 ||
+         o.body_metrics.ascent + o.body_metrics.descent <= 0 ||
+         o.body_metrics.ascent + o.body_metrics.descent > 10000000))
+        return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;
     s->glyph_count = 0;
@@ -1977,7 +2001,10 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             if (!cui_text_view_layout_block(s, b, indent, y, fmaxf(1, o.width - indent), o, measure,
                                             user))
                 return CUI_TEXT_VIEW_INVALID;
-            y += block->list_item ? fmaxf(block->bounds.h, o.line_height) : block->bounds.h;
+            float height = block->kind == CUI_TEXT_VIEW_IMAGE && block->image_ready
+                               ? block->image_line.h
+                               : block->bounds.h;
+            y += block->list_item ? fmaxf(height, o.line_height) : height;
             if (b + 1 < s->block_count && ((!block->list_item && !block->list_continuation) ||
                                            (!s->workspace.blocks[b + 1].list_item &&
                                             !s->workspace.blocks[b + 1].list_continuation)))
@@ -2728,7 +2755,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (actions_only)
             continue;
         cui_rect r = b->bounds;
-        if (r.y + r.h <= scroll || r.y >= scroll + viewport)
+        cui_rect line = b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready ? b->image_line : r;
+        if (line.y + line.h <= scroll || line.y >= scroll + viewport)
             continue;
         r.x -= origin_x;
         r.y -= origin_y;
@@ -2736,6 +2764,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (b->list_item && b->kind != CUI_TEXT_VIEW_LIST_ITEM &&
             b->kind != CUI_TEXT_VIEW_TABLE_CELL) {
             cui_rect prefix = r;
+            if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready)
+                prefix.y = b->image_line.y - origin_y;
             prefix.x -= b->list_prefix_width;
             cui_text_view_paint_list_prefix(ui, part ^ UINT64_C(0x70666978), b, prefix,
                                             b->list_prefix_width, style);
@@ -3053,6 +3083,9 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 o.image((cui_str){resource, length}, &bitmap, o.image_user);
             b->image = bitmap;
         }
+    cui_font_metrics body_metrics = {0};
+    bool font_metrics_available =
+        cui_measure_font_metrics(ui, style.font_size, (cui_text_style){0}, &body_metrics);
     if (cui_text_view_layout(
             s,
             (cui_text_view_layout_options){
@@ -3063,6 +3096,8 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 .max_lines = o.max_lines,
                 .scrollable = o.scrollable,
                 .table_mode = o.table_mode,
+                .font_metrics_available = font_metrics_available,
+                .body_metrics = body_metrics,
                 .code_actions_height = o.code_actions ? o.code_actions_height : 0,
                 .table_actions_height = o.table_actions ? o.table_actions_height : 0},
             cui_text_view_core_measure, ui) != CUI_TEXT_VIEW_OK)

@@ -74,7 +74,9 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
     }
     for (size_t series = 0; series < o->extra_series_count; series++) {
         const cui_chart_series *extra = &o->extra_series[series];
-        if (!extra->values || extra->count != o->count || !cui_chart_valid_str(extra->name))
+        if (!extra->values || extra->count != o->count || !cui_chart_valid_str(extra->name) ||
+            (extra->custom_curve &&
+             (extra->curve < CUI_CHART_CURVE_NATURAL || extra->curve > CUI_CHART_CURVE_STEP_AFTER)))
             return CUI_PLOT_INVALID;
         for (size_t i = 0; i < o->count; i++)
             if (!isfinite(extra->values[i]))
@@ -358,6 +360,12 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
         color = o->series[series].a ? o->series[series] : cui_chart_palette(o, 0);
     cui_color fill = color;
     fill.a = (unsigned char)(fill.a / 3);
+    cui_color explicit_fill = series ? o->extra_series[series - 1].fill : o->primary_fill;
+    if (explicit_fill.a)
+        fill = explicit_fill;
+    cui_chart_curve curve = series && o->extra_series[series - 1].custom_curve
+                                ? o->extra_series[series - 1].curve
+                                : o->curve;
     double first_x, first_y;
     cui_chart_series_point(o, series, 0, left, right, lo, hi, top, bottom, &first_x, &first_y);
     if (o->kind == CUI_CHART_AREA)
@@ -367,14 +375,14 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
         double x0, y0, x1, y1;
         cui_chart_series_point(o, series, i - 1, left, right, lo, hi, top, bottom, &x0, &y0);
         cui_chart_series_point(o, series, i, left, right, lo, hi, top, bottom, &x1, &y1);
-        if (o->curve == CUI_CHART_CURVE_STEP_AFTER) {
+        if (curve == CUI_CHART_CURVE_STEP_AFTER) {
             cui_chart_line(s, o, x0, y0, x1, y0, color);
             if (i + 1 < o->count)
                 cui_chart_line(s, o, x1, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
                 cui_chart_rect(s, o, (int)ceil(x0), (int)floor(fmin(y0, baseline)), (int)ceil(x1),
                                (int)ceil(fmax(y0, baseline)), fill);
-        } else if (o->curve == CUI_CHART_CURVE_LINEAR) {
+        } else if (curve == CUI_CHART_CURVE_LINEAR) {
             cui_chart_line(s, o, x0, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
                 for (int x = (int)ceil(x0); x <= (int)floor(x1); x++) {
@@ -753,6 +761,9 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
             color = o->series[series].a ? o->series[series] : cui_chart_palette(o, 0);
         cui_color fill = color;
         fill.a = (unsigned char)(color.a * 3 / 10);
+        cui_color explicit_fill = series ? o->extra_series[series - 1].fill : o->primary_fill;
+        if (explicit_fill.a)
+            fill = explicit_fill;
         double xs[256], ys[256];
         for (size_t i = 0; i < o->count; i++) {
             double a = -CUI_CHART_PI / 2 + 2 * CUI_CHART_PI * i / o->count;
@@ -1160,6 +1171,9 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     const cui_color *colors = &o->background;
     for (size_t i = 0; i < sizeof(cui_color) * 13; i++)
         h = cui_chart_mix(h, ((const unsigned char *)colors)[i]);
+    const unsigned char *primary_fill = (const unsigned char *)&o->primary_fill;
+    for (size_t i = 0; i < sizeof(o->primary_fill); i++)
+        h = cui_chart_mix(h, primary_fill[i]);
     return h ? h : 1;
 }
 cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o) {

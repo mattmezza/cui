@@ -66,6 +66,9 @@ typedef struct {
     size_t count;
     cui_str name;
     cui_color color;
+    cui_color fill; /* area/radar fill; alpha zero derives from stroke */
+    bool custom_curve;
+    cui_chart_curve curve;
 } cui_chart_series;
 typedef size_t (*cui_chart_format_fn)(double value, char *buffer, size_t capacity, void *user);
 typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index, cui_plot_rect bar,
@@ -133,6 +136,7 @@ typedef struct {
     float sankey_link_opacity;      /* default 0.3 */
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
+    cui_color primary_fill; /* area/radar fill for the first series */
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

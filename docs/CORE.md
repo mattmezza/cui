@@ -190,3 +190,5 @@ It supports source cropping, tint, opacity and corner radii through the normal
 image renderer path. Inherited alpha is applied once. Invalid bitmap geometry
 leaves an existing underlay intact; a later solid underlay replaces the bitmap.
 This permits image/gradient backgrounds without floating over interactive text.
+
+After `cui_end_frame`, `cui_semantic_parent(ui, id)` returns the explicit semantic parent when supplied, otherwise the closest layout ancestor with semantics. It returns zero for roots, unknown IDs and while a frame is open. Hosts can use this alongside `cui_semantics` to build the accessibility tree without guessing parentage from rectangles. `CUI_ROLE_RADIOGROUP` is appended to the role enum, preserving earlier role values.

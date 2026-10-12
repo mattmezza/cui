@@ -175,7 +175,8 @@ typedef enum {
     CUI_ROLE_LOG,
     CUI_ROLE_TOOLBAR,
     CUI_ROLE_SEPARATOR,
-    CUI_ROLE_REGION
+    CUI_ROLE_REGION,
+    CUI_ROLE_RADIOGROUP
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -433,6 +434,9 @@ bool cui_event_within_scope(cui_context *, size_t index, cui_id scope);
  * logical scope must be active now. Non-pointer events return false. */
 bool cui_event_hit_within_scope(cui_context *, size_t index, cui_id scope);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
+/* After end_frame: explicit semantic parent, otherwise the nearest semantic
+ * layout ancestor. Zero for roots, unknown IDs, or while a frame is open. */
+cui_id cui_semantic_parent(cui_context *ui, cui_id id);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
 /* Update a current-frame clipped box before end_frame computes layout. Useful
  * for scroll events deferred by children after their parent's begin call. */

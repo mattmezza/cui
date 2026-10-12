@@ -32,7 +32,8 @@ enum {
     CUI_TEXT_VIEW_STRIKE = 8u,
     CUI_TEXT_VIEW_MARK = 16u,
     CUI_TEXT_VIEW_MEDIUM = 32u,
-    CUI_TEXT_VIEW_SEMIBOLD = 64u
+    CUI_TEXT_VIEW_SEMIBOLD = 64u,
+    CUI_TEXT_VIEW_INLINE_IMAGE = 128u
 };
 typedef enum {
     CUI_TEXT_VIEW_PARAGRAPH,
@@ -53,6 +54,10 @@ typedef struct {
     cui_text_view_range text, source, link;
     size_t block;
     unsigned flags;
+    cui_text_view_range resource, alt;
+    cui_bitmap image;
+    bool image_ready;
+    cui_rect image_bounds;
 } cui_text_view_span;
 typedef enum {
     CUI_TEXT_VIEW_ALIGN_LEFT,
@@ -147,6 +152,8 @@ cui_text_view_error cui_text_view_reveal(cui_text_view_state *, cui_text_view_ra
 /* Paint clock is application-driven. Returns true while animation/reveal needs a frame. */
 bool cui_text_view_advance(cui_text_view_state *, float dt);
 typedef cui_size (*cui_text_view_measure_fn)(void *, cui_str, float font_size, unsigned flags);
+typedef bool (*cui_text_view_font_metrics_fn)(void *, float font_size, unsigned flags,
+                                              cui_font_metrics *);
 typedef enum {
     CUI_TEXT_VIEW_TABLE_WRAP,
     CUI_TEXT_VIEW_TABLE_ADAPTIVE,
@@ -161,6 +168,8 @@ typedef struct {
     cui_text_view_table_mode table_mode;
     bool font_metrics_available;
     cui_font_metrics body_metrics;
+    cui_text_view_font_metrics_fn font_metrics;
+    void *font_metrics_user;
 } cui_text_view_layout_options;
 cui_text_view_error cui_text_view_layout(cui_text_view_state *, cui_text_view_layout_options,
                                          cui_text_view_measure_fn, void *);

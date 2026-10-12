@@ -1,0 +1,1 @@
+test_questionnaire_styled: /tmp/cui-questionnaire-containers/tests/unit/test_questionnaire_styled.c:196: card_paint: Assertion `found_fill == (fill.a != 0) && found_border && found_shortcut && found_indicator && found_badge && found_badge_fill' failed.

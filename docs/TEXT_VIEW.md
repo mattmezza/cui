@@ -206,8 +206,12 @@ The body baseline is `(line_height - ascent - descent) / 2 + ascent`. Ready stan
 images use this formula and retain a separate logical row extent for list prefixes
 and following blocks. Pure layout accepts validated optional body metrics. Without
 a valid provider, images retain top alignment; no size-derived baseline is synthesized.
-Mixed image/text wrapping, inline image object selection, titles/links and explicit
-image attributes also remain outside the standalone block representation.
+Mixed Markdown images now occupy atomic one-byte span slots. Their host bitmaps
+reserve horizontal space among text runs and wrap at object boundaries. Default
+inline height is 75% of the logical line height, with loaded aspect ratio or a
+square unloaded slot, matching the frozen source. Selection maps each slot to
+the entire image source syntax, and Source copy preserves that syntax. Title tooltips,
+explicit image dimensions and custom object renderers remain unimplemented. Standalone image blocks still retain their earlier alt-text ranges.
 
 Tables following existing list content retain parent membership and paint in the
 16px continuation column. Column sizing, horizontal viewport clipping and footer
@@ -221,3 +225,34 @@ on the first cell. Other cells and nested children retain that item as their par
 The separate marker column stays outside the horizontal mask and does not move
 when the table scrolls; table-body snapshots preserve its scroll offset when
 appending rows.
+
+Inline image slots use a single space byte in the rendered selection coordinate
+space; Plain copy includes that slot, while Source copy writes the original image
+syntax. No unloaded bitmap is fabricated. Removing the host loader restores a
+compact square slot without discarding surrounding text or retaining stale pixels.
+
+Layout may provide a font-metrics callback keyed by each block's actual font size
+and style flags. The styled component uses the core provider, so a semibold heading
+image uses heading metrics rather than regular body metrics. The callback supersedes
+fixed body metrics and may decline measurement; unavailable or invalid callback
+metrics use top alignment. Host bitmap validity follows the shared core contract,
+and invalid loader output becomes an unloaded slot instead of a malformed draw.
+
+Each mixed image line expands its logical ascent and descent from the actual body
+baseline and image baseline. Wrapped following lines begin after that complete
+logical extent, including fonts whose ascent or descent exceeds the requested line
+height. Text-only lines retain their requested logical height.
+
+Bounded balanced brackets and parentheses recognize linked Markdown images and
+parenthesized destinations. Quoted titles and angle-delimited destinations no
+longer become part of the host image URI. A linked image uses its alt source as
+its link label, activates the host link callback through ordinary capture, and
+Source copy preserves its enclosing link. Title tooltip presentation remains absent;
+this delimiter parser is not a complete CommonMark grammar.
+
+Images inside HTML paragraph, heading and table-cell containers now share the
+atomic inline flow with neighboring styled text. Linked HTML images also use the
+ordinary link callback. Missing `src` images inside these containers are skipped.
+Bare root HTML images retain legacy standalone blocks; explicit dimensions and
+HTML source-range/copy support remain unfinished. HTML container tracking is bounded
+and does not replace a repairing HTML5 tree parser.

@@ -1483,6 +1483,18 @@ const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
         *count = ui ? ui->semantic_count : 0;
     return ui ? ui->semantics : NULL;
 }
+cui_id cui_semantic_parent(cui_context *ui, cui_id id) {
+    if (!ui || !id || ui->in_frame)
+        return 0;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            if (ui->semantics[i].details.parent)
+                return ui->semantics[i].details.parent;
+            size_t parent = ui->previous_parents[i];
+            return parent < ui->semantic_count ? ui->semantics[parent].id : 0;
+        }
+    return 0;
+}
 cui_id cui_focused(cui_context *ui) {
     return ui && !cui_core_inert(ui) ? ui->focus : 0;
 }
@@ -1848,7 +1860,7 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
-        role > CUI_ROLE_REGION)
+        role > CUI_ROLE_RADIOGROUP)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {

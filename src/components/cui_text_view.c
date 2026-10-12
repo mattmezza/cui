@@ -49,6 +49,10 @@ static cui_text_style cui_text_view_text_style(unsigned flags) {
 static cui_size cui_text_view_core_measure(void *ui, cui_str text, float font, unsigned flags) {
     return cui_measure_text_ex(ui, text, font, cui_text_view_text_style(flags));
 }
+static bool cui_text_view_core_font_metrics(void *ui, float font, unsigned flags,
+                                            cui_font_metrics *out) {
+    return cui_measure_font_metrics(ui, font, cui_text_view_text_style(flags), out);
+}
 static cui_str cui_text_view_slice(cui_str s, cui_text_view_range r) {
     return r.begin <= r.end && r.end <= s.length ? (cui_str){s.data + r.begin, r.end - r.begin}
                                                  : (cui_str){0};
@@ -429,11 +433,13 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             r.x -= cell_bounds.x;
             r.y -= cell_bounds.y;
         }
-        cui_interaction interaction = cui_interact(
-            ui, link_id, CUI_ROLE_LINK,
+        cui_str label =
             cui_text_view_slice(cui_text_view_rendered_text(s),
-                                (cui_text_view_range){first->text.begin, last->text.end}),
-            o.disabled, false, 0);
+                                (cui_text_view_range){first->text.begin, last->text.end});
+        if (end == i + 1 && (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            label = cui_text_view_slice(cui_text_view_source(s), span->alt);
+        cui_interaction interaction =
+            cui_interact(ui, link_id, CUI_ROLE_LINK, label, o.disabled, false, 0);
         cui_set_semantic_details(ui, link_id, (cui_semantic_details){.cursor = CUI_CURSOR_POINTER});
         cui_begin_absolute_box(ui, link_id, (cui_box){0}, r);
         cui_end_box(ui);
@@ -505,15 +511,29 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (selected)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x521e8438), r, style.selection);
         cui_begin_absolute_box(ui, leaf, (cui_box){.custom_opacity = true, .opacity = opacity}, r);
-        cui_text_line(ui,
-                      cui_text_view_slice(cui_text_view_rendered_text(s),
-                                          (cui_text_view_range){first->text.begin, last->text.end}),
-                      first->font_size, color, first->line_height,
-                      cui_text_view_text_style(first->flags));
-        if (is_link)
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            if (span->image_ready) {
+                cui_rect image = span->image_bounds;
+                image.x -= first->bounds.x;
+                image.y -= first->bounds.y;
+                cui_begin_absolute_box(ui, leaf ^ UINT64_C(0x696d616765000000), (cui_box){0},
+                                       image);
+                cui_paint_bitmap(ui, leaf ^ UINT64_C(0x6269746d61700000),
+                                 (cui_bitmap_paint){.bitmap = span->image, .opacity = 1},
+                                 (cui_box){.width = image.w, .height = image.h});
+                cui_end_box(ui);
+            }
+        } else
+            cui_text_line(
+                ui,
+                cui_text_view_slice(cui_text_view_rendered_text(s),
+                                    (cui_text_view_range){first->text.begin, last->text.end}),
+                first->font_size, color, first->line_height,
+                cui_text_view_text_style(first->flags));
+        if (is_link && !(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x756e646572000000),
                                (cui_rect){0, r.h - 2, r.w, 1}, color);
-        if (first->flags & CUI_TEXT_VIEW_STRIKE)
+        if ((first->flags & CUI_TEXT_VIEW_STRIKE) && !(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x737472696b000000),
                                (cui_rect){0, r.h * .5f, r.w, 1}, color);
         cui_end_box(ui);
@@ -659,12 +679,24 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 o.image &&
                 cui_text_view_decode_resource(s, b->resource, resource, sizeof resource, &length) ==
                     CUI_TEXT_VIEW_OK &&
-                o.image((cui_str){resource, length}, &bitmap, o.image_user);
+                o.image((cui_str){resource, length}, &bitmap, o.image_user) &&
+                cui_bitmap_valid(bitmap);
             b->image = bitmap;
         }
-    cui_font_metrics body_metrics = {0};
-    bool font_metrics_available =
-        cui_measure_font_metrics(ui, style.font_size, (cui_text_style){0}, &body_metrics);
+    for (size_t i = 0; i < s->span_count; ++i) {
+        cui_text_view_span *span = &s->workspace.spans[i];
+        if (!(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        cui_bitmap bitmap = {0};
+        size_t length;
+        span->image_ready =
+            o.image &&
+            cui_text_view_decode_resource(s, span->resource, resource, sizeof resource, &length) ==
+                CUI_TEXT_VIEW_OK &&
+            o.image((cui_str){resource, length}, &bitmap, o.image_user) && bitmap.pixels &&
+            bitmap.width && bitmap.height && bitmap.stride / 4 >= bitmap.width;
+        span->image = bitmap;
+    }
     if (cui_text_view_layout(
             s,
             (cui_text_view_layout_options){
@@ -675,8 +707,8 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 .max_lines = o.max_lines,
                 .scrollable = o.scrollable,
                 .table_mode = o.table_mode,
-                .font_metrics_available = font_metrics_available,
-                .body_metrics = body_metrics,
+                .font_metrics = cui_text_view_core_font_metrics,
+                .font_metrics_user = ui,
                 .code_actions_height = o.code_actions ? o.code_actions_height : 0,
                 .table_actions_height = o.table_actions ? o.table_actions_height : 0},
             cui_text_view_core_measure, ui) != CUI_TEXT_VIEW_OK)

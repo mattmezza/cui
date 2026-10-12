@@ -176,7 +176,8 @@ typedef enum {
     CUI_ROLE_LOG,
     CUI_ROLE_TOOLBAR,
     CUI_ROLE_SEPARATOR,
-    CUI_ROLE_REGION
+    CUI_ROLE_REGION,
+    CUI_ROLE_RADIOGROUP
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -434,6 +435,9 @@ bool cui_event_within_scope(cui_context *, size_t index, cui_id scope);
  * logical scope must be active now. Non-pointer events return false. */
 bool cui_event_hit_within_scope(cui_context *, size_t index, cui_id scope);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
+/* After end_frame: explicit semantic parent, otherwise the nearest semantic
+ * layout ancestor. Zero for roots, unknown IDs, or while a frame is open. */
+cui_id cui_semantic_parent(cui_context *ui, cui_id id);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
 /* Update a current-frame clipped box before end_frame computes layout. Useful
  * for scroll events deferred by children after their parent's begin call. */
@@ -7039,6 +7043,18 @@ const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
         *count = ui ? ui->semantic_count : 0;
     return ui ? ui->semantics : NULL;
 }
+cui_id cui_semantic_parent(cui_context *ui, cui_id id) {
+    if (!ui || !id || ui->in_frame)
+        return 0;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            if (ui->semantics[i].details.parent)
+                return ui->semantics[i].details.parent;
+            size_t parent = ui->previous_parents[i];
+            return parent < ui->semantic_count ? ui->semantics[parent].id : 0;
+        }
+    return 0;
+}
 cui_id cui_focused(cui_context *ui) {
     return ui && !cui_core_inert(ui) ? ui->focus : 0;
 }
@@ -7404,7 +7420,7 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
-        role > CUI_ROLE_REGION)
+        role > CUI_ROLE_RADIOGROUP)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {

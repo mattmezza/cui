@@ -513,6 +513,29 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     extra.count = 3;
+    float x_with_axis, y_with_axis, x_without_axis, y_without_axis;
+    assert(cui_chart_point_coordinates(&options, 1, 0, &x_with_axis, &y_with_axis) == CUI_PLOT_OK);
+    assert(!cui_chart_hit_test(&options, x_with_axis * options.logical_width / options.width,
+                               options.logical_height - 1)
+                .valid);
+    options.hide_x_axis = true;
+    assert(cui_chart_point_coordinates(&options, 1, 0, &x_without_axis, &y_without_axis) ==
+           CUI_PLOT_OK);
+    assert(fabsf(x_with_axis - x_without_axis) < .01f && y_without_axis > y_with_axis);
+    assert(cui_chart_hit_test(&options, x_without_axis * options.logical_width / options.width,
+                              options.logical_height - 1)
+               .valid);
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    options.hide_x_axis = false;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    options.kind = CUI_CHART_AREA;
+    options.hide_x_axis = true;
+    assert(cui_chart_point_coordinates(&options, 1, 0, &x_without_axis, &y_without_axis) ==
+           CUI_PLOT_OK);
+    assert(y_without_axis > y_with_axis);
+    options.hide_x_axis = false;
     options.kind = CUI_CHART_RADAR;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     float radar_x = -1, radar_y = -1;
@@ -654,6 +677,19 @@ int main(void) {
     options.bar_alignment = CUI_CHART_BAR_RIGHT;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(memcmp(bottom_bars, pixels, sizeof pixels) != 0);
+    cui_plot_rect right_labeled, right_unlabeled, left_labeled, left_unlabeled;
+    assert(cui_chart_bar_bounds(&options, 0, &right_labeled) == CUI_PLOT_OK);
+    options.hide_x_axis = true;
+    assert(cui_chart_bar_bounds(&options, 0, &right_unlabeled) == CUI_PLOT_OK);
+    assert(right_unlabeled.x_max > right_labeled.x_max + 20);
+    assert(cui_chart_hit_test(&options, options.logical_width - 1, 20).valid);
+    options.bar_alignment = CUI_CHART_BAR_LEFT;
+    options.hide_x_axis = false;
+    assert(cui_chart_bar_bounds(&options, 0, &left_labeled) == CUI_PLOT_OK);
+    options.hide_x_axis = true;
+    assert(cui_chart_bar_bounds(&options, 0, &left_unlabeled) == CUI_PLOT_OK);
+    assert(left_unlabeled.x_min < left_labeled.x_min - 20);
+    options.hide_x_axis = false;
     options.bar_alignment = CUI_CHART_BAR_BOTTOM;
     options.grid_columns = 3;
     options.grid_solid = false;
@@ -742,6 +778,17 @@ int main(void) {
     assert(cui_chart_value_domain(&options, &lo, &hi) && lo == 90 && hi == 112);
     assert(cui_chart_candle_bounds(&options, 0, &first_candle) == CUI_PLOT_OK);
     assert(cui_chart_candle_bounds(&options, 1, &second_candle) == CUI_PLOT_OK);
+    double candle_average = options.width / 3.0;
+    double candle_outer = candle_average * .2;
+    double candle_band = fmin(30, candle_average * .6);
+    double candle_step = (options.width - 2 * candle_outer) / 3 * 1.2;
+    assert(fabs(first_candle.wick.x_min - (candle_outer + candle_band / 2)) < .01 &&
+           fabs(second_candle.wick.x_min - (candle_outer + candle_band / 2 + candle_step)) < .01);
+    assert(cui_chart_hit_test(&options, 1, 1).valid &&
+           !cui_chart_hit_test(&options, 1, options.logical_height - 1).valid);
+    options.hide_x_axis = true;
+    assert(cui_chart_hit_test(&options, 1, options.logical_height - 1).valid);
+    options.hide_x_axis = false;
     assert(first_candle.bullish && !second_candle.bullish);
     assert(first_candle.wick.y_min > 12 && first_candle.wick.y_max < 76);
     assert(first_candle.body.x_max - first_candle.body.x_min > 14);
@@ -760,6 +807,12 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     options.candle_body_ratio = 0;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    size_t candle_grid_pixel = (size_t)0 * options.width + 36;
+    size_t candle_left_pixel = (size_t)5 * options.width;
+    assert(pixels[4 * candle_grid_pixel] != options.background.r ||
+           pixels[4 * candle_grid_pixel + 1] != options.background.g);
+    assert(pixels[4 * candle_left_pixel] == options.background.r &&
+           pixels[4 * candle_left_pixel + 1] == options.background.g);
     cui_chart_hit candle_hit =
         cui_chart_hit_test(&options, (float)(first_candle.wick.x_min / 2), 18);
     assert(candle_hit.valid && candle_hit.hovered == 0 && candle_hit.value == 105);
@@ -889,26 +942,54 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     cui_draw_list draw = cui_end_frame(ui);
     bool image = false, text = false, formatted = false, hover_crosshair = false,
-         hover_halo = false, eased_crosshair = false;
+         hover_halo = false, hover_dot = false, hover_stroke = false, eased_crosshair = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_IMAGE) {
-            image = true;
-            assert(draw.commands[i].bitmap.bitmap.pixels == pixels);
-            assert(draw.commands[i].bounds.w == 64 && draw.commands[i].bounds.h == 48);
+            if (draw.commands[i].bitmap.bitmap.pixels == pixels) {
+                image = true;
+                assert(draw.commands[i].bounds.w == 64 && draw.commands[i].bounds.h == 48);
+            } else if (draw.commands[i].bitmap.bitmap.width == 1 &&
+                       draw.commands[i].bitmap.bitmap.height == 38) {
+                hover_crosshair = draw.commands[i].bounds.w == 1 &&
+                                  fabsf(draw.commands[i].bounds.y) < .01f &&
+                                  fabsf(draw.commands[i].bounds.h - 38) < .01f;
+                const unsigned char *guide = draw.commands[i].bitmap.bitmap.pixels;
+                eased_crosshair = guide[3] > 0 && guide[3 + 4 * 4] == 0 &&
+                                  fabsf(guide[3] - (options.grid.a ? options.grid.a : 150) *
+                                                       state.tooltip_focus) <= 1;
+            }
         } else if (draw.commands[i].type == CUI_DRAW_TEXT) {
             text = true;
             if (draw.commands[i].text.length == 1 && draw.commands[i].text.data[0] == 'Q')
                 formatted = true;
         } else if (draw.commands[i].type == CUI_DRAW_RECT) {
-            hover_crosshair |= draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20;
-            if (draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20)
-                eased_crosshair |=
-                    fabsf(draw.commands[i].color.a -
-                          (options.grid.a ? options.grid.a : 150) * state.tooltip_focus) <= 1;
-            hover_halo |= draw.commands[i].bounds.w == 10 && draw.commands[i].bounds.h == 10;
-        }
-    assert(image && text && formatted && hover_crosshair && hover_halo && eased_crosshair);
+            hover_halo |= fabsf(draw.commands[i].bounds.w - 20 * state.tooltip_focus) < .01f &&
+                          draw.commands[i].color.r == options.series[0].r &&
+                          draw.commands[i].color.a > 0;
+            hover_dot |= draw.commands[i].bounds.w == 8 && draw.commands[i].bounds.h == 8 &&
+                         draw.commands[i].color.r == options.series[0].r;
+        } else if (draw.commands[i].type == CUI_DRAW_BORDER)
+            hover_stroke |= draw.commands[i].color.r == options.background.r;
+    assert(image && text && formatted && hover_crosshair && hover_halo && hover_dot &&
+           hover_stroke && eased_crosshair);
     assert(state.hover_progress > 0 && state.hover_progress < 1);
+    unsigned char guide_pixels[48 * 4] = {0};
+    state.hover_guide_pixels = guide_pixels;
+    state.hover_guide_capacity = sizeof guide_pixels;
+    assert(cui_begin_frame(ui, 256, 256, .01));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool dashed_guide = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE &&
+            draw.commands[i].bitmap.bitmap.pixels == guide_pixels &&
+            draw.commands[i].bitmap.bitmap.width == 1 &&
+            draw.commands[i].bitmap.bitmap.height == 38 && fabsf(draw.commands[i].bounds.y) < .01f)
+            dashed_guide = true;
+    assert(dashed_guide && guide_pixels[3] > 0 && guide_pixels[3 + 3 * 4] > 0 &&
+           guide_pixels[3 + 4 * 4] == 0 && guide_pixels[3 + 6 * 4] > 0);
+    state.hover_guide_pixels = NULL;
+    state.hover_guide_capacity = 0;
     options.reduced_motion = true;
     assert(cui_begin_frame(ui, 256, 256, .04));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
@@ -988,10 +1069,25 @@ int main(void) {
     assert(state.hovered == 1 && state.emphasis_focus == 1);
     bool hover_band = false;
     for (size_t i = 0; i < draw.count; i++)
-        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.h == 32 &&
-            draw.commands[i].color.a > 0 && draw.commands[i].color.a <= 25)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.y == 0 &&
+            draw.commands[i].bounds.h == 38 && draw.commands[i].color.a > 0 &&
+            draw.commands[i].color.a <= 25)
             hover_band = true;
     assert(hover_band);
+    options.bar_alignment = CUI_CHART_BAR_TOP;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 1;
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool top_hover_band = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.y == 10 &&
+            draw.commands[i].bounds.h == 38 && draw.commands[i].color.a > 0 &&
+            draw.commands[i].color.a <= 25)
+            top_hover_band = true;
+    assert(top_hover_band);
+    options.bar_alignment = CUI_CHART_BAR_BOTTOM;
     options.reduced_motion = false;
     float old_band_center = state.emphasis_center;
     assert(cui_chart_bar_bounds(&options, 0, &hovered_bar) == CUI_PLOT_OK);
@@ -1141,6 +1237,16 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(state.emphasis_center > first_hover_candle.wick.x_min &&
            state.emphasis_center < next_hover_candle.wick.x_min);
+    options.reduced_motion = true;
+    state.hovered = 2;
+    cui_chart_candle_geometry last_hover_candle;
+    assert(cui_chart_candle_bounds(&options, 2, &last_hover_candle) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    (void)cui_end_frame(ui);
+    assert(fabs(state.emphasis_center - last_hover_candle.wick.x_min) < .01 &&
+           state.emphasis_focus == 1);
+    options.reduced_motion = false;
     state.hovered = 0;
     size_t tooltip_calls = 0;
     options.tooltip_content = custom_tooltip;
@@ -1335,18 +1441,22 @@ int main(void) {
     state.hovered = 0;
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Radar", 5}));
     draw = cui_end_frame(ui);
-    bool radar_colored_label = false, radar_hover_dot = false;
+    bool radar_colored_label = false, radar_hover_dot = false, radar_hover_halo = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
             draw.commands[i].color.r == 220 && draw.commands[i].color.g == 10)
             radar_colored_label = true;
         else if (draw.commands[i].type == CUI_DRAW_RECT &&
-                 fabsf(draw.commands[i].bounds.w - 6) < .01f &&
-                 fabsf(draw.commands[i].bounds.h - 6) < .01f &&
+                 fabsf(draw.commands[i].bounds.w - 8) < .01f &&
+                 fabsf(draw.commands[i].bounds.h - 8) < .01f &&
                  draw.commands[i].color.r == options.series[0].r)
             radar_hover_dot = true;
+        else if (draw.commands[i].type == CUI_DRAW_RECT &&
+                 fabsf(draw.commands[i].bounds.w - 20 * state.tooltip_focus) < .01f &&
+                 draw.commands[i].color.r == options.series[0].r)
+            radar_hover_halo = true;
     assert(radar_colored_label);
-    assert(radar_hover_dot);
+    assert(radar_hover_dot && radar_hover_halo);
     radar_label_calls custom_labels = {0};
     options.radar_label_measure = measure_radar_label;
     options.radar_label_paint = paint_radar_label;

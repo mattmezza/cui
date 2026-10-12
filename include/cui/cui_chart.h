@@ -236,6 +236,9 @@ typedef struct {
     cui_chart_kind rendered_kind;
     float hover_progress;                             /* private styled hover fade 0..1 */
     float hover_x, hover_y[8], hover_vx, hover_vy[8]; /* private pointer spring */
+    unsigned char *hover_guide_pixels; /* optional caller-owned RGBA scratch for dashed guide */
+    size_t hover_guide_capacity;       /* at least ceil(logical plot height)*4 bytes */
+    uint64_t hover_guide_revision;     /* private bitmap revision */
     size_t hover_visual_index;
     bool hover_visual_started;
     float emphasis_focus, emphasis_center, emphasis_velocity;

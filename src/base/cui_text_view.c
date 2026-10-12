@@ -82,7 +82,8 @@ static void cui_text_view_emit(cui_text_view_parser *p, cui_str text, cui_text_v
     }
     bool mapped = source.begin != SIZE_MAX;
     if (mapped && text.length) {
-        bool same = p->spans && p->last.block == p->block && p->last.flags == flags &&
+        bool same = !(flags & CUI_TEXT_VIEW_INLINE_IMAGE) && p->spans &&
+                    p->last.block == p->block && p->last.flags == flags &&
                     p->last.link.begin == link.begin && p->last.link.end == link.end &&
                     p->last.text.end == p->text;
         if (!same) {
@@ -289,6 +290,79 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *s,
     output[required] = 0;
     return CUI_TEXT_VIEW_OK;
 }
+static bool cui_text_view_link_syntax(cui_str input, size_t opening, size_t end, size_t *label_end,
+                                      size_t *destination_end) {
+    if (opening >= end || input.data[opening] != '[')
+        return false;
+    unsigned brackets = 1;
+    size_t close = opening + 1;
+    for (; close < end; ++close) {
+        char c = input.data[close];
+        if (c == '\\' && close + 1 < end) {
+            ++close;
+            continue;
+        }
+        if (c == '[' && ++brackets > 32)
+            return false;
+        if (c == ']' && --brackets == 0)
+            break;
+    }
+    if (close + 1 >= end || input.data[close + 1] != '(')
+        return false;
+    unsigned parentheses = 1;
+    bool angle = false;
+    char quote = 0;
+    for (size_t at = close + 2; at < end; ++at) {
+        char c = input.data[at];
+        if (c == '\\' && at + 1 < end) {
+            ++at;
+            continue;
+        }
+        if (quote) {
+            if (c == quote)
+                quote = 0;
+            continue;
+        }
+        if (angle) {
+            if (c == '>')
+                angle = false;
+            continue;
+        }
+        if (c == '<' && at == close + 2) {
+            angle = true;
+            continue;
+        }
+        if ((c == '"' || c == '\'') && at > close + 2 &&
+            (input.data[at - 1] == ' ' || input.data[at - 1] == '\t')) {
+            quote = c;
+            continue;
+        }
+        if (c == '(' && ++parentheses > 32)
+            return false;
+        if (c == ')' && --parentheses == 0) {
+            *label_end = close;
+            *destination_end = at;
+            return true;
+        }
+    }
+    return false;
+}
+static cui_text_view_range cui_text_view_link_uri(cui_str input, size_t begin, size_t end) {
+    while (begin < end && (input.data[begin] == ' ' || input.data[begin] == '\t'))
+        ++begin;
+    if (begin < end && input.data[begin] == '<') {
+        size_t close = cui_text_view_find(input, begin + 1, end, ">", 1);
+        if (close != SIZE_MAX)
+            return (cui_text_view_range){begin + 1, close};
+    }
+    size_t at = begin;
+    while (at < end && input.data[at] != ' ' && input.data[at] != '\t') {
+        if (input.data[at] == '\\' && at + 1 < end)
+            ++at;
+        ++at;
+    }
+    return (cui_text_view_range){begin, at};
+}
 static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, unsigned flags,
                                  cui_text_view_range link, unsigned depth) {
     if (depth > 16) {
@@ -320,19 +394,26 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
                 continue;
             }
         }
+        if (c == '!' && a + 1 < b && p->input.data[a + 1] == '[') {
+            size_t close, last;
+            if (cui_text_view_link_syntax(p->input, a + 1, b, &close, &last)) {
+                cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, last + 1},
+                                   flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
+                p->last.resource = cui_text_view_link_uri(p->input, close + 2, last);
+                p->last.alt = (cui_text_view_range){a + 2, close};
+                if (p->write && !p->error)
+                    p->state->workspace.spans[p->spans - 1] = p->last;
+                a = last + 1;
+                continue;
+            }
+        }
         if (c == '[') {
-            size_t close = cui_text_view_find(p->input, a + 1, b, "](", 2);
-            if (close != SIZE_MAX) {
-                size_t dest = close + 2, last = cui_text_view_find(p->input, dest, b, ")", 1);
-                if (last != SIZE_MAX) {
-                    size_t uri = dest;
-                    while (uri < last && p->input.data[uri] != ' ' && p->input.data[uri] != '\t')
-                        ++uri;
-                    cui_text_view_inline(p, a + 1, close, flags, (cui_text_view_range){dest, uri},
-                                         depth + 1);
-                    a = last + 1;
-                    continue;
-                }
+            size_t close, last;
+            if (cui_text_view_link_syntax(p->input, a, b, &close, &last)) {
+                cui_text_view_inline(p, a + 1, close, flags,
+                                     cui_text_view_link_uri(p->input, close + 2, last), depth + 1);
+                a = last + 1;
+                continue;
             }
         }
         if (c == '*' || c == '_' || c == '~') {
@@ -586,9 +667,16 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         size_t image_close = SIZE_MAX, image_last = SIZE_MAX;
         if (b - a >= 4 && p->input.data[a] == '!' && p->input.data[a + 1] == '[') {
-            image_close = cui_text_view_find(p->input, a + 2, b, "](", 2);
-            if (image_close != SIZE_MAX)
-                image_last = cui_text_view_find(p->input, image_close + 2, b, ")", 1);
+            if (!cui_text_view_link_syntax(p->input, a + 1, b, &image_close, &image_last))
+                image_close = image_last = SIZE_MAX;
+            if (image_last != SIZE_MAX) {
+                size_t remainder = image_last + 1;
+                while (remainder < b &&
+                       (p->input.data[remainder] == ' ' || p->input.data[remainder] == '\t'))
+                    ++remainder;
+                if (remainder != b)
+                    image_last = SIZE_MAX;
+            }
             if (image_last != SIZE_MAX && kind == CUI_TEXT_VIEW_PARAGRAPH)
                 kind = CUI_TEXT_VIEW_IMAGE;
         }
@@ -789,7 +877,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             if (p->write) {
                 cui_text_view_block *block = &p->state->workspace.blocks[p->block];
                 block->kind = CUI_TEXT_VIEW_IMAGE;
-                block->resource = (cui_text_view_range){image_close + 2, image_last};
+                block->resource = cui_text_view_link_uri(p->input, image_close + 2, image_last);
             }
             cui_text_view_inline(p, a + 2, image_close, 0, (cui_text_view_range){0}, 0);
             cui_text_view_block_end(p, next, true);
@@ -992,7 +1080,7 @@ static size_t cui_text_view_html_skip_raw(cui_str input, size_t start, cui_str t
 }
 static void cui_text_view_html(cui_text_view_parser *p) {
     size_t a = 0;
-    unsigned flags = 0, table = 0, row = 0, col = 0;
+    unsigned flags = 0, table = 0, row = 0, col = 0, inline_containers = 0;
     unsigned bold_depth = 0, italic_depth = 0, code_depth = 0, strike_depth = 0, mark_depth = 0;
     cui_text_view_range link = {0};
     bool active = false, pre = false;
@@ -1009,6 +1097,20 @@ static void cui_text_view_html(cui_text_view_parser *p) {
                        p->input.data[name_end] != '/' && p->input.data[name_end] != '\t')
                     ++name_end;
                 cui_str name = {p->input.data + begin, name_end - begin};
+                bool inline_container =
+                    cui_text_view_name(name, "p") || cui_text_view_name(name, "td") ||
+                    cui_text_view_name(name, "th") ||
+                    (name.length == 2 && (name.data[0] == 'h' || name.data[0] == 'H') &&
+                     name.data[1] >= '1' && name.data[1] <= '6');
+                if (inline_container) {
+                    if (closing) {
+                        if (inline_containers)
+                            --inline_containers;
+                    } else if (++inline_containers > 32) {
+                        p->error = CUI_TEXT_VIEW_INVALID;
+                        return;
+                    }
+                }
                 if (!closing &&
                     (cui_text_view_name(name, "script") || cui_text_view_name(name, "style"))) {
                     a = cui_text_view_html_skip_raw(p->input, end + 1, name);
@@ -1027,7 +1129,24 @@ static void cui_text_view_html(cui_text_view_parser *p) {
                 else if (cui_text_view_name(name, "a"))
                     link = closing ? (cui_text_view_range){0}
                                    : cui_text_view_attribute(p->input, name_end, end, "href");
-                else if (cui_text_view_name(name, "br")) {
+                else if (!closing && cui_text_view_name(name, "img") &&
+                         (inline_containers || link.end > link.begin)) {
+                    cui_text_view_range src =
+                        cui_text_view_attribute(p->input, name_end, end, "src");
+                    if (src.begin || src.end) {
+                        if (!active) {
+                            if (!cui_text_view_block_begin(p, CUI_TEXT_VIEW_PARAGRAPH, a, 0))
+                                return;
+                            active = true;
+                        }
+                        cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, end + 1},
+                                           flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
+                        p->last.resource = src;
+                        p->last.alt = cui_text_view_attribute(p->input, name_end, end, "alt");
+                        if (p->write && !p->error)
+                            p->state->workspace.spans[p->spans - 1] = p->last;
+                    }
+                } else if (cui_text_view_name(name, "br")) {
                     if (active)
                         cui_text_view_emit(p, (cui_str){"\n", 1}, (cui_text_view_range){a, end + 1},
                                            flags, link);
@@ -1434,6 +1553,51 @@ static bool cui_text_view_prepare_list_prefix(cui_text_view_block *b, float font
     }
     return true;
 }
+static bool cui_text_view_metrics_valid(cui_font_metrics m) {
+    return isfinite(m.ascent) && isfinite(m.descent) && isfinite(m.line_height) && m.ascent >= 0 &&
+           m.descent >= 0 && m.line_height > 0 && m.line_height <= 10000000 &&
+           m.ascent + m.descent > 0 && m.ascent + m.descent <= 10000000;
+}
+static float cui_text_view_finish_inline_line(cui_text_view_state *s, size_t first, float y,
+                                              float line, cui_text_view_layout_options o) {
+    float baseline =
+        o.font_metrics_available
+            ? (line - o.body_metrics.ascent - o.body_metrics.descent) * .5f + o.body_metrics.ascent
+            : 0;
+    float ascent = o.font_metrics_available ? baseline : 0;
+    float descent = o.font_metrics_available ? line - baseline : line;
+    bool image = false;
+    for (size_t i = first; i < s->glyph_count; ++i) {
+        cui_text_view_span *span = &s->workspace.spans[s->workspace.glyphs[i].span];
+        if (!(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        image = true;
+        float h = span->image_bounds.h;
+        float b =
+            o.font_metrics_available ? fminf(h, fmaxf(0, h * .5f + baseline - line * .5f)) : 0;
+        ascent = fmaxf(ascent, b);
+        descent = fmaxf(descent, h - b);
+    }
+    if (!image)
+        return line;
+    float height = ascent + descent;
+    if (!isfinite(height) || height <= 0 || height > 10000000)
+        return NAN;
+    for (size_t i = first; i < s->glyph_count; ++i) {
+        cui_text_view_glyph *glyph = &s->workspace.glyphs[i];
+        cui_text_view_span *span = &s->workspace.spans[glyph->span];
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            float h = span->image_bounds.h;
+            float b =
+                o.font_metrics_available ? fminf(h, fmaxf(0, h * .5f + baseline - line * .5f)) : 0;
+            span->image_bounds.y = y + ascent - b;
+            glyph->bounds.y = y;
+            glyph->bounds.h = height;
+        } else
+            glyph->bounds.y += ascent - baseline;
+    }
+    return height;
+}
 static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, float x, float y,
                                        float width, cui_text_view_layout_options o,
                                        cui_text_view_measure_fn measure, void *user) {
@@ -1448,6 +1612,13 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
           padding = b->kind == CUI_TEXT_VIEW_CODE_BLOCK   ? 12
                     : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 4
                                                           : 0;
+    if (o.font_metrics) {
+        cui_font_metrics metrics = {0};
+        o.font_metrics_available =
+            o.font_metrics(o.font_metrics_user, font, cui_text_view_block_flags(b), &metrics) &&
+            cui_text_view_metrics_valid(metrics);
+        o.body_metrics = metrics;
+    }
     float left = b->kind == CUI_TEXT_VIEW_QUOTE            ? 12
                  : b->kind == CUI_TEXT_VIEW_TABLE_CELL     ? 8
                  : (b->list_item || b->list_repeat_marker) ? 20
@@ -1468,7 +1639,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     b->image_line = (cui_rect){0};
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
     float cursor_x = 0, cursor_y = 0;
-    size_t first_glyph = s->glyph_count;
+    size_t first_glyph = s->glyph_count, line_first = first_glyph;
     if (b->kind == CUI_TEXT_VIEW_RULE) {
         b->bounds = (cui_rect){x, y, width, 1};
         return true;
@@ -1498,6 +1669,44 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         unsigned flags = r->flags | cui_text_view_block_flags(b);
         float size =
             flags & CUI_TEXT_VIEW_CODE && b->kind != CUI_TEXT_VIEW_CODE_BLOCK ? font * .875f : font;
+        if (r->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            float h = fmaxf(1, line * .75f);
+            float ratio = r->image_ready && r->image.width && r->image.height
+                              ? (float)r->image.width / r->image.height
+                              : 1;
+            float w = fmaxf(1, h * ratio);
+            if (!isfinite(w) || w > 10000000 || s->glyph_count >= s->workspace.glyph_capacity)
+                return false;
+            if (cursor_x > 0 && cursor_x + w > available &&
+                !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                  o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
+                cursor_x = 0;
+                float height = cui_text_view_finish_inline_line(s, line_first,
+                                                                y + padding + cursor_y, line, o);
+                if (!isfinite(height))
+                    return false;
+                cursor_y += height;
+                line_first = s->glyph_count;
+            }
+            float top = 0;
+            if (o.font_metrics_available) {
+                float baseline = (line - o.body_metrics.ascent - o.body_metrics.descent) * .5f +
+                                 o.body_metrics.ascent;
+                float image_baseline = fminf(h, fmaxf(0, h * .5f + baseline - line * .5f));
+                top = fmaxf(baseline, image_baseline) - image_baseline;
+            }
+            r->image_bounds = (cui_rect){x + left + cursor_x, y + padding + cursor_y + top, w, h};
+            s->workspace.glyphs[s->glyph_count++] = (cui_text_view_glyph){
+                .text = r->text,
+                .span = span,
+                .block = index,
+                .bounds = {x + left + cursor_x, y + padding + cursor_y, w, line},
+                .font_size = size,
+                .line_height = line,
+                .flags = flags};
+            cursor_x += w;
+            continue;
+        }
         size_t segment = r->text.begin;
         float measured = 0;
         for (size_t i = r->text.begin; i < r->text.end;) {
@@ -1506,7 +1715,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 return false;
             if (s->workspace.rendered[i] == '\n') {
                 cursor_x = 0;
-                cursor_y += line;
+                float height = cui_text_view_finish_inline_line(s, line_first,
+                                                                y + padding + cursor_y, line, o);
+                if (!isfinite(height))
+                    return false;
+                cursor_y += height;
+                line_first = s->glyph_count;
                 i += n;
                 segment = i;
                 measured = 0;
@@ -1528,7 +1742,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                     return false;
                 if (word_size.width > available - cursor_x) {
                     cursor_x = 0;
-                    cursor_y += line;
+                    float height = cui_text_view_finish_inline_line(
+                        s, line_first, y + padding + cursor_y, line, o);
+                    if (!isfinite(height))
+                        return false;
+                    cursor_y += height;
+                    line_first = s->glyph_count;
                     segment = i;
                     measured = 0;
                 }
@@ -1542,7 +1761,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
                   o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
                 cursor_x = 0;
-                cursor_y += line;
+                float height = cui_text_view_finish_inline_line(s, line_first,
+                                                                y + padding + cursor_y, line, o);
+                if (!isfinite(height))
+                    return false;
+                cursor_y += height;
+                line_first = s->glyph_count;
                 segment = i;
                 measured = 0;
                 m = measure(user, (cui_str){s->workspace.rendered + i, n}, size, flags);
@@ -1579,8 +1803,18 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
             first = last;
         }
     }
+    for (size_t i = first_glyph; i < s->glyph_count; ++i) {
+        cui_text_view_glyph *glyph = &s->workspace.glyphs[i];
+        cui_text_view_span *span = &s->workspace.spans[glyph->span];
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+            span->image_bounds.x = glyph->bounds.x;
+    }
     b->actions_height = b->kind == CUI_TEXT_VIEW_CODE_BLOCK ? o.code_actions_height : 0;
-    b->bounds = (cui_rect){x, y, width, cursor_y + line + padding * 2};
+    float final_height =
+        cui_text_view_finish_inline_line(s, line_first, y + padding + cursor_y, line, o);
+    if (!isfinite(final_height))
+        return false;
+    b->bounds = (cui_rect){x, y, width, cursor_y + final_height + padding * 2};
     return true;
 }
 static bool cui_text_view_table_widths(cui_text_view_state *s, size_t first, size_t end,
@@ -1693,13 +1927,7 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         o.table_actions_height < 0 || o.table_actions_height > 10000000 ||
         o.table_mode < CUI_TEXT_VIEW_TABLE_WRAP || o.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
         return CUI_TEXT_VIEW_INVALID;
-    if (o.font_metrics_available &&
-        (!isfinite(o.body_metrics.ascent) || !isfinite(o.body_metrics.descent) ||
-         !isfinite(o.body_metrics.line_height) || o.body_metrics.ascent < 0 ||
-         o.body_metrics.descent < 0 || o.body_metrics.line_height <= 0 ||
-         o.body_metrics.line_height > 10000000 ||
-         o.body_metrics.ascent + o.body_metrics.descent <= 0 ||
-         o.body_metrics.ascent + o.body_metrics.descent > 10000000))
+    if (o.font_metrics_available && !cui_text_view_metrics_valid(o.body_metrics))
         return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;
@@ -1913,6 +2141,22 @@ static void cui_text_view_copy_inline(const cui_text_view_state *s, cui_text_vie
         size_t a = span->text.begin > r.begin ? span->text.begin : r.begin;
         size_t b = span->text.end < r.end ? span->text.end : r.end;
         cui_str t = {s->workspace.rendered + a, b - a};
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            bool linked = span->link.end > span->link.begin;
+            if (linked)
+                cui_text_view_copy_literal(w, "[");
+            cui_text_view_copy_write(w, (cui_str){s->workspace.source + span->source.begin,
+                                                  span->source.end - span->source.begin});
+            if (linked) {
+                cui_text_view_copy_literal(w, "](");
+                cui_text_view_copy_escape(w,
+                                          (cui_str){s->workspace.source + span->link.begin,
+                                                    span->link.end - span->link.begin},
+                                          true);
+                cui_text_view_copy_literal(w, ")");
+            }
+            continue;
+        }
         bool link = span->link.end > span->link.begin;
         unsigned flags = span->flags, ticks = 0;
         if (link)
@@ -1983,9 +2227,11 @@ static void cui_text_view_copy_table(const cui_text_view_state *s, cui_text_view
         ++columns;
         size_t begin = cell->text.begin > a ? cell->text.begin : a,
                finish = cell->text.end < b ? cell->text.end : b;
-        while (begin < finish && s->workspace.rendered[begin] == ' ')
+        while (begin < finish && s->workspace.rendered[begin] == ' ' &&
+               !(s->workspace.mapping[begin].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             ++begin;
-        while (finish > begin && s->workspace.rendered[finish - 1] == ' ')
+        while (finish > begin && s->workspace.rendered[finish - 1] == ' ' &&
+               !(s->workspace.mapping[finish - 1].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             --finish;
         if (begin < finish)
             cui_text_view_copy_inline(s, w, (cui_text_view_range){begin, finish}, i);

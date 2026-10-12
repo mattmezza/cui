@@ -46,6 +46,135 @@ static cui_size measure(void *u, cui_str t, float font, unsigned flags) {
             ++count;
     return (cui_size){(float)count * font * .5f, font};
 }
+static void test_inline_image_objects(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "a![alt](asset)**b**";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && f.blocks[0].kind == CUI_TEXT_VIEW_PARAGRAPH);
+    assert(!strcmp(f.rendered, "a b\n") && f.state.span_count == 3);
+    assert(f.spans[1].flags & CUI_TEXT_VIEW_INLINE_IMAGE);
+    assert(f.spans[1].text.begin == 1 && f.spans[1].text.end == 2 && f.spans[1].source.begin == 1 &&
+           f.spans[1].source.end == 14);
+    cui_text_view_layout_options o = {.width = 30,
+                                      .font_size = 14,
+                                      .line_height = 20,
+                                      .paragraph_gap = 16,
+                                      .font_metrics_available = true,
+                                      .body_metrics = {8, 2, 10}};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.state.glyph_count == 3 && f.glyphs[0].bounds.y == 0 && f.glyphs[2].bounds.y == 0 &&
+           f.spans[1].image_bounds.w == 15 && f.spans[1].image_bounds.y == 2.5f);
+    f.spans[1].image_ready = true;
+    f.spans[1].image = (cui_bitmap){.width = 2, .height = 1};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[1].image_bounds.x == 0 && f.spans[1].image_bounds.y == 22.5f &&
+           f.glyphs[2].bounds.y == 40 && f.blocks[0].bounds.h == 60);
+    o.width = 200;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[0].bounds.y == f.glyphs[2].bounds.y && f.glyphs[2].bounds.x == 37 &&
+           (f.glyphs[2].flags & CUI_TEXT_VIEW_BOLD));
+    o.body_metrics = (cui_font_metrics){40, 0, 40};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.h == 30 && f.spans[1].image_bounds.y == 15 &&
+           f.glyphs[1].bounds.h == 30);
+    o.width = 30;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[1].image_bounds.y == 35 && f.glyphs[2].bounds.y == 50 &&
+           f.blocks[0].bounds.h == 70);
+    o.width = 200;
+    o.body_metrics = (cui_font_metrics){0, 40, 40};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[0].bounds.y == 10 && f.spans[1].image_bounds.y == 0 &&
+           f.blocks[0].bounds.h == 30);
+    assert(cui_text_view_select(&f.state, 1, 2));
+    cui_text_view_range range;
+    assert(cui_text_view_selected_source_range(&f.state, &range) && range.begin == 1 &&
+           range.end == 14);
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "![alt](asset)"));
+    assert(cui_text_view_set_text(&f.state, text("![a](asset)![b](asset) tail")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.span_count == 3 && f.spans[0].text.end == 1 && f.spans[1].text.begin == 1 &&
+           f.spans[1].text.end == 2);
+    assert(cui_text_view_set_text(&f.state, text("| a![alt](asset)b |\n| :---: |")) ==
+           CUI_TEXT_VIEW_OK);
+    o.width = 200;
+    o.body_metrics = (cui_font_metrics){8, 2, 10};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    bool aligned = false;
+    for (size_t i = 0; i < f.state.glyph_count; ++i) {
+        cui_text_view_glyph *glyph = &f.glyphs[i];
+        cui_text_view_span *span = &f.spans[glyph->span];
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            aligned = true;
+            assert(glyph->bounds.x > 50 && span->image_bounds.x == glyph->bounds.x);
+        }
+    }
+    assert(aligned);
+}
+static void test_linked_image_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "[![alt](asset \"image (title)\")](https://x.test) end";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.rendered, "  end\n") && f.state.span_count == 2);
+    cui_text_view_span *image = &f.spans[0];
+    assert((image->flags & CUI_TEXT_VIEW_INLINE_IMAGE) && image->text.end == 1 &&
+           image->resource.end - image->resource.begin == 5 &&
+           image->link.end - image->link.begin == strlen("https://x.test"));
+    assert(cui_text_view_select(&f.state, 0, 1));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "[![alt](asset \"image (title)\")](https://x.test)"));
+    assert(cui_text_view_set_text(&f.state, text("![nested [alt]](<asset> \"title)\")")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].kind == CUI_TEXT_VIEW_IMAGE &&
+           f.blocks[0].resource.end - f.blocks[0].resource.begin == 5);
+    assert(cui_text_view_set_text(&f.state, text("[text](https://x.test/a(b))")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].link.end - f.spans[0].link.begin == strlen("https://x.test/a(b)"));
+}
+static void test_html_inline_image_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    const char *source =
+        "<p>before <a href='https://x.test'><img src='asset' alt='image'></a> after</p>";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && !strcmp(f.rendered, "before   after\n"));
+    assert(f.state.span_count == 3 && (f.spans[1].flags & CUI_TEXT_VIEW_INLINE_IMAGE));
+    assert(f.spans[1].text.end - f.spans[1].text.begin == 1 &&
+           f.spans[1].link.end > f.spans[1].link.begin);
+    assert(cui_text_view_select(&f.state, f.spans[1].text.begin, f.spans[1].text.end));
+    cui_text_view_range source_range = f.mapping[f.spans[1].text.begin].source;
+    assert(!cui_text_view_selected_source_range(&f.state, NULL));
+    assert(source[source_range.begin] == '<' && !memcmp(source + source_range.begin, "<img", 4) &&
+           source[source_range.end - 1] == '>');
+    cui_text_view_layout_options o = {.width = 400, .font_size = 14, .line_height = 20};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[0].bounds.y == f.glyphs[f.state.glyph_count - 1].bounds.y);
+    assert(cui_text_view_set_text(&f.state, text("<p>a<img alt='missing'>b</p>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.rendered, "ab\n") && f.state.span_count == 1);
+}
+static void test_image_only_table_copy(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("| ![alt](asset) |\n| --- |\n| after |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].flags & CUI_TEXT_VIEW_INLINE_IMAGE);
+    assert(cui_text_view_select(&f.state, f.spans[0].text.begin, f.spans[0].text.end));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "| ![alt](asset) |\n| :-- |\n|  |"));
+}
 static void test_image_font_metrics(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -900,6 +1029,195 @@ static bool image_metrics(void *user, float size, cui_text_style style, cui_font
     assert(size == 14 && style.weight == CUI_TEXT_WEIGHT_NORMAL);
     *out = *(cui_font_metrics *)user;
     return true;
+}
+static void test_inline_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("a![alt](asset)**b**")) == CUI_TEXT_VIEW_OK);
+    cui_font_metrics metrics = {8, 2, 10};
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 512, .font_metrics = image_metrics, .measure_user = &metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    cui_draw_list d = frame(ui, &f, o);
+    bool bitmap = false, before = false, after = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *c = &d.commands[i];
+        if (c->type == CUI_DRAW_IMAGE) {
+            bitmap = true;
+            assert(c->bounds.w == 30 && c->bounds.h == 15 &&
+                   c->bounds.y == f.state.viewport.y + 2.5f);
+        }
+        if (c->type == CUI_DRAW_TEXT && c->text.length == 1) {
+            before |= c->text.data[0] == 'a';
+            after |= c->text.data[0] == 'b' && c->text_style.weight == CUI_TEXT_WEIGHT_BOLD;
+        }
+    }
+    assert(bitmap && before && after && f.glyphs[0].bounds.y == f.glyphs[2].bounds.y);
+    frame(ui, &f, o);
+    float x = f.state.viewport.x + f.glyphs[1].bounds.x;
+    float y = f.state.viewport.y + f.glyphs[1].bounds.y + 5;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x + 1,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x + 29, .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x + 29,
+                                           .y = y}));
+    frame(ui, &f, o);
+    char selected[64];
+    size_t copied;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, selected,
+                                        sizeof selected, &copied) == CUI_TEXT_VIEW_OK &&
+           !strcmp(selected, "![alt](asset)"));
+    o.width = 32;
+    frame(ui, &f, o);
+    assert(f.spans[1].image_bounds.y == 22.5f && f.glyphs[2].bounds.y == 40);
+    o.image = NULL;
+    d = frame(ui, &f, o);
+    for (size_t i = 0; i < d.count; ++i)
+        assert(d.commands[i].type != CUI_DRAW_IMAGE);
+    assert(!f.spans[1].image_ready && f.spans[1].image_bounds.w == 15 &&
+           f.glyphs[0].bounds.y == f.glyphs[2].bounds.y && !strcmp(f.rendered, "a b\n"));
+    cui_destroy(ui);
+}
+static unsigned image_link_clicks;
+static void image_link_clicked(cui_str uri, const cui_event *event, void *user) {
+    (void)user;
+    assert(uri.length == strlen("https://x.test") &&
+           !memcmp(uri.data, "https://x.test", uri.length));
+    assert(event->pointer_button == CUI_POINTER_PRIMARY);
+    ++image_link_clicks;
+}
+static void test_linked_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("[![alt](asset \"title)\")](https://x.test) after")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    o.on_link = image_link_clicked;
+    frame(ui, &f, o);
+    cui_draw_list draw = frame(ui, &f, o);
+    for (size_t i = 0; i < draw.count; ++i)
+        assert(draw.commands[i].type != CUI_DRAW_RECT || draw.commands[i].bounds.h != 1);
+    bool label = false;
+    const cui_semantic *nodes;
+    size_t count;
+    nodes = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].role == CUI_ROLE_LINK)
+            label |= nodes[i].name.length == 3 && !memcmp(nodes[i].name.data, "alt", 3);
+    assert(label);
+    float x = f.state.viewport.x + f.glyphs[0].bounds.x + 5;
+    float y = f.state.viewport.y + f.glyphs[0].bounds.y + 5;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(image_link_clicks == 1);
+    cui_destroy(ui);
+}
+static void test_html_inline_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(
+        cui_text_view_set_text(
+            &f.state,
+            text("<p>a<a href='https://x.test'><img src='asset' alt='image'></a><em>b</em></p>")) ==
+        CUI_TEXT_VIEW_OK);
+    cui_font_metrics metrics = {8, 2, 10};
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 512, .font_metrics = image_metrics, .measure_user = &metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    o.on_link = image_link_clicked;
+    cui_draw_list d = frame(ui, &f, o);
+    bool bitmap = false, italic = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        if (d.commands[i].type == CUI_DRAW_IMAGE)
+            bitmap = d.commands[i].bounds.h == 15 && d.commands[i].bounds.y == 2.5f;
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 1 &&
+            d.commands[i].text.data[0] == 'b')
+            italic = d.commands[i].text_style.italic;
+    }
+    assert(bitmap && italic && f.state.block_count == 1);
+    frame(ui, &f, o);
+    float x = f.state.viewport.x + f.glyphs[1].bounds.x + 5;
+    float y = f.state.viewport.y + f.glyphs[1].bounds.y + 5;
+    unsigned before = image_link_clicks;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(image_link_clicks == before + 1);
+    cui_destroy(ui);
+}
+static unsigned heading_metric_calls;
+static bool heading_image_metrics(void *user, float size, cui_text_style style,
+                                  cui_font_metrics *out) {
+    (void)user;
+    assert(size == 21 && style.weight == CUI_TEXT_WEIGHT_SEMIBOLD);
+    ++heading_metric_calls;
+    *out = (cui_font_metrics){17, 4, 21};
+    return true;
+}
+static bool invalid_image_loaded(cui_str uri, cui_bitmap *out, void *user) {
+    assert(image_loaded(uri, out, user));
+    out->stride = 0;
+    return true;
+}
+static void test_inline_image_heading_metrics(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("## a![alt](asset)b")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui =
+        cui_create((cui_config){.max_elements = 512, .font_metrics = heading_image_metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    cui_draw_list d = frame(ui, &f, o);
+    bool bitmap = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *c = &d.commands[i];
+        if (c->type == CUI_DRAW_IMAGE) {
+            bitmap = true;
+            assert(c->bounds.h == 22.5f && c->bounds.w == 45 &&
+                   c->bounds.y == f.state.viewport.y + 3.75f);
+        }
+    }
+    assert(bitmap && heading_metric_calls > 0);
+    o.image = invalid_image_loaded;
+    d = frame(ui, &f, o);
+    assert(!f.spans[1].image_ready && f.spans[1].image_bounds.w == 22.5f);
+    for (size_t i = 0; i < d.count; ++i)
+        assert(d.commands[i].type != CUI_DRAW_IMAGE);
+    cui_destroy(ui);
 }
 static void test_image_metric_paint(void) {
     fixture f;
@@ -1922,6 +2240,10 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_html_inline_image_model();
+    test_image_only_table_copy();
+    test_linked_image_model();
+    test_inline_image_objects();
     test_image_font_metrics();
     test_markdown();
     test_unicode_ranges_and_stream();
@@ -1949,6 +2271,10 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_linked_image_paint();
+    test_html_inline_image_paint();
+    test_inline_image_heading_metrics();
+    test_inline_image_paint();
     test_image_metric_paint();
     test_links_and_images();
     test_theme_scroll_and_reveal();

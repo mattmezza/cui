@@ -316,15 +316,15 @@ bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str n
  * base function; both zero is invalid. The explicit IDs remain independently
  * focusable; container is paint-only in the styled function. */
 typedef enum {
+    CUI_DROPDOWN_BUTTON_DEFAULT,
     CUI_DROPDOWN_BUTTON_PRIMARY,
     CUI_DROPDOWN_BUTTON_SECONDARY,
+    CUI_DROPDOWN_BUTTON_DANGER,
     CUI_DROPDOWN_BUTTON_OUTLINE,
     CUI_DROPDOWN_BUTTON_GHOST,
-    CUI_DROPDOWN_BUTTON_DANGER,
     CUI_DROPDOWN_BUTTON_WARNING,
     CUI_DROPDOWN_BUTTON_SUCCESS,
     CUI_DROPDOWN_BUTTON_INFO,
-    CUI_DROPDOWN_BUTTON_DEFAULT,
     CUI_DROPDOWN_BUTTON_LINK,
     CUI_DROPDOWN_BUTTON_TEXT,
     CUI_DROPDOWN_BUTTON_CUSTOM
@@ -362,7 +362,7 @@ typedef struct {
     void *content_user;
     cui_menu_tree_options menu;
     /* When an outer property is unset, inherit the action button's property
-     * for both halves. Zero-initialized options keep the existing defaults. */
+     * for both halves. Zero-initialized options use source Default and Medium. */
     bool inherit_action_variant, inherit_action_size;
     bool hide_action, hide_menu;       /* at least one half must remain visible */
     cui_dropdown_button_anchor anchor; /* popup corner; default top right */
@@ -3604,9 +3604,8 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         }
     }
     if (loading) {
-        box.background = cui_dropdown_opacity(box.background, .8f);
-        box.border = cui_dropdown_opacity(box.border, .8f);
-        *foreground = cui_dropdown_opacity(*foreground, .8f);
+        box.custom_opacity = true;
+        box.opacity = .8f;
     }
     if (cui_focused(ui) == id) {
         box.border = theme->focus;

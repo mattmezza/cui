@@ -32,6 +32,7 @@ typedef struct {
     bool clip, layout_only, inert;
     int16_t layer;
     float opacity;
+    uint32_t paint_root;
     cui_bitmap_paint bitmap;
     cui_rect underlay_bounds;
     cui_underlay_layout underlay_layout;
@@ -71,6 +72,8 @@ struct cui_context {
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
     cui_rect *previous_hits;
     int16_t *previous_layers;
+    uint64_t *previous_order;
+    uint32_t paint_root_count;
     cui_semantic *semantics, *previous;
     size_t semantic_count, previous_count;
     cui_id *ids, *activations;
@@ -236,6 +239,7 @@ cui_context *cui_create(cui_config config) {
     ui->semantic_nodes = calloc(config.max_elements, sizeof(*ui->semantic_nodes));
     ui->previous_hits = calloc(config.max_elements, sizeof(*ui->previous_hits));
     ui->previous_layers = calloc(config.max_elements, sizeof(*ui->previous_layers));
+    ui->previous_order = calloc(config.max_elements, sizeof(*ui->previous_order));
     Clay_Context *saved = Clay_GetCurrentContext();
     Clay_SetCurrentContext(NULL);
     /* Clay's ID map retains the prior layout until EndLayout retires old IDs.
@@ -246,7 +250,7 @@ cui_context *cui_create(cui_config config) {
     if (!ui->text_styles || !ui->commands || !ui->semantics || !ui->previous || !ui->ids ||
         !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings ||
         !ui->nodes || !ui->semantic_nodes || !ui->previous_hits || !ui->bounds_tracks ||
-        !ui->previous_layers || !ui->clip_containers || !ui->arena) {
+        !ui->previous_layers || !ui->previous_order || !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -282,6 +286,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->semantic_nodes);
     free(ui->previous_hits);
     free(ui->previous_layers);
+    free(ui->previous_order);
     free(ui->commands);
     free(ui->semantics);
     free(ui->previous);
@@ -350,18 +355,20 @@ static cui_id cui_core_pointer_focus_target(cui_context *ui, size_t index) {
             return ui->previous[i].id;
     return 0;
 }
+static bool cui_core_above(cui_context *ui, size_t candidate, size_t current) {
+    return current == SIZE_MAX || ui->previous_layers[candidate] > ui->previous_layers[current] ||
+           (ui->previous_layers[candidate] == ui->previous_layers[current] &&
+            ui->previous_order[candidate] >= ui->previous_order[current]);
+}
 static cui_id cui_core_hit(cui_context *ui, float x, float y) {
-    cui_id hit = 0;
-    int16_t layer = INT16_MIN;
+    size_t hit = SIZE_MAX;
     for (size_t i = 0; i < ui->previous_count; i++)
         if ((cui_core_pointer_focus_target(ui, i) ||
              (!ui->previous[i].disabled && ui->previous[i].details.pointer_activatable)) &&
             cui_core_previous_allowed(ui, i) && cui_core_inside(ui->previous_hits[i], x, y) &&
-            ui->previous_layers[i] >= layer) {
-            hit = ui->previous[i].id;
-            layer = ui->previous_layers[i];
-        }
-    return hit;
+            cui_core_above(ui, i, hit))
+            hit = i;
+    return hit == SIZE_MAX ? 0 : ui->previous[hit].id;
 }
 cui_cursor cui_pointer_cursor(cui_context *ui) {
     if (!ui)
@@ -555,6 +562,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
     }
     ui->node_count = 0;
+    ui->paint_root_count = 0;
     ui->bounds_track_count = 0;
     ui->overflow_depth = 0;
     ui->focus_depth = ui->focus_scope_count = 0;
@@ -653,6 +661,9 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
     bool layout_only = b.layout_only || (parent != SIZE_MAX && ui->nodes[parent].layout_only);
     bool inert = layout_only || b.inert || (parent != SIZE_MAX && ui->nodes[parent].inert);
+    uint32_t paint_root = portal               ? ++ui->paint_root_count
+                          : parent != SIZE_MAX ? ui->nodes[parent].paint_root
+                                               : 0;
     float opacity =
         b.custom_opacity ? (isfinite(b.opacity) ? fminf(1, fmaxf(0, b.opacity)) : 0) : 1;
     if (parent != SIZE_MAX)
@@ -667,7 +678,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                     .layout_only = layout_only,
                                                     .inert = inert,
                                                     .layer = layer,
-                                                    .opacity = opacity};
+                                                    .opacity = opacity,
+                                                    .paint_root = paint_root};
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
@@ -1146,6 +1158,31 @@ cui_core_commands_done:
             ui->dirty = true;
         *track.retained = bounds;
     }
+    /* Behavior may register before its own layout box. Bind to the actual
+     * painted node so clipping, layers and hit order do not depend on API order. */
+    size_t visible = 0;
+    for (size_t i = 0; i < ui->semantic_count; i++) {
+        uint32_t folded = cui_core_folded(ui->semantics[i].id);
+        Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(folded);
+        size_t node = ui->semantic_nodes[i];
+        if (item != &Clay_LayoutElementHashMapItem_DEFAULT && item->layoutElement) {
+            void *data = item->layoutElement->config.userData;
+            if (data && data != ui)
+                node = (size_t)((cui_core_box_node *)data - ui->nodes);
+            else if (data == ui)
+                for (size_t n = 0; n < ui->node_count; n++)
+                    if (ui->nodes[n].clay_id == folded) {
+                        node = n;
+                        break;
+                    }
+        }
+        if (node != SIZE_MAX && (ui->nodes[node].inert || ui->nodes[node].layout_only))
+            continue;
+        ui->semantics[visible] = ui->semantics[i];
+        ui->semantic_scopes[visible] = ui->semantic_scopes[i];
+        ui->semantic_nodes[visible++] = node;
+    }
+    ui->semantic_count = visible;
     bool retained = false, captured = false, space = false;
     for (size_t i = 0; i < ui->semantic_count; i++) {
         cui_semantic *s = &ui->semantics[i];
@@ -1168,6 +1205,10 @@ cui_core_commands_done:
         ui->previous_hits[i] = clipped;
         ui->previous_layers[i] =
             ui->semantic_nodes[i] == SIZE_MAX ? 0 : ui->nodes[ui->semantic_nodes[i]].layer;
+        size_t node = ui->semantic_nodes[i];
+        ui->previous_order[i] =
+            node == SIZE_MAX ? 0
+                             : ((uint64_t)ui->nodes[node].paint_root << 32) | (uint64_t)(node + 1);
         if (cui_core_focusable(s)) {
             retained |= s->id == ui->focus;
             if (cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
@@ -1357,12 +1398,10 @@ bool cui_hover_within(cui_context *ui, cui_id scope) {
         if (ui->focus_scopes[i].id == scope && !ui->focus_scopes[i].active)
             return false;
     size_t hit = SIZE_MAX;
-    int16_t layer = INT16_MIN;
     for (size_t i = 0; i < ui->previous_count; i++)
-        if (cui_core_previous_allowed(ui, i) && ui->previous_layers[i] >= layer &&
+        if (cui_core_previous_allowed(ui, i) && cui_core_above(ui, i, hit) &&
             cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y)) {
             hit = i;
-            layer = ui->previous_layers[i];
         }
     if (hit == SIZE_MAX)
         return false;
@@ -1393,7 +1432,7 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
-        role > CUI_ROLE_LOG)
+        role > CUI_ROLE_SEPARATOR)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {
@@ -1433,7 +1472,9 @@ bool cui_hovered(cui_context *ui, cui_id id) {
         if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i) &&
             cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y)) {
             for (size_t j = 0; j < ui->previous_count; j++)
-                if (ui->previous_layers[j] > ui->previous_layers[i] &&
+                if ((ui->previous_layers[j] > ui->previous_layers[i] ||
+                     (ui->previous_layers[j] == ui->previous_layers[i] &&
+                      (ui->previous_order[j] >> 32) > (ui->previous_order[i] >> 32))) &&
                     cui_core_previous_allowed(ui, j) && cui_core_focusable(&ui->previous[j]) &&
                     cui_core_inside(ui->previous_hits[j], ui->pointer_x, ui->pointer_y))
                     return false;

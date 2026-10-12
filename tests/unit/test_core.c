@@ -1641,7 +1641,63 @@ static void test_fractional_text_metrics(void) {
     assert(fabsf(list.commands[1].bounds.y - list.commands[0].bounds.y - 21.75f) < .001f);
     cui_destroy(ui);
 }
+static void ordered_absolute_scene(cui_context *ui, bool hidden) {
+    cui_begin_box(ui, 940, (cui_box){.width = 100, .height = 60, .clip = true});
+    /* Register handle behavior before children, but paint it as a floating child. */
+    cui_interact(ui, 941, CUI_ROLE_GROUP, cui_string("Handle"), false, false, 0);
+    cui_set_semantic_role(ui, 941, CUI_ROLE_SEPARATOR);
+    cui_set_semantic_details(
+        ui, 941, (cui_semantic_details){.focusable = true, .cursor = CUI_CURSOR_RESIZE_HORIZONTAL});
+    cui_begin_absolute_box(ui, 941, (cui_box){.background = {1, 2, 3, 255}, .inert = hidden},
+                           (cui_rect){95, 0, 9, -1});
+    cui_end_box(ui);
+    cui_begin_box(ui, 942, (cui_box){.width = 100, .height = 60});
+    cui_interact(ui, 942, CUI_ROLE_BUTTON, cui_string("Pane child"), false, false, 0);
+    cui_end_box(ui);
+    cui_end_box(ui);
+}
+static void test_layout_hit_order(void) {
+    cui_context *ui = make();
+    begin(ui);
+    ordered_absolute_scene(ui, false);
+    cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 2 && sem[0].role == CUI_ROLE_SEPARATOR);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 97, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 941 && cui_pressed(ui, 941));
+    assert(!cui_hovered(ui, 942));
+    ordered_absolute_scene(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_MOVE, 200, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 941);
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_RESIZE_HORIZONTAL);
+    ordered_absolute_scene(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_UP, 200, 20, 0, 0);
+    begin(ui);
+    ordered_absolute_scene(ui, true);
+    cui_end_frame(ui);
+    sem = cui_semantics(ui, &count);
+    assert(count == 1 && sem[0].id == 942); /* Paint-time inert applies to early behavior. */
+    queue(ui, CUI_EVENT_POINTER_DOWN, 97, 20, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 97, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 942);
+    ordered_absolute_scene(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 102, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 0);
+    ordered_absolute_scene(ui, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_layout_hit_order();
     test_fractional_text_metrics();
     test_inherited_opacity();
     test_absolute_boxes();

@@ -139,3 +139,9 @@ stable Clay measurement identities; old generations are reclaimed only between
 frames, avoiding stale metrics when a line height changes. Text stays vertically
 centered in an explicit line box. Native font rasterizers may still quantize glyph
 outlines independently of these float layout coordinates.
+
+Pointer hit order follows each semantic's matching layout node, even when behavior
+is registered before that box. Higher layers win, then floating-root paint order,
+then child layout order. Ancestor clips and paint-time inert/layout-only state
+apply to that matched node. Semantics without a matching box retain their
+registration-parent fallback. Focus-scope ownership remains behavior-owned.

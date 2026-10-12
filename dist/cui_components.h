@@ -4,6 +4,7 @@
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
 #include "cui_carousel.h"
+#include "cui_chart.h"
 #include "cui_choice.h"
 #include "cui_chrome.h"
 #include "cui_command.h"
@@ -18,9 +19,11 @@
 #include "cui_resizable.h"
 #include "cui_root.h"
 #include "cui_scroll.h"
+#include "cui_speech.h"
 #include "cui_status.h"
 #include "cui_surface.h"
 #include "cui_table.h"
+#include "cui_text_view.h"
 #include "cui_theme.h"
 #include "cui_toolbar.h"
 #include "cui_tree.h"
@@ -311,6 +314,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_CHART_IMPLEMENTATION
 #endif
 #include "cui_chart.h"
+#ifndef CUI_SPEECH_IMPLEMENTATION
+#define CUI_SPEECH_IMPLEMENTATION
+#endif
+#include "cui_speech.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

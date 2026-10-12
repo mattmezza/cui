@@ -3730,30 +3730,56 @@
       "name": "Speech",
       "reference_url": "https://gpui-kit.com/component/speech/",
       "category": "forms",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_speech_start",
+        "cui_speech_pump",
+        "cui_speech_meter_push"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_speech.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_speech.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Injected-provider lifecycle, bounded copied report queue, transcript handling, level meter and graphical controls are tested. Real microphone capture, format conversion, platform recognizers, fallback, event-loop integration and live-device verification remain unfinished; see docs/SPEECH.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "capability/permission adapter",
-          "status": "not_started",
-          "evidence": []
+          "name": "generation-safe provider lifecycle and stop timeout",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_speech.c"
+          ]
         },
         {
-          "name": "recognition callback lifecycle",
-          "status": "not_started",
-          "evidence": []
+          "name": "UTF-8 transcripts and copied PCM with bounded capacity",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_speech.c"
+          ]
         },
         {
-          "name": "fake adapter tests and explicit unavailability",
+          "name": "PCM meter smoothing, history and waveform geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_speech.c"
+          ]
+        },
+        {
+          "name": "SVG controls, four sizes, pointer and keyboard activation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_speech.c"
+          ]
+        },
+        {
+          "name": "platform capture, system recognizers and complete source integration",
           "status": "not_started",
           "evidence": []
         }

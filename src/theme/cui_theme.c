@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_theme.h"
+#include <string.h>
 #define CUI_THEME_RGB(r, g, b) {r, g, b, 255}
 static cui_color cui_theme_scale(cui_color c, float factor) {
     c.r = (uint8_t)(c.r * factor);
@@ -192,3 +193,28 @@ cui_theme cui_theme_terminal(void) {
 }
 
 #undef CUI_THEME_RGB
+
+#include "cui_theme_presets.inc"
+size_t cui_theme_preset_count(void) {
+    return sizeof cui_theme_presets / sizeof cui_theme_presets[0];
+}
+cui_str cui_theme_preset_name(size_t index) {
+    if (index >= cui_theme_preset_count())
+        return (cui_str){0};
+    const char *name = cui_theme_presets[index].name;
+    return (cui_str){name, strlen(name)};
+}
+bool cui_theme_preset_is_dark(size_t index) {
+    return index < cui_theme_preset_count() && cui_theme_presets[index].dark;
+}
+bool cui_theme_preset_get(size_t index, cui_theme *output) {
+    if (!output || index >= cui_theme_preset_count())
+        return false;
+    const cui_theme_preset_record *record = &cui_theme_presets[index];
+    cui_theme theme = record->dark ? cui_theme_dark() : cui_theme_light();
+    for (size_t i = record->begin; i < record->begin + record->count; ++i)
+        cui_theme_preset_assign(&theme, cui_theme_preset_colors[i].field,
+                                cui_theme_preset_colors[i].color);
+    *output = theme;
+    return true;
+}

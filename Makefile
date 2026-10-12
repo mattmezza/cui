@@ -8,6 +8,7 @@ check: all
 lint:
 	python scripts/check_manifest.py
 	python scripts/check_licenses.py
+	python scripts/theme_presets.py --check
 format:
 	python scripts/format.py
 format-check:

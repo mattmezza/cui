@@ -19,6 +19,33 @@ static void test_theme_list_tokens(void) {
         assert(t.group_box.a == 255);
     }
 }
+static void test_named_themes(void) {
+    assert(cui_theme_preset_count() == 38);
+    unsigned light = 0, dark = 0;
+    bool ayu = false, tokyo = false;
+    for (size_t i = 0; i < cui_theme_preset_count(); ++i) {
+        cui_theme theme;
+        assert(cui_theme_preset_get(i, &theme));
+        cui_str name = cui_theme_preset_name(i);
+        assert(name.data && name.length && theme.background.a == 255 && theme.text.a == 255);
+        if (cui_theme_preset_is_dark(i))
+            dark++;
+        else
+            light++;
+        if (name.length == 9 && !memcmp(name.data, "Ayu Light", 9)) {
+            ayu = true;
+            assert(theme.background.r == 252 && theme.text.r == 92 && theme.primary.r == 85);
+        }
+        if (name.length == 11 && !memcmp(name.data, "Tokyo Night", 11))
+            tokyo = true;
+        assert(theme.buttons[CUI_THEME_BUTTON_PRIMARY].normal.a > 0);
+    }
+    assert(light == 12 && dark == 26 && ayu && tokyo);
+    cui_theme original = cui_theme_light(), untouched = original;
+    assert(!cui_theme_preset_get(38, &untouched));
+    assert(!memcmp(&original, &untouched, sizeof original));
+    assert(!cui_theme_preset_name(38).length && !cui_theme_preset_get(0, NULL));
+}
 static bool checked;
 static void scene(cui_context *ui, const cui_theme *t) {
     assert(cui_begin_frame(ui, 640, 480, .016f));
@@ -731,6 +758,7 @@ int main(void) {
     test_button_intent_outlines();
     test_button_palette_overrides();
     test_icon_button();
+    test_named_themes();
     test_button_options();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

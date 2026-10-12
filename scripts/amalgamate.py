@@ -24,6 +24,8 @@ def generate(name,sources):
             lines += [f'#ifndef {macro_dependency}',f'#define {macro_dependency}', '#endif',f'#include "{module}.h"']
     for source in sources:
         code=(ROOT/source).read_text(encoding="utf-8")
+        if name=='cui_theme':
+            code=code.replace('#include "cui_theme_presets.inc"',(ROOT/'src/theme/cui_theme_presets.inc').read_text(encoding='utf-8'))
         if name=='cui_icon':
             for vendor in ['nanosvg.h', 'nanosvgrast.h']:
                 code=code.replace(f'#include "../../third_party/nanosvg/{vendor}"',(ROOT/'third_party/nanosvg'/vendor).read_text(encoding="utf-8"))

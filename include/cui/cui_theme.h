@@ -60,6 +60,12 @@ cui_theme cui_theme_dark(void);
 cui_theme cui_theme_high_contrast(void);
 /* Independent, square-cornered amber/ink design system using the same base. */
 cui_theme cui_theme_terminal(void);
+/* Named palette adaptations from the pinned GPUI Kit theme collection.
+ * Invalid indices return an empty name/false and leave output unchanged. */
+size_t cui_theme_preset_count(void);
+cui_str cui_theme_preset_name(size_t index);
+bool cui_theme_preset_is_dark(size_t index);
+bool cui_theme_preset_get(size_t index, cui_theme *output);
 #ifdef __cplusplus
 }
 #endif

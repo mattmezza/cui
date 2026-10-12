@@ -196,6 +196,9 @@ typedef struct {
     double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
     bool mark_clip_active;
     float rendered_reveal_progress;
+    const cui_chart_datum *rendered_data; /* private hover identity */
+    size_t rendered_count;
+    cui_chart_kind rendered_kind;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {
@@ -218,6 +221,9 @@ float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options
 cui_plot_result cui_chart_measure_sankey_margins(cui_context *, const cui_chart_options *,
                                                  cui_chart_sankey_margins *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
+/* Pixel-space point location shared by line/area raster and hover decoration. */
+cui_plot_result cui_chart_point_coordinates(const cui_chart_options *, size_t index, size_t series,
+                                            float *x, float *y);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,
                                         cui_chart_candle_geometry *);

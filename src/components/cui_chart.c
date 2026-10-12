@@ -236,6 +236,53 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     bool ok = cui_paint_bitmap(
         ui, id ^ UINT64_C(0x381c6b293497e8a1), paint,
         (cui_box){.width = w, .height = h, .fixed_width = true, .fixed_height = true});
+    if (!o->noninteractive && state->hovered < o->count &&
+        (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)) {
+        float pixel_x, pixel_y;
+        if (cui_chart_point_coordinates(o, state->hovered, 0, &pixel_x, &pixel_y) == CUI_PLOT_OK) {
+            float x = pixel_x * w / o->width;
+            float top = (o->custom_y_padding ? o->y_padding_top : 10) * h / o->height;
+            float bottom =
+                (o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)) * h / o->height;
+            cui_color crosshair = o->grid.a ? o->grid : (cui_color){120, 120, 120, 150};
+            cui_begin_absolute_box(ui, id ^ UINT64_C(0x9f39c738cd235001),
+                                   (cui_box){.width = 1,
+                                             .height = bottom - top,
+                                             .fixed_width = true,
+                                             .fixed_height = true,
+                                             .background = crosshair},
+                                   (cui_rect){x, top, 1, bottom - top});
+            cui_end_box(ui);
+            for (size_t series = 0; series <= o->extra_series_count; series++) {
+                if (cui_chart_point_coordinates(o, state->hovered, series, &pixel_x, &pixel_y) !=
+                    CUI_PLOT_OK)
+                    continue;
+                float dot_x = pixel_x * w / o->width;
+                float dot_y = pixel_y * h / o->height;
+                cui_color dot = series ? o->extra_series[series - 1].color : o->series[0];
+                if (!dot.a)
+                    dot = o->series[series].a ? o->series[series] : o->foreground;
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x8e4ad6f381012000) + series),
+                                       (cui_box){.width = 10,
+                                                 .height = 10,
+                                                 .radius = 5,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = o->background},
+                                       (cui_rect){dot_x - 5, dot_y - 5, 10, 10});
+                cui_end_box(ui);
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9e4ad6f381012000) + series),
+                                       (cui_box){.width = 6,
+                                                 .height = 6,
+                                                 .radius = 3,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = dot},
+                                       (cui_rect){dot_x - 3, dot_y - 3, 6, 6});
+                cui_end_box(ui);
+            }
+        }
+    }
     if (!o->hide_axes && !o->hide_x_axis && o->kind != CUI_CHART_PIE &&
         o->kind != CUI_CHART_RADAR && o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40) {
         size_t slots = o->point_count ? o->point_count : o->count;

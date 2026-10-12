@@ -427,6 +427,32 @@ static void cui_chart_series_point(const cui_chart_options *o, size_t series, si
     if (*y > bottom)
         *y = bottom;
 }
+cui_plot_result cui_chart_point_coordinates(const cui_chart_options *o, size_t index, size_t series,
+                                            float *x, float *y) {
+    if (!o || !x || !y || !o->data || (o->kind != CUI_CHART_LINE && o->kind != CUI_CHART_AREA) ||
+        !o->count || o->count > CUI_CHART_MAX_ITEMS || index >= o->count ||
+        series > o->extra_series_count || !o->width || !o->height || o->width > 4096 ||
+        o->height > 4096 || !isfinite(o->value_axis_gutter) || o->value_axis_gutter < 0 ||
+        o->value_axis_gutter >= o->width || !isfinite(o->y_padding_top) ||
+        !isfinite(o->y_padding_bottom) || o->y_padding_top < 0 || o->y_padding_bottom < 0 ||
+        (o->point_count && (o->point_count < o->count || o->point_count > 1000000)))
+        return CUI_PLOT_INVALID;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
+    double top = o->custom_y_padding ? o->y_padding_top : 10;
+    double bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
+    if (right <= left || bottom <= top)
+        return CUI_PLOT_EMPTY;
+    double lo, hi;
+    if (!cui_chart_value_domain(o, &lo, &hi))
+        return CUI_PLOT_INVALID;
+    double px, py;
+    cui_chart_series_point(o, series, index, left, right, lo, hi, top, bottom, &px, &py);
+    if (!isfinite(px) || !isfinite(py))
+        return CUI_PLOT_OVERFLOW;
+    *x = (float)px;
+    *y = (float)py;
+    return CUI_PLOT_OK;
+}
 static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o, size_t series,
                                   double left, double right, double top, double bottom, double lo,
                                   double hi, double baseline) {
@@ -1340,8 +1366,14 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         cui_chart_sankey(s, o, nodes, link_geometry);
         s->mark_clip_active = false;
     }
-    s->hovered = SIZE_MAX;
-    s->hovered_value = 0;
+    if (s->rendered_data != o->data || s->rendered_count != o->count ||
+        s->rendered_kind != o->kind) {
+        s->hovered = SIZE_MAX;
+        s->hovered_value = 0;
+    }
+    s->rendered_data = o->data;
+    s->rendered_count = o->count;
+    s->rendered_kind = o->kind;
     s->revision++;
     s->cache_key = key;
     s->rendered_reveal_progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;

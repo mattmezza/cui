@@ -157,11 +157,27 @@ int main(void) {
     }
     options.data_revision = 0;
     options.kind = CUI_CHART_LINE;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 1;
+    state.hovered_value = points[1].value;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(state.hovered == 1 && state.hovered_value == points[1].value);
+    options.kind = CUI_CHART_AREA;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(state.hovered == SIZE_MAX);
+    options.kind = CUI_CHART_LINE;
+    float point_x = -1, point_y = -1;
+    assert(cui_chart_point_coordinates(&options, 0, 0, &point_x, &point_y) == CUI_PLOT_OK);
+    assert(point_x == 0 && point_y >= 10 && point_y <= 76);
+    assert(cui_chart_point_coordinates(&options, 2, 0, &point_x, &point_y) == CUI_PLOT_OK);
+    assert(point_x == 128);
     assert(cui_chart_hit_test(&options, 0, 20).valid &&
            cui_chart_hit_test(&options, 0, 20).hovered == 0);
     assert(cui_chart_hit_test(&options, 63, 20).valid &&
            cui_chart_hit_test(&options, 63, 20).hovered == 2);
     options.show_y_axis = true;
+    assert(cui_chart_point_coordinates(&options, 0, 0, &point_x, &point_y) == CUI_PLOT_OK &&
+           point_x == 32);
     assert(!cui_chart_hit_test(&options, 0, 20).valid);
     assert(cui_chart_hit_test(&options, 16, 20).valid &&
            cui_chart_hit_test(&options, 16, 20).hovered == 0);
@@ -665,9 +681,11 @@ int main(void) {
     options.value_axis_gutter = wide_gutter;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     cui_draw_list draw = cui_end_frame(ui);
-    bool image = false, text = false, formatted = false;
+    bool image = false, text = false, formatted = false, hover_crosshair = false,
+         hover_halo = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_IMAGE) {
             image = true;
@@ -677,10 +695,14 @@ int main(void) {
             text = true;
             if (draw.commands[i].text.length == 1 && draw.commands[i].text.data[0] == 'Q')
                 formatted = true;
+        } else if (draw.commands[i].type == CUI_DRAW_RECT) {
+            hover_crosshair |= draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20;
+            hover_halo |= draw.commands[i].bounds.w == 10 && draw.commands[i].bounds.h == 10;
         }
-    assert(image && text && formatted);
+    assert(image && text && formatted && hover_crosshair && hover_halo);
     options.x_tick_count = 0;
     options.x_tick_margin = 2;
+    state.hovered = SIZE_MAX;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));

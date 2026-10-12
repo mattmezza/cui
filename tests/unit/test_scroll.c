@@ -365,11 +365,69 @@ static void gesture_filter(void) {
     assert(!cui_scroll_gesture_filter(&state, &e, NAN));
     assert(e.dx == -40 && e.dy == -10 && !state.has_last);
 }
+static void persistent_owner(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_theme theme = {0};
+    cui_scroll_state state = {0};
+    cui_scroll_options o = {.width = 200,
+                            .height = 100,
+                            .content_width = 600,
+                            .content_height = 100,
+                            .horizontal = true,
+                            .hide_scrollbars = true,
+                            .axis_lock = true,
+                            .trap_horizontal = true,
+                            .gesture_lock = true};
+    scene(ui, &theme, &state, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 50,
+                                           .y = 50,
+                                           .dx = -40,
+                                           .dy = -10,
+                                           .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+    assert(state.x == 40);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 50,
+                                           .y = 50,
+                                           .dx = -10,
+                                           .dy = -15,
+                                           .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+#if defined(__wasm__)
+    assert(state.x == 40);
+#else
+    assert(state.x == 50 && cui_event_consumed(ui, 0));
+#endif
+    float before = state.x;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 50,
+                                           .y = 50,
+                                           .dx = -10,
+                                           .dy = -25,
+                                           .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+    assert(state.x == before && !cui_event_consumed(ui, 0));
+    /* Two idle16ms frames delimit the next gesture. */
+    scene(ui, &theme, &state, o);
+    scene(ui, &theme, &state, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 50,
+                                           .y = 50,
+                                           .dx = -40,
+                                           .dy = -10,
+                                           .scroll_precise = true}));
+    scene(ui, &theme, &state, o);
+    assert(state.x == before + 40);
+    cui_destroy(ui);
+}
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+    persistent_owner();
     gesture_filter();
     horizontal_mask_edges();
     hidden_tracks();

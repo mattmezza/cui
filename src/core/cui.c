@@ -66,6 +66,7 @@ struct cui_context {
     size_t focus_stack[CUI_CORE_STACK_MAX], focus_depth, focus_scope_count,
         previous_focus_scope_count, top_modal, previous_top_modal;
     size_t *semantic_scopes, *previous_semantic_scopes;
+    cui_scroll_gesture *scroll_gestures, *previous_scroll_gestures;
     Clay_Context *clay;
     void *arena;
     Clay__ScrollContainerDataInternal *clip_containers;
@@ -271,6 +272,9 @@ cui_context *cui_create(cui_config config) {
     ui->semantic_scopes = calloc(config.max_elements, sizeof(*ui->semantic_scopes));
     ui->previous_semantic_scopes =
         calloc(config.max_elements, sizeof(*ui->previous_semantic_scopes));
+    ui->scroll_gestures = calloc(config.max_elements, sizeof(*ui->scroll_gestures));
+    ui->previous_scroll_gestures =
+        calloc(config.max_elements, sizeof(*ui->previous_scroll_gestures));
     ui->strings = malloc(config.frame_bytes);
     ui->clip_containers = calloc(config.max_elements, sizeof(*ui->clip_containers));
     ui->nodes = calloc(config.max_elements, sizeof(*ui->nodes));
@@ -289,9 +293,9 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->resources || !ui->text_styles || !ui->commands || !ui->semantics || !ui->previous ||
         !ui->ids || !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes ||
-        !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_parents ||
-        !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order ||
-        !ui->clip_containers || !ui->arena) {
+        !ui->scroll_gestures || !ui->previous_scroll_gestures || !ui->strings || !ui->nodes ||
+        !ui->semantic_nodes || !ui->previous_parents || !ui->previous_hits || !ui->bounds_tracks ||
+        !ui->previous_layers || !ui->previous_order || !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -326,6 +330,8 @@ void cui_destroy(cui_context *ui) {
                 r->destroy(r->payload);
             free(r->payload);
         }
+    free(ui->scroll_gestures);
+    free(ui->previous_scroll_gestures);
     free(ui->resources);
     free(ui->semantic_scopes);
     free(ui->previous_semantic_scopes);
@@ -432,7 +438,8 @@ cui_cursor cui_pointer_cursor(cui_context *ui) {
     }
     return CUI_CURSOR_DEFAULT;
 }
-static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from) {
+static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from,
+                                  bool gesture_probe) {
     cui_id hit = 0;
     int16_t layer = INT16_MIN, blocking_layer = INT16_MIN;
     for (size_t i = 0; i < ui->previous_count; ++i) {
@@ -457,7 +464,11 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from)
             (event.dy > 0 && d.scroll_y > 0) || (event.dy < 0 && d.scroll_y < d.scroll_max_y);
         if (d.scroll_trap_horizontal && fabsf(event.dx) > fabsf(event.dy))
             can_x = true;
-        if (d.scroll_axis_lock) {
+        if (gesture_probe) {
+            can_x = d.scroll_gesture_lock;
+            can_y = false;
+        }
+        if (d.scroll_axis_lock && !gesture_probe) {
             bool vertical = fabsf(event.dy) >= fabsf(event.dx);
             if (d.orientation == CUI_ORIENTATION_VERTICAL) {
                 can_x = false;
@@ -576,8 +587,18 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             if (!ui->event_targets[i] && ui->previous_top_modal != SIZE_MAX)
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
         }
-        if (e.type == CUI_EVENT_SCROLL)
-            ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX);
+        if (e.type == CUI_EVENT_SCROLL) {
+            cui_id owner = cui_core_scroll_hit(ui, e, SIZE_MAX, true);
+            if (owner)
+                for (size_t n = 0; n < ui->previous_count; n++)
+                    if (ui->previous[n].id == owner) {
+                        (void)cui_scroll_gesture_filter(&ui->previous_scroll_gestures[n], &e,
+                                                        ui->frame_time);
+                        break;
+                    }
+            ui->events[i] = e;
+            ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false);
+        }
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
             size_t scope = ui->previous_focus_scope_count;
@@ -1412,6 +1433,17 @@ cui_core_commands_done:
     ui->previous_top_modal = ui->top_modal;
     memcpy(ui->previous_semantic_scopes, ui->semantic_scopes,
            ui->semantic_count * sizeof(*ui->semantic_scopes));
+    for (size_t n = 0; n < ui->semantic_count; n++) {
+        ui->scroll_gestures[n] = (cui_scroll_gesture){0};
+        if (ui->semantics[n].details.scroll_gesture_lock && !ui->semantics[n].disabled)
+            for (size_t p = 0; p < ui->previous_count; p++)
+                if (ui->previous[p].id == ui->semantics[n].id) {
+                    ui->scroll_gestures[n] = ui->previous_scroll_gestures[p];
+                    break;
+                }
+    }
+    memcpy(ui->previous_scroll_gestures, ui->scroll_gestures,
+           ui->semantic_count * sizeof(*ui->scroll_gestures));
     memcpy(ui->previous, ui->semantics, ui->semantic_count * sizeof(*ui->previous));
     ui->previous_count = ui->semantic_count;
     ui->in_frame = false;
@@ -1541,7 +1573,7 @@ bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {
         return false;
     for (size_t i = 0; i < ui->previous_count; ++i)
         if (ui->previous[i].id == from && cui_core_previous_allowed(ui, i)) {
-            cui_id target = cui_core_scroll_hit(ui, ui->events[index], i);
+            cui_id target = cui_core_scroll_hit(ui, ui->events[index], i, false);
             if (!target)
                 return false;
             ui->event_targets[index] = target;

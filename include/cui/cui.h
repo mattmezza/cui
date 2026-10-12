@@ -170,6 +170,7 @@ typedef struct {
     /* Horizontal masks retain horizontal-dominant wheel events at both edges,
      * including when content fits. Normal scroll owners leave this false. */
     bool scroll_trap_horizontal;
+    bool scroll_gesture_lock; /* Opt-in per-owner precise gesture filtering. */
     /* Opt a normally passive semantic container into keyboard/pointer focus. */
     bool focusable;
     /* Primary pointer activation without opting into focus or keyboard activation. */

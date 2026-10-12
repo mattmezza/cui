@@ -18,6 +18,7 @@ typedef struct {
     bool hide_scrollbars;
     /* Route gestures by their starting axis when exactly one axis is enabled. */
     bool axis_lock;
+    bool gesture_lock;    /* Persistent precise axis lock; disabled on WASM. */
     bool trap_horizontal; /* Opt-in horizontal mask edge ownership. */
 } cui_scroll_options;
 typedef struct {
@@ -59,6 +60,14 @@ void cui_scrollable_end_ex(cui_context *, cui_id, const cui_theme *, cui_scroll_
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
+static bool cui_scroll_persistent_lock(cui_scroll_options o) {
+#if defined(__wasm__)
+    (void)o;
+    return false;
+#else
+    return o.gesture_lock;
+#endif
+}
 static float cui_scroll_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
 }
@@ -208,6 +217,7 @@ bool cui_base_scrollable_finish(cui_context *ui, cui_id id, cui_scroll_state *s,
         ui, id,
         (cui_semantic_details){.scrollable = !o.disabled,
                                .scroll_axis_lock = o.axis_lock,
+                               .scroll_gesture_lock = cui_scroll_persistent_lock(o),
                                .scroll_trap_horizontal = o.horizontal && o.trap_horizontal,
                                .orientation = o.horizontal == o.vertical
                                                   ? CUI_ORIENTATION_UNSPECIFIED
@@ -238,6 +248,7 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
         ui, id,
         (cui_semantic_details){.scrollable = !o.disabled,
                                .scroll_axis_lock = o.axis_lock,
+                               .scroll_gesture_lock = cui_scroll_persistent_lock(o),
                                .scroll_trap_horizontal = o.horizontal && o.trap_horizontal,
                                .orientation = o.horizontal == o.vertical
                                                   ? CUI_ORIENTATION_UNSPECIFIED

@@ -1173,6 +1173,92 @@ static void test_dominant_axis_scroll(void) {
     cui_destroy(ui);
 }
 
+static void gesture_regions(cui_context *ui, bool reorder, bool portal, bool enabled) {
+    if (reorder)
+        cui_interact(ui, 99, CUI_ROLE_GROUP, cui_string("Unrelated"), false, false, 0);
+    scroll_regions(ui, 50, portal);
+    cui_set_semantic_details(ui, 20,
+                             (cui_semantic_details){.scrollable = true,
+                                                    .scroll_axis_lock = true,
+                                                    .scroll_gesture_lock = enabled,
+                                                    .scroll_trap_horizontal = true,
+                                                    .orientation = CUI_ORIENTATION_HORIZONTAL,
+                                                    .scroll_x = 50,
+                                                    .scroll_max_x = 100});
+}
+static void gesture_event(cui_context *ui, float x, float dx, float dy, cui_scroll_phase phase,
+                          bool precise) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = x,
+                                           .y = 20,
+                                           .dx = dx,
+                                           .dy = dy,
+                                           .scroll_phase = phase,
+                                           .scroll_precise = precise}));
+}
+static void test_persistent_scroll_routing(void) {
+    cui_context *ui = make();
+    begin(ui);
+    gesture_regions(ui, false, false, true);
+    cui_end_frame(ui);
+    gesture_event(ui, 20, -40, -10, CUI_SCROLL_PHASE_STARTED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 20);
+    assert(cui_frame_events(ui, NULL)[0].dy == 0);
+    gesture_regions(ui, true, false, true);
+    cui_end_frame(ui);
+    /* Inserting an unrelated semantic must not transfer the gesture to another ID. */
+    gesture_event(ui, 20, -10, -15, CUI_SCROLL_PHASE_MOVED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 20);
+    assert(cui_frame_events(ui, NULL)[0].dy == 0);
+    gesture_regions(ui, false, false, true);
+    cui_end_frame(ui);
+    gesture_event(ui, 20, -10, -25, CUI_SCROLL_PHASE_MOVED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10);
+    assert(cui_frame_events(ui, NULL)[0].dy == -25);
+    gesture_regions(ui, false, false, true);
+    cui_end_frame(ui);
+    /* Ending the gesture permits a fresh horizontal lock in the same batch. */
+    gesture_event(ui, 20, 0, 0, CUI_SCROLL_PHASE_ENDED, true);
+    gesture_event(ui, 20, -40, -10, CUI_SCROLL_PHASE_MOVED, true);
+    gesture_event(ui, 20, -10, -15, CUI_SCROLL_PHASE_MOVED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 2) == 20);
+    gesture_regions(ui, false, true, true);
+    cui_end_frame(ui);
+    gesture_event(ui, 20, -10, -15, CUI_SCROLL_PHASE_MOVED, true);
+    begin(ui);
+    assert(!cui_event_target(ui, 0));
+    assert(cui_frame_events(ui, NULL)[0].dy == -15); /* Occluded owner cannot filter. */
+    gesture_regions(ui, false, false, true);
+    cui_end_frame(ui);
+    gesture_event(ui, 120, -40, -10, CUI_SCROLL_PHASE_STARTED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10);
+    assert(cui_frame_events(ui, NULL)[0].dy == -10); /* Outside child's clip. */
+    gesture_regions(ui, false, false, false);
+    cui_end_frame(ui);
+    gesture_event(ui, 20, -10, -15, CUI_SCROLL_PHASE_MOVED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10);
+    gesture_regions(ui, false, false, true);
+    cui_end_frame(ui);
+    gesture_event(ui, 20, -10, -15, CUI_SCROLL_PHASE_MOVED, true);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10); /* Re-enabled owner starts fresh vertically. */
+    assert(cui_frame_events(ui, NULL)[0].dx == 0);
+    gesture_regions(ui, false, false, true);
+    cui_end_frame(ui);
+    gesture_event(ui, 20, -40, -10, CUI_SCROLL_PHASE_NONE, false);
+    begin(ui);
+    assert(cui_frame_events(ui, NULL)[0].dy == -10); /* Line wheels remain unfiltered. */
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void test_table_semantic_roles(void) {
     cui_context *ui = make();
     begin(ui);
@@ -2121,6 +2207,7 @@ int main(void) {
     test_pointer_scope_guard();
     test_nested_wheel_routing();
     test_dominant_axis_scroll();
+    test_persistent_scroll_routing();
     test_perceptual_color_mix();
     test_focusable_container();
     test_nonfocusable_proxy_button();

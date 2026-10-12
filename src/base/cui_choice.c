@@ -157,6 +157,54 @@ void cui_choice_popup_init(cui_choice_popup *state, cui_id popup_id) {
     *state = (cui_choice_popup){0};
     cui_overlay_init(&state->overlay, popup_id, true);
 }
+static bool cui_choice_scroll_event(cui_context *ui, const cui_choice_item *items, size_t count,
+                                    cui_list_state *state, size_t length, size_t *begin,
+                                    cui_rect bounds, cui_id scope, cui_event event) {
+    if (!count || !length || event.type != CUI_EVENT_SCROLL || !isfinite(event.dy) ||
+        !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
+        bounds.w <= 0 || bounds.h <= 0 || event.x < bounds.x || event.x >= bounds.x + bounds.w ||
+        event.y < bounds.y || event.y >= bounds.y + bounds.h ||
+        !cui_pointer_scope_allowed(ui, scope))
+        return false;
+    if (length > count)
+        length = count;
+    if (*begin > count - length)
+        *begin = count - length;
+    float amount = state->scroll_remainder - event.dy;
+    if (!isfinite(amount))
+        amount = event.dy > 0 ? -(float)count : (float)count;
+    float whole = truncf(amount);
+    state->scroll_remainder = amount - whole;
+    size_t before = *begin;
+    if (whole < 0) {
+        float steps = -whole;
+        *begin = steps >= (float)*begin ? 0 : *begin - (size_t)steps;
+    } else {
+        size_t remaining = count - length - *begin;
+        *begin += whole >= (float)remaining ? remaining : (size_t)whole;
+    }
+    if (before == *begin)
+        return false;
+    bool focused_option = false, active_visible = false;
+    for (size_t i = 0; i < count; i++) {
+        focused_option |= cui_focused(ui) == items[i].id;
+        if (i >= *begin && i < *begin + length && !items[i].disabled &&
+            items[i].id == state->active)
+            active_visible = true;
+    }
+    if (!active_visible) {
+        state->active = 0;
+        for (size_t i = *begin; i < *begin + length; i++)
+            if (!items[i].disabled) {
+                state->active = items[i].id;
+                break;
+            }
+        if (focused_option)
+            cui_focus(ui, state->active);
+    }
+    cui_invalidate(ui);
+    return true;
+}
 bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_list_state *state, cui_list_options options) {
     if (!items || !selected || !state || !count)
@@ -176,49 +224,14 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
     size_t window_begin = options.visible_count ? options.visible_begin : 0;
     if (window_begin > count - window_length)
         window_begin = count - window_length;
-    bool scrolled = false;
+    bool scrolled = options.window_changed;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
         cui_event event = events[e];
-        cui_rect bounds = options.scroll_bounds;
-        if (event.type == CUI_EVENT_SCROLL && options.visible_count && isfinite(event.dy) &&
-            event.x >= bounds.x && event.x < bounds.x + bounds.w && event.y >= bounds.y &&
-            event.y < bounds.y + bounds.h && cui_pointer_scope_allowed(ui, options.scroll_scope)) {
-            float amount = state->scroll_remainder - event.dy;
-            if (!isfinite(amount))
-                amount = event.dy > 0 ? -(float)count : (float)count;
-            float whole = truncf(amount);
-            state->scroll_remainder = amount - whole;
-            size_t before = window_begin;
-            if (whole < 0) {
-                float steps = -whole;
-                window_begin = steps >= (float)window_begin ? 0 : window_begin - (size_t)steps;
-            } else {
-                size_t remaining = count - window_length - window_begin;
-                window_begin += whole >= (float)remaining ? remaining : (size_t)whole;
-            }
-            if (before != window_begin) {
-                bool focused_option = false, active_visible = false;
-                for (size_t i = 0; i < count; i++) {
-                    focused_option |= cui_focused(ui) == items[i].id;
-                    if (i >= window_begin && i < window_begin + window_length &&
-                        !items[i].disabled && items[i].id == state->active)
-                        active_visible = true;
-                }
-                if (!active_visible) {
-                    state->active = 0;
-                    for (size_t i = window_begin; i < window_begin + window_length; i++)
-                        if (!items[i].disabled) {
-                            state->active = items[i].id;
-                            break;
-                        }
-                    if (focused_option)
-                        cui_focus(ui, state->active);
-                }
-                scrolled = true;
-                cui_invalidate(ui);
-            }
+        scrolled |=
+            cui_choice_scroll_event(ui, items, count, state, options.visible_count, &window_begin,
+                                    options.scroll_bounds, options.scroll_scope, event);
+        if (event.type == CUI_EVENT_SCROLL)
             continue;
-        }
         size_t target = count, from = count;
         for (size_t i = 0; i < count; ++i) {
             if (items[i].id == cui_event_target(ui, e))
@@ -464,6 +477,15 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
         state->list.active = filtered[active].id;
     bool commit = false;
     for (size_t e = 0; e < event_count && !disabled; e++) {
+        if (cui_choice_scroll_event(ui, filtered, matched, &state->list, state->visible_rows,
+                                    &state->list.first_visible, state->overlay.bounds,
+                                    state->overlay.id, events[e])) {
+            result.scrolled = true;
+            active = matched;
+            for (size_t i = 0; i < matched; i++)
+                if (filtered[i].id == state->list.active && !filtered[i].disabled)
+                    active = i;
+        }
         if (cui_event_target(ui, e) != input || events[e].type != CUI_EVENT_KEY_DOWN)
             continue;
         size_t next = active == matched

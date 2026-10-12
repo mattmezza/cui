@@ -881,6 +881,49 @@ static void test_list_scroll_modal_guard(void) {
     }
 }
 
+static void test_scroll_activation_order(void) {
+    for (unsigned mode = 0; mode < 6; mode++) {
+        for (unsigned order = 0; order < 3; order++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            assert(ui);
+            char text[32] = "";
+            cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
+                                                                .capacity = sizeof(text),
+                                                                .history_bytes = 512,
+                                                                .max_history_steps = 8});
+            assert(query);
+            cui_choice_popup state;
+            cui_choice_popup_init(&state, 800);
+            cui_id value = 0;
+            bool chosen[12] = {false};
+            scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+            if (mode >= 2) {
+                click(ui, 2);
+                scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+            } else
+                cui_focus(ui, 1000);
+            cui_rect bounds = cui_bounds(ui, mode >= 2 ? 800 : 90);
+            if (order == 1)
+                key(ui, CUI_KEY_ENTER);
+            wheel(ui, bounds.x + 10, bounds.y + 12, -3);
+            if (order == 0)
+                key(ui, CUI_KEY_ENTER);
+            else if (order == 2)
+                click(ui, 1000); /* previous-frame row hit must not activate after scrolling */
+            bool changed = scroll_choices_scene(ui, mode, query, &state, &value, chosen, false);
+            assert(changed == (order != 2));
+            if (order == 2)
+                assert(value == 0 && !chosen[0] && !chosen[3]);
+            else if (mode == 1 || mode == 3 || mode == 5)
+                assert(chosen[order == 0 ? 3 : 0] && !chosen[order == 0 ? 0 : 3]);
+            else
+                assert(value == (order == 0 ? 1003 : 1000));
+            cui_edit_destroy(query);
+            cui_destroy(ui);
+        }
+    }
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -961,6 +1004,7 @@ int main(void) {
     test_custom_choice_rows();
     test_choice_scrolling();
     test_list_scroll_modal_guard();
+    test_scroll_activation_order();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

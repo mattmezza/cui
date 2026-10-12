@@ -122,6 +122,8 @@ ASCII typeahead and keyboard paging over forty items with disabled endpoints.
 Scroll tests cover all six single/multi List/Select/Combobox paths, fractional
 wheel deltas, both clamps, out-of-bounds and nonfinite events, idle retention,
 disabled input, skipped disabled rows, focus transfer and subsequent selection.
+All six paths also test wheel+Enter, Enter+wheel and stale pointer activation in
+one event batch.
 Hierarchical descriptors and multiple selection are documented below. Remaining
 list gaps include touch dragging, variable-height item delegates, searchable
 Select, Unicode normalization/case folding and OS accessibility adapters. Tab currently stays in the open popup rather than dismissing and
@@ -156,8 +158,10 @@ Combobox supports single and multiple selection. Remote query delegates,
 query/label synchronization policies, Unicode collation, IME,
 painted caret and selection, and the OS accessibility bridge remain incomplete.
 The current suggestion reducer applies edits before filtering for the frame;
-interleaving text edits or wheel scrolling with commits in a single batch remains
-an ordering gap.
+interleaving text edits with commits in a single batch remains an ordering gap.
+Wheel navigation and keyboard commits are reduced in event order; a pointer
+activation against the previous layout is discarded if scrolling moved the
+window earlier in that batch.
 
 
 ## Multiple selection

@@ -65,10 +65,12 @@ typedef struct {
     void *render_user;
     cui_rect scroll_bounds; /* base scrolling receiving bounds; styled fills automatically */
     cui_id scroll_scope;    /* popup scope, or zero for a standalone list */
+    bool window_changed;    /* discard pointer activation against pre-scroll layout */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
     cui_list_state list;
+    size_t visible_rows; /* previous styled popup rows, used for ordered Combo scrolling */
 } cui_choice_popup;
 typedef struct {
     bool disabled;
@@ -107,7 +109,7 @@ bool cui_select_multi(cui_context *, cui_id trigger, const cui_theme *, cui_str 
                       cui_str placeholder, const cui_choice_item *, size_t count, bool *selected,
                       cui_choice_popup *, cui_choice_popup_options);
 typedef struct {
-    bool changed, query_changed;
+    bool changed, query_changed, scrolled;
     size_t matching_count;
     cui_edit_result error;
 } cui_combobox_result;

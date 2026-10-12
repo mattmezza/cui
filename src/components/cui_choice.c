@@ -307,6 +307,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
     if (rows > 4096)
         rows = 4096;
+    state->visible_rows = rows;
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, input),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
@@ -319,8 +320,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
                                      .visible_count = rows,
                                      .render = options.render,
                                      .render_user = options.render_user,
-                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
-                                     .scroll_scope = state->overlay.id};
+                                     .window_changed = result.scrolled};
     cui_id old = *selected;
     bool activated =
         matched ? cui_base_list(ui, filtered, matched, selected, &state->list, list_options)
@@ -510,6 +510,7 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
     if (rows > 4096)
         rows = 4096;
+    state->visible_rows = rows;
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, input),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
@@ -522,8 +523,7 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
                                      .visible_count = rows,
                                      .render = options.render,
                                      .render_user = options.render_user,
-                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
-                                     .scroll_scope = state->overlay.id};
+                                     .window_changed = result.scrolled};
     bool activated = matched ? cui_base_list_multi(ui, filtered, matched, filtered_selected,
                                                    &state->list, list_options)
                              : false;

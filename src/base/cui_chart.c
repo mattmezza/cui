@@ -731,11 +731,14 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         unsigned n = o->tick_count ? o->tick_count : 5;
         for (unsigned i = 0; i + 1 < n; i++) {
             if (horizontal) {
-                double x = left + (right - left) * i / (n - 1);
+                double x = o->bar_alignment == CUI_CHART_BAR_LEFT
+                               ? right - (right - left) * i / (n - 1)
+                               : left + (right - left) * i / (n - 1);
                 cui_chart_guide(s, o, x, top, x, bottom, grid, o->grid_solid);
             } else {
-                double y = o->kind == CUI_CHART_CANDLESTICK && !o->tick_count
-                               ? bottom * i / 4
+                double y = o->kind == CUI_CHART_CANDLESTICK && !o->tick_count ? bottom * i / 4
+                           : o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_TOP
+                               ? bottom - (bottom - top) * i / (n - 1)
                                : top + (bottom - top) * i / (n - 1);
                 cui_chart_guide(s, o, left, y, right, y, grid, o->grid_solid);
             }

@@ -3,6 +3,19 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+static void test_theme_list_tokens(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t i = 0; i < 4; i++) {
+        cui_theme t = themes[i];
+        assert(t.list_active_highlight);
+        assert(memcmp(&t.popover_foreground, &t.text, sizeof(cui_color)) == 0);
+        assert(t.list_hover.r == t.accent.r && t.list_hover.a == 153);
+        assert(t.list_active.r == (9u * t.background.r + t.primary.r) / 10u);
+        assert(t.list_active.a == 51);
+        assert(t.selection.r == t.primary.r && t.selection.a == 76);
+    }
+}
 static bool checked;
 static void scene(cui_context *ui, const cui_theme *t) {
     assert(cui_begin_frame(ui, 640, 480, .016f));
@@ -633,6 +646,7 @@ static void test_toggle(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    test_theme_list_tokens();
     test_toggle();
     test_switch();
     test_checkbox_geometry();

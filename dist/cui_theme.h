@@ -40,6 +40,8 @@ typedef struct {
         tab_bar_segmented;
     cui_spring_settings spring_move;
     cui_color switch_background, switch_thumb;
+    cui_color popover_foreground, list_hover, list_active, selection;
+    bool list_active_highlight;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -117,6 +119,13 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
     t.tab_bar_segmented = t.secondary;
     t.switch_background = t.buttons[CUI_THEME_BUTTON_SECONDARY].active;
     t.switch_thumb = t.background;
+    t.popover_foreground = t.text;
+    t.list_hover = cui_theme_opacity(t.accent, .6f);
+    t.list_active = (cui_color){(uint8_t)((9u * t.background.r + t.primary.r) / 10u),
+                                (uint8_t)((9u * t.background.g + t.primary.g) / 10u),
+                                (uint8_t)((9u * t.background.b + t.primary.b) / 10u), 51};
+    t.selection = cui_theme_opacity(t.primary, .3f);
+    t.list_active_highlight = true;
     t.spring_move =
         (cui_spring_settings){.response = .28f, .damping = .85f, .epsilon = .1f, .travel = true};
     return t;

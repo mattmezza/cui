@@ -2671,16 +2671,26 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
     if (length > count - begin)
         length = count - begin;
     for (size_t i = begin; i < begin + length; i++) {
+        bool active = state->active == items[i].id || state->secondary_active == items[i].id;
+        bool disabled = options.disabled || items[i].disabled;
+        cui_color background = active ? theme->primary : theme->surface;
+        if (searchable || options.menu) {
+            background = (cui_color){0};
+            if (active && (searchable || !disabled))
+                background = theme->accent;
+            else if (!disabled && cui_hovered(ui, items[i].id)) {
+                background = theme->accent;
+                if (searchable)
+                    background.a = (uint8_t)lroundf(background.a * .7f);
+            }
+        }
         cui_box box = {.height = theme->control_height,
                        .width = -1,
                        .padding = theme->padding,
                        .row = true,
                        .align_y = CUI_ALIGN_CENTER,
                        .gap = theme->gap,
-                       .background =
-                           (state->active == items[i].id || state->secondary_active == items[i].id)
-                               ? theme->primary
-                               : theme->surface,
+                       .background = background,
                        .border = cui_focused(ui) == items[i].id ? theme->focus : theme->surface,
                        .border_width = cui_focused(ui) == items[i].id ? 1 : 0};
         cui_begin_box(ui, items[i].id, box);
@@ -2691,10 +2701,11 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
             options.render(ui, &items[i], i, options.render_user);
         else
             cui_text(ui, items[i].label, theme->font_size,
-                     options.disabled || items[i].disabled ? theme->muted
-                     : (state->active == items[i].id || state->secondary_active == items[i].id)
-                         ? theme->on_primary
-                         : theme->text);
+                     disabled     ? theme->muted
+                     : searchable ? theme->text
+                     : active     ? (options.menu ? theme->accent_foreground : theme->on_primary)
+                     : options.menu && cui_hovered(ui, items[i].id) ? theme->accent_foreground
+                                                                    : theme->text);
         cui_end_box(ui);
         if (searchable || multiple_selected) {
             float density = theme->font_size / 16;
@@ -3231,14 +3242,15 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         cui_base_menu_entry(ui, entry, options.popup.disabled, expanded, scope);
         if (entry->kind != CUI_MENU_SEPARATOR && entry->kind != CUI_MENU_LABEL)
             cui_set_tab_stop(ui, entry->id, entry->id == cursor->active);
-        bool highlighted = cursor->active == entry->id;
+        bool highlighted = !cui_menu_entry_is_disabled(entry) && !options.popup.disabled &&
+                           (cursor->active == entry->id || cui_hovered(ui, entry->id));
         bool checked = entry->kind == CUI_MENU_CHECK && entry->checked ? *entry->checked
                        : entry->kind == CUI_MENU_RADIO && entry->radio_value
                            ? *entry->radio_value == entry->radio_option
                            : false;
         cui_color foreground = cui_menu_entry_is_disabled(entry) || options.popup.disabled
                                    ? theme->muted
-                               : highlighted ? theme->on_primary
+                               : highlighted ? theme->accent_foreground
                                              : theme->text;
         cui_begin_box(
             ui, entry->id,
@@ -3248,7 +3260,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                       .gap = theme->gap,
                       .row = true,
                       .align_y = CUI_ALIGN_CENTER,
-                      .background = highlighted ? theme->primary : theme->surface,
+                      .background = highlighted ? theme->accent : (cui_color){0},
                       .border = cui_focused(ui) == entry->id ? theme->focus : theme->surface,
                       .border_width = cui_focused(ui) == entry->id ? 1 : 0});
         if (entry->kind == CUI_MENU_SEPARATOR) {

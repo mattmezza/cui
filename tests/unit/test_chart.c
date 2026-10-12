@@ -67,6 +67,11 @@ static size_t format_q(double value, char *buffer, size_t capacity, void *user) 
         buffer[0] = 'Q';
     return capacity ? 1 : 0;
 }
+static cui_color bar_label_by_index(const cui_chart_datum *datum, size_t index, void *user) {
+    (void)datum;
+    (void)user;
+    return index == 1 ? (cui_color){4, 211, 5, 255} : (cui_color){100, 20, 30, 255};
+}
 static cui_str tooltip_title_override(const cui_chart_datum *datum, size_t index, void *user) {
     (void)user;
     assert(datum && index == 0);
@@ -641,16 +646,21 @@ int main(void) {
     options.show_bar_values = true;
     options.show_y_axis = false;
     options.bar_label_format = format_q;
+    options.bar_label_color_fn = bar_label_by_index;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
     draw = cui_end_frame(ui);
     formatted = false;
+    bool per_bar_color = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
-            draw.commands[i].text.data[0] == 'Q')
+            draw.commands[i].text.data[0] == 'Q') {
             formatted = true;
-    assert(formatted);
+            per_bar_color |= draw.commands[i].color.g == 211;
+        }
+    assert(formatted && per_bar_color);
+    options.bar_label_color_fn = NULL;
     options.kind = CUI_CHART_CANDLESTICK;
     options.tooltip_format = NULL;
     assert(cui_begin_frame(ui, 256, 256, 0));

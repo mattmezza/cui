@@ -76,6 +76,8 @@ typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index
 typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
                                           double default_radius, void *user);
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
+typedef cui_color (*cui_chart_bar_label_color_fn)(const cui_chart_datum *, size_t index,
+                                                  void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
 typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
@@ -143,7 +145,9 @@ typedef struct {
     float appear_duration; /* seconds; zero selects styled source default 1s */
     bool show_bar_values;
     cui_color bar_label_color; /* alpha zero uses foreground */
-    cui_chart_curve curve;     /* natural is source default */
+    cui_chart_bar_label_color_fn bar_label_color_fn;
+    void *bar_label_color_user;
+    cui_chart_curve curve; /* natural is source default */
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     float radar_label_gap;                      /* zero selects source 10px */

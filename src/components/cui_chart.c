@@ -279,7 +279,6 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             }
     }
     if (o->kind == CUI_CHART_BAR && o->show_bar_values && o->count <= 128) {
-        cui_color color = o->bar_label_color.a ? o->bar_label_color : o->foreground;
         for (size_t i = 0; i < o->count; i++) {
             cui_plot_rect bar;
             if (cui_chart_bar_bounds(o, i, &bar) != CUI_PLOT_OK)
@@ -304,6 +303,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 ui, id ^ (UINT64_C(0x81ce703914b50000) + i),
                 (cui_box){.width = 64, .height = 12, .fixed_width = true, .fixed_height = true},
                 (cui_rect){x, y, 64, 12});
+            cui_color color = o->bar_label_color_fn
+                                  ? o->bar_label_color_fn(&o->data[i], i, o->bar_label_color_user)
+                                  : (o->bar_label_color.a ? o->bar_label_color : o->foreground);
             cui_text(ui, label, 10, color);
             cui_end_box(ui);
         }

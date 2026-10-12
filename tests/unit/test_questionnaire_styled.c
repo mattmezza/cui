@@ -34,11 +34,15 @@ static void shortcut_frame(cui_context *ui, cui_questionnaire_state *s, bool num
     cui_id ids[] = {22, 23, 24};
     (void)cui_questionnaire_radio_keys(ui, s, ids, 3);
     assert(cui_questionnaire_begin(ui, 20, &t, s, (cui_questionnaire_options){.width = 300}));
+    (void)cui_questionnaire_answer_keys(ui, 20, s, ids, 3, 0);
     (void)cui_questionnaire_confirm_keys(ui, 20, s, ids, 3, 0, CUI_MOD_CTRL);
     (void)cui_questionnaire_shortcut_keys(ui, 20, s, ids, 3, 0, numbers);
     for (size_t i = 0; i < 3; i++)
         (void)cui_questionnaire_choice_control(ui, ids[i], &t, s, 0, i,
                                                (cui_questionnaire_options){0});
+    cui_begin_box(ui, 26, (cui_box){.width = 60, .height = 20});
+    cui_interact(ui, 26, CUI_ROLE_BUTTON, cui_string("Action"), false, false, 0);
+    cui_end_box(ui);
     cui_questionnaire_end(ui);
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
@@ -117,6 +121,19 @@ static void radio_keyboard(void) {
         (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .modifiers = CUI_MOD_CTRL}));
     radio_frame(ui, &s);
     assert(!s.complete && cui_questionnaire_item_error(&s, 0).kind == CUI_QUESTIONNAIRE_UNFILLED);
+    assert(cui_questionnaire_activate(&s, 0, 2) == CUI_QUESTIONNAIRE_OK);
+    cui_focus(ui, 26);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    radio_frame(ui, &s);
+    assert(cui_focused(ui) == 24 && cui_questionnaire_choice_selected(&s, 0, 2));
+    assert(!cui_questionnaire_choice_selected(&s, 0, 0) && !s.pending_confirm);
+    assert(cui_questionnaire_activate(&s, 0, 0) == CUI_QUESTIONNAIRE_OK);
+    cui_focus(ui, 26);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_UP}));
+    radio_frame(ui, &s);
+    assert(cui_focused(ui) == 22 && cui_questionnaire_choice_selected(&s, 0, 0));
+    assert(!cui_questionnaire_choice_selected(&s, 0, 2) && !s.pending_confirm);
+
     cui_destroy(ui);
 }
 static void progress_semantics(void) {

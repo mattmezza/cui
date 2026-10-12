@@ -337,10 +337,31 @@ bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionna
         bool previous = events[e].key == CUI_KEY_UP;
         size_t slots = count + 1, current = SIZE_MAX;
         for (size_t c = 0; c < count; c++)
-            if (ids[c] && ids[c] == focused)
+            if (ids[c] && ids[c] == focused &&
+                !s->storage.choices[s->storage.items[item].choice_offset + c].disabled)
                 current = c;
         if (input && focused == input_id)
             current = count;
+        /* Entering the answers from an item/action focus restores a filled
+         * answer first, without selecting an unrelated radio. */
+        if (current == SIZE_MAX) {
+            bool restored = false;
+            for (size_t step = 0; step < slots; step++) {
+                size_t next = previous ? slots - 1 - step : step;
+                bool filled = next == count
+                                  ? input && cui_questionnaire_freeform(s, item).length != 0
+                                  : ids[next] && cui_questionnaire_choice_selected(s, item, next);
+                if (!filled)
+                    continue;
+                cui_focus(ui, next == count ? input_id : ids[next]);
+                cui_consume_event(ui, e);
+                cui_invalidate(ui);
+                handled = restored = true;
+                break;
+            }
+            if (restored)
+                continue;
+        }
         size_t start = current == SIZE_MAX ? (previous ? 0 : slots - 1) : current;
         for (size_t step = 1; step <= slots; step++) {
             size_t next = previous ? (start + slots - step) % slots : (start + step) % slots;

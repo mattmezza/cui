@@ -46,6 +46,40 @@ static cui_size measure(void *u, cui_str t, float font, unsigned flags) {
             ++count;
     return (cui_size){(float)count * font * .5f, font};
 }
+static void test_image_font_metrics(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("![alt](asset)\n\nnext")) == CUI_TEXT_VIEW_OK);
+    f.blocks[0].image_ready = true;
+    f.blocks[0].image = (cui_bitmap){.width = 2, .height = 1};
+    cui_text_view_layout_options o = {.width = 200,
+                                      .font_size = 14,
+                                      .line_height = 20,
+                                      .paragraph_gap = 16,
+                                      .font_metrics_available = true,
+                                      .body_metrics = {8, 2, 10}};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.y == 12 && f.blocks[0].bounds.h == 1 &&
+           f.blocks[0].image_line.h == 20 && f.blocks[1].bounds.y == 36);
+    o.body_metrics = (cui_font_metrics){4, 6, 10};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.y == 9);
+    f.blocks[0].image.height = 40;
+    o.body_metrics = (cui_font_metrics){8, 2, 10};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.y == 0 && f.blocks[0].image_line.h == 40 &&
+           f.blocks[1].bounds.y == 56);
+    size_t count = f.state.glyph_count;
+    o.body_metrics.ascent = NAN;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_INVALID);
+    assert(f.state.glyph_count == count && f.blocks[1].bounds.y == 56);
+    o.body_metrics.ascent = FLT_MAX;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_INVALID);
+    o.font_metrics_available = false;
+    f.blocks[0].image.height = 1;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.y == 0 && f.blocks[0].image_line.h == 1);
+}
 static void test_markdown(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -861,6 +895,39 @@ static bool image_loaded(cui_str uri, cui_bitmap *out, void *u) {
     assert(uri.length == 5 && !memcmp(uri.data, "asset", 5));
     *out = (cui_bitmap){.pixels = pixels, .width = 2, .height = 1, .stride = 8, .revision = 1};
     return true;
+}
+static bool image_metrics(void *user, float size, cui_text_style style, cui_font_metrics *out) {
+    assert(size == 14 && style.weight == CUI_TEXT_WEIGHT_NORMAL);
+    *out = *(cui_font_metrics *)user;
+    return true;
+}
+static void test_image_metric_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("- ![alt](asset)\n- next")) == CUI_TEXT_VIEW_OK);
+    cui_font_metrics metrics = {8, 2, 10};
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 512, .font_metrics = image_metrics, .measure_user = &metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    cui_draw_list d = frame(ui, &f, o);
+    bool image = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        if (d.commands[i].type == CUI_DRAW_IMAGE) {
+            image = true;
+            assert(d.commands[i].bounds.y == f.state.viewport.y + 12 &&
+                   d.commands[i].bounds.h == 1);
+        }
+    }
+    assert(image && f.blocks[0].image_line.y == 0 && f.blocks[1].bounds.y == 20);
+    metrics.ascent = NAN;
+    d = frame(ui, &f, o);
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_IMAGE)
+            assert(d.commands[i].bounds.y == f.state.viewport.y);
+    cui_destroy(ui);
 }
 static void test_links_and_images(void) {
     fixture f;
@@ -1855,6 +1922,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_image_font_metrics();
     test_markdown();
     test_unicode_ranges_and_stream();
     test_html();
@@ -1881,6 +1949,7 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_image_metric_paint();
     test_links_and_images();
     test_theme_scroll_and_reveal();
     test_action_composition();

@@ -201,9 +201,11 @@ metrics. In frozen `inline_flow.rs`, each line starts with the body's baseline
 and descent. An image baseline is clamped to its height from
 `height / 2 + body_baseline - line_height / 2`; line ascent and descent expand
 with that baseline, and the image paints at `line_y + line_ascent - baseline`.
-The shared size-only styled text measurement callback cannot supply these metrics.
-A future portable styled font metrics callback and matching Canvas/native adapters
-are required; this implementation does not substitute a size-derived baseline.
+The optional core font metrics provider now supplies actual body ascent and descent.
+The body baseline is `(line_height - ascent - descent) / 2 + ascent`. Ready standalone
+images use this formula and retain a separate logical row extent for list prefixes
+and following blocks. Pure layout accepts validated optional body metrics. Without
+a valid provider, images retain top alignment; no size-derived baseline is synthesized.
 Mixed image/text wrapping, inline image object selection, titles/links and explicit
 image attributes also remain outside the standalone block representation.
 

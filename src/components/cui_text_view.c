@@ -334,7 +334,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (actions_only)
             continue;
         cui_rect r = b->bounds;
-        if (r.y + r.h <= scroll || r.y >= scroll + viewport)
+        cui_rect line = b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready ? b->image_line : r;
+        if (line.y + line.h <= scroll || line.y >= scroll + viewport)
             continue;
         r.x -= origin_x;
         r.y -= origin_y;
@@ -342,6 +343,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (b->list_item && b->kind != CUI_TEXT_VIEW_LIST_ITEM &&
             b->kind != CUI_TEXT_VIEW_TABLE_CELL) {
             cui_rect prefix = r;
+            if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready)
+                prefix.y = b->image_line.y - origin_y;
             prefix.x -= b->list_prefix_width;
             cui_text_view_paint_list_prefix(ui, part ^ UINT64_C(0x70666978), b, prefix,
                                             b->list_prefix_width, style);
@@ -659,6 +662,9 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 o.image((cui_str){resource, length}, &bitmap, o.image_user);
             b->image = bitmap;
         }
+    cui_font_metrics body_metrics = {0};
+    bool font_metrics_available =
+        cui_measure_font_metrics(ui, style.font_size, (cui_text_style){0}, &body_metrics);
     if (cui_text_view_layout(
             s,
             (cui_text_view_layout_options){
@@ -669,6 +675,8 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
                 .max_lines = o.max_lines,
                 .scrollable = o.scrollable,
                 .table_mode = o.table_mode,
+                .font_metrics_available = font_metrics_available,
+                .body_metrics = body_metrics,
                 .code_actions_height = o.code_actions ? o.code_actions_height : 0,
                 .table_actions_height = o.table_actions ? o.table_actions_height : 0},
             cui_text_view_core_measure, ui) != CUI_TEXT_VIEW_OK)

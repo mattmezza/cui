@@ -1465,6 +1465,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         left = content_inset;
     }
     b->text_inset = left;
+    b->image_line = (cui_rect){0};
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
     float cursor_x = 0, cursor_y = 0;
     size_t first_glyph = s->glyph_count;
@@ -1474,7 +1475,20 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     }
     if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready && b->image.width && b->image.height) {
         float w = fminf(width, (float)b->image.width);
-        b->bounds = (cui_rect){x, y, w, w * b->image.height / b->image.width};
+        float height = w * b->image.height / b->image.width;
+        b->bounds = (cui_rect){x, y, w, height};
+        b->image_line = b->bounds;
+        if (o.font_metrics_available) {
+            float baseline =
+                (o.line_height - o.body_metrics.ascent - o.body_metrics.descent) * .5f +
+                o.body_metrics.ascent;
+            float image_baseline =
+                fminf(height, fmaxf(0, height * .5f + baseline - o.line_height * .5f));
+            float ascent = fmaxf(baseline, image_baseline);
+            float descent = fmaxf(o.line_height - baseline, height - image_baseline);
+            b->bounds.y += ascent - image_baseline;
+            b->image_line.h = ascent + descent;
+        }
         return true;
     }
     for (size_t span = 0; span < s->span_count; ++span) {
@@ -1679,6 +1693,14 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
         o.table_actions_height < 0 || o.table_actions_height > 10000000 ||
         o.table_mode < CUI_TEXT_VIEW_TABLE_WRAP || o.table_mode > CUI_TEXT_VIEW_TABLE_NOWRAP)
         return CUI_TEXT_VIEW_INVALID;
+    if (o.font_metrics_available &&
+        (!isfinite(o.body_metrics.ascent) || !isfinite(o.body_metrics.descent) ||
+         !isfinite(o.body_metrics.line_height) || o.body_metrics.ascent < 0 ||
+         o.body_metrics.descent < 0 || o.body_metrics.line_height <= 0 ||
+         o.body_metrics.line_height > 10000000 ||
+         o.body_metrics.ascent + o.body_metrics.descent <= 0 ||
+         o.body_metrics.ascent + o.body_metrics.descent > 10000000))
+        return CUI_TEXT_VIEW_INVALID;
     if (s->text_length > s->workspace.glyph_capacity)
         return CUI_TEXT_VIEW_CAPACITY;
     s->glyph_count = 0;
@@ -1762,7 +1784,10 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             if (!cui_text_view_layout_block(s, b, indent, y, fmaxf(1, o.width - indent), o, measure,
                                             user))
                 return CUI_TEXT_VIEW_INVALID;
-            y += block->list_item ? fmaxf(block->bounds.h, o.line_height) : block->bounds.h;
+            float height = block->kind == CUI_TEXT_VIEW_IMAGE && block->image_ready
+                               ? block->image_line.h
+                               : block->bounds.h;
+            y += block->list_item ? fmaxf(height, o.line_height) : height;
             if (b + 1 < s->block_count && ((!block->list_item && !block->list_continuation) ||
                                            (!s->workspace.blocks[b + 1].list_item &&
                                             !s->workspace.blocks[b + 1].list_continuation)))

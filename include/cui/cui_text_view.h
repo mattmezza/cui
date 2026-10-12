@@ -71,7 +71,7 @@ typedef struct {
         list_repeat_marker;
     cui_text_view_alignment alignment;
     cui_bitmap image;
-    cui_rect bounds, table_frame;
+    cui_rect bounds, table_frame, image_line;
     float table_track_width;
     cui_scroll_state table_scroll;
     float actions_height, text_inset, list_prefix_width;
@@ -159,6 +159,8 @@ typedef struct {
     size_t max_lines;
     bool scrollable;
     cui_text_view_table_mode table_mode;
+    bool font_metrics_available;
+    cui_font_metrics body_metrics;
 } cui_text_view_layout_options;
 cui_text_view_error cui_text_view_layout(cui_text_view_state *, cui_text_view_layout_options,
                                          cui_text_view_measure_fn, void *);

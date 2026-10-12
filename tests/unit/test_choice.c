@@ -2204,6 +2204,104 @@ static void test_tab_reveal_requests(void) {
     assert(!scroll.reveal_id && scroll.offset == 32);
     cui_destroy(ui);
 }
+static void scrollbar_tabs_scene(cui_context *ui, cui_tab_scroll_state *scroll, bool vertical,
+                                 bool disabled, size_t count) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {{10, {"First long tab", 14}, false},
+                                       {20, {"Second long tab", 15}, false},
+                                       {30, {"Third long tab", 14}, false}};
+    cui_id value = 10;
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_tabs(ui, 1, &theme, entries, count, &value,
+             (cui_tabs_options){.vertical = vertical,
+                                .disabled = disabled,
+                                .max_width = 100,
+                                .scroll = scroll,
+                                .bar_extent = vertical ? 48 : 110,
+                                .scrollbar = true},
+             NULL, NULL);
+    dropdown_draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void test_tab_scrollbars(void) {
+    for (int vertical = 0; vertical < 2; vertical++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_tab_scroll_state scroll = {0};
+        for (int frame = 0; frame < 3; frame++)
+            scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.scrollbar_id && scroll.maximum > 0);
+        cui_id id = scroll.scrollbar_id;
+        cui_rect track = cui_bounds(ui, id);
+        assert((vertical ? track.w : track.h) == 6);
+        bool thumb = false;
+        for (size_t i = 0; i < dropdown_draw.count; i++) {
+            cui_draw_command command = dropdown_draw.commands[i];
+            thumb |= command.type == CUI_DRAW_RECT &&
+                     (vertical ? command.bounds.w == 6 : command.bounds.h == 6) &&
+                     same_color(command.color, cui_theme_light().primary);
+        }
+        assert(thumb);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = track.x + 2, .y = track.y + 2}));
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.scrollbar_dragging && scroll.offset == 0);
+        float x = vertical ? track.x + 2 : track.x + track.w - 2;
+        float y = vertical ? track.y + track.h - 2 : track.y + 2;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x, .y = y}));
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y}));
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(!scroll.scrollbar_dragging && scroll.offset == scroll.maximum && scroll.changed);
+        size_t count;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        bool range = false;
+        for (size_t i = 0; i < count; i++)
+            range |= semantics[i].id == id && semantics[i].role == CUI_ROLE_SCROLLBAR &&
+                     semantics[i].details.maximum == scroll.maximum &&
+                     semantics[i].value == scroll.offset &&
+                     semantics[i].details.orientation ==
+                         (vertical ? CUI_ORIENTATION_VERTICAL : CUI_ORIENTATION_HORIZONTAL);
+        assert(range);
+        cui_focus(ui, id);
+        key(ui, CUI_KEY_HOME);
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.offset == 0);
+        key(ui, vertical ? CUI_KEY_DOWN : CUI_KEY_RIGHT);
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.offset == 32);
+        key(ui, CUI_KEY_PAGEDOWN);
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.offset == fminf(scroll.maximum, vertical ? 80 : 142));
+        key(ui, CUI_KEY_END);
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.offset == scroll.maximum);
+        float end = scroll.offset;
+        key(ui, CUI_KEY_HOME);
+        scrollbar_tabs_scene(ui, &scroll, vertical, true, 3);
+        assert(scroll.offset == end && !scroll.changed);
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = track.x + 2,
+                                               .y = track.y + 2,
+                                               .dx = vertical ? 0 : 1,
+                                               .dy = vertical ? 1 : 0}));
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.offset == end - 32);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = track.x + 2, .y = track.y + 2}));
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(scroll.scrollbar_dragging);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 3);
+        assert(!scroll.scrollbar_dragging);
+        scrollbar_tabs_scene(ui, &scroll, vertical, false, 1);
+        assert(!scroll.scrollbar_id && scroll.offset == 0);
+        semantics = cui_semantics(ui, &count);
+        for (size_t i = 0; i < count; i++)
+            assert(semantics[i].id != id);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -2236,6 +2334,7 @@ int main(void) {
     test_dropdown_colored_outline();
     test_dropdown_inner_button_presentation();
     test_tab_reveal_requests();
+    test_tab_scrollbars();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

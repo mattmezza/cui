@@ -39,6 +39,10 @@ typedef struct {
     cui_id receiving_id;
     bool changed;
     cui_id reveal_id, last_selected; /* explicit reveal request and auto-reveal tracking */
+    cui_id scrollbar_id;
+    cui_rect scrollbar_bounds;
+    float scrollbar_grab;
+    bool scrollbar_dragging;
 } cui_tab_scroll_state;
 typedef struct {
     bool vertical, disabled, manual_activation;
@@ -53,6 +57,7 @@ typedef struct {
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
     cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
     bool reveal_selected;     /* opt in to reveal selection changes in a bounded strip */
+    bool scrollbar;           /* optional pointer/keyboard scrollbar over the viewport edge */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

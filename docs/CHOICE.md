@@ -403,7 +403,7 @@ pre-scroll geometry in a scrolling event batch. Standalone base users provide
 the state's viewport, receiving ID and maximum themselves. Built-in labels have
 immediate measured extents; custom bodies use previous-frame tab widths. Tests
 cover both axes, translation, fixed slots, selection preservation, clamps,
-disabled and off-viewport input and removing tabs while scrolled. Native scrollbars remain a gap.
+disabled and off-viewport input and removing tabs while scrolled. Optional native-painted scrollbars are described below.
 
 ## All-tabs overflow menu
 
@@ -486,3 +486,18 @@ that stays unchanged never resets manual position. `cui_tab_scroll_reveal` also
 provides the portable headless geometry operation directly. Tests cover clamps,
 invalid geometry, explicit stable-ID reveal, default preservation, same-frame
 keyboard reveal and unchanged-selection/manual-offset preservation.
+
+Set Tabs `scrollbar` with a bounded scroll state to show a six-pixel track over
+the viewport's trailing cross-axis edge when content overflows. Thumb size follows
+the visible/content ratio with a 16-pixel minimum. Primary pointer drag retains
+the grab position inside the thumb; track presses center the thumb at the pointer.
+The scrollbar supports axis arrows, Home/End and PageUp/PageDown, participates in
+focus order and exposes role, orientation, range, value and controlled viewport.
+Wheel input over the track uses the same bounded strip reducer. Cancel/Escape,
+disabling or removing overflow ends dragging. Painting and input remain portable
+CUI operations; this does not claim a platform-native OS scrollbar.
+
+Tests cover both axes, painted thumbs, primary capture/drag to the end, semantic
+ranges, keyboard paging, disabled input, wheel routing over the track, input
+cancellation and removal when the tabs fit. The track overlays the last six
+pixels of the tab viewport and first uses previous-frame viewport geometry.

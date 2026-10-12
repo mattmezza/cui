@@ -46,6 +46,68 @@ void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger
     *state = (cui_tab_overflow){.entries = entries, .capacity = capacity, .trigger = trigger};
     cui_menu_tree_init(&state->menu, popup);
 }
+static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) {
+    cui_tab_scroll_state *scroll = options.scroll;
+    if (!scroll || !scroll->scrollbar_id || scroll->maximum <= 0) {
+        if (scroll)
+            scroll->scrollbar_dragging = false;
+        return;
+    }
+    if (options.disabled)
+        scroll->scrollbar_dragging = false;
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    cui_rect bounds = scroll->scrollbar_bounds;
+    float track = options.vertical ? bounds.h : bounds.w;
+    float thumb = track > 0 && options.bar_extent > 0
+                      ? track * (float)((double)options.bar_extent /
+                                        ((double)options.bar_extent + scroll->maximum))
+                      : 0;
+    thumb = fminf(track, fmaxf(16, thumb));
+    float travel = track - thumb;
+    for (size_t e = 0; e < count; e++) {
+        cui_event event = events[e];
+        if (event.type == CUI_EVENT_CANCEL ||
+            (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE))
+            scroll->scrollbar_dragging = false;
+        if (options.disabled || cui_event_target(ui, e) != scroll->scrollbar_id ||
+            ((event.type == CUI_EVENT_POINTER_DOWN || event.type == CUI_EVENT_POINTER_UP) &&
+             event.pointer_button != CUI_POINTER_PRIMARY))
+            continue;
+        float before = scroll->offset;
+        float position = options.vertical ? event.y - bounds.y : event.x - bounds.x;
+        if (event.type == CUI_EVENT_POINTER_DOWN && isfinite(position)) {
+            float start = travel > 0 ? travel * scroll->offset / scroll->maximum : 0;
+            scroll->scrollbar_grab =
+                position >= start && position <= start + thumb ? position - start : thumb * .5f;
+            scroll->scrollbar_dragging = true;
+        }
+        if (scroll->scrollbar_dragging && travel > 0 && isfinite(position) &&
+            (event.type == CUI_EVENT_POINTER_DOWN || event.type == CUI_EVENT_POINTER_MOVE ||
+             event.type == CUI_EVENT_POINTER_UP))
+            scroll->offset =
+                scroll->maximum * fminf(1, fmaxf(0, (position - scroll->scrollbar_grab) / travel));
+        if (event.type == CUI_EVENT_POINTER_UP)
+            scroll->scrollbar_dragging = false;
+        if (event.type == CUI_EVENT_KEY_DOWN) {
+            if (event.key == CUI_KEY_HOME)
+                scroll->offset = 0;
+            else if (event.key == CUI_KEY_END)
+                scroll->offset = scroll->maximum;
+            else if (event.key == CUI_KEY_PAGEUP)
+                scroll->offset -= options.bar_extent;
+            else if (event.key == CUI_KEY_PAGEDOWN)
+                scroll->offset += options.bar_extent;
+            else if (event.key == (options.vertical ? CUI_KEY_UP : CUI_KEY_LEFT))
+                scroll->offset -= 32;
+            else if (event.key == (options.vertical ? CUI_KEY_DOWN : CUI_KEY_RIGHT))
+                scroll->offset += 32;
+            scroll->offset = fminf(scroll->maximum, fmaxf(0, scroll->offset));
+        }
+        scroll->changed |= before != scroll->offset;
+    }
+    cui_update_semantic(ui, scroll->scrollbar_id, false, scroll->offset);
+}
 static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, size_t count,
                                cui_tabs_options options, cui_event event, cui_id target) {
     cui_tab_drag_state *drag = options.drag;
@@ -158,7 +220,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         for (size_t e = 0; e < n && !options.disabled; e++) {
             cui_event event = events[e];
             cui_id target = cui_event_target(ui, e);
-            bool eligible = scroll->receiving_id && target == scroll->receiving_id;
+            bool eligible = (scroll->receiving_id && target == scroll->receiving_id) ||
+                            (scroll->scrollbar_id && target == scroll->scrollbar_id);
             for (size_t i = 0; i < count; i++)
                 eligible |= target == items[i].id;
             cui_rect bounds = scroll->viewport;
@@ -179,6 +242,9 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         if (scroll->changed)
             cui_invalidate(ui);
     }
+    cui_tab_scrollbar_reduce(ui, options);
+    if (options.scroll && options.scroll->changed)
+        cui_invalidate(ui);
     if (options.scroll && options.scroll->changed && options.drag) {
         options.drag->candidate = 0;
         options.drag->active = false;

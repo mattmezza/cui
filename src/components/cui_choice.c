@@ -130,6 +130,11 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                 content += extent;
         }
         options.scroll->maximum = fmaxf(0, content - options.bar_extent);
+        options.scroll->scrollbar_id = options.scrollbar && options.scroll->maximum > 0
+                                           ? container ^ UINT64_C(0x973a1e35f90453bc)
+                                           : 0;
+        options.scroll->scrollbar_bounds = cui_bounds(ui, options.scroll->scrollbar_id);
+
     } else
         options.scroll = NULL;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
@@ -257,6 +262,54 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     }
 
     cui_end_box(ui);
+    if (scrollable && options.scroll->scrollbar_id) {
+        cui_tab_scroll_state *scroll = options.scroll;
+        cui_rect viewport = scroll->viewport;
+        cui_rect track = options.vertical
+                             ? (cui_rect){viewport.x + viewport.w - 6, viewport.y, 6, viewport.h}
+                             : (cui_rect){viewport.x, viewport.y + viewport.h - 6, viewport.w, 6};
+        if (track.w > 0 && track.h > 0) {
+            float length = options.vertical ? track.h : track.w;
+            float thumb_length = length * (float)((double)options.bar_extent /
+                                                  ((double)options.bar_extent + scroll->maximum));
+            thumb_length = fminf(length, fmaxf(16, thumb_length));
+            float thumb_start = (length - thumb_length) * scroll->offset / scroll->maximum;
+            cui_rect thumb =
+                options.vertical
+                    ? (cui_rect){track.x, track.y + thumb_start, track.w, thumb_length}
+                    : (cui_rect){track.x + thumb_start, track.y, thumb_length, track.h};
+            cui_begin_portal(
+                ui, scroll->scrollbar_id,
+                (cui_box){.background = theme->border,
+                          .radius = 3,
+                          .border = theme->focus,
+                          .border_width = cui_focused(ui) == scroll->scrollbar_id ? 1 : 0},
+                track, 1);
+            cui_interact(ui, scroll->scrollbar_id, CUI_ROLE_SCROLLBAR, cui_string("Tab scrollbar"),
+                         options.disabled, false, scroll->offset);
+            cui_end_box(ui);
+            cui_begin_portal(
+                ui, scroll->scrollbar_id ^ UINT64_C(0x247d15723f61c98b),
+                (cui_box){.background = options.disabled ? theme->muted : theme->primary,
+                          .radius = 3},
+                thumb, 2);
+            cui_end_box(ui);
+        }
+        cui_update_semantic(ui, scroll->scrollbar_id, false, scroll->offset);
+        cui_set_semantic_details(
+            ui, scroll->scrollbar_id,
+            (cui_semantic_details){.orientation = options.vertical ? CUI_ORIENTATION_VERTICAL
+                                                                   : CUI_ORIENTATION_HORIZONTAL,
+                                   .minimum = 0,
+                                   .maximum = scroll->maximum,
+                                   .controls = viewport_id,
+                                   .parent = list_id,
+                                   .scrollable = true,
+                                   .scroll_x = options.vertical ? 0 : scroll->offset,
+                                   .scroll_y = options.vertical ? scroll->offset : 0,
+                                   .scroll_max_x = options.vertical ? 0 : scroll->maximum,
+                                   .scroll_max_y = options.vertical ? scroll->maximum : 0});
+    }
     if (active != count && panel) {
         cui_id panel_id = items[active].id ^ UINT64_C(0x691a17db80e22f45);
         cui_interact(ui, panel_id, CUI_ROLE_TABPANEL, items[active].label, false, false, 0);

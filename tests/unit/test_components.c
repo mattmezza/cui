@@ -91,7 +91,33 @@ static void test_button_options(void) {
     cui_destroy(ui);
 }
 
+static double theme_luminance(cui_color c) {
+    double channels[] = {c.r / 255.0, c.g / 255.0, c.b / 255.0};
+    for (size_t i = 0; i < 3; i++)
+        channels[i] =
+            channels[i] <= .04045 ? channels[i] / 12.92 : pow((channels[i] + .055) / 1.055, 2.4);
+    return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
+}
+static void test_semantic_theme_contrast(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t i = 0; i < sizeof(themes) / sizeof(*themes); i++) {
+        cui_theme t = themes[i];
+        cui_color pairs[][2] = {{t.warning, t.on_warning},
+                                {t.success, t.on_success},
+                                {t.info, t.on_info},
+                                {t.danger, t.on_danger}};
+        for (size_t p = 0; p < 4; p++) {
+            double a = theme_luminance(pairs[p][0]), b = theme_luminance(pairs[p][1]);
+            assert(pairs[p][0].a == 255 && pairs[p][1].a == 255);
+            assert((fmax(a, b) + .05) / (fmin(a, b) + .05) >= 4.5);
+            double surface = theme_luminance(t.surface);
+            assert((fmax(a, surface) + .05) / (fmin(a, surface) + .05) >= 4.5);
+        }
+    }
+}
 int main(void) {
+    test_semantic_theme_contrast();
     test_button_options();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

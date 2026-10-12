@@ -9,6 +9,8 @@ extern "C" {
 typedef struct {
     cui_color background, surface, text, muted, primary, on_primary, border, danger, focus;
     float font_size, padding, gap, radius, control_height;
+    /* Semantic intent surfaces and their readable foregrounds. */
+    cui_color warning, on_warning, success, on_success, info, on_info, on_danger;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -40,7 +42,14 @@ cui_theme cui_theme_light(void) {
                        10,
                        8,
                        6,
-                       42};
+                       42,
+                       CUI_THEME_RGB(133, 77, 14),
+                       CUI_THEME_RGB(255, 255, 255),
+                       CUI_THEME_RGB(22, 101, 52),
+                       CUI_THEME_RGB(255, 255, 255),
+                       CUI_THEME_RGB(7, 89, 133),
+                       CUI_THEME_RGB(255, 255, 255),
+                       CUI_THEME_RGB(255, 255, 255)};
 }
 cui_theme cui_theme_dark(void) {
     return (cui_theme){CUI_THEME_RGB(18, 23, 30),
@@ -56,7 +65,14 @@ cui_theme cui_theme_dark(void) {
                        10,
                        8,
                        6,
-                       42};
+                       42,
+                       CUI_THEME_RGB(250, 204, 21),
+                       CUI_THEME_RGB(14, 24, 38),
+                       CUI_THEME_RGB(74, 222, 128),
+                       CUI_THEME_RGB(14, 24, 38),
+                       CUI_THEME_RGB(56, 189, 248),
+                       CUI_THEME_RGB(14, 24, 38),
+                       CUI_THEME_RGB(14, 24, 38)};
 }
 cui_theme cui_theme_high_contrast(void) {
     return (cui_theme){CUI_THEME_RGB(0, 0, 0),
@@ -72,7 +88,14 @@ cui_theme cui_theme_high_contrast(void) {
                        10,
                        10,
                        0,
-                       46};
+                       46,
+                       CUI_THEME_RGB(255, 255, 0),
+                       CUI_THEME_RGB(0, 0, 0),
+                       CUI_THEME_RGB(0, 255, 128),
+                       CUI_THEME_RGB(0, 0, 0),
+                       CUI_THEME_RGB(0, 255, 255),
+                       CUI_THEME_RGB(0, 0, 0),
+                       CUI_THEME_RGB(0, 0, 0)};
 }
 cui_theme cui_theme_terminal(void) {
     return (cui_theme){CUI_THEME_RGB(31, 29, 23),
@@ -88,7 +111,14 @@ cui_theme cui_theme_terminal(void) {
                        12,
                        6,
                        0,
-                       44};
+                       44,
+                       CUI_THEME_RGB(255, 192, 77),
+                       CUI_THEME_RGB(31, 29, 23),
+                       CUI_THEME_RGB(168, 212, 128),
+                       CUI_THEME_RGB(31, 29, 23),
+                       CUI_THEME_RGB(145, 205, 232),
+                       CUI_THEME_RGB(31, 29, 23),
+                       CUI_THEME_RGB(31, 29, 23)};
 }
 
 #undef CUI_THEME_RGB

@@ -73,3 +73,7 @@ Release candidate `d6aa5bd`: root59/59 native,57/57 ASAN/UBSAN,49/49 WASI and68-
 ### Isolated next integration: 75ef24f
 
 Chart source plot extents/dashed hover guides and marks, TextView atomic inline Markdown/HTML images and linked-image selection/copy, and Questionnaire semantic containers plus badge background corrections are combined on `integration/next-parity`. Native 77/77, ASan/UBSan 75/75, and quality gates pass. WASI 67/67 and the strict browser WASM build also pass; browser runtime and publication remain pending. This branch is not the published site and does not establish full feature parity. Main remains held for the separate physical-click helper release repair.
+
+### Validated integration bc295be
+
+The Chart/TextView/Questionnaire batch from portable source75ef24f is now integrated on main together with the browser physical-click repair. Native77, sanitizers75, WASI67, quality, strict web build and full Chromium78 pass. The merged portable source, adapters, examples, build scripts and browser files match the tested integration branch exactly. Publication is pending; public04e044e remains the last verified HTTPS78 release. All78 entries remain in scope and full feature parity is not claimed.

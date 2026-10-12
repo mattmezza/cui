@@ -1,37 +1,37 @@
 {
-  "source": "d85d2a5",
+  "source": "bc295be",
   "published_source": "04e044e3bef7084e1ea64b3f8a74061fdf3f950c",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Release candidated85d2a5 fixes browser modifier classification on Canvas and semantic inputs. Full integrated Chromium78 passes, including actual Textarea Undo/Redo and Questionnaire completion/reset shortcuts. Portable C is unchanged fromcf513f5, whose native77, ASan/UBSan75, WASI67 and quality gates pass. Published04e044e remains full HTTPS78 verified until this candidate deploys and HTTPS validation passes. Full feature parity remains unfinished. Hosted publication1edb47d subsequently failed the physical-click helper visibility check; shared helper repair is in progress and no newer release is claimed published.",
+  "summary": "Integrated Chart source extents/dashed hover guides and marks, TextView atomic inline Markdown/HTML image layout and linked-image copy, Questionnaire semantic containers and shortcut badge backgrounds, and stable physical browser click targeting. Native77, ASan/UBSan75, WASI67, quality and strict web build pass on portable source75ef24f; full Chromium78 passes on d60b8ef with identical final source/test trees. Publication pending; public04e044e remains HTTPS78 verified. Full feature parity remains incomplete.",
   "checks": [
     {
       "name": "native",
-      "source": "cf513f5",
+      "source": "75ef24f",
       "passed": 77,
       "total": 77,
-      "log": "native-cf513f5.txt"
+      "log": "native-75ef24f.txt"
     },
     {
       "name": "sanitizers",
-      "source": "cf513f5",
+      "source": "75ef24f",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-cf513f5.txt"
+      "log": "sanitizers-75ef24f.txt"
     },
     {
       "name": "WASI",
-      "source": "cf513f5",
+      "source": "75ef24f",
       "passed": 67,
       "total": 67,
-      "log": "wasi-cf513f5.txt"
+      "log": "wasi-75ef24f.txt"
     },
     {
       "name": "browser",
-      "source": "d85d2a5",
+      "source": "d60b8ef",
       "passed": 78,
       "total": 78,
-      "palettes": 38,
-      "log": "browser-d85d2a5.txt"
+      "log": "browser-d60b8ef.txt",
+      "palettes": 38
     }
   ],
   "previous_deployment": {

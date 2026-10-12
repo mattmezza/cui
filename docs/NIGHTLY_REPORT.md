@@ -284,3 +284,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 ## Publishing/CI checkpoint
 
 Safe branch pushes are performed with ordinary Git; no force push/history rewrite. This report records the evidence commit above. Integrator updates publishing/CI observations in swarm-status.md and PLATFORM_MATRIX.md after each push.
+
+### Validated integration bc295be
+
+The Chart/TextView/Questionnaire batch from portable source75ef24f is now integrated on main together with the browser physical-click repair. Native77, sanitizers75, WASI67, quality, strict web build and full Chromium78 pass. The merged portable source, adapters, examples, build scripts and browser files match the tested integration branch exactly. Publication is pending; public04e044e remains the last verified HTTPS78 release. All78 entries remain in scope and full feature parity is not claimed.

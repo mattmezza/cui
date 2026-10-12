@@ -19,8 +19,13 @@
     },
     "quality": "passed",
     "web_build": "passed",
-    "browser_runtime": "pending"
+    "browser_runtime": {
+      "passed": 78,
+      "total": 78,
+      "source": "d60b8ef"
+    }
   },
   "scope": "Chart through c084c82, TextView through ff76139, Questionnaire containers 74c9347 and shortcut badge backgrounds 761fff8. Full feature parity remains incomplete.",
-  "release_note": "Main held for separate physical-click helper repair; no new publication claimed."
+  "release_note": "Merged on main after all local gates passed; publication and HTTPS validation pending.",
+  "merged_source": "bc295be"
 }

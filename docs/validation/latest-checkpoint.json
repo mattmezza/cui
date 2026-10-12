@@ -1,36 +1,36 @@
 {
-  "source": "f01c6f9",
+  "source": "2a188c5",
   "published_source": "59a0988ecf432f371378e1398193587de6806fb3",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Source f01c6f9 passes native51/51, sanitizers49/49 and WASI42/42. Browser88511a4 passes62 stories with actual Image/Attachment rendering and lifecycle actions. Later ToggleGroup/core cursor changes await next browser release gate. Public59a0988 is confirmed60 stories with graphical controls and system theme. All78 entries retained;16 not started and62 partial; full parity unfinished.",
+  "summary": "62-story release candidate: native51/51, sanitizers49/49, WASI42/42 and Chromium62-story checks pass. Includes real Image/Attachment, richer graphical controls, source Dropdown defaults/loading fade, Menu metrics, fractional text, cursor and layout-order hit fixes. The final InputGroup sample width adjustment is covered by worker browser and next Pages gate. Public59a0988 remains60 stories pending deployment. All78 entries retained; full parity unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "f01c6f9",
+      "source": "d1cb42b",
       "passed": 51,
       "total": 51,
-      "log": "native-62.txt"
+      "log": "native-62-source.txt"
     },
     {
       "name": "sanitizers",
-      "source": "f01c6f9",
+      "source": "d1cb42b",
       "passed": 49,
       "total": 49,
-      "log": "asan-62.txt"
+      "log": "asan-62-source.txt"
     },
     {
       "name": "WASI",
-      "source": "f01c6f9",
+      "source": "d1cb42b",
       "passed": 42,
       "total": 42,
-      "log": "wasi-62.txt"
+      "log": "wasi-62-source.txt"
     },
     {
       "name": "browser",
-      "source": "88511a4",
+      "source": "d1cb42b",
       "stories": 62,
       "catalog_entries": 78,
-      "log": "browser-62.txt"
+      "log": "browser-62-source.txt"
     }
   ],
   "previous_deployment": {

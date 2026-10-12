@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `f01c6f90b88255ea7d244106c1bd269d002cfd4f`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `2a188c5a971b316cbcae25be6f116f44dc7c3f65`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -22,7 +22,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Recovery source 996e356 passes native51/51, sanitizers49/49, WASI42/42 and Chromium60 stories. Includes graphical Checkbox/Radio/Switch and Choice checks, automatic system theme, and deterministic Dropdown browser frame readiness. Public59a0988 verified: all six CI jobs and Pages passed, HTTPS Chromium verified system-theme changes and graphical controls. All78 entries retained; full parity unfinished.
+62-story release candidate: native51/51, sanitizers49/49, WASI42/42 and Chromium62-story checks pass. Includes real Image/Attachment, richer graphical controls, source Dropdown defaults/loading fade, Menu metrics, fractional text, cursor and layout-order hit fixes. The final InputGroup sample width adjustment is covered by worker browser and next Pages gate. Public59a0988 remains60 stories pending deployment. All78 entries retained; full parity unfinished.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
@@ -30,6 +30,8 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [asan-57.txt](validation/asan-57.txt)
 - [asan-58.txt](validation/asan-58.txt)
 - [asan-60.txt](validation/asan-60.txt)
+- [asan-62-source.txt](validation/asan-62-source.txt)
+- [asan-62.txt](validation/asan-62.txt)
 - [asan-controls-753be98.txt](validation/asan-controls-753be98.txt)
 - [asan-form.txt](validation/asan-form.txt)
 - [asan-measurement-input-group.txt](validation/asan-measurement-input-group.txt)
@@ -49,10 +51,13 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [browser-57-integrated.txt](validation/browser-57-integrated.txt)
 - [browser-58-integrated.txt](validation/browser-58-integrated.txt)
 - [browser-60.txt](validation/browser-60.txt)
+- [browser-62-source.txt](validation/browser-62-source.txt)
+- [browser-62.txt](validation/browser-62.txt)
 - [browser-pre-surfaces.txt](validation/browser-pre-surfaces.txt)
 - [browser-recovery.txt](validation/browser-recovery.txt)
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
 - [clang-zig-headless.txt](validation/clang-zig-headless.txt)
+- [cursor-x11.txt](validation/cursor-x11.txt)
 - [deployed-42.txt](validation/deployed-42.txt)
 - [gcc-56.txt](validation/gcc-56.txt)
 - [gcc-57.txt](validation/gcc-57.txt)
@@ -96,6 +101,8 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [gcc-tabs-scrollbar.txt](validation/gcc-tabs-scrollbar.txt)
 - [gcc-wheel.txt](validation/gcc-wheel.txt)
 - [gcc-xorg.txt](validation/gcc-xorg.txt)
+- [native-62-source.txt](validation/native-62-source.txt)
+- [native-62.txt](validation/native-62.txt)
 - [native-controls-753be98.txt](validation/native-controls-753be98.txt)
 - [native-recovery.txt](validation/native-recovery.txt)
 - [pages-157961a-failure.txt](validation/pages-157961a-failure.txt)
@@ -117,6 +124,8 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [wasi-57.txt](validation/wasi-57.txt)
 - [wasi-58.txt](validation/wasi-58.txt)
 - [wasi-60.txt](validation/wasi-60.txt)
+- [wasi-62-source.txt](validation/wasi-62-source.txt)
+- [wasi-62.txt](validation/wasi-62.txt)
 - [wasi-controls-753be98.txt](validation/wasi-controls-753be98.txt)
 - [wasi-form.txt](validation/wasi-form.txt)
 - [wasi-initial.txt](validation/wasi-initial.txt)

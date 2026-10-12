@@ -52,6 +52,7 @@ typedef struct {
     cui_theme_icon_loader_fn icon_loader;
     void *icon_loader_user;
     uint64_t icon_revision; /* Increment when the same loader supplies new artwork. */
+    cui_color caret;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

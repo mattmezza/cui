@@ -375,10 +375,25 @@ static void attachment_states(void) {
                 cui_draw_list list = cui_end_frame(ui);
                 assert(r.valid && cui_last_error(ui) == CUI_OK);
                 size_t images = 0;
+                size_t icons = 0;
                 bool percentage = false, scrim = false;
                 for (size_t i = 0; i < list.count; i++) {
                     cui_draw_command c = list.commands[i];
-                    images += c.type == CUI_DRAW_IMAGE;
+                    if (c.type == CUI_DRAW_IMAGE) {
+                        if (c.bitmap.bitmap.pixels == pixels)
+                            images++;
+                        else {
+                            icons++;
+                            unsigned coverage = 0;
+                            for (uint32_t y = 0; y < c.bitmap.bitmap.height; ++y)
+                                for (uint32_t x = 0; x < c.bitmap.bitmap.width; ++x)
+                                    coverage +=
+                                        c.bitmap.bitmap
+                                            .pixels[y * c.bitmap.bitmap.stride + x * 4 + 3] != 0;
+                            assert(coverage);
+                            assert(c.bounds.w == 10 || c.bounds.w == 12 || r.plan.rejection);
+                        }
+                    }
                     if (c.type == CUI_DRAW_TEXT && c.text.length == 6 &&
                         !memcmp(c.text.data, "· 62%", 6))
                         percentage = true;
@@ -388,6 +403,8 @@ static void attachment_states(void) {
                         scrim = true;
                 }
                 assert(images == 1);
+                assert(icons == (size_t)r.plan.remove_visible + (size_t)r.plan.retry_media +
+                                    (size_t)r.plan.rejection);
                 assert(percentage == (status == CUI_ATTACHMENT_UPLOADING));
                 assert(scrim ==
                        (status == CUI_ATTACHMENT_UPLOADING || status == CUI_ATTACHMENT_PROCESSING ||

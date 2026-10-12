@@ -53,6 +53,7 @@ typedef struct {
     cui_theme_icon_loader_fn icon_loader;
     void *icon_loader_user;
     uint64_t icon_revision; /* Increment when the same loader supplies new artwork. */
+    cui_color caret;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);
@@ -136,6 +137,7 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
                                 (uint8_t)((9u * t.background.g + t.primary.g) / 10u),
                                 (uint8_t)((9u * t.background.b + t.primary.b) / 10u), 51};
     t.selection = cui_theme_opacity(t.primary, .3f);
+    t.caret = t.text;
     t.list_active_highlight = true;
     t.description_list_label = (cui_color){(uint8_t)((4u * t.background.r + t.border.r) / 5u),
                                            (uint8_t)((4u * t.background.g + t.border.g) / 5u),

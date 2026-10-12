@@ -470,6 +470,7 @@ cui_attachment_group_options cui_attachment_group_options_default(void) {
 /* src/components/cui_media.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
 #include <stdio.h>
 static cui_id cui_media_id(cui_id parent, uint64_t child) {
@@ -556,9 +557,9 @@ cui_image_result cui_image(cui_context *ui, cui_id id, cui_image_state *state,
         cui_invalidate(ui);
     return result;
 }
-static bool cui_media_control(cui_context *ui, cui_id id, cui_str label, cui_str glyph,
-                              cui_color fg, cui_color bg, cui_color border, float size,
-                              float font) {
+static bool cui_media_control(cui_context *ui, const cui_theme *theme, cui_id id, cui_str label,
+                              cui_str glyph, cui_color fg, cui_color bg, cui_color border,
+                              float size, float font) {
     cui_interaction interaction = cui_interact(ui, id, CUI_ROLE_BUTTON, label, false, false, 0);
     cui_begin_box(ui, id,
                   (cui_box){.width = size,
@@ -569,7 +570,10 @@ static bool cui_media_control(cui_context *ui, cui_id id, cui_str label, cui_str
                             .border_width = border.a ? 1 : 0,
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER});
-    cui_text(ui, glyph, font, fg);
+    (void)cui_icon_named(
+        ui, cui_media_id(id, 89), theme, glyph,
+        (cui_icon_options){
+            .size = CUI_ICON_CUSTOM, .custom_size = font, .custom_color = true, .color = fg});
     cui_end_box(ui);
     return interaction.activated;
 }
@@ -837,11 +841,15 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                 cui_media_busy(ui, cui_media_id(media_id, 4), t, o, p,
                                o.model.size == CUI_MEDIA_XSMALL ? 14 : 20, color);
             else if (p.retry_media)
-                r.retried |= cui_media_control(ui, cui_attachment_retry_id(id), o.retry_label,
-                                               cui_string("↻"), t->danger, t->background,
+                r.retried |= cui_media_control(ui, t, cui_attachment_retry_id(id), o.retry_label,
+                                               cui_string("refresh-cw"), t->danger, t->background,
                                                (cui_color){0}, 24, 12);
             else if (p.rejection)
-                cui_text(ui, cui_string("⊘"), p.metrics.glyph, color);
+                (void)cui_icon_named(ui, cui_media_id(media_id, 88), t, cui_string("ban"),
+                                     (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                                        .custom_size = p.metrics.glyph,
+                                                        .custom_color = true,
+                                                        .color = color});
             cui_end_box(ui);
         }
         if (b.w > 0 && o.media_overlay) {
@@ -905,8 +913,9 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
         cui_rect b = state->card;
         cui_begin_portal(ui, cui_media_id(id, 8), (cui_box){0},
                          (cui_rect){b.x + b.w - 14, b.y - 6, 20, 20}, 4);
-        r.removed = cui_media_control(ui, cui_attachment_remove_id(id), o.remove_label,
-                                      cui_string("x"), t->text, t->background, t->border, 20, 10);
+        r.removed =
+            cui_media_control(ui, t, cui_attachment_remove_id(id), o.remove_label,
+                              cui_string("close"), t->text, t->background, t->border, 20, 10);
         cui_end_box(ui);
     }
     if (o.model.identified && o.tooltip.length) {

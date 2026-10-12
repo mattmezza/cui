@@ -14,6 +14,7 @@ static void test_theme_list_tokens(void) {
         assert(t.list_active.r == (9u * t.background.r + t.primary.r) / 10u);
         assert(t.list_active.a == 51);
         assert(t.selection.r == t.primary.r && t.selection.a == 76);
+        assert(memcmp(&t.caret, &t.text, sizeof(cui_color)) == 0);
     }
 }
 static bool checked;

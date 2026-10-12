@@ -22,6 +22,7 @@
 #include "cui/cui_scroll.h"
 #include "cui/cui_settings.h"
 #include "cui/cui_sidebar.h"
+#include "cui/cui_speech.h"
 #include "cui/cui_status.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
@@ -120,6 +121,84 @@ static cui_chart_state chart_state;
 static int chart_kind, chart_curve, chart_dots, chart_labels, chart_animate;
 static cui_plot_result chart_result;
 static unsigned chart_revision = 1;
+static cui_speech_state speech_state;
+static char speech_transcript[512];
+static cui_speech_message speech_messages[48];
+static unsigned char speech_queue[32768];
+static cui_speech_sink speech_sink;
+static unsigned speech_events[5], speech_recognizer_closed, speech_capture_closed;
+static unsigned speech_samples, speech_finishes;
+static cui_speech_error speech_last_error;
+static int speech_size, speech_unavailable;
+static bool gallery_speech_available(void *user) {
+    (void)user;
+    return !speech_unavailable;
+}
+static cui_speech_error gallery_speech_start_recognizer(void *user, cui_speech_sink sink,
+                                                        void **session) {
+    (void)user;
+    speech_sink = sink;
+    *session = &speech_state;
+    (void)cui_speech_report_ready(sink);
+    return CUI_SPEECH_OK;
+}
+static cui_speech_error gallery_speech_start_input(void *user, cui_speech_format format,
+                                                   cui_speech_sink sink, void **session) {
+    (void)user;
+    (void)format;
+    (void)sink;
+    *session = &speech_state;
+    return CUI_SPEECH_OK;
+}
+static void gallery_speech_push_audio(void *user, void *session, const int16_t *pcm, size_t count) {
+    (void)user;
+    (void)session;
+    (void)pcm;
+    speech_samples += (unsigned)count;
+}
+static void gallery_speech_finish_recognizer(void *user, void *session) {
+    (void)user;
+    (void)session;
+    speech_finishes++;
+}
+static void gallery_speech_close_recognizer(void *user, void *session) {
+    (void)user;
+    (void)session;
+    speech_recognizer_closed++;
+}
+static void gallery_speech_close_input(void *user, void *session) {
+    (void)user;
+    (void)session;
+    speech_capture_closed++;
+}
+static void gallery_speech_event(void *user, cui_speech_event event) {
+    (void)user;
+    speech_events[event.type]++;
+    if (event.type == CUI_SPEECH_ERROR)
+        speech_last_error = event.error;
+}
+void gallery_speech_options(int size, int unavailable) {
+    speech_size = size >= CUI_SPEECH_MEDIUM && size <= CUI_SPEECH_XSMALL ? size : 0;
+    speech_unavailable = unavailable != 0;
+}
+float gallery_speech_stats(int field) {
+    return field == 0    ? (float)speech_state.status
+           : field == 1  ? (float)cui_speech_transcript(&speech_state).length
+           : field == 2  ? (float)speech_state.meter.length
+           : field == 3  ? (float)speech_events[CUI_SPEECH_STARTED]
+           : field == 4  ? (float)speech_events[CUI_SPEECH_PARTIAL]
+           : field == 5  ? (float)speech_events[CUI_SPEECH_FINAL]
+           : field == 6  ? (float)speech_events[CUI_SPEECH_CANCELLED]
+           : field == 7  ? (float)speech_events[CUI_SPEECH_ERROR]
+           : field == 8  ? (float)speech_samples
+           : field == 9  ? (float)speech_capture_closed
+           : field == 10 ? (float)speech_recognizer_closed
+           : field == 11 ? (float)speech_finishes
+                         : (float)speech_last_error;
+}
+const char *gallery_speech_text(void) {
+    return cui_speech_transcript(&speech_state).data;
+}
 void gallery_chart_options(int kind, int curve, int dots, int labels, int animate) {
     if (kind < CUI_CHART_LINE || kind > CUI_CHART_SANKEY)
         kind = CUI_CHART_LINE;
@@ -1082,6 +1161,20 @@ static bool gallery_text_view_load(void) {
 int gallery_init(void) {
     if (ui)
         return 1;
+    if (!cui_speech_init(
+            &speech_state,
+            (cui_speech_workspace){speech_transcript, sizeof(speech_transcript), speech_messages,
+                                   sizeof(speech_messages) / sizeof(speech_messages[0]),
+                                   speech_queue, sizeof(speech_queue)},
+            (cui_speech_recognizer){.available = gallery_speech_available,
+                                    .start = gallery_speech_start_recognizer,
+                                    .push_audio = gallery_speech_push_audio,
+                                    .finish = gallery_speech_finish_recognizer,
+                                    .close = gallery_speech_close_recognizer},
+            (cui_speech_input){.start = gallery_speech_start_input,
+                               .close = gallery_speech_close_input},
+            gallery_speech_event, NULL))
+        return 0;
     chart_state.pixels = chart_pixels;
     chart_state.byte_capacity = sizeof(chart_pixels);
     chart_state.hovered = SIZE_MAX;
@@ -1292,6 +1385,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         t.gap *= .75f;
     }
     if (previous_story != story) {
+        if (previous_story == 78)
+            (void)cui_speech_cancel(&speech_state);
         if (story == 59)
             shimmer_started = host_seconds;
         cui_overlay_close(ui, &select_popup.overlay);
@@ -1751,6 +1846,66 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         if (chart_result == CUI_PLOT_OK)
             (void)cui_chart(ui, cui_id_from(ui, "chart-preview"), &chart_state, &options,
                             cui_string("Project activity chart"));
+        break;
+    }
+    case 78: {
+        (void)cui_speech_pump(&speech_state, host_seconds);
+        cui_label(ui, &t, cui_string("Scripted provider demo — no microphone access"));
+        (void)cui_speech_button(ui, cui_id_from(ui, "speech-toggle"), &t, &speech_state,
+                                (cui_speech_button_options){.size = (cui_speech_size)speech_size,
+                                                            .disabled = disabled != 0,
+                                                            .show_when_unsupported = true},
+                                host_seconds);
+        (void)cui_speech_waveform(
+            ui, cui_id_from(ui, "speech-waveform"), &t, &speech_state,
+            (cui_speech_waveform_options){.size = (cui_speech_size)speech_size,
+                                          .width = 260,
+                                          .reduced_motion = reduced_motion},
+            host_seconds);
+        cui_begin_box(ui, cui_id_from(ui, "speech-actions-a"), (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "speech-interim"), &t, cui_string("Emit interim"),
+                       disabled || speech_state.status != CUI_SPEECH_RECORDING)) {
+            (void)cui_speech_report_hypothesis(speech_sink, cui_string("draft notes"));
+            (void)cui_speech_pump(&speech_state, host_seconds);
+            redraw = true;
+        }
+        if (cui_button(ui, cui_id_from(ui, "speech-phrase"), &t, cui_string("Emit phrase"),
+                       disabled || speech_state.status != CUI_SPEECH_RECORDING)) {
+            (void)cui_speech_report_phrase(speech_sink, cui_string("Meeting notes "));
+            (void)cui_speech_pump(&speech_state, host_seconds);
+            redraw = true;
+        }
+        if (cui_button(ui, cui_id_from(ui, "speech-audio"), &t, cui_string("Emit PCM"),
+                       disabled || speech_state.status != CUI_SPEECH_RECORDING)) {
+            int16_t pcm[1280];
+            for (size_t i = 0; i < 1280; ++i)
+                pcm[i] = (i / 160) % 2 ? 12000 : 6000;
+            (void)cui_speech_report_audio(speech_sink, pcm, 1280, host_seconds);
+            (void)cui_speech_pump(&speech_state, host_seconds);
+            redraw = true;
+        }
+        cui_end_box(ui);
+        cui_begin_box(ui, cui_id_from(ui, "speech-actions-b"), (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "speech-final"), &t, cui_string("Deliver final"),
+                       disabled || speech_state.status != CUI_SPEECH_STOPPING)) {
+            (void)cui_speech_report_finish(speech_sink);
+            (void)cui_speech_pump(&speech_state, host_seconds);
+            redraw = true;
+        }
+        if (cui_button(ui, cui_id_from(ui, "speech-cancel"), &t, cui_string("Cancel session"),
+                       disabled || speech_state.status == CUI_SPEECH_IDLE)) {
+            (void)cui_speech_cancel(&speech_state);
+            redraw = true;
+        }
+        if (cui_button(ui, cui_id_from(ui, "speech-error"), &t, cui_string("Report error"),
+                       disabled || speech_state.status == CUI_SPEECH_IDLE)) {
+            (void)cui_speech_report_error(speech_sink, CUI_SPEECH_INPUT_ERROR);
+            (void)cui_speech_pump(&speech_state, host_seconds);
+            redraw = true;
+        }
+        cui_end_box(ui);
+        cui_str spoken = cui_speech_transcript(&speech_state);
+        cui_label(ui, &t, spoken.length ? spoken : cui_string("Transcript is empty"));
         break;
     }
     case 0: {

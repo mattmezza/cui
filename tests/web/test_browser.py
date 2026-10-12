@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 76
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 77
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -264,6 +264,8 @@ def main():
                 assert 'draw commands' in page.locator('#preview-note').inner_text(), (name, page.locator('#preview-note').inner_text(), errors)
             def semantic_index(name, role=None):
                 return page.evaluate('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', {'name':name,'role':role})
+            def wait_semantic(name, role):
+                page.wait_for_function('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', arg={'name':name,'role':role})
             def click_semantic(name, role=None):
                 index = semantic_index(name, role)
                 assert index is not None, name
@@ -449,6 +451,59 @@ def main():
             control_change('chart-curve', '2')
             control_change('chart-dots', True)
             assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
+            page.evaluate('location.hash="Speech"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Speech"')
+            assert semantic_index('Start dictation', 1) is not None
+            assert semantic_index('Emit interim', 1) is not None
+            click_semantic('Start dictation', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===2&&cuiGallery.exports.gallery_speech_stats(3)===1')
+            click_semantic('Emit interim', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(4)===1&&cuiGallery.exports.gallery_speech_stats(1)===11')
+            speech_commands_before_audio = page.evaluate('cuiGallery.exports.gallery_count()')
+            click_semantic('Emit PCM', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(2)===1&&cuiGallery.exports.gallery_speech_stats(8)===1280')
+            for _ in range(7):
+                click_semantic('Emit PCM', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(2)===8&&cuiGallery.exports.gallery_speech_stats(8)===10240')
+            assert page.evaluate('cuiGallery.exports.gallery_count()') > speech_commands_before_audio
+            page.screenshot(path='/tmp/cui-web-speech-recording.png')
+            speech_frame = page.evaluate('cuiGallery.frame')
+            page.emulate_media(reduced_motion='reduce')
+            page.wait_for_function('(before)=>cuiGallery.frame>before', arg=speech_frame)
+            waveform_bounds = page.evaluate('()=>Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===0).map(i=>Array.from({length:4},(_,field)=>cuiGallery.exports.gallery_command(i,field+1)))')
+            speech_frame = page.evaluate('cuiGallery.frame')
+            speech_canvas = canvas.bounding_box()
+            page.mouse.move(speech_canvas['x']+5, speech_canvas['y']+350)
+            page.wait_for_function('(before)=>cuiGallery.frame>before', arg=speech_frame)
+            assert page.evaluate('()=>Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===0).map(i=>Array.from({length:4},(_,field)=>cuiGallery.exports.gallery_command(i,field+1)))') == waveform_bounds
+            page.emulate_media(reduced_motion='no-preference')
+            click_semantic('Emit phrase', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(1)===14')
+            assert page.evaluate('new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_speech_text(),14))') == 'Meeting notes '
+            click_semantic('Stop dictation', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===3&&cuiGallery.exports.gallery_speech_stats(9)===1&&cuiGallery.exports.gallery_speech_stats(11)===1')
+            click_semantic('Deliver final', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===0&&cuiGallery.exports.gallery_speech_stats(5)===1&&cuiGallery.exports.gallery_speech_stats(10)===1')
+            assert page.evaluate('cuiGallery.exports.gallery_speech_stats(1)') == 14
+            wait_semantic('Start dictation', 1)
+            click_semantic('Start dictation', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===2')
+            click_semantic('Cancel session', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===0&&cuiGallery.exports.gallery_speech_stats(6)===1&&cuiGallery.exports.gallery_speech_stats(1)===0')
+            wait_semantic('Start dictation', 1)
+            click_semantic('Start dictation', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===2')
+            click_semantic('Report error', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===0&&cuiGallery.exports.gallery_speech_stats(7)===1&&cuiGallery.exports.gallery_speech_stats(12)===4')
+            speech_heights = []
+            for size in range(4):
+                control_change('speech-size', str(size))
+                speech_heights.append(page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,4)', semantic_index('Start dictation', 1)))
+            assert speech_heights[0] == speech_heights[2] and speech_heights[1] < speech_heights[0] and speech_heights[3] < speech_heights[1], speech_heights
+            control_change('speech-unavailable', True)
+            assert semantic_index('Speech unavailable', 1) is not None
+            assert page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,5)', semantic_index('Speech unavailable', 1)) == 1
+            control_change('speech-unavailable', False)
             page.evaluate('location.hash="Sidebar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
             assert semantic_index('Workspace sidebar', 9) is not None
@@ -2011,8 +2066,8 @@ def main():
             page.wait_for_function('document.querySelector("#accessible [role=textbox]")?.getAttribute("aria-invalid")==="true"')
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-required') == 'true'
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-readonly') == 'false'
-            page.evaluate('location.hash="Speech"')
-            page.wait_for_function('document.querySelector("#name").textContent==="Speech" && cuiGallery.renderedComponent==="Speech"')
+            page.evaluate('location.hash="Questionnaire"')
+            page.wait_for_function('document.querySelector("#name").textContent==="Questionnaire" && cuiGallery.renderedComponent==="Questionnaire"')
             assert page.locator('#pending').is_visible()
             assert not page.locator('#preview-card').is_visible()
             page.locator('#search').fill('button')
@@ -2070,7 +2125,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 76 real WASM stories, Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 77 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

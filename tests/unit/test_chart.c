@@ -1056,6 +1056,29 @@ int main(void) {
     options.y_tick_format = format_wide_tick;
     float wide_gutter = cui_chart_measure_value_axis_gutter(ui, &options);
     assert(short_gutter >= 32 && wide_gutter > short_gutter);
+    cui_chart_options no_candle_axis = options;
+    no_candle_axis.kind = CUI_CHART_CANDLESTICK;
+    assert(cui_chart_measure_value_axis_gutter(ui, &no_candle_axis) == 0);
+    cui_chart_options styled_axis_auto = options, styled_axis_manual = options;
+    styled_axis_auto.value_axis_gutter = 0;
+    styled_axis_manual.value_axis_gutter = wide_gutter;
+    unsigned char axis_auto_pixels[sizeof pixels], axis_manual_pixels[sizeof pixels];
+    cui_chart_state axis_auto_chart = {
+        .pixels = axis_auto_pixels, .byte_capacity = sizeof axis_auto_pixels, .hovered = SIZE_MAX};
+    cui_chart_state axis_manual_chart = {.pixels = axis_manual_pixels,
+                                         .byte_capacity = sizeof axis_manual_pixels,
+                                         .hovered = SIZE_MAX};
+    assert(cui_chart_render(&axis_manual_chart, &styled_axis_manual) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 902, &axis_auto_chart, &styled_axis_auto, (cui_str){"Measured axis", 13}));
+    (void)cui_end_frame(ui);
+    assert(axis_auto_chart.revision == 1 &&
+           memcmp(axis_auto_pixels, axis_manual_pixels, sizeof pixels) == 0);
+    styled_axis_auto.disable_appear = true;
+    cui_chart_state axis_animated_chart = {
+        .pixels = axis_auto_pixels, .byte_capacity = sizeof axis_auto_pixels, .hovered = SIZE_MAX};
+    assert(cui_chart_render_animated(ui, &axis_animated_chart, &styled_axis_auto) == CUI_PLOT_OK);
+    assert(memcmp(axis_auto_pixels, axis_manual_pixels, sizeof pixels) == 0);
     options.value_axis_gutter = wide_gutter;
     options.kind = CUI_CHART_BAR;
     cui_plot_rect shifted_bar;

@@ -65,3 +65,9 @@ Focus requests from the subtree are ignored; hidden modal scopes do not trap
 outside focus. Clipping commands remain balanced even when all enclosed paint is
 suppressed. This is useful for measuring a disclosure before animating its outer
 viewport. The application retains measured bounds through `cui_track_bounds`.
+
+`cui_box.inert` preserves layout and painting while suppressing semantics, hover,
+routed events, focus requests and modal scope effects throughout the subtree,
+including portals. It supports visible exit animations without leaving closing
+controls interactive. `layout_only` implies inert behavior and also suppresses
+painting. A hidden/inert subtree cannot dismiss an enclosing active focus scope.

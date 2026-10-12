@@ -164,6 +164,8 @@ typedef struct {
     /* Measure/layout descendants, including portals, without paint, input or
      * semantics. Application callbacks still run and must avoid side effects. */
     bool layout_only;
+    /* Preserve painting/layout but suppress descendant semantics and input. */
+    bool inert;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,
@@ -5350,7 +5352,7 @@ freely, subject to the following restrictions:
 typedef struct {
     uint32_t clay_id;
     size_t parent;
-    bool clip, layout_only;
+    bool clip, layout_only, inert;
     int16_t layer;
 } cui_core_box_node;
 typedef struct {
@@ -5402,6 +5404,10 @@ struct cui_context {
 static bool cui_core_layout_only(const cui_context *ui) {
     return ui && ui->in_frame && ui->depth && !ui->overflow_depth && ui->opened[ui->depth - 1] &&
            ui->nodes[ui->node_stack[ui->depth - 1]].layout_only;
+}
+static bool cui_core_inert(const cui_context *ui) {
+    return ui && ui->in_frame && ui->depth && !ui->overflow_depth && ui->opened[ui->depth - 1] &&
+           ui->nodes[ui->node_stack[ui->depth - 1]].inert;
 }
 static void cui_core_fail(cui_context *ui, cui_error e) {
     if (ui && ui->error == CUI_OK)
@@ -5843,12 +5849,13 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     uint32_t internal_id = cui_core_folded(id ? id : (cui_id)(ui->element_count + 0x80000000u));
     size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
     bool layout_only = b.layout_only || (parent != SIZE_MAX && ui->nodes[parent].layout_only);
+    bool inert = layout_only || b.inert || (parent != SIZE_MAX && ui->nodes[parent].inert);
     if (portal)
         parent = SIZE_MAX;
     else if (parent != SIZE_MAX)
         layer = ui->nodes[parent].layer;
     ui->nodes[ui->node_count] =
-        (cui_core_box_node){internal_id, parent, b.clip, layout_only, layer};
+        (cui_core_box_node){internal_id, parent, b.clip, layout_only, inert, layer};
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
@@ -6020,7 +6027,7 @@ bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value) {
     cui_interaction out = {0};
-    if (!cui_core_active(ui) || !id || cui_core_layout_only(ui))
+    if (!cui_core_active(ui) || !id || cui_core_inert(ui))
         return out;
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
         return out;
@@ -6230,10 +6237,10 @@ const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
     return ui ? ui->semantics : NULL;
 }
 cui_id cui_focused(cui_context *ui) {
-    return ui && !cui_core_layout_only(ui) ? ui->focus : 0;
+    return ui && !cui_core_inert(ui) ? ui->focus : 0;
 }
 void cui_focus(cui_context *ui, cui_id id) {
-    if (ui && !cui_core_layout_only(ui)) {
+    if (ui && !cui_core_inert(ui)) {
         ui->focus = id;
         ui->focus_visible = true;
         ui->dirty = true;
@@ -6270,17 +6277,15 @@ void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value) 
         }
 }
 cui_id cui_event_target(cui_context *ui, size_t index) {
-    return ui && !cui_core_layout_only(ui) && index < ui->event_count ? ui->event_targets[index]
-                                                                      : 0;
+    return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_targets[index] : 0;
 }
 
 cui_id cui_event_activation(cui_context *ui, size_t index) {
-    return ui && !cui_core_layout_only(ui) && index < ui->event_count ? ui->event_activations[index]
-                                                                      : 0;
+    return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_activations[index] : 0;
 }
 
 bool cui_pointer_scope_allowed(cui_context *ui, cui_id owned_scope) {
-    if (!ui || !ui->in_frame || cui_core_layout_only(ui))
+    if (!ui || !ui->in_frame || cui_core_inert(ui))
         return false;
     size_t current = ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX;
     if (ui->top_modal != SIZE_MAX && ui->focus_scopes[ui->top_modal].active &&
@@ -6315,7 +6320,7 @@ bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {
             cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
             return false;
         }
-    bool active = !cui_core_layout_only(ui);
+    bool active = !cui_core_inert(ui);
     size_t n = ui->focus_scope_count++;
     ui->focus_scopes[n] = (cui_core_focus_scope){
         id, ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX, modal, active};
@@ -6367,7 +6372,7 @@ void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
 }
 
 bool cui_hovered(cui_context *ui, cui_id id) {
-    if (!ui || !id)
+    if (!ui || !id || cui_core_inert(ui))
         return false;
     for (size_t i = 0; i < ui->previous_count; i++)
         if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i) &&
@@ -6383,7 +6388,7 @@ bool cui_hovered(cui_context *ui, cui_id id) {
 }
 
 bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
-    if (!cui_core_active(ui))
+    if (!cui_core_active(ui) || cui_core_inert(ui))
         return false;
     size_t dismissed = SIZE_MAX;
     for (size_t i = 0; i < ui->focus_scope_count; i++)

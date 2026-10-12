@@ -163,6 +163,8 @@ typedef struct {
     /* Measure/layout descendants, including portals, without paint, input or
      * semantics. Application callbacks still run and must avoid side effects. */
     bool layout_only;
+    /* Preserve painting/layout but suppress descendant semantics and input. */
+    bool inert;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,

@@ -953,8 +953,39 @@ static void test_layout_only_and_zero_size(void) {
     cui_destroy(ui);
 }
 
+static void test_inert_painted_subtree(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 1);
+    queue(ui, CUI_EVENT_POINTER_MOVE, 10, 10, CUI_KEY_NONE, 0);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    assert(cui_begin_focus_scope(ui, 100, true));
+    cui_begin_box(ui, 20, (cui_box){.inert = true, .width = 100});
+    assert(!cui_hovered(ui, 1) && !cui_focused(ui) && !cui_event_target(ui, 1));
+    assert(!cui_dismiss_focus_scope(ui, 100, 1));
+    assert(!control(ui, 1, false).activated);
+    cui_begin_portal(ui, 30, (cui_box){0}, (cui_rect){120, 0, 100, 30}, 10);
+    assert(!control(ui, 2, false).activated);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    control(ui, 3, false);
+    cui_end_focus_scope(ui);
+    cui_draw_list dl = cui_end_frame(ui);
+    size_t count, paints = 0;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 1 && sem[0].id == 3 && cui_focused(ui) == 3);
+    for (size_t i = 0; i < dl.count; i++)
+        paints += dl.commands[i].type == CUI_DRAW_RECT;
+    assert(paints == 3 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_layout_only_and_zero_size();
+    test_inert_painted_subtree();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

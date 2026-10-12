@@ -904,11 +904,6 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 if (row_label[row_count].length && !row_label[row_count].data)
                     row_label[row_count] = (cui_str){0};
                 row_color[row_count] = o->foreground;
-                if (o->kind == CUI_CHART_CANDLESTICK) {
-                    cui_color direction = datum->close > datum->open ? o->bullish : o->bearish;
-                    if (direction.a)
-                        row_color[row_count] = direction;
-                }
                 if (o->tooltip_value_color)
                     row_color[row_count] = o->tooltip_value_color(datum, tooltip_index, series,
                                                                   number, o->tooltip_user);

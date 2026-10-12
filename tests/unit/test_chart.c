@@ -1053,6 +1053,8 @@ int main(void) {
     assert(zero_category);
     points[0].value = 20;
     options.kind = CUI_CHART_CANDLESTICK;
+    options.foreground = (cui_color){20, 30, 40, 255};
+    options.bullish = (cui_color){7, 180, 8, 255};
     options.tooltip_format = NULL;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
@@ -1060,6 +1062,7 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
     draw = cui_end_frame(ui);
     bool ohlc[4] = {0};
+    bool candle_swatch = false, neutral_value = false;
     static const char *ohlc_labels[] = {"Open", "High", "Low", "Close"};
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT) {
@@ -1068,8 +1071,15 @@ int main(void) {
                 if (draw.commands[i].text.length == strlen(ohlc_labels[row]) &&
                     memcmp(label, ohlc_labels[row], draw.commands[i].text.length) == 0)
                     ohlc[row] = true;
+            if (draw.commands[i].text.length > 0 && label[0] >= '0' && label[0] <= '9' &&
+                draw.commands[i].color.r == options.foreground.r)
+                neutral_value = true;
+        } else if (draw.commands[i].type == CUI_DRAW_RECT &&
+                   fabsf(draw.commands[i].bounds.w - 8) < .01f &&
+                   draw.commands[i].color.g == options.bullish.g) {
+            candle_swatch = true;
         }
-    assert(ohlc[0] && ohlc[1] && ohlc[2] && ohlc[3]);
+    assert(ohlc[0] && ohlc[1] && ohlc[2] && ohlc[3] && candle_swatch && neutral_value);
     size_t tooltip_calls = 0;
     options.tooltip_content = custom_tooltip;
     options.tooltip_user = &tooltip_calls;

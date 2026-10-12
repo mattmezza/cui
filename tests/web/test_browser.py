@@ -201,6 +201,7 @@ def main():
             page.mouse.click(rectangle['x']+rectangle['width']-4, rectangle['y']+rectangle['height']-4)
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===0')
             click_semantic('Open account card')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===1')
             page.keyboard.press('Escape')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===0')
             page.evaluate('location.hash="DropdownButton"')
@@ -281,9 +282,20 @@ def main():
             page.keyboard.press('ArrowDown')
             page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 0002"')
             page.keyboard.press('End')
-            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 1000"')
+            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.getAttribute("aria-colindex")==="3"')
+            assert page.locator('#accessible [role=gridcell][aria-selected=true]').get_attribute('aria-rowindex') == '2'
             page.keyboard.press('Home')
-            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 0001"')
+            page.wait_for_function('document.querySelector("#accessible [role=gridcell][aria-selected=true]")?.textContent==="File 0002"')
+            page.locator('#table-selection').select_option('0')
+            canvas.focus()
+            page.keyboard.press('End')
+            page.wait_for_function('document.querySelector("#accessible [role=row][aria-selected=true]")?.getAttribute("aria-rowindex")==="1000"')
+            assert page.locator('#accessible [role=gridcell]').filter(has_text='File 1000').count() == 1
+            page.keyboard.press('Home')
+            page.wait_for_function('document.querySelector("#accessible [role=row][aria-selected=true]")?.getAttribute("aria-rowindex")==="1"')
+            page.keyboard.press('Escape')
+            page.wait_for_function('!document.querySelector("#accessible [aria-selected=true]")')
+            page.locator('#table-selection').select_option('2')
             click_semantic('Name')
             page.wait_for_function('document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")==="ascending"')
             page.keyboard.press('ArrowRight')
@@ -319,6 +331,32 @@ def main():
             page.mouse.move(rectangle['x']+100,rectangle['y']+140)
             page.mouse.wheel(0,160)
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,17)&&cuiGallery.exports.gallery_semantic(i,19)>0)')
+            page.locator('#table-mode').select_option('1')
+            page.wait_for_function('document.querySelectorAll("#accessible [role=rowheader]").length>0')
+            assert page.locator('#accessible [role=rowgroup]').count() > 0
+            assert page.locator('#accessible [role=scrollbar]').count() > 0
+            table_texts = 'Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{const e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)));})'
+            page.wait_for_function(table_texts + '.some(s=>s==="File details")')
+            page.wait_for_function(table_texts + '.some(s=>s==="Storage")')
+            hooks = next(text for text in page.evaluate(table_texts) if text.startswith('Visible row hooks:'))
+            assert 0 < int(hooks.split(':')[1].split('/')[0]) < 20, hooks
+            click_semantic('Inspect')
+            page.wait_for_function(table_texts + '.some(s=>s.includes("inspections: 1"))')
+            click_semantic('File 0001')
+            page.wait_for_function('document.querySelector("#table-selection").value==="0"')
+            page.wait_for_function('document.querySelector("#accessible [role=rowheader][aria-selected=true]")?.getAttribute("aria-rowindex")==="1"')
+            page.locator('#table-mode').select_option('2')
+            page.wait_for_function(table_texts + '.some(s=>s.includes("Loading file metadata"))')
+            assert page.locator('#accessible [role=gridcell]').count() == 0
+            page.locator('#table-mode').select_option('3')
+            page.wait_for_function('document.querySelector("#accessible [role=grid]")?.getAttribute("aria-rowcount")==="0"')
+            page.wait_for_function(table_texts + '.some(s=>s==="No files in this table.")')
+            assert page.locator('#accessible [role=gridcell]').count() == 0
+            page.evaluate('location.hash="Table"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Table"')
+            assert page.locator('#accessible [role=rowgroup]').count() == 2
+            assert page.locator('#accessible [role=columnheader]').count() == 3
+            assert page.locator('#accessible [role=cell]').count() == 9
             page.evaluate('location.hash="Tree"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tree"')
             assert page.locator('#accessible [role=treeitem]').count() == 5

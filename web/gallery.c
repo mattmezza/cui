@@ -84,6 +84,8 @@ static cui_table_model *table;
 static cui_table_state table_state;
 static cui_table_selection table_selection[64];
 static bool table_pinned;
+static int table_mode, table_row_hooks, table_inspections;
+static cui_table_selection_mode table_selection_mode = CUI_TABLE_SELECT_CELL;
 static cui_table_row table_rows[1000];
 static cui_table_column table_columns[3];
 static char table_names[1000][24], table_sizes[1000][24];
@@ -106,6 +108,31 @@ static cui_str table_label(void *user, size_t row, cui_id column) {
     return cui_string(column == 101   ? table_names[row]
                       : column == 102 ? "Ready"
                                       : table_sizes[row]);
+}
+static void table_row_hook(cui_context *context, const cui_theme *theme, void *user, size_t row) {
+    (void)context;
+    (void)theme;
+    (void)user;
+    (void)row;
+    table_row_hooks++;
+}
+static void table_trailing(cui_context *context, const cui_theme *theme, void *user, bool header,
+                           size_t row) {
+    (void)user;
+    if (header)
+        cui_label(context, theme, cui_string("Action"));
+    else if (cui_button_ex(
+                 context, cui_id_from(context, "inspect-row") + row, theme, cui_string("Inspect"),
+                 (cui_button_options){.size = CUI_CONTROL_SMALL, .variant = CUI_BUTTON_GHOST}))
+        table_inspections++;
+}
+static void table_empty(cui_context *context, const cui_theme *theme, void *user) {
+    (void)user;
+    cui_label(context, theme, cui_string("No files in this table."));
+}
+static void table_loading(cui_context *context, const cui_theme *theme, void *user) {
+    (void)user;
+    cui_label(context, theme, cui_string("Loading file metadata…"));
 }
 static cui_tree_model *tree;
 static cui_tree_state tree_state;
@@ -537,21 +564,45 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 45: {
-        cui_table_result result =
-            cui_data_table(ui, cui_id_from(ui, "data-table"), &t, table, &table_state,
-                           (cui_table_options){.width = width - 48,
-                                               .height = 224,
-                                               .row_height = 32,
-                                               .header_height = 32,
-                                               .disabled = disabled,
-                                               .striped = true,
-                                               .bordered = true,
-                                               .multiple_selection = multiple_mode,
-                                               .selection_mode = CUI_TABLE_SELECT_CELL},
-                           table_label, NULL, NULL);
+        const cui_table_column_group groups[] = {{cui_string("File details"), 2},
+                                                 {cui_string("Storage"), 1}};
+        const cui_table_group_row group_row = {groups, 2};
+        table_row_hooks = 0;
+        cui_table_result result = cui_data_table(
+            ui, cui_id_from(ui, "data-table"), &t, table, &table_state,
+            (cui_table_options){.width = width - 48,
+                                .height = 224,
+                                .row_height = 32,
+                                .header_height = 32,
+                                .disabled = disabled,
+                                .striped = true,
+                                .bordered = true,
+                                .multiple_selection = multiple_mode,
+                                .selection_mode = table_selection_mode,
+                                .row_header = table_mode == 1,
+                                .row_header_width = 52,
+                                .scrollbars = table_mode == 1,
+                                .group_headers = &group_row,
+                                .group_header_count = table_mode == 1 ? 1 : 0,
+                                .render_row = table_mode == 1 ? table_row_hook : NULL,
+                                .render_trailing = table_mode == 1 ? table_trailing : NULL,
+                                .trailing_width = 80,
+                                .loading = table_mode == 2,
+                                .render_loading = table_loading,
+                                .render_empty = table_empty},
+            table_label, NULL, NULL);
+        if (result.selection_mode_requested) {
+            table_selection_mode = result.requested_selection_mode;
+            redraw = true;
+        }
         char text[72];
-        snprintf(text, sizeof(text), "1,000 rows / visible %zu-%zu / sort %d",
-                 result.rows.begin + 1, result.rows.end, (int)table_state.sort);
+        snprintf(text, sizeof(text), "%zu rows / visible %zu-%zu / sort %d", cui_table_rows(table),
+                 result.rows.end > result.rows.begin ? result.rows.begin + 1 : 0, result.rows.end,
+                 (int)table_state.sort);
+        if (table_mode == 1) {
+            snprintf(text, sizeof(text), "Visible row hooks: %d / inspections: %d", table_row_hooks,
+                     table_inspections);
+        }
         cui_label(ui, &t, cui_string(text));
         break;
     }
@@ -559,25 +610,41 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         float cell_width = (width - 48) / 3;
         cui_id table_id = cui_id_from(ui, "composition-table");
         cui_table_begin(ui, table_id, &t, width - 48);
+        cui_id section_id = table_id + 50;
+        cui_table_begin_section(ui, section_id, &t, CUI_TABLE_SECTION_HEADER);
+        cui_set_semantic_details(ui, section_id, (cui_semantic_details){.parent = table_id});
         for (size_t r = 0; r < 4; r++) {
+            if (r == 1) {
+                cui_table_end(ui);
+                section_id++;
+                cui_table_begin_section(ui, section_id, &t, CUI_TABLE_SECTION_BODY);
+                cui_set_semantic_details(ui, section_id,
+                                         (cui_semantic_details){.parent = table_id});
+            }
             cui_id row_id = table_id + r + 1;
             cui_table_begin_row(ui, row_id, &t, 40, r == 0);
-            cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = table_id});
+            cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = section_id});
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;
-                cui_table_begin_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT);
                 const char *headers[] = {"Name", "Status", "Size"};
                 cui_str label = r == 0 ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
+                if (r == 0)
+                    cui_table_begin_head_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT,
+                                              label);
+                else
+                    cui_table_begin_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT);
                 cui_set_semantic_details(ui, cell_id,
                                          (cui_semantic_details){.parent = row_id,
                                                                 .row_index = (unsigned)r,
                                                                 .column_index = (unsigned)c + 1,
+                                                                .readonly = r == 0,
                                                                 .description = label});
                 cui_label(ui, &t, label);
                 cui_table_end(ui);
             }
             cui_table_end(ui);
         }
+        cui_table_end(ui);
         cui_table_end(ui);
         break;
     }
@@ -1117,8 +1184,21 @@ void gallery_table_pin(int pinned) {
         cui_table_move_column(table, 101, 0);
     for (size_t c = 0; c < 3; c++)
         table_columns[c].fixed_left = pinned && table_columns[c].key == 101;
-    if (cui_table_bind(table, table_rows, 1000, table_columns, 3) == CUI_TABLE_OK)
+    if (cui_table_bind(table, table_rows, table_mode == 3 ? 0 : 1000, table_columns, 3) ==
+        CUI_TABLE_OK)
         table_pinned = pinned != 0;
+}
+void gallery_table_mode(int mode) {
+    if (!table || mode == table_mode || mode < 0 || mode > 3)
+        return;
+    table_mode = mode;
+    cui_table_bind(table, table_rows, mode == 3 ? 0 : 1000, table_columns, 3);
+    table_state = (cui_table_state){.selection = table_selection, .selection_capacity = 64};
+}
+int gallery_table_selection_mode(int mode) {
+    if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
+        table_selection_mode = (cui_table_selection_mode)mode;
+    return table_selection_mode;
 }
 void gallery_surface_variant(int variant) {
     if (surface_variant != variant)

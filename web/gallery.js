@@ -71,6 +71,8 @@ function render(){
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
+ wasm.gallery_table_mode(Number($('table-mode').value));
+ wasm.gallery_table_selection_mode(Number($('table-selection').value));
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_density(Number($('density').value));
@@ -100,6 +102,7 @@ function render(){
  }
  while(clips-- >0)ctx.restore();
  syncSemantics();
+ $('table-selection').value=String(wasm.gallery_table_selection_mode(-1));
  window.cuiGallery.renderedComponent=selected.name;window.cuiGallery.frame=(window.cuiGallery.frame||0)+1;
  const clipboard=wasm.gallery_clipboard_request();if(clipboard)void clipboardAction(clipboard);
  if(wasm.gallery_redraw())requestFrame();
@@ -136,8 +139,8 @@ function syncSemantics(){
   if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));if(f(31))el.setAttribute('aria-posinset',String(f(31)));if(f(32))el.setAttribute('aria-setsize',String(f(32)));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
   if(role==='tab'||role==='option'||role==='treeitem')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
-  for(const [field,attribute] of [[22,'aria-rowindex'],[23,'aria-colindex'],[24,'aria-rowcount'],[25,'aria-colcount']]){if(f(field))el.setAttribute(attribute,String(f(field)));else el.removeAttribute(attribute);}
-  if(role==='gridcell'||role==='columnheader'||role==='row')el.setAttribute('aria-selected',String(Boolean(f(11))));
+  for(const [field,attribute] of [[22,'aria-rowindex'],[23,'aria-colindex'],[24,'aria-rowcount'],[25,'aria-colcount']]){if(f(field)||(field>=24&&['grid','table'].includes(role)))el.setAttribute(attribute,String(f(field)));else el.removeAttribute(attribute);}
+  if(role==='gridcell'||role==='columnheader'||role==='row'||role==='rowheader')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(role==='columnheader')el.setAttribute('aria-sort',f(8)===1?'ascending':f(8)===2?'descending':'none');
   if(role==='dialog'||role==='alertdialog')el.setAttribute('aria-modal',String(selected.name!=='Popover'));else el.removeAttribute('aria-modal');
   if(role==='textbox'){el.setAttribute('aria-readonly',String(Boolean(f(26))));el.setAttribute('aria-required',String(Boolean(f(27))));el.setAttribute('aria-invalid',String(Boolean(f(28))));el.setAttribute('aria-multiline',String(Boolean(f(29))));}
@@ -179,6 +182,8 @@ function selectComponent(){
  $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
  $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental. IME composition and a complete platform accessibility bridge remain pending.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
  $('table-pin').hidden=selected.name!=='DataTable';$('table-pin').value='0';
+ $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
+ $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
  $('input-mode').hidden=selected.name!=='Input';$('input-mode').value='0';
  $('menu-kind').hidden=selected.name!=='Menu';$('menu-kind').value='0';
@@ -219,6 +224,8 @@ $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
 $('table-pin').addEventListener('change',requestFrame);
+ $('table-mode').addEventListener('change',requestFrame);
+ $('table-selection').addEventListener('change',requestFrame);
 $('surface-variant').addEventListener('change',requestFrame);
 $('density').addEventListener('change',requestFrame);
 $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);

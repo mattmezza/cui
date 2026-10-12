@@ -296,7 +296,7 @@ function syncSemantics(){
   const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
   if(role==='text')el.textContent=name;
   el.setAttribute('aria-label',name);
-  if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_event(3,0,0,key,mods(e),Number(e.repeat));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
+  if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_keyboard_event(3,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(role==='textbox'&&e.key.length===1));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
   const description=stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
   if(description)el.setAttribute('aria-description',description);else el.removeAttribute('aria-description');
   if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
@@ -455,6 +455,7 @@ function selectComponent(){
 }
 const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,PageUp:19,PageDown:20};
 function keyIdentity(key){return keys[key]||(key.length===1?wasm.gallery_key_identity(key.charCodeAt(0)):0);}
+function prefersCharacterInput(key){return key.length===1&&Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>wasm.gallery_semantic(i,0)===6&&wasm.gallery_semantic(i,7));}
 function mods(e){return(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);}
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const rect=canvas.getBoundingClientRect();if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);}wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,e.button===2?1:e.button===1?2:0);requestFrame();
@@ -477,10 +478,16 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
   const focusedHandlesTab=focused>=0&&wasm.gallery_semantic(enabled[focused],35);
   if(!focusedHandlesTab&&!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
- if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
- if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Input Group'||selected.name==='OtpInput'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||selected.name==='Toolbar'||selected.name==='Textarea'||selected.name==='Settings'||selected.name==='Command'||selected.name==='Questionnaire'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){
+ if(key){e.preventDefault();wasm.gallery_keyboard_event(type,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(prefersCharacterInput(e.key)));}
+ if(type===3 && e.key.length===1 && !e.isComposing && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Input Group'||selected.name==='OtpInput'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||selected.name==='Toolbar'||selected.name==='Textarea'||selected.name==='Settings'||selected.name==='Command'||selected.name==='Questionnaire'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
+});
+canvas.addEventListener('compositionend',e=>{
+ if(!wasm||!e.data||selected.name!=='Questionnaire')return;
+ const bytes=encoder.encode(e.data),pointer=wasm.malloc(bytes.length);
+ new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);
+ wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);requestFrame();
 });
 reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if(themeChoice==='system')syncTheme();});

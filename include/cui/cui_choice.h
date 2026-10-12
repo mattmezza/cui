@@ -69,6 +69,7 @@ typedef struct {
     cui_choice_render_fn render;
     void *render_user;
     cui_rect scroll_bounds; /* base scrolling receiving bounds; styled fills automatically */
+    cui_id scroll_target;   /* eligible scrolling semantic ID */
     cui_id scroll_scope;    /* popup scope, or zero for a standalone list */
     bool window_changed;    /* discard pointer activation against pre-scroll layout */
 } cui_list_options;

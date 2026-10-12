@@ -159,10 +159,12 @@ void cui_choice_popup_init(cui_choice_popup *state, cui_id popup_id) {
 }
 static bool cui_choice_scroll_event(cui_context *ui, const cui_choice_item *items, size_t count,
                                     cui_list_state *state, size_t length, size_t *begin,
-                                    cui_rect bounds, cui_id scope, cui_event event) {
-    if (!count || !length || event.type != CUI_EVENT_SCROLL || !isfinite(event.dy) ||
-        !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
-        bounds.w <= 0 || bounds.h <= 0 || event.x < bounds.x || event.x >= bounds.x + bounds.w ||
+                                    cui_rect bounds, cui_id scope, cui_id receiving, cui_id routed,
+                                    cui_event event) {
+    if ((!receiving || (routed != receiving && (!scope || routed != scope))) || !count || !length ||
+        event.type != CUI_EVENT_SCROLL || !isfinite(event.dy) || !isfinite(bounds.x) ||
+        !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) || bounds.w <= 0 ||
+        bounds.h <= 0 || event.x < bounds.x || event.x >= bounds.x + bounds.w ||
         event.y < bounds.y || event.y >= bounds.y + bounds.h ||
         !cui_pointer_scope_allowed(ui, scope))
         return false;
@@ -227,9 +229,9 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
     bool scrolled = options.window_changed;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
         cui_event event = events[e];
-        scrolled |=
-            cui_choice_scroll_event(ui, items, count, state, options.visible_count, &window_begin,
-                                    options.scroll_bounds, options.scroll_scope, event);
+        scrolled |= cui_choice_scroll_event(
+            ui, items, count, state, options.visible_count, &window_begin, options.scroll_bounds,
+            options.scroll_scope, options.scroll_target, cui_event_target(ui, e), event);
         if (event.type == CUI_EVENT_SCROLL)
             continue;
         size_t target = count, from = count;
@@ -479,7 +481,9 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
     for (size_t e = 0; e < event_count && !disabled; e++) {
         if (cui_choice_scroll_event(ui, filtered, matched, &state->list, state->visible_rows,
                                     &state->list.first_visible, state->overlay.bounds,
-                                    state->overlay.id, events[e])) {
+                                    state->overlay.id,
+                                    state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11),
+                                    cui_event_target(ui, e), events[e])) {
             result.scrolled = true;
             active = matched;
             for (size_t i = 0; i < matched; i++)

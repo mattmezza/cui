@@ -130,9 +130,16 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
 
     cui_interact(ui, container, options.menu ? CUI_ROLE_MENU : CUI_ROLE_LISTBOX, cui_string(""),
                  options.disabled, false, 0);
-    cui_set_semantic_details(ui, container,
-                             (cui_semantic_details){.multiselectable = multiple_selected != NULL,
-                                                    .orientation = CUI_ORIENTATION_VERTICAL});
+    cui_set_semantic_details(
+        ui, container,
+        (cui_semantic_details){.multiselectable = multiple_selected != NULL,
+                               .orientation = CUI_ORIENTATION_VERTICAL,
+                               .scrollable = options.visible_count && count > options.visible_count,
+                               .scroll_y = state->first_visible * theme->control_height,
+                               .scroll_max_y =
+                                   options.visible_count && count > options.visible_count
+                                       ? (count - options.visible_count) * theme->control_height
+                                       : 0});
     cui_begin_box(ui, container, (cui_box){.gap = 0});
     size_t begin = options.visible_count ? state->first_visible : 0;
     size_t length = options.visible_count ? options.visible_count : count;
@@ -176,6 +183,7 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
     if (!theme || !items || !selected || !state)
         return false;
     options.scroll_bounds = cui_bounds(ui, container);
+    options.scroll_target = container;
     bool activated = cui_base_list(ui, items, count, selected, state, options);
     cui_choice_paint_list(ui, container, theme, items, count, selected, state, options, NULL);
     return activated;
@@ -230,7 +238,9 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                      .render = options.render,
                                      .render_user = options.render_user,
                                      .scroll_bounds = cui_bounds(ui, state->overlay.id),
-                                     .scroll_scope = state->overlay.id};
+                                     .scroll_scope = state->overlay.id,
+                                     .scroll_target =
+                                         state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11)};
     cui_id old = *selected;
     bool activated =
         count ? cui_base_list(ui, items, count, selected, &state->list, list_options) : false;
@@ -254,7 +264,13 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                      placement.bounds, 100);
     cui_interact(ui, state->overlay.id, menu ? CUI_ROLE_MENU : CUI_ROLE_LISTBOX, name, false, false,
                  0);
-    cui_set_semantic_details(ui, state->overlay.id, (cui_semantic_details){.labelled_by = trigger});
+    cui_set_semantic_details(
+        ui, state->overlay.id,
+        (cui_semantic_details){.labelled_by = trigger,
+                               .scrollable = count > rows,
+                               .scroll_y = state->list.first_visible * theme->control_height,
+                               .scroll_max_y =
+                                   count > rows ? (count - rows) * theme->control_height : 0});
     if (count)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, items,
                               count, selected, &state->list, list_options, NULL);
@@ -356,7 +372,13 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
                                .radius = theme->radius},
                      placement.bounds, 100);
     cui_interact(ui, state->overlay.id, CUI_ROLE_LISTBOX, name, false, false, 0);
-    cui_set_semantic_details(ui, state->overlay.id, (cui_semantic_details){.labelled_by = input});
+    cui_set_semantic_details(
+        ui, state->overlay.id,
+        (cui_semantic_details){.labelled_by = input,
+                               .scrollable = matched > rows,
+                               .scroll_y = state->list.first_visible * theme->control_height,
+                               .scroll_max_y =
+                                   matched > rows ? (matched - rows) * theme->control_height : 0});
     if (matched)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, filtered,
                               matched, selected, &state->list, list_options, NULL);
@@ -373,6 +395,7 @@ bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
     if (!theme || !items || !selected || !state)
         return false;
     options.scroll_bounds = cui_bounds(ui, container);
+    options.scroll_target = container;
     bool activated = cui_base_list_multi(ui, items, count, selected, state, options);
     cui_id action = 0;
     cui_choice_paint_list(ui, container, theme, items, count, &action, state, options, selected);
@@ -451,7 +474,9 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
                                      .render = options.render,
                                      .render_user = options.render_user,
                                      .scroll_bounds = cui_bounds(ui, state->overlay.id),
-                                     .scroll_scope = state->overlay.id};
+                                     .scroll_scope = state->overlay.id,
+                                     .scroll_target =
+                                         state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11)};
     if (count)
         changed |= cui_base_list_multi(ui, items, count, selected, &state->list, list_options);
     cui_begin_portal(ui, state->overlay.id,
@@ -463,10 +488,15 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
                                .radius = theme->radius},
                      placement.bounds, 100);
     cui_interact(ui, state->overlay.id, CUI_ROLE_LISTBOX, name, false, false, 0);
-    cui_set_semantic_details(ui, state->overlay.id,
-                             (cui_semantic_details){.labelled_by = trigger,
-                                                    .multiselectable = true,
-                                                    .orientation = CUI_ORIENTATION_VERTICAL});
+    cui_set_semantic_details(
+        ui, state->overlay.id,
+        (cui_semantic_details){.labelled_by = trigger,
+                               .multiselectable = true,
+                               .orientation = CUI_ORIENTATION_VERTICAL,
+                               .scrollable = count > rows,
+                               .scroll_y = state->list.first_visible * theme->control_height,
+                               .scroll_max_y =
+                                   count > rows ? (count - rows) * theme->control_height : 0});
     cui_id action = 0;
     if (count)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, items,
@@ -559,10 +589,15 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
                                .radius = theme->radius},
                      placement.bounds, 100);
     cui_interact(ui, state->overlay.id, CUI_ROLE_LISTBOX, name, false, false, 0);
-    cui_set_semantic_details(ui, state->overlay.id,
-                             (cui_semantic_details){.labelled_by = input,
-                                                    .multiselectable = true,
-                                                    .orientation = CUI_ORIENTATION_VERTICAL});
+    cui_set_semantic_details(
+        ui, state->overlay.id,
+        (cui_semantic_details){.labelled_by = input,
+                               .multiselectable = true,
+                               .orientation = CUI_ORIENTATION_VERTICAL,
+                               .scrollable = matched > rows,
+                               .scroll_y = state->list.first_visible * theme->control_height,
+                               .scroll_max_y =
+                                   matched > rows ? (matched - rows) * theme->control_height : 0});
     cui_id action = 0;
     if (matched)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, filtered,

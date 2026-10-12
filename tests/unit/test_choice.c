@@ -785,6 +785,20 @@ static bool scroll_choices_scene(cui_context *ui, unsigned mode, cui_edit *query
 static void wheel(cui_context *ui, float x, float y, float dy) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dy = dy}));
 }
+static void assert_scroll_metadata(cui_context *ui, cui_id id, size_t first) {
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    cui_theme theme = cui_theme_light();
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == id) {
+            assert(semantics[i].details.scrollable);
+            assert(semantics[i].details.scroll_y == first * theme.control_height);
+            assert(semantics[i].details.scroll_max_y >= semantics[i].details.scroll_y);
+            assert(semantics[i].details.scroll_max_y > 0);
+            return;
+        }
+    assert(!"Scroll semantics missing");
+}
 static void test_choice_scrolling(void) {
     for (size_t i = 0; i < 12; i++)
         scroll_items[i] = (cui_choice_item){1000 + i, cui_string("Scroll option"), i == 2};
@@ -815,6 +829,9 @@ static void test_choice_scrolling(void) {
         wheel(ui, x, y, -1.75f);
         assert(!scroll_choices_scene(ui, mode, query, &state, &value, chosen, false));
         assert(state.list.first_visible == 2 && state.list.active == 1003);
+        assert_scroll_metadata(ui, mode >= 2 ? 800 : 90, 2);
+        if (mode >= 2)
+            assert_scroll_metadata(ui, 800 ^ UINT64_C(0xd1bc905ee4216f11), 2);
         assert(value == 1000 && !chosen[3]);
         assert(cui_focused(ui) == (mode >= 4 ? 2 : 1003));
         /* Idle frames retain the wheel window instead of snapping to old selection. */
@@ -992,6 +1009,50 @@ static void test_custom_tabs(void) {
     }
 }
 
+static void nested_lists_scene(cui_context *ui, cui_list_state *parent, cui_list_state *child) {
+    cui_theme theme = cui_theme_light();
+    cui_id parent_selected = 0, child_selected = 0;
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    assert(!cui_base_list(ui, scroll_items, 12, &parent_selected, parent,
+                          (cui_list_options){.visible_count = 4,
+                                             .visible_begin = parent->first_visible,
+                                             .scroll_target = 100,
+                                             .scroll_bounds = cui_bounds(ui, 100)}));
+    cui_interact(ui, 100, CUI_ROLE_LISTBOX, cui_string("Parent list"), false, false, 0);
+    cui_set_semantic_details(ui, 100,
+                             (cui_semantic_details){.scrollable = true,
+                                                    .scroll_y = parent->first_visible * 36,
+                                                    .scroll_max_y = 8 * 36});
+    cui_begin_box(ui, 100, (cui_box){.width = 400, .height = 250, .clip = true});
+    cui_choice_item child_items[12];
+    for (size_t i = 0; i < 12; i++)
+        child_items[i] = (cui_choice_item){2000 + i, cui_string("Nested child"), false};
+    assert(
+        !cui_list(ui, 90, &theme, child_items, 12, &child_selected, child,
+                  (cui_list_options){.visible_count = 4, .visible_begin = child->first_visible}));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void test_nested_list_wheel_routing(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    assert(ui);
+    cui_list_state parent = {0}, child = {0};
+    nested_lists_scene(ui, &parent, &child);
+    cui_rect bounds = cui_bounds(ui, 90);
+    wheel(ui, bounds.x + 10, bounds.y + 10, -3);
+    nested_lists_scene(ui, &parent, &child);
+    assert(child.first_visible == 3 && parent.first_visible == 0);
+    wheel(ui, bounds.x + 10, bounds.y + 10, -100);
+    nested_lists_scene(ui, &parent, &child);
+    assert(child.first_visible == 8 && parent.first_visible == 0);
+    /* At the inner boundary, the core routes a subsequent wheel to its ancestor. */
+    wheel(ui, bounds.x + 10, bounds.y + 10, -1);
+    nested_lists_scene(ui, &parent, &child);
+    assert(child.first_visible == 8 && parent.first_visible == 1);
+    cui_destroy(ui);
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -1074,6 +1135,7 @@ int main(void) {
     test_list_scroll_modal_guard();
     test_scroll_activation_order();
     test_custom_tabs();
+    test_nested_list_wheel_routing();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

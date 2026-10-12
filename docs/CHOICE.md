@@ -100,7 +100,12 @@ For long lists, only a bounded window of options is submitted and painted. Arrow
 navigation, Home/End and typeahead bring the active item into that window in the
 same frame. Wheel events inside the list or popup move this window in row units,
 carry fractional deltas across frames, clamp at both ends and respect modal scope
-ancestry. They do not commit selection. If the focused option leaves the window,
+ancestry. Scrollable listbox semantics expose physical row-height offsets and
+maximum offsets, preserving selected-set and label relationships. The core routes
+wheel events to the deepest eligible list; an inner list at its boundary allows
+its enclosing scroll region to receive the next wheel event. Base-only callers
+must provide the receiving semantic ID as `scroll_target`, its bounds and scroll
+metadata; styled lists supply these automatically. They do not commit selection. If the focused option leaves the window,
 focus moves to the first enabled visible option; Combobox keeps input focus while
 moving its active suggestion. Disabled lists ignore scrolling. This provides paging
 without allocating or registering

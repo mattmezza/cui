@@ -1,5 +1,6 @@
 #include "cui/cui.h"
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 static cui_context *make(void) {
@@ -734,6 +735,24 @@ static void test_nested_wheel_routing(void) {
     cui_destroy(ui);
 }
 
+static void test_perceptual_color_mix(void) {
+    cui_color black = {0, 0, 0, 255}, white = {255, 255, 255, 255};
+    cui_color middle = cui_color_mix_oklab(black, white, .5f);
+    /* Half Oklab lightness encodes approximately sRGB 0.389, not RGB 0.5. */
+    assert(middle.r >= 98 && middle.r <= 100);
+    assert(middle.r == middle.g && middle.g == middle.b && middle.a == 255);
+    cui_color red = {255, 0, 0, 255}, transparent_white = {255, 255, 255, 0};
+    cui_color faded = cui_color_mix_oklab(red, transparent_white, .75f);
+    assert(faded.r == 255 && faded.g == 0 && faded.b == 0 && faded.a == 64);
+    cui_color purple = cui_color_mix_oklab(red, (cui_color){0, 0, 255, 255}, .5f);
+    assert(purple.r >= 139 && purple.r <= 141 && purple.g >= 82 && purple.g <= 84 &&
+           purple.b >= 161 && purple.b <= 163);
+    assert(cui_color_mix_oklab(red, white, -1).r == 255);
+    assert(cui_color_mix_oklab(red, white, NAN).g == 0);
+    assert(cui_color_mix_oklab(red, white, 2).g == 255);
+    assert(cui_color_mix_oklab(transparent_white, (cui_color){255, 0, 0, 0}, .5f).a == 0);
+}
+
 static void test_dominant_axis_scroll(void) {
     cui_context *ui = make();
     for (int horizontal = 0; horizontal < 2; horizontal++) {
@@ -1223,6 +1242,7 @@ int main(void) {
     test_pointer_scope_guard();
     test_nested_wheel_routing();
     test_dominant_axis_scroll();
+    test_perceptual_color_mix();
     test_table_semantic_roles();
     test_input();
     test_strings_and_draw();

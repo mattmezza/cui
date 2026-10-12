@@ -19,6 +19,9 @@ typedef struct {
 typedef struct {
     uint8_t r, g, b, a;
 } cui_color;
+/* Alpha-premultiplied Oklab interpolation; amount is the second color weight.
+ * Clamp to [0,1]; non-finite amount selects the first color. */
+cui_color cui_color_mix_oklab(cui_color first, cui_color second, float amount);
 typedef struct cui_context cui_context;
 typedef enum {
     CUI_OK,

@@ -133,6 +133,50 @@ static void cui_core_clay_error(Clay_ErrorData e) {
 cui_str cui_string(const char *s) {
     return (cui_str){s, s ? strlen(s) : 0};
 }
+static float cui_core_linear_channel(uint8_t channel) {
+    float x = channel / 255.0f;
+    return x <= .04045f ? x / 12.92f : powf((x + .055f) / 1.055f, 2.4f);
+}
+static uint8_t cui_core_srgb_channel(float x) {
+    x = x <= .0031308f ? 12.92f * x : 1.055f * powf(x, 1 / 2.4f) - .055f;
+    return (uint8_t)lroundf(fmaxf(0, fminf(1, x)) * 255);
+}
+static void cui_core_color_lab(cui_color c, float lab[3]) {
+    float r = cui_core_linear_channel(c.r), g = cui_core_linear_channel(c.g),
+          b = cui_core_linear_channel(c.b);
+    float l = cbrtf(.4122214708f * r + .5363325363f * g + .0514459929f * b),
+          m = cbrtf(.2119034982f * r + .6806995451f * g + .1073969566f * b),
+          s = cbrtf(.0883024619f * r + .2817188376f * g + .6299787005f * b);
+    lab[0] = .2104542553f * l + .7936177850f * m - .0040720468f * s;
+    lab[1] = 1.9779984951f * l - 2.4285922050f * m + .4505937099f * s;
+    lab[2] = .0259040371f * l + .7827717662f * m - .8086757660f * s;
+}
+cui_color cui_color_mix_oklab(cui_color first, cui_color second, float amount) {
+    if (!isfinite(amount) || amount <= 0)
+        return first;
+    if (amount >= 1)
+        return second;
+    float a = first.a * (1 - amount), b = second.a * amount, alpha = a + b;
+    if (alpha <= 0)
+        return (cui_color){0};
+    float x[3], y[3];
+    cui_core_color_lab(first, x);
+    cui_core_color_lab(second, y);
+    for (size_t i = 0; i < 3; i++)
+        x[i] = (x[i] * a + y[i] * b) / alpha;
+    float l = x[0] + .3963377774f * x[1] + .2158037573f * x[2],
+          m = x[0] - .1055613458f * x[1] - .0638541728f * x[2],
+          s = x[0] - .0894841775f * x[1] - 1.2914855480f * x[2];
+    l = l * l * l;
+    m = m * m * m;
+    s = s * s * s;
+    return (cui_color){
+        cui_core_srgb_channel(4.0767416621f * l - 3.3077115913f * m + .2309699292f * s),
+        cui_core_srgb_channel(-1.2684380046f * l + 2.6097574011f * m - .3413193965f * s),
+        cui_core_srgb_channel(-.0041960863f * l - .7034186147f * m + 1.7076147010f * s),
+        (uint8_t)lroundf(alpha)};
+}
+
 cui_context *cui_create(cui_config config) {
     cui_context *ui = calloc(1, sizeof(*ui));
     if (!ui)

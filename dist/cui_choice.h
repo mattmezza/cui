@@ -2734,123 +2734,112 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
     return activated;
 }
 
-static cui_color cui_dropdown_intent(const cui_theme *theme, cui_dropdown_button_variant variant) {
-    switch (variant) {
-    case CUI_DROPDOWN_BUTTON_DANGER:
-        return theme->danger;
-    case CUI_DROPDOWN_BUTTON_WARNING:
-        return theme->warning;
-    case CUI_DROPDOWN_BUTTON_SUCCESS:
-        return theme->success;
-    case CUI_DROPDOWN_BUTTON_INFO:
-        return theme->info;
-    case CUI_DROPDOWN_BUTTON_SECONDARY:
-        return theme->border;
-    default:
-        return theme->primary;
-    }
+static cui_color cui_dropdown_opacity(cui_color color, float factor) {
+    color.a = (uint8_t)fminf(255, color.a * factor);
+    return color;
 }
-static cui_color cui_dropdown_foreground(const cui_theme *theme,
-                                         cui_dropdown_button_options options) {
-    if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM)
-        return options.outline ? options.custom.color : options.custom.foreground;
-    if (options.variant == CUI_DROPDOWN_BUTTON_LINK)
-        return theme->primary;
-    if (options.variant == CUI_DROPDOWN_BUTTON_TEXT ||
-        options.variant == CUI_DROPDOWN_BUTTON_DEFAULT)
-        return theme->text;
-    if (options.outline)
-        return options.variant == CUI_DROPDOWN_BUTTON_SECONDARY ||
-                       options.variant == CUI_DROPDOWN_BUTTON_OUTLINE ||
-                       options.variant == CUI_DROPDOWN_BUTTON_GHOST
-                   ? theme->text
-                   : cui_dropdown_intent(theme, options.variant);
-    switch (options.variant) {
+static cui_theme_button_kind cui_dropdown_kind(cui_dropdown_button_variant variant) {
+    switch (variant) {
+    case CUI_DROPDOWN_BUTTON_SECONDARY:
+        return CUI_THEME_BUTTON_SECONDARY;
     case CUI_DROPDOWN_BUTTON_DANGER:
-        return theme->on_danger;
+        return CUI_THEME_BUTTON_DANGER;
     case CUI_DROPDOWN_BUTTON_WARNING:
-        return theme->on_warning;
+        return CUI_THEME_BUTTON_WARNING;
     case CUI_DROPDOWN_BUTTON_SUCCESS:
-        return theme->on_success;
+        return CUI_THEME_BUTTON_SUCCESS;
     case CUI_DROPDOWN_BUTTON_INFO:
-        return theme->on_info;
-    case CUI_DROPDOWN_BUTTON_PRIMARY:
-        return theme->on_primary;
+        return CUI_THEME_BUTTON_INFO;
+    case CUI_DROPDOWN_BUTTON_DEFAULT:
+    case CUI_DROPDOWN_BUTTON_OUTLINE:
+        return CUI_THEME_BUTTON_DEFAULT;
     default:
-        return options.selected ? theme->on_primary : theme->text;
+        return CUI_THEME_BUTTON_PRIMARY;
     }
 }
 static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_theme *theme,
                                        cui_dropdown_button_options options, bool trigger,
-                                       bool disabled, bool pair_surfaced) {
+                                       bool disabled, bool pair_surfaced, cui_color *foreground) {
     float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
                   : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
                   : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
                                                               : 1;
+    bool loading = !trigger && options.action_loading && !options.action_disabled &&
+                   !options.disabled && !options.menu.popup.disabled;
+    bool inactive = disabled && !loading;
+    bool hovered = !disabled && cui_hovered(ui, id);
+    bool pressed = !disabled && cui_pressed(ui, id);
+    bool active = options.selected || pressed;
+    bool outlined = options.outline || options.variant == CUI_DROPDOWN_BUTTON_OUTLINE;
+    cui_theme_button_kind kind = cui_dropdown_kind(options.variant);
+    cui_theme_button_colors colors = theme->buttons[kind];
     cui_box box = {.height = theme->control_height * scale,
                    .padding = theme->padding * scale,
                    .row = true,
                    .align_x = CUI_ALIGN_CENTER,
                    .align_y = CUI_ALIGN_CENTER,
                    .radius = theme->radius,
-                   .background = theme->primary,
-                   .border = theme->border,
-                   .border_width = 1};
+                   .background = outlined ? (active    ? colors.outline_active
+                                             : hovered ? colors.outline_hover
+                                                       : colors.outline_normal)
+                                          : (active    ? colors.active
+                                             : hovered ? colors.hover
+                                                       : colors.normal),
+                   .border = outlined ? colors.outline_border : colors.border,
+                   .border_width = outlined || kind == CUI_THEME_BUTTON_DEFAULT ? 1 : 0};
+    *foreground = outlined ? colors.outline_foreground : colors.foreground;
     if (!trigger)
-        box.width = isfinite(options.width) ? options.width : 0;
-    if (options.variant == CUI_DROPDOWN_BUTTON_SECONDARY)
-        box.background = theme->border;
-    else if (options.variant == CUI_DROPDOWN_BUTTON_OUTLINE ||
-             options.variant == CUI_DROPDOWN_BUTTON_GHOST)
-        box.background.a = 0;
-    else
-        box.background = cui_dropdown_intent(theme, options.variant);
+        box.width = options.width;
     if (options.variant == CUI_DROPDOWN_BUTTON_GHOST) {
         box.border_width = 0;
-        if (pair_surfaced && !disabled)
-            box.background = theme->surface;
-    }
-    if (options.selected && options.variant < CUI_DROPDOWN_BUTTON_DANGER)
-        box.background = theme->primary;
-    bool active = options.selected || (!disabled && cui_pressed(ui, id));
-    bool transparent =
-        options.variant == CUI_DROPDOWN_BUTTON_LINK || options.variant == CUI_DROPDOWN_BUTTON_TEXT;
-    if (transparent) {
-        box.background.a = 0;
+        box.background = pressed            ? theme->buttons[CUI_THEME_BUTTON_DEFAULT].active
+                         : options.selected ? theme->buttons[CUI_THEME_BUTTON_SECONDARY].active
+                         : hovered          ? theme->accent
+                         : pair_surfaced && !disabled ? cui_dropdown_opacity(theme->accent, .5f)
+                                                      : (cui_color){0};
+        *foreground = hovered ? theme->accent_foreground : theme->secondary_foreground;
+    } else if (options.variant == CUI_DROPDOWN_BUTTON_LINK) {
+        box.background = (cui_color){0};
         box.border_width = 0;
-    } else if (options.variant == CUI_DROPDOWN_BUTTON_DEFAULT) {
-        box.background = theme->surface;
-        if (options.selected)
-            box.border = theme->primary;
+        *foreground = active ? theme->link_active : hovered ? theme->link_hover : theme->link;
+    } else if (options.variant == CUI_DROPDOWN_BUTTON_TEXT) {
+        box.background = (cui_color){0};
+        box.border_width = 0;
+        *foreground = cui_dropdown_opacity(theme->text, active ? .7f : hovered ? 1 : .9f);
     } else if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM) {
-        box.background = active ? options.custom.active : options.custom.color;
-        box.border = options.custom.color;
-        if (!disabled && cui_hovered(ui, id) && !active)
-            box.background = options.custom.hover;
+        box.background = active    ? options.custom.active
+                         : hovered ? options.custom.hover
+                                   : cui_dropdown_opacity(options.custom.color, .8f);
+        box.border =
+            outlined ? cui_dropdown_opacity(options.custom.color, .6f) : options.custom.color;
+        box.border_width = outlined ? 1 : 0;
+        *foreground = options.custom.foreground;
     }
-    bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
-                           options.variant != CUI_DROPDOWN_BUTTON_OUTLINE && !transparent;
-    if (colored_outline) {
-        box.background = options.variant == CUI_DROPDOWN_BUTTON_CUSTOM ? options.custom.color
-                         : options.variant == CUI_DROPDOWN_BUTTON_DEFAULT
-                             ? theme->border
-                             : cui_dropdown_intent(theme, options.variant);
-        box.border = box.background;
-        box.background.a = active ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
+    if (inactive) {
+        *foreground = cui_dropdown_opacity(theme->muted, .5f);
+        if (options.variant == CUI_DROPDOWN_BUTTON_GHOST ||
+            options.variant == CUI_DROPDOWN_BUTTON_LINK ||
+            options.variant == CUI_DROPDOWN_BUTTON_TEXT)
+            box.background = box.border = (cui_color){0};
+        else if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM) {
+            box.background = cui_dropdown_opacity(options.custom.color, outlined ? .4f : .15f);
+            box.border = cui_dropdown_opacity(box.border, outlined ? .5f : .15f);
+        } else if (outlined) {
+            box.background = cui_dropdown_opacity(colors.outline_normal, .5f);
+            box.border = cui_dropdown_opacity(colors.outline_border, .5f);
+        } else if (kind == CUI_THEME_BUTTON_DEFAULT) {
+            box.background = cui_dropdown_opacity(theme->input_background, .5f);
+            box.border = cui_dropdown_opacity(theme->input, .5f);
+        } else {
+            float opacity = kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
+            box.background = cui_dropdown_opacity(colors.normal, opacity);
+            box.border = cui_dropdown_opacity(colors.border, opacity);
+        }
     }
-    if (!disabled && cui_hovered(ui, id) && !transparent &&
-        options.variant != CUI_DROPDOWN_BUTTON_CUSTOM) {
-        if (!box.background.a)
-            box.background = theme->surface;
-        box.background.r = (uint8_t)(box.background.r * .9f);
-        box.background.g = (uint8_t)(box.background.g * .9f);
-        box.background.b = (uint8_t)(box.background.b * .9f);
-    }
-    if (disabled && box.background.a) {
-        if (colored_outline)
-            box.background.a /= 2;
-        else
-            box.background = theme->surface;
+    if (loading) {
+        box.background = cui_dropdown_opacity(box.background, .8f);
+        box.border = cui_dropdown_opacity(box.border, .8f);
+        *foreground = cui_dropdown_opacity(*foreground, .8f);
     }
     if (cui_focused(ui) == id) {
         box.border = theme->focus;
@@ -2917,20 +2906,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     bool pair_surfaced = state->overlay.open ||
                          (!options.hide_action && cui_hovered(ui, action_id)) ||
                          (!options.hide_menu && cui_hovered(ui, trigger_id));
-    cui_color trigger_foreground = cui_dropdown_foreground(theme, options);
-    cui_dropdown_button_options foreground_options = options;
-    foreground_options.outline = options.outline || options.action_outline;
-    cui_color action_foreground = cui_dropdown_foreground(theme, foreground_options);
-    if (options.variant == CUI_DROPDOWN_BUTTON_TEXT) {
-        if (!cui_hovered(ui, action_id))
-            action_foreground.a = (uint8_t)(action_foreground.a * .9f);
-        if (!cui_hovered(ui, trigger_id))
-            trigger_foreground.a = (uint8_t)(trigger_foreground.a * .9f);
-    }
-    if (action_disabled)
-        action_foreground = theme->muted;
-    if (all_disabled)
-        trigger_foreground = theme->muted;
+    cui_color trigger_foreground, action_foreground;
     float scale = options.size == CUI_DROPDOWN_BUTTON_XSMALL  ? .625f
                   : options.size == CUI_DROPDOWN_BUTTON_SMALL ? .8f
                   : options.size == CUI_DROPDOWN_BUTTON_LARGE ? 1.2f
@@ -2939,8 +2915,9 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     if (!options.hide_action) {
         cui_dropdown_button_options action_options = options;
         action_options.outline = options.outline || options.action_outline;
-        cui_box action_box = cui_dropdown_button_box(ui, action_id, theme, action_options, false,
-                                                     action_disabled, pair_surfaced);
+        cui_box action_box =
+            cui_dropdown_button_box(ui, action_id, theme, action_options, false, action_disabled,
+                                    pair_surfaced, &action_foreground);
         cui_begin_box(ui, action_id, action_box);
         if (options.action_loading)
             cui_text(ui, cui_string("..."), theme->font_size * scale, action_foreground);
@@ -2958,8 +2935,8 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         cui_end_box(ui);
     }
     if (!options.hide_menu) {
-        cui_box trigger_box = cui_dropdown_button_box(ui, trigger_id, theme, options, true,
-                                                      all_disabled, pair_surfaced);
+        cui_box trigger_box = cui_dropdown_button_box(
+            ui, trigger_id, theme, options, true, all_disabled, pair_surfaced, &trigger_foreground);
         cui_begin_box(ui, trigger_id, trigger_box);
         cui_dropdown_label(ui, trigger_id, cui_string("v"), theme->font_size * scale,
                            trigger_foreground, options.variant == CUI_DROPDOWN_BUTTON_LINK);

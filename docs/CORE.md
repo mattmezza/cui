@@ -99,3 +99,5 @@ Nonpositive/nonfinite caps mean unbounded. Combine a cap with `clip` to bound
 arbitrary custom children without a previous-frame measurement flash.
 
 `CUI_ROLE_LISTITEM` and `CUI_ROLE_LOG` describe passive list entries and append-oriented logs without adding automatic Tab stops. Optional `scroll_axis_lock` in semantic details uses the declared orientation to accept only dominant-axis wheel motion (ties count as vertical). Unlocked routing is unchanged; a locked region at its boundary still chains to a movable ancestor. Event deltas remain intact for the recipient.
+
+`cui_color_mix_oklab(first, second, amount)` interpolates premultiplied alpha in perceptual Oklab space, then clamps the result to byte sRGB. Amount is the second color weight; finite out-of-range values clamp, and non-finite amounts select the first color. Transparent endpoints do not tint an opaque color while fading it.

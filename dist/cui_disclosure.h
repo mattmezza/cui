@@ -24,10 +24,14 @@ typedef struct {
     float progress, velocity;
     bool initialized;
 } cui_disclosure_motion;
-/* Critically damped, reversible reveal; initial state and reduced motion snap.
- * dt is seconds; response is settling seconds (zero defaults to .2). */
+/* Reversible reveal; initial state and reduced motion snap.
+ * Legacy step uses critical damping; response is natural-period seconds
+ * (zero defaults to .2). Styled components use theme.spring_control by default. */
 void cui_disclosure_motion_step(cui_disclosure_motion *, bool open, float dt, float response,
                                 bool reduced_motion);
+/* Explicit theme spring policy; response zero or travel false snaps. */
+void cui_disclosure_motion_step_ex(cui_disclosure_motion *, bool open, float dt,
+                                   cui_spring_settings, bool reduced_motion);
 typedef struct {
     bool multiple, collapsible, disabled, bordered;
     cui_disclosure_header_fn render_header;
@@ -73,13 +77,19 @@ bool cui_accordion(cui_context *, cui_id container, const cui_theme *, const cui
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
-void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float dt, float response,
-                                bool reduced_motion) {
+void cui_disclosure_motion_step_ex(cui_disclosure_motion *motion, bool open, float dt,
+                                   cui_spring_settings settings, bool reduced_motion) {
     if (!motion)
         return;
     float target = open ? 1 : 0;
-    if (!motion->initialized || reduced_motion || !isfinite(motion->progress) ||
-        !isfinite(motion->velocity)) {
+    if (!isfinite(settings.response) || settings.response < 0)
+        settings.response = .18f;
+    if (!isfinite(settings.damping) || settings.damping < 0)
+        settings.damping = 1;
+    if (!isfinite(settings.epsilon) || settings.epsilon <= 0)
+        settings.epsilon = .001f;
+    if (!motion->initialized || reduced_motion || !settings.travel || settings.response == 0 ||
+        !isfinite(motion->progress) || !isfinite(motion->velocity)) {
         motion->progress = target;
         motion->velocity = 0;
         motion->initialized = true;
@@ -87,19 +97,43 @@ void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float 
     }
     if (!isfinite(dt) || dt <= 0)
         return;
-    if (!isfinite(response) || response <= 0)
-        response = .2f;
-    float omega = 6 / fmaxf(response, .001f);
-    float displacement = motion->progress - target;
-    float sum = motion->velocity + omega * displacement;
-    float decay = expf(-omega * fminf(dt, 10));
-    motion->progress = target + (displacement + sum * fminf(dt, 10)) * decay;
-    motion->velocity = (motion->velocity - omega * sum * fminf(dt, 10)) * decay;
-    motion->progress = fminf(1, fmaxf(0, motion->progress));
-    if (fabsf(motion->progress - target) < .001f && fabsf(motion->velocity) < .01f) {
+    double omega = 6.28318530717958647692 / settings.response;
+    double damping = settings.damping, displacement = motion->progress - target;
+    double velocity = motion->velocity, time = dt, next, speed;
+    if (fabs(damping - 1) < .0001) {
+        double sum = velocity + omega * displacement, decay = exp(-omega * time);
+        next = (displacement + sum * time) * decay;
+        speed = (velocity - omega * sum * time) * decay;
+    } else if (damping < 1) {
+        double frequency = omega * sqrt(1 - damping * damping);
+        double decay = exp(-damping * omega * time);
+        double sine = sin(frequency * time), cosine = cos(frequency * time);
+        next = decay * (displacement * cosine +
+                        (velocity + damping * omega * displacement) / frequency * sine);
+        speed = decay *
+                (velocity * cosine -
+                 (damping * omega * velocity + omega * omega * displacement) / frequency * sine);
+    } else {
+        double factor = damping + sqrt(damping * damping - 1);
+        double slow = -omega / factor, fast = -omega * factor;
+        double first = (velocity - fast * displacement) / (slow - fast);
+        double second = displacement - first;
+        next = first * exp(slow * time) + second * exp(fast * time);
+        speed = slow * first * exp(slow * time) + fast * second * exp(fast * time);
+    }
+    motion->progress = (float)(target + next);
+    motion->velocity = (float)speed;
+    if (fabs(next) < settings.epsilon && fabs(speed) < settings.epsilon) {
         motion->progress = target;
         motion->velocity = 0;
     }
+}
+void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float dt, float response,
+                                bool reduced_motion) {
+    if (!isfinite(response) || response <= 0)
+        response = .2f;
+    cui_disclosure_motion_step_ex(motion, open, dt, (cui_spring_settings){response, 1, .001f, true},
+                                  reduced_motion);
 }
 
 bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled) {
@@ -229,8 +263,8 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
 }
 static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent, cui_str label,
                                  bool open, cui_box box, cui_disclosure_motion *motion, float dt,
-                                 float response, bool reduced_motion, size_t index,
-                                 cui_disclosure_panel_fn panel, void *user) {
+                                 float response, cui_spring_settings settings, bool reduced_motion,
+                                 size_t index, cui_disclosure_panel_fn panel, void *user) {
     if (!panel || (!open && !motion))
         return;
     cui_id panel_id = trigger ^ UINT64_C(0x1d8f322539deca61);
@@ -238,10 +272,12 @@ static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent,
         if (motion->id != trigger) {
             *motion = (cui_disclosure_motion){.id = trigger};
         }
-        cui_disclosure_motion_step(motion, open, dt, response, reduced_motion);
+        if (isfinite(response) && response > 0)
+            settings.response = response;
+        cui_disclosure_motion_step_ex(motion, open, dt, settings, reduced_motion);
         float height = isfinite(motion->measured.h) ? fmaxf(0, motion->measured.h) : 0;
         cui_begin_box(ui, trigger ^ UINT64_C(0x48aaf2a21d3ed09f),
-                      (cui_box){.height = height * motion->progress,
+                      (cui_box){.height = height * fminf(1, fmaxf(0, motion->progress)),
                                 .fixed_height = true,
                                 .clip = true,
                                 .layout_only = motion->progress == 0,
@@ -274,7 +310,8 @@ bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     cui_box panel_box = options.panel_box ? *options.panel_box
                                           : (cui_box){.padding = theme->padding, .gap = theme->gap};
     cui_disclosure_panel(ui, id, 0, label, *open, panel_box, options.motion, options.dt,
-                         options.response, options.reduced_motion, 0, panel, user);
+                         options.response, theme->spring_control, options.reduced_motion, 0, panel,
+                         user);
     cui_end_box(ui);
     return changed;
 }
@@ -309,7 +346,8 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
         cui_disclosure_motion *motion =
             options.motion && i < options.motion_count ? &options.motion[i] : NULL;
         cui_disclosure_panel(ui, items[i].id, container, items[i].label, open[i], panel_box, motion,
-                             options.dt, options.response, options.reduced_motion, i, panel, user);
+                             options.dt, options.response, theme->spring_control,
+                             options.reduced_motion, i, panel, user);
     }
     cui_end_box(ui);
     return changed;

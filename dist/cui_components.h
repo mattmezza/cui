@@ -254,6 +254,14 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_TOOLBAR_IMPLEMENTATION
 #endif
 #include "cui_toolbar.h"
+#ifndef CUI_SIDEBAR_IMPLEMENTATION
+#define CUI_SIDEBAR_IMPLEMENTATION
+#endif
+#include "cui_sidebar.h"
+#ifndef CUI_TEXTAREA_IMPLEMENTATION
+#define CUI_TEXTAREA_IMPLEMENTATION
+#endif
+#include "cui_textarea.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

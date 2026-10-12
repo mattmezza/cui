@@ -1785,6 +1785,46 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     }
     return h ? h : 1;
 }
+/* Compare explicit animation and styled rendering in the same frame, including
+ * caller-owned data when normal cross-frame caching is disabled. */
+uint64_t cui_chart_frame_key(const cui_chart_options *o, const cui_chart_state *s) {
+    if (!o || !s || !o->data || o->count > CUI_CHART_MAX_ITEMS || o->extra_series_count > 7 ||
+        (o->extra_series_count && !o->extra_series) || o->link_count > 1024 ||
+        (o->link_count && !o->links))
+        return 0;
+    cui_chart_options normalized = *o;
+    if (!normalized.data_revision)
+        normalized.data_revision = 1;
+    uint64_t h = cui_chart_cache_key(&normalized, s);
+    for (size_t i = 0; i < o->count; i++) {
+        const cui_chart_datum *d = &o->data[i];
+        h = cui_chart_mix(h, (uintptr_t)d->label.data);
+        h = cui_chart_mix(h, d->label.length);
+        h = cui_chart_mix(h, cui_chart_bits(d->value));
+        h = cui_chart_mix(h, cui_chart_bits(d->open));
+        h = cui_chart_mix(h, cui_chart_bits(d->high));
+        h = cui_chart_mix(h, cui_chart_bits(d->low));
+        h = cui_chart_mix(h, cui_chart_bits(d->close));
+        h = cui_chart_mix(h, d->color.r | ((uint64_t)d->color.g << 8) |
+                                 ((uint64_t)d->color.b << 16) | ((uint64_t)d->color.a << 24));
+    }
+    for (size_t i = 0; i < o->extra_series_count; i++) {
+        const cui_chart_series *series = &o->extra_series[i];
+        if (!series->values || series->count != o->count)
+            return 0;
+        for (size_t j = 0; j < o->count; j++)
+            h = cui_chart_mix(h, cui_chart_bits(series->values[j]));
+    }
+    for (size_t i = 0; i < o->link_count; i++) {
+        const cui_chart_link *link = &o->links[i];
+        h = cui_chart_mix(h, link->source);
+        h = cui_chart_mix(h, link->target);
+        h = cui_chart_mix(h, cui_chart_bits(link->value));
+        h = cui_chart_mix(h, link->color.r | ((uint64_t)link->color.g << 8) |
+                                 ((uint64_t)link->color.b << 16) | ((uint64_t)link->color.a << 24));
+    }
+    return h ? h : 1;
+}
 cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o) {
     cui_plot_result status = cui_chart_validate(s, o);
     if (status != CUI_PLOT_OK)
@@ -1820,6 +1860,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }
     uint64_t key = cui_chart_cache_key(o, s);
+    s->animated_at_valid = false;
     if (key && key == s->cache_key)
         return CUI_PLOT_OK;
     for (size_t i = 0; i < (size_t)o->width * o->height; i++) {

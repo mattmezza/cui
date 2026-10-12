@@ -1481,7 +1481,7 @@ int main(void) {
     assert(cui_begin_frame(ui, 256, 256, .069));
     assert(cui_chart(ui, 92, &fresh_candle, &options, (cui_str){"Fresh candle", 12}));
     draw = cui_end_frame(ui);
-    assert(fresh_candle.revision == 1 &&
+    assert(fresh_candle.revision == 1 && fresh_candle.hovered == SIZE_MAX &&
            differs(fresh_candle_pixels, options.width * options.height, options.background));
     memcpy(saved, fresh_candle_pixels, sizeof saved);
     float original_open = points[0].open;
@@ -1979,6 +1979,31 @@ int main(void) {
         cui_chart(ui, 94, &explicit_clock_state, &explicit_clock, (cui_str){"Explicit clock", 14}));
     (void)cui_end_frame(ui);
     assert(explicit_clock_state.revision == explicit_revision);
+    explicit_clock.disable_appear = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render_animated(ui, &explicit_clock_state, &explicit_clock) == CUI_PLOT_OK);
+    explicit_revision = explicit_clock_state.revision;
+    memcpy(saved, default_appear_pixels, sizeof saved);
+    explicit_clock.width -= 16;
+    assert(
+        cui_chart(ui, 94, &explicit_clock_state, &explicit_clock, (cui_str){"Explicit clock", 14}));
+    (void)cui_end_frame(ui);
+    assert(explicit_clock_state.revision > explicit_revision &&
+           memcmp(saved, default_appear_pixels, sizeof saved) != 0);
+    explicit_clock.width += 16;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render_animated(ui, &explicit_clock_state, &explicit_clock) == CUI_PLOT_OK);
+    explicit_revision = explicit_clock_state.revision;
+    memcpy(saved, default_appear_pixels, sizeof saved);
+    double original_chart_value = points[0].value;
+    points[0].value = original_chart_value + 45;
+    assert(
+        cui_chart(ui, 94, &explicit_clock_state, &explicit_clock, (cui_str){"Explicit clock", 14}));
+    (void)cui_end_frame(ui);
+    assert(explicit_clock_state.revision > explicit_revision &&
+           memcmp(saved, default_appear_pixels, sizeof saved) != 0);
+    points[0].value = original_chart_value;
+    explicit_clock.disable_appear = false;
     explicit_clock.appear_key++;
     assert(cui_begin_frame(ui, 256, 256, .5f));
     assert(

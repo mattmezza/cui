@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+uint64_t cui_chart_frame_key(const cui_chart_options *, const cui_chart_state *);
 static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
                                 cui_chart_format_fn formatter, void *user) {
     size_t length;
@@ -336,6 +337,7 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
             return measured;
         frame.custom_horizontal_bar_gutters = true;
     }
+    cui_chart_options request = frame;
     bool restart = !state->appear_started || state->active_appear_key != options->appear_key;
     double now = cui_frame_time(ui);
     double started = restart ? now : state->appear_started_at;
@@ -357,6 +359,7 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     state->active_appear_key = options->appear_key;
     state->animated_at_time = now;
     state->animated_at_valid = true;
+    state->animated_request_key = cui_chart_frame_key(&request, state);
     if (frame.reveal_progress < 1)
         cui_invalidate(ui);
     return CUI_PLOT_OK;
@@ -401,11 +404,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         measured_options.custom_horizontal_bar_gutters = true;
         o = &measured_options;
     }
-    bool animation_current = state->animated_at_valid &&
-                             state->animated_at_time == cui_frame_time(ui) &&
-                             state->active_appear_key == o->appear_key &&
-                             (!(o->disable_appear || o->reduced_motion || cui_reduced_motion(ui)) ||
-                              state->rendered_reveal_progress == 1);
+    bool animation_current =
+        state->animated_at_valid && state->animated_at_time == cui_frame_time(ui) &&
+        state->active_appear_key == o->appear_key && state->animated_request_key != 0 &&
+        state->animated_request_key == cui_chart_frame_key(o, state) &&
+        (!(o->disable_appear || o->reduced_motion || cui_reduced_motion(ui)) ||
+         state->rendered_reveal_progress == 1);
     bool rendered_for_appearance = animation_current && !o->reveal_enabled;
     if (!o->reveal_enabled && (state->appear_started || state->revision == 0) &&
         !animation_current) {

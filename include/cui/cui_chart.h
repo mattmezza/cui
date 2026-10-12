@@ -243,6 +243,7 @@ typedef struct {
     bool appear_started;
     double animated_at_time; /* private frame-clock stamp for explicit animation calls */
     bool animated_at_valid;
+    uint64_t animated_request_key;      /* private normalized visual input fingerprint */
     double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
     bool mark_clip_active;
     float rendered_reveal_progress;

@@ -77,3 +77,7 @@ Chart source plot extents/dashed hover guides and marks, TextView atomic inline 
 ### Validated integration bc295be
 
 The Chart/TextView/Questionnaire batch from portable source75ef24f is now integrated on main together with the browser physical-click repair. Native77, sanitizers75, WASI67, quality, strict web build and full Chromium78 pass. The merged portable source, adapters, examples, build scripts and browser files match the tested integration branch exactly. Publication is pending; public04e044e remains the last verified HTTPS78 release. All78 entries remain in scope and full feature parity is not claimed.
+
+### Next isolated batch: 2af3f39
+
+Automatic Chart axis-label measurement, Bar/point-axis source geometry, atomic standalone Markdown/HTML image sizing and baseline flow, and Questionnaire answer description/enabled-position semantics pass native77, ASan/UBSan75, WASI67, full Chromium78, quality and strict web build. This batch remains isolated until release5608e51 HTTPS validation completes; it does not establish full feature parity.

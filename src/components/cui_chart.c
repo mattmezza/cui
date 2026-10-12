@@ -126,9 +126,20 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
         return 0;
     unsigned visible = count < 32 ? count : 32;
     float gutter = 32;
+    bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+    double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 0;
+    double bottom = point_chart ? o->height - (o->hide_x_axis ? 0 : 20) -
+                                      (o->custom_y_padding ? o->y_padding_bottom : 0)
+                                : 0;
+    cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
     for (unsigned i = 0; i < visible; i++) {
         unsigned tick = (count - 1) * i / (visible - 1);
         double value = hi - (hi - lo) * tick / (count - 1);
+        if (point_chart) {
+            double pixel_y = (o->height - (o->hide_x_axis ? 0 : 20)) * tick / (count - 1);
+            if (cui_plot_inverse(&scale, pixel_y, &value) != CUI_PLOT_OK)
+                return 0;
+        }
         char buffer[48];
         cui_str label =
             cui_chart_number(buffer, sizeof buffer, value, o->y_tick_format, o->format_user);
@@ -820,7 +831,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
-                double pixel_y = top + (bottom - top) * (double)tick / (count - 1);
+                double pixel_y = point_chart ? (o->height - (o->hide_x_axis ? 0 : 20)) *
+                                                   (double)tick / (count - 1)
+                                             : top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
                 if (horizontal_bar)
                     value = lo + (hi - lo) * tick / (count - 1);

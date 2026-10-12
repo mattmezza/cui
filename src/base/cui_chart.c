@@ -750,6 +750,9 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         top = 10;
     if (right <= left || bottom <= top)
         return;
+    bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+    double grid_top = point_chart ? 0 : top;
+    double grid_bottom = point_chart ? o->height - (o->hide_x_axis ? 0 : 20) : bottom;
     double lo, hi;
     cui_chart_domain(o, &lo, &hi);
     bool horizontal = o->kind == CUI_CHART_BAR && (o->bar_alignment == CUI_CHART_BAR_LEFT ||
@@ -764,7 +767,8 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                                : left + (right - left) * i / (n - 1);
                 cui_chart_guide(s, o, x, top, x, bottom, grid, o->grid_solid);
             } else {
-                double y = o->kind == CUI_CHART_CANDLESTICK && !o->tick_count ? bottom * i / 4
+                double y = point_chart ? grid_top + (grid_bottom - grid_top) * i / (n - 1)
+                           : o->kind == CUI_CHART_CANDLESTICK && !o->tick_count ? bottom * i / 4
                            : o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_TOP
                                ? bottom - (bottom - top) * i / (n - 1)
                                : top + (bottom - top) * i / (n - 1);
@@ -773,12 +777,10 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         }
         for (unsigned i = 0; i < o->grid_columns; i++) {
             double x = left + (right - left) * i / o->grid_columns;
-            cui_chart_guide(s, o, x, top, x, bottom, grid, o->grid_solid);
+            cui_chart_guide(s, o, x, grid_top, x, grid_bottom, grid, o->grid_solid);
         }
     }
     if (!o->hide_axes) {
-        if (o->kind != CUI_CHART_CANDLESTICK && o->kind != CUI_CHART_BAR)
-            cui_chart_line(s, o, left, top, left, bottom, grid);
         if (!o->hide_x_axis) {
             if (o->kind == CUI_CHART_BAR) {
                 cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, 0, 0, true};
@@ -797,7 +799,7 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                         cui_chart_line(s, o, left, zero, right, zero, grid);
                 }
             } else
-                cui_chart_line(s, o, left, bottom, right, bottom, grid);
+                cui_chart_line(s, o, left, grid_bottom, right, grid_bottom, grid);
         }
     }
     for (size_t i = 0; i < o->reference_count; i++) {
@@ -1935,8 +1937,10 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
         return hit;
     } else {
         double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
-        double top = o->kind == CUI_CHART_CANDLESTICK ? 0 : cui_chart_plot_top(o);
-        double bottom = cui_chart_plot_bottom(o);
+        bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+        double top = o->kind == CUI_CHART_CANDLESTICK || point_chart ? 0 : cui_chart_plot_top(o);
+        double bottom =
+            point_chart ? o->height - (o->hide_x_axis ? 0 : 20) : cui_chart_plot_bottom(o);
         if (x < left || x > right || y < top || y > bottom || right <= left)
             return hit;
         size_t n = o->point_count ? o->point_count : o->count;

@@ -279,6 +279,24 @@ int main(void) {
     assert(cui_chart_hit_test(&options, 16, 20).valid &&
            cui_chart_hit_test(&options, 16, 20).hovered == 0);
     options.show_y_axis = false;
+    assert(cui_chart_hit_test(&options, 16, 1).valid);
+    options.custom_y_padding = true;
+    options.y_padding_bottom = 20;
+    assert(cui_chart_hit_test(&options, 16, 37).valid);
+    cui_chart_options source_point_plot = options;
+    source_point_plot.grid = (cui_color){9, 21, 233, 255};
+    source_point_plot.grid_solid = true;
+    source_point_plot.hide_grid = false;
+    source_point_plot.hide_axes = true;
+    assert(cui_chart_render(&state, &source_point_plot) == CUI_PLOT_OK);
+    size_t point_top_grid = ((size_t)0 * source_point_plot.width + 127) * 4;
+    assert(pixels[point_top_grid] == 9 && pixels[point_top_grid + 2] == 233);
+    source_point_plot.hide_grid = true;
+    source_point_plot.hide_axes = false;
+    assert(cui_chart_render(&state, &source_point_plot) == CUI_PLOT_OK);
+    size_t point_axis = ((size_t)76 * source_point_plot.width + 127) * 4;
+    assert(pixels[point_axis] == 9 && pixels[point_axis + 2] == 233);
+    options.y_padding_bottom = 0;
     options.hide_grid = true;
     options.hide_axes = true;
     options.custom_y_padding = true;

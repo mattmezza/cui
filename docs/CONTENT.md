@@ -1,0 +1,17 @@
+# Content components
+
+`cui_content.h` adds controlled alert dismissal; named avatar initials; composable bubble and group surfaces; empty states; keyboard hints; loading indicators; dividers; and a shared delayed hover lifecycle. These portable C11 APIs use the existing theme and draw list. They do not imply complete GPUI Kit family parity.
+
+Alerts carry text naming their severity, an optional title, custom textual icon, banner style, width, and size multiplier. A dismiss button reports activation and updates optional application-owned visibility. Passing false visibility omits the entire subtree next frame. Success and warning currently use the theme primary color with distinct text because the theme has no separate success/warning tokens. Rich content can instead be composed with boxes; the convenience alert renders plain text.
+
+Avatar fallback takes the first scalar of the first and last ASCII-whitespace-separated words, uppercases ASCII letters, and preserves valid non-ASCII UTF-8. Empty/invalid input produces `?`. Its semantic name retains the person's name. The circular surface has an explicit pixel size. Image loading, generated hue palettes, exact typographic centering, custom icons, and overlapping groups remain pending.
+
+Bubble and GroupBox begin/end pairs accept arbitrary child controls or text. Bubble offers filled, secondary, muted, tinted, outline, ghost, and destructive surfaces. The caller supplies child text colors and owns horizontal placement, maximum width, wrapping, reactions, and footer content. Empty provides title and description; a custom actionable empty state can use a GroupBox instead. Empty custom-image/icon slots and GPUI's exact typography remain pending.
+
+Keyboard formatting takes modifier bits, the display key label, and an explicit platform convention. It supports Ctrl/Alt/Shift/Win labels and macOS symbols in stable order, reports required bytes, and bounds/NUL-terminates the output. The caller supplies special-key labels; action/keybinding lookup is application-owned. `cui_kbd` styles any resulting string.
+
+Spinner is an eight-dot ring built from common rounded rectangles, with phase-selected emphasis. Skeleton supports arbitrary size, radius, a secondary opacity, and cosine pulse. Applications pass a phase computed from their clock via `cui_loading_phase`; animation requests another frame unless reduced motion is selected. Reduced motion freezes spinner emphasis and keeps skeleton opacity stable. There are no icon rotations or renderer-specific transforms. Divider accepts horizontal/vertical orientation and length.
+
+`cui_hover_update` is the reusable Tooltip/HoverCard timing reducer. Trigger hover and keyboard focus open after a configured delay. Once open, hovering content keeps it open; leaving starts a cancellable close delay. Escape or disabled closes immediately. Invalid time steps do not advance timers. This first batch contains the lifecycle only; floating rendering, popup placement, semantics, and trigger integration follow once core portals are available.
+
+Headless tests verify UTF-8 validation, formatting truncation, lifecycle transitions, reduced motion and animated redraw, measured geometry, named semantic snapshots, controlled pointer dismissal, and omission of dismissed content across all four themes. The worker compiles the new files with C11 strict warnings, runs `test_content` linked to the core library, and runs the existing CTest suite. Build/distribution registration belongs to the integrator.

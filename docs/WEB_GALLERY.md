@@ -59,3 +59,5 @@ Theme also demonstrates passive and explicitly focusable Log semantics. The host
 Shimmer renders standalone animated text with repeat, reverse, once and absolute spread controls, clipped width and reduced motion.
 
 Tabs exposes all five variants and four source sizes, automatic/manual activation, bounded horizontal/vertical strips, selected-tab reveal, an all-tabs menu and keyboard/pointer scrollbars. Structured slots and caller-applied drag reordering still need dedicated browser coverage.
+
+DropdownButton exposes all twelve variants and four sizes, custom palettes, outline/selected paint, independently disabled/loading actions, split/menu-only/action-only composition and four anchors. Browser checks cover independent action/menu routing and captured pressed colors. Tooltip composition and inherited action properties still need dedicated browser coverage.

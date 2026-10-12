@@ -33,6 +33,8 @@ static size_t semantic_count;
 static bool checked, enabled = true, toggled;
 static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
+static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
+static bool dropdown_outline, dropdown_selected;
 static cui_id selected_tab;
 static int tabs_mode, tabs_size, tabs_variant = CUI_TAB_UNDERLINE;
 static bool tabs_manual;
@@ -1316,8 +1318,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 ui, cui_id_from(ui, "split-button"), cui_id_from(ui, "split-action"),
                 cui_id_from(ui, "split-trigger"), &t, cui_string("Export workspace"),
                 cui_string("Export options"), entries, 9, &menu_action, &menu_tree,
-                (cui_dropdown_button_options){
-                    .disabled = disabled, .leading = cui_string("↓"), .menu = options});
+                (cui_dropdown_button_options){.disabled = disabled,
+                                              .leading = cui_string("↓"),
+                                              .variant =
+                                                  (cui_dropdown_button_variant)dropdown_variant,
+                                              .size = (cui_dropdown_button_size)dropdown_size,
+                                              .outline = dropdown_outline,
+                                              .selected = dropdown_selected,
+                                              .action_disabled = dropdown_action == 1,
+                                              .action_loading = dropdown_action == 2,
+                                              .hide_action = dropdown_halves == 1,
+                                              .hide_menu = dropdown_halves == 2,
+                                              .anchor = (cui_dropdown_button_anchor)dropdown_anchor,
+                                              .custom = {{65, 40, 160, 255},
+                                                         {255, 255, 255, 255},
+                                                         {90, 60, 190, 255},
+                                                         {40, 20, 120, 255}},
+                                              .menu = options});
             if (result.action_activated)
                 clicks++;
             invoked = result.menu_activated;
@@ -1969,4 +1986,15 @@ float gallery_tabs_scroll(unsigned field) {
     default:
         return 0;
     }
+}
+
+void gallery_dropdown_options(int variant, int size, int halves, int action, int anchor,
+                              int outline, int selected) {
+    dropdown_variant = variant;
+    dropdown_size = size;
+    dropdown_halves = halves;
+    dropdown_action = action;
+    dropdown_anchor = anchor;
+    dropdown_outline = outline != 0;
+    dropdown_selected = selected != 0;
 }

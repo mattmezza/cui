@@ -639,6 +639,87 @@ def main():
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == count + 1
             assert page.evaluate('cuiGallery.exports.gallery_modal()') == 0
             page.locator('#disabled').uncheck()
+            for variant in map(str, range(12)):
+                frame = page.evaluate('cuiGallery.frame')
+                page.locator('#dropdown-variant').select_option(variant)
+                page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+                role = 36 if variant == '9' else 1
+                assert semantic_index('Export workspace', role) is not None
+                click_semantic('Export options', role)
+                page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
+                page.keyboard.press('Escape')
+                page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
+            page.locator('#dropdown-variant').select_option('9')
+            frame = page.evaluate('cuiGallery.frame')
+            page.wait_for_function('document.querySelector(`#accessible [role=link][aria-label="Export workspace"]`)')
+            action_count = page.evaluate('cuiGallery.exports.gallery_clicks()')
+            click_semantic('Export workspace', 36)
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_clicks()===n+1', arg=action_count)
+            page.keyboard.press('Enter')
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_clicks()===n+2', arg=action_count)
+            page.locator('#dropdown-variant').select_option('0')
+            for anchor in map(str, range(4)):
+                page.locator('#dropdown-anchor').select_option(anchor)
+                click_semantic('Export options', 1)
+                page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
+                menu = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Export options', 15))
+                assert menu[0] >= 0 and menu[1] >= 0 and menu[0]+menu[2] <= canvas.bounding_box()['width']+.2 and menu[1]+menu[3] <= canvas.bounding_box()['height']+.2
+                trigger = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Export options', 1))
+                expected_x = trigger[0]+trigger[2]-menu[2] if anchor in ['0','2'] else trigger[0]
+                expected_x = max(0,min(canvas.bounding_box()['width']-menu[2],expected_x))
+                assert abs(menu[0]-expected_x) < .2
+                page.keyboard.press('Escape')
+                page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
+            heights = []
+            for size in ['3','1','0','2']:
+                frame = page.evaluate('cuiGallery.frame')
+                page.locator('#dropdown-size').select_option(size)
+                page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+                heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Export workspace', 1)))
+            assert heights == sorted(heights) and heights[0] < heights[-1], heights
+            page.locator('#dropdown-size').select_option('0')
+            for state in ['1','2']:
+                page.locator('#dropdown-action').select_option(state)
+                page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,5)===1', arg=semantic_index('Export workspace', 1))
+                action_count = page.evaluate('cuiGallery.exports.gallery_clicks()')
+                click_semantic('Export workspace', 1)
+                click_semantic('Export options', 1)
+                page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
+                assert page.evaluate('cuiGallery.exports.gallery_clicks()') == action_count
+                page.keyboard.press('Escape')
+                page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
+            page.locator('#dropdown-action').select_option('0')
+            for halves, absent, present in [('1','Export workspace','Export options'),('2','Export options','Export workspace')]:
+                page.locator('#dropdown-halves').select_option(halves)
+                page.wait_for_function('(name)=>!Array.from(document.querySelectorAll("#accessible [aria-label]")).some(e=>e.getAttribute("aria-label")===name)', arg=absent)
+                click_semantic(present, 1)
+                if halves == '1':
+                    page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
+                    page.keyboard.press('Escape')
+                    page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
+                else:
+                    page.wait_for_function('(n)=>cuiGallery.exports.gallery_clicks()>n', arg=action_count)
+            page.locator('#dropdown-halves').select_option('0')
+            page.locator('#dropdown-variant').select_option('11')
+            page.mouse.move(0,0)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,5)===0', arg=semantic_index('Export workspace', 1))
+            def dropdown_background():
+                return page.evaluate('''(i)=>{const e=cuiGallery.exports,b=[1,2,3,4].map(f=>e.gallery_semantic(i,f));return Array.from({length:e.gallery_count()},(_,n)=>n).filter(n=>e.gallery_command(n,0)===0&&[1,2,3,4].every((f,k)=>Math.abs(e.gallery_command(n,f)-b[k])<.2)).map(n=>[5,6,7,8,12,13,14,15,16].map(f=>e.gallery_command(n,f)));}''', semantic_index('Export workspace', 1))
+            page.wait_for_function('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>[5,6,7,8].map(f=>e.gallery_command(i,f)).join()).includes("65,40,160,51");}')
+            background = dropdown_background()
+            assert background and background[0][:4] == [65,40,160,51]
+            assert background[0][4] == 1 and background[0][5] > 0 and background[0][6] == 0 and background[0][7] > 0 and background[0][8] == 0
+            bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Export workspace', 1))
+            rect = canvas.bounding_box()
+            page.mouse.move(rect['x']+bounds[0]+bounds[2]/2,rect['y']+bounds[1]+bounds[3]/2)
+            page.mouse.down()
+            page.wait_for_function('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>[5,6,7,8].map(f=>e.gallery_command(i,f)).join()).includes("40,20,120,255");}')
+            page.mouse.up()
+            page.locator('#dropdown-outline').check()
+            page.locator('#dropdown-selected').check()
+            page.mouse.move(0,0)
+            page.wait_for_function('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>[5,6,7,8].map(f=>e.gallery_command(i,f)).join()).includes("40,20,120,255");}')
+            page.wait_for_function('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===1&&[5,6,7,8].map(f=>e.gallery_command(i,f)).join()==="65,40,160,102");}')
             page.evaluate('location.hash="Menu"')
             page.wait_for_function('cuiGallery.renderedComponent==="Menu"')
             click_semantic('Actions')

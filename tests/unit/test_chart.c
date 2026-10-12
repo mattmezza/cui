@@ -739,6 +739,19 @@ int main(void) {
             hover_halo |= draw.commands[i].bounds.w == 10 && draw.commands[i].bounds.h == 10;
         }
     assert(image && text && formatted && hover_crosshair && hover_halo);
+    assert(state.hover_progress > 0 && state.hover_progress < 1);
+    options.reduced_motion = true;
+    assert(cui_begin_frame(ui, 256, 256, .04));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    (void)cui_end_frame(ui);
+    assert(state.hover_progress == 1);
+    state.hovered = SIZE_MAX;
+    assert(cui_begin_frame(ui, 256, 256, .05));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    (void)cui_end_frame(ui);
+    assert(state.hover_progress == 0 && !state.hover_visual_started);
+    options.reduced_motion = false;
     options.x_tick_count = 0;
     options.x_tick_margin = 2;
     state.hovered = SIZE_MAX;

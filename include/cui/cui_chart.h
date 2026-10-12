@@ -158,6 +158,7 @@ typedef struct {
     bool disable_appear;   /* styled animated render skips first-paint/replay motion */
     uint64_t appear_key;   /* changing this replays styled appear */
     float appear_duration; /* seconds; zero selects styled source default 1s */
+    float hover_duration;  /* seconds; zero selects styled source fast tier 0.12s */
     bool show_bar_values;
     cui_color bar_label_color; /* alpha zero uses foreground */
     cui_chart_bar_label_color_fn bar_label_color_fn;
@@ -203,6 +204,10 @@ typedef struct {
     const cui_chart_datum *rendered_data; /* private hover identity */
     size_t rendered_count;
     cui_chart_kind rendered_kind;
+    float hover_progress;                             /* private styled hover fade 0..1 */
+    float hover_x, hover_y[8], hover_vx, hover_vy[8]; /* private pointer spring */
+    size_t hover_visual_index;
+    bool hover_visual_started;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {

@@ -61,6 +61,7 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->min_bar_length < 0 || !isfinite(o->radar_max_value) || !isfinite(o->bar_corner_radius) ||
         o->bar_corner_radius < 0 || !isfinite(o->reveal_progress) || o->reveal_progress < 0 ||
         o->reveal_progress > 1 || !isfinite(o->appear_duration) || o->appear_duration < 0 ||
+        !isfinite(o->hover_duration) || o->hover_duration < 0 ||
         (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
         !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
         o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
@@ -1582,6 +1583,8 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->rendered_kind != o->kind) {
         s->hovered = SIZE_MAX;
         s->hovered_value = 0;
+        s->hover_visual_started = false;
+        s->hover_progress = 0;
     }
     s->rendered_data = o->data;
     s->rendered_count = o->count;

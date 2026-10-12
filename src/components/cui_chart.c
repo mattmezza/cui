@@ -16,6 +16,19 @@ static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
         length = capacity ? capacity - 1 : 0;
     return (cui_str){buffer, length};
 }
+static void cui_chart_hover_spring(float *position, float *velocity, float target, float dt,
+                                   float response) {
+    float omega = 6.28318530718f / response;
+    float displacement = *position - target;
+    float movement = *velocity + omega * displacement;
+    float decay = expf(-omega * dt);
+    *position = target + (displacement + movement * dt) * decay;
+    *velocity = (*velocity - omega * movement * dt) * decay;
+    if (fabsf(*position - target) < .1f && fabsf(*velocity) < .1f) {
+        *position = target;
+        *velocity = 0;
+    }
+}
 static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
                                          const cui_chart_sankey_node *node, size_t index,
                                          cui_chart_sankey_label out[16], size_t *count,
@@ -236,15 +249,73 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     bool ok = cui_paint_bitmap(
         ui, id ^ UINT64_C(0x381c6b293497e8a1), paint,
         (cui_box){.width = w, .height = h, .fixed_width = true, .fixed_height = true});
-    if (!o->noninteractive && state->hovered < o->count &&
-        (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)) {
-        float pixel_x, pixel_y;
-        if (cui_chart_point_coordinates(o, state->hovered, 0, &pixel_x, &pixel_y) == CUI_PLOT_OK) {
-            float x = pixel_x * w / o->width;
+    if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
+        bool active = !o->noninteractive && state->hovered < o->count;
+        float target_x = 0, target_y[8] = {0}, pixel_x, pixel_y;
+        if (active &&
+            cui_chart_point_coordinates(o, state->hovered, 0, &pixel_x, &pixel_y) != CUI_PLOT_OK)
+            active = false;
+        if (active) {
+            target_x = pixel_x * w / o->width;
+            for (size_t series = 0; series <= o->extra_series_count; series++) {
+                if (cui_chart_point_coordinates(o, state->hovered, series, &pixel_x, &pixel_y) ==
+                    CUI_PLOT_OK)
+                    target_y[series] = pixel_y * h / o->height;
+            }
+            if (!state->hover_visual_started) {
+                state->hover_visual_started = true;
+                state->hover_progress = 0;
+                state->hover_x = target_x;
+                state->hover_vx = 0;
+                for (size_t series = 0; series <= o->extra_series_count; series++) {
+                    state->hover_y[series] = target_y[series];
+                    state->hover_vy[series] = 0;
+                }
+            }
+            state->hover_visual_index = state->hovered;
+        }
+        if (state->hover_visual_started) {
+            bool instant = o->reduced_motion || cui_reduced_motion(ui);
+            float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
+            float dt = cui_frame_delta(ui);
+            if (!isfinite(dt) || dt < 0)
+                dt = 0;
+            if (dt == 0 && active && state->hover_progress == 0)
+                dt = 1.f / 60;
+            dt = fminf(dt, .25f);
+            state->hover_progress =
+                instant
+                    ? (active ? 1 : 0)
+                    : fmaxf(0, fminf(1, state->hover_progress + (active ? dt : -dt) / duration));
+            if (active) {
+                if (instant) {
+                    state->hover_x = target_x;
+                    state->hover_vx = 0;
+                } else
+                    cui_chart_hover_spring(&state->hover_x, &state->hover_vx, target_x, dt,
+                                           duration);
+                for (size_t series = 0; series <= o->extra_series_count; series++)
+                    if (instant) {
+                        state->hover_y[series] = target_y[series];
+                        state->hover_vy[series] = 0;
+                    } else
+                        cui_chart_hover_spring(&state->hover_y[series], &state->hover_vy[series],
+                                               target_y[series], dt, duration);
+            }
+            if (state->hover_progress > 0 && !instant)
+                cui_invalidate(ui);
+            if (state->hover_progress == 0)
+                state->hover_visual_started = false;
+        }
+        if (state->hover_visual_started && state->hover_progress > 0) {
+            float progress = state->hover_progress;
+            float opacity = progress * progress * (3 - 2 * progress);
+            float x = state->hover_x;
             float top = (o->custom_y_padding ? o->y_padding_top : 10) * h / o->height;
             float bottom =
                 (o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)) * h / o->height;
             cui_color crosshair = o->grid.a ? o->grid : (cui_color){120, 120, 120, 150};
+            crosshair.a = (unsigned char)lroundf(crosshair.a * opacity);
             cui_begin_absolute_box(ui, id ^ UINT64_C(0x9f39c738cd235001),
                                    (cui_box){.width = 1,
                                              .height = bottom - top,
@@ -254,21 +325,21 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                    (cui_rect){x, top, 1, bottom - top});
             cui_end_box(ui);
             for (size_t series = 0; series <= o->extra_series_count; series++) {
-                if (cui_chart_point_coordinates(o, state->hovered, series, &pixel_x, &pixel_y) !=
-                    CUI_PLOT_OK)
-                    continue;
-                float dot_x = pixel_x * w / o->width;
-                float dot_y = pixel_y * h / o->height;
+                float dot_x = state->hover_x;
+                float dot_y = state->hover_y[series];
                 cui_color dot = series ? o->extra_series[series - 1].color : o->series[0];
                 if (!dot.a)
                     dot = o->series[series].a ? o->series[series] : o->foreground;
+                dot.a = (unsigned char)lroundf(dot.a * opacity);
+                cui_color halo = o->background;
+                halo.a = (unsigned char)lroundf(halo.a * opacity);
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0x8e4ad6f381012000) + series),
                                        (cui_box){.width = 10,
                                                  .height = 10,
                                                  .radius = 5,
                                                  .fixed_width = true,
                                                  .fixed_height = true,
-                                                 .background = o->background},
+                                                 .background = halo},
                                        (cui_rect){dot_x - 5, dot_y - 5, 10, 10});
                 cui_end_box(ui);
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9e4ad6f381012000) + series),

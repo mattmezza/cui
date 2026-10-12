@@ -16,6 +16,7 @@ void cui_surface_open(cui_context *ui, cui_surface_state *s, cui_id trigger) {
     if (!s)
         return;
     s->result = CUI_SURFACE_NONE;
+    s->pending_close = CUI_SURFACE_NONE;
     cui_overlay_open(ui, &s->overlay, trigger);
 }
 void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
@@ -25,6 +26,16 @@ void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result
     s->resizing = false;
     cui_dismiss_focus_scope(ui, s->overlay.id, s->overlay.trigger);
     cui_overlay_close(ui, &s->overlay);
+    if (s->on_close)
+        s->on_close(s->close_user, result);
+}
+void cui_surface_request_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
+    if (!ui || !s || !s->overlay.open)
+        return;
+    s->pending_close = result >= CUI_SURFACE_ACCEPTED && result <= CUI_SURFACE_CLOSED
+                           ? result
+                           : CUI_SURFACE_CLOSED;
+    cui_invalidate(ui);
 }
 cui_surface_result cui_surface_take_result(cui_surface_state *s) {
     if (!s)
@@ -149,6 +160,16 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
     if (!ui || !s || !s->overlay.open)
         return false;
+    s->on_close = o.on_close;
+    s->close_user = o.close_user;
+    if (s->pending_close != CUI_SURFACE_NONE) {
+        cui_surface_result reason = s->pending_close;
+        s->pending_close = CUI_SURFACE_NONE;
+        if (!o.decide || o.decide(o.decision_user, reason)) {
+            cui_surface_close(ui, s, reason);
+            return true;
+        }
+    }
     s->overlay.modal = s->kind != CUI_SURFACE_POPOVER || o.modal_popover;
     if (o.no_sheet_resize || s->kind != CUI_SURFACE_SHEET)
         s->resizing = false;

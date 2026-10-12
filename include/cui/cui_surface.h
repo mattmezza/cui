@@ -21,12 +21,16 @@ typedef enum {
     CUI_SURFACE_CLOSED
 } cui_surface_result;
 typedef bool (*cui_surface_decision_fn)(void *user, cui_surface_result);
+typedef void (*cui_surface_closed_fn)(void *user, cui_surface_result);
 typedef struct {
     cui_overlay overlay;
     cui_surface_kind kind;
     cui_surface_result result;
     float sheet_size, resize_origin, resize_size;
     bool resizing;
+    cui_surface_result pending_close;
+    cui_surface_closed_fn on_close;
+    void *close_user;
 } cui_surface_state;
 typedef struct {
     cui_rect viewport, anchor;
@@ -40,10 +44,14 @@ typedef struct {
     float sheet_minimum, sheet_maximum;
     cui_surface_decision_fn decide; /* False keeps the surface open. */
     void *decision_user;
+    cui_surface_closed_fn on_close; /* Runs after close and focus restoration. */
+    void *close_user;
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
 void cui_surface_close(cui_context *, cui_surface_state *, cui_surface_result);
+/* Safe between frames; the next submitted frame applies the decision policy. */
+void cui_surface_request_close(cui_context *, cui_surface_state *, cui_surface_result);
 cui_surface_result cui_surface_take_result(cui_surface_state *);
 cui_rect cui_surface_geometry(cui_surface_kind, cui_surface_options);
 cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_options);
@@ -60,6 +68,8 @@ void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cu
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);
 void cui_surface_end(cui_context *);
+/* Close the body and begin a fixed footer row; surface_end closes the footer. */
+void cui_surface_footer_begin(cui_context *, const cui_theme *);
 /* Complete confirmation composition. Results persist until explicitly taken. */
 void cui_alert_dialog(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                       cui_str description, cui_str confirm, cui_str cancel, cui_surface_options);

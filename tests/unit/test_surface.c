@@ -429,6 +429,99 @@ static void resize_sheets(void) {
             cui_destroy(ui);
         }
 }
+typedef struct {
+    cui_context *ui;
+    cui_surface_state *surface;
+    unsigned calls;
+    cui_surface_result reason;
+} close_observer;
+static void closed(void *user, cui_surface_result reason) {
+    close_observer *observer = user;
+    assert(!observer->surface->overlay.open && cui_focused(observer->ui) == 1);
+    observer->calls++;
+    observer->reason = reason;
+}
+static void requested_close(void) {
+#ifdef CUI_SURFACE_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    cui_surface_state s;
+    cui_surface_init(&s, 100, CUI_SURFACE_ALERT);
+    close_observer observer = {.ui = ui, .surface = &s};
+    cui_surface_options o = {.viewport = {0, 0, 600, 400},
+                             .width = 300,
+                             .height = 260,
+                             .decide = decide,
+                             .on_close = closed,
+                             .close_user = &observer};
+    scene(ui, &theme, &s, o, false);
+    cui_surface_open(ui, &s, 1);
+    scene(ui, &theme, &s, o, false);
+    allow_accept = false;
+    decisions = 0;
+    cui_surface_request_close(ui, &s, CUI_SURFACE_ACCEPTED);
+    assert(cui_last_error(ui) == CUI_OK && s.overlay.open && observer.calls == 0);
+    scene(ui, &theme, &s, o, false);
+    assert(s.overlay.open && observer.calls == 0 && decisions == 1);
+    scene(ui, &theme, &s, o, false);
+    assert(decisions == 1); /* A rejected request is consumed, not retried every frame. */
+    allow_accept = true;
+    cui_surface_request_close(ui, &s, CUI_SURFACE_ACCEPTED);
+    scene(ui, &theme, &s, o, false);
+    assert(!s.overlay.open && observer.calls == 1 && decisions == 2 &&
+           observer.reason == CUI_SURFACE_ACCEPTED);
+    scene(ui, &theme, &s, o, false);
+    assert(observer.calls == 1);
+    cui_surface_init(&s, 100, CUI_SURFACE_DIALOG);
+    cui_surface_open(ui, &s, 1);
+    scene(ui, &theme, &s, o, false);
+    cui_focus(ui, 20);
+    key(ui, CUI_KEY_ENTER);
+    scene(ui, &theme, &s, o, true);
+    assert(observer.calls == 2 && observer.reason == CUI_SURFACE_CLOSED);
+    cui_destroy(ui);
+}
+#ifndef CUI_SURFACE_BASE_ONLY
+static void footer_scene(cui_context *ui, const cui_theme *theme, cui_surface_state *s) {
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400});
+    button(ui, 1, theme, cui_string("Open"), false);
+    if (cui_surface_begin(
+            ui, theme, s, cui_string("Fixed footer"), cui_string("Long body"),
+            (cui_surface_options){.viewport = {0, 0, 600, 400}, .width = 360, .height = 300})) {
+        cui_begin_box(ui, 40, (cui_box){.width = -1, .height = 1000, .background = theme->primary});
+        cui_end_box(ui);
+        cui_surface_footer_begin(ui, theme);
+        if (button(ui, 41, theme, cui_string("Save"), false))
+            cui_surface_close(ui, s, CUI_SURFACE_ACCEPTED);
+        cui_surface_end(ui);
+    }
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void fixed_footer(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (unsigned i = 0; i < 4; ++i) {
+        cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+        cui_surface_state s;
+        cui_surface_init(&s, 100, CUI_SURFACE_DIALOG);
+        footer_scene(ui, &themes[i], &s);
+        cui_surface_open(ui, &s, 1);
+        footer_scene(ui, &themes[i], &s);
+        cui_rect panel = cui_bounds(ui, 100), footer = cui_bounds(ui, 41);
+        assert(footer.h > 0 && footer.y >= panel.y && footer.y + footer.h <= panel.y + panel.h);
+        pointer(ui, footer.x + footer.w / 2, footer.y + footer.h / 2);
+        footer_scene(ui, &themes[i], &s);
+        assert(!s.overlay.open && cui_focused(ui) == 1 && s.result == CUI_SURFACE_ACCEPTED);
+        cui_destroy(ui);
+    }
+}
+#endif
 static void geometry(void) {
     cui_surface_options o = {.viewport = {10, 20, 600, 400}, .width = 200, .height = 150};
     const cui_rect expected[] = {
@@ -452,8 +545,10 @@ int main(void) {
     sheet_events();
     resize_sheets();
     nested_surfaces();
+    requested_close();
 #ifndef CUI_SURFACE_BASE_ONLY
     styled_confirmation();
+    fixed_footer();
 #endif
     return 0;
 }

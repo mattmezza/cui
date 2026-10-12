@@ -22,12 +22,16 @@ typedef enum {
     CUI_SURFACE_CLOSED
 } cui_surface_result;
 typedef bool (*cui_surface_decision_fn)(void *user, cui_surface_result);
+typedef void (*cui_surface_closed_fn)(void *user, cui_surface_result);
 typedef struct {
     cui_overlay overlay;
     cui_surface_kind kind;
     cui_surface_result result;
     float sheet_size, resize_origin, resize_size;
     bool resizing;
+    cui_surface_result pending_close;
+    cui_surface_closed_fn on_close;
+    void *close_user;
 } cui_surface_state;
 typedef struct {
     cui_rect viewport, anchor;
@@ -41,10 +45,14 @@ typedef struct {
     float sheet_minimum, sheet_maximum;
     cui_surface_decision_fn decide; /* False keeps the surface open. */
     void *decision_user;
+    cui_surface_closed_fn on_close; /* Runs after close and focus restoration. */
+    void *close_user;
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
 void cui_surface_close(cui_context *, cui_surface_state *, cui_surface_result);
+/* Safe between frames; the next submitted frame applies the decision policy. */
+void cui_surface_request_close(cui_context *, cui_surface_state *, cui_surface_result);
 cui_surface_result cui_surface_take_result(cui_surface_state *);
 cui_rect cui_surface_geometry(cui_surface_kind, cui_surface_options);
 cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_options);
@@ -61,6 +69,8 @@ void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cu
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);
 void cui_surface_end(cui_context *);
+/* Close the body and begin a fixed footer row; surface_end closes the footer. */
+void cui_surface_footer_begin(cui_context *, const cui_theme *);
 /* Complete confirmation composition. Results persist until explicitly taken. */
 void cui_alert_dialog(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                       cui_str description, cui_str confirm, cui_str cancel, cui_surface_options);
@@ -91,6 +101,7 @@ void cui_surface_open(cui_context *ui, cui_surface_state *s, cui_id trigger) {
     if (!s)
         return;
     s->result = CUI_SURFACE_NONE;
+    s->pending_close = CUI_SURFACE_NONE;
     cui_overlay_open(ui, &s->overlay, trigger);
 }
 void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
@@ -100,6 +111,16 @@ void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result
     s->resizing = false;
     cui_dismiss_focus_scope(ui, s->overlay.id, s->overlay.trigger);
     cui_overlay_close(ui, &s->overlay);
+    if (s->on_close)
+        s->on_close(s->close_user, result);
+}
+void cui_surface_request_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
+    if (!ui || !s || !s->overlay.open)
+        return;
+    s->pending_close = result >= CUI_SURFACE_ACCEPTED && result <= CUI_SURFACE_CLOSED
+                           ? result
+                           : CUI_SURFACE_CLOSED;
+    cui_invalidate(ui);
 }
 cui_surface_result cui_surface_take_result(cui_surface_state *s) {
     if (!s)
@@ -224,6 +245,16 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
     if (!ui || !s || !s->overlay.open)
         return false;
+    s->on_close = o.on_close;
+    s->close_user = o.close_user;
+    if (s->pending_close != CUI_SURFACE_NONE) {
+        cui_surface_result reason = s->pending_close;
+        s->pending_close = CUI_SURFACE_NONE;
+        if (!o.decide || o.decide(o.decision_user, reason)) {
+            cui_surface_close(ui, s, reason);
+            return true;
+        }
+    }
     s->overlay.modal = s->kind != CUI_SURFACE_POPOVER || o.modal_popover;
     if (o.no_sheet_resize || s->kind != CUI_SURFACE_SHEET)
         s->resizing = false;
@@ -339,8 +370,7 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
                                .radius = t->radius,
                                .background = t->surface,
                                .border = t->border,
-                               .border_width = 1,
-                               .clip = true},
+                               .border_width = 1},
                      bounds, (int16_t)(layer + 1));
     cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = t->gap});
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 4), (cui_box){.width = -1});
@@ -355,6 +385,13 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_begin_box(ui, 0, (cui_box){.width = -1, .height = -1, .gap = t->gap, .clip = true});
     cui_overlay_set_bounds(&s->overlay, bounds);
     return true;
+}
+void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
+    if (!ui || !t)
+        return;
+    cui_end_box(ui);
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = -1, .row = true, .gap = t->gap, .align_x = CUI_ALIGN_END});
 }
 void cui_surface_end(cui_context *ui) {
     cui_end_box(ui);

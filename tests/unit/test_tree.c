@@ -271,6 +271,7 @@ static void virtualization(void) {
     size_t n;
     const cui_semantic *sem = cui_semantics(ui, &n);
     assert(n == 13 && sem[1].id == cui_tree_row_id(10, 4999));
+    assert(sem[0].details.scrollable && sem[0].details.scroll_max_y == 319760);
 #ifndef CUI_TREE_BASE_ONLY
     assert(cui_bounds(ui, cui_tree_row_id(10, 5001)).y == -5);
     click(ui, cui_bounds(ui, cui_tree_row_id(10, 4999)));
@@ -281,6 +282,15 @@ static void virtualization(void) {
     scene(ui, &theme, model, &state, &selected,
           (cui_tree_options){.height = 240, .row_height = 32, .overscan = 2});
     assert(selected == 0);
+    cui_focus(ui, cui_tree_row_id(10, 5001));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 10, .y = 100}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 10, .y = 100, .dy = -1}));
+    scene(ui, &theme, model, &state, &selected,
+          (cui_tree_options){.height = 240, .row_height = 32, .overscan = 2});
+    assert(state.scroll == 160037);
+    scene(ui, &theme, model, &state, &selected,
+          (cui_tree_options){.height = 240, .row_height = 32, .overscan = 2});
+    assert(state.scroll == 160037);
 #endif
     cui_destroy(ui);
     cui_tree_destroy(model);

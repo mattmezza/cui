@@ -13,3 +13,8 @@ Fixed-height virtualization computes the visible/overscan range arithmetically a
 The styled Tree paints indented theme-colored rows, textual expand/collapse affordances, selected surfaces and focus borders. Its base model and public node accessors support application-specific row painting. Icons, custom row callback convenience, context menus and drag/drop are not implemented; none are claimed by the parity manifest.
 
 Tests cover transactional rejection and preserved models, parent/subtree structure, expand/collapse, a 10,000-node viewport and 1,000 deterministic expansion rebuilds compared with an independent ancestor scan. Routed keyboard/pointer tests run all four themes and verify multiple navigation events, disabled skipping, direct-child/parent behavior, expansion controls, typeahead/repeated letters, activation, manual selection and semantic hierarchy. Fractional-scroll tests verify measured row positions and reject overscan pointer targets. The same event suite builds with `CUI_TREE_BASE_ONLY`, links only core/base Tree and emits no draw commands. Strict C11 warnings, fully instrumented ASan/UBSan and existing CTest pass before submission. Build/distribution registration belongs to the integrator.
+
+The root exposes scroll offsets and extents for core wheel routing. Wheel events
+apply only when routed to this Tree; ancestor boundary bubbling is handled by
+core. Scrolling does not repeatedly reveal the focused row; keyboard navigation
+reveals it again. Tree-item semantics include the one-based hierarchy level.

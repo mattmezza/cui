@@ -105,7 +105,10 @@ typedef enum {
     CUI_ROLE_COLUMNHEADER,
     CUI_ROLE_GRIDCELL,
     CUI_ROLE_GRID,
-    CUI_ROLE_SCROLLBAR
+    CUI_ROLE_SCROLLBAR,
+    CUI_ROLE_ROWHEADER,
+    CUI_ROLE_ROWGROUP,
+    CUI_ROLE_ALERTDIALOG
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -5510,6 +5513,7 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_MENUITEM:
     case CUI_ROLE_MENUITEMCHECKBOX:
     case CUI_ROLE_MENUITEMRADIO:
+    case CUI_ROLE_ROWHEADER:
     case CUI_ROLE_COLUMNHEADER:
     case CUI_ROLE_GRIDCELL:
     case CUI_ROLE_TREEITEM:

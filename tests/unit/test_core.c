@@ -734,12 +734,36 @@ static void test_nested_wheel_routing(void) {
     cui_destroy(ui);
 }
 
+static void test_table_semantic_roles(void) {
+    cui_context *ui = make();
+    begin(ui);
+    cui_interact(ui, 1, CUI_ROLE_ROWGROUP, cui_string("Body"), false, false, 0);
+    cui_interact(ui, 2, CUI_ROLE_ROWHEADER, cui_string("Row 2"), false, false, 0);
+    cui_interact(ui, 3, CUI_ROLE_COLUMNHEADER, cui_string("Name"), false, false, 0);
+    cui_interact(ui, 4, CUI_ROLE_GRIDCELL, cui_string("Alice"), false, false, 0);
+    cui_interact(ui, 5, CUI_ROLE_ALERTDIALOG, cui_string("Confirm"), false, false, 0);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 2);
+    cui_interact(ui, 2, CUI_ROLE_ROWHEADER, cui_string("Row 2"), false, false, 0);
+    cui_interact(ui, 3, CUI_ROLE_COLUMNHEADER, cui_string("Name"), false, false, 0);
+    cui_interact(ui, 4, CUI_ROLE_GRIDCELL, cui_string("Alice"), false, false, 0);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 3);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();
     test_pointer_scope_guard();
     test_nested_wheel_routing();
+    test_table_semantic_roles();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

@@ -860,17 +860,26 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                            : datum->close;
                 char value[48];
                 cui_str formatted;
-                if (o->tooltip_value) {
+                double pie_share = 0;
+                if (o->kind == CUI_CHART_PIE &&
+                    (o->pie_tooltip_value || (!o->tooltip_value && !o->tooltip_format))) {
+                    long double total = 0;
+                    for (size_t part = 0; part < o->count; part++)
+                        total += fmax(0, o->data[part].value);
+                    pie_share = total > 0 ? (double)((long double)number / total * 100) : 0;
+                }
+                if (o->kind == CUI_CHART_PIE && o->pie_tooltip_value) {
+                    size_t written = o->pie_tooltip_value(datum, tooltip_index, number, pie_share,
+                                                          value, sizeof value, o->tooltip_user);
+                    formatted =
+                        (cui_str){value, written < sizeof value ? written : sizeof value - 1};
+                } else if (o->tooltip_value) {
                     size_t written = o->tooltip_value(datum, tooltip_index, series, number, value,
                                                       sizeof value, o->tooltip_user);
                     formatted =
                         (cui_str){value, written < sizeof value ? written : sizeof value - 1};
                 } else if (o->kind == CUI_CHART_PIE && !o->tooltip_format) {
-                    long double total = 0;
-                    for (size_t part = 0; part < o->count; part++)
-                        total += fmax(0, o->data[part].value);
-                    double share = total > 0 ? (double)((long double)number / total * 100) : 0;
-                    int written = snprintf(value, sizeof value, "%.3g (%.1f%%)", number, share);
+                    int written = snprintf(value, sizeof value, "%.3g (%.1f%%)", number, pie_share);
                     formatted =
                         (cui_str){value, written <= 0                     ? 0
                                          : (size_t)written < sizeof value ? (size_t)written

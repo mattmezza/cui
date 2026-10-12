@@ -140,6 +140,14 @@ static cui_str tooltip_label_override(const cui_chart_datum *datum, size_t index
     assert(datum && index == 0 && series == 0);
     return (cui_str){"CustomName", 10};
 }
+static size_t pie_value_override(const cui_chart_datum *datum, size_t index, double value,
+                                 double share_percent, char *buffer, size_t capacity, void *user) {
+    (void)user;
+    assert(datum && index == 0 && value == 20 && fabs(share_percent - 2000. / 90.) < .001 &&
+           capacity >= 6);
+    memcpy(buffer, "Share!", 6);
+    return 6;
+}
 static void custom_tooltip(cui_context *ui, cui_id id, size_t index, const cui_chart_datum *datum,
                            void *user) {
     size_t *calls = user;
@@ -1215,6 +1223,17 @@ int main(void) {
             pie_custom_name = true;
     assert(pie_custom_name);
     options.tooltip_label = NULL;
+    options.pie_tooltip_value = pie_value_override;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
+    draw = cui_end_frame(ui);
+    bool pie_custom_value = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 6 &&
+            memcmp(draw.commands[i].text.data, "Share!", 6) == 0)
+            pie_custom_value = true;
+    assert(pie_custom_value);
+    options.pie_tooltip_value = NULL;
     bool outside_label = false;
     cui_chart_pie_label styled_pie_labels[3];
     assert(cui_chart_pie_labels(&options, styled_pie_labels, 3) == CUI_PLOT_OK);

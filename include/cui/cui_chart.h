@@ -109,6 +109,9 @@ typedef cui_str (*cui_chart_tooltip_label_fn)(const cui_chart_datum *, size_t in
 typedef size_t (*cui_chart_tooltip_value_fn)(const cui_chart_datum *, size_t index, size_t series,
                                              double value, char *buffer, size_t capacity,
                                              void *user);
+typedef size_t (*cui_chart_pie_tooltip_value_fn)(const cui_chart_datum *, size_t index,
+                                                 double value, double share_percent, char *buffer,
+                                                 size_t capacity, void *user);
 typedef cui_color (*cui_chart_tooltip_value_color_fn)(const cui_chart_datum *, size_t index,
                                                       size_t series, double value, void *user);
 typedef struct {
@@ -141,6 +144,7 @@ typedef struct {
     cui_chart_tooltip_title_fn tooltip_title;
     cui_chart_tooltip_label_fn tooltip_label; /* per-row label; pie/sankey tooltip_name */
     cui_chart_tooltip_value_fn tooltip_value;
+    cui_chart_pie_tooltip_value_fn pie_tooltip_value; /* receives source share percentage */
     cui_chart_tooltip_value_color_fn tooltip_value_color;
     bool has_domain;
     double domain_min, domain_max;

@@ -330,7 +330,7 @@ typedef cui_size (*cui_measure_fn)(void *user, cui_str text, float font_size);
 typedef cui_size (*cui_measure_styled_fn)(void *user, cui_str text, float font_size,
                                           cui_text_style style);
 /* Distances from the baseline in logical pixels. Descent is nonnegative;
- * line_height is the face's preferred line spacing, independent of ink bounds. */
+ * line_height is the renderer's line spacing, independent of ink bounds. */
 typedef struct {
     float ascent, descent, line_height;
 } cui_font_metrics;

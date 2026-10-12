@@ -1,36 +1,37 @@
 {
-  "source": "d6aa5bd",
-  "published_source": "e49dc95e0de9602ed1e4f4afe76f93a309e239ae",
+  "source": "1c1322e",
+  "published_source": "bd462ec51af449f740c2ed19fe235fbe753bdf8a",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local alignment/icon release passes59/59 native,57/57 sanitizers,49/49 WASI and68 real Chromium stories. Canvas baseline and source Button XS/S/M/L metrics are tested in light/dark, size controls expanded, built-in SVG migration and theme-provided custom artwork integrated. Public remains e49dc95/62 stories until deployment verification. All78entries retained:10notstarted,4implementedpartial,64testedpartial,0verified. Sidebar/Textarea worker checkpoints await integration; homepage/docs/search/copy-code site work continues. Full parity unfinished.",
+  "summary": "Local native63/63, sanitizers61/61 and WASI53/53 pass. Sidebar, Textarea and Settings have tested partial implementations. All78 manifest entries retained:7notstarted,4implementedpartial,67testedpartial,0verified. All38 named palettes are implemented in C; grouped website picker is in progress. Homepage/docs/search/copy-code passed the root68-story Chromium gate; still local. Public bd462ec has68 WASM stories with source Button sizes, text alignment and SVG defaults. Its Pages deployment succeeded; native CI exposed a headless SDL decoration issue, fixed locally in080f543. Full parity unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "7970367",
-      "passed": 59,
-      "total": 59,
-      "log": "native-7970367.txt"
+      "source": "1c1322e",
+      "passed": 63,
+      "total": 63,
+      "log": "native-1c1322e.txt"
     },
     {
       "name": "sanitizers",
-      "source": "7970367",
-      "passed": 57,
-      "total": 57,
-      "log": "asan-7970367.txt"
-    },
-    {
-      "name": "WASI",
-      "source": "7970367",
-      "passed": 49,
-      "total": 49,
-      "log": "wasi-7970367.txt"
+      "source": "1c1322e",
+      "passed": 61,
+      "total": 61,
+      "log": "asan-1c1322e.txt"
     },
     {
       "name": "browser",
-      "source": "d6aa5bd",
-      "stories": 68,
-      "catalog_entries": 78,
-      "log": "browser-d6aa5bd.txt"
+      "source": "0e64d7e",
+      "test_source": "93d6706",
+      "passed": 68,
+      "total": 68,
+      "log": "browser-93d6706.txt"
+    },
+    {
+      "name": "WASI",
+      "source": "1c1322e",
+      "passed": 53,
+      "total": 53,
+      "log": "wasi-1c1322e.txt"
     }
   ],
   "previous_deployment": {

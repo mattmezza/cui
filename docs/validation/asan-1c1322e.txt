@@ -1,0 +1,127 @@
+Test project /home/matteo/dev/cui/build-asan
+      Start  1: bootstrap
+ 1/61 Test  #1: bootstrap ........................   Passed    0.02 sec
+      Start  2: core
+ 2/61 Test  #2: core .............................   Passed    0.08 sec
+      Start  3: base
+ 3/61 Test  #3: base .............................   Passed    0.03 sec
+      Start  4: components
+ 4/61 Test  #4: components .......................   Passed    0.14 sec
+      Start  5: render
+ 5/61 Test  #5: render ...........................   Passed    0.03 sec
+      Start  6: edit
+ 6/61 Test  #6: edit .............................   Passed    0.04 sec
+      Start  7: overlay
+ 7/61 Test  #7: overlay ..........................   Passed    0.03 sec
+      Start  8: virtual
+ 8/61 Test  #8: virtual ..........................   Passed    0.09 sec
+      Start  9: dock
+ 9/61 Test  #9: dock .............................   Passed    0.98 sec
+      Start 10: plot
+10/61 Test #10: plot .............................   Passed    0.02 sec
+      Start 11: content
+11/61 Test #11: content ..........................   Passed    0.05 sec
+      Start 12: disclosure
+12/61 Test #12: disclosure .......................   Passed    0.09 sec
+      Start 13: choice
+13/61 Test #13: choice ...........................   Passed    1.76 sec
+      Start 14: numeric
+14/61 Test #14: numeric ..........................   Passed    0.08 sec
+      Start 15: picker
+15/61 Test #15: picker ...........................   Passed    0.23 sec
+      Start 16: tree
+16/61 Test #16: tree .............................   Passed    0.14 sec
+      Start 17: input
+17/61 Test #17: input ............................   Passed    0.06 sec
+      Start 18: table
+18/61 Test #18: table ............................   Passed    0.11 sec
+      Start 19: scroll
+19/61 Test #19: scroll ...........................   Passed    0.05 sec
+      Start 20: surface
+20/61 Test #20: surface ..........................   Passed    0.40 sec
+      Start 21: form
+21/61 Test #21: form .............................   Passed    0.09 sec
+      Start 22: otp
+22/61 Test #22: otp ..............................   Passed    0.09 sec
+      Start 23: status
+23/61 Test #23: status ...........................   Passed    0.17 sec
+      Start 24: message
+24/61 Test #24: message ..........................   Passed    0.11 sec
+      Start 25: media
+25/61 Test #25: media ............................   Passed    0.17 sec
+      Start 26: description
+26/61 Test #26: description ......................   Passed    0.08 sec
+      Start 27: chrome
+27/61 Test #27: chrome ...........................   Passed    0.08 sec
+      Start 28: resizable
+28/61 Test #28: resizable ........................   Passed    0.06 sec
+      Start 29: icon
+29/61 Test #29: icon .............................   Passed    0.43 sec
+      Start 30: toolbar
+30/61 Test #30: toolbar ..........................   Passed    0.03 sec
+      Start 31: sidebar
+31/61 Test #31: sidebar ..........................   Passed    0.07 sec
+      Start 32: textarea
+32/61 Test #32: textarea .........................   Passed    0.04 sec
+      Start 33: settings
+33/61 Test #33: settings .........................   Passed    0.07 sec
+      Start 34: icon_host_svg
+34/61 Test #34: icon_host_svg ....................   Passed    0.03 sec
+      Start 35: example_unstyled
+35/61 Test #35: example_unstyled .................   Passed    0.02 sec
+      Start 36: example_styled_settings
+36/61 Test #36: example_styled_settings ..........   Passed    0.02 sec
+      Start 37: manifest
+37/61 Test #37: manifest .........................   Passed    0.15 sec
+      Start 38: licenses
+38/61 Test #38: licenses .........................   Passed    0.20 sec
+      Start 39: distribution
+39/61 Test #39: distribution .....................   Passed    0.23 sec
+      Start 40: cpp_embedding
+40/61 Test #40: cpp_embedding ....................   Passed    0.03 sec
+      Start 41: distribution_single
+41/61 Test #41: distribution_single ..............   Passed    0.05 sec
+      Start 42: distribution_multi
+42/61 Test #42: distribution_multi ...............   Passed    0.04 sec
+      Start 43: sdl3_services
+43/61 Test #43: sdl3_services ....................   Passed    0.89 sec
+      Start 44: gallery_layout
+44/61 Test #44: gallery_layout ...................   Passed    0.04 sec
+      Start 45: gallery_capture
+45/61 Test #45: gallery_capture ..................   Passed    0.49 sec
+      Start 46: implementation_embedding
+46/61 Test #46: implementation_embedding .........   Passed    0.03 sec
+      Start 47: numeric_base_only
+47/61 Test #47: numeric_base_only ................   Passed    0.07 sec
+      Start 48: picker_base_only
+48/61 Test #48: picker_base_only .................   Passed    0.18 sec
+      Start 49: tree_base_only
+49/61 Test #49: tree_base_only ...................   Passed    0.17 sec
+      Start 50: input_base_only
+50/61 Test #50: input_base_only ..................   Passed    0.03 sec
+      Start 51: table_base_only
+51/61 Test #51: table_base_only ..................   Passed    0.06 sec
+      Start 52: scroll_base_only
+52/61 Test #52: scroll_base_only .................   Passed    0.06 sec
+      Start 53: surface_base_only
+53/61 Test #53: surface_base_only ................   Passed    0.21 sec
+      Start 54: form_base_only
+54/61 Test #54: form_base_only ...................   Passed    0.03 sec
+      Start 55: otp_base_only
+55/61 Test #55: otp_base_only ....................   Passed    0.03 sec
+      Start 56: status_base_only
+56/61 Test #56: status_base_only .................   Passed    0.02 sec
+      Start 57: message_base_only
+57/61 Test #57: message_base_only ................   Passed    0.03 sec
+      Start 58: media_base_only
+58/61 Test #58: media_base_only ..................   Passed    0.02 sec
+      Start 59: resizable_base_only
+59/61 Test #59: resizable_base_only ..............   Passed    0.03 sec
+      Start 60: toolbar_base_only
+60/61 Test #60: toolbar_base_only ................   Passed    0.03 sec
+      Start 61: sidebar_base_only
+61/61 Test #61: sidebar_base_only ................   Passed    0.02 sec
+
+100% tests passed out of 61
+
+Total Test time (real) =   9.16 sec

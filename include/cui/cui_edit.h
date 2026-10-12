@@ -50,6 +50,10 @@ cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
  * selection. Undo restores the original selection; success collapses it after
  * the inserted text. Rejection leaves text, selection and history unchanged. */
 cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui_str text);
+/* Indent selected lines (inclusive of a selection ending at line start), or
+ * insert at the collapsed cursor. Outdent removes only an exact line prefix.
+ * One successful change is one undo step with both selection endpoints mapped. */
+cui_edit_result cui_edit_indent(cui_edit *, bool outdent, size_t tab_size, bool hard_tabs);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);

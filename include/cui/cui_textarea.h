@@ -41,6 +41,8 @@ typedef struct {
     bool auto_grow, no_wrap, no_appearance, no_border;
     bool submit_on_enter; /* Shift-Enter still inserts a newline. */
     bool disabled, readonly, required, invalid, no_tab_stop;
+    bool no_indent, hard_tabs; /* Editable text handles Tab; zero tab_size defaults to two. */
+    size_t tab_size;
     bool custom_role;
     cui_role role;
     cui_str placeholder;

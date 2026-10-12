@@ -63,7 +63,7 @@ cui_id cui_textarea_viewport_id(cui_id id) {
 }
 bool cui_textarea_measure(cui_textarea_options options, float root, cui_textarea_metrics *out) {
     if (!out || options.size < CUI_TEXTAREA_MEDIUM || options.size > CUI_TEXTAREA_CUSTOM ||
-        !isfinite(root) || root <= 0 || root > 4096)
+        options.tab_size > 4096 || !isfinite(root) || root <= 0 || root > 4096)
         return false;
     float density = root / 16;
     float font = options.size == CUI_TEXTAREA_XSMALL  ? 12
@@ -255,6 +255,10 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
     cui_interaction interaction =
         cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, options.disabled, false, (float)before.length);
     cui_set_tab_stop(ui, id, !options.no_tab_stop);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.handles_tab = !options.disabled &&
+                                                                   !options.readonly &&
+                                                                   !options.no_indent});
     if (options.custom_role && !cui_set_semantic_role(ui, id, options.role)) {
         result.error = CUI_TEXTAREA_INVALID;
         return result;
@@ -358,6 +362,13 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             state->upstream_affinity = false;
             state->preferred_valid = false;
             handled = true;
+        } else if (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_TAB && !command &&
+                   !options.readonly && !options.no_indent) {
+            error = cui_edit_indent(edit, shift, options.tab_size ? options.tab_size : 2,
+                                    options.hard_tabs);
+            state->upstream_affinity = false;
+            state->preferred_valid = false;
+            move = handled = true;
         } else if (event.type == CUI_EVENT_TEXT ||
                    (event.type == CUI_EVENT_KEY_DOWN &&
                     (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT ||
@@ -404,19 +415,21 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                                old_row != state->caret_line;
     result.scrolled = old_x != state->scroll_x || old_y != state->scroll_y;
     cui_update_semantic(ui, id, false, (float)after.length);
-    cui_set_semantic_details(ui, id,
-                             (cui_semantic_details){.multiline = true,
-                                                    .readonly = options.readonly,
-                                                    .required = options.required,
-                                                    .invalid = options.invalid ||
-                                                               result.edit_error != CUI_EDIT_OK ||
-                                                               result.error != CUI_TEXTAREA_OK,
-                                                    .cursor = CUI_CURSOR_TEXT,
-                                                    .scrollable = true,
-                                                    .scroll_x = state->scroll_x,
-                                                    .scroll_y = state->scroll_y,
-                                                    .scroll_max_x = state->maximum_x,
-                                                    .scroll_max_y = state->maximum_y});
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.multiline = true,
+                               .readonly = options.readonly,
+                               .handles_tab =
+                                   !options.disabled && !options.readonly && !options.no_indent,
+                               .required = options.required,
+                               .invalid = options.invalid || result.edit_error != CUI_EDIT_OK ||
+                                          result.error != CUI_TEXTAREA_OK,
+                               .cursor = CUI_CURSOR_TEXT,
+                               .scrollable = true,
+                               .scroll_x = state->scroll_x,
+                               .scroll_y = state->scroll_y,
+                               .scroll_max_x = state->maximum_x,
+                               .scroll_max_y = state->maximum_y});
     if (result.changed || result.selection_changed || result.scrolled)
         cui_invalidate(ui);
     return result;

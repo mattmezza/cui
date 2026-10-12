@@ -161,6 +161,7 @@ typedef struct {
     bool focusable;
     /* Primary pointer activation without opting into focus or keyboard activation. */
     bool pointer_activatable;
+    bool handles_tab; /* Focused editable control consumes Tab and Shift-Tab itself. */
     cui_cursor cursor;
     bool no_focus; /* Suppress role-default focus; pointer activation remains opt-in. */
 } cui_semantic_details;

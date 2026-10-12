@@ -273,7 +273,61 @@ static void test_submit_and_horizontal(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static cui_textarea_result focus_frame(cui_context *ui, cui_edit *edit, cui_textarea_state *state,
+                                       cui_textarea_options options) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_textarea_result result =
+        cui_textarea(ui, 10, &theme, cui_string("Notes"), edit, state, options);
+    cui_interact(ui, 11, CUI_ROLE_BUTTON, cui_string("Next"), false, false, 0);
+    cui_begin_box(ui, 11, (cui_box){.width = 60, .height = 24});
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_tab_indent_and_focus(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    char buffer[64] = "a\nb";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[16];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 16));
+    cui_textarea_options options = {.width = 180, .rows = 2};
+    focus_frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    assert(cui_edit_select(edit, 0, 3) == CUI_EDIT_OK);
+    key(ui, CUI_KEY_TAB, 0);
+    cui_textarea_result result = focus_frame(ui, edit, &state, options);
+    assert(result.changed && !result.edit_error && cui_focused(ui) == 10 &&
+           strcmp(buffer, "  a\n  b") == 0);
+    assert(cui_edit_get_state(edit).anchor == 2 && cui_edit_get_state(edit).cursor == 7);
+    key(ui, CUI_KEY_TAB, CUI_MOD_SHIFT);
+    result = focus_frame(ui, edit, &state, options);
+    assert(result.changed && cui_focused(ui) == 10 && strcmp(buffer, "a\nb") == 0);
+    assert(cui_edit_get_state(edit).anchor == 0 && cui_edit_get_state(edit).cursor == 3);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB, .repeat = true}));
+    result = focus_frame(ui, edit, &state, options);
+    assert(result.changed && cui_focused(ui) == 10 && strcmp(buffer, "a  \nb") == 0);
+    options.no_indent = true;
+    focus_frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_TAB, 0);
+    result = focus_frame(ui, edit, &state, options);
+    assert(!result.changed && cui_focused(ui) == 11 && strcmp(buffer, "a  \nb") == 0);
+    options.no_indent = false;
+    options.readonly = true;
+    focus_frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_TAB, 0);
+    result = focus_frame(ui, edit, &state, options);
+    assert(!result.changed && cui_focused(ui) == 11);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_tab_indent_and_focus();
     test_submit_and_horizontal();
     test_metrics_and_layout();
     test_editing_navigation_scroll();

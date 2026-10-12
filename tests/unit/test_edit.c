@@ -189,6 +189,47 @@ static void test_revision_and_max_scalar(void) {
     assert(cui_edit_valid_utf8(cui_edit_get_text(e)));
     cui_edit_destroy(e);
 }
+static void test_atomic_indent(void) {
+    char buffer[64] = "\xc3\xa9\nx\n";
+    cui_edit *edit = make(buffer, sizeof buffer, true, 8);
+    assert(cui_edit_select(edit, 5, 0) == CUI_EDIT_OK);
+    assert(cui_edit_indent(edit, false, 2, false) == CUI_EDIT_OK);
+    assert(strcmp(buffer, "  \xc3\xa9\n  x\n  ") == 0);
+    cui_edit_state state = cui_edit_get_state(edit);
+    assert(state.anchor == 11 && state.cursor == 2 && state.can_undo);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    state = cui_edit_get_state(edit);
+    assert(strcmp(buffer, "\xc3\xa9\nx\n") == 0 && state.anchor == 5 && state.cursor == 0);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK);
+    state = cui_edit_get_state(edit);
+    assert(state.anchor == 11 && state.cursor == 2);
+    assert(cui_edit_indent(edit, true, 2, false) == CUI_EDIT_OK);
+    assert(strcmp(buffer, "\xc3\xa9\nx\n") == 0);
+    state = cui_edit_get_state(edit);
+    assert(state.anchor == 5 && state.cursor == 0);
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    assert(cui_edit_indent(edit, false, 2, true) == CUI_EDIT_OK);
+    assert(strcmp(buffer, "\t\xc3\xa9\nx\n") == 0);
+    assert(cui_edit_get_state(edit).cursor == 1);
+    assert(cui_edit_indent(edit, true, 2, true) == CUI_EDIT_OK);
+    assert(strcmp(buffer, "\xc3\xa9\nx\n") == 0);
+    state = cui_edit_get_state(edit);
+    assert(state.anchor == 0 && state.cursor == 0);
+    assert(cui_edit_indent(edit, true, 2, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).revision == state.revision);
+    cui_edit_destroy(edit);
+
+    char tight[8] = "a\nb";
+    edit = make(tight, sizeof tight, true, 4);
+    assert(cui_edit_select(edit, 0, 3) == CUI_EDIT_OK);
+    state = cui_edit_get_state(edit);
+    assert(cui_edit_indent(edit, false, 3, false) == CUI_EDIT_CAPACITY);
+    cui_edit_state after = cui_edit_get_state(edit);
+    assert(strcmp(tight, "a\nb") == 0 && after.revision == state.revision &&
+           after.anchor == state.anchor && after.cursor == state.cursor && !after.can_undo);
+    assert(cui_edit_indent(edit, false, 0, false) == CUI_EDIT_INVALID_ARGUMENT);
+    cui_edit_destroy(edit);
+}
 
 static void test_atomic_range(void) {
     char b[16] = "a\xc3\xa9z";
@@ -217,6 +258,7 @@ static void test_atomic_range(void) {
 }
 int main(void) {
     test_atomic_range();
+    test_atomic_indent();
     test_unicode();
     test_rejection();
     test_history_lines();

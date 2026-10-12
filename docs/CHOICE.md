@@ -548,3 +548,8 @@ works for touch adapters that produce the same pointer events; CUI currently has
 no device discriminator, so this is not a claim of native touch inertia or
 multitouch. Tests cover parent/child gestures, held state, cancellation, sub-row
 movement, stale release and ordinary clicking.
+
+Re-entering an already open submenu trigger preserves its child scroll window
+and active row instead of rebuilding that level. This also retains deeper open
+paths; changing to another parent or scrolling a parent still closes/replaces
+the affected child. A pointer test verifies re-entry after child wheel scrolling.

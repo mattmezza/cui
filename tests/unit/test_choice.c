@@ -2479,6 +2479,12 @@ static void test_hierarchical_menu_scroll(void) {
             range = semantics[i].details.scrollable && semantics[i].details.scroll_y == 84 &&
                     semantics[i].details.scroll_max_y == 336;
     assert(range);
+    cui_rect parent = cui_bounds(ui, 3100);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = parent.x + 3, .y = parent.y + 3}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.depth == 2 && state.levels[1].first_visible == 2 &&
+           state.levels[1].active == 3203);
     menu_wheel(ui, state.panels[0], -2);
     scrolling_menu_scene(ui, &state, &action, false);
     assert(state.depth == 1 && state.levels[0].first_visible == 2);

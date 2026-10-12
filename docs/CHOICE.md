@@ -695,8 +695,8 @@ Horizontal spacer padding avoids vertical padding, and labels reserve the source
 padding or fixed height; a styled height override still applies to them.
 Tests cover every theme/variant/size combination, exact spacing/font/caret bounds,
 density and height overrides, and Link action routing. This changes a standard
-42px Button theme's Dropdown Medium height to 32px. Menu row metrics retain their
-supplied theme settings. The caret remains a text fallback pending a proper
+42px Button theme's Dropdown Medium height to 32px. Menu rows use their
+separately documented source metrics. The caret remains a text fallback pending a proper
 portable icon primitive; intrinsic custom-body sizing and built-in capped-label
 ellipsis remain separate presentation gaps.
 
@@ -724,7 +724,7 @@ selection for the secondary-selected outline. Their foreground remains text;
 disabled rows use muted and suppress active/secondary paint. Popup panels use
 popover, and ordinary hierarchical menu labels use popover_foreground. These
 colors are independently configurable and tested with distinct token values.
-Full row density defaults remain separate source-parity work.
+Row metric policies are documented below; other remaining gaps stay explicit.
 
 Default and Underline bars paint their full-width one-pixel baseline as an
 anchored underlay, after the bar background and before tab children. Its width
@@ -746,12 +746,12 @@ whole-group disablement through the convenience API.
 Hierarchical Menu options now expose size, density and max_height. Medium,
 Large and XSmall use the source 26 px row height; Small uses 20 px. Density defaults
 to theme.font_size/16 and scales these logical metrics. Rows use 14 px text,
-12 px icon slots,8 px horizontal padding,4 px outer padding and 2 px vertical gaps.
+12 px icon slots, 8 px horizontal padding, 4 px outer padding and 2 px vertical gaps.
 The radius caps at 8 px and Small halves it. A separator reserves 6 px (2 px line
 plus two 2 px margins); group labels reserve 14*1.618034 px. The natural line-height
 factor comes from the pinned gpui-pre 0.3.8 TextStyle default, rather than a
-Tailwind line-height assumption. The explicit core text line-height API is used;
-its current integer internal text positioning remains a typography limitation.
+Tailwind line-height assumption. The explicit core text line-height API preserves
+fractional font and line-height values through layout and painting.
 Default popup height caps at min(viewport.height/2,450 px); positive max_height
 sets an explicit cap. Popup fitting, semantic scroll offsets, submenu anchors,
 pointer hover routing and wheel tail limits account for nonuniform rows.
@@ -771,3 +771,33 @@ selectors must be remapped. Previous values were Primary 0, Secondary 1,
 Outline 2, Ghost 3, Danger 4, Warning 5, Success 6, Info 7, Default 8; Link/Text/Custom
 values remain unchanged. A custom Default token test verifies the zero-options
 presentation directly.
+
+Ordinary List rows now use the source 16 px font,12 px horizontal/4 px vertical
+padding, 4 px body/check gap and natural height 16*1.618034+8 px. List has no source
+size variant. Positive options.height overrides the fixed row height; density
+scales logical metrics and defaults to theme.font_size/16. Its multiselect check
+reserves 20 px and paints a 14 px muted glyph. Inactive rows are transparent; the
+secondary-selected selection outline is the only row border.
+
+Select and Combobox rows expose Medium/Small/Large/XSmall/Custom sizing.
+Their fonts are 14/14/16/12 px; horizontal padding is 7/5/9/1 px and vertical
+padding 4/2/8/4 px. Custom sizing uses font=custom_size*0.875 with 5 px horizontal
+and 4 px vertical padding. Natural height is font*1.618034+2*vertical_padding.
+All searchable rows reserve a 12 px check slot and 4 px body/check gap. Density
+scales these logical values, including fractional fonts and glyph sizes.
+Positive row_height overrides row height while preserving the font policy.
+Popup padding is 4 px and the default total height cap is 20 rem=320 px, scaled by
+density; positive max_height changes that cap. Popup fitting, cursor reveal and
+semantic scroll offsets use the resulting row heights. Headless tests cover all
+five sizes across Select/Combobox single/multiple modes, fractional custom fonts
+and density, padding/gap/check geometry, explicit row-height overrides, routed
+selection, default/custom popup caps and End reveal/activation. Existing wheel,
+disabled and custom-body routing tests remain in the full suite.
+
+The fixed-height convenience row APIs still do not measure arbitrary custom
+content height or variable multiline body heights. Scroll windows remain whole
+rows rather than continuous pixel offsets/partially visible rows. Custom body
+callbacks choose their own text presentation. Natural popup width, portal shadow
+and remaining icon/loader substitution remain separate gaps. Legacy flat Menu
+shares the flat popup infrastructure; hierarchical Menu has its dedicated
+source row metrics and nonuniform separator/label accounting.

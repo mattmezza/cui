@@ -135,6 +135,19 @@ typedef struct {
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
 typedef void (*cui_choice_confirm_fn)(cui_id item, bool secondary, void *user);
 typedef void (*cui_choice_cancel_fn)(void *user);
+typedef enum {
+    CUI_LIST_MEDIUM,
+    CUI_LIST_SMALL,
+    CUI_LIST_LARGE,
+    CUI_LIST_XSMALL,
+    CUI_LIST_CUSTOM
+} cui_list_size;
+typedef struct {
+    float height, font_size, line_height, padding_x, padding_y, gap;
+    float check_size, check_width, density;
+} cui_list_metrics;
+cui_list_metrics cui_list_default_metrics(float density);
+cui_list_metrics cui_searchable_list_size_metrics(cui_list_size, float custom_size, float density);
 typedef struct {
     bool disabled, menu;
     float dt;
@@ -151,6 +164,8 @@ typedef struct {
     cui_choice_cancel_fn on_cancel;   /* Escape, independent of selection change */
     unsigned secondary_modifiers;     /* zero uses CTRL|META; caller selects host policy */
     bool track_secondary;             /* highlight secondary presses without confirming */
+    float density; /* zero derives theme.font_size/16; ordinary List has no size variant */
+    float height;  /* positive fixed row override; zero uses source natural text plus padding */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -168,6 +183,11 @@ typedef struct {
     cui_choice_render_fn render; /* optional fixed-height option body */
     void *render_user;
     bool align_end; /* align popup right edge with anchor right edge */
+    cui_list_size size;
+    float custom_size; /* CUI_LIST_CUSTOM logical font basis; font = size*0.875 */
+    float density;     /* zero derives theme.font_size/16 */
+    float row_height;  /* positive fixed row override; zero uses source natural height */
+    float max_height;  /* positive popup cap; default source 20rem = 320*density */
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */

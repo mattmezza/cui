@@ -841,14 +841,13 @@ static bool scroll_choices_scene(cui_context *ui, unsigned mode, cui_edit *query
 static void wheel(cui_context *ui, float x, float y, float dy) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dy = dy}));
 }
-static void assert_scroll_metadata(cui_context *ui, cui_id id, size_t first) {
+static void assert_scroll_metadata(cui_context *ui, cui_id id, size_t first, float row_height) {
     size_t count = 0;
     const cui_semantic *semantics = cui_semantics(ui, &count);
-    cui_theme theme = cui_theme_light();
     for (size_t i = 0; i < count; i++)
         if (semantics[i].id == id) {
             assert(semantics[i].details.scrollable);
-            assert(semantics[i].details.scroll_y == first * theme.control_height);
+            assert(fabsf(semantics[i].details.scroll_y - first * row_height) < .0001f);
             assert(semantics[i].details.scroll_max_y >= semantics[i].details.scroll_y);
             assert(semantics[i].details.scroll_max_y > 0);
             return;
@@ -885,9 +884,13 @@ static void test_choice_scrolling(void) {
         wheel(ui, x, y, -1.75f);
         assert(!scroll_choices_scene(ui, mode, query, &state, &value, chosen, false));
         assert(state.list.first_visible == 2 && state.list.active == 1003);
-        assert_scroll_metadata(ui, mode >= 2 ? 800 : 90, 2);
+        assert_scroll_metadata(ui, mode >= 2 ? 800 : 90, 2,
+                               mode >= 2
+                                   ? cui_searchable_list_size_metrics(CUI_LIST_MEDIUM, 0, 1).height
+                                   : cui_list_default_metrics(1).height);
         if (mode >= 2)
-            assert_scroll_metadata(ui, 800 ^ UINT64_C(0xd1bc905ee4216f11), 2);
+            assert_scroll_metadata(ui, 800 ^ UINT64_C(0xd1bc905ee4216f11), 2,
+                                   cui_searchable_list_size_metrics(CUI_LIST_MEDIUM, 0, 1).height);
         assert(value == 1000 && !chosen[3]);
         assert(cui_focused(ui) == (mode >= 4 ? 2 : 1003));
         /* Idle frames retain the wheel window instead of snapping to old selection. */
@@ -3548,6 +3551,193 @@ static cui_draw_list metric_menu_scene(cui_context *ui, const cui_theme *theme,
     assert(cui_last_error(ui) == CUI_OK);
     return draw;
 }
+static cui_draw_list sized_search_scene(cui_context *ui, unsigned mode, const cui_theme *theme,
+                                        cui_choice_popup *popup, cui_edit *query,
+                                        cui_choice_popup_options options, cui_id *value,
+                                        bool *chosen) {
+    const cui_choice_item entries[] = {{10, {"One", 3}, false}, {20, {"Two", 3}, false}};
+    cui_choice_item scratch[2];
+    bool scratch_selected[2];
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    if (mode == 0)
+        cui_select(ui, 2, theme, cui_string("Picker"), cui_string("Choose"), entries, 2, value,
+                   popup, options);
+    else if (mode == 1)
+        cui_select_multi(ui, 2, theme, cui_string("Picker"), cui_string("Choose"), entries, 2,
+                         chosen, popup, options);
+    else if (mode == 2)
+        cui_combobox(ui, 2, theme, cui_string("Picker"), query, entries, 2, scratch, 2, value,
+                     popup, options);
+    else
+        cui_combobox_multi(ui, 2, theme, cui_string("Picker"), query, entries, 2, scratch,
+                           scratch_selected, 2, chosen, popup, options);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void test_searchable_reference_metrics(void) {
+    const float fonts[] = {14, 14, 16, 12, 15.25f * .875f};
+    const float horizontal[] = {7, 5, 9, 1, 5}, vertical[] = {4, 2, 8, 4, 4};
+    const cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                                cui_theme_terminal()};
+    for (unsigned mode = 0; mode < 4; mode++)
+        for (int size = CUI_LIST_MEDIUM; size <= CUI_LIST_CUSTOM; size++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            assert(ui);
+            cui_theme theme = themes[mode];
+            cui_choice_popup popup;
+            cui_choice_popup_init(&popup, 9800);
+            char buffer[32] = "";
+            cui_edit *query =
+                cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+            assert(query);
+            cui_id value = 10;
+            bool chosen[] = {true, false};
+            cui_choice_popup_options options = {.size = (cui_list_size)size,
+                                                .custom_size = 15.25f,
+                                                .density = 1.25f,
+                                                .width = 240,
+                                                .viewport = {0, 0, 640, 480}};
+            cui_list_metrics metrics =
+                cui_searchable_list_size_metrics(options.size, options.custom_size, 1.25f);
+            assert(metrics.font_size == fonts[size] * 1.25f &&
+                   metrics.padding_x == horizontal[size] * 1.25f &&
+                   metrics.padding_y == vertical[size] * 1.25f && metrics.check_size == 15 &&
+                   metrics.gap == 5);
+            sized_search_scene(ui, mode, &theme, &popup, query, options, &value, chosen);
+            click(ui, 2);
+            cui_draw_list draw =
+                sized_search_scene(ui, mode, &theme, &popup, query, options, &value, chosen);
+            assert(popup.overlay.open);
+            cui_rect first = cui_bounds(ui, 10), second = cui_bounds(ui, 20);
+            assert(fabsf(first.h - metrics.height) < .0001f &&
+                   fabsf(second.y - first.y - first.h) < .0001f);
+            cui_rect body = cui_bounds(ui, 10 ^ UINT64_C(0x9e3f5d2a91bca002));
+            cui_rect check = cui_bounds(ui, 10 ^ UINT64_C(0x4b705ad687e1a963));
+            assert(fabsf(body.x - first.x - metrics.padding_x) < .0001f && check.w == 15 &&
+                   fabsf(check.x - body.x - body.w - metrics.gap) < .0001f &&
+                   fabsf(first.x + first.w - check.x - check.w - metrics.padding_x) < .0001f);
+            bool text = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                cui_draw_command command = draw.commands[i];
+                if (command.type == CUI_DRAW_TEXT && command.text.length == 3 &&
+                    !memcmp(command.text.data, "One", 3) && command.bounds.x == body.x) {
+                    text = true;
+                    assert(command.font_size == metrics.font_size &&
+                           fabsf(command.bounds.h - metrics.line_height) < .0001f &&
+                           fabsf(command.bounds.y - first.y - metrics.padding_y -
+                                 (metrics.line_height -
+                                  cui_measure_text(ui, command.text, metrics.font_size).height) *
+                                     .5f) < .0001f);
+                }
+            }
+            assert(text);
+            click(ui, 20);
+            sized_search_scene(ui, mode, &theme, &popup, query, options, &value, chosen);
+            assert(mode == 0 || mode == 2 ? value == 20 : chosen[1]);
+            if (!popup.overlay.open) {
+                click(ui, 2);
+                sized_search_scene(ui, mode, &theme, &popup, query, options, &value, chosen);
+            }
+            options.row_height = 60;
+            sized_search_scene(ui, mode, &theme, &popup, query, options, &value, chosen);
+            assert(cui_bounds(ui, 10).h == 60);
+            cui_edit_destroy(query);
+            cui_destroy(ui);
+        }
+}
+static cui_draw_list bounded_search_scene(cui_context *ui, cui_choice_popup *popup, cui_id *value,
+                                          cui_choice_popup_options options) {
+    cui_theme theme = cui_theme_light();
+    cui_choice_item entries[12];
+    for (size_t i = 0; i < 12; i++)
+        entries[i] = (cui_choice_item){6000 + i, {"Choice", 6}, false};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_select(ui, 2, &theme, cui_string("Picker"), cui_string("Choose"), entries, 12, value, popup,
+               options);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void test_searchable_popup_height_cap(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_choice_popup popup;
+    cui_choice_popup_init(&popup, 9800);
+    cui_id value = 6000;
+    cui_choice_popup_options options = {.width = 240, .viewport = {0, 0, 640, 480}};
+    bounded_search_scene(ui, &popup, &value, options);
+    click(ui, 2);
+    bounded_search_scene(ui, &popup, &value, options);
+    cui_list_metrics metrics = cui_searchable_list_size_metrics(CUI_LIST_MEDIUM, 0, 1);
+    assert(cui_bounds(ui, 6009).h == metrics.height && cui_bounds(ui, 6010).h == 0);
+    options.max_height = 80;
+    bounded_search_scene(ui, &popup, &value, options);
+    assert(cui_bounds(ui, 6001).h == metrics.height && cui_bounds(ui, 6002).h == 0);
+    cui_focus(ui, 6000);
+    key(ui, CUI_KEY_END);
+    bounded_search_scene(ui, &popup, &value, options);
+    assert(popup.list.first_visible == 10 && cui_focused(ui) == 6011);
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    bool range = false;
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == popup.overlay.id) {
+            range = true;
+            assert(fabsf(semantics[i].details.scroll_y - 10 * metrics.height) < .0001f &&
+                   fabsf(semantics[i].details.scroll_max_y - 10 * metrics.height) < .0001f);
+        }
+    assert(range);
+    click(ui, 6010);
+    bounded_search_scene(ui, &popup, &value, options);
+    assert(value == 6010 && !popup.overlay.open && cui_focused(ui) == 2);
+    cui_destroy(ui);
+}
+static void test_list_reference_metrics(void) {
+    for (unsigned multi = 0; multi < 2; multi++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        theme.font_size = 20;
+        cui_list_metrics metrics = cui_list_default_metrics(1.25f);
+        const cui_choice_item entries[] = {{10, {"One", 3}, false}, {20, {"Two", 3}, false}};
+        cui_list_state state = {0};
+        cui_id value = 10;
+        bool chosen[] = {true, false};
+        for (unsigned phase = 0; phase < 2; phase++) {
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_begin_box(ui, 90, (cui_box){.width = 240});
+            cui_list_options options = {.height = phase ? 60 : 0};
+            if (multi)
+                cui_list_multi(ui, 91, &theme, entries, 2, chosen, &state, options);
+            else
+                cui_list(ui, 91, &theme, entries, 2, &value, &state, options);
+            cui_end_box(ui);
+            cui_draw_list draw = cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_rect row = cui_bounds(ui, 10);
+            assert(fabsf(row.h - (phase ? 60 : metrics.height)) < .0001f);
+            bool text = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                cui_draw_command command = draw.commands[i];
+                if (command.type == CUI_DRAW_TEXT && command.text.length == 3 &&
+                    !memcmp(command.text.data, "One", 3)) {
+                    text = true;
+                    assert(command.font_size == 20 &&
+                           fabsf(command.bounds.h - metrics.line_height) < .0001f &&
+                           fabsf(command.bounds.x - row.x - 15) < .0001f);
+                }
+                if (command.type == CUI_DRAW_IMAGE)
+                    assert(multi && command.bounds.w == 17.5f);
+            }
+            assert(text);
+            if (!phase)
+                click(ui, 20);
+        }
+        assert(multi ? chosen[1] : value == 20);
+        cui_destroy(ui);
+    }
+}
 static void test_menu_reference_metrics(void) {
     const cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                                 cui_theme_terminal()};
@@ -3832,6 +4022,9 @@ static void test_tab_current_frame_baseline(void) {
     }
 }
 int main(void) {
+    test_searchable_popup_height_cap();
+    test_searchable_reference_metrics();
+    test_list_reference_metrics();
     test_menu_reference_metrics();
     test_list_source_palette();
     test_toggle_group_shared_renderer();

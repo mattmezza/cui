@@ -178,8 +178,10 @@ typedef struct {
 /* Composable containers. Item/choices begin returns false for inactive, unknown
  * or disabled items and opens nothing. Call part_end only after a true result.
  * Item is a programmatically focusable Group, excluded from Tab order; choices
- * uses Group for multiple answers and RadioGroup for single answers. Explicit
- * keyboard helpers remain responsible for answer navigation. */
+ * uses Group for multiple answers and RadioGroup for single answers. Root begin
+ * captures keyboard events using the preceding frame's submitted part bindings;
+ * standalone parts may use the explicit keyboard helpers. Root numeric_shortcuts
+ * also supplies the shortcut labels of its parts. */
 bool cui_questionnaire_item_begin(cui_context *, cui_id, const cui_questionnaire_state *,
                                   size_t item, cui_questionnaire_options);
 bool cui_questionnaire_choices_begin(cui_context *, cui_id, const cui_questionnaire_state *,

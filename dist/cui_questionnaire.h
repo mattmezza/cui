@@ -179,8 +179,10 @@ typedef struct {
 /* Composable containers. Item/choices begin returns false for inactive, unknown
  * or disabled items and opens nothing. Call part_end only after a true result.
  * Item is a programmatically focusable Group, excluded from Tab order; choices
- * uses Group for multiple answers and RadioGroup for single answers. Explicit
- * keyboard helpers remain responsible for answer navigation. */
+ * uses Group for multiple answers and RadioGroup for single answers. Root begin
+ * captures keyboard events using the preceding frame's submitted part bindings;
+ * standalone parts may use the explicit keyboard helpers. Root numeric_shortcuts
+ * also supplies the shortcut labels of its parts. */
 bool cui_questionnaire_item_begin(cui_context *, cui_id, const cui_questionnaire_state *,
                                   size_t item, cui_questionnaire_options);
 bool cui_questionnaire_choices_begin(cui_context *, cui_id, const cui_questionnaire_state *,
@@ -847,6 +849,7 @@ bool cui_questionnaire_activate_shortcut(cui_questionnaire_state *s, char key, b
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 typedef struct {
     float root_gap, gap, content_gap, px, py, height, indicator, mark, shortcut, font, line;
 } cui_questionnaire_metrics;
@@ -897,9 +900,12 @@ static bool cui_questionnaire_publish_size(cui_context *ui, const cui_questionna
     sizes->entries[i] = (cui_questionnaire_size_entry){s, size};
     return true;
 }
+static void cui_questionnaire_resolve_shortcuts(cui_context *, const cui_questionnaire_state *,
+                                                cui_questionnaire_options *);
 static cui_questionnaire_options cui_questionnaire_resolve_size(cui_context *ui,
                                                                 const cui_questionnaire_state *s,
                                                                 cui_questionnaire_options o) {
+    cui_questionnaire_resolve_shortcuts(ui, s, &o);
     if (o.custom_size || o.size != CUI_QUESTIONNAIRE_MEDIUM)
         return o;
     cui_questionnaire_sizes *sizes = cui_questionnaire_size_table(ui);
@@ -911,23 +917,267 @@ static cui_questionnaire_options cui_questionnaire_resolve_size(cui_context *ui,
             }
     return o;
 }
+/* Context resources keep the previous submitted controls available to root capture.
+ * Rebuild the list each frame so omitted controls cannot leave dangling bindings. */
+typedef struct cui_questionnaire_binding cui_questionnaire_binding;
+typedef struct cui_questionnaire_route cui_questionnaire_route;
+struct cui_questionnaire_binding {
+    cui_questionnaire_binding *next;
+    cui_id id;
+    size_t item, choice;
+    unsigned kind; /* 0 item, 1 choice, 2 input */
+    bool disabled;
+};
+struct cui_questionnaire_route {
+    cui_questionnaire_route *parent;
+    cui_questionnaire_state *state;
+    cui_questionnaire_binding *previous, *current;
+    cui_id scope;
+    size_t opened_item;
+    bool focus_pending, invalid_pending, numeric;
+};
+typedef struct {
+    cui_questionnaire_route *active;
+} cui_questionnaire_routes;
+static cui_questionnaire_routes *cui_questionnaire_route_stack(cui_context *ui) {
+    return cui_resource_get(ui, UINT64_C(0x516e526f75746531), UINT64_C(0x516e526f75746532),
+                            sizeof(cui_questionnaire_routes), NULL, NULL);
+}
+static void cui_questionnaire_resolve_shortcuts(cui_context *ui, const cui_questionnaire_state *s,
+                                                cui_questionnaire_options *o) {
+    cui_questionnaire_routes *stack = cui_questionnaire_route_stack(ui);
+    if (stack && stack->active && stack->active->state == s)
+        o->numeric_shortcuts = stack->active->numeric;
+}
+static void cui_questionnaire_bind(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
+                                   size_t item, size_t choice, unsigned kind, bool disabled) {
+    cui_questionnaire_routes *stack = cui_questionnaire_route_stack(ui);
+    if (!stack || !stack->active || stack->active->state != s)
+        return;
+    cui_questionnaire_binding *binding = cui_resource_get(
+        ui, id, UINT64_C(0x516e42696e64696e), sizeof(cui_questionnaire_binding), NULL, NULL);
+    if (!binding)
+        return;
+    for (cui_questionnaire_binding *b = stack->active->current; b; b = b->next)
+        if (b == binding)
+            return;
+    *binding =
+        (cui_questionnaire_binding){stack->active->current, id, item, choice, kind, disabled};
+    stack->active->current = binding;
+}
+static cui_questionnaire_binding *
+cui_questionnaire_bound(cui_questionnaire_route *route, size_t item, unsigned kind, size_t choice) {
+    for (cui_questionnaire_binding *b = route->previous; b; b = b->next)
+        if (!b->disabled && b->item == item && b->kind == kind &&
+            (kind != 1 || b->choice == choice))
+            return b;
+    return NULL;
+}
+static bool cui_questionnaire_root_key(cui_context *ui, cui_questionnaire_route *r,
+                                       const cui_event *e) {
+    cui_questionnaire_state *s = r->state;
+    if (s->current >= s->count || s->storage.items[s->current].disabled)
+        return false;
+    size_t item = s->current, count = s->items[item].choice_count;
+    const cui_questionnaire_item *d = &s->items[item];
+    cui_id focused = cui_focused(ui);
+    cui_questionnaire_binding *input = cui_questionnaire_bound(r, item, 2, 0);
+    bool input_focused = input && input->id == focused;
+    size_t current = SIZE_MAX;
+    for (size_t c = 0; c < count; ++c) {
+        cui_questionnaire_binding *b = cui_questionnaire_bound(r, item, 1, c);
+        if (b && b->id == focused &&
+            !s->storage.choices[s->storage.items[item].choice_offset + c].disabled)
+            current = c;
+    }
+    if (e->key == CUI_KEY_ENTER) {
+        bool modified = e->modifiers == CUI_MOD_CTRL || e->modifiers == CUI_MOD_META;
+        bool filled = input_focused ? cui_questionnaire_freeform(s, item).length != 0
+                                    : current != SIZE_MAX &&
+                                          cui_questionnaire_choice_selected(s, item, current);
+        if (modified || (!e->modifiers && filled)) {
+            bool confirmed = cui_questionnaire_confirm(s);
+            if (!confirmed && s->current < s->count &&
+                cui_questionnaire_item_error(s, s->current).kind != CUI_QUESTIONNAIRE_VALID) {
+                r->invalid_pending = true;
+                cui_invalidate(ui);
+            }
+            return confirmed || modified;
+        }
+        return false;
+    }
+    if (e->modifiers)
+        return false;
+    if (e->key == CUI_KEY_UP || e->key == CUI_KEY_DOWN) {
+        if (input_focused && cui_edit_get_text(d->input).length)
+            return false;
+        bool previous = e->key == CUI_KEY_UP;
+        size_t slots = count + 1;
+        if (input_focused)
+            current = count;
+        if (current == SIZE_MAX) {
+            for (size_t step = 0; step < slots; ++step) {
+                size_t next = previous ? slots - 1 - step : step;
+                cui_questionnaire_binding *b =
+                    cui_questionnaire_bound(r, item, next == count ? 2 : 1, next);
+                bool filled = next == count
+                                  ? input && cui_questionnaire_freeform(s, item).length != 0
+                                  : cui_questionnaire_choice_selected(s, item, next);
+                if (b && filled) {
+                    cui_focus(ui, b->id);
+                    return true;
+                }
+            }
+        }
+        size_t start = current == SIZE_MAX ? (previous ? 0 : slots - 1) : current;
+        for (size_t step = 1; step <= slots; ++step) {
+            size_t next = previous ? (start + slots - step) % slots : (start + step) % slots;
+            cui_questionnaire_binding *b =
+                cui_questionnaire_bound(r, item, next == count ? 2 : 1, next);
+            if (!b || (next < count &&
+                       s->storage.choices[s->storage.items[item].choice_offset + next].disabled))
+                continue;
+            if (next < count && !d->multiple)
+                (void)cui_questionnaire_activate(s, item, next);
+            cui_focus(ui, b->id);
+            return true;
+        }
+        return false;
+    }
+    if (input_focused)
+        return false;
+    if (e->key == CUI_KEY_LEFT || e->key == CUI_KEY_RIGHT) {
+        if (!d->multiple && current != SIZE_MAX) {
+            for (size_t step = 1; step <= count; ++step) {
+                size_t next = e->key == CUI_KEY_LEFT ? (current + count - step) % count
+                                                     : (current + step) % count;
+                cui_questionnaire_binding *b = cui_questionnaire_bound(r, item, 1, next);
+                if (!b || s->storage.choices[s->storage.items[item].choice_offset + next].disabled)
+                    continue;
+                (void)cui_questionnaire_activate(s, item, next);
+                cui_focus(ui, b->id);
+                return true;
+            }
+            return false;
+        }
+        if (e->key == CUI_KEY_LEFT)
+            return cui_questionnaire_previous(s);
+        if (cui_questionnaire_item_status(s, item) != CUI_QUESTIONNAIRE_UNANSWERED) {
+            bool next = cui_questionnaire_next(s);
+            if (!next && cui_questionnaire_item_error(s, item).kind != CUI_QUESTIONNAIRE_VALID) {
+                r->invalid_pending = true;
+                cui_invalidate(ui);
+            }
+            return next;
+        }
+        return false;
+    }
+    char key = cui_key_character(e->key);
+    if (!key)
+        return false;
+    for (size_t c = 0; c < count; ++c) {
+        cui_questionnaire_binding *b = cui_questionnaire_bound(r, item, 1, c);
+        if (b && cui_questionnaire_shortcut(s, item, c, r->numeric) == key &&
+            cui_questionnaire_choose(s, item, c, cui_frame_time(ui), cui_reduced_motion(ui)) ==
+                CUI_QUESTIONNAIRE_OK) {
+            if (s->current == item)
+                cui_focus(ui, b->id);
+            return true;
+        }
+    }
+    return false;
+}
+static void cui_questionnaire_root_capture(cui_context *ui, cui_questionnaire_route *r,
+                                           bool disabled) {
+    if (disabled || !cui_focus_within(ui, r->scope))
+        return;
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i) {
+        const cui_event *e = &events[i];
+        if (cui_event_consumed(ui, i) || e->type != CUI_EVENT_KEY_DOWN || e->repeat ||
+            e->ime_composing || e->prefer_character_input)
+            continue;
+        size_t before = r->state->current;
+        if (cui_questionnaire_root_key(ui, r, e)) {
+            (void)cui_consume_event(ui, i);
+            if (e->key == CUI_KEY_ENTER)
+                (void)cui_cancel_event_activation(ui, i);
+            cui_invalidate(ui);
+        }
+        if (r->state->current != before)
+            r->focus_pending = true;
+    }
+}
 bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
                              cui_questionnaire_state *s, cui_questionnaire_options o) {
     if (!ui || !id || !theme || !s || !s->initialized)
         return false;
     if (!cui_questionnaire_publish_size(ui, s, o.size))
         return false;
+    cui_questionnaire_routes *stack = cui_questionnaire_route_stack(ui);
+    cui_questionnaire_route *route = cui_resource_get(ui, id, UINT64_C(0x516e526f6f744b65),
+                                                      sizeof(cui_questionnaire_route), NULL, NULL);
+    if (!stack || !route)
+        return false;
+    if (route->state != s) {
+        memset(route, 0, sizeof *route);
+        route->state = s;
+    }
+    route->scope = id;
+    route->numeric = o.numeric_shortcuts;
+    route->opened_item = s->current;
+    cui_questionnaire_root_capture(ui, route, o.disabled);
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
+    size_t before_tick = s->current;
     (void)cui_questionnaire_tick(s, cui_frame_time(ui));
+    if (s->current != before_tick)
+        route->focus_pending = true;
     if (s->pending_confirm)
         cui_invalidate(ui);
     if (!cui_begin_focus_scope(ui, id, false))
         return false;
+    route->parent = stack->active;
+    route->current = NULL;
+    stack->active = route;
     cui_interact(ui, id, CUI_ROLE_GROUP, (cui_str){0}, o.disabled, false, 0);
+    cui_set_semantic_details(ui, id, (cui_semantic_details){.focusable = true});
+    cui_set_tab_stop(ui, id, false);
     cui_begin_box(ui, id, (cui_box){.width = o.width > 0 ? o.width : -1, .gap = m.root_gap});
     return true;
 }
 void cui_questionnaire_end(cui_context *ui) {
+    cui_questionnaire_routes *stack = cui_questionnaire_route_stack(ui);
+    if (stack && stack->active) {
+        cui_questionnaire_route *r = stack->active;
+        r->previous = r->current;
+        size_t current = r->state->current;
+        if (current != r->opened_item && current < r->state->count &&
+            cui_questionnaire_item_error(r->state, current).kind != CUI_QUESTIONNAIRE_VALID)
+            r->invalid_pending = true;
+        if (r->focus_pending || r->invalid_pending || current != r->opened_item) {
+            cui_questionnaire_binding *target = NULL;
+            if (r->invalid_pending && current < r->state->count) {
+                if (cui_questionnaire_freeform(r->state, current).length)
+                    target = cui_questionnaire_bound(r, current, 2, 0);
+                for (size_t c = 0; !target && c < r->state->items[current].choice_count; ++c)
+                    if (cui_questionnaire_choice_selected(r->state, current, c))
+                        target = cui_questionnaire_bound(r, current, 1, c);
+                for (size_t c = 0; !target && c < r->state->items[current].choice_count; ++c)
+                    target = cui_questionnaire_bound(r, current, 1, c);
+                if (!target)
+                    target = cui_questionnaire_bound(r, current, 2, 0);
+            }
+            if (!target)
+                target = cui_questionnaire_bound(r, current, 0, 0);
+            cui_focus(ui, target ? target->id : r->scope);
+            if (target)
+                r->focus_pending = r->invalid_pending = false;
+            else
+                r->focus_pending = true;
+        }
+        stack->active = r->parent;
+    }
     cui_end_box(ui);
     cui_end_focus_scope(ui);
 }
@@ -951,6 +1201,7 @@ bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_question
                                   size_t item, cui_questionnaire_options o) {
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
+    cui_questionnaire_bind(ui, id, s, item, 0, 0, o.disabled);
     o = cui_questionnaire_resolve_size(ui, s, o);
     const cui_questionnaire_item *definition = &s->items[item];
     cui_interact(ui, id, CUI_ROLE_GROUP,
@@ -1018,6 +1269,7 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
     const cui_questionnaire_choice *c = &d->choices[choice];
     bool disabled = o.disabled || s->storage.items[item].disabled ||
                     s->storage.choices[s->storage.items[item].choice_offset + choice].disabled;
+    cui_questionnaire_bind(ui, id, s, item, choice, 1, disabled);
     bool selected = cui_questionnaire_choice_selected(s, item, choice);
     cui_str label = c->label.length ? c->label : c->value;
     cui_interaction interaction = cui_interact(
@@ -1247,6 +1499,9 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
         return CUI_QUESTIONNAIRE_ANSWER_MISMATCH;
     if (item != s->current)
         return CUI_QUESTIONNAIRE_OK;
+    cui_questionnaire_bind(ui, id, s, item, 0, 2,
+                           o.disabled || d->input_disabled || s->storage.items[item].disabled);
+
     if (!o.disabled && !s->storage.items[item].disabled && !d->input_disabled &&
         cui_focused(ui) == id && cui_questionnaire_freeform(s, item).length) {
         size_t count;

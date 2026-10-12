@@ -1,0 +1,1 @@
+cui-questionnaire-before-root: tests/unit/test_questionnaire_styled.c:782: automatic_root_keyboard: Assertion `cui_focused(ui) == 200 && cui_questionnaire_choice_selected(&state, 0, 0) && !state.pending_confirm' failed.

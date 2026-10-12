@@ -35,7 +35,8 @@ static void shortcut_frame(cui_context *ui, cui_questionnaire_state *s, bool num
     cui_theme t = cui_theme_light();
     cui_id ids[] = {22, 23, 24};
     (void)cui_questionnaire_radio_keys(ui, s, ids, 3);
-    assert(cui_questionnaire_begin(ui, 20, &t, s, (cui_questionnaire_options){.width = 300}));
+    assert(cui_questionnaire_begin(
+        ui, 20, &t, s, (cui_questionnaire_options){.width = 300, .numeric_shortcuts = numbers}));
     (void)cui_questionnaire_answer_keys(ui, 20, s, ids, 3, 0);
     (void)cui_questionnaire_confirm_keys(ui, 20, s, ids, 3, 0, CUI_MOD_CTRL);
     (void)cui_questionnaire_shortcut_keys(ui, 20, s, ids, 3, 0, numbers);
@@ -717,7 +718,150 @@ static void inherited_sizes(void) {
     cui_destroy(b);
     cui_edit_destroy(edit);
 }
+static cui_draw_list automatic_frame(cui_context *ui, cui_questionnaire_state *s,
+                                     cui_questionnaire_options o,
+                                     cui_questionnaire_input_state *input) {
+    assert(cui_begin_frame(ui, 400, 500, 0));
+    cui_theme theme = cui_theme_light();
+    assert(cui_questionnaire_begin(ui, 10, &theme, s, o));
+    for (size_t item = 0; item < s->count; ++item) {
+        if (!cui_questionnaire_item_begin(ui, 100 + item, s, item, o))
+            continue;
+        for (size_t choice = 0; choice < s->items[item].choice_count; ++choice)
+            (void)cui_questionnaire_choice_control(
+                ui, 200 + item * 10 + choice, &theme, s, item, choice,
+                (cui_questionnaire_options){.disabled = o.disabled});
+        if (s->items[item].input)
+            assert(cui_questionnaire_input_control(ui, 300 + item, &theme, s, item, input, NULL,
+                                                   o) == CUI_QUESTIONNAIRE_OK);
+        cui_questionnaire_part_end(ui);
+    }
+    cui_questionnaire_end(ui);
+    cui_begin_box(ui, 999, (cui_box){.width = 50, .height = 20});
+    cui_interact(ui, 999, CUI_ROLE_BUTTON, cui_string("Outside"), false, false, 0);
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void automatic_key(cui_context *ui, cui_questionnaire_state *s,
+                          cui_questionnaire_input_state *input, cui_key key, unsigned mods) {
+    assert(cui_queue_event(ui,
+                           (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = key, .modifiers = mods}));
+    automatic_frame(ui, s, (cui_questionnaire_options){0}, input);
+}
+static void automatic_root_keyboard(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    assert(ui && edit);
+    cui_questionnaire_choice choices[] = {{.value = cui_string("a")}, {.value = cui_string("b")}};
+    cui_questionnaire_item items[] = {{.name = cui_string("first"),
+                                       .choices = choices,
+                                       .choice_count = 2,
+                                       .required = true,
+                                       .input = edit},
+                                      {.name = cui_string("second"),
+                                       .choices = choices,
+                                       .choice_count = 2,
+                                       .required = true,
+                                       .multiple = true}};
+    cui_questionnaire_item_runtime runtime[2];
+    cui_questionnaire_choice_runtime selected[4];
+    char answers[256];
+    cui_questionnaire_state state = {0};
+    assert(cui_questionnaire_init(
+               &state, items, 2,
+               (cui_questionnaire_workspace){runtime, 2, selected, 4, answers, sizeof answers, 32},
+               NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    cui_questionnaire_input_state input = {0};
+    automatic_frame(ui, &state, (cui_questionnaire_options){0}, &input);
+    cui_focus(ui, 10);
+    automatic_key(ui, &state, &input, CUI_KEY_DOWN, 0);
+    assert(cui_focused(ui) == 200 && cui_questionnaire_choice_selected(&state, 0, 0) &&
+           !state.pending_confirm);
+    automatic_key(ui, &state, &input, CUI_KEY_RIGHT, 0);
+    assert(cui_focused(ui) == 201 && cui_questionnaire_choice_selected(&state, 0, 1) &&
+           state.current == 0 && !state.pending_confirm);
+    automatic_key(ui, &state, &input, CUI_KEY_DOWN, 0);
+    assert(cui_focused(ui) == 300);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "typed"}));
+    automatic_key(ui, &state, &input, CUI_KEY_LEFT, 0);
+    assert(!strcmp(buffer, "typed") && cui_edit_get_state(edit).cursor == 4 &&
+           cui_focused(ui) == 300);
+    automatic_key(ui, &state, &input, CUI_KEY_UP, 0);
+    assert(cui_focused(ui) == 300 && state.current == 0);
+    automatic_key(ui, &state, &input, CUI_KEY_ENTER, CUI_MOD_CTRL);
+    assert(state.current == 1 && cui_focused(ui) == 101);
+    automatic_key(ui, &state, &input, CUI_KEY_RIGHT, 0);
+    assert(state.current == 1 && !state.storage.items[1].validation_attempted);
+    cui_focus(ui, 210);
+    automatic_key(ui, &state, &input, CUI_KEY_LEFT, 0);
+    assert(state.current == 0 && cui_focused(ui) == 100);
+    cui_focus(ui, 999);
+    automatic_key(ui, &state, &input, CUI_KEY_B, 0);
+    assert(cui_questionnaire_freeform(&state, 0).length == 5 && cui_focused(ui) == 999);
+    cui_focus(ui, 10);
+    const cui_event ignored[] = {
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .repeat = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .ime_composing = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .prefer_character_input = true},
+        {.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_B, .modifiers = CUI_MOD_ALT}};
+    for (size_t i = 0; i < sizeof ignored / sizeof ignored[0]; ++i) {
+        assert(cui_queue_event(ui, ignored[i]));
+        automatic_frame(ui, &state, (cui_questionnaire_options){0}, &input);
+        assert(cui_questionnaire_freeform(&state, 0).length == 5 && !state.pending_confirm);
+    }
+    automatic_key(ui, &state, &input, CUI_KEY_B, 0);
+    assert(cui_questionnaire_choice_selected(&state, 0, 1) && state.pending_confirm);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_A}));
+    automatic_frame(ui, &state, (cui_questionnaire_options){.disabled = true}, &input);
+    assert(cui_questionnaire_choice_selected(&state, 0, 1));
+    automatic_frame(ui, &state, (cui_questionnaire_options){0}, &input);
+    cui_focus(ui, 10);
+    automatic_key(ui, &state, &input, CUI_KEY_ENTER, CUI_MOD_CTRL);
+    assert(state.current == 1 && cui_focused(ui) == 101);
+    automatic_key(ui, &state, &input, CUI_KEY_ENTER, CUI_MOD_META);
+    assert(state.current == 1 && cui_focused(ui) == 210 &&
+           !cui_questionnaire_choice_selected(&state, 1, 0));
+    assert(cui_begin_frame(ui, 400, 500, 0));
+    cui_theme theme = cui_theme_light();
+    assert(cui_questionnaire_begin(ui, 10, &theme, &state, (cui_questionnaire_options){0}));
+    cui_questionnaire_end(ui);
+    cui_end_frame(ui);
+    cui_focus(ui, 10);
+    automatic_key(ui, &state, &input, CUI_KEY_DOWN, 0);
+    assert(!cui_questionnaire_choice_selected(&state, 1, 0));
+    automatic_key(ui, &state, &input, CUI_KEY_DOWN, 0);
+    assert(cui_focused(ui) == 210);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_2}));
+    cui_draw_list draw =
+        automatic_frame(ui, &state, (cui_questionnaire_options){.numeric_shortcuts = true}, &input);
+    assert(cui_questionnaire_choice_selected(&state, 1, 1) && cui_focused(ui) == 211);
+    bool numeric_badge = false;
+    for (size_t i = 0; i < draw.count; ++i)
+        numeric_badge |= draw.commands[i].type == CUI_DRAW_TEXT &&
+                         draw.commands[i].text.length == 1 && draw.commands[i].text.data[0] == '2';
+    assert(numeric_badge);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+static void automatic_capacity_failure(void) {
+    cui_context *ui = cui_create((cui_config){.max_resources = 2});
+    assert(ui);
+    cui_questionnaire_state state = {0};
+    assert(cui_questionnaire_init(&state, NULL, 0, (cui_questionnaire_workspace){0}, NULL, NULL) ==
+           CUI_QUESTIONNAIRE_OK);
+    assert(cui_begin_frame(ui, 400, 300, 0));
+    cui_theme theme = cui_theme_light();
+    assert(!cui_questionnaire_begin(ui, 10, &theme, &state, (cui_questionnaire_options){0}));
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_destroy(ui);
+}
 int main(void) {
+    automatic_root_keyboard();
+    automatic_capacity_failure();
     inherited_sizes();
     choice_accessibility();
     composable_containers();

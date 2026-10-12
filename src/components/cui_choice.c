@@ -1560,9 +1560,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
             cui_dropdown_button_box(ui, action_id, theme, action_options, false, action_disabled,
                                     pair_surfaced, &action_foreground);
         cui_begin_box(ui, action_id, action_box);
-        if (options.action_loading)
-            cui_text(ui, cui_string("..."), theme->font_size * scale, action_foreground);
-        else {
+        {
             if (options.leading.length)
                 cui_text(ui, options.leading, theme->font_size * scale, action_foreground);
             if (options.content)

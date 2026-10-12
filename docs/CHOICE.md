@@ -672,3 +672,10 @@ Per-item parts also expose `omit_leading_border`, matching the frozen first
 Default tab's `tab_bar_prefix(false)` policy. It removes only that first tab's
 left edge; later tabs and other variants keep their own edge policy. Rendered
 edge tests cover default, opted-out, disabled selected and a later selected tab.
+
+Loading preserves the action label and custom body instead of replacing them
+with an ellipsis. It keeps the action inert while the menu remains independently
+usable. Headless tests verify the custom callback runs during loading, layout
+width remains stable, built-in labels remain visible and action clicks are
+blocked. Existing icon-to-loader substitution and whole-subtree opacity for
+caller-colored custom bodies still need portable icon/opacity primitives.

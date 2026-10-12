@@ -3222,7 +3222,45 @@ static void test_first_tab_border_policy(void) {
     }
     cui_destroy(ui);
 }
+static void test_dropdown_loading_keeps_content(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    cui_dropdown_button_options options = {.content = dropdown_custom_body,
+                                           .content_user = &dropdown_custom_calls};
+    dropdown_custom_calls = 0;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    cui_rect normal = cui_bounds(ui, 2001);
+    options.action_loading = true;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(dropdown_custom_calls == 2 && cui_bounds(ui, 2001).w == normal.w);
+    bool body = false, replacement = false;
+    for (size_t i = 0; i < dropdown_draw.count; i++) {
+        cui_draw_command command = dropdown_draw.commands[i];
+        if (command.type != CUI_DRAW_TEXT)
+            continue;
+        body |= command.text.length == 11 && !memcmp(command.text.data, "Custom save", 11);
+        replacement |= command.text.length == 3 && !memcmp(command.text.data, "...", 3);
+    }
+    assert(body && !replacement);
+    click(ui, 2001);
+    assert(!dropdown_scene(ui, &state, &action, &theme, options).action_activated);
+    assert(dropdown_custom_calls == 3);
+    options.content = NULL;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    bool label = false;
+    for (size_t i = 0; i < dropdown_draw.count; i++)
+        label |= dropdown_draw.commands[i].type == CUI_DRAW_TEXT &&
+                 dropdown_draw.commands[i].text.length == 4 &&
+                 !memcmp(dropdown_draw.commands[i].text.data, "Save", 4);
+    assert(label);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_dropdown_loading_keeps_content();
     test_first_tab_border_policy();
     test_tab_scroll_tail();
     test_tab_shared_indicator();

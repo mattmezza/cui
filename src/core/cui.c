@@ -592,7 +592,7 @@ static uint16_t cui_core_scalar(float x) {
     return !isfinite(x) || x < 0 ? 0 : x > 65535 ? 65535 : (uint16_t)x;
 }
 static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_rect *portal,
-                               int16_t layer) {
+                               int16_t layer, bool absolute) {
     if (!cui_core_active(ui))
         return;
     if (ui->depth == CUI_CORE_STACK_MAX || ui->overflow_depth) {
@@ -622,7 +622,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
     bool layout_only = b.layout_only || (parent != SIZE_MAX && ui->nodes[parent].layout_only);
     bool inert = layout_only || b.inert || (parent != SIZE_MAX && ui->nodes[parent].inert);
-    if (portal)
+    if (portal && !absolute)
         parent = SIZE_MAX;
     else if (parent != SIZE_MAX)
         layer = ui->nodes[parent].layer;
@@ -664,8 +664,10 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         .cornerRadius = {cr.top_left, cr.top_right, cr.bottom_left, cr.bottom_right},
         .floating = {.offset = portal ? (Clay_Vector2){portal->x, portal->y} : (Clay_Vector2){0},
                      .zIndex = layer,
-                     .attachTo = portal ? CLAY_ATTACH_TO_ROOT : CLAY_ATTACH_TO_NONE,
-                     .clipTo = CLAY_CLIP_TO_NONE},
+                     .attachTo = absolute ? CLAY_ATTACH_TO_PARENT
+                                 : portal ? CLAY_ATTACH_TO_ROOT
+                                          : CLAY_ATTACH_TO_NONE,
+                     .clipTo = absolute ? CLAY_CLIP_TO_ATTACHED_PARENT : CLAY_CLIP_TO_NONE},
         .clip = {.horizontal = b.clip,
                  .vertical = b.clip,
                  .childOffset = {isfinite(b.offset_x) ? b.offset_x : 0,
@@ -691,7 +693,7 @@ bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_bo
         box.width = s->w;
     if (!box.height && !box.fixed_height)
         box.height = s->h;
-    cui_core_begin_box(ui, id, box, NULL, 0);
+    cui_core_begin_box(ui, id, box, NULL, 0, false);
     bool ok = !ui->overflow_depth && ui->depth && ui->opened[ui->depth - 1];
     if (ok) {
         cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
@@ -725,7 +727,7 @@ bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_cor
     return cui_set_underlay_ex(ui, (cui_underlay_layout){.bounds = bounds}, color, radii);
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
-    cui_core_begin_box(ui, id, b, NULL, 0);
+    cui_core_begin_box(ui, id, b, NULL, 0, false);
 }
 void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, int16_t layer) {
     if (!isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
@@ -744,7 +746,21 @@ void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, 
     }
     box.width = bounds.w;
     box.height = bounds.h;
-    cui_core_begin_box(ui, id, box, &bounds, layer);
+    cui_core_begin_box(ui, id, box, &bounds, layer, false);
+}
+void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bounds) {
+    if (!ui || !ui->in_frame)
+        return;
+    if (!ui->depth || !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) ||
+        !isfinite(bounds.h) || bounds.w < 0 || bounds.h < 0) {
+        /* Reuse the balanced malformed-portal suppression path. */
+        cui_begin_portal(ui, id, box, (cui_rect){0, 0, -1, 0}, 1);
+        return;
+    }
+    box.width = bounds.w;
+    box.height = bounds.h;
+    box.fixed_width = box.fixed_height = true;
+    cui_core_begin_box(ui, id, box, &bounds, 0, true);
 }
 void cui_end_box(cui_context *ui) {
     if (!cui_core_active(ui))

@@ -114,7 +114,8 @@ typedef enum {
     CUI_ROLE_LINK,
     CUI_ROLE_LISTITEM,
     CUI_ROLE_LOG,
-    CUI_ROLE_TOOLBAR
+    CUI_ROLE_TOOLBAR,
+    CUI_ROLE_SEPARATOR
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -258,6 +259,9 @@ typedef struct {
 } cui_underlay_layout;
 bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corner_radii);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
+/* Zero-flow child at parent-relative bounds, inheriting clipping and layer.
+ * Must be nested in a box. End with cui_end_box, including invalid bounds. */
+void cui_begin_absolute_box(cui_context *ui, cui_id id, cui_box box, cui_rect bounds);
 /* Floating viewport coordinates, independent of ancestor clipping/layout.
  * layer must be positive. Close with cui_end_box. Portal dimensions come from
  * bounds (zero dimensions fit contents); box controls styling and child layout. */

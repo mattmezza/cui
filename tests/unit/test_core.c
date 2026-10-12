@@ -1478,7 +1478,71 @@ static void test_bitmap_leaf(void) {
     assert(list.count == 1 && list.commands[0].bounds.w == 20 && list.commands[0].bounds.h == 30);
     cui_destroy(ui);
 }
+static void absolute_scene(cui_context *ui, bool overlay) {
+    cui_begin_box(ui, 800, (cui_box){.width = 100, .height = 80, .clip = true});
+    cui_begin_box(ui, 801, (cui_box){.width = 100, .height = 40});
+    cui_end_box(ui);
+    cui_begin_absolute_box(ui, 802, (cui_box){.background = {255, 0, 0, 255}},
+                           (cui_rect){95, 10, 9, 40});
+    cui_interact(ui, 802, CUI_ROLE_SEPARATOR, cui_string("Resize"), false, false, 50);
+    cui_set_semantic_details(ui, 802, (cui_semantic_details){.focusable = true});
+    cui_end_box(ui);
+    cui_begin_box(ui, 803, (cui_box){.width = 100, .height = 40});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    if (overlay) {
+        cui_begin_portal(ui, 804, (cui_box){.background = {0, 0, 255, 255}},
+                         (cui_rect){90, 0, 20, 60}, 2);
+        cui_interact(ui, 804, CUI_ROLE_BUTTON, cui_string("Overlay"), false, false, 0);
+        cui_end_box(ui);
+    }
+}
+static void test_absolute_boxes(void) {
+    cui_context *ui = make();
+    begin(ui);
+    absolute_scene(ui, false);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_bounds(ui, 803).y == 40); /* Absolute child consumes no flow space. */
+    cui_rect bounds = cui_bounds(ui, 802);
+    assert(bounds.x == 95 && bounds.y == 10 && bounds.w == 9 && bounds.h == 40);
+    bool clipped = false, painted = false;
+    for (size_t i = 0; i < list.count; i++) {
+        if (list.commands[i].type == CUI_DRAW_CLIP_PUSH)
+            clipped = list.commands[i].bounds.w == 100;
+        if (list.commands[i].type == CUI_DRAW_RECT && list.commands[i].color.r == 255) {
+            assert(clipped);
+            painted = true;
+        }
+    }
+    assert(painted);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 102, 20, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 102, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 0); /* Clipped tail is not interactive. */
+    absolute_scene(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 97, 20, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 97, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 802 && cui_focused(ui) == 802);
+    absolute_scene(ui, true);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 97, 20, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 97, 20, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 804); /* Parent layer stays below portals. */
+    absolute_scene(ui, true);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    begin(ui);
+    cui_begin_absolute_box(ui, 900, (cui_box){0}, (cui_rect){0, 0, 10, 10});
+    cui_end_box(ui);
+    assert(cui_end_frame(ui).count == 0);
+    assert(cui_last_error(ui) == CUI_ERROR_LAYOUT);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_absolute_boxes();
     test_bitmap_leaf();
     test_explicit_text_line_height();
     test_anchored_underlay();

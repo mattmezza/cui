@@ -805,6 +805,28 @@ static void test_horizontal_table_interaction(void) {
                                            .scroll_precise = true}));
     frame(ui, &f, o);
     assert(f.state.scroll.y == 2 && f.blocks[0].table_scroll.x == 2);
+    f.state.scroll.y = 0;
+    f.blocks[0].table_scroll.x = f.blocks[0].table_track_width;
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -40,
+                                           .dy = -10,
+                                           .scroll_precise = true}));
+    frame(ui, &f, o);
+    assert(f.state.scroll.y == 0);
+    o.width = 400;
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -40,
+                                           .dy = -10,
+                                           .scroll_precise = true}));
+    frame(ui, &f, o);
+    assert(f.state.scroll.y == 0 && f.blocks[0].table_scroll.x == 0);
     cui_destroy(ui);
 }
 static void test_passive_task_paint(void) {

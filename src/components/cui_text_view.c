@@ -579,6 +579,7 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                                          .content_width = fmaxf(1, block->table_track_width - 2),
                                          .content_height = fmaxf(1, frame.h - 2),
                                          .horizontal = true,
+                                         .trap_horizontal = true,
                                          .hide_scrollbars = true,
                                          .axis_lock = true,
                                          .disabled = o.disabled};

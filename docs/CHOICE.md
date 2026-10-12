@@ -174,6 +174,12 @@ all, replacement and undo continue to use the editor. Tests cover both modes in
 all four themes, selected colors, Unicode drag ranges, one-time text insertion,
 undo and pointer mapping after horizontal scrolling.
 
+Queued text and Enter events retain their queue order. Text followed by Enter
+commits from the newly filtered suggestions. Enter followed by text commits the
+previous active suggestion, then applies the query and leaves its new suggestions
+open. This matches separate frames while allowing platform adapters to submit an
+input burst without changing which value is committed.
+
 The query remains independent of the committed ID;
 selection does not overwrite the query or destroy its undo history. Callers may
 replace/select editor text using the editor API when their product needs that.

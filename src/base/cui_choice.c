@@ -430,6 +430,7 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
     cui_overlay_update(ui, &state->overlay);
     if (disabled)
         cui_overlay_close(ui, &state->overlay);
+    cui_id active_before_edit = state->list.active;
     cui_input_hit_geometry hit = {ui, state->query_viewport, state->query_font_size,
                                   state->query_scroll_x};
     cui_input_result input_result = cui_base_input_ex(
@@ -484,7 +485,7 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
             }
     if (active != matched)
         state->list.active = filtered[active].id;
-    bool commit = false;
+    bool commit = false, edit_after_commit = false;
     for (size_t e = 0; e < event_count && !disabled; e++) {
         if (cui_choice_scroll_event(ui, filtered, matched, &state->list, state->visible_rows,
                                     &state->list.first_visible, state->overlay.bounds,
@@ -506,19 +507,39 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
             active = next;
             state->list.active = filtered[active].id;
         }
-        if (events[e].key == CUI_KEY_ENTER && !events[e].repeat && active != matched) {
+        if (events[e].key == CUI_KEY_ENTER && !events[e].repeat) {
+            bool later_text = false;
+            for (size_t later = e + 1; later < event_count; later++)
+                if (cui_event_target(ui, later) == input && events[later].type == CUI_EVENT_TEXT) {
+                    later_text = true;
+                    break;
+                }
+            cui_id commit_id = active != matched ? filtered[active].id : 0;
+            if (later_text) {
+                commit_id = 0;
+                for (size_t i = 0; i < count; i++)
+                    if (items[i].id == active_before_edit && !items[i].disabled) {
+                        commit_id = items[i].id;
+                        break;
+                    }
+            }
+            if (!commit_id)
+                continue;
             cui_id old = *selected;
-            *selected = filtered[active].id;
+            *selected = commit_id;
             state->list.active = *selected;
             if (commit_fn)
                 commit_fn(*selected, commit_user);
             result.changed |= keep_open || old != *selected;
             commit = true;
+            edit_after_commit |= later_text;
             if (!keep_open)
                 break;
         }
     }
-    if (commit && !keep_open) {
+    if (edit_after_commit && active != matched)
+        state->list.active = filtered[active].id;
+    if (commit && !keep_open && !edit_after_commit) {
         cui_overlay_close(ui, &state->overlay);
         cui_set_semantic_details(
             ui, input, (cui_semantic_details){.controls = state->overlay.id, .description = text});

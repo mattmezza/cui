@@ -235,6 +235,62 @@ static void test_combobox(void) {
     cui_destroy(ui);
 }
 
+static cui_combobox_result combo_order_scene(cui_context *ui, bool multi, cui_edit *query,
+                                             cui_choice_popup *popup, cui_id *value, bool *chosen) {
+    cui_theme theme = cui_theme_light();
+    cui_choice_item filtered[3];
+    bool filtered_selected[3];
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_combobox_result result =
+        multi
+            ? cui_combobox_multi(ui, 2, &theme, cui_string("Ordered query"), query, items, 3,
+                                 filtered, filtered_selected, 3, chosen, popup,
+                                 (cui_choice_popup_options){.viewport = {0, 0, 640, 480}})
+            : cui_combobox(ui, 2, &theme, cui_string("Ordered query"), query, items, 3, filtered, 3,
+                           value, popup, (cui_choice_popup_options){.viewport = {0, 0, 640, 480}});
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+
+static void test_combobox_text_enter_order(void) {
+    for (unsigned multi = 0; multi < 2; multi++) {
+        for (unsigned enter_first = 0; enter_first < 2; enter_first++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            assert(ui);
+            char text[32] = "";
+            cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
+                                                                .capacity = sizeof(text),
+                                                                .history_bytes = 512,
+                                                                .max_history_steps = 8});
+            assert(query);
+            cui_choice_popup popup;
+            cui_choice_popup_init(&popup, 700);
+            cui_id value = 0;
+            bool chosen[3] = {false};
+            combo_order_scene(ui, multi != 0, query, &popup, &value, chosen);
+            click(ui, 2);
+            combo_order_scene(ui, multi != 0, query, &popup, &value, chosen);
+            assert(popup.overlay.open && popup.list.active == 10);
+            if (enter_first)
+                key(ui, CUI_KEY_ENTER);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "Las"}));
+            if (!enter_first)
+                key(ui, CUI_KEY_ENTER);
+            cui_combobox_result result =
+                combo_order_scene(ui, multi != 0, query, &popup, &value, chosen);
+            assert(result.changed && result.query_changed && result.matching_count == 1);
+            assert(cui_edit_get_text(query).length == 3 && memcmp(text, "Las", 3) == 0);
+            assert((multi ? chosen[enter_first ? 0 : 2] : value == (enter_first ? 10 : 30)));
+            assert(popup.overlay.open == (multi || enter_first));
+            if (popup.overlay.open)
+                assert(popup.list.active == 30);
+            cui_edit_destroy(query);
+            cui_destroy(ui);
+        }
+    }
+}
+
 static size_t action_count;
 static void record_action(cui_id id, void *user) {
     (void)user;
@@ -1345,6 +1401,7 @@ static void test_menu_configuration(void) {
 int main(void) {
     test_lists_and_popups();
     test_combobox();
+    test_combobox_text_enter_order();
     test_multi_select();
     test_multi_combobox();
     test_menu_tree();

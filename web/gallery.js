@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -13,6 +13,7 @@ const snippets = {
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
  Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.width = 280});',
  Tag:'cui_tag(ui, id, &theme, cui_string("Workspace"), options);\n/* Rich children use cui_begin_tag / cui_end_tag. */',
+ Notification:'/* Queue pushes after the frame; descriptors stay application-owned. */\ncui_notification_push(&state, descriptor, host_seconds);\ncui_notification_advance result = cui_notifications(\n    ui, id, &theme, &state, viewport, host_seconds);',
  Marker:'cui_marker(ui, id, &theme, &state, children, count, options);\n/* Schedule the deadline from cui_base_marker. */',
  OtpInput:'cui_otp_result result = cui_otp(ui, id, &theme, &state, options);\n/* Schedule a host frame at result.next_wake_seconds. */',
  'Input Group':'cui_input_group(ui, group_id, input_id, &theme, editor, &state,\n    addons, addon_count, options);',
@@ -73,7 +74,7 @@ function requestFrame(){if(framePending||!wasm)return;framePending=true;requestA
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -81,6 +82,7 @@ function render(){
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
+ wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
  wasm.gallery_tag_options(Number($('tag-variant').value),Number($('tag-color').value),Number($('tag-outline').checked),Number($('tag-pill').checked));
  wasm.gallery_marker_options(Number($('marker-variant').value),Number($('marker-loading').value),Number($('marker-alignment').value),Number($('marker-icon').checked));
  wasm.gallery_otp_options(Number($('otp-groups').value),Number($('otp-mask').checked));
@@ -127,7 +129,7 @@ async function clipboardAction(action){
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 const semanticNodes = new Map();
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link'];
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log'];
 const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
@@ -197,6 +199,8 @@ function selectComponent(){
  $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
  $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
+ for(const id of ['notification-anchor','notification-kind','notification-autohide-control'])$(id).hidden=selected.name!=='Notification';
+ $('notification-anchor').value='2';$('notification-kind').value='1';$('notification-autohide').checked=true;
  for(const id of ['tag-variant','tag-color','tag-outline-control','tag-pill-control'])$(id).hidden=selected.name!=='Tag';
  $('tag-variant').value='0';$('tag-color').value='14';$('tag-outline').checked=false;$('tag-pill').checked=false;
  for(const id of ['marker-variant','marker-loading','marker-alignment','marker-icon-control'])$(id).hidden=selected.name!=='Marker';
@@ -243,7 +247,7 @@ $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
-for(const id of ['tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
+for(const id of ['notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);
 $('group-mode').addEventListener('change',requestFrame);

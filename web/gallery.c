@@ -94,6 +94,71 @@ static bool tag_outline, tag_pill;
 static int marker_variant, marker_loading, marker_alignment;
 static bool marker_icon;
 static cui_marker_state marker_state;
+static cui_notification_state notification_state;
+static cui_notification_entry notification_entries[8];
+static char notification_titles[8][40];
+static bool notification_pins[8], notification_autohide = true;
+static int notification_kind = CUI_NOTIFICATION_INFO, notification_pushes;
+static bool notification_clear;
+static unsigned notification_serial, notification_clicks, notification_actions, notification_closes;
+static void notification_clicked(void *user, cui_notification_id id) {
+    (void)user;
+    (void)id;
+    notification_clicks++;
+}
+static void notification_action(void *user, cui_notification_id id) {
+    (void)user;
+    (void)id;
+    notification_actions++;
+}
+static void notification_closed(void *user, cui_notification_id id) {
+    (void)user;
+    (void)id;
+    notification_closes++;
+}
+static void notification_content(cui_context *context, cui_id id, void *user, float font,
+                                 cui_color color, float opacity) {
+    (void)font;
+    cui_theme theme = current_theme;
+    theme.text = color;
+    cui_color *colors[] = {&theme.surface, &theme.background, &theme.border, &theme.focus,
+                           &theme.primary, &theme.on_primary, &theme.muted};
+    for (size_t i = 0; i < sizeof(colors) / sizeof(colors[0]); i++)
+        colors[i]->a = (uint8_t)(colors[i]->a * opacity);
+    cui_checkbox(context, id, &theme, cui_string("Pin alert"), user, false);
+}
+static void notification_push(void) {
+    size_t slot = 8;
+    for (size_t candidate = 0; candidate < 8; candidate++) {
+        bool used = false;
+        for (size_t i = 0; i < notification_state.count; i++)
+            used |= notification_state.entries[i].notification.title.data ==
+                    notification_titles[candidate];
+        if (!used) {
+            slot = candidate;
+            break;
+        }
+    }
+    if (slot == 8)
+        return;
+    notification_serial++;
+    notification_pins[slot] = false;
+    snprintf(notification_titles[slot], sizeof(notification_titles[slot]), "Workspace update %u",
+             notification_serial);
+    cui_notification descriptor = cui_notification_default();
+    descriptor.id = (cui_notification_id){1, notification_serial};
+    descriptor.title = cui_string(notification_titles[slot]);
+    descriptor.message = cui_string("Tasks are ready.");
+    descriptor.action_label = cui_string("Review");
+    descriptor.kind = (cui_notification_kind)notification_kind;
+    descriptor.autohide = notification_autohide;
+    descriptor.content = notification_content;
+    descriptor.content_user = &notification_pins[slot];
+    descriptor.on_click = notification_clicked;
+    descriptor.on_action = notification_action;
+    descriptor.on_close = notification_closed;
+    cui_notification_push(&notification_state, descriptor, host_seconds);
+}
 static void marker_content(cui_context *context, cui_id id, void *user, float font, cui_color color,
                            float opacity) {
     (void)id;
@@ -238,6 +303,13 @@ int gallery_init(void) {
                                                         .capacity = sizeof(form_email_buffer),
                                                         .history_bytes = 2048,
                                                         .max_history_steps = 16});
+    cui_notification_settings notification_settings = cui_notification_settings_default();
+    notification_settings.width = 330;
+    notification_settings.margin_top = 164;
+    notification_settings.max_visible = 4;
+    if (!cui_notification_init(&notification_state, notification_entries, 8, notification_settings,
+                               (cui_notification_host){0}))
+        return 0;
     if (cui_otp_init(&otp_state, otp_buffer, sizeof(otp_buffer), 6) != CUI_EDIT_OK)
         return 0;
     group_edit = cui_edit_create((cui_edit_config){.buffer = group_buffer,
@@ -430,6 +502,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 58: {
+        if (cui_button(ui, cui_id_from(ui, "notification-add"), &t, cui_string("Add notification"),
+                       disabled || notification_state.count >= 8))
+            notification_pushes = 1;
+        if (cui_button(ui, cui_id_from(ui, "notification-three"), &t,
+                       cui_string("Add three alerts"), disabled || notification_state.count > 5))
+            notification_pushes = 3;
+        if (cui_button(ui, cui_id_from(ui, "notification-clear"), &t, cui_string("Dismiss alerts"),
+                       disabled || notification_state.count == 0))
+            notification_clear = true;
+        notification_state.settings.reduced_motion = reduced_motion;
+        cui_notification_advance result =
+            cui_notifications(ui, cui_id_from(ui, "notifications"), &t, &notification_state,
+                              (cui_rect){0, 0, width, height}, host_seconds);
+        next_wake = result.next_wake_seconds;
+        break;
+    }
     case 56: {
         cui_tag_options options = {.variant = (cui_tag_variant)tag_variant,
                                    .size = compact_density ? CUI_STATUS_SMALL : CUI_STATUS_MEDIUM,
@@ -1278,6 +1367,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     cui_end_box(ui);
     draw = cui_end_frame(ui);
+    if (notification_clear) {
+        cui_notification_clear(&notification_state, host_seconds);
+        notification_clear = false;
+        redraw = true;
+    }
+    while (notification_pushes > 0) {
+        notification_push();
+        notification_pushes--;
+        redraw = true;
+    }
     semantics = cui_semantics(ui, &semantic_count);
     return cui_last_error(ui) == CUI_OK;
 }
@@ -1458,6 +1557,47 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_notification_options(int anchor, int kind, int autohide) {
+    if (anchor >= 0 && anchor <= CUI_NOTIFICATION_RIGHT_CENTER)
+        notification_state.settings.placement = (cui_notification_anchor)anchor;
+    notification_kind = kind >= 0 && kind <= CUI_NOTIFICATION_ERROR ? kind : CUI_NOTIFICATION_INFO;
+    notification_autohide = autohide != 0;
+}
+unsigned gallery_notification_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return (unsigned)notification_state.count;
+    case 1:
+        return notification_clicks;
+    case 2:
+        return notification_actions;
+    case 3:
+        return notification_closes;
+    default:
+        return 0;
+    }
+}
+float gallery_notification_entry(unsigned index, unsigned field) {
+    if (index >= notification_state.count)
+        return 0;
+    const cui_notification_entry *entry = &notification_state.entries[index];
+    switch (field) {
+    case 0:
+        return entry->phase;
+    case 1:
+        return (float)entry->remaining;
+    case 2:
+        return entry->bounds.x;
+    case 3:
+        return entry->bounds.y;
+    case 4:
+        return entry->bounds.w;
+    case 5:
+        return entry->bounds.h;
+    default:
+        return 0;
+    }
 }
 void gallery_tag_options(int variant, int color, int outline, int pill) {
     tag_variant = variant >= 0 && variant <= CUI_TAG_PALETTE ? variant : 0;

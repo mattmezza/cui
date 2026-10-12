@@ -124,15 +124,22 @@ cui_calendar_result cui_calendar_reduce(cui_context *ui, cui_id id, cui_calendar
             cui_picker_target_date(id, cui_event_target(ui, e), old_month, months, o.first_weekday);
         if (!cui_date_valid(target))
             continue;
-        if (activation && cui_calendar_date_enabled(target, o)) {
-            cui_picker_select(s, selection, target, o.range);
-            result.activated = true;
+        bool keyboard = events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP;
+        if (keyboard && keyboard_source != cui_event_target(ui, e))
+            s->cursor = target;
+        if (keyboard)
+            keyboard_source = cui_event_target(ui, e);
+        if (activation) {
+            cui_date chosen = keyboard ? s->cursor : target;
+            if (cui_calendar_date_enabled(chosen, o)) {
+                cui_picker_select(s, selection, chosen, o.range);
+                result.activated = true;
+            }
+            if (!keyboard)
+                keyboard_source = 0;
         }
         if (events[e].type != CUI_EVENT_KEY_DOWN)
             continue;
-        if (keyboard_source != cui_event_target(ui, e))
-            s->cursor = target;
-        keyboard_source = cui_event_target(ui, e);
         cui_key key = events[e].key;
         int step = 0;
         cui_date next = s->cursor;

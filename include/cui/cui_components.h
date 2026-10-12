@@ -8,6 +8,7 @@
 #include "cui_numeric.h"
 #include "cui_picker.h"
 #include "cui_theme.h"
+#include "cui_tree.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +39,18 @@ bool cui_toggle(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool 
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);
+typedef struct {
+    cui_input_behavior_state behavior;
+    float scroll_x;
+} cui_input_state;
+typedef struct {
+    bool disabled, readonly, required, invalid;
+    float width; /* Zero defaults to 280; negative grows. */
+    cui_str placeholder;
+    const cui_platform *clipboard;
+} cui_input_options;
+cui_input_result cui_input_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
+                              cui_input_state *, cui_input_options);
 cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);

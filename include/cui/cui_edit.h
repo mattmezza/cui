@@ -13,7 +13,8 @@ typedef enum {
     CUI_EDIT_BOUNDARY,
     CUI_EDIT_NO_HISTORY,
     CUI_EDIT_INVALID_ARGUMENT,
-    CUI_EDIT_LINE_BREAK
+    CUI_EDIT_LINE_BREAK,
+    CUI_EDIT_CLIPBOARD_UNAVAILABLE
 } cui_edit_result;
 typedef struct {
     char *buffer;
@@ -49,6 +50,8 @@ cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);
 cui_edit_result cui_edit_redo(cui_edit *edit);
+/* Apply one event in caller-defined order. Pointer events are ignored. */
+cui_edit_result cui_edit_apply_event(cui_edit *, cui_event);
 /* Applies events already routed to id; returns the first rejected edit while
    continuing independent later events. Disabled input is ignored. */
 cui_edit_result cui_edit_apply_events(cui_edit *edit, cui_context *ui, cui_id id, bool disabled);

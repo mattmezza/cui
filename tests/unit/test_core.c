@@ -651,10 +651,44 @@ static void test_clipped_child_translation(void) {
     cui_destroy(ui);
 }
 
+static void test_pointer_scope_guard(void) {
+    cui_context *ui = make();
+    assert(!cui_pointer_scope_allowed(ui, 0));
+    begin(ui);
+    assert(cui_pointer_scope_allowed(ui, 500));
+    assert(cui_begin_focus_scope(ui, 100, true));
+    assert(cui_pointer_scope_allowed(ui, 500));
+    assert(cui_begin_focus_scope(ui, 200, false));
+    assert(cui_pointer_scope_allowed(ui, 500));
+    cui_end_focus_scope(ui);
+    cui_end_focus_scope(ui);
+    assert(!cui_pointer_scope_allowed(ui, 500));
+    cui_end_frame(ui);
+    begin(ui);
+    assert(!cui_pointer_scope_allowed(ui, 500));
+    assert(cui_pointer_scope_allowed(ui, 100));
+    assert(cui_begin_focus_scope(ui, 100, true));
+    assert(cui_pointer_scope_allowed(ui, 500));
+    assert(cui_begin_focus_scope(ui, 300, true));
+    cui_end_focus_scope(ui);
+    assert(!cui_pointer_scope_allowed(ui, 500));
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    begin(ui);
+    assert(!cui_pointer_scope_allowed(ui, 100));
+    assert(cui_pointer_scope_allowed(ui, 300));
+    assert(cui_begin_focus_scope(ui, 300, true));
+    assert(cui_pointer_scope_allowed(ui, 500));
+    cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();
+    test_pointer_scope_guard();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

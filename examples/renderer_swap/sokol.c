@@ -18,6 +18,16 @@ static cui_key key(SDL_Keycode k) {
         return CUI_KEY_SPACE;
     case SDLK_ESCAPE:
         return CUI_KEY_ESCAPE;
+    case SDLK_Z:
+        return CUI_KEY_Z;
+    case SDLK_Y:
+        return CUI_KEY_Y;
+    case SDLK_C:
+        return CUI_KEY_C;
+    case SDLK_X:
+        return CUI_KEY_X;
+    case SDLK_V:
+        return CUI_KEY_V;
     default:
         return CUI_KEY_NONE;
     }

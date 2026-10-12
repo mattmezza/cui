@@ -88,15 +88,22 @@ static bool cui_core_active(cui_context *ui) {
     cui_core_select_context(ui);
     return true;
 }
-static Clay_Dimensions cui_core_measure(Clay_StringSlice s, Clay_TextElementConfig *c, void *u) {
-    cui_context *ui = u;
-    if (ui->config.measure) {
-        cui_size z = ui->config.measure(ui->config.measure_user,
-                                        (cui_str){s.chars, (size_t)s.length}, c->fontSize);
-        return (Clay_Dimensions){z.width, z.height};
-    }
-    return (Clay_Dimensions){s.length * c->fontSize * 0.6f, c->fontSize * 1.3f};
+cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
+    if (!ui || (!text.data && text.length) || !isfinite(size) || size <= 0)
+        return (cui_size){0};
+    size = size > 65535 ? 65535 : (float)(uint16_t)size;
+    cui_size result = ui->config.measure ? ui->config.measure(ui->config.measure_user, text, size)
+                                         : (cui_size){text.length * size * .6f, size * 1.3f};
+    if (!isfinite(result.width) || !isfinite(result.height) || result.width < 0 ||
+        result.height < 0)
+        return (cui_size){0};
+    return result;
 }
+static Clay_Dimensions cui_core_measure(Clay_StringSlice s, Clay_TextElementConfig *c, void *u) {
+    cui_size z = cui_measure_text(u, (cui_str){s.chars, (size_t)s.length}, c->fontSize);
+    return (Clay_Dimensions){z.width, z.height};
+}
+
 static void cui_core_clay_error(Clay_ErrorData e) {
     cui_error kind = CUI_ERROR_LAYOUT;
     if (e.errorType == CLAY_ERROR_TYPE_DUPLICATE_ID)
@@ -211,6 +218,8 @@ static bool cui_core_focusable(const cui_semantic *s) {
     case CUI_ROLE_MENUITEM:
     case CUI_ROLE_MENUITEMCHECKBOX:
     case CUI_ROLE_MENUITEMRADIO:
+    case CUI_ROLE_COLUMNHEADER:
+    case CUI_ROLE_GRIDCELL:
     case CUI_ROLE_TREEITEM:
         return true;
     default:
@@ -807,6 +816,26 @@ cui_id cui_event_activation(cui_context *ui, size_t index) {
     return ui && index < ui->event_count ? ui->event_activations[index] : 0;
 }
 
+bool cui_pointer_scope_allowed(cui_context *ui, cui_id owned_scope) {
+    if (!ui || !ui->in_frame)
+        return false;
+    size_t current = ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX;
+    if (ui->top_modal != SIZE_MAX && ui->focus_scopes[ui->top_modal].active &&
+        ui->focus_scopes[ui->top_modal].id != owned_scope &&
+        !cui_core_scope_contains(ui->focus_scopes, current, ui->top_modal))
+        return false;
+    if (ui->previous_top_modal == SIZE_MAX)
+        return true;
+    cui_id previous = ui->previous_focus_scopes[ui->previous_top_modal].id;
+    if (previous == owned_scope)
+        return true;
+    while (current != SIZE_MAX) {
+        if (ui->focus_scopes[current].active && ui->focus_scopes[current].id == previous)
+            return true;
+        current = ui->focus_scopes[current].parent;
+    }
+    return false;
+}
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {
     if (!cui_core_active(ui))
         return false;

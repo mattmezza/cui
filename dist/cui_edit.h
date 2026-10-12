@@ -14,7 +14,8 @@ typedef enum {
     CUI_EDIT_BOUNDARY,
     CUI_EDIT_NO_HISTORY,
     CUI_EDIT_INVALID_ARGUMENT,
-    CUI_EDIT_LINE_BREAK
+    CUI_EDIT_LINE_BREAK,
+    CUI_EDIT_CLIPBOARD_UNAVAILABLE
 } cui_edit_result;
 typedef struct {
     char *buffer;
@@ -50,6 +51,8 @@ cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);
 cui_edit_result cui_edit_redo(cui_edit *edit);
+/* Apply one event in caller-defined order. Pointer events are ignored. */
+cui_edit_result cui_edit_apply_event(cui_edit *, cui_event);
 /* Applies events already routed to id; returns the first rejected edit while
    continuing independent later events. Disabled input is ignored. */
 cui_edit_result cui_edit_apply_events(cui_edit *edit, cui_context *ui, cui_id id, bool disabled);
@@ -362,6 +365,65 @@ cui_edit_result cui_edit_redo(cui_edit *e) {
     e->revision++;
     return CUI_EDIT_OK;
 }
+cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
+    if (!e)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_result r = CUI_EDIT_OK;
+    if (v.type == CUI_EVENT_TEXT) {
+        size_t n = 0;
+        while (n < sizeof(v.text) && v.text[n])
+            n++;
+        r = n == sizeof(v.text) ? CUI_EDIT_INVALID_ARGUMENT
+                                : cui_edit_insert(e, (cui_str){v.text, n});
+    } else if (v.type == CUI_EVENT_KEY_DOWN) {
+        bool shift = (v.modifiers & CUI_MOD_SHIFT) != 0;
+        switch (v.key) {
+        case CUI_KEY_LEFT:
+            r = cui_edit_move(e, CUI_EDIT_PREVIOUS, shift);
+            break;
+        case CUI_KEY_RIGHT:
+            r = cui_edit_move(e, CUI_EDIT_NEXT, shift);
+            break;
+        case CUI_KEY_HOME:
+            r = cui_edit_move(
+                e, (v.modifiers & CUI_MOD_CTRL) ? CUI_EDIT_START : CUI_EDIT_LINE_START, shift);
+            break;
+        case CUI_KEY_END:
+            r = cui_edit_move(e, (v.modifiers & CUI_MOD_CTRL) ? CUI_EDIT_END : CUI_EDIT_LINE_END,
+                              shift);
+            break;
+        case CUI_KEY_BACKSPACE:
+            r = cui_edit_backspace(e);
+            break;
+        case CUI_KEY_DELETE:
+            r = cui_edit_delete(e);
+            break;
+        case CUI_KEY_ENTER:
+            if (e->config.multiline)
+                r = cui_edit_insert(e, cui_string("\n"));
+            break;
+        case CUI_KEY_A:
+            if (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_META))
+                r = cui_edit_select(e, 0, e->length);
+            break;
+        case CUI_KEY_Z:
+            if (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) {
+                if (shift && cui_edit_get_state(e).can_redo)
+                    r = cui_edit_redo(e);
+                else if (!shift && cui_edit_get_state(e).can_undo)
+                    r = cui_edit_undo(e);
+            }
+            break;
+        case CUI_KEY_Y:
+            if ((v.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) && cui_edit_get_state(e).can_redo)
+                r = cui_edit_redo(e);
+            break;
+        default:
+            break;
+        }
+    }
+    return r;
+}
 cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, bool disabled) {
     if (!e || !ui || !id)
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -370,52 +432,10 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     cui_edit_result first = CUI_EDIT_OK;
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; ++i) {
         if (cui_event_target(ui, i) != id)
             continue;
-        cui_event v = events[i];
-        cui_edit_result r = CUI_EDIT_OK;
-        if (v.type == CUI_EVENT_TEXT) {
-            size_t n = 0;
-            while (n < sizeof(v.text) && v.text[n])
-                n++;
-            r = n == sizeof(v.text) ? CUI_EDIT_INVALID_ARGUMENT
-                                    : cui_edit_insert(e, (cui_str){v.text, n});
-        } else if (v.type == CUI_EVENT_KEY_DOWN) {
-            bool shift = (v.modifiers & CUI_MOD_SHIFT) != 0;
-            switch (v.key) {
-            case CUI_KEY_LEFT:
-                r = cui_edit_move(e, CUI_EDIT_PREVIOUS, shift);
-                break;
-            case CUI_KEY_RIGHT:
-                r = cui_edit_move(e, CUI_EDIT_NEXT, shift);
-                break;
-            case CUI_KEY_HOME:
-                r = cui_edit_move(
-                    e, (v.modifiers & CUI_MOD_CTRL) ? CUI_EDIT_START : CUI_EDIT_LINE_START, shift);
-                break;
-            case CUI_KEY_END:
-                r = cui_edit_move(
-                    e, (v.modifiers & CUI_MOD_CTRL) ? CUI_EDIT_END : CUI_EDIT_LINE_END, shift);
-                break;
-            case CUI_KEY_BACKSPACE:
-                r = cui_edit_backspace(e);
-                break;
-            case CUI_KEY_DELETE:
-                r = cui_edit_delete(e);
-                break;
-            case CUI_KEY_ENTER:
-                if (e->config.multiline)
-                    r = cui_edit_insert(e, cui_string("\n"));
-                break;
-            case CUI_KEY_A:
-                if (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_META))
-                    r = cui_edit_select(e, 0, e->length);
-                break;
-            default:
-                break;
-            }
-        }
+        cui_edit_result r = cui_edit_apply_event(e, events[i]);
         if (first == CUI_EDIT_OK && r != CUI_EDIT_OK)
             first = r;
     }

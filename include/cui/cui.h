@@ -51,7 +51,12 @@ typedef enum {
     CUI_KEY_END,
     CUI_KEY_BACKSPACE,
     CUI_KEY_DELETE,
-    CUI_KEY_A
+    CUI_KEY_A,
+    CUI_KEY_Z,
+    CUI_KEY_Y,
+    CUI_KEY_C,
+    CUI_KEY_X,
+    CUI_KEY_V
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
 typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
@@ -90,7 +95,13 @@ typedef enum {
     CUI_ROLE_TREE,
     CUI_ROLE_TREEITEM,
     CUI_ROLE_MENUITEMCHECKBOX,
-    CUI_ROLE_MENUITEMRADIO
+    CUI_ROLE_MENUITEMRADIO,
+    CUI_ROLE_TABLE,
+    CUI_ROLE_ROW,
+    CUI_ROLE_CELL,
+    CUI_ROLE_COLUMNHEADER,
+    CUI_ROLE_GRIDCELL,
+    CUI_ROLE_GRID
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -103,6 +114,8 @@ typedef struct {
     cui_id controls, labelled_by, parent;
     cui_str description;
     float minimum, maximum;
+    unsigned level, pos_in_set, set_size;
+    unsigned row_index, column_index, row_count, column_count;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -171,6 +184,8 @@ void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, int16_t layer);
 void cui_end_box(cui_context *ui);
 void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
+/* Uses the same configured font measurement as layout; no frame allocation. */
+cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */
@@ -188,6 +203,9 @@ cui_rect cui_bounds(cui_context *ui, cui_id id);
 bool cui_hovered(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);
 void cui_focus(cui_context *ui, cui_id id);
+/* Is a coordinate-based opener permitted by current/previous modal scopes?
+ * owned_scope allows reanchoring the opener's own popup. Call before opening it. */
+bool cui_pointer_scope_allowed(cui_context *, cui_id owned_scope);
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal);
 void cui_end_focus_scope(cui_context *ui);
 /* Withdraw current scope descendants before painting a closing popup. Paired

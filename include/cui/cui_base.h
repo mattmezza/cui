@@ -3,6 +3,7 @@
 #define CUI_BASE_H
 #include "cui.h"
 #include "cui_edit.h"
+#include "cui_platform.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -21,6 +22,18 @@ typedef struct {
     bool changed, submitted;
     cui_edit_result error;
 } cui_input_result;
+typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
+typedef struct {
+    bool dragging;
+} cui_input_behavior_state;
+typedef struct {
+    bool disabled, readonly, required, invalid;
+    const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */
+    cui_input_hit_test_fn hit_test; /* UTF-8 byte offset in current text. */
+    void *hit_test_user;
+} cui_base_input_options;
+cui_input_result cui_base_input_ex(cui_context *, cui_id, cui_str, cui_edit *,
+                                   cui_input_behavior_state *, cui_base_input_options);
 /* Text is owned by the editor; changed concerns text, not cursor movement. */
 cui_input_result cui_base_input(cui_context *, cui_id, cui_str, cui_edit *, bool disabled);
 /* Standalone allocation-free layout models. */

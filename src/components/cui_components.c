@@ -195,22 +195,137 @@ void cui_separator(cui_context *ui, cui_id id, const cui_theme *t, float width) 
     cui_end_box(ui);
 }
 
-cui_input_result cui_input(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                           cui_edit *edit, bool disabled) {
-    cui_input_result result = cui_base_input(ui, id, name, edit, disabled);
-    cui_box b = cui_components_control(t, disabled, false);
-    b.width = 280;
-    b.height = 0;
-    b.row = false;
-    if (result.error != CUI_EDIT_OK)
-        b.border = t->danger;
-    cui_components_focus(ui, id, t, &b);
-    cui_begin_box(ui, id, b);
-    cui_text(ui, name, t->font_size * .8f, t->muted);
-    cui_str text = edit ? cui_edit_get_text(edit) : cui_string("");
+typedef struct {
+    cui_context *ui;
+    cui_rect viewport;
+    float font_size, scroll;
+} cui_components_input_hit;
+static size_t cui_components_input_offset(void *user, cui_str text, float x, float y) {
+    (void)y;
+    cui_components_input_hit *hit = user;
+    float target = x - hit->viewport.x + hit->scroll;
+    if (target <= 0 || !text.length)
+        return 0;
+    size_t low = 0, high = text.length;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        while (middle > low && ((unsigned char)text.data[middle] & 0xc0) == 0x80)
+            middle--;
+        size_t next = middle + 1;
+        while (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)
+            next++;
+        float width = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
+        if (width <= target)
+            low = next;
+        else
+            high = middle;
+    }
+    if (low == text.length)
+        return low;
+    size_t next = low + 1;
+    while (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)
+        next++;
+    float left = cui_measure_text(hit->ui, (cui_str){text.data, low}, hit->font_size).width;
+    float right = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
+    return target < (left + right) * .5f ? low : next;
+}
+static void cui_components_input_span(cui_context *ui, cui_str text, const cui_theme *t,
+                                      bool selected, bool disabled) {
     if (!text.length)
-        text = cui_string(" ");
-    cui_text(ui, text, t->font_size, disabled ? t->muted : t->text);
+        return;
+    cui_size extent = cui_measure_text(ui, text, t->font_size);
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = extent.width,
+                            .height = extent.height,
+                            .background = selected ? t->primary : (cui_color){0}});
+    cui_text(ui, text, t->font_size, disabled ? t->muted : selected ? t->on_primary : t->text);
+    cui_end_box(ui);
+}
+static void cui_components_input_caret(cui_context *ui, const cui_theme *t, float height) {
+    cui_begin_box(ui, 0, (cui_box){.width = 1, .height = height, .background = t->text});
+    cui_end_box(ui);
+}
+cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              cui_edit *edit, cui_input_state *state, cui_input_options options) {
+    if (!ui || !t || !edit || !state)
+        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_id viewport_id = id ^ UINT64_C(0xb1642b97583fbd63);
+    cui_components_input_hit hit = {ui, cui_bounds(ui, viewport_id), t->font_size, state->scroll_x};
+    bool multiline = cui_edit_get_state(edit).multiline;
+    cui_input_result result = cui_base_input_ex(
+        ui, id, name, edit, &state->behavior,
+        (cui_base_input_options){.disabled = options.disabled,
+                                 .readonly = options.readonly,
+                                 .required = options.required,
+                                 .invalid = options.invalid,
+                                 .clipboard = options.clipboard,
+                                 .hit_test = multiline ? NULL : cui_components_input_offset,
+                                 .hit_test_user = &hit});
+    cui_box box = cui_components_control(t, options.disabled, false);
+    box.width = options.width ? options.width : 280;
+    box.height = 0;
+    box.row = false;
+    box.clip = true;
+    if (options.invalid || result.error != CUI_EDIT_OK)
+        box.border = t->danger;
+    else
+        cui_components_focus(ui, id, t, &box);
+    cui_begin_box(ui, id, box);
+    cui_text(ui, name, t->font_size * .8f, t->muted);
+    cui_str text = cui_edit_get_text(edit);
+    cui_edit_state selection = cui_edit_get_state(edit);
+    bool focused = cui_focused(ui) == id && !options.disabled;
+    if (multiline) {
+        cui_text(ui, text.length ? text : cui_string(" "), t->font_size,
+                 options.disabled ? t->muted : t->text);
+    } else {
+        float height = cui_measure_text(ui, cui_string("M"), t->font_size).height;
+        float viewport_width = hit.viewport.w;
+        if (box.width > 0)
+            viewport_width = fmaxf(1, box.width - 2 * box.padding);
+        float caret =
+            cui_measure_text(ui, (cui_str){text.data, selection.cursor}, t->font_size).width;
+        float total = cui_measure_text(ui, text, t->font_size).width + (focused ? 1 : 0);
+        if (!isfinite(state->scroll_x) || state->scroll_x < 0)
+            state->scroll_x = 0;
+        if (focused && viewport_width > 0) {
+            if (caret < state->scroll_x)
+                state->scroll_x = caret;
+            if (caret + 1 > state->scroll_x + viewport_width)
+                state->scroll_x = caret + 1 - viewport_width;
+        }
+        state->scroll_x = fminf(state->scroll_x, fmaxf(0, total - viewport_width));
+        cui_begin_box(ui, viewport_id,
+                      (cui_box){.width = -1,
+                                .height = height,
+                                .row = true,
+                                .clip = true,
+                                .offset_x = -state->scroll_x});
+        if (!text.length && options.placeholder.length) {
+            if (focused)
+                cui_components_input_caret(ui, t, height);
+            cui_text(ui, options.placeholder, t->font_size, t->muted);
+        } else {
+            size_t first =
+                selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
+            size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+            cui_components_input_span(ui, (cui_str){text.data, first}, t, false, options.disabled);
+            if (focused && selection.cursor == first)
+                cui_components_input_caret(ui, t, height);
+            cui_components_input_span(ui, (cui_str){text.data + first, last - first}, t, focused,
+                                      options.disabled);
+            if (focused && selection.cursor != first)
+                cui_components_input_caret(ui, t, height);
+            cui_components_input_span(ui, (cui_str){text.data + last, text.length - last}, t, false,
+                                      options.disabled);
+        }
+        cui_end_box(ui);
+    }
     cui_end_box(ui);
     return result;
+}
+cui_input_result cui_input(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                           cui_edit *edit, bool disabled) {
+    cui_input_state state = {0};
+    return cui_input_ex(ui, id, t, name, edit, &state, (cui_input_options){.disabled = disabled});
 }

@@ -121,6 +121,52 @@ cui_combobox_result cui_combobox_multi(cui_context *, cui_id input, const cui_th
                                        cui_choice_item *filtered, bool *filtered_selected,
                                        size_t filtered_capacity, bool *selected, cui_choice_popup *,
                                        cui_choice_popup_options);
+
+#define CUI_MENU_DEPTH_MAX 16
+typedef enum {
+    CUI_MENU_ACTION,
+    CUI_MENU_CHECK,
+    CUI_MENU_RADIO,
+    CUI_MENU_SEPARATOR,
+    CUI_MENU_LABEL,
+    CUI_MENU_SUBMENU
+} cui_menu_kind;
+typedef struct cui_menu_entry {
+    cui_id id;
+    cui_str label, icon, shortcut;
+    bool disabled;
+    cui_menu_kind kind;
+    bool *checked;
+    int *radio_value;
+    int radio_option;
+    const struct cui_menu_entry *children;
+    size_t child_count;
+} cui_menu_entry;
+typedef struct {
+    cui_overlay overlay;
+    cui_list_state levels[CUI_MENU_DEPTH_MAX];
+    cui_id path[CUI_MENU_DEPTH_MAX - 1];
+    cui_rect panels[CUI_MENU_DEPTH_MAX];
+    size_t depth;
+    bool depth_limit;
+    float row_height, padding; /* previous painted metrics for pointer hover */
+} cui_menu_tree_state;
+typedef struct {
+    cui_choice_popup_options popup;
+    bool keep_open_checks;
+} cui_menu_tree_options;
+void cui_menu_tree_init(cui_menu_tree_state *, cui_id popup);
+/* Ordered reducer before painting. Descriptors and pointed-to check/radio values
+ * are borrowed; IDs must be globally unique throughout the tree. */
+bool cui_base_menu_tree(cui_context *, cui_id trigger, cui_str name, const cui_menu_entry *,
+                        size_t count, cui_id *action, cui_menu_tree_state *, bool disabled,
+                        float dt, bool keep_open_checks);
+bool cui_menu_entry_is_disabled(const cui_menu_entry *);
+void cui_base_menu_entry(cui_context *, const cui_menu_entry *, bool disabled, bool expanded,
+                         cui_id parent);
+bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
+                   const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
+                   cui_menu_tree_options);
 #ifdef __cplusplus
 }
 #endif
@@ -515,7 +561,9 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
                 continue;
             if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE)
                 dismiss = true;
-            if (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_TEXT ||
+            if ((events[e].type == CUI_EVENT_POINTER_DOWN &&
+                 events[e].pointer_button == CUI_POINTER_PRIMARY) ||
+                events[e].type == CUI_EVENT_TEXT ||
                 (events[e].type == CUI_EVENT_KEY_DOWN &&
                  (events[e].key == CUI_KEY_DOWN || events[e].key == CUI_KEY_UP))) {
                 if (!state->overlay.open)
@@ -656,6 +704,307 @@ cui_combobox_result cui_base_combobox_multi(cui_context *ui, cui_id input, cui_s
     return result;
 }
 
+bool cui_menu_entry_is_disabled(const cui_menu_entry *entry) {
+    if (!entry)
+        return true;
+    return entry->disabled || entry->kind == CUI_MENU_SEPARATOR || entry->kind == CUI_MENU_LABEL ||
+           (entry->kind == CUI_MENU_CHECK && !entry->checked) ||
+           (entry->kind == CUI_MENU_RADIO && !entry->radio_value) ||
+           (entry->kind == CUI_MENU_SUBMENU && (!entry->child_count || !entry->children));
+}
+static size_t cui_menu_find(const cui_menu_entry *items, size_t count, cui_id id) {
+    for (size_t i = 0; i < count; i++)
+        if (items[i].id == id)
+            return i;
+    return count;
+}
+static size_t cui_menu_step(const cui_menu_entry *items, size_t count, size_t from, cui_key key) {
+    if (!count)
+        return count;
+    int direction = 0;
+    if (key == CUI_KEY_HOME) {
+        from = count - 1;
+        direction = 1;
+    } else if (key == CUI_KEY_END) {
+        from = 0;
+        direction = -1;
+    } else if (key == CUI_KEY_DOWN)
+        direction = 1;
+    else if (key == CUI_KEY_UP)
+        direction = -1;
+    if (!direction)
+        return count;
+    for (size_t n = 0; n < count; n++) {
+        from = direction > 0 ? (from + 1) % count : from ? from - 1 : count - 1;
+        if (!cui_menu_entry_is_disabled(&items[from]))
+            return from;
+    }
+    return count;
+}
+void cui_menu_tree_init(cui_menu_tree_state *state, cui_id popup) {
+    if (!state)
+        return;
+    *state = (cui_menu_tree_state){0};
+    cui_overlay_init(&state->overlay, popup, true);
+}
+void cui_base_menu_entry(cui_context *ui, const cui_menu_entry *entry, bool disabled, bool expanded,
+                         cui_id parent) {
+    if (!entry)
+        return;
+    if (entry->kind == CUI_MENU_SEPARATOR)
+        return;
+    bool checked = entry->kind == CUI_MENU_CHECK && entry->checked ? *entry->checked
+                   : entry->kind == CUI_MENU_RADIO && entry->radio_value
+                       ? *entry->radio_value == entry->radio_option
+                       : false;
+    cui_role role = entry->kind == CUI_MENU_LABEL   ? CUI_ROLE_LABEL
+                    : entry->kind == CUI_MENU_CHECK ? CUI_ROLE_MENUITEMCHECKBOX
+                    : entry->kind == CUI_MENU_RADIO ? CUI_ROLE_MENUITEMRADIO
+                                                    : CUI_ROLE_MENUITEM;
+    cui_interact(ui, entry->id, role, entry->label, disabled || cui_menu_entry_is_disabled(entry),
+                 checked,
+                 entry->kind == CUI_MENU_RADIO ? (float)entry->radio_option
+                 : checked                     ? 1
+                                               : 0);
+    cui_set_semantic_details(
+        ui, entry->id,
+        (cui_semantic_details){.parent = parent,
+                               .expanded = expanded,
+                               .controls = entry->kind == CUI_MENU_SUBMENU
+                                               ? entry->id ^ UINT64_C(0x4b64d23e91a738c1)
+                                               : 0,
+                               .description = entry->shortcut});
+}
+bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui_menu_entry *items,
+                        size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
+                        float dt, bool keep_open_checks) {
+    if (!state || !state->overlay.id || !action || (!items && count))
+        return false;
+    bool was_open = state->overlay.open;
+    cui_choice_popup temporary = {.overlay = state->overlay, .list = state->levels[0]};
+    cui_base_choice_popup_trigger(ui, trigger, name, disabled, NULL, 0, 0, &temporary);
+    state->overlay = temporary.overlay;
+    if (!state->overlay.open) {
+        state->depth = 0;
+        return false;
+    }
+    if (!was_open || !state->depth) {
+        state->depth = 1;
+        state->depth_limit = false;
+        size_t queued = 0;
+        bool reverse = false;
+        const cui_event *opening_events = cui_frame_events(ui, &queued);
+        for (size_t e = 0; e < queued; e++)
+            if (cui_event_target(ui, e) == trigger &&
+                opening_events[e].type == CUI_EVENT_KEY_DOWN && opening_events[e].key == CUI_KEY_UP)
+                reverse = true;
+        size_t first = cui_menu_step(items, count,
+                                     reverse ? 0
+                                     : count ? count - 1
+                                             : 0,
+                                     reverse ? CUI_KEY_UP : CUI_KEY_DOWN);
+        state->levels[0].active = first < count ? items[first].id : 0;
+        state->levels[0].search_length = 0;
+        cui_focus(ui, state->levels[0].active);
+    }
+    if (state->depth > CUI_MENU_DEPTH_MAX)
+        state->depth = CUI_MENU_DEPTH_MAX;
+    const cui_menu_entry *menus[CUI_MENU_DEPTH_MAX] = {items};
+    size_t counts[CUI_MENU_DEPTH_MAX] = {count};
+    for (size_t level = 1; level < state->depth; level++) {
+        size_t parent = cui_menu_find(menus[level - 1], counts[level - 1], state->path[level - 1]);
+        if (parent == counts[level - 1] || menus[level - 1][parent].kind != CUI_MENU_SUBMENU ||
+            cui_menu_entry_is_disabled(&menus[level - 1][parent])) {
+            state->depth = level;
+            break;
+        }
+        state->levels[level - 1].active = menus[level - 1][parent].id;
+        menus[level] = menus[level - 1][parent].children;
+        counts[level] = menus[level - 1][parent].child_count;
+    }
+    for (size_t level = 0; level < state->depth; level++) {
+        cui_list_state *cursor = &state->levels[level];
+        if (cursor->search_length >= sizeof(cursor->search))
+            cursor->search_length = 0;
+        if (dt > 0 && dt < 60)
+            cursor->search_time += dt;
+        if (cursor->search_time > .75f)
+            cursor->search_length = 0;
+        size_t current = cui_menu_find(menus[level], counts[level], cursor->active);
+        if (current == counts[level] || cui_menu_entry_is_disabled(&menus[level][current])) {
+            size_t first = cui_menu_step(menus[level], counts[level],
+                                         counts[level] ? counts[level] - 1 : 0, CUI_KEY_DOWN);
+            cursor->active = first < counts[level] ? menus[level][first].id : 0;
+        }
+    }
+    size_t event_count = 0, logical_level = state->depth - 1;
+    bool redirected = false, activated_any = false;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    for (size_t e = 0; e < event_count; e++) {
+        cui_id target = cui_event_target(ui, e);
+        if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE) {
+            size_t escape_level = state->depth;
+            if (target == state->overlay.id)
+                escape_level = 0;
+            for (size_t level = 1; level < state->depth; level++)
+                if (target == (state->path[level - 1] ^ UINT64_C(0x4b64d23e91a738c1)))
+                    escape_level = level;
+            if (escape_level < state->depth) {
+                if (!escape_level) {
+                    cui_overlay_close(ui, &state->overlay);
+                    state->depth = 0;
+                    break;
+                }
+                state->depth = escape_level;
+                logical_level = escape_level - 1;
+                cui_focus(ui, state->path[logical_level]);
+                redirected = true;
+                continue;
+            }
+        }
+        if (events[e].type == CUI_EVENT_POINTER_MOVE && state->row_height > 0) {
+            for (size_t reverse = state->depth; reverse > 0; reverse--) {
+                size_t level = reverse - 1;
+                cui_rect panel = state->panels[level];
+                if (events[e].x >= panel.x && events[e].x < panel.x + panel.w &&
+                    events[e].y >= panel.y + state->padding &&
+                    events[e].y < panel.y + panel.h - state->padding) {
+                    float offset = (events[e].y - panel.y - state->padding) / state->row_height;
+                    if (offset >= (float)counts[level])
+                        break;
+                    size_t row = state->levels[level].first_visible + (size_t)offset;
+                    if (row < counts[level] && !cui_menu_entry_is_disabled(&menus[level][row]))
+                        target = menus[level][row].id;
+                    break;
+                }
+            }
+        }
+        size_t target_level = state->depth, target_index = 0;
+        for (size_t level = 0; level < state->depth; level++) {
+            size_t index = cui_menu_find(menus[level], counts[level], target);
+            if (index < counts[level]) {
+                target_level = level;
+                target_index = index;
+                break;
+            }
+        }
+        if (target_level == state->depth)
+            continue;
+        bool keyboard = events[e].type == CUI_EVENT_KEY_DOWN ||
+                        events[e].type == CUI_EVENT_KEY_UP || events[e].type == CUI_EVENT_TEXT;
+        size_t level = keyboard && redirected ? logical_level : target_level;
+        if (level >= state->depth)
+            continue;
+        const cui_menu_entry *entries = menus[level];
+        size_t n = counts[level];
+        size_t active = cui_menu_find(entries, n, state->levels[level].active);
+        if (!keyboard)
+            active = target_index;
+        if (active == n || cui_menu_entry_is_disabled(&entries[active]))
+            continue;
+        const cui_menu_entry *entry = &entries[active];
+        if (events[e].type == CUI_EVENT_POINTER_MOVE) {
+            state->levels[level].active = entry->id;
+            cui_focus(ui, entry->id);
+            state->depth = level + 1;
+            logical_level = level;
+            redirected = true;
+        }
+        bool activation = cui_event_activation(ui, e) != 0;
+        if (events[e].type == CUI_EVENT_KEY_UP && entry->id != cui_event_activation(ui, e))
+            activation = false;
+        bool open_child =
+            entry->kind == CUI_MENU_SUBMENU &&
+            (activation || events[e].type == CUI_EVENT_POINTER_MOVE ||
+             (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_RIGHT));
+        if (open_child) {
+            if (level + 1 == CUI_MENU_DEPTH_MAX) {
+                state->depth_limit = true;
+                continue;
+            }
+            state->path[level] = entry->id;
+            state->depth = level + 2;
+            menus[level + 1] = entry->children;
+            counts[level + 1] = entry->child_count;
+            size_t first =
+                cui_menu_step(entry->children, entry->child_count,
+                              entry->child_count ? entry->child_count - 1 : 0, CUI_KEY_DOWN);
+            state->levels[level + 1] = (cui_list_state){
+                .active = first < entry->child_count ? entry->children[first].id : 0};
+            cui_focus(ui, state->levels[level + 1].active);
+            logical_level = level + 1;
+            redirected = true;
+            continue;
+        }
+        if (activation && entry->kind != CUI_MENU_SUBMENU) {
+            state->levels[level].active = entry->id;
+            if (!keyboard)
+                state->depth = level + 1;
+            if (entry->kind == CUI_MENU_CHECK)
+                *entry->checked = !*entry->checked;
+            if (entry->kind == CUI_MENU_RADIO)
+                *entry->radio_value = entry->radio_option;
+            *action = entry->id;
+            if (!keep_open_checks ||
+                (entry->kind != CUI_MENU_CHECK && entry->kind != CUI_MENU_RADIO)) {
+                cui_overlay_close(ui, &state->overlay);
+                state->depth = 0;
+            }
+            activated_any = true;
+            if (!state->overlay.open)
+                return true;
+            continue;
+        }
+        if (events[e].type == CUI_EVENT_KEY_DOWN) {
+            if (events[e].key == CUI_KEY_LEFT && level) {
+                state->depth = level;
+                logical_level = level - 1;
+                redirected = true;
+                cui_focus(ui, state->path[level - 1]);
+                continue;
+            }
+            size_t next = cui_menu_step(entries, n, active, events[e].key);
+            if (next < n) {
+                state->levels[level].active = entries[next].id;
+                state->depth = level + 1;
+                logical_level = level;
+                redirected = true;
+                cui_focus(ui, entries[next].id);
+                state->levels[level].search_length = 0;
+            }
+        } else if (events[e].type == CUI_EVENT_TEXT) {
+            cui_list_state *cursor = &state->levels[level];
+            size_t length = 0;
+            while (length < sizeof(events[e].text) && events[e].text[length])
+                length++;
+            if (!length || length >= sizeof(events[e].text))
+                continue;
+            if (length > sizeof(cursor->search) - 1 - cursor->search_length)
+                cursor->search_length = 0;
+            bool cycle = length == 1 && cursor->search_length == 1 &&
+                         cui_choice_lower((unsigned char)events[e].text[0]) ==
+                             cui_choice_lower((unsigned char)cursor->search[0]);
+            if (!cycle)
+                for (size_t j = 0; j < length; j++)
+                    cursor->search[cursor->search_length++] = events[e].text[j];
+            cursor->search_time = 0;
+            for (size_t step = 0; step < n; step++) {
+                size_t i = (active + 1 + step) % n;
+                if (!cui_menu_entry_is_disabled(&entries[i]) &&
+                    cui_choice_prefix(entries[i].label, cursor->search, cursor->search_length)) {
+                    cursor->active = entries[i].id;
+                    cui_focus(ui, cursor->active);
+                    state->depth = level + 1;
+                    logical_level = level;
+                    redirected = true;
+                    break;
+                }
+            }
+        }
+    }
+    return activated_any;
+}
+
 /* src/components/cui_choice.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -717,6 +1066,10 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
     cui_interact(ui, list_id, CUI_ROLE_TABLIST, cui_string(""), options.disabled, false, 0);
+    cui_set_semantic_details(
+        ui, list_id,
+        (cui_semantic_details){.orientation = options.vertical ? CUI_ORIENTATION_VERTICAL
+                                                               : CUI_ORIENTATION_HORIZONTAL});
     cui_begin_box(ui, container ^ UINT64_C(0xcda0312561f50cab),
                   (cui_box){.row = !options.vertical, .gap = theme->gap});
     size_t active = count;
@@ -753,6 +1106,10 @@ bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
         return false;
     bool changed = cui_base_toggle_group(ui, items, count, selected, options);
     cui_interact(ui, container, CUI_ROLE_GROUP, cui_string(""), options.disabled, false, 0);
+    cui_set_semantic_details(
+        ui, container,
+        (cui_semantic_details){.orientation = options.vertical ? CUI_ORIENTATION_VERTICAL
+                                                               : CUI_ORIENTATION_HORIZONTAL});
     cui_begin_box(ui, container, (cui_box){.row = !options.vertical, .gap = theme->gap});
     for (size_t i = 0; i < count; ++i)
         cui_choice_draw(ui, &items[i], theme, selected[i], options.disabled || items[i].disabled,
@@ -768,6 +1125,9 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
 
     cui_interact(ui, container, options.menu ? CUI_ROLE_MENU : CUI_ROLE_LISTBOX, cui_string(""),
                  options.disabled, false, 0);
+    cui_set_semantic_details(ui, container,
+                             (cui_semantic_details){.multiselectable = multiple_selected != NULL,
+                                                    .orientation = CUI_ORIENTATION_VERTICAL});
     cui_begin_box(ui, container, (cui_box){.gap = 0});
     size_t begin = options.visible_count ? state->first_visible : 0;
     size_t length = options.visible_count ? options.visible_count : count;
@@ -1080,7 +1440,10 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
                                .radius = theme->radius},
                      placement.bounds, 100);
     cui_interact(ui, state->overlay.id, CUI_ROLE_LISTBOX, name, false, false, 0);
-    cui_set_semantic_details(ui, state->overlay.id, (cui_semantic_details){.labelled_by = trigger});
+    cui_set_semantic_details(ui, state->overlay.id,
+                             (cui_semantic_details){.labelled_by = trigger,
+                                                    .multiselectable = true,
+                                                    .orientation = CUI_ORIENTATION_VERTICAL});
     cui_id action = 0;
     if (count)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, items,
@@ -1168,7 +1531,10 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
                                .radius = theme->radius},
                      placement.bounds, 100);
     cui_interact(ui, state->overlay.id, CUI_ROLE_LISTBOX, name, false, false, 0);
-    cui_set_semantic_details(ui, state->overlay.id, (cui_semantic_details){.labelled_by = input});
+    cui_set_semantic_details(ui, state->overlay.id,
+                             (cui_semantic_details){.labelled_by = input,
+                                                    .multiselectable = true,
+                                                    .orientation = CUI_ORIENTATION_VERTICAL});
     cui_id action = 0;
     if (matched)
         cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, filtered,
@@ -1178,6 +1544,148 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     cui_end_box(ui);
     cui_overlay_end(ui);
     return result;
+}
+
+static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
+                                  const cui_menu_entry *entries, size_t count,
+                                  cui_menu_tree_state *state, size_t level, cui_rect anchor,
+                                  cui_menu_tree_options options) {
+    cui_list_state *cursor = &state->levels[level];
+    float available = options.popup.viewport.h - 2 * theme->padding - 8;
+    size_t rows = count;
+    if (available / theme->control_height < (float)rows)
+        rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
+    if (rows > 4096)
+        rows = 4096;
+    if (cursor->first_visible >= count)
+        cursor->first_visible = 0;
+    size_t active = count;
+    for (size_t i = 0; i < count; i++)
+        if (entries[i].id == cursor->active)
+            active = i;
+    if (active < count && rows) {
+        if (active < cursor->first_visible)
+            cursor->first_visible = active;
+        else if (active >= cursor->first_visible + rows)
+            cursor->first_visible = active + 1 - rows;
+    }
+    float width =
+        options.popup.width > 0 && isfinite(options.popup.width) ? options.popup.width : 240;
+    if (width > options.popup.viewport.w)
+        width = options.popup.viewport.w;
+    float height = 2 * theme->padding + (rows ? rows : 1) * theme->control_height;
+    cui_popup_result placement =
+        cui_popup_place(anchor, (cui_size){width, height}, options.popup.viewport,
+                        level ? CUI_POPUP_RIGHT : CUI_POPUP_BELOW, 4);
+    state->panels[level] = placement.bounds;
+    if (!level)
+        cui_overlay_set_bounds(&state->overlay, placement.bounds);
+    cui_id scope =
+        level ? state->path[level - 1] ^ UINT64_C(0x4b64d23e91a738c1) : state->overlay.id;
+    if (!cui_begin_focus_scope(ui, scope, !level))
+        return;
+    cui_begin_portal(ui, scope,
+                     (cui_box){.padding = theme->padding,
+                               .clip = true,
+                               .background = theme->surface,
+                               .border = theme->border,
+                               .border_width = 1,
+                               .radius = theme->radius},
+                     placement.bounds, (int16_t)(100 + level));
+    cui_interact(ui, scope, CUI_ROLE_MENU, cui_string(""), false, false, 0);
+    cui_set_semantic_details(ui, scope,
+                             (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
+                                                    .labelled_by = level ? state->path[level - 1]
+                                                                         : state->overlay.trigger});
+    size_t begin = cursor->first_visible, end = rows > count - begin ? count : begin + rows;
+    for (size_t i = begin; i < end; i++) {
+        const cui_menu_entry *entry = &entries[i];
+        bool expanded = level + 1 < state->depth && state->path[level] == entry->id;
+        cui_base_menu_entry(ui, entry, options.popup.disabled, expanded, scope);
+        if (entry->kind != CUI_MENU_SEPARATOR && entry->kind != CUI_MENU_LABEL)
+            cui_set_tab_stop(ui, entry->id, entry->id == cursor->active);
+        bool highlighted = cursor->active == entry->id;
+        bool checked = entry->kind == CUI_MENU_CHECK && entry->checked ? *entry->checked
+                       : entry->kind == CUI_MENU_RADIO && entry->radio_value
+                           ? *entry->radio_value == entry->radio_option
+                           : false;
+        cui_color foreground = cui_menu_entry_is_disabled(entry) || options.popup.disabled
+                                   ? theme->muted
+                               : highlighted ? theme->on_primary
+                                             : theme->text;
+        cui_begin_box(
+            ui, entry->id,
+            (cui_box){.height = theme->control_height,
+                      .width = -1,
+                      .padding = theme->padding,
+                      .gap = theme->gap,
+                      .row = true,
+                      .align_y = CUI_ALIGN_CENTER,
+                      .background = highlighted ? theme->primary : theme->surface,
+                      .border = cui_focused(ui) == entry->id ? theme->focus : theme->surface,
+                      .border_width = cui_focused(ui) == entry->id ? 1 : 0});
+        if (entry->kind == CUI_MENU_SEPARATOR) {
+            cui_begin_box(ui, 0, (cui_box){.height = 1, .width = -1, .background = theme->border});
+            cui_end_box(ui);
+        } else {
+            if (entry->kind == CUI_MENU_CHECK || entry->kind == CUI_MENU_RADIO)
+                cui_text(ui,
+                         cui_string(checked ? (entry->kind == CUI_MENU_RADIO ? "(*)" : "[x]")
+                                    : entry->kind == CUI_MENU_RADIO ? "( )"
+                                                                    : "[ ]"),
+                         theme->font_size, foreground);
+            else if (entry->icon.length)
+                cui_text(ui, entry->icon, theme->font_size, foreground);
+            cui_begin_box(ui, 0, (cui_box){.width = -1});
+            cui_text(ui, entry->label, theme->font_size,
+                     entry->kind == CUI_MENU_LABEL ? theme->muted : foreground);
+            cui_end_box(ui);
+            if (entry->shortcut.length)
+                cui_text(ui, entry->shortcut, theme->font_size * .8f, foreground);
+            if (entry->kind == CUI_MENU_SUBMENU)
+                cui_text(ui, cui_string(">"), theme->font_size, foreground);
+        }
+        cui_end_box(ui);
+    }
+    if (!count)
+        cui_text(ui, cui_string("No actions"), theme->font_size, theme->muted);
+    if (level + 1 < state->depth) {
+        size_t parent = count;
+        for (size_t i = 0; i < count; i++)
+            if (entries[i].id == state->path[level])
+                parent = i;
+        if (parent < count) {
+            cui_rect child_anchor = {placement.bounds.x,
+                                     placement.bounds.y + theme->padding +
+                                         (float)(parent - begin) * theme->control_height,
+                                     placement.bounds.w, theme->control_height};
+            cui_choice_menu_level(ui, theme, entries[parent].children, entries[parent].child_count,
+                                  state, level + 1, child_anchor, options);
+        }
+    }
+    cui_end_box(ui);
+    cui_end_focus_scope(ui);
+}
+bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
+                   const cui_menu_entry *items, size_t count, cui_id *action,
+                   cui_menu_tree_state *state, cui_menu_tree_options options) {
+    if (!theme || !state || !state->overlay.id || !action || (!items && count) ||
+        !isfinite(theme->control_height) || theme->control_height <= 0 ||
+        !isfinite(theme->padding) || theme->padding < 0 || !isfinite(options.popup.viewport.x) ||
+        !isfinite(options.popup.viewport.y) || !isfinite(options.popup.viewport.w) ||
+        !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
+        options.popup.viewport.h <= 2 * theme->padding)
+        return false;
+    bool activated =
+        cui_base_menu_tree(ui, trigger, name, items, count, action, state, options.popup.disabled,
+                           options.popup.dt, options.keep_open_checks);
+    cui_choice_item trigger_item = {trigger, name, options.popup.disabled};
+    cui_choice_draw(ui, &trigger_item, theme, false, options.popup.disabled, CUI_TAB_DEFAULT);
+    state->row_height = theme->control_height;
+    state->padding = theme->padding;
+    if (state->overlay.open)
+        cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger), options);
+    return activated;
 }
 
 #endif

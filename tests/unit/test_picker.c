@@ -114,8 +114,17 @@ static void calendar_events(void) {
         assert(calendar_scene(ui, &themes[i], &state, &selected, options).changed);
         assert(!cui_date_compare(selected.start, (cui_date){2024, 3, 1}));
         key(ui, CUI_KEY_RIGHT, 0);
-        calendar_scene(ui, &themes[i], &state, &selected, options);
+        key(ui, CUI_KEY_ENTER, 0);
+        cui_calendar_result ordered = calendar_scene(ui, &themes[i], &state, &selected, options);
+        assert(ordered.changed && ordered.navigated && ordered.activated);
         assert(!cui_date_compare(state.cursor, (cui_date){2024, 3, 4}));
+        assert(!cui_date_compare(selected.start, (cui_date){2024, 3, 4}));
+        key(ui, CUI_KEY_RIGHT, 0);
+        key(ui, CUI_KEY_RIGHT, 0);
+        key(ui, CUI_KEY_SPACE, 0);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+        calendar_scene(ui, &themes[i], &state, &selected, options);
+        assert(!cui_date_compare(selected.start, (cui_date){2024, 3, 6}));
         click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 1)));
         calendar_scene(ui, &themes[i], &state, &selected, options);
         assert(state.month.year == 2023 && state.month.month == 3);

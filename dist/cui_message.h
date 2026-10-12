@@ -206,6 +206,13 @@ static void cui_message_private_clamp(cui_message_scroller_state *s) {
     double maximum = cui_message_private_max(s);
     s->scroll = s->following ? maximum : fmin(fmax(s->scroll, 0), maximum);
 }
+static cui_virtual_anchor cui_message_private_capture(cui_message_scroller_state *s) {
+    cui_virtual_anchor anchor =
+        cui_virtual_capture_anchor(s->list, fmax(0, s->scroll - s->metrics.padding_top));
+    if (anchor.valid && s->scroll < s->metrics.padding_top)
+        anchor.within = s->scroll - s->metrics.padding_top;
+    return anchor;
+}
 static double cui_message_private_restore(cui_message_scroller_state *s,
                                           cui_virtual_anchor anchor) {
     size_t index;
@@ -292,8 +299,7 @@ bool cui_message_scroller_splice(cui_message_scroller_state *s, size_t begin, si
     if (!s || begin > end || end > s->count || count > s->capacity - (s->count - (end - begin)) ||
         count > UINT64_MAX - s->next_key)
         return false;
-    cui_virtual_anchor anchor =
-        cui_virtual_capture_anchor(s->list, fmax(0, s->scroll - s->metrics.padding_top));
+    cui_virtual_anchor anchor = cui_message_private_capture(s);
     size_t next = s->count - (end - begin) + count;
     memmove(s->rows + begin + count, s->rows + end, (s->count - end) * sizeof(*s->rows));
     for (size_t i = 0; i < count; i++)
@@ -370,8 +376,7 @@ bool cui_message_scroller_scroll(cui_message_scroller_state *s, double offset) {
 bool cui_message_scroller_measure(cui_message_scroller_state *s, size_t index, double height) {
     if (!s || index >= s->count || !isfinite(height) || height < 0 || height > 1000000)
         return false;
-    cui_virtual_anchor anchor =
-        cui_virtual_capture_anchor(s->list, fmax(0, s->scroll - s->metrics.padding_top));
+    cui_virtual_anchor anchor = cui_message_private_capture(s);
     s->rows[index].raw_height = height;
     s->rows[index].measured = true;
     cui_virtual_set_height(s->list, index,
@@ -389,8 +394,7 @@ bool cui_message_scroller_layout(cui_message_scroller_state *s, cui_message_scro
         m.padding_bottom > 1000000 || m.row_gap > 1000000)
         return false;
     bool changed = m.row_gap != s->metrics.row_gap || m.padding_top != s->metrics.padding_top;
-    cui_virtual_anchor anchor =
-        cui_virtual_capture_anchor(s->list, fmax(0, s->scroll - s->metrics.padding_top));
+    cui_virtual_anchor anchor = cui_message_private_capture(s);
     s->metrics = m;
     if (changed) {
         cui_message_private_rebuild(s);

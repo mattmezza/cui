@@ -246,7 +246,24 @@ static void interactions(void) {
     cui_message_scroller_destroy(s);
     cui_destroy(ui);
 }
+static void test_measure_preserves_top_padding(void) {
+    cui_message_scroller_state *s = cui_message_scroller_create(
+        (cui_message_scroller_config){.capacity = 20, .item_count = 10, .estimated_height = 50});
+    assert(s);
+    cui_message_scroller_metrics metrics = {
+        .viewport_height = 100, .padding_top = 8, .padding_bottom = 8, .row_gap = 32};
+    cui_message_scroller_view view;
+    assert(cui_message_scroller_layout(s, metrics, &view));
+    assert(cui_message_scroller_scroll(s, 0));
+    assert(cui_message_scroller_measure(s, 0, 80));
+    assert(cui_message_scroller_layout(s, metrics, &view) && view.scroll == 0);
+    assert(cui_message_scroller_scroll(s, 4));
+    assert(cui_message_scroller_measure(s, 1, 75));
+    assert(cui_message_scroller_layout(s, metrics, &view) && view.scroll == 4);
+    cui_message_scroller_destroy(s);
+}
 int main(void) {
+    test_measure_preserves_top_padding();
     models();
 #ifndef CUI_MESSAGE_BASE_ONLY
     composition();

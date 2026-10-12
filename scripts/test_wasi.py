@@ -37,6 +37,8 @@ SOURCES = (
     "src/components/cui_textarea.c",
     "src/base/cui_settings.c",
     "src/components/cui_settings.c",
+    "src/base/cui_questionnaire.c",
+    "src/components/cui_questionnaire.c",
     "src/base/cui_speech.c",
     "src/components/cui_speech.c",
     "src/base/cui_chart.c",
@@ -85,7 +87,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root", "text_view", "chart", "speech")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:

@@ -3506,32 +3506,50 @@
       "name": "Questionnaire",
       "reference_url": "https://gpui-kit.com/component/questionnaire/",
       "category": "forms",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_questionnaire_init",
+        "cui_questionnaire_set_answer",
+        "cui_questionnaire_submit"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_questionnaire.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_questionnaire.c",
+        "tests/unit/test_questionnaire_styled.c"
+      ],
+      "status": "implemented",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Retained answers, validation, delayed confirmation and initial composable graphical parts have targeted tests. Automatic root keyboard capture, shortcuts, cross-item focus transfer, custom slots, exact styling, localization, full accessibility and browser story remain unfinished; see docs/QUESTIONNAIRE.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "step and answer models",
-          "status": "not_started",
-          "evidence": []
+          "status": "implemented",
+          "evidence": [
+            "tests/unit/test_questionnaire.c",
+            "tests/unit/test_questionnaire_styled.c"
+          ]
         },
         {
           "name": "validation/navigation",
-          "status": "not_started",
-          "evidence": []
+          "status": "implemented",
+          "evidence": [
+            "tests/unit/test_questionnaire.c",
+            "tests/unit/test_questionnaire_styled.c"
+          ]
         },
         {
           "name": "compound UI semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "implemented",
+          "evidence": [
+            "tests/unit/test_questionnaire.c",
+            "tests/unit/test_questionnaire_styled.c"
+          ]
         }
       ],
       "upstream_doc": {

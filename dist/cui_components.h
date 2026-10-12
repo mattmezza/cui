@@ -16,6 +16,7 @@
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
+#include "cui_questionnaire.h"
 #include "cui_resizable.h"
 #include "cui_root.h"
 #include "cui_scroll.h"
@@ -318,6 +319,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_SPEECH_IMPLEMENTATION
 #endif
 #include "cui_speech.h"
+#ifndef CUI_QUESTIONNAIRE_IMPLEMENTATION
+#define CUI_QUESTIONNAIRE_IMPLEMENTATION
+#endif
+#include "cui_questionnaire.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

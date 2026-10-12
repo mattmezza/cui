@@ -35,8 +35,11 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         !isfinite(o->max_bar_width) || !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 ||
         o->bar_padding_inner > 1 || o->bar_padding_outer < 0 || o->bar_padding_outer > 1 ||
         o->max_bar_width < 0 || o->min_bar_length < 0 || !isfinite(o->radar_max_value) ||
-        o->radar_max_value < 0 || !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 ||
-        o->x_tick_count > 1000 || o->grid_columns > 1000 || o->reference_count > 16 ||
+        !isfinite(o->bar_corner_radius) || o->bar_corner_radius < 0 ||
+        !isfinite(o->reveal_progress) || o->reveal_progress < 0 || o->reveal_progress > 1 ||
+        (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
+        !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
+        o->grid_columns > 1000 || o->reference_count > 16 ||
         (o->reference_count && !o->reference_values) ||
         (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
@@ -405,6 +408,56 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
                        (int)lround(y) + 2, color);
     }
 }
+static cui_color cui_chart_blend_color(cui_color a, cui_color b, double t) {
+    t = fmax(0, fmin(1, t));
+    return (cui_color){
+        (unsigned char)lround(a.r + (b.r - a.r) * t), (unsigned char)lround(a.g + (b.g - a.g) * t),
+        (unsigned char)lround(a.b + (b.b - a.b) * t), (unsigned char)lround(a.a + (b.a - a.a) * t)};
+}
+static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, size_t index,
+                               cui_plot_rect bounds, cui_color solid) {
+    bool horizontal =
+        o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
+    bool positive = o->data[index].value >= 0;
+    bool forward = (o->bar_alignment == CUI_CHART_BAR_BOTTOM ||
+                    o->bar_alignment == CUI_CHART_BAR_RIGHT) == positive;
+    double start = horizontal ? (forward ? bounds.x_min : bounds.x_max)
+                              : (forward ? bounds.y_max : bounds.y_min);
+    double end = horizontal ? (forward ? bounds.x_max : bounds.x_min)
+                            : (forward ? bounds.y_min : bounds.y_max);
+    double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
+    double reveal_end = start + (end - start) * progress;
+    if (horizontal) {
+        bounds.x_min = fmin(start, reveal_end);
+        bounds.x_max = fmax(start, reveal_end);
+    } else {
+        bounds.y_min = fmin(start, reveal_end);
+        bounds.y_max = fmax(start, reveal_end);
+    }
+    double radius = fmin(o->bar_corner_radius, fmin((bounds.x_max - bounds.x_min) / 2,
+                                                    (bounds.y_max - bounds.y_min) / 2));
+    int x0 = (int)fmax(0, floor(bounds.x_min)), x1 = (int)fmin(o->width, ceil(bounds.x_max));
+    int y0 = (int)fmax(0, floor(bounds.y_min)), y1 = (int)fmin(o->height, ceil(bounds.y_max));
+    for (int y = y0; y < y1; y++)
+        for (int x = x0; x < x1; x++) {
+            double px = x + .5, py = y + .5;
+            if (px < bounds.x_min || px >= bounds.x_max || py < bounds.y_min || py >= bounds.y_max)
+                continue;
+            if (radius > 0) {
+                double cx = fmax(bounds.x_min + radius, fmin(bounds.x_max - radius, px));
+                double cy = fmax(bounds.y_min + radius, fmin(bounds.y_max - radius, py));
+                if ((px - cx) * (px - cx) + (py - cy) * (py - cy) > radius * radius)
+                    continue;
+            }
+            cui_color color = solid;
+            if (o->bar_gradient_start.a && o->bar_gradient_end.a) {
+                double coordinate = horizontal ? px : py;
+                double t = end != start ? (coordinate - start) / (end - start) : 0;
+                color = cui_chart_blend_color(o->bar_gradient_start, o->bar_gradient_end, t);
+            }
+            cui_chart_pixel(s, o, x, y, color);
+        }
+}
 static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) {
     double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left, top = 12,
            bottom = o->height > 32 ? o->height - 20 : 12;
@@ -464,8 +517,7 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         if (o->kind == CUI_CHART_BAR) {
             cui_plot_rect bounds;
             if (cui_chart_bar_bounds_domain(o, i, lo, hi, &bounds) == CUI_PLOT_OK)
-                cui_chart_rect(s, o, (int)floor(bounds.x_min), (int)floor(bounds.y_min),
-                               (int)ceil(bounds.x_max), (int)ceil(bounds.y_max), c);
+                cui_chart_draw_bar(s, o, i, bounds, c);
         } else if (o->kind == CUI_CHART_CANDLESTICK) {
             cui_chart_candle_geometry candle;
             if (cui_chart_candle_bounds(o, i, &candle) != CUI_PLOT_OK)
@@ -794,6 +846,13 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->pad_angle));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_ratio));
     h = cui_chart_mix(h, cui_chart_bits(o->candle_body_ratio));
+    h = cui_chart_mix(h, cui_chart_bits(o->bar_corner_radius));
+    h = cui_chart_mix(h, o->reveal_enabled);
+    h = cui_chart_mix(h, o->reduced_motion);
+    h = cui_chart_mix(h, cui_chart_bits(o->reveal_progress));
+    const unsigned char *gradient = (const unsigned char *)&o->bar_gradient_start;
+    for (size_t i = 0; i < 2 * sizeof(cui_color); i++)
+        h = cui_chart_mix(h, gradient[i]);
     h = cui_chart_mix(h, cui_chart_bits(o->bar_padding_inner));
     h = cui_chart_mix(h, cui_chart_bits(o->bar_padding_outer));
     h = cui_chart_mix(h, cui_chart_bits(o->max_bar_width));

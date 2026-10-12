@@ -87,9 +87,13 @@ typedef struct {
     double bar_ratio;        /* zero means 0.6 */
     cui_chart_bar_alignment bar_alignment;
     bool custom_bar_padding;
-    float bar_padding_inner, bar_padding_outer; /* shares of a band; defaults .4/.2 */
-    float max_bar_width, min_bar_length;        /* zero means source 30px/no stub */
-    float candle_body_ratio;                    /* zero selects source 0.8 */
+    float bar_padding_inner, bar_padding_outer;     /* shares of a band; defaults .4/.2 */
+    float max_bar_width, min_bar_length;            /* zero means source 30px/no stub */
+    float candle_body_ratio;                        /* zero selects source 0.8 */
+    cui_color bar_gradient_start, bar_gradient_end; /* both set for base-to-tip fill */
+    float bar_corner_radius;                        /* uniform pixel radius */
+    bool reveal_enabled, reduced_motion;
+    float reveal_progress; /* host animation progress 0..1; reduced motion paints fully */
     bool show_bar_values;
     cui_color bar_label_color; /* alpha zero uses foreground */
     cui_chart_curve curve;     /* natural is source default */

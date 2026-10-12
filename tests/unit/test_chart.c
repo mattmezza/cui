@@ -213,6 +213,43 @@ int main(void) {
     options.reference_values = NULL;
     options.reference_count = 0;
     options.grid_columns = 0;
+    options.hide_grid = true;
+    options.hide_axes = true;
+    options.bar_gradient_start = (cui_color){255, 0, 0, 255};
+    options.bar_gradient_end = (cui_color){0, 0, 255, 255};
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    bool red_end = false, blue_end = false;
+    for (size_t i = 0; i < options.width * options.height; i++) {
+        if (pixels[4 * i] > 180 && pixels[4 * i + 2] < 70)
+            red_end = true;
+        if (pixels[4 * i + 2] > 180 && pixels[4 * i] < 70)
+            blue_end = true;
+    }
+    assert(red_end && blue_end);
+    memcpy(saved, pixels, sizeof pixels);
+    options.bar_corner_radius = 6;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    options.reveal_enabled = true;
+    options.reveal_progress = 0;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(!differs(pixels, options.width * options.height, options.background));
+    options.reduced_motion = true;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(differs(pixels, options.width * options.height, options.background));
+    options.reveal_enabled = false;
+    options.reduced_motion = false;
+    options.bar_corner_radius = 0;
+    options.bar_gradient_start = (cui_color){0};
+    options.bar_gradient_end = (cui_color){0};
+    options.bar_corner_radius = NAN;
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
+    assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
+    options.bar_corner_radius = 0;
+    options.hide_grid = false;
+    options.hide_axes = false;
     options.kind = CUI_CHART_CANDLESTICK;
     points[0].open = 100;
     points[0].low = 95;

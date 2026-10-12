@@ -1212,7 +1212,6 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_id viewport_id = cui_input_viewport_id(id);
     float viewport_width = width > 0 ? fmaxf(0, width - 2 * inset) : cui_bounds(ui, viewport_id).w;
     float text_width = cui_measure_text(ui, text, metrics.font_size).width;
-    float align = cui_input_alignment(viewport_width, text_width, options.text_align);
     float caret =
         cui_measure_text(ui, (cui_str){text.data, selection.cursor}, metrics.font_size).width;
     float total = text_width + (focused ? 1 : 0);
@@ -1232,9 +1231,11 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .height = metrics.line_height,
                             .fixed_height = true,
                             .clip = true,
-                            .offset_x = align - state->scroll_x});
+                            .align_x = options.text_align,
+                            .offset_x = -state->scroll_x});
     cui_begin_box(ui, id ^ UINT64_C(0xb1642b97583fbd64),
-                  (cui_box){.width = fmaxf(text_width + 1, viewport_width),
+                  (cui_box){.width = fmaxf(text_width, 1),
+                            .fixed_width = true,
                             .height = metrics.line_height,
                             .fixed_height = true});
     size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;

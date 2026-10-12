@@ -123,6 +123,44 @@ static cui_rect text_bounds(cui_draw_list list, const char *text) {
 static void pointer(cui_context *ui, cui_event_type type, float x, float y, unsigned modifiers) {
     assert(cui_queue_event(ui, (cui_event){.type = type, .x = x, .y = y, .modifiers = modifiers}));
 }
+static void grow_resize_and_alignment(void) {
+    cui_context *ui = cui_create((cui_config){.measure = measure});
+    char buffer[32] = "abc";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_state state = {0};
+    cui_theme theme = cui_theme_light();
+    assert(ui && edit);
+    const float widths[] = {400, 220, 500, 180};
+    for (unsigned align = CUI_ALIGN_START; align <= CUI_ALIGN_END; ++align) {
+        for (unsigned frame = 0; frame < 4; ++frame) {
+            cui_input_options options = {.width = -1,
+                                         .text_align = (cui_align)align,
+                                         .custom_padding = true,
+                                         .padding_x = frame * 4.0f};
+            assert(cui_begin_frame(ui, widths[frame], 100, .016f));
+            cui_begin_box(ui, 100, (cui_box){.width = widths[frame], .fixed_width = true});
+            assert(cui_input_ex(ui, 1, &theme, cui_string("Name"), edit, &state, options).error ==
+                   CUI_EDIT_OK);
+            cui_end_box(ui);
+            cui_draw_list list = cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_rect box = cui_bounds(ui, 1), viewport = cui_bounds(ui, cui_input_viewport_id(1));
+            float inset = options.padding_x + 1;
+            assert(fabsf(box.w - widths[frame]) < .001f);
+            assert(fabsf(viewport.x - box.x - inset) < .001f);
+            assert(fabsf(viewport.w - (box.w - 2 * inset)) < .001f);
+            cui_rect bounds = text_bounds(list, buffer);
+            float extra = viewport.w - bounds.w;
+            float expected = viewport.x + (align == CUI_ALIGN_CENTER ? extra * .5f
+                                           : align == CUI_ALIGN_END  ? extra
+                                                                     : 0);
+            assert(fabsf(bounds.x - expected) < .001f);
+        }
+    }
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 static void paint_only_reduction(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200, .measure = measure});
     char buffer[32] = "ab";
@@ -374,6 +412,7 @@ static void size_metrics_and_centering(void) {
 int main(void) {
 #ifndef CUI_INPUT_BASE_ONLY
     size_metrics_and_centering();
+    grow_resize_and_alignment();
 #endif
     consumed_release_ends_selection();
     input_consumes_caret_keys();

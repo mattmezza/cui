@@ -34,6 +34,17 @@ controls retain their own IDs and behavior and do not select a tab automatically
 Headless tests exercise custom bodies and both controls in all five variants and
 all four themes, including disabled semantics and ordered keyboard selection.
 
+As in GPUI Kit's documented closable-tab example, a custom tab body can compose a
+separate small close button beside its label. Give the close button a distinct
+stable ID, a meaningful accessible name/description and the tab's disabled state.
+Record the requested tab ID during the callback and apply removal after `cui_tabs`
+returns; the callback borrows the array. Applications own which neighbor becomes
+selected and where focus returns. A close button activates independently of the
+tab and can also be focused and activated with Enter. Tests remove an unselected
+tab without changing selection, reject a disabled close button, remove a selected
+tab by keyboard, verify withdrawn child semantics and apply an explicit empty
+selection policy when only disabled tabs remain, across all variants and themes.
+
 ToggleGroup accepts a caller-owned boolean per item. Options choose single or
 multiple selection, whether the final selected item can be cleared, orientation,
 and group disabled state. Arrow/Home/End traversal moves focus without selecting;
@@ -56,8 +67,8 @@ Labels are frame-copied by the core, and callbacks must not retain draw-list str
 `tests/unit/test_choice.c` covers actual pointer activation, keyboard modes,
 orientation, wrapping, disabled controls, ID-stable reorder, invalid selection,
 toggle selection rules, and all five tab variants in all four themes. This is a
-portable C11 vertical slice. GPUI Kit's overflow menu, drag reordering, close
-buttons and maximum label width/ellipsis,
+portable C11 vertical slice. GPUI Kit's overflow menu, drag reordering, built-in
+close-button policy, maximum label width/ellipsis,
 and gallery stories remain pending. Composing those controls beside this tab list
 is possible, but is not claimed as equivalent built-in support. Full family parity
 is not yet verified.

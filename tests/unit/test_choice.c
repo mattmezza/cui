@@ -1165,6 +1165,115 @@ static void test_combo_editor_paint_and_hit(void) {
     }
 }
 
+typedef struct {
+    cui_choice_item entries[3];
+    size_t count;
+    cui_id selected, requested;
+    cui_theme theme;
+} close_tabs_model;
+static cui_id close_tab_id(cui_id tab) {
+    return tab ^ UINT64_C(0x8242bd476918bf60);
+}
+static void close_tab_mark(cui_context *ui, void *user) {
+    cui_theme *theme = user;
+    cui_text(ui, cui_string("×"), theme->font_size, theme->text);
+}
+static void close_tab_body(cui_context *ui, const cui_choice_item *item, size_t index, void *user) {
+    close_tabs_model *model = user;
+    assert(index < model->count);
+    cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 3});
+    cui_text(ui, item->label, model->theme.font_size,
+             item->disabled ? model->theme.muted : model->theme.text);
+    cui_theme close_theme = model->theme;
+    close_theme.control_height = 14;
+    close_theme.font_size = 10;
+    close_theme.padding = 1;
+    cui_id close = close_tab_id(item->id);
+    if (cui_button_ex(ui, close, &close_theme, item->label,
+                      (cui_button_options){.variant = CUI_BUTTON_GHOST,
+                                           .disabled = item->disabled,
+                                           .content = close_tab_mark,
+                                           .content_user = &close_theme}))
+        model->requested = item->id;
+    cui_set_semantic_details(
+        ui, close, (cui_semantic_details){.description = {"Close tab", 9}, .parent = item->id});
+    cui_end_box(ui);
+}
+static bool closable_tabs_scene(cui_context *ui, close_tabs_model *model, cui_tab_variant variant) {
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    visible = 99;
+    bool changed = cui_tabs(
+        ui, 1, &model->theme, model->entries, model->count, &model->selected,
+        (cui_tabs_options){.variant = variant, .render = close_tab_body, .render_user = model},
+        panel, NULL);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void apply_tab_close(cui_context *ui, close_tabs_model *model) {
+    assert(model->requested);
+    for (size_t i = 0; i < model->count; i++) {
+        if (model->entries[i].id != model->requested)
+            continue;
+        for (size_t j = i + 1; j < model->count; j++)
+            model->entries[j - 1] = model->entries[j];
+        model->count--;
+        if (model->selected == model->requested) {
+            model->selected = 0;
+            for (size_t j = 0; j < model->count; j++)
+                if (!model->entries[j].disabled) {
+                    model->selected = model->entries[j].id;
+                    break;
+                }
+        }
+        cui_focus(ui, model->selected);
+        model->requested = 0;
+        return;
+    }
+    assert(!"Closing request must refer to a current tab");
+}
+static void test_closable_tab_composition(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t t = 0; t < 4; t++) {
+        for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            assert(ui);
+            close_tabs_model model = {.count = 3, .selected = 10, .theme = themes[t]};
+            memcpy(model.entries, items, sizeof(items));
+            closable_tabs_scene(ui, &model, variant);
+            click(ui, close_tab_id(30));
+            assert(!closable_tabs_scene(ui, &model, variant));
+            assert(model.requested == 30 && model.selected == 10 && visible == 0);
+            size_t count = 0;
+            const cui_semantic *semantics = cui_semantics(ui, &count);
+            bool labelled = false;
+            for (size_t i = 0; i < count; i++)
+                if (semantics[i].id == close_tab_id(30))
+                    labelled = semantics[i].role == CUI_ROLE_BUTTON &&
+                               semantics[i].name.length == 4 &&
+                               semantics[i].details.description.length == 9 &&
+                               semantics[i].details.parent == 30;
+            assert(labelled);
+            apply_tab_close(ui, &model); /* mutation is after borrowing ends */
+            closable_tabs_scene(ui, &model, variant);
+            assert(model.count == 2 && model.selected == 10 && cui_focused(ui) == 10);
+            semantics = cui_semantics(ui, &count);
+            for (size_t i = 0; i < count; i++)
+                assert(semantics[i].id != 30 && semantics[i].id != close_tab_id(30));
+            click(ui, close_tab_id(20));
+            assert(!closable_tabs_scene(ui, &model, variant) && !model.requested);
+            cui_focus(ui, close_tab_id(10));
+            key(ui, CUI_KEY_ENTER);
+            assert(!closable_tabs_scene(ui, &model, variant) && model.requested == 10);
+            apply_tab_close(ui, &model);
+            closable_tabs_scene(ui, &model, variant);
+            assert(model.count == 1 && !model.selected && !cui_focused(ui) && visible == 99);
+            cui_destroy(ui);
+        }
+    }
+}
+
 static unsigned custom_rows;
 static void custom_menu_row(cui_context *ui, void *user) {
     assert(user == &custom_rows);
@@ -1249,6 +1358,7 @@ int main(void) {
     test_custom_tabs();
     test_nested_list_wheel_routing();
     test_combo_editor_paint_and_hit();
+    test_closable_tab_composition();
     test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

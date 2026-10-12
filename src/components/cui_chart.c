@@ -256,16 +256,17 @@ cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_char
     return CUI_PLOT_OK;
 }
 static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
+    size_t slots = o->point_count > o->count ? o->point_count : o->count;
     if (!o->x_tick_count) {
         size_t margin = o->x_tick_margin ? o->x_tick_margin : 1;
         return (index + 1) % margin == 0;
     }
-    if (o->x_tick_count >= o->count)
+    if (o->x_tick_count >= slots)
         return true;
     if (o->x_tick_count == 1)
         return index == 0;
     for (unsigned tick = 0; tick < o->x_tick_count; tick++) {
-        size_t selected = (size_t)lround((double)tick * (o->count - 1) / (o->x_tick_count - 1));
+        size_t selected = (size_t)lround((double)tick * (slots - 1) / (o->x_tick_count - 1));
         if (selected == index)
             return true;
     }

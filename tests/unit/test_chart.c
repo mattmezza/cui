@@ -1094,6 +1094,30 @@ int main(void) {
         .pixels = axis_auto_pixels, .byte_capacity = sizeof axis_auto_pixels, .hovered = SIZE_MAX};
     assert(cui_chart_render_animated(ui, &axis_animated_chart, &styled_axis_auto) == CUI_PLOT_OK);
     assert(memcmp(axis_auto_pixels, axis_manual_pixels, sizeof pixels) == 0);
+    cui_chart_options unfinished_labels = {.kind = CUI_CHART_LINE,
+                                           .data = points,
+                                           .count = 3,
+                                           .width = 128,
+                                           .height = 96,
+                                           .point_count = 5,
+                                           .x_tick_count = 2,
+                                           .noninteractive = true,
+                                           .background = {255, 255, 255, 255},
+                                           .series = {{240, 0, 0, 255}}};
+    cui_chart_state label_chart = {
+        .pixels = axis_auto_pixels, .byte_capacity = sizeof axis_auto_pixels, .hovered = SIZE_MAX};
+    assert(cui_chart_render(&label_chart, &unfinished_labels) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 903, &label_chart, &unfinished_labels, (cui_str){"Slots", 5}));
+    cui_draw_list unfinished_draw = cui_end_frame(ui);
+    unsigned first_label = 0, last_label = 0;
+    for (size_t i = 0; i < unfinished_draw.count; i++)
+        if (unfinished_draw.commands[i].type == CUI_DRAW_TEXT &&
+            unfinished_draw.commands[i].text.length == 1) {
+            first_label += unfinished_draw.commands[i].text.data[0] == 'A';
+            last_label += unfinished_draw.commands[i].text.data[0] == 'C';
+        }
+    assert(first_label == 1 && last_label == 0);
     options.value_axis_gutter = wide_gutter;
     options.kind = CUI_CHART_BAR;
     cui_plot_rect shifted_bar;

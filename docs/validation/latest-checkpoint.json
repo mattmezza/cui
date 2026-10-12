@@ -1,36 +1,36 @@
 {
-  "source": "ef24642",
-  "published_source": "0e61b2f9f508c38e28b323a47ccbd9481da85208",
+  "source": "47dfd82",
+  "published_source": "edea48411392b0f0069f7b035bc32f07bb42f4b4",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Integrated Notification, perceptual Marker shimmer, independent popover tokens, container focus, dominant-axis wheel routing and configurable Disclosure/Dropdown behavior passed native47/47, ASan/UBSan45/45, WASI38/38 and Chromium57 live-story gates. Public source0e61b2f has56 stories with six CI jobs and Pages successful; direct HTTPS OTP/Tag/Marker validation passed. This57-story checkpoint awaits deployment. All78 entries remain; full parity is unfinished.",
+  "summary": "Source47dfd82 passed native49/49, ASan/UBSan47/47, WASI40/40 and Chromium58 real-story gates, including standalone Shimmer, Message/MessageScroller, exact Tab sizes and disclosure animation. Publishededea484 has57 stories with six CI jobs and Pages successful, confirmed by an actual HTTPS Notification click. This58-story checkpoint awaits deployment. All78 entries remain; full parity is unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "ef24642",
-      "passed": 47,
-      "total": 47,
-      "log": "gcc-57.txt"
+      "source": "47dfd82",
+      "passed": 49,
+      "total": 49,
+      "log": "gcc-58.txt"
     },
     {
       "name": "sanitizers",
-      "source": "ef24642",
-      "passed": 45,
-      "total": 45,
-      "log": "asan-57.txt"
+      "source": "47dfd82",
+      "passed": 47,
+      "total": 47,
+      "log": "asan-58.txt"
     },
     {
       "name": "WASI",
-      "source": "ef24642",
-      "passed": 38,
-      "total": 38,
-      "log": "wasi-57.txt"
+      "source": "47dfd82",
+      "passed": 40,
+      "total": 40,
+      "log": "wasi-58.txt"
     },
     {
       "name": "browser",
-      "source": "ef24642",
-      "stories": 57,
+      "source": "47dfd82",
+      "stories": 58,
       "catalog_entries": 78,
-      "log": "browser-57-integrated.txt"
+      "log": "browser-58-integrated.txt"
     },
     {
       "name": "previous framework CI",
@@ -60,6 +60,22 @@
       "name": "published framework CI",
       "source": "0e61b2f",
       "log": "ci-0e61b2f.json"
+    },
+    {
+      "name": "published57 framework CI",
+      "source": "edea484",
+      "log": "ci-edea484.json"
+    },
+    {
+      "name": "published57 gallery pipeline",
+      "source": "edea484",
+      "stories": 57,
+      "log": "pages-edea484.json"
+    },
+    {
+      "name": "published57 HTTPS browser",
+      "source": "edea484",
+      "log": "published-edea484.txt"
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `ef2464225a800f8192d10fdff78cbb291dabc4ec`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `47dfd82128af0914e94271667b23ec2694180f5c`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -12,22 +12,23 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 
 | Status | Families |
 |---|---:|
-| not_started | 21 |
+| not_started | 18 |
 | scaffolded | 0 |
 | implemented | 4 |
-| tested | 53 |
+| tested | 56 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-Integrated Notification, perceptual Marker shimmer, independent popover tokens, container focus, dominant-axis wheel routing and configurable Disclosure/Dropdown behavior passed native47/47, ASan/UBSan45/45, WASI38/38 and Chromium57 live-story gates. Public source0e61b2f has56 stories with six CI jobs and Pages successful; direct HTTPS OTP/Tag/Marker validation passed. This57-story checkpoint awaits deployment. All78 entries remain; full parity is unfinished.
+Source47dfd82 passed native49/49, ASan/UBSan47/47, WASI40/40 and Chromium58 real-story gates, including standalone Shimmer, Message/MessageScroller, exact Tab sizes and disclosure animation. Publishededea484 has57 stories with six CI jobs and Pages successful, confirmed by an actual HTTPS Notification click. This58-story checkpoint awaits deployment. All78 entries remain; full parity is unfinished.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
 - [asan-56.txt](validation/asan-56.txt)
 - [asan-57.txt](validation/asan-57.txt)
+- [asan-58.txt](validation/asan-58.txt)
 - [asan-form.txt](validation/asan-form.txt)
 - [asan-measurement-input-group.txt](validation/asan-measurement-input-group.txt)
 - [asan-otp.txt](validation/asan-otp.txt)
@@ -43,12 +44,14 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [browser-53-integrated.txt](validation/browser-53-integrated.txt)
 - [browser-56-integrated.txt](validation/browser-56-integrated.txt)
 - [browser-57-integrated.txt](validation/browser-57-integrated.txt)
+- [browser-58-integrated.txt](validation/browser-58-integrated.txt)
 - [browser-pre-surfaces.txt](validation/browser-pre-surfaces.txt)
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
 - [clang-zig-headless.txt](validation/clang-zig-headless.txt)
 - [deployed-42.txt](validation/deployed-42.txt)
 - [gcc-56.txt](validation/gcc-56.txt)
 - [gcc-57.txt](validation/gcc-57.txt)
+- [gcc-58.txt](validation/gcc-58.txt)
 - [gcc-button-intents.txt](validation/gcc-button-intents.txt)
 - [gcc-choice-wheel.txt](validation/gcc-choice-wheel.txt)
 - [gcc-clip-lifecycle.txt](validation/gcc-clip-lifecycle.txt)
@@ -89,6 +92,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [gcc-xorg.txt](validation/gcc-xorg.txt)
 - [pages-daf43b9-failure.txt](validation/pages-daf43b9-failure.txt)
 - [published-0e61b2f.txt](validation/published-0e61b2f.txt)
+- [published-edea484.txt](validation/published-edea484.txt)
 - [release-headless.txt](validation/release-headless.txt)
 - [release-resumed.txt](validation/release-resumed.txt)
 - [sanitizers-input-tree.txt](validation/sanitizers-input-tree.txt)
@@ -100,6 +104,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [wasi-56-fuel-limit.txt](validation/wasi-56-fuel-limit.txt)
 - [wasi-56.txt](validation/wasi-56.txt)
 - [wasi-57.txt](validation/wasi-57.txt)
+- [wasi-58.txt](validation/wasi-58.txt)
 - [wasi-form.txt](validation/wasi-form.txt)
 - [wasi-initial.txt](validation/wasi-initial.txt)
 - [wasi-input-tree.txt](validation/wasi-input-tree.txt)
@@ -183,19 +188,19 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Kbd | tested | Platform modifier formatting and styled UTF-8-safe hint tested. Action/keybinding lookup and grouped shortcut composition pending. |
 | Label | implemented | Text wrapper renders, but control association and standalone semantic labeling pending. |
 | Marker | tested | Text wrapping, inherited font styling and arbitrary separator styling remain incomplete. Custom child widths/layout are application supplied. Default shimmer now uses alpha-aware Oklab and the source lightness fallback. |
-| Message | not_started | Full documented behavior pending implementation and audit. |
-| MessageScroller | not_started | Full documented behavior pending implementation and audit. |
+| Message | tested | Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending. |
+| MessageScroller | tested | Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending. |
 | Notification | tested | Native OS delivery adapters remain absent; portable host callbacks are opt-in. Shadows approximate blur with bounded rounded layers; intent icons are text symbols and title font weight is not independently styled. Custom content and action descriptors remain borrowed through lifecycle callbacks. |
 | Pagination | tested | Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. Responsive wrapping, configurable label slots and arbitrary page budgets pending. |
 | Progress | implemented | Determinate bar renders/clamps. Indeterminate motion, semantic values and dedicated story tests pending. |
 | Radio | tested | Selection/exclusivity tested; full radio-group roving focus and arrow navigation pending. |
 | Rating | tested | Independent keyboard/pointer half-step values, controlled clearing, readonly/disabled and range semantics tested. SVG masks/custom icons/color and hover preview pending. |
-| Shimmer | not_started | Full documented behavior pending implementation and audit. |
+| Shimmer | tested | Single-line text only; inherited styled runs, wrapping, ellipsis and font weight await rich text infrastructure. Caller supplies elapsed time and schedules base-plan deadlines. |
 | Skeleton | tested | Placeholder dimensions/radii, secondary opacity, phase pulse and reduced motion tested. Loading owner semantics and richer placeholder layouts pending. |
 | Spinner | tested | Themed eight-dot ring, explicit clock phase, redraw invalidation, reduced motion and status snapshot tested. Scheduler deadlines and alternative icon geometry pending. |
 | Stepper | tested | Controlled current index, explicit pending/active/completed/error states, pointer/keyboard navigation and semantic snapshots tested. Validation callbacks, connectors/custom icons and exact density variants pending. |
 | Switch | tested | Controlled activation tested; native switch geometry, theme variants and touch pending. |
-| Tag | tested | Frozen Tag has no built-in close action; interactive children are application composition. Exact inherited typography and distinct secondary theme tokens remain incomplete. |
+| Tag | tested | Frozen Tag has no built-in close action; interactive children are application composition. Semantic secondary colors are independently configurable. Exact inherited typography remains incomplete. |
 | Toggle | tested | Controlled press state tested; toggle groups and full visual states pending. |
 | Tooltip | tested | Delayed pointer/focus opening, collision placement, viewport portals, Escape suppression, disabled omission and trigger description tested. configurable layer policy and native accessibility bridge pending. |
 | Calendar | tested | Actual one-to-three month Gregorian grid, ordered keyboard navigation, controlled date/range selection, disabled/min/max predicates and roving semantic days tested. Locale labels, week numbers, today markers, hover range previews and neighboring-day interaction remain pending. |

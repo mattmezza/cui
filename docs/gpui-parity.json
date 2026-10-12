@@ -1439,31 +1439,44 @@
       "reference_url": "https://gpui-kit.com/component/message/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_message.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_message.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "sender/time/content slots",
-          "status": "not_started",
-          "evidence": []
+          "name": "avatar/header/content/footer composition and start/end alignment",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
         },
         {
-          "name": "attachments and reactions",
-          "status": "not_started",
-          "evidence": []
+          "name": "metadata inset override and typed bubble inheritance",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
         },
         {
-          "name": "accessibility and alignment",
-          "status": "not_started",
-          "evidence": []
+          "name": "four-theme styling and passive semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1492,38 +1505,60 @@
           "`MessageContent`",
           "Related types"
         ]
-      }
+      },
+      "last_tested_commit": "47dfd82"
     },
     {
       "name": "MessageScroller",
       "reference_url": "https://gpui-kit.com/component/message-scroller/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_message.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_message.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "variable-height virtualization",
-          "status": "not_started",
-          "evidence": []
+          "name": "measured variable-height virtualization and 10000-row coverage",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
         },
         {
-          "name": "stable keys and incremental updates",
-          "status": "not_started",
-          "evidence": []
+          "name": "tail following, splice and measured anchor preservation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
         },
         {
-          "name": "tail following/scroll restore",
-          "status": "not_started",
-          "evidence": []
+          "name": "dominant-axis wheel, keyboard and reusable scrollbar",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
+        },
+        {
+          "name": "animated jump-to-latest control and edge fade",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_message.c",
+            "docs/MESSAGE.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1544,7 +1579,8 @@
           "`MessageScrollerState`",
           "`MessageScroller`"
         ]
-      }
+      },
+      "last_tested_commit": "47dfd82"
     },
     {
       "name": "Notification",
@@ -1907,31 +1943,54 @@
       "reference_url": "https://gpui-kit.com/component/shimmer/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_status.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_status.c",
+        "tests/web/test_browser.py"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Single-line text only; inherited styled runs, wrapping, ellipsis and font weight await rich text infrastructure. Caller supplies elapsed time and schedules base-plan deadlines."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "animation scheduling",
-          "status": "not_started",
-          "evidence": []
+          "name": "timed twelve-layer glyph sweep with relative/absolute spread",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "docs/STATUS_COMPONENTS.md"
+          ]
         },
         {
-          "name": "reduced-motion fallback",
-          "status": "not_started",
-          "evidence": []
+          "name": "reverse/once duration and stable caller-owned animation state",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "docs/STATUS_COMPONENTS.md"
+          ]
         },
         {
-          "name": "loading region semantics",
-          "status": "not_started",
-          "evidence": []
+          "name": "reduced-motion static text and idle deadlines",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "docs/STATUS_COMPONENTS.md"
+          ]
+        },
+        {
+          "name": "alpha-aware perceptual/custom highlights, font/color override and clipped width",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status.c",
+            "docs/STATUS_COMPONENTS.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1957,7 +2016,8 @@
           "`ShimmerText`",
           "Related components"
         ]
-      }
+      },
+      "last_tested_commit": "dcc748e"
     },
     {
       "name": "Skeleton",
@@ -2248,7 +2308,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Frozen Tag has no built-in close action; interactive children are application composition. Exact inherited typography and distinct secondary theme tokens remain incomplete."
+        "Frozen Tag has no built-in close action; interactive children are application composition. Semantic secondary colors are independently configurable. Exact inherited typography remains incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

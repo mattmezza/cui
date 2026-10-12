@@ -39,3 +39,6 @@ Deployment `0e61b2f` succeeded:56 live WASM stories and all78 catalog entries ar
 
 
 Integration `ef24642` passes47 native tests,45 ASan/UBSan tests,38 WASI suites and57 real Chromium stories. Notification is now a tested partial family with host delivery callbacks and real timer/stack browser tests. Core adds opt-in container focus, dominant-axis wheel routing and alpha-aware Oklab color interpolation; Notification and Marker consume corrected theme/color behavior. Manifest:21 not started,4 implemented partial,53 tested partial,zero verified. Public0e61b2f/56-story deployment and all six CI jobs passed;57-story deployment follows.
+
+
+Integration `47dfd82`:49 native tests,47 ASan/UBSan tests,40 WASI suites and58 Chromium stories passed. Shimmer has a real story; Message/MessageScroller have measured headless behavior and pending browser stories. Disclosure gallery verifies animated reversal, inert exits, reduced motion and keyboard focus. Publishededea484/57 stories passed all six CI jobs, Pages, and actual HTTPS Canvas Notification creation. Manifest:18 not started,4 implemented partial,56 tested partial,zero verified. Root is adding real bitmap rendering; workers continue Image/Attachment, gallery coverage and exact Choice/Disclosure behaviors.

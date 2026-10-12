@@ -166,11 +166,63 @@ static void consumed_wheel(void) {
     assert(state.y == 0);
     cui_destroy(ui);
 }
+
+static void deferred_frame(cui_context *ui, cui_scroll_state *s, bool defer) {
+    cui_scroll_options o = {.width = 200, .height = 120, .content_height = 400, .vertical = true};
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+#ifdef CUI_SCROLL_BASE_ONLY
+    cui_base_scrollable(ui, 1, s, o);
+    cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 120});
+    cui_begin_box(ui, 20, (cui_box){.width = 190, .height = 120, .clip = true, .offset_y = -s->y});
+#else
+    cui_theme theme = cui_theme_light();
+    assert(cui_scrollable_begin(ui, 1, &theme, s, o));
+#endif
+    cui_begin_box(ui, 30, (cui_box){.width = 100, .height = 80});
+    cui_interact(ui, 30, CUI_ROLE_GROUP, cui_string("Child scroll"), false, false, 0);
+    cui_set_semantic_details(ui, 30,
+                             (cui_semantic_details){.scrollable = true, .scroll_max_y = 100});
+    cui_end_box(ui);
+    if (defer) {
+        assert(s->y == 0 && cui_event_target(ui, 0) == 30);
+        assert(cui_defer_scroll_event(ui, 0, 30));
+    }
+#ifdef CUI_SCROLL_BASE_ONLY
+    cui_base_scrollable_finish(ui, 1, s, o);
+    assert(cui_set_box_scroll_offset(ui, 20, 0, -s->y));
+    cui_end_box(ui);
+    cui_end_box(ui);
+#else
+    cui_scrollable_end_ex(ui, 1, &theme, s, o);
+#endif
+    if (defer) {
+        assert(s->y == .5f && cui_event_consumed(ui, 0));
+        assert(!cui_base_scrollable_finish(ui, 1, s, o)); /* No replay. */
+        assert(s->y == .5f);
+    }
+    assert(!cui_set_box_scroll_offset(ui, 30, 0, 1)); /* Not clipped. */
+    assert(!cui_set_box_scroll_offset(ui, 999, 0, 1));
+    cui_end_frame(ui);
+    assert(fabsf(cui_bounds(ui, 30).y + s->y) < .001f);
+    assert(!cui_set_box_scroll_offset(ui, 20, 0, 1)); /* Outside frame. */
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void deferred_scroll(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_scroll_state s = {0};
+    deferred_frame(ui, &s, false);
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 50, .y = 50, .dy = -.5f, .scroll_precise = true}));
+    deferred_frame(ui, &s, true);
+    cui_destroy(ui);
+}
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+    deferred_scroll();
     consumed_wheel();
     behavior();
     return 0;

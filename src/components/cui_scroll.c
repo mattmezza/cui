@@ -77,3 +77,12 @@ void cui_scrollable_end(cui_context *ui, cui_id id, const cui_theme *t, const cu
         cui_scrollbar(ui, id, t, s, g, o, false);
     cui_end_box(ui); /* root */
 }
+
+void cui_scrollable_end_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_scroll_state *s,
+                           cui_scroll_options o) {
+    if (!ui || !id || !t || !s)
+        return;
+    cui_base_scrollable_finish(ui, id, s, o);
+    cui_set_box_scroll_offset(ui, id ^ UINT64_C(0x75b21b4d3cba0f89), -s->x, -s->y);
+    cui_scrollable_end(ui, id, t, s, o);
+}

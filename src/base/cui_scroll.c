@@ -118,6 +118,40 @@ bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
                                                     .maximum = maximum});
     return before != *value;
 }
+static void cui_scroll_reduce_wheel(cui_context *ui, cui_id id, cui_scroll_state *s,
+                                    cui_scroll_options o, cui_scroll_geometry g) {
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count && !o.disabled; ++i)
+        if (events[i].type == CUI_EVENT_SCROLL && !cui_event_consumed(ui, i) &&
+            cui_event_target(ui, i) == id) {
+            float previous_x = s->x, previous_y = s->y;
+            float step = events[i].scroll_precise ? 1 : cui_scroll_positive(o.wheel_step, 48);
+            if (o.horizontal && isfinite(events[i].dx))
+                s->x = cui_scroll_limit(s->x - events[i].dx * step, g.maximum_x);
+            if (o.vertical && isfinite(events[i].dy))
+                s->y = cui_scroll_limit(s->y - events[i].dy * step, g.maximum_y);
+            if (s->x != previous_x || s->y != previous_y)
+                cui_consume_event(ui, i);
+            else
+                cui_defer_scroll_event(ui, i, id);
+        }
+}
+bool cui_base_scrollable_finish(cui_context *ui, cui_id id, cui_scroll_state *s,
+                                cui_scroll_options o) {
+    if (!ui || !id || !s)
+        return false;
+    cui_scroll_geometry g = cui_scroll_layout(o);
+    float old_x = s->x, old_y = s->y;
+    cui_scroll_reduce_wheel(ui, id, s, o, g);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.scrollable = !o.disabled,
+                                                    .scroll_x = s->x,
+                                                    .scroll_y = s->y,
+                                                    .scroll_max_x = g.maximum_x,
+                                                    .scroll_max_y = g.maximum_y});
+    return s->x != old_x || s->y != old_y;
+}
 bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_scroll_options o) {
     if (!ui || !id || !s)
         return false;
@@ -125,17 +159,7 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
     float old_x = s->x, old_y = s->y;
     s->x = cui_scroll_limit(s->x, g.maximum_x);
     s->y = cui_scroll_limit(s->y, g.maximum_y);
-    size_t count;
-    const cui_event *events = cui_frame_events(ui, &count);
-    for (size_t i = 0; i < count && !o.disabled; ++i)
-        if (events[i].type == CUI_EVENT_SCROLL && !cui_event_consumed(ui, i) &&
-            cui_event_target(ui, i) == id) {
-            float step = events[i].scroll_precise ? 1 : cui_scroll_positive(o.wheel_step, 48);
-            if (o.horizontal && isfinite(events[i].dx))
-                s->x = cui_scroll_limit(s->x - events[i].dx * step, g.maximum_x);
-            if (o.vertical && isfinite(events[i].dy))
-                s->y = cui_scroll_limit(s->y - events[i].dy * step, g.maximum_y);
-        }
+    cui_scroll_reduce_wheel(ui, id, s, o, g);
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Scrollable content"), o.disabled, false, 0);
     if (o.horizontal)
         cui_base_scrollbar(ui, id, s, g, o, false);

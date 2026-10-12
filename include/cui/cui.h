@@ -345,6 +345,9 @@ bool cui_event_within_scope(cui_context *, size_t index, cui_id scope);
 bool cui_event_hit_within_scope(cui_context *, size_t index, cui_id scope);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
+/* Update a current-frame clipped box before end_frame computes layout. Useful
+ * for scroll events deferred by children after their parent's begin call. */
+bool cui_set_box_scroll_offset(cui_context *, cui_id, float x, float y);
 /* Register one current-layout bounds result per ID for this frame. The retained
  * pointer must remain valid through cui_end_frame, which writes the computed
  * rectangle (zero if absent) and invalidates only when its fields change.

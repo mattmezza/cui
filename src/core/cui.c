@@ -788,6 +788,22 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                  isfinite(b.offset_y) ? b.offset_y : 0}},
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
 }
+bool cui_set_box_scroll_offset(cui_context *ui, cui_id id, float x, float y) {
+    if (!ui || !ui->in_frame || !id || !isfinite(x) || !isfinite(y) || cui_core_inert(ui))
+        return false;
+    for (size_t i = 0; i < ui->node_count; ++i)
+        if (ui->nodes[i].clay_id == cui_core_folded(id) && ui->nodes[i].clip &&
+            !ui->nodes[i].inert) {
+            Clay_SetCurrentContext(ui->clay);
+            Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(ui->nodes[i].clay_id);
+            if (!item->layoutElement)
+                return false;
+            item->layoutElement->config.clip.childOffset = (Clay_Vector2){x, y};
+            return true;
+        }
+    return false;
+}
+
 bool cui_bitmap_valid(cui_bitmap b) {
     return b.pixels && b.width && b.height && b.width <= 16384 && b.height <= 16384 &&
            b.stride >= (size_t)b.width * 4 && b.stride <= SIZE_MAX / b.height;

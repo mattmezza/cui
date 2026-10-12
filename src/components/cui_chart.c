@@ -699,7 +699,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                      : (o->show_y_axis && !o->y_axis_inside
                                             ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
                                             : 24);
-            float right = point_chart ? o->width - left : o->width - 12;
+            float right = point_chart ? o->width : o->width - 12;
             float x = slots > 1
                           ? (left + (right - left) * (float)i / (float)(slots - 1)) * w / o->width
                           : w / 2;

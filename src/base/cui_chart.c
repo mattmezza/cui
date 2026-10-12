@@ -271,7 +271,7 @@ static double cui_chart_plot_right(const cui_chart_options *o, double left) {
     if (o->kind == CUI_CHART_BAR)
         return o->width;
     return o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA
-               ? o->width - left
+               ? o->width
                : (o->width > 36 ? o->width - 12 : left);
 }
 static double cui_chart_plot_bottom(const cui_chart_options *o) {

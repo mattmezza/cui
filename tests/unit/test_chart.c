@@ -253,6 +253,12 @@ int main(void) {
     options.show_y_axis = true;
     assert(cui_chart_point_coordinates(&options, 0, 0, &point_x, &point_y) == CUI_PLOT_OK &&
            point_x == 32);
+    assert(cui_chart_point_coordinates(&options, 2, 0, &point_x, &point_y) == CUI_PLOT_OK &&
+           point_x == 128);
+    options.point_count = 5;
+    assert(cui_chart_point_coordinates(&options, 2, 0, &point_x, &point_y) == CUI_PLOT_OK &&
+           point_x == 80);
+    options.point_count = 0;
     assert(!cui_chart_hit_test(&options, 0, 20).valid);
     assert(cui_chart_hit_test(&options, 16, 20).valid &&
            cui_chart_hit_test(&options, 16, 20).hovered == 0);

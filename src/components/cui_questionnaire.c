@@ -230,6 +230,7 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
         cui_begin_box(ui, 0,
                       (cui_box){.width = m.shortcut,
                                 .height = m.shortcut,
+                                .background = t->background,
                                 .border_width = 1,
                                 .border = t->input,
                                 .radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius / 2

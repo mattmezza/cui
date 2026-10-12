@@ -150,10 +150,11 @@ static cui_draw_list card_frame(cui_context *ui, cui_questionnaire_state *s, con
     return cui_end_frame(ui);
 }
 static void card_paint(cui_context *ui, cui_draw_list list, cui_color fill, cui_color border,
-                       float radius, float shortcut_font, const cui_theme *theme, int size) {
+                       float radius, float shortcut_font, const cui_theme *theme, int size,
+                       bool disabled) {
     cui_rect bounds = cui_bounds(ui, 12);
     bool found_fill = false, found_border = false, found_shortcut = false;
-    bool found_indicator = false, found_badge = false;
+    bool found_indicator = false, found_badge = false, found_badge_fill = false;
     const float indicators[] = {16, 14, 18, 12}, badges[] = {20, 18, 24, 16};
     for (size_t i = 0; i < list.count; i++) {
         const cui_draw_command *d = &list.commands[i];
@@ -165,6 +166,14 @@ static void card_paint(cui_context *ui, cui_draw_list list, cui_color fill, cui_
             d->bounds.h == indicators[size]) {
             assert(d->corner_radii.top_left == theme->radius / 2);
             found_indicator = true;
+        }
+        if (d->type == CUI_DRAW_RECT && d->bounds.w == badges[size] &&
+            d->bounds.h == badges[size]) {
+            cui_color expected = theme->background;
+            if (disabled)
+                expected.a = (uint8_t)(expected.a * .5f);
+            assert(same_color(d->color, expected));
+            found_badge_fill = true;
         }
         if (d->type == CUI_DRAW_BORDER && d->bounds.w == badges[size] &&
             d->bounds.h == badges[size]) {
@@ -186,7 +195,7 @@ static void card_paint(cui_context *ui, cui_draw_list list, cui_color fill, cui_
         }
     }
     assert(found_fill == (fill.a != 0) && found_border && found_shortcut && found_indicator &&
-           found_badge);
+           found_badge && found_badge_fill);
 }
 static void source_card_styles(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 128});
@@ -221,24 +230,24 @@ static void source_card_styles(void) {
             cui_draw_list list = card_frame(ui, &s, &t, o);
             cui_color fill = t.dark ? t.input : t.background;
             fill.a = t.dark ? (uint8_t)(fill.a * .2f + .5f) : 0;
-            card_paint(ui, list, fill, t.input, radius, font, &t, size);
+            card_paint(ui, list, fill, t.input, radius, font, &t, size, o.disabled);
             assert(cui_questionnaire_activate(&s, 0, 0) == CUI_QUESTIONNAIRE_OK);
             list = card_frame(ui, &s, &t, o);
             cui_color border = t.primary;
             border.a = (uint8_t)(border.a * .4f + .5f);
-            card_paint(ui, list, t.muted_background, border, radius, font, &t, size);
+            card_paint(ui, list, t.muted_background, border, radius, font, &t, size, o.disabled);
             assert(
                 cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 20, .y = 20}));
             list = card_frame(ui, &s, &t, o);
             fill = t.muted_background;
             fill.a = (uint8_t)(fill.a * .5f + .5f);
-            card_paint(ui, list, fill, border, radius, font, &t, size);
+            card_paint(ui, list, fill, border, radius, font, &t, size, o.disabled);
             o.disabled = true;
             list = card_frame(ui, &s, &t, o);
             fill = t.muted_background;
             fill.a = (uint8_t)(fill.a * .5f);
             border.a = (uint8_t)(border.a * .5f);
-            card_paint(ui, list, fill, border, radius, font, &t, size);
+            card_paint(ui, list, fill, border, radius, font, &t, size, o.disabled);
         }
     }
     assert(cui_last_error(ui) == CUI_OK);

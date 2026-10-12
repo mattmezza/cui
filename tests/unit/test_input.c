@@ -320,6 +320,28 @@ static void size_metrics_and_centering(void) {
            metrics.height == 30 && metrics.font_size == 26.25f);
     assert(!cui_input_measure((cui_input_options){.size = CUI_INPUT_CUSTOM}, 16, &metrics));
     assert(!cui_input_measure((cui_input_options){.density = NAN}, 16, &metrics));
+    assert(!cui_input_measure((cui_input_options){.custom_padding = true, .padding_x = NAN}, 16,
+                              &metrics));
+    assert(!cui_input_measure((cui_input_options){.custom_padding = true, .padding_y = -1}, 16,
+                              &metrics));
+    cui_input_options zero_padding = {.width = 180, .no_appearance = true, .custom_padding = true};
+    assert(cui_input_measure(zero_padding, 16, &metrics) && metrics.padding_x == 0 &&
+           metrics.padding_y == 0);
+    styled_frame(ui, edit, &theme, &state, zero_padding);
+    cui_rect zero_box = cui_bounds(ui, 1);
+    cui_rect zero_viewport = cui_bounds(ui, cui_input_viewport_id(1));
+    assert(zero_viewport.x == zero_box.x && zero_viewport.w == zero_box.w);
+    cui_input_options custom_padding = {.width = 180,
+                                        .no_appearance = true,
+                                        .custom_padding = true,
+                                        .padding_x = 7,
+                                        .padding_y = 3};
+    assert(cui_input_measure(custom_padding, 16, &metrics) && metrics.padding_x == 7 &&
+           metrics.padding_y == 3);
+    styled_frame(ui, edit, &theme, &state, custom_padding);
+    cui_rect custom_box = cui_bounds(ui, 1);
+    cui_rect custom_viewport = cui_bounds(ui, cui_input_viewport_id(1));
+    assert(custom_viewport.x == custom_box.x + 7 && custom_viewport.w == custom_box.w - 14);
     cui_edit_select(edit, 0, 0);
     cui_input_options center = {.width = 180, .text_align = CUI_ALIGN_CENTER};
     cui_draw_list list = styled_frame(ui, edit, &theme, &state, center);

@@ -169,7 +169,9 @@ typedef struct {
     cui_input_size size;
     float custom_size, density; /* density 0 derives theme font_size/16. */
     float height;               /* Optional frame-height refinement; line box remains 20*density. */
-    bool custom_height; /* Preserve explicit zero height. Positive height always overrides. */
+    bool custom_height;  /* Preserve explicit zero height. Positive height always overrides. */
+    bool custom_padding; /* Use padding_x/y in pixels, including explicit zero. */
+    float padding_x, padding_y;
     bool no_appearance, no_border, hide_focus_ring;
     cui_align text_align;
 } cui_input_options;

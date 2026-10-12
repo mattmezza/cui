@@ -788,7 +788,9 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
     if (!metrics || options.size < CUI_INPUT_MEDIUM || options.size > CUI_INPUT_CUSTOM ||
         !isfinite(root_font_size) || root_font_size <= 0 || root_font_size > 4096 ||
         !isfinite(options.density) || options.density < 0 || options.density > 256 ||
-        !isfinite(options.height) || options.height < 0 || options.height > 1000000)
+        !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
+        !isfinite(options.padding_x) || options.padding_x < 0 || options.padding_x > 1000000 ||
+        !isfinite(options.padding_y) || options.padding_y < 0 || options.padding_y > 1000000)
         return false;
     float d = options.density > 0 ? options.density : root_font_size / 16;
     float h = 32, font = 14, px = 10, py = 8, gap = 6;
@@ -828,8 +830,8 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
         (cui_input_metrics){options.custom_height || options.height > 0 ? options.height : h * d,
                             font * d,
                             20 * d,
-                            px * d,
-                            py * d,
+                            options.custom_padding ? options.padding_x : px * d,
+                            options.custom_padding ? options.padding_y : py * d,
                             gap * d};
     return true;
 }

@@ -36,6 +36,12 @@ static void test_named_themes(void) {
             ayu = true;
             assert(theme.background.r == 252 && theme.text.r == 92 && theme.primary.r == 85);
         }
+        if (name.length == 12 && !memcmp(name.data, "Default Dark", 12)) {
+            cui_theme_button_colors danger = theme.buttons[CUI_THEME_BUTTON_DANGER];
+            assert(danger.normal.a == 51 && danger.hover.a == 76 && danger.active.a == 102);
+            assert(danger.foreground.r == theme.danger.r && danger.foreground.g == theme.danger.g);
+            assert(danger.outline_normal.a == 26 && danger.outline_border.a == 102);
+        }
         if (name.length == 11 && !memcmp(name.data, "Tokyo Night", 11))
             tokyo = true;
         assert(theme.buttons[CUI_THEME_BUTTON_PRIMARY].normal.a > 0);

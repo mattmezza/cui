@@ -61,7 +61,7 @@ def generate():
                   'accent': colors['accent.background'], 'accent_foreground': colors['accent.foreground'],
                   'popover': colors['popover.background'], 'popover_foreground': colors.get('popover.foreground', fg)}
         for intent, base, fallback in [('danger', 'red', '#ef4444'), ('warning', 'yellow', '#eab308'),
-                                       ('success', 'green', '#22c55e'), ('info', 'blue', '#3b82f6')]:
+                                       ('success', 'green', '#22c55e'), ('info', 'cyan', '#06b6d4')]:
             values[intent] = colors.get(intent + '.background', colors.get('base.' + base, rgba(fallback)))
             values['on_' + intent] = colors.get(intent + '.foreground', colors['primary.foreground'])
         for field, key, fallback in [
@@ -84,19 +84,37 @@ def generate():
             ('caret', 'caret', primary), ('group_box', 'group_box.background', mix(bg, secondary, .3 if dark else .4)),
             ('group_box_foreground', 'group_box.foreground', fg)]:
             values[field] = colors.get(key, fallback)
+        def opacity(color, amount):
+            return color[:3] + (round(color[3] * amount),)
+
         for index, intent in enumerate(['button', 'primary', 'secondary', 'danger', 'warning', 'success', 'info']):
-            normal = colors.get(intent + '.background', bg if index == 0 else values[intent])
-            foreground = colors.get(intent + '.foreground', fg if index in (0, 2) else values['on_' + intent])
             prefix = 'button' if index == 0 else 'button.' + intent
-            normal = colors.get(prefix + '.background', normal)
-            foreground = colors.get(prefix + '.foreground', foreground)
-            hover = colors.get(prefix + '.hover.background', colors.get(intent + '.hover.background', mix(bg, normal, .9)))
-            active = colors.get(prefix + '.active.background', colors.get(intent + '.active.background', darken(normal, .2 if dark else .1)))
+            base = values['input'] if index == 0 else values[intent]
+            base_hover = colors.get(intent + '.hover.background', mix(bg, base, .9))
+            base_active = colors.get(intent + '.active.background', darken(base, .2 if dark else .1))
+            if index == 0:
+                normal = colors.get('button.background', opacity(base, .3) if dark else bg)
+                hover = colors.get('button.hover.background', opacity(base, .5))
+                active = colors.get('button.active.background', opacity(base, .7))
+                foreground = colors.get('button.foreground', fg)
+            elif index >= 3:
+                normal = colors.get(prefix + '.background', opacity(base, .2))
+                hover = colors.get(prefix + '.hover.background', opacity(base, .3))
+                active = colors.get(prefix + '.active.background', opacity(base, .4))
+                foreground = colors.get(prefix + '.foreground', base)
+            else:
+                normal = colors.get(prefix + '.background', base)
+                hover = colors.get(prefix + '.hover.background', base_hover)
+                active = colors.get(prefix + '.active.background', base_active)
+                foreground = colors.get(prefix + '.foreground', values['secondary_foreground'] if index == 2 else values['on_primary'])
+            edge = base if index == 0 else border if index == 2 else normal if index >= 3 else base
             for field, value in {'normal': normal, 'hover': hover, 'active': active, 'foreground': foreground,
-                                 'outline_normal': (0, 0, 0, 0), 'outline_hover': normal[:3] + (26,),
-                                 'outline_active': normal[:3] + (51,), 'border': border if index == 0 else normal,
-                                 'outline_border': border if index == 0 else normal,
-                                 'outline_foreground': fg if index == 0 else normal}.items():
+                                 'outline_normal': values['input_background'] if index == 0 else opacity(base, .1),
+                                 'outline_hover': opacity(base if index == 0 else base_hover, .5 if index == 0 else .2),
+                                 'outline_active': opacity(base if index == 0 else base_active, .7 if index == 0 else .4),
+                                 'border': edge,
+                                 'outline_border': opacity(base, .4) if index >= 3 else edge,
+                                 'outline_foreground': fg if index == 0 else values['secondary_foreground'] if index == 2 else base}.items():
                 values[f'buttons[{index}].{field}'] = value
         begin = len(entries)
         entries.extend(values.items())

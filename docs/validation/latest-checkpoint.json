@@ -2,7 +2,7 @@
   "source": "d6fe7b0",
   "published_source": "3aecd899bd4ce372c690b7a402617ef2a4ccf47a",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "All78 catalog entries now have real WASM stories in the integrated gallery. Combined native77/77, ASan/UBSan75/75, WASI67/67, full Chromium78-story suite and quality gates pass for portable source d6fe7b0. Publication is pending; public3aecd89 remains verified77 stories. This completes gallery coverage, not full feature parity; all78 manifest entries remain partial.",
+  "summary": "Local78-story gallery passed all broad gates, but Pages release5ced994 failed its hosted Skip-after-validation browser test. A physical-click reproduction identified stale test coordinates during the error layout transition. Fix under validation; published3aecd89 remains verified77 stories. Full78-entry feature parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -35,10 +35,13 @@
     }
   ],
   "previous_deployment": {
-    "source": "f063619",
+    "source": "5ced994bae34dec46293a32a9317b14a77af2d42",
     "status": "failed",
-    "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
-    "run": 38273904793
+    "reason": "Hosted Chromium timed out after invalid Submit then Skip. Reproduction shows test reads old Skip bounds before error layout paints and clicks shifted Start over. Browser worker is validating a rendered-alert readiness regression; public77-story source remains unchanged.",
+    "run": 38287215259,
+    "framework_ci_run": 38287215256,
+    "framework_ci_status": "success",
+    "log": "pages-failure-5ced994.txt"
   },
   "published_evidence": "published-3aecd89.txt",
   "deployment": {

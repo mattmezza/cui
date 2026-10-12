@@ -1371,16 +1371,15 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
             page.evaluate('location.hash="Skeleton"')
             page.wait_for_function('document.querySelector("#name").textContent==="Skeleton" && cuiGallery.renderedComponent==="Skeleton"')
-            page.wait_for_timeout(80)
             signature = 'JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))'
-            initial_signature = page.evaluate(signature)
-            page.wait_for_timeout(200)
-            assert page.evaluate(signature) != initial_signature
+            before = page.evaluate('''()=>({frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))})''')
+            page.wait_for_function('''before=>cuiGallery.frame>before.frame&&JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))!==before.signature''', arg=before)
+            before_reduce = page.evaluate('cuiGallery.frame')
             page.emulate_media(reduced_motion='reduce')
-            page.wait_for_function('cuiGallery.exports.gallery_redraw()===0')
-            initial_signature = page.evaluate(signature)
-            page.wait_for_timeout(100)
-            assert page.evaluate(signature) == initial_signature
+            page.wait_for_function('(frame)=>cuiGallery.frame>frame&&cuiGallery.exports.gallery_redraw()===0', arg=before_reduce)
+            settled = page.evaluate('''()=>({frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))})''')
+            after = page.evaluate('''async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>requestAnimationFrame(resolve));return {frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))};}''')
+            assert after == settled, (settled, after)
             page.emulate_media(reduced_motion='no-preference')
             page.wait_for_function('cuiGallery.exports.gallery_redraw()===1')
             page.evaluate('location.hash="Clipboard"')

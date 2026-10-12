@@ -1,0 +1,34 @@
+build	Exercise component behavior in Chromium	﻿2026-10-12T13:09:53.9504884Z ##[group]Run uv run tests/web/test_browser.py
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9505299Z ^[[36;1muv run tests/web/test_browser.py^[[0m
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9568441Z shell: /usr/bin/bash -e {0}
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9568764Z env:
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9569284Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9569871Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9570446Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9570946Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9571454Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9571962Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+build	Exercise component behavior in Chromium	2026-10-12T13:09:53.9572386Z ##[endgroup]
+build	Exercise component behavior in Chromium	2026-10-12T13:09:54.0663866Z Installed 4 packages in 11ms
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9484692Z Traceback (most recent call last):
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9494645Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 1487, in <module>
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9495496Z     main()
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9496099Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 319, in main
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9497607Z     page.wait_for_function('(w)=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===5);return e.gallery_command(i,3)>w;}', arg=image_width)
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9499750Z   File "/home/runner/.cache/uv/environments-v2/test-browser-486b23d6b968e231/lib/python3.12/site-packages/playwright/sync_api/_generated.py", line 11599, in wait_for_function
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9508133Z     self._sync(
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9509202Z   File "/home/runner/.cache/uv/environments-v2/test-browser-486b23d6b968e231/lib/python3.12/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9510022Z     return task.result()
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9510273Z            ^^^^^^^^^^^^^
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9511249Z   File "/home/runner/.cache/uv/environments-v2/test-browser-486b23d6b968e231/lib/python3.12/site-packages/playwright/_impl/_page.py", line 1110, in wait_for_function
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9512414Z     return await self._main_frame.wait_for_function(**locals_to_params(locals()))
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9513168Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9514286Z   File "/home/runner/.cache/uv/environments-v2/test-browser-486b23d6b968e231/lib/python3.12/site-packages/playwright/_impl/_frame.py", line 878, in wait_for_function
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9515468Z     await self._channel.send("waitForFunction", self._timeout, params)
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9516545Z   File "/home/runner/.cache/uv/environments-v2/test-browser-486b23d6b968e231/lib/python3.12/site-packages/playwright/_impl/_connection.py", line 69, in send
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9517604Z     return await self._connection.wrap_api_call(
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9517971Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9518896Z   File "/home/runner/.cache/uv/environments-v2/test-browser-486b23d6b968e231/lib/python3.12/site-packages/playwright/_impl/_connection.py", line 559, in wrap_api_call
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9519971Z     raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9520644Z playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 30000ms exceeded.
+build	Exercise component behavior in Chromium	2026-10-12T13:10:42.9804197Z ##[error]Process completed with exit code 1.

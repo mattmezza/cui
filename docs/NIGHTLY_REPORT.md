@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `2a188c5a971b316cbcae25be6f116f44dc7c3f65`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `71a64d54fdaa6773444adb9cc465973032a5785c`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -12,17 +12,17 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 
 | Status | Families |
 |---|---:|
-| not_started | 16 |
+| not_started | 12 |
 | scaffolded | 0 |
 | implemented | 4 |
-| tested | 58 |
+| tested | 62 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-62-story release candidate: native51/51, sanitizers49/49, WASI42/42 and Chromium62-story checks pass. Includes real Image/Attachment, richer graphical controls, source Dropdown defaults/loading fade, Menu metrics, fractional text, cursor and layout-order hit fixes. The final InputGroup sample width adjustment is covered by worker browser and next Pages gate. Public59a0988 remains60 stories pending deployment. All78 entries retained; full parity unfinished.
+Recovery candidate71a64d5 passes56/56 native,54/54 sanitizer,47/47 WASI and62 real Chromium gallery stories. Four additional families (DescriptionList, StatusBar, Resizable, Icon) now have tested partial C implementations; their browser stories are in progress. Public59a0988 remains60 stories until deployment. Pages9e72440 failed stale Image readiness; the repair also fixes physical clicks hidden beneath the fixed header. All78 entries retained;12 not started,4 implemented partial,62 tested partial,zero verified. Full parity unfinished.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
@@ -32,6 +32,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [asan-60.txt](validation/asan-60.txt)
 - [asan-62-source.txt](validation/asan-62-source.txt)
 - [asan-62.txt](validation/asan-62.txt)
+- [asan-71a64d5.txt](validation/asan-71a64d5.txt)
 - [asan-controls-753be98.txt](validation/asan-controls-753be98.txt)
 - [asan-form.txt](validation/asan-form.txt)
 - [asan-measurement-input-group.txt](validation/asan-measurement-input-group.txt)
@@ -53,6 +54,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [browser-60.txt](validation/browser-60.txt)
 - [browser-62-source.txt](validation/browser-62-source.txt)
 - [browser-62.txt](validation/browser-62.txt)
+- [browser-71a64d5.txt](validation/browser-71a64d5.txt)
 - [browser-pre-surfaces.txt](validation/browser-pre-surfaces.txt)
 - [browser-recovery.txt](validation/browser-recovery.txt)
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
@@ -103,9 +105,11 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [gcc-xorg.txt](validation/gcc-xorg.txt)
 - [native-62-source.txt](validation/native-62-source.txt)
 - [native-62.txt](validation/native-62.txt)
+- [native-71a64d5.txt](validation/native-71a64d5.txt)
 - [native-controls-753be98.txt](validation/native-controls-753be98.txt)
 - [native-recovery.txt](validation/native-recovery.txt)
 - [pages-157961a-failure.txt](validation/pages-157961a-failure.txt)
+- [pages-9e72440-failure.txt](validation/pages-9e72440-failure.txt)
 - [pages-a96fd34-failure.txt](validation/pages-a96fd34-failure.txt)
 - [pages-daf43b9-failure.txt](validation/pages-daf43b9-failure.txt)
 - [published-0e61b2f.txt](validation/published-0e61b2f.txt)
@@ -126,6 +130,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [wasi-60.txt](validation/wasi-60.txt)
 - [wasi-62-source.txt](validation/wasi-62-source.txt)
 - [wasi-62.txt](validation/wasi-62.txt)
+- [wasi-71a64d5.txt](validation/wasi-71a64d5.txt)
 - [wasi-controls-753be98.txt](validation/wasi-controls-753be98.txt)
 - [wasi-form.txt](validation/wasi-form.txt)
 - [wasi-initial.txt](validation/wasi-initial.txt)
@@ -206,7 +211,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Focus Trap | tested | Core nested modal scopes and overlay state tested. No OS accessibility bridge or full modal relationship semantics. |
 | GroupBox | tested | Composable title/content, themed border/layout and group semantic snapshot tested. Complete upstream audit and native accessibility bridge pending. |
 | HoverCard | tested | Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending. |
-| Icon | not_started | Full documented behavior pending implementation and audit. |
+| Icon | tested | 106 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.; Icon is decorative by default; named image semantics must currently be supplied by the caller. Dedicated accessible/decorative API remains pending. |
 | Image | tested | Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity. |
 | Kbd | tested | Platform modifier formatting and styled UTF-8-safe hint tested. Action/keybinding lookup and grouped shortcut composition pending. |
 | Label | implemented | Text wrapper renders, but control association and standalone semantic labeling pending. |
@@ -243,19 +248,19 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Textarea | not_started | Full documented behavior pending implementation and audit. |
 | TimeField | tested | Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending. |
 | Carousel | not_started | Full documented behavior pending implementation and audit. |
-| DescriptionList | not_started | Full documented behavior pending implementation and audit. |
+| DescriptionList | tested | Headless layout and passive semantics tested across sizes/themes; browser/native visual audit pending. Outer clipping is rectangular; independent cell clipping, inherited rich typography and Text values remain partial. |
 | Dialog | tested | Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending. |
 | Dock | tested | Retained split/tab tree, stable keys, constrained geometry and transactional versioned persistence tested. Styled Dock, drag/drop, resize gestures, floating windows and keyboard/focus integration pending. |
 | List | tested | Stable keyed single/multiple selection, per-event activations, roving keyboard/typeahead, disabled items, semantic options and bounded visible window tested. remote data, full virtualization remain pending. |
 | Menu | tested | Actual flat/nested menus, check/radio, separators, text adornments, custom row delegates, context opening with modal guard, bounded collision placement and immediate focus restoration tested. OS shortcuts/link activation, arbitrary nested viewport scrolling and complete upstream behavior remain pending. |
 | Popover | tested | Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.; Current side-based flip/clamp differs from upstream anchor-only clamp. Complete anchor/offset/arrow, right-click trigger and accessible trigger relationships are pending. |
-| Resizable | not_started | Full documented behavior pending implementation and audit. |
+| Resizable | tested | Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Browser/native audit pending. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native GPUI drag payload adapter. |
 | Root View | not_started | Full documented behavior pending implementation and audit. |
 | Scrollable | tested | Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Auto-measured/grow sizing, inertia/touch, auto-hide and native system behavior remain pending. |
 | Settings | not_started | Full documented behavior pending implementation and audit. |
 | Sheet | tested | Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending. |
 | Sidebar | not_started | Full documented behavior pending implementation and audit. |
-| StatusBar | not_started | Full documented behavior pending implementation and audit. |
+| StatusBar | tested | Pinned end regions, adaptive center alignment, themed spacing and callback composition tested headlessly. Independent region clipping, inherited rich font styles and full Styled refinement remain partial; browser/native audit pending. |
 | Tabs | tested | Stable-ID selection, keyboard navigation, five variants, custom body slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom body width caps preserve short content and clip oversized bodies from the first frame. Structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source. |
 | Theme | tested | Four runtime token structs tested; system integration, comprehensive tokens and reduced motion pending. |
 | TitleBar | not_started | Full documented behavior pending implementation and audit. |

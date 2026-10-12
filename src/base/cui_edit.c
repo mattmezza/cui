@@ -249,6 +249,13 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     cui_edit_private_record(e);
     return CUI_EDIT_OK;
 }
+cui_edit_result cui_edit_replace_range(cui_edit *e, size_t start, size_t end, cui_str text) {
+    if (!e)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (start > end || !cui_edit_private_boundary(e, start) || !cui_edit_private_boundary(e, end))
+        return CUI_EDIT_BOUNDARY;
+    return cui_edit_private_replace(e, text, start, end);
+}
 cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;

@@ -236,12 +236,8 @@ static bool reset_item(const cui_setting_item *item) {
         break;
     case CUI_SETTING_INPUT:
         if (item->edit) {
-            cui_edit_state previous = cui_edit_get_state(item->edit);
-            if (cui_edit_select(item->edit, 0, previous.length) == CUI_EDIT_OK) {
-                done = cui_edit_insert(item->edit, item->default_text) == CUI_EDIT_OK;
-                if (!done)
-                    cui_edit_select(item->edit, previous.anchor, previous.cursor);
-            }
+            done = cui_edit_replace_range(item->edit, 0, cui_edit_get_state(item->edit).length,
+                                          item->default_text) == CUI_EDIT_OK;
         }
         break;
     default:

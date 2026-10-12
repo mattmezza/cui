@@ -282,8 +282,12 @@ static void test_input_number_and_sizes(void) {
     cui_focus(ui, cui_settings_part_id(11, 0, 0, 0, 24));
     frame(ui, &page, 1, &state, options);
     assert(strcmp(draft, "10") == 0);
+    assert(cui_edit_select(edit, 4, 1) == CUI_EDIT_OK);
     assert(cui_settings_reset_page(&page, (cui_str){0}));
     assert(strcmp(buffer, "default") == 0 && number == 4);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && strcmp(buffer, "hello") == 0);
+    assert(cui_edit_get_state(edit).anchor == 4 && cui_edit_get_state(edit).cursor == 1);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK && strcmp(buffer, "default") == 0);
     for (unsigned i = 0; i < 4; i++) {
         options.size = (cui_settings_size)i;
         frame(ui, &page, 1, &state, options);

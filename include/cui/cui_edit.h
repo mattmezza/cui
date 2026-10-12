@@ -46,6 +46,10 @@ bool cui_edit_valid_utf8(cui_str text);
 cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
 cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
+/* Replace a UTF-8 byte range as one history step without first changing the
+ * selection. Undo restores the original selection; success collapses it after
+ * the inserted text. Rejection leaves text, selection and history unchanged. */
+cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui_str text);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);

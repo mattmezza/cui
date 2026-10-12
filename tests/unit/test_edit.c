@@ -190,7 +190,33 @@ static void test_revision_and_max_scalar(void) {
     cui_edit_destroy(e);
 }
 
+static void test_atomic_range(void) {
+    char b[16] = "a\xc3\xa9z";
+    cui_edit *e = make(b, sizeof b, false, 10);
+    assert(cui_edit_select(e, 3, 1) == CUI_EDIT_OK);
+    assert(cui_edit_replace_range(e, 0, 4, cui_string("reset")) == CUI_EDIT_OK);
+    assert(!strcmp(b, "reset") && cui_edit_get_state(e).cursor == 5);
+    assert(cui_edit_undo(e) == CUI_EDIT_OK);
+    assert(!strcmp(b, "a\xc3\xa9z"));
+    cui_edit_state before = cui_edit_get_state(e);
+    assert(before.anchor == 3 && before.cursor == 1 && !before.can_undo && before.can_redo);
+    assert(cui_edit_replace_range(e, 2, 3, cui_string("x")) == CUI_EDIT_BOUNDARY);
+    assert(cui_edit_replace_range(e, 3, 1, cui_string("x")) == CUI_EDIT_BOUNDARY);
+    assert(cui_edit_replace_range(e, 0, 99, cui_string("x")) == CUI_EDIT_BOUNDARY);
+    assert(cui_edit_replace_range(e, 0, 4, cui_string("\n")) == CUI_EDIT_LINE_BREAK);
+    assert(cui_edit_replace_range(e, 0, 4, cui_string("1234567890123456")) == CUI_EDIT_CAPACITY);
+    assert(cui_edit_replace_range(e, 0, 4, cui_string("\x80")) == CUI_EDIT_INVALID_UTF8);
+    cui_edit_state after = cui_edit_get_state(e);
+    assert(after.anchor == before.anchor && after.cursor == before.cursor &&
+           after.revision == before.revision && after.can_redo && !after.can_undo);
+    assert(cui_edit_redo(e) == CUI_EDIT_OK && !strcmp(b, "reset"));
+    assert(cui_edit_replace_range(e, 0, 5, (cui_str){b + 1, 3}) == CUI_EDIT_OK);
+    assert(!strcmp(b, "ese"));
+    assert(cui_edit_undo(e) == CUI_EDIT_OK && !strcmp(b, "reset"));
+    cui_edit_destroy(e);
+}
 int main(void) {
+    test_atomic_range();
     test_unicode();
     test_rejection();
     test_history_lines();

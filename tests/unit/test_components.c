@@ -800,7 +800,40 @@ static void test_button_paint_composition(void) {
     assert(count == 0 && cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_button_hover_and_disabled_paint(void) {
+    cui_context *ui = cui_create((cui_config){.width = 320, .height = 200});
+    cui_theme theme = cui_theme_light();
+    cui_button_options options = {.variant = CUI_BUTTON_OUTLINE, .width = 160};
+    assert(cui_begin_frame(ui, 320, 200, .016f));
+    assert(!cui_button_ex(ui, 461, &theme, cui_string("Hover"), options));
+    cui_end_frame(ui);
+    cui_rect bounds = cui_bounds(ui, 461);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = bounds.x + 4, .y = bounds.y + 4}));
+    assert(cui_begin_frame(ui, 320, 200, .016f));
+    assert(!cui_button_ex(ui, 461, &theme, cui_string("Hover"), options));
+    cui_draw_list list = cui_end_frame(ui);
+    cui_color hover = theme.buttons[CUI_THEME_BUTTON_DEFAULT].outline_hover;
+    bool hovered_color = false;
+    for (size_t i = 0; i < list.count; i++)
+        hovered_color |= list.commands[i].type == CUI_DRAW_RECT &&
+                         memcmp(&list.commands[i].color, &hover, sizeof hover) == 0;
+    assert(hovered_color);
+    options.disabled = true;
+    assert(cui_begin_frame(ui, 320, 200, .016f));
+    assert(!cui_button_ex(ui, 461, &theme, cui_string("Hover"), options));
+    list = cui_end_frame(ui);
+    hovered_color = false;
+    for (size_t i = 0; i < list.count; i++)
+        hovered_color |= list.commands[i].type == CUI_DRAW_RECT &&
+                         memcmp(&list.commands[i].color, &hover, sizeof hover) == 0;
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    assert(!hovered_color && count == 1 && semantics[0].disabled);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_button_hover_and_disabled_paint();
     test_button_paint_composition();
     test_button_loading_artwork();
     test_theme_list_tokens();

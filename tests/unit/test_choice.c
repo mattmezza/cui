@@ -1564,6 +1564,46 @@ static void test_dropdown_inheritance_and_ghost_pair(void) {
     assert(dropdown_surface(ui, 2001).a == 0 && dropdown_surface(ui, 2002).a == 0);
     cui_destroy(ui);
 }
+static void test_dropdown_optional_halves(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    cui_dropdown_button_options options = {
+        .hide_action = true, .menu = {.popup = {.viewport = {0, 0, 640, 480}, .width = 220}}};
+    dropdown_scene(ui, &state, &action, &theme, options);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].id != 2001);
+    assert(cui_bounds(ui, 2002).x == cui_bounds(ui, 2000).x);
+    click(ui, 2002);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(state.overlay.open);
+    key(ui, CUI_KEY_ENTER);
+    cui_dropdown_button_result result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(result.menu_activated && !result.action_activated && action == 2101);
+    click(ui, 2002);
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(state.overlay.open);
+    options.hide_action = false;
+    options.hide_menu = true;
+    dropdown_scene(ui, &state, &action, &theme, options);
+    assert(!state.overlay.open && state.depth == 0);
+    semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].id != 2002);
+    click(ui, 2001);
+    result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(result.action_activated && !result.menu_activated);
+    cui_focus(ui, 2001);
+    key(ui, CUI_KEY_ENTER);
+    result = dropdown_scene(ui, &state, &action, &theme, options);
+    assert(result.action_activated && !result.menu_activated);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1585,6 +1625,7 @@ int main(void) {
     test_menu_configuration();
     test_dropdown_button();
     test_dropdown_inheritance_and_ghost_pair();
+    test_dropdown_optional_halves();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

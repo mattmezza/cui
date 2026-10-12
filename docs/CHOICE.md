@@ -349,5 +349,13 @@ that surface while its menu is open. The hovered half receives the stronger hove
 color. Escape restores the transparent resting appearance when the pointer has
 left. Disabled pairs remain transparent. Headless tests inspect the draw list after
 real pointer movement, menu activation and Escape, and verify inheritance and
-outer overrides. Optional halves, action tooltip composition, independent corner
+outer overrides. Action tooltip composition, independent corner
 geometry and the complete upstream anchor-corner contract remain parity gaps.
+
+`hide_action` or `hide_menu` omits that half from rendering, semantics and focus
+registration. At least one half must remain visible. Hiding the menu half closes
+an existing menu and clears submenu depth. The remaining half retains pointer
+and keyboard activation. The base function accepts a zero action or trigger ID
+for the same omission; both zero is invalid. Headless tests cover menu-only action
+dispatch, action-only pointer and Enter activation, absent semantic nodes and
+changing to action-only while a menu is open.

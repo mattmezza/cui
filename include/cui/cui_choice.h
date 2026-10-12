@@ -205,7 +205,8 @@ bool cui_base_context_menu(cui_context *, cui_id target, const cui_menu_entry *,
 bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str name,
                       const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                       cui_menu_tree_options);
-/* Split action and menu trigger. The explicit IDs remain independently
+/* Split action and menu trigger. Zero action/trigger IDs omit that half in the
+ * base function; both zero is invalid. The explicit IDs remain independently
  * focusable; container is paint-only in the styled function. */
 typedef enum {
     CUI_DROPDOWN_BUTTON_PRIMARY,
@@ -231,6 +232,7 @@ typedef struct {
     /* When an outer property is unset, inherit the action button's property
      * for both halves. Zero-initialized options keep the existing defaults. */
     bool inherit_action_variant, inherit_action_size;
+    bool hide_action, hide_menu; /* at least one half must remain visible */
     cui_dropdown_button_variant action_variant;
     cui_dropdown_button_size action_size;
 } cui_dropdown_button_options;

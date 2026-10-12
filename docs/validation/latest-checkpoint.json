@@ -1,22 +1,22 @@
 {
-  "source": "e96fa1a",
+  "source": "3d769d8",
   "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published 1b453ab passes 65/65 native, 63/63 sanitizer, 55/55 WASI and 70 real Chromium stories. All 38 named palettes verified over HTTPS, with system default, live OS appearance changes and persisted manual selection. Four source Input/NumberInput sizes are public. GitHub Pages and build CI both succeeded. All 78 entries retained: 6 not started, 4 implemented partial, 68 tested partial, 0 verified. Full parity unfinished; Settings adapter and Command/Carousel gallery followups continue locally.",
+  "summary": "Public 1b453ab has the verified 38-theme picker and 70 stories. Local Settings/Carousel stories bring implemented browser coverage to 72, but integration found an intermittent Carousel loop click and a Textarea Tab host interception; fixes and browser revalidation pending. Native 65/65, sanitizers 63/63 and WASI 55/55 passed the composed Settings, atomic Textarea indentation and consumed Surface event changes. Full parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
-      "source": "283a328",
+      "source": "3d769d8",
       "passed": 55,
       "total": 55,
-      "log": "wasi-283a328.txt"
+      "log": "wasi-3d769d8.txt"
     },
     {
       "name": "native",
-      "source": "283a328",
+      "source": "3d769d8",
       "passed": 65,
       "total": 65,
-      "log": "native-283a328.txt"
+      "log": "native-3d769d8.txt"
     },
     {
       "name": "browser",
@@ -28,10 +28,10 @@
     },
     {
       "name": "sanitizers",
-      "source": "283a328",
+      "source": "3d769d8",
       "passed": 63,
       "total": 63,
-      "log": "sanitizers-283a328.txt"
+      "log": "sanitizers-3d769d8.txt"
     }
   ],
   "previous_deployment": {

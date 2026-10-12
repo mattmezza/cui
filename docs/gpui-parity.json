@@ -3187,8 +3187,11 @@
       "features": [
         {
           "name": "UTF-8 insertion/deletion/selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_input.c"
+          ]
         },
         {
           "name": "clipboard and IME",
@@ -3793,7 +3796,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Measured wrap, selection, clipboard, history, XS/S/M/L and auto-grow have headless tests. Tab indentation, grapheme shaping/bidi, IME, atomic inline tokens and complete first-frame grow layout remain unfinished; see docs/TEXTAREA.md."
+        "Measured wrap, selection, clipboard, history, XS/S/M/L, auto-grow and atomic Tab/Shift-Tab indentation have headless tests. Grapheme shaping/bidi, IME, atomic inline tokens and complete first-frame grow layout remain unfinished; see docs/TEXTAREA.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3823,6 +3826,14 @@
           "name": "complete documented source behavior and visual parity",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "atomic Tab/Shift-Tab indentation with selection-preserving undo/redo and focus fallback",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_textarea.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3918,13 +3929,15 @@
       "category": "layout",
       "base_behavior": [],
       "public_header": "include/cui/cui_carousel.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_carousel.c"
+        "tests/unit/test_carousel.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Controlled variable extents, circular repositioning, spring motion, pointer axis-lock, wheel/precise phases, nested scroll deferral and actual Input-child behavior tested. Caller-supplied outer extents, first growing-width estimate and host gesture/tooltip services remain explicit boundaries; see docs/CAROUSEL.md."
@@ -4661,13 +4674,15 @@
       "category": "layout",
       "base_behavior": [],
       "public_header": "include/cui/cui_settings.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_settings.c"
+        "tests/unit/test_settings.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Searchable pages/groups, atomic filtered reset, source-size Input/NumberInput, checked Menu dropdown composition and reset tooltip are tested. Unicode search, virtualization, rich descriptions, unconstrained oversized Menu layout and complete host styling remain partial; see docs/SETTINGS.md."

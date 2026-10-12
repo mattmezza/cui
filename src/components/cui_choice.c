@@ -1077,6 +1077,7 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     }
     if (options.selected && options.variant < CUI_DROPDOWN_BUTTON_DANGER)
         box.background = theme->primary;
+    bool active = options.selected || (!disabled && cui_pressed(ui, id));
     bool transparent =
         options.variant == CUI_DROPDOWN_BUTTON_LINK || options.variant == CUI_DROPDOWN_BUTTON_TEXT;
     if (transparent) {
@@ -1087,9 +1088,9 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
         if (options.selected)
             box.border = theme->primary;
     } else if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM) {
-        box.background = options.selected ? options.custom.active : options.custom.color;
+        box.background = active ? options.custom.active : options.custom.color;
         box.border = options.custom.color;
-        if (!disabled && cui_hovered(ui, id) && !options.selected)
+        if (!disabled && cui_hovered(ui, id) && !active)
             box.background = options.custom.hover;
     }
     bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
@@ -1100,7 +1101,7 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
                              ? theme->border
                              : cui_dropdown_intent(theme, options.variant);
         box.border = box.background;
-        box.background.a = options.selected ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
+        box.background.a = active ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
     }
     if (!disabled && cui_hovered(ui, id) && !transparent &&
         options.variant != CUI_DROPDOWN_BUTTON_CUSTOM) {
@@ -1169,6 +1170,12 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         menu_name, items, count, menu_action, state,
         options.disabled || options.menu.popup.disabled, options.action_disabled,
         options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks);
+    if (options.variant == CUI_DROPDOWN_BUTTON_LINK) {
+        if (!options.hide_action)
+            cui_set_semantic_role(ui, action_id, CUI_ROLE_LINK);
+        if (!options.hide_menu)
+            cui_set_semantic_role(ui, trigger_id, CUI_ROLE_LINK);
+    }
     bool all_disabled = options.disabled || options.menu.popup.disabled;
     bool action_disabled = all_disabled || options.action_disabled || options.action_loading;
     bool pair_surfaced = state->overlay.open ||

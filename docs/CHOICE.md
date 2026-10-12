@@ -514,7 +514,14 @@ choices. Default uses theme surface/text/border, Link uses theme primary with a
 measured underline, and Text uses a transparent background with a slightly faded
 resting label. Link/Text stay transparent on hover and selection. Custom accepts
 portable `color`, `foreground`, `hover` and `active` colors shared by both halves;
-selected uses active, and orthogonal outline uses the custom color with the same
+selection and held pointer/Space capture use active, and orthogonal outline uses the custom color with the same
 translucent state levels as intent outlines. A custom content callback owns its
 label decoration; built-in Link labels and the menu indicator are underlined.
 Exact upstream default/link token palettes and custom shadows remain unfinished.
+
+Link refines both halves to the Link semantic role while retaining the split
+action and menu activation contract. Custom active color survives held capture
+across frames and reverts after release/cancellation; pressed colored outlines
+use the selected alpha level. Tests verify roles, pointer cancellation and Space
+release activation in all themes. Link decoration reserves each half ID XOR
+`0xc8134e39119b750d` and `0xc8134e39119b751d` for its label group/underline.

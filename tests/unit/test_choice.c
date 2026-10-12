@@ -1497,13 +1497,15 @@ static void test_dropdown_button(void) {
                     assert(left_border && right_border);
                 size_t count = 0;
                 const cui_semantic *semantics = cui_semantics(ui, &count);
+                cui_role expected_role =
+                    variant == CUI_DROPDOWN_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON;
                 bool action_named = false, trigger_named = false;
                 for (size_t i = 0; i < count; i++) {
                     if (semantics[i].id == 2001)
-                        action_named = semantics[i].role == CUI_ROLE_BUTTON &&
+                        action_named = semantics[i].role == expected_role &&
                                        semantics[i].name.length == 4 && !semantics[i].checked;
                     if (semantics[i].id == 2002)
-                        trigger_named = semantics[i].role == CUI_ROLE_BUTTON &&
+                        trigger_named = semantics[i].role == expected_role &&
                                         semantics[i].name.length == 17 && !semantics[i].checked;
                 }
                 assert(action_named && trigger_named);
@@ -2359,6 +2361,15 @@ static void test_dropdown_presentation_variants(void) {
             else
                 assert(same_color(dropdown_surface(ui, 2001), expected));
             if (v == CUI_DROPDOWN_BUTTON_LINK) {
+                size_t semantic_count;
+                const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+                unsigned links = 0;
+                for (size_t i = 0; i < semantic_count; i++)
+                    if (semantics[i].id == 2001 || semantics[i].id == 2002) {
+                        assert(semantics[i].role == CUI_ROLE_LINK);
+                        links++;
+                    }
+                assert(links == 2);
                 cui_rect line = cui_bounds(ui, 2001 ^ UINT64_C(0xc8134e39119b751d));
                 assert(line.h == 1 && line.w > 0);
             }
@@ -2371,6 +2382,26 @@ static void test_dropdown_presentation_variants(void) {
                 assert(dropdown_surface(ui, 2001).a == 0);
             if (v == CUI_DROPDOWN_BUTTON_CUSTOM)
                 assert(same_color(dropdown_surface(ui, 2001), options.custom.hover));
+            if (v == CUI_DROPDOWN_BUTTON_CUSTOM) {
+                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                       .x = bounds.x + 2,
+                                                       .y = bounds.y + 2}));
+                dropdown_scene(ui, &state, &action, &themes[t], options);
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.active));
+                dropdown_scene(ui, &state, &action, &themes[t], options);
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.active));
+                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+                dropdown_scene(ui, &state, &action, &themes[t], options);
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.hover));
+                cui_focus(ui, 2001);
+                key(ui, CUI_KEY_SPACE);
+                dropdown_scene(ui, &state, &action, &themes[t], options);
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.active));
+                assert(cui_queue_event(
+                    ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+                assert(dropdown_scene(ui, &state, &action, &themes[t], options).action_activated);
+                assert(same_color(dropdown_surface(ui, 2001), options.custom.hover));
+            }
             options.selected = true;
             dropdown_scene(ui, &state, &action, &themes[t], options);
             if (v == CUI_DROPDOWN_BUTTON_CUSTOM)

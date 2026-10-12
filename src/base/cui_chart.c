@@ -39,7 +39,7 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         !isfinite(o->reveal_progress) || o->reveal_progress < 0 || o->reveal_progress > 1 ||
         (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
         !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
-        o->grid_columns > 1000 || o->reference_count > 16 ||
+        o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
         (o->reference_count && !o->reference_values) ||
         (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
@@ -649,6 +649,8 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
         }
     }
 }
+static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
+                                   size_t layers, double padding);
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sankey_node *out,
                                         size_t capacity) {
     if (!o || o->kind != CUI_CHART_SANKEY || !o->data || !o->count || o->count > 256 ||
@@ -656,7 +658,7 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         o->sankey_align < CUI_CHART_SANKEY_JUSTIFY || o->sankey_align > CUI_CHART_SANKEY_CENTER ||
         !o->width || !o->height || o->width > 4096 || o->height > 4096 ||
         !isfinite(o->node_width) || !isfinite(o->node_padding) || o->node_width < 0 ||
-        o->node_padding < 0)
+        o->node_padding < 0 || o->sankey_iterations > 100)
         return CUI_PLOT_INVALID;
     if (capacity < o->count)
         return CUI_PLOT_CAPACITY;
@@ -764,8 +766,81 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
                 y += padding;
             }
     }
+    cui_chart_sankey_relax(o, nodes, layers, padding);
     memcpy(out, nodes, o->count * sizeof(*out));
     return CUI_PLOT_OK;
+}
+static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count, size_t layer,
+                                     double padding, double top, double bottom) {
+    size_t indices[256], n = 0;
+    for (size_t i = 0; i < count; i++)
+        if (nodes[i].layer == layer)
+            indices[n++] = i;
+    for (size_t i = 1; i < n; i++) {
+        size_t item = indices[i], j = i;
+        while (j && nodes[indices[j - 1]].y0 > nodes[item].y0) {
+            indices[j] = indices[j - 1];
+            j--;
+        }
+        indices[j] = item;
+    }
+    double cursor = top;
+    for (size_t i = 0; i < n; i++) {
+        cui_chart_sankey_node *node = &nodes[indices[i]];
+        double height = node->y1 - node->y0;
+        double y = fmax(cursor, node->y0);
+        node->y0 = (float)y;
+        node->y1 = (float)(y + height);
+        cursor = node->y1 + padding;
+    }
+    cursor = bottom;
+    for (size_t i = n; i > 0; i--) {
+        cui_chart_sankey_node *node = &nodes[indices[i - 1]];
+        double height = node->y1 - node->y0;
+        double y = fmin(cursor - height, node->y0);
+        node->y0 = (float)y;
+        node->y1 = (float)(y + height);
+        cursor = y - padding;
+    }
+}
+static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
+                                   size_t layers, double padding) {
+    unsigned iterations = o->sankey_iterations ? o->sankey_iterations : 6;
+    for (unsigned pass = 0; pass < iterations; pass++) {
+        double alpha = pow(.99, pass);
+        for (int direction = 0; direction < 2; direction++)
+            for (size_t step = 0; step < layers; step++) {
+                size_t layer = direction == 0 ? layers - 1 - step : step;
+                for (size_t node_index = 0; node_index < o->count; node_index++) {
+                    cui_chart_sankey_node *node = &nodes[node_index];
+                    if (node->layer != layer)
+                        continue;
+                    long double total = 0, weighted = 0;
+                    for (size_t link_index = 0; link_index < o->link_count; link_index++) {
+                        const cui_chart_link *link = &o->links[link_index];
+                        size_t other;
+                        if (direction == 0 && link->source == node_index)
+                            other = link->target;
+                        else if (direction == 1 && link->target == node_index)
+                            other = link->source;
+                        else
+                            continue;
+                        size_t distance = nodes[other].layer > layer ? nodes[other].layer - layer
+                                                                     : layer - nodes[other].layer;
+                        long double weight = link->value * distance;
+                        weighted += weight * (nodes[other].y0 + nodes[other].y1) / 2;
+                        total += weight;
+                    }
+                    if (total > 0) {
+                        double center = (node->y0 + node->y1) / 2;
+                        double delta = ((double)(weighted / total) - center) * alpha;
+                        node->y0 += (float)delta;
+                        node->y1 += (float)delta;
+                    }
+                }
+                cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8, o->height - 8);
+            }
+    }
 }
 static void cui_chart_sankey(cui_chart_state *s, const cui_chart_options *o,
                              const cui_chart_sankey_node *nodes) {
@@ -832,6 +907,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->custom_bar_padding);
     h = cui_chart_mix(h, o->show_dots);
     h = cui_chart_mix(h, o->sankey_align);
+    h = cui_chart_mix(h, o->sankey_iterations);
     h = cui_chart_mix(h, o->hide_grid);
     h = cui_chart_mix(h, o->hide_axes);
     h = cui_chart_mix(h, o->hide_x_axis);

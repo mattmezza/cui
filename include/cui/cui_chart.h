@@ -100,6 +100,7 @@ typedef struct {
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     cui_chart_sankey_align sankey_align;
+    unsigned sankey_iterations;     /* zero selects six relaxation passes; maximum 100 */
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
 } cui_chart_options;

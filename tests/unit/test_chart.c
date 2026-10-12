@@ -82,6 +82,26 @@ int main(void) {
     assert(node_hit.valid && node_hit.hovered == 1 && node_hit.value == 30);
     flow_options.sankey_align = CUI_CHART_SANKEY_LEFT;
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK && nodes[3].layer == 2);
+    cui_chart_link crossing[] = {{0, 3, 15, {0}}, {1, 2, 15, {0}}};
+    flow_options.links = crossing;
+    flow_options.link_count = 2;
+    flow_options.sankey_iterations = 1;
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    assert(fabs((nodes[0].y0 + nodes[0].y1) - (nodes[3].y0 + nodes[3].y1)) < 2);
+    assert(fabs((nodes[1].y0 + nodes[1].y1) - (nodes[2].y0 + nodes[2].y1)) < 2);
+    flow_options.sankey_iterations = 6;
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    for (size_t i = 0; i < 4; i++) {
+        assert(nodes[i].y0 >= 8 && nodes[i].y1 <= flow_options.height - 8);
+        for (size_t j = i + 1; j < 4; j++)
+            if (nodes[i].layer == nodes[j].layer)
+                assert(nodes[i].y1 + 15 <= nodes[j].y0 || nodes[j].y1 + 15 <= nodes[i].y0);
+    }
+    flow_options.sankey_iterations = 101;
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_INVALID);
+    flow_options.sankey_iterations = 0;
+    flow_options.links = flow_links;
+    flow_options.link_count = 3;
     flow_links[2].target = 0;
     memset(pixels, 77, sizeof pixels);
     memcpy(saved, pixels, sizeof pixels);

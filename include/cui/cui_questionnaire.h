@@ -179,6 +179,10 @@ void cui_questionnaire_error_control(cui_context *, cui_id, const cui_theme *,
 bool cui_questionnaire_action_control(cui_context *, cui_id, const cui_theme *,
                                       cui_questionnaire_state *, cui_questionnaire_action,
                                       cui_str label, cui_questionnaire_options);
+/* Route focused radio Left/Right before rendering the choices. IDs follow schema
+ * order, including disabled choices. Consumed/repeated/modified events are ignored. */
+bool cui_questionnaire_radio_keys(cui_context *, cui_questionnaire_state *,
+                                  const cui_id *choice_ids, size_t count);
 /* Composable parts: begin/end enclose caller-selected children. Choice parts
  * render only for the current item. Call tick from the host frame clock. */
 bool cui_questionnaire_begin(cui_context *, cui_id, const cui_theme *, cui_questionnaire_state *,

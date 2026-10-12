@@ -232,6 +232,21 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
         return CUI_QUESTIONNAIRE_ANSWER_MISMATCH;
     if (item != s->current)
         return CUI_QUESTIONNAIRE_OK;
+    if (!o.disabled && !s->storage.items[item].disabled && !d->input_disabled &&
+        cui_focused(ui) == id && cui_questionnaire_freeform(s, item).length) {
+        size_t count;
+        const cui_event *events = cui_frame_events(ui, &count);
+        for (size_t n = 0; n < count; n++)
+            if (!cui_event_consumed(ui, n) && events[n].type == CUI_EVENT_KEY_DOWN &&
+                events[n].key == CUI_KEY_ENTER && !events[n].repeat && !events[n].modifiers) {
+                if (cui_questionnaire_confirm(s)) {
+                    cui_consume_event(ui, n);
+                    cui_invalidate(ui);
+                }
+                if (s->current != item)
+                    return CUI_QUESTIONNAIRE_OK;
+            }
+    }
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
     cui_input_state input = {.behavior = {.dragging = view->dragging}, .scroll_x = view->scroll_x};
     cui_input_result result = cui_input_ex(
@@ -255,4 +270,43 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
         return sync;
     }
     return CUI_QUESTIONNAIRE_OK;
+}
+bool cui_questionnaire_radio_keys(cui_context *ui, cui_questionnaire_state *s, const cui_id *ids,
+                                  size_t count) {
+    if (!ui || !s || !s->initialized || s->current >= s->count || !ids)
+        return false;
+    size_t item = s->current;
+    const cui_questionnaire_item *d = &s->items[item];
+    if (d->multiple || count != d->choice_count || s->storage.items[item].disabled)
+        return false;
+    bool changed = false;
+    size_t event_count;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    for (size_t e = 0; e < event_count && s->current == item; e++) {
+        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN || events[e].repeat ||
+            events[e].modifiers ||
+            (events[e].key != CUI_KEY_LEFT && events[e].key != CUI_KEY_RIGHT))
+            continue;
+        size_t current = SIZE_MAX;
+        for (size_t c = 0; c < count; c++)
+            if (ids[c] && cui_focused(ui) == ids[c] &&
+                !s->storage.choices[s->storage.items[item].choice_offset + c].disabled)
+                current = c;
+        if (current == SIZE_MAX)
+            continue;
+        for (size_t step = 1; step <= count; step++) {
+            size_t next = events[e].key == CUI_KEY_LEFT ? (current + count - step) % count
+                                                        : (current + step) % count;
+            if (!ids[next] ||
+                s->storage.choices[s->storage.items[item].choice_offset + next].disabled)
+                continue;
+            (void)cui_questionnaire_activate(s, item, next);
+            cui_focus(ui, ids[next]);
+            cui_consume_event(ui, e);
+            cui_invalidate(ui);
+            changed = true;
+            break;
+        }
+    }
+    return changed;
 }

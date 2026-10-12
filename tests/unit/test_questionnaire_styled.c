@@ -25,7 +25,56 @@ static void frame(cui_context *ui, cui_questionnaire_state *s, cui_questionnaire
     cui_draw_list draws = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK && draws.count > 0);
 }
+static void radio_frame(cui_context *ui, cui_questionnaire_state *s) {
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_theme t = cui_theme_light();
+    cui_id ids[] = {22, 23, 24};
+    (void)cui_questionnaire_radio_keys(ui, s, ids, 3);
+    assert(cui_questionnaire_begin(ui, 20, &t, s, (cui_questionnaire_options){.width = 300}));
+    for (size_t i = 0; i < 3; i++)
+        (void)cui_questionnaire_choice_control(ui, ids[i], &t, s, 0, i,
+                                               (cui_questionnaire_options){0});
+    cui_questionnaire_end(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void radio_keyboard(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_questionnaire_choice choices[] = {{.value = cui_string("a")},
+                                          {.value = cui_string("b"), .disabled = true},
+                                          {.value = cui_string("c")}};
+    cui_questionnaire_item item = {
+        .name = cui_string("radio"), .choices = choices, .choice_count = 3};
+    cui_questionnaire_item_runtime runtime;
+    cui_questionnaire_choice_runtime selected[3];
+    cui_questionnaire_state s = {0};
+    assert(cui_questionnaire_init(&s, &item, 1,
+                                  (cui_questionnaire_workspace){.items = &runtime,
+                                                                .item_capacity = 1,
+                                                                .choices = selected,
+                                                                .choice_capacity = 3},
+                                  NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    radio_frame(ui, &s);
+    cui_focus(ui, 22);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
+    radio_frame(ui, &s);
+    assert(cui_focused(ui) == 24 && cui_questionnaire_choice_selected(&s, 0, 2));
+    assert(!s.pending_confirm && !s.complete && cui_event_consumed(ui, 0));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
+    radio_frame(ui, &s);
+    assert(cui_focused(ui) == 22 && cui_questionnaire_choice_selected(&s, 0, 0));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_LEFT, .repeat = true}));
+    radio_frame(ui, &s);
+    assert(cui_focused(ui) == 22 && cui_questionnaire_choice_selected(&s, 0, 0));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_LEFT}));
+    radio_frame(ui, &s);
+    assert(cui_focused(ui) == 24 && cui_questionnaire_choice_selected(&s, 0, 2));
+    cui_destroy(ui);
+}
 int main(void) {
+    radio_keyboard();
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);
     cui_questionnaire_choice choice = {.value = cui_string("yes"),
@@ -118,6 +167,13 @@ int main(void) {
     frame(ui, &s, o);
     assert(cui_questionnaire_freeform(&s, 0).length == 6);
     assert(!cui_questionnaire_choice_selected(&s, 0, 0));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .repeat = true}));
+    frame(ui, &s, o);
+    assert(!s.complete);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    frame(ui, &s, o);
+    assert(s.complete && cui_event_consumed(ui, 0));
     o.disabled = true;
     frame(ui, &s, o);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "ignored"}));

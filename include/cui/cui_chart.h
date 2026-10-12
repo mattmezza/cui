@@ -310,7 +310,7 @@ cui_plot_result cui_chart_pie_labels(const cui_chart_options *, cui_chart_pie_la
                                      size_t capacity);
 /* Read-only hit geometry over a successfully rendered chart. */
 cui_chart_hit cui_chart_hit_test(const cui_chart_options *, float x, float y);
-/* Draws the caller-owned bitmap, labels and a named image semantic. Render first. */
+/* Renders and draws the caller-owned bitmap, labels and a named image semantic. */
 bool cui_chart(cui_context *, cui_id, cui_chart_state *, const cui_chart_options *, cui_str name);
 /* Colors from the active theme; caller options override individual fields. */
 cui_chart_options cui_chart_theme(cui_chart_options, const cui_theme *);

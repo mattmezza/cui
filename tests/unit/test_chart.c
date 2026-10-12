@@ -1473,6 +1473,24 @@ int main(void) {
     options.foreground = (cui_color){20, 30, 40, 255};
     options.bullish = (cui_color){7, 180, 8, 255};
     options.tooltip_format = NULL;
+    unsigned char fresh_candle_pixels[sizeof pixels] = {0};
+    cui_chart_state fresh_candle = {.pixels = fresh_candle_pixels,
+                                    .byte_capacity = sizeof fresh_candle_pixels};
+    assert(cui_begin_frame(ui, 256, 256, .069));
+    assert(cui_chart(ui, 92, &fresh_candle, &options, (cui_str){"Fresh candle", 12}));
+    draw = cui_end_frame(ui);
+    assert(fresh_candle.revision == 1 &&
+           differs(fresh_candle_pixels, options.width * options.height, options.background));
+    memcpy(saved, fresh_candle_pixels, sizeof saved);
+    float original_open = points[0].open;
+    points[0].open = points[0].high - 1;
+    cui_chart_options changed_candle = options;
+    changed_candle.data_revision++;
+    assert(cui_begin_frame(ui, 256, 256, .0695));
+    assert(cui_chart(ui, 92, &fresh_candle, &changed_candle, (cui_str){"Fresh candle", 12}));
+    draw = cui_end_frame(ui);
+    assert(fresh_candle.revision == 2 && memcmp(saved, fresh_candle_pixels, sizeof saved) != 0);
+    points[0].open = original_open;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     state.hovered = 0;

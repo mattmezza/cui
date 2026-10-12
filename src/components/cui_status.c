@@ -61,6 +61,8 @@ bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_ta
                                  : o.custom_radius ? o.radius
                                  : small           ? t->radius / 2
                                                    : t->radius};
+    if (!isfinite(s.font_size) || !isfinite(s.radius))
+        return false;
     if (hovered) {
         s.background = cui_status_alpha(s.background, .9f);
         s.foreground = cui_status_alpha(s.foreground, .9f);
@@ -283,7 +285,11 @@ static void cui_status_shimmer(cui_context *ui, cui_id id, cui_rect b, cui_str t
                                    .offset_x = -left,
                                    .inert = true},
                          (cui_rect){b.x + left, b.y, right - left, b.h}, 2);
+        cui_begin_box(
+            ui, cui_status_child_id(id, layer + 20),
+            (cui_box){.width = b.w, .height = b.h, .fixed_width = true, .fixed_height = true});
         cui_text(ui, text, font, color);
+        cui_end_box(ui);
         cui_end_box(ui);
     }
 }
@@ -387,4 +393,355 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
     }
     cui_end_box(ui);
     return true;
+}
+#include "cui/cui_components.h"
+static void cui_status_notification_close_content(cui_context *ui, void *user) {
+    const cui_theme *t = user;
+    cui_text(ui, cui_string("x"), t->font_size * .65f, t->muted);
+}
+static cui_id cui_status_notification_element(cui_id id, cui_notification_id n) {
+    return cui_status_child_id(id, (size_t)(n.type ^ (n.key + UINT64_C(0x9e3779b97f4a7c15) +
+                                                      (n.type << 6) + (n.type >> 2))));
+}
+static bool cui_status_notification_bottom(cui_notification_anchor a) {
+    return a >= CUI_NOTIFICATION_BOTTOM_LEFT && a <= CUI_NOTIFICATION_BOTTOM_RIGHT;
+}
+static cui_color cui_status_notification_color(cui_color c, float alpha) {
+    c.a = (uint8_t)(c.a * fmaxf(0, fminf(alpha, 1)));
+    return c;
+}
+static cui_theme cui_status_notification_theme(const cui_theme *t, float alpha) {
+    cui_theme copy = *t;
+    copy.background = cui_status_notification_color(copy.background, alpha);
+    copy.surface = cui_status_notification_color(copy.surface, alpha);
+    copy.text = cui_status_notification_color(copy.text, alpha);
+    copy.muted = cui_status_notification_color(copy.muted, alpha);
+    copy.border = cui_status_notification_color(copy.border, alpha);
+    copy.primary = cui_status_notification_color(copy.primary, alpha);
+    copy.on_primary = cui_status_notification_color(copy.on_primary, alpha);
+    return copy;
+}
+static float cui_status_notification_ease(float phase) {
+    float u = phase;
+    for (int i = 0; i < 6; i++) {
+        float x = 3 * (1 - u) * (1 - u) * u * .25f + 3 * (1 - u) * u * u * .25f + u * u * u;
+        float dx =
+            .75f * (1 - u) * (1 - u) + 6 * (1 - u) * u * (.25f - .25f) + 3 * u * u * (1 - .25f);
+        if (dx < .00001f)
+            break;
+        u = fmaxf(0, fminf(1, u - (x - phase) / dx));
+    }
+    return 3 * (1 - u) * (1 - u) * u * .1f + 3 * (1 - u) * u * u + u * u * u;
+}
+static void cui_status_notification_spring(float *position, float *velocity, float target,
+                                           double dt, float epsilon) {
+    /* Closed-form critically damped response, stable for large frame intervals. */
+    float omega = 15.7079632679f, delta = *position - target, step = (float)fmin(dt, 1),
+          decay = expf(-omega * step), c = *velocity + omega * delta;
+    *position = target + (delta + c * step) * decay;
+    *velocity = (*velocity - omega * c * step) * decay;
+    if (fabsf(*position - target) < epsilon && fabsf(*velocity) < epsilon) {
+        *position = target;
+        *velocity = 0;
+    }
+}
+static void cui_status_notification_shadow(cui_context *ui, cui_id id, cui_rect b, float radius,
+                                           float opacity, int16_t layer) {
+    for (size_t shadow = 0; shadow < 2; shadow++)
+        for (size_t ring = 0; ring < 8; ring++) {
+            float blur = shadow ? 3 : 7.5f, spread = shadow ? -4 : -3, offset = shadow ? 4 : 10,
+                  extent = spread + blur * (1 - (float)ring / 8);
+            float width = fmaxf(0, b.w + 2 * extent), height = fmaxf(0, b.h + 2 * extent);
+            if (width <= 0 || height <= 0)
+                continue;
+            cui_color ink = {0, 0, 0, (uint8_t)(255 * .1f * opacity / 8)};
+            if (!ink.a)
+                continue;
+            cui_begin_portal(ui, cui_status_child_id(id, shadow * 8 + ring),
+                             (cui_box){.width = width,
+                                       .height = height,
+                                       .radius = fmaxf(0, radius + extent),
+                                       .background = ink,
+                                       .inert = true},
+                             (cui_rect){b.x - extent, b.y - extent + offset, width, height}, layer);
+            cui_end_box(ui);
+        }
+}
+cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *t,
+                                           cui_notification_state *s, cui_rect viewport,
+                                           double now) {
+    cui_notification_advance result = {0};
+    if (!ui || !t || !s || !isfinite(now) || now < 0 || !isfinite(viewport.x) ||
+        !isfinite(viewport.y) || !isfinite(viewport.w) || viewport.w <= 0 ||
+        !isfinite(viewport.h) || viewport.h <= 0 || !isfinite(viewport.x + viewport.w) ||
+        !isfinite(viewport.y + viewport.h))
+        return result;
+    bool expanded[8] = {0}, paused = false;
+    cui_id focused = cui_focused(ui);
+    for (size_t anchor = 0; anchor < 8; anchor++) {
+        cui_id stack = cui_status_child_id(id, anchor + 500);
+        expanded[anchor] = cui_hovered(ui, stack) || cui_focus_within(ui, stack);
+        for (size_t i = 0; i < s->count; i++) {
+            cui_notification *n = &s->entries[i].notification;
+            cui_notification_anchor a = n->custom_placement ? n->placement : s->settings.placement;
+            if (a != (cui_notification_anchor)anchor)
+                continue;
+            cui_id card = cui_status_notification_element(id, n->id);
+            expanded[anchor] |= cui_hovered(ui, card) || focused == card ||
+                                focused == cui_status_child_id(card, 300) ||
+                                focused == cui_status_child_id(card, 301);
+        }
+        paused |= expanded[anchor];
+    }
+    size_t event_count;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    for (size_t ev = 0; ev < event_count; ev++)
+        if (events[ev].pointer_button == CUI_POINTER_MIDDLE) {
+            if (events[ev].type == CUI_EVENT_POINTER_DOWN) {
+                s->middle_pressed = false;
+                for (size_t i = s->count; i > 0; i--) {
+                    cui_notification_entry *e = &s->entries[i - 1];
+                    cui_rect b = e->bounds;
+                    if (cui_notification_visible(s, i - 1) && e->phase != CUI_NOTIFICATION_ENDING &&
+                        events[ev].x >= b.x && events[ev].x < b.x + b.w && events[ev].y >= b.y &&
+                        events[ev].y < b.y + b.h) {
+                        s->middle_capture = e->notification.id;
+                        s->middle_pressed = true;
+                        break;
+                    }
+                }
+            } else if (events[ev].type == CUI_EVENT_POINTER_UP && s->middle_pressed) {
+                s->middle_pressed = false;
+                for (size_t i = 0; i < s->count; i++) {
+                    cui_notification_entry *e = &s->entries[i];
+                    cui_rect b = e->bounds;
+                    if (e->notification.id.type == s->middle_capture.type &&
+                        e->notification.id.key == s->middle_capture.key &&
+                        cui_notification_visible(s, i) && events[ev].x >= b.x &&
+                        events[ev].x < b.x + b.w && events[ev].y >= b.y &&
+                        events[ev].y < b.y + b.h) {
+                        cui_notification_dismiss(s, e->notification.id, now);
+                        cui_invalidate(ui);
+                        break;
+                    }
+                }
+            }
+        }
+    result = cui_notification_update(s, now, paused);
+    double dt = fmax(0, now - s->last_render);
+    s->last_render = fmax(now, s->last_render);
+    for (size_t anchor = 0; anchor < 8; anchor++) {
+        size_t indices[CUI_NOTIFICATION_MAX_ITEMS], count = 0;
+        float heights[CUI_NOTIFICATION_MAX_ITEMS];
+        for (size_t i = 0; i < s->count; i++) {
+            cui_notification_entry *e = &s->entries[i];
+            cui_notification_anchor a = e->notification.custom_placement ? e->notification.placement
+                                                                         : s->settings.placement;
+            if (cui_notification_visible(s, i) && a == (cui_notification_anchor)anchor) {
+                indices[count] = i;
+                heights[count] = e->notification.height > 0 ? e->notification.height
+                                 : e->bounds.h > 0          ? e->bounds.h
+                                                            : 64;
+                count++;
+            }
+        }
+        if (!count) {
+            s->stack_bounds[anchor] = (cui_rect){0};
+            continue;
+        }
+        bool bottom = cui_status_notification_bottom((cui_notification_anchor)anchor);
+        cui_notification_geometry geometry;
+        cui_notification_stack_geometry(heights, count, 0, bottom, &geometry);
+        float target_height =
+            expanded[anchor] ? geometry.expanded_height : geometry.collapsed_height;
+        if (!s->stack_initialized[anchor] || s->settings.reduced_motion) {
+            s->stack_height[anchor] = target_height;
+            s->stack_initialized[anchor] = true;
+        } else
+            cui_status_notification_spring(&s->stack_height[anchor], &s->stack_velocity[anchor],
+                                           target_height, dt, .1f);
+        if (s->stack_height[anchor] != target_height) {
+            cui_invalidate(ui);
+            result.next_wake_seconds = now + 1.0 / 60;
+        }
+        float stack_height = s->stack_height[anchor],
+              width = fminf(s->settings.width, fmaxf(1, viewport.w - s->settings.margin_left -
+                                                            s->settings.margin_right));
+        float x = viewport.x + s->settings.margin_left, y = viewport.y + s->settings.margin_top;
+        if (anchor == CUI_NOTIFICATION_TOP_CENTER || anchor == CUI_NOTIFICATION_BOTTOM_CENTER)
+            x = viewport.x + (viewport.w - width) / 2;
+        else if (anchor == CUI_NOTIFICATION_TOP_RIGHT || anchor == CUI_NOTIFICATION_BOTTOM_RIGHT ||
+                 anchor == CUI_NOTIFICATION_RIGHT_CENTER)
+            x = viewport.x + viewport.w - s->settings.margin_right - width;
+        if (bottom)
+            y = viewport.y + viewport.h - s->settings.margin_bottom - stack_height;
+        else if (anchor == CUI_NOTIFICATION_LEFT_CENTER || anchor == CUI_NOTIFICATION_RIGHT_CENTER)
+            y = viewport.y + (viewport.h - stack_height) / 2;
+        cui_id stack = cui_status_child_id(id, anchor + 500);
+        cui_begin_portal(
+            ui, stack,
+            (cui_box){
+                .width = width, .height = stack_height, .fixed_width = true, .fixed_height = true},
+            (cui_rect){x, y, width, stack_height}, 20);
+        cui_track_bounds(ui, stack, &s->stack_bounds[anchor]);
+        cui_interact(ui, stack, CUI_ROLE_GROUP, cui_string("Notifications"), false, false, 0);
+        cui_set_tab_stop(ui, stack, false);
+        cui_begin_focus_scope(ui, stack, false);
+        for (size_t position = 0; position < count; position++) {
+            cui_notification_entry *e = &s->entries[indices[position]];
+            cui_notification n = e->notification;
+            cui_notification_stack_geometry(heights, count, position, bottom, &geometry);
+            float target_y = expanded[anchor] ? geometry.expanded_y : geometry.collapsed_y,
+                  inset =
+                      expanded[anchor] ? 0 : width * (.05f * fminf((float)geometry.rank, 2) / 2),
+                  target_width = width - 2 * inset;
+            if (!e->motion_initialized || s->settings.reduced_motion) {
+                e->motion_y = target_y;
+                e->motion_width = target_width;
+                e->visibility = (!expanded[anchor] && geometry.rank >= 3) ? 0 : 1;
+                e->motion_initialized = true;
+            } else {
+                cui_status_notification_spring(&e->motion_y, &e->velocity_y, target_y, dt, .1f);
+                cui_status_notification_spring(&e->motion_width, &e->velocity_width, target_width,
+                                               dt, .1f);
+            }
+            bool hidden = !expanded[anchor] && geometry.rank >= 3;
+            if (s->settings.reduced_motion)
+                e->visibility = hidden ? 0 : 1;
+            else
+                cui_status_notification_spring(&e->visibility, &e->velocity_visibility,
+                                               hidden ? 0 : 1, dt, .001f);
+            bool moving = e->motion_y != target_y || e->motion_width != target_width ||
+                          e->visibility != (hidden ? 0 : 1);
+            float phase =
+                (float)fmin(1, e->elapsed / (e->phase == CUI_NOTIFICATION_ENDING ? .2 : .4));
+            float eased = s->settings.reduced_motion ? 1 : cui_status_notification_ease(phase);
+            float alpha = e->phase == CUI_NOTIFICATION_STARTING ? eased
+                          : e->phase == CUI_NOTIFICATION_ENDING ? 1 - eased
+                                                                : 1,
+                  slide = e->phase == CUI_NOTIFICATION_STARTING ? (1 - eased) * 16
+                          : e->phase == CUI_NOTIFICATION_ENDING ? eased * 16
+                                                                : 0;
+            if (!bottom && anchor != CUI_NOTIFICATION_LEFT_CENTER &&
+                anchor != CUI_NOTIFICATION_RIGHT_CENTER)
+                slide = -slide;
+            if (anchor == CUI_NOTIFICATION_LEFT_CENTER || anchor == CUI_NOTIFICATION_RIGHT_CENTER)
+                slide = 0;
+            alpha *= e->visibility;
+            cui_theme theme = cui_status_notification_theme(t, alpha);
+            cui_id card = cui_status_notification_element(id, n.id);
+            if (!hidden)
+                cui_status_notification_shadow(
+                    ui, cui_status_child_id(card, 320),
+                    (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
+                               e->motion_width, heights[position]},
+                    t->radius, alpha * alpha * alpha, (int16_t)(21 + position));
+            cui_begin_portal(ui, card,
+                             (cui_box){.width = e->motion_width,
+                                       .height = n.height,
+                                       .padding = 14,
+                                       .gap = 0,
+                                       .row = true,
+                                       .radius = t->radius,
+                                       .background = theme.surface,
+                                       .border = theme.border,
+                                       .border_width = 1,
+                                       .layout_only = hidden && e->visibility == 0,
+                                       .inert = hidden || e->phase == CUI_NOTIFICATION_ENDING},
+                             (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
+                                        e->motion_width, n.height},
+                             (int16_t)(21 + position));
+            cui_track_bounds(ui, card, &e->bounds);
+            cui_interaction interaction =
+                cui_interact(ui, card, n.on_click ? CUI_ROLE_BUTTON : CUI_ROLE_ALERT,
+                             n.message.length ? n.message : n.title, false, false, 0);
+            cui_set_tab_stop(ui, card, n.on_click != NULL);
+            if (n.title.length)
+                cui_set_semantic_details(ui, card, (cui_semantic_details){.description = n.title});
+            cui_status_spacer(ui, cui_status_child_id(card, 310), 2);
+            cui_begin_box(ui, cui_status_child_id(card, 311), (cui_box){.row = true, .gap = 12});
+            bool has_icon = n.kind != CUI_NOTIFICATION_UNTYPED || n.icon.length;
+            if (has_icon) {
+                cui_color color = n.kind == CUI_NOTIFICATION_SUCCESS   ? t->success
+                                  : n.kind == CUI_NOTIFICATION_WARNING ? t->warning
+                                  : n.kind == CUI_NOTIFICATION_ERROR   ? t->danger
+                                  : n.kind == CUI_NOTIFICATION_INFO    ? t->info
+                                                                       : t->muted;
+                const char *icon = n.kind == CUI_NOTIFICATION_SUCCESS   ? "+"
+                                   : n.kind == CUI_NOTIFICATION_WARNING ? "!"
+                                   : n.kind == CUI_NOTIFICATION_ERROR   ? "x"
+                                                                        : "i";
+                cui_text(ui, n.kind == CUI_NOTIFICATION_UNTYPED ? n.icon : cui_string(icon),
+                         t->font_size, cui_status_notification_color(color, alpha));
+            }
+            float action_width =
+                n.action ? 80
+                : n.action_label.length
+                    ? cui_measure_text(ui, n.action_label, t->font_size * .8f).width +
+                          2 * t->padding * .8f + 12
+                    : 0;
+            float content_width =
+                fmaxf(1, e->motion_width - 32 - (has_icon ? 28 : 0) - action_width);
+            cui_begin_box(ui, cui_status_child_id(card, 302),
+                          (cui_box){.width = content_width, .gap = 4, .clip = true});
+            if (n.title.length)
+                cui_text(ui, n.title, t->font_size, theme.text);
+            if (n.message.length)
+                cui_text(ui, n.message, t->font_size, theme.text);
+            if (n.content)
+                n.content(ui, cui_status_child_id(card, 303), n.content_user, t->font_size,
+                          theme.text, alpha);
+            cui_end_box(ui);
+            if (n.action)
+                n.action(ui, cui_status_child_id(card, 301), n.action_user, t->font_size,
+                         theme.text, alpha);
+            else if (n.action_label.length &&
+                     cui_button_ex(ui, cui_status_child_id(card, 301), &theme, n.action_label,
+                                   (cui_button_options){.size = CUI_CONTROL_SMALL,
+                                                        .variant = CUI_BUTTON_PRIMARY}) &&
+                     n.on_action)
+                n.on_action(n.user, n.id);
+            cui_end_box(ui);
+            cui_status_spacer(ui, cui_status_child_id(card, 312), 2);
+            bool close = false;
+            if (cui_hovered(ui, card) || expanded[anchor]) {
+                cui_begin_portal(
+                    ui, cui_status_child_id(card, 313), (cui_box){.width = 20, .height = 20},
+                    (cui_rect){x + (width - e->motion_width) / 2 + e->motion_width - 24,
+                               y + e->motion_y + slide + 4, 20, 20},
+                    (int16_t)(21 + position));
+                close = cui_button_ex(
+                    ui, cui_status_child_id(card, 300), &theme, cui_string("Close"),
+                    (cui_button_options){.variant = CUI_BUTTON_GHOST,
+                                         .size = CUI_CONTROL_XSMALL,
+                                         .width = 20,
+                                         .content = cui_status_notification_close_content,
+                                         .content_user = &theme});
+                cui_end_box(ui);
+            }
+            cui_end_box(ui);
+            if (close || interaction.activated) {
+                cui_notification_dismiss(s, n.id, now);
+                if (interaction.activated && n.on_click)
+                    n.on_click(n.user, n.id);
+                cui_invalidate(ui);
+                result.changed = true;
+            }
+            if (moving) {
+                cui_invalidate(ui);
+                result.next_wake_seconds = now + 1.0 / 60;
+            }
+        }
+        cui_end_focus_scope(ui);
+        cui_end_box(ui);
+    }
+    for (size_t i = 0; i < s->count; i++)
+        if (s->entries[i].in_app && s->entries[i].phase != CUI_NOTIFICATION_PRESENT) {
+            double wake = now + 1.0 / 60;
+            if (!result.next_wake_seconds || wake < result.next_wake_seconds)
+                result.next_wake_seconds = wake;
+        }
+    if (result.changed)
+        cui_invalidate(ui);
+    return result;
 }

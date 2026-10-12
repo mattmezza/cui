@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_status.h"
+#ifndef CUI_STATUS_BASE_ONLY
+#include "cui/cui_components.h"
+#endif
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <string.h>
 #ifndef CUI_STATUS_BASE_ONLY
@@ -131,10 +135,395 @@ static void marker_render(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_STATUS_BASE_ONLY
+static void notification_render(void) {
+    cui_context *ui = cui_create((cui_config){.width = 900, .height = 700});
+    assert(ui);
+    cui_notification_entry entries[16];
+    cui_notification_state s;
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    assert(cui_notification_init(&s, entries, 16, settings, (cui_notification_host){0}));
+    cui_notification n = cui_notification_default();
+    n.title = cui_string("Saved");
+    n.message = cui_string("Changes saved");
+    n.autohide = false;
+    n.height = 80;
+    n.custom_placement = true;
+    for (int a = 0; a < 8; a++) {
+        n.id = (cui_notification_id){1, (uint64_t)a + 1};
+        n.placement = (cui_notification_anchor)a;
+        assert(cui_notification_push(&s, n, 0));
+    }
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme = 0; theme < 4; theme++) {
+        assert(cui_begin_frame(ui, 900, 700, .016f));
+        cui_notification_advance r =
+            cui_notifications(ui, 500, &themes[theme], &s, (cui_rect){0, 0, 900, 700}, .4 + theme);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && r.next_wake_seconds == 0);
+        size_t text = 0;
+        for (size_t i = 0; i < list.count; i++)
+            text += list.commands[i].type == CUI_DRAW_TEXT;
+        assert(text == 16);
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        assert(count == 16);
+        size_t alerts = 0;
+        for (size_t i = 0; i < count; i++)
+            alerts += sem[i].role == CUI_ROLE_ALERT;
+        assert(alerts == 8);
+        assert(entries[0].bounds.x == 16 && entries[0].bounds.y == 48);
+        assert(entries[1].bounds.x == 259);
+        assert(entries[2].bounds.x == 502);
+        assert(entries[3].bounds.y == 604);
+        assert(entries[6].bounds.y == 310);
+    }
+    assert(cui_begin_frame(ui, 900, 700, .016f));
+    cui_notification_advance idle =
+        cui_notifications(ui, 500, &themes[3], &s, (cui_rect){0, 0, 900, 700}, 4);
+    cui_end_frame(ui);
+    assert(idle.next_wake_seconds == 0 && !cui_needs_redraw(ui));
+    cui_notification_clear(&s, 5);
+    assert(cui_begin_frame(ui, 900, 700, .016f));
+    cui_notifications(ui, 500, &themes[0], &s, (cui_rect){0, 0, 900, 700}, 5.2);
+    cui_end_frame(ui);
+    assert(s.count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+#endif
+typedef struct {
+    int sent, retracted, activated, clicked, closed;
+    bool reject;
+} notification_counts;
+static bool send_notification(void *user, const cui_notification *n) {
+    notification_counts *c = user;
+    c->sent++;
+    assert(n->id.type || n->id.key);
+    return !c->reject;
+}
+static void retract_notification(void *user, cui_notification_id id) {
+    (void)id;
+    ((notification_counts *)user)->retracted++;
+}
+static void activate_notification(void *user, cui_notification_id id) {
+    (void)id;
+    ((notification_counts *)user)->activated++;
+}
+static void click_notification(void *user, cui_notification_id id) {
+    (void)id;
+    ((notification_counts *)user)->clicked++;
+}
+static void close_notification(void *user, cui_notification_id id) {
+    (void)id;
+    ((notification_counts *)user)->closed++;
+}
+#ifndef CUI_STATUS_BASE_ONLY
+static cui_notification_advance notification_frame(cui_context *ui, cui_notification_state *s,
+                                                   double now) {
+    cui_theme t = cui_theme_light();
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_notification_advance r = cui_notifications(ui, 900, &t, s, (cui_rect){0, 0, 600, 400}, now);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return r;
+}
+static void pointer_notification(cui_context *ui, cui_rect b, cui_pointer_button button) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = b.x + b.w / 2,
+                                           .y = b.y + b.h / 2,
+                                           .pointer_button = button}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = b.x + b.w / 2,
+                                           .y = b.y + b.h / 2,
+                                           .pointer_button = button}));
+}
+static void notification_custom_content(cui_context *ui, cui_id id, void *user, float font,
+                                        cui_color color, float opacity) {
+    (void)font;
+    (void)color;
+    (void)opacity;
+    cui_button(ui, id, user, cui_string("Custom action"), false);
+}
+static void notification_sized_content(cui_context *ui, cui_id id, void *user, float font,
+                                       cui_color color, float opacity) {
+    (void)font;
+    (void)opacity;
+    cui_begin_box(ui, id, (cui_box){.width = 30, .height = *(float *)user, .background = color});
+    cui_end_box(ui);
+}
+static void notification_autoheight(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_notification_entry entries[1];
+    cui_notification_state s;
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    assert(cui_notification_init(&s, entries, 1, settings, (cui_notification_host){0}));
+    float height = 10;
+    cui_notification n = cui_notification_default();
+    n.id = (cui_notification_id){4, 1};
+    n.autohide = false;
+    n.content = notification_sized_content;
+    n.content_user = &height;
+    assert(cui_notification_push(&s, n, 0));
+    notification_frame(ui, &s, .4);
+    notification_frame(ui, &s, .5);
+    float before = entries[0].bounds.h;
+    height = 70;
+    notification_frame(ui, &s, .6);
+    assert(entries[0].bounds.h > before && cui_needs_redraw(ui));
+    float grown = entries[0].bounds.h;
+    notification_frame(ui, &s, .7);
+    notification_frame(ui, &s, .8);
+    assert(!cui_needs_redraw(ui));
+    height = 5;
+    notification_frame(ui, &s, .9);
+    assert(entries[0].bounds.h < grown && cui_needs_redraw(ui));
+    notification_frame(ui, &s, 1);
+    notification_frame(ui, &s, 1.1);
+    assert(!cui_needs_redraw(ui));
+    cui_destroy(ui);
+}
+static void notification_interactions(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_notification_entry entries[4];
+    cui_notification_state s;
+    notification_counts counts = {0};
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    assert(cui_notification_init(&s, entries, 4, settings, (cui_notification_host){0}));
+    cui_notification n = cui_notification_default();
+    n.id = (cui_notification_id){2, 1};
+    n.message = cui_string("Click details");
+    n.action_label = cui_string("Retry");
+    n.height = 80;
+    n.on_click = click_notification;
+    n.on_close = close_notification;
+    n.on_action = click_notification;
+    n.user = &counts;
+    assert(cui_notification_push(&s, n, 0));
+    notification_frame(ui, &s, .4);
+    cui_rect card = entries[0].bounds;
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = card.x + 10, .y = card.y + 10}));
+    notification_frame(ui, &s, 2);
+    assert(entries[0].remaining == 5);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    cui_id action = 0, body = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (sem[i].name.length == 5 && !memcmp(sem[i].name.data, "Retry", 5))
+            action = sem[i].id;
+        if (sem[i].name.length == 13 && !memcmp(sem[i].name.data, "Click details", 13))
+            body = sem[i].id;
+    }
+    assert(action && body);
+    cui_focus(ui, action);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 0, .y = 0}));
+    notification_frame(ui, &s, 10);
+    assert(entries[0].remaining == 5);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    notification_frame(ui, &s, 11);
+    assert(counts.clicked == 1 && entries[0].phase == CUI_NOTIFICATION_PRESENT);
+    cui_focus(ui, 0);
+    notification_frame(ui, &s, 12);
+    assert(entries[0].remaining == 4);
+    pointer_notification(ui, (cui_rect){card.x + 20, card.y + 30, 20, 20}, CUI_POINTER_PRIMARY);
+    notification_frame(ui, &s, 12.1);
+    assert(entries[0].phase == CUI_NOTIFICATION_ENDING && counts.clicked == 2 &&
+           counts.closed == 0);
+    notification_frame(ui, &s, 12.3);
+    assert(s.count == 0 && counts.closed == 1);
+    n.id.key = 2;
+    n.on_click = NULL;
+    n.action_label = (cui_str){0};
+    assert(cui_notification_push(&s, n, 13));
+    notification_frame(ui, &s, 13.4);
+    pointer_notification(ui, entries[0].bounds, CUI_POINTER_MIDDLE);
+    notification_frame(ui, &s, 14);
+    assert(entries[0].phase == CUI_NOTIFICATION_ENDING);
+    notification_frame(ui, &s, 14.2);
+    assert(s.count == 0 && counts.closed == 2);
+    cui_theme theme = cui_theme_light();
+    n.id.key = 3;
+    n.autohide = true;
+    n.content = notification_custom_content;
+    n.content_user = &theme;
+    assert(cui_notification_push(&s, n, 15));
+    notification_frame(ui, &s, 15.4);
+    sem = cui_semantics(ui, &count);
+    cui_id custom = 0;
+    for (size_t i = 0; i < count; i++)
+        if (sem[i].name.length == 13 && !memcmp(sem[i].name.data, "Custom action", 13))
+            custom = sem[i].id;
+    assert(custom);
+    cui_focus(ui, custom);
+    notification_frame(ui, &s, 30);
+    assert(entries[0].remaining == 5);
+    cui_focus(ui, 0);
+    cui_notification_clear(&s, 31);
+    notification_frame(ui, &s, 31.2);
+    n.id.key = 4;
+    n.content = NULL;
+    assert(cui_notification_push(&s, n, 32));
+    notification_frame(ui, &s, 32.4);
+    card = entries[0].bounds;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_MIDDLE,
+                                           .x = card.x + 10,
+                                           .y = card.y + 10}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_MIDDLE,
+                                           .x = 0,
+                                           .y = 0}));
+    notification_frame(ui, &s, 32.5);
+    assert(entries[0].phase == CUI_NOTIFICATION_PRESENT);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = card.x + 10, .y = card.y + 10}));
+    notification_frame(ui, &s, 33);
+    sem = cui_semantics(ui, &count);
+    cui_id close = 0;
+    for (size_t i = 0; i < count; i++)
+        if (sem[i].name.length == 5 && !memcmp(sem[i].name.data, "Close", 5))
+            close = sem[i].id;
+    assert(close);
+    int clicked = counts.clicked;
+    pointer_notification(ui, cui_bounds(ui, close), CUI_POINTER_PRIMARY);
+    notification_frame(ui, &s, 33.1);
+    assert(entries[0].phase == CUI_NOTIFICATION_ENDING && counts.clicked == clicked);
+    notification_frame(ui, &s, 33.3);
+    assert(s.count == 0);
+    cui_destroy(ui);
+}
+#endif
+#ifndef CUI_STATUS_BASE_ONLY
+static void notification_motion(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_notification_entry entries[4];
+    cui_notification_state s;
+    cui_notification_settings settings = cui_notification_settings_default();
+    assert(cui_notification_init(&s, entries, 4, settings, (cui_notification_host){0}));
+    cui_notification n = cui_notification_default();
+    n.autohide = false;
+    n.height = 80;
+    n.message = cui_string("Persistent");
+    for (uint64_t i = 1; i <= 4; i++) {
+        n.id = (cui_notification_id){3, i};
+        assert(cui_notification_push(&s, n, 0));
+    }
+    notification_frame(ui, &s, .4);
+    assert(entries[0].visibility == 0 && entries[1].motion_width == settings.width * .9f &&
+           s.stack_height[2] == 122);
+    cui_rect front = entries[3].bounds;
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = front.x + 10, .y = front.y + 10}));
+    cui_notification_advance r = notification_frame(ui, &s, .5);
+    assert(r.next_wake_seconds > .5 && s.stack_height[2] > 122 && s.stack_height[2] < 362 &&
+           entries[0].motion_y > 42 && entries[0].motion_y < 282 && entries[0].visibility > 0);
+    double time = .5;
+    for (int i = 0; i < 300 && r.next_wake_seconds; i++) {
+        time += .016;
+        r = notification_frame(ui, &s, time);
+    }
+    assert(r.next_wake_seconds == 0 && s.stack_height[2] == 362 && entries[0].visibility == 1);
+    r = notification_frame(ui, &s, time + .016);
+    assert(!cui_needs_redraw(ui) && r.next_wake_seconds == 0);
+    cui_destroy(ui);
+}
+#endif
+static void notification_models(void) {
+    cui_notification_entry entries[4];
+    cui_notification_state s;
+    notification_counts counts = {0};
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.max_visible = 2;
+    cui_notification_host host = {send_notification, retract_notification, activate_notification,
+                                  &counts};
+    assert(cui_notification_init(&s, entries, 4, settings, host));
+    cui_notification n = cui_notification_default();
+    n.id = (cui_notification_id){1, 1};
+    n.user = &counts;
+    n.on_close = close_notification;
+    n.on_click = click_notification;
+    assert(cui_notification_push(&s, n, 0));
+    assert(s.count == 1 && entries[0].phase == CUI_NOTIFICATION_STARTING);
+    cui_notification_advance r = cui_notification_update(&s, .4, false);
+    assert(r.presented == 1 && entries[0].remaining == 5);
+    r = cui_notification_update(&s, 10, true);
+    assert(entries[0].remaining == 5 && r.next_wake_seconds == 0);
+    r = cui_notification_update(&s, 14.9, false);
+    assert(entries[0].phase == CUI_NOTIFICATION_PRESENT && entries[0].remaining > .09);
+    r = cui_notification_update(&s, 15, false);
+    assert(r.ending == 1 && counts.closed == 0 && s.count == 1);
+    r = cui_notification_update(&s, 15.199, false);
+    assert(s.count == 1 && counts.closed == 0);
+    r = cui_notification_update(&s, 15.2, false);
+    assert(r.removed == 1 && s.count == 0 && counts.closed == 1);
+    for (uint64_t i = 1; i <= 4; i++) {
+        n.id.key = i;
+        assert(cui_notification_push(&s, n, 20));
+    }
+    assert(!cui_notification_visible(&s, 0) && !cui_notification_visible(&s, 1) &&
+           cui_notification_visible(&s, 2) && cui_notification_visible(&s, 3));
+    assert(cui_notification_dismiss(&s, (cui_notification_id){1, 1}, 20));
+    assert(cui_notification_visible(&s, 0));
+    n.id.key = 3;
+    assert(cui_notification_push(&s, n, 21));
+    assert(s.count == 4 && entries[3].notification.id.key == 3 && counts.closed == 1);
+    n.id.key = 5;
+    assert(!cui_notification_push(&s, n, 21) && s.count == 4);
+    assert(cui_notification_clear(&s, 22) == 3);
+    r = cui_notification_update(&s, 22.3, false);
+    assert(s.count == 0 && r.removed == 4 && counts.closed == 5);
+    n.id.key = 9;
+    n.delivery = CUI_NOTIFICATION_BOTH;
+    n.custom_delivery = true;
+    assert(cui_notification_push(&s, n, 30) && counts.sent == 1 && s.system_count == 1);
+    cui_notification_update(&s, 30.4, false);
+    cui_notification_update(&s, 36, false);
+    cui_notification_update(&s, 36.3, false);
+    assert(s.count == 0 && s.system_count == 1 && counts.retracted == 0);
+    assert(cui_notification_system_click(&s, n.id, 37) && counts.activated == 1 &&
+           counts.clicked == 1 && counts.retracted == 1 && s.system_count == 0);
+    assert(!cui_notification_system_click(&s, n.id, 37));
+    n.delivery = CUI_NOTIFICATION_SYSTEM;
+    assert(cui_notification_push(&s, n, 40) && s.count == 0 && s.system_count == 1);
+    assert(cui_notification_clear(&s, 41) == 1 && s.system_count == 0);
+    counts.reject = true;
+    assert(!cui_notification_push(&s, n, 42) && s.count == 0 && s.system_count == 0);
+    counts.reject = false;
+    for (uint64_t i = 1; i <= 101; i++) {
+        n.id.key = i;
+        assert(cui_notification_push(&s, n, 43));
+    }
+    assert(s.system_count == 100 &&
+           !cui_notification_system_click(&s, (cui_notification_id){1, 1}, 44));
+    assert(cui_notification_dismiss_type(&s, 1, 45) == 100 && s.system_count == 0);
+    float heights[] = {180, 80};
+    cui_notification_geometry g;
+    assert(cui_notification_stack_geometry(heights, 2, 0, false, &g) && g.collapsed_height == 194 &&
+           g.expanded_height == 274 && g.collapsed_y == 14 && g.expanded_y == 94);
+    assert(cui_notification_stack_geometry(heights, 2, 1, true, &g) && g.collapsed_y == 114 &&
+           g.expanded_y == 194);
+    heights[0] = FLT_MAX;
+    heights[1] = FLT_MAX;
+    assert(!cui_notification_stack_geometry(heights, 2, 0, false, &g));
+    heights[0] = NAN;
+    assert(!cui_notification_stack_geometry(heights, 2, 0, false, &g));
+}
 int main(void) {
     marker_models();
+    notification_models();
 #ifndef CUI_STATUS_BASE_ONLY
     marker_render();
+    notification_render();
+    notification_interactions();
+    notification_autoheight();
+    notification_motion();
 #endif
 #ifdef CUI_STATUS_BASE_ONLY
     cui_marker_options o = cui_marker_options_default();

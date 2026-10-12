@@ -128,6 +128,120 @@ bool cui_base_marker(cui_marker_options options, const cui_marker_child *childre
                      cui_marker_plan *plan);
 bool cui_marker(cui_context *ui, cui_id id, const cui_theme *theme, cui_marker_state *state,
                 const cui_marker_child *children, size_t count, cui_marker_options options);
+#define CUI_NOTIFICATION_MAX_ITEMS 128
+typedef struct {
+    uint64_t type, key;
+} cui_notification_id;
+typedef enum {
+    CUI_NOTIFICATION_UNTYPED,
+    CUI_NOTIFICATION_INFO,
+    CUI_NOTIFICATION_SUCCESS,
+    CUI_NOTIFICATION_WARNING,
+    CUI_NOTIFICATION_ERROR
+} cui_notification_kind;
+typedef enum {
+    CUI_NOTIFICATION_TOP_LEFT,
+    CUI_NOTIFICATION_TOP_CENTER,
+    CUI_NOTIFICATION_TOP_RIGHT,
+    CUI_NOTIFICATION_BOTTOM_LEFT,
+    CUI_NOTIFICATION_BOTTOM_CENTER,
+    CUI_NOTIFICATION_BOTTOM_RIGHT,
+    CUI_NOTIFICATION_LEFT_CENTER,
+    CUI_NOTIFICATION_RIGHT_CENTER
+} cui_notification_anchor;
+typedef enum {
+    CUI_NOTIFICATION_IN_APP,
+    CUI_NOTIFICATION_SYSTEM,
+    CUI_NOTIFICATION_BOTH
+} cui_notification_delivery;
+typedef enum {
+    CUI_NOTIFICATION_STARTING,
+    CUI_NOTIFICATION_PRESENT,
+    CUI_NOTIFICATION_ENDING
+} cui_notification_phase;
+typedef void (*cui_notification_callback)(void *user, cui_notification_id id);
+typedef struct {
+    cui_notification_id id;
+    cui_str title, message, icon, action_label;
+    cui_notification_kind kind;
+    cui_notification_anchor placement;
+    cui_notification_delivery delivery;
+    bool custom_placement, custom_delivery, autohide;
+    cui_status_render_fn content, action;
+    void *content_user, *action_user;
+    cui_notification_callback on_click, on_close, on_action;
+    void *user;
+    /* Optional fixed card height; zero measures content after layout. */
+    float height;
+} cui_notification;
+/* Host callbacks implement OS delivery; send false rejects push transactionally.
+ * Host owns OS API details. Response calls cui_notification_system_click. */
+typedef bool (*cui_notification_send_fn)(void *, const cui_notification *);
+typedef struct {
+    cui_notification_send_fn send;
+    cui_notification_callback retract, activate;
+    void *user;
+} cui_notification_host;
+typedef struct {
+    cui_notification_anchor placement;
+    cui_notification_delivery delivery;
+    float width, margin_left, margin_right, margin_top, margin_bottom;
+    size_t max_visible;
+    bool reduced_motion;
+} cui_notification_settings;
+typedef struct {
+    cui_notification notification;
+    cui_notification_phase phase;
+    double elapsed, remaining, last_advance;
+    bool system_posted, in_app, explicit_close;
+    cui_rect bounds;
+    float motion_y, motion_width, velocity_y, velocity_width, visibility, velocity_visibility;
+    bool motion_initialized;
+} cui_notification_entry;
+typedef struct {
+    cui_notification_entry *entries;
+    size_t count, capacity;
+    cui_notification_settings settings;
+    cui_notification_host host;
+    /* Retained stack bounds and focus IDs remain stable across placement changes. */
+    cui_rect stack_bounds[8];
+    cui_notification system_registry[100];
+    size_t system_count;
+    double last_render;
+    float stack_height[8], stack_velocity[8];
+    bool stack_initialized[8];
+    cui_notification_id middle_capture;
+    bool middle_pressed;
+} cui_notification_state;
+typedef struct {
+    bool changed;
+    size_t presented, ending, removed;
+    double next_wake_seconds;
+} cui_notification_advance;
+typedef struct {
+    float collapsed_height, expanded_height, collapsed_y, expanded_y;
+    size_t rank;
+} cui_notification_geometry;
+cui_notification cui_notification_default(void);
+cui_notification_settings cui_notification_settings_default(void);
+bool cui_notification_init(cui_notification_state *, cui_notification_entry *, size_t capacity,
+                           cui_notification_settings, cui_notification_host);
+bool cui_notification_push(cui_notification_state *, cui_notification, double now_seconds);
+bool cui_notification_dismiss(cui_notification_state *, cui_notification_id, double now_seconds);
+size_t cui_notification_dismiss_type(cui_notification_state *, uint64_t type, double now_seconds);
+size_t cui_notification_clear(cui_notification_state *, double now_seconds);
+cui_notification_advance cui_notification_update(cui_notification_state *, double now_seconds,
+                                                 bool paused);
+bool cui_notification_visible(const cui_notification_state *, size_t index);
+bool cui_notification_stack_geometry(const float *heights, size_t count, size_t index, bool bottom,
+                                     cui_notification_geometry *);
+bool cui_notification_system_click(cui_notification_state *, cui_notification_id,
+                                   double now_seconds);
+/* Render at viewport coordinates. Host owns scheduling returned deadlines.
+ * Call once per frame after application content, with a stable overlay ID. */
+cui_notification_advance cui_notifications(cui_context *, cui_id, const cui_theme *,
+                                           cui_notification_state *, cui_rect viewport,
+                                           double now_seconds);
 #ifdef __cplusplus
 }
 #endif

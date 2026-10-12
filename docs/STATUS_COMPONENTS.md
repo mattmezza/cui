@@ -52,5 +52,85 @@ creates a stable-ID node (for example Status).
 Status base now owns only theme-independent defaults/motion validation. Tag style
 resolution and palette choices live in components. Marker styled rendering adds
 existing `cui_content` spinner dependencies. The base links only math.
-Notification is not implemented yet. Text wrapping and inherited font refinements
+Notification manager and rendering are implemented below. Text wrapping and inherited font refinements
 are bounded by the existing core text API; custom content can provide its own layout.
+
+
+## Notification
+
+Initialize `cui_notification_state` with application-owned entry storage (1–128
+entries), settings, and optional host hooks. Initialize each descriptor with
+`cui_notification_default`, assign a nonzero `{type,key}` ID, then push it with
+monotonic host seconds. Distinct keys can share an application type; exact-ID
+close and type-wide close are separate operations. Anonymous IDs are generated
+by the application. A repeated ID replaces its entry, moves it to newest, and
+restarts enter and timeout; replacement does not fire the old close callback.
+Capacity rejection and rejected host delivery leave the manager unchanged.
+
+Descriptors, strings, callback code, and callback users are borrowed. They remain
+valid while an entry is mounted, and while its system registry record remains
+registered. An auto-hidden in-app toast can still have an OS record, so its close
+callback does not by itself end these borrowed lifetimes. An explicit dismiss,
+clear, replacement, or registry aging ends the corresponding registry borrow.
+Do not initialize, push, or advance the same manager from a render callback;
+queue structural changes until `cui_end_frame` completes, so tracked retained
+bounds still refer to the same entries. Callbacks may request
+`cui_notification_dismiss`; action callbacks choose whether to dismiss.
+Custom rendering receives a reserved ID, font/color, and opacity; multiply custom
+paint alpha by that opacity. No callback or label is retained by core beyond its
+ordinary frame semantics.
+
+The pure base manager matches frozen lifecycle rules: 400ms enter, five seconds
+present for autohide, then 200ms exit. Each advance crosses at most one phase;
+excess time at a phase boundary is discarded. Present timers pause together when
+any stack is hovered or contains keyboard focus, including arbitrary custom
+children through core focus-scope ancestry. Enter/exit continue while paused.
+Window activity is not a pause input. Persistent-only settled stacks have no
+wake deadline. Close callbacks fire after exit removal, once. Manual dismissals
+remain mounted while ending; visible selection is the newest global
+`max_visible` active entries plus every ending entry. It is then grouped into
+separate stable stacks for all eight supported anchors.
+
+Render once per frame after application content with `cui_notifications`, a
+stable overlay ID, explicit viewport, and host seconds. Schedule the returned
+absolute wake deadline and invalidate at that deadline. Per-card placement
+can override global settings. Defaults are top right, width 382, ten visible
+active entries, margins 16, and top margin 48 (16 plus the reference 32px title
+bar); hosts without a title bar can set top margin 16. Auto height is measured
+through retained bounds and schedules a follow-up frame when it changes; fixed
+height is optional. Entry arrays and state must remain alive through frame end.
+
+Collapsed stacks show three layers, 14px peeks, and 5 percent width reduction
+per layer; expanded stacks use actual heights and 14px gaps. A taller rear card
+contributes to collapsed stack height. Stack height, item offset, width, and
+visibility use bounded critically damped springs with reference 400ms response,
+0.1px geometry settling and 0.001 visibility settling. Enter/exit use the
+reference cubic Bezier curve and 16px directional slide. Reduced motion uses
+settled geometry and static transition paint while retaining lifecycle deadlines.
+Body clicks dismiss before calling the click handler. Close buttons appear on
+hover or expanded keyboard focus. Middle clicks require matching down/up inside
+the card; cancelled captures do not dismiss. Built-in action buttons keep their
+own focus and do not automatically dismiss. Titles, messages, custom content,
+custom action controls, typed intent icons and custom icon text compose together.
+Typed intent overrides custom icon, as in the reference.
+
+To use OS delivery, explicitly configure portable host `send`, `retract`, and
+`activate` callbacks and select System or Both delivery. No native OS adapters are
+provided by this module. A failed/missing send callback rejects the push. Host
+code owns OS availability, stable namespaced tags, activation, and cross-window
+ownership. Report OS responses through `cui_notification_system_click`; unknown
+or aged-out IDs are ignored. A separate registry retains the newest 100 system
+records, including records whose in-app toast auto-hid. Auto-hide does not retract
+OS delivery. Explicit exact/type/clear dismissal retracts it; response activates
+the host window, retracts, closes any in-app toast, and calls the click handler.
+
+Base status links only math; styled Notification additionally uses core,
+existing components buttons, content spinner, and status base. No allocation,
+platform, renderer, or default-theme implementation is required by the base.
+Renderer limits remain explicit: shadows are two bounded eight-layer rounded
+rect approximations of the reference blur/spread/offset, intent icons use portable
+text symbols, title font weight and theme popover/radius-large tokens fall back
+to the current core font and theme surface/radius. Custom content can supply more
+specific icons/typography. Core text wrapping refinements and Oklab shimmer color
+mixing remain limitations described above; this does not establish full native
+platform or renderer parity.

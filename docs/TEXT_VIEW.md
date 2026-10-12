@@ -193,8 +193,7 @@ Markdown images in list items retain parent ancestry, ordered counters and Sourc
 copy grouping. Standalone Markdown images now use the same one-byte paragraph
 object flow as mixed images, including default inline sizing, loaded/unloaded slots
 and list continuation marker rules. Their ranges cover complete image syntax,
-rather than the former alt-text ranges. Bare root HTML images retain legacy
-standalone blocks pending migration.
+rather than the former alt-text ranges. Bare root HTML images also use a separate paragraph with an atomic image slot.
 
 Exact source inline image flow requires styled font ascent, descent and baseline
 metrics. In frozen `inline_flow.rs`, each line starts with the body's baseline
@@ -253,8 +252,8 @@ this delimiter parser is not a complete CommonMark grammar.
 Images inside HTML paragraph, heading and table-cell containers now share the
 atomic inline flow with neighboring styled text. Linked HTML images also use the
 ordinary link callback. Missing `src` images inside these containers are skipped.
-Bare root HTML images retain legacy standalone blocks; their explicit dimensions
-and HTML source-range/copy support remain unfinished. HTML container tracking is bounded
+Bare root HTML images use the same sizing rules in their own paragraph.
+HTML source-range/copy support remains unfinished. HTML container tracking is bounded
 and does not replace a repairing HTML5 tree parser.
 
 Inline HTML image dimensions support finite nonnegative numbers, `px`, and `%`,
@@ -269,3 +268,9 @@ Numeric tokens are bounded to 64 bytes, exponents to ±38, and dimensions to
 no bitmap. Caller-provided NaN/negative/nonfinite dimensions are rejected before
 layout mutation. Tall image rows retain their logical origin separately from shifted
 text bounds, so aligned table cells move all runs together.
+
+Both Markdown and HTML standalone images now use one-byte image slots and source
+default sizing rather than alt-text ranges or unscaled intrinsic pixels. Bare root
+HTML images retain separate paragraph boundaries and accept the same explicit
+dimensions as paragraph images. Missing root `src` images are skipped. HTML tag
+boundaries respect quoted `>` characters and HTML attribute whitespace.

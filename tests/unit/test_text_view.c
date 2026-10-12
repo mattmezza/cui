@@ -195,6 +195,27 @@ static void test_html_image_dimensions(void) {
            f.spans[1].image_bounds.x == f.glyphs[1].bounds.x &&
            f.glyphs[0].line_top == f.glyphs[1].line_top);
 }
+static void test_root_html_image_object(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    const char *source = "<img\nsrc='asset' title='a>b' width='20' height='40'>next";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 2 && f.blocks[0].kind == CUI_TEXT_VIEW_PARAGRAPH &&
+           f.blocks[0].text.end == 1 && (f.spans[0].flags & CUI_TEXT_VIEW_INLINE_IMAGE));
+    assert(f.spans[0].source.end == (size_t)(strstr(source, "next") - source) &&
+           f.spans[0].resource.end - f.spans[0].resource.begin == 5);
+    cui_text_view_layout_options o = {.width = 200,
+                                      .font_size = 14,
+                                      .line_height = 20,
+                                      .paragraph_gap = 16,
+                                      .font_metrics_available = true,
+                                      .body_metrics = {8, 2, 10}};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[0].image_bounds.h == 40 && f.spans[0].image_bounds.w == 20 &&
+           f.blocks[1].bounds.y == 56);
+    assert(cui_text_view_set_text(&f.state, text("<img alt='missing'>next")) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && !strcmp(f.rendered, "next\n"));
+}
 static void test_html_inline_image_model(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -233,10 +254,9 @@ static void test_image_only_table_copy(void) {
 static void test_image_font_metrics(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
-    assert(cui_text_view_set_text(&f.state, text("<img src='asset' alt='alt'>next")) ==
+    assert(cui_text_view_set_text(&f.state,
+                                  text("<img src='asset' alt='alt' width='2' height='1'>next")) ==
            CUI_TEXT_VIEW_OK);
-    f.blocks[0].image_ready = true;
-    f.blocks[0].image = (cui_bitmap){.width = 2, .height = 1};
     cui_text_view_layout_options o = {.width = 200,
                                       .font_size = 14,
                                       .line_height = 20,
@@ -244,15 +264,15 @@ static void test_image_font_metrics(void) {
                                       .font_metrics_available = true,
                                       .body_metrics = {8, 2, 10}};
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
-    assert(f.blocks[0].bounds.y == 12 && f.blocks[0].bounds.h == 1 &&
-           f.blocks[0].image_line.h == 20 && f.blocks[1].bounds.y == 36);
+    assert(f.spans[0].image_bounds.y == 12 && f.spans[0].image_bounds.h == 1 &&
+           f.blocks[0].bounds.h == 20 && f.blocks[1].bounds.y == 36);
     o.body_metrics = (cui_font_metrics){4, 6, 10};
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
-    assert(f.blocks[0].bounds.y == 9);
-    f.blocks[0].image.height = 40;
+    assert(f.spans[0].image_bounds.y == 9);
+    f.spans[0].image_height.value = 40;
     o.body_metrics = (cui_font_metrics){8, 2, 10};
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
-    assert(f.blocks[0].bounds.y == 0 && f.blocks[0].image_line.h == 40 &&
+    assert(f.spans[0].image_bounds.y == 0 && f.blocks[0].bounds.h == 40 &&
            f.blocks[1].bounds.y == 56);
     size_t count = f.state.glyph_count;
     o.body_metrics.ascent = NAN;
@@ -261,9 +281,9 @@ static void test_image_font_metrics(void) {
     o.body_metrics.ascent = FLT_MAX;
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_INVALID);
     o.font_metrics_available = false;
-    f.blocks[0].image.height = 1;
+    f.spans[0].image_height.value = 1;
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
-    assert(f.blocks[0].bounds.y == 0 && f.blocks[0].image_line.h == 1);
+    assert(f.spans[0].image_bounds.y == 0 && f.blocks[0].bounds.h == 20);
 }
 static void test_markdown(void) {
     fixture f;
@@ -1299,6 +1319,14 @@ static void test_html_sized_image_paint(void) {
             next = c->bounds.y >= 40 && c->bounds.y < 42;
     }
     assert(bitmap && next);
+    assert(cui_text_view_set_text(&f.state, text("<img src='asset' width='20' height='40'>next")) ==
+           CUI_TEXT_VIEW_OK);
+    d = frame(ui, &f, o);
+    bitmap = false;
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_IMAGE)
+            bitmap = d.commands[i].bounds.w == 20 && d.commands[i].bounds.h == 40;
+    assert(bitmap && f.blocks[1].bounds.y == 56);
     assert(
         cui_text_view_set_text(&f.state, text("<p>a<img src='asset' width='0' height='0'>b</p>")) ==
         CUI_TEXT_VIEW_OK);
@@ -1367,11 +1395,11 @@ static void test_image_metric_paint(void) {
     for (size_t i = 0; i < d.count; ++i) {
         if (d.commands[i].type == CUI_DRAW_IMAGE) {
             image = true;
-            assert(d.commands[i].bounds.y == f.state.viewport.y + 12 &&
-                   d.commands[i].bounds.h == 1);
+            assert(d.commands[i].bounds.y == f.state.viewport.y + 2.5f &&
+                   d.commands[i].bounds.h == 15);
         }
     }
-    assert(image && f.blocks[0].image_line.y == 0 && f.blocks[1].bounds.y == 36);
+    assert(image && f.blocks[0].bounds.y == 0 && f.blocks[1].bounds.y == 36);
     metrics.ascent = NAN;
     d = frame(ui, &f, o);
     for (size_t i = 0; i < d.count; ++i)
@@ -2372,6 +2400,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_root_html_image_object();
     test_html_image_dimensions();
     test_html_inline_image_model();
     test_image_only_table_copy();

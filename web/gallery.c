@@ -5,6 +5,7 @@
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
 #include "cui/cui_form.h"
+#include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_numeric.h"
 #include "cui/cui_otp.h"
@@ -28,6 +29,9 @@ static float host_measure(const char *s, size_t n, float size) {
 }
 #endif
 static cui_context *ui;
+static cui_theme current_theme;
+static bool redraw, reduced_motion, compact_density;
+static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
 static const cui_semantic *semantics;
 static size_t semantic_count;
@@ -38,6 +42,112 @@ static const unsigned char image_story_pixels[80] = {
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0};
+static const unsigned char image_story_blue[80] = {
+    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0,
+    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0,
+    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0,
+    40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 40, 90, 230, 255, 0, 0, 0, 0};
+static const cui_image_frame image_frames[2] = {{image_story_pixels, 4, 4, 20, 1, .5},
+                                                {image_story_blue, 4, 4, 20, 2, .5}};
+static cui_image_state image_state, attachment_images[6];
+static cui_attachment_state attachment_states[6];
+static cui_attachment_group_state attachment_group_state;
+static int image_mode, image_fit, image_grayscale, image_half_opacity;
+static int attachment_status = CUI_ATTACHMENT_COMPLETE, attachment_vertical;
+static unsigned attachment_removed_mask, attachment_clicks, attachment_removes, attachment_retries,
+    attachment_actions;
+static cui_attachment_group_result attachment_group_result;
+static cui_image_result image_result;
+static cui_image_load gallery_image_loader(void *user, cui_image_source source) {
+    (void)user;
+    return (cui_image_load){.status = source.identity == 2   ? CUI_IMAGE_PENDING
+                                      : source.identity == 3 ? CUI_IMAGE_FAILED
+                                                             : CUI_IMAGE_READY,
+                            .frames = image_frames,
+                            .count = 2};
+}
+static void gallery_image_placeholder(cui_context *context, cui_id id, void *user, float width,
+                                      float height) {
+    (void)id;
+    (void)user;
+    (void)width;
+    (void)height;
+    cui_label(context, &current_theme,
+              cui_string(image_mode == 1 ? "Image loading" : "Image failed"));
+}
+static void gallery_attachment_click(void *user, cui_id id) {
+    (void)user;
+    (void)id;
+    attachment_clicks++;
+}
+static void gallery_attachment_remove(void *user, cui_id id) {
+    (void)id;
+    attachment_removed_mask |= 1u << (uintptr_t)user;
+    attachment_removes++;
+    redraw = true;
+}
+static void gallery_attachment_retry(void *user, cui_id id) {
+    (void)user;
+    (void)id;
+    attachment_status = CUI_ATTACHMENT_UPLOADING;
+    attachment_retries++;
+    redraw = true;
+}
+static void gallery_attachment_actions(cui_context *context, cui_id id, void *user, float width,
+                                       float height) {
+    (void)user;
+    (void)width;
+    (void)height;
+    if (cui_button_ex(context, id, &current_theme, cui_string("Open"),
+                      (cui_button_options){.size = CUI_CONTROL_XSMALL, .width = 64}))
+        attachment_actions++;
+}
+static void gallery_attachment_cards(cui_context *context, cui_id id, void *user, float width,
+                                     float height) {
+    (void)id;
+    (void)user;
+    (void)width;
+    (void)height;
+    for (unsigned index = 0; index < 6; index++) {
+        if (attachment_removed_mask & (1u << index))
+            continue;
+        char name[32];
+        snprintf(name, sizeof(name), "Attachment %u", index + 1);
+        cui_attachment_child children[2] = {
+            {.kind = CUI_ATTACHMENT_TITLE, .text = cui_string(name)},
+            {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = cui_string("Workspace file")}};
+        cui_attachment_options options = cui_attachment_options_default();
+        options.name = cui_string(name);
+        options.model.status =
+            index ? CUI_ATTACHMENT_COMPLETE : (cui_attachment_status)attachment_status;
+        options.model.size = CUI_MEDIA_MEDIUM;
+        options.model.width = 260;
+        options.model.vertical = attachment_vertical != 0;
+        options.model.identified = true;
+        options.model.progress_known = true;
+        options.model.progress = 45;
+        options.children = children;
+        options.child_count = 2;
+        options.image_state = &attachment_images[index];
+        options.image_source = (cui_image_source){
+            .kind = CUI_IMAGE_ASSET, .name = cui_string(name), .identity = 10 + index};
+        options.image_loader = gallery_image_loader;
+        options.actions = gallery_attachment_actions;
+        options.actions_width = 64;
+        options.on_click = gallery_attachment_click;
+        options.on_remove = gallery_attachment_remove;
+        options.on_retry = gallery_attachment_retry;
+        options.action_user = (void *)(uintptr_t)index;
+        options.remove_label = cui_string("Remove attachment");
+        options.retry_label = cui_string("Retry attachment");
+        options.now_seconds = host_seconds;
+        options.delta_seconds = host_dt;
+        options.reduced_motion = reduced_motion;
+        options.active = true;
+        cui_attachment(context, cui_id_from(context, name), &current_theme,
+                       &attachment_states[index], options);
+    }
+}
 static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
@@ -51,7 +161,6 @@ static cui_menu_entry tabs_entries[12];
 static int disclosure_mode, disclosure_actions;
 static bool disclosure_multiple, disclosure_checked;
 static cui_disclosure_motion accordion_motion[3], collapsible_motion;
-static cui_theme current_theme;
 static void disclosure_header(cui_context *context, const cui_disclosure_item *item, size_t index,
                               bool expanded, void *user) {
     (void)index;
@@ -121,9 +230,6 @@ static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
 static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
-static bool redraw;
-static float host_seconds, host_dt = 1.0f / 60;
-static bool reduced_motion, compact_density;
 static cui_overlay trap;
 static int clipboard_request;
 static char clipboard_status[128] = "Clipboard access requires a secure browser context.";
@@ -658,6 +764,38 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         conversation_result = cui_message_scroller(ui, cui_id_from(ui, "conversation"), &t,
                                                    conversation, conversation_row, NULL, options);
         next_wake = conversation_result.next_wake_seconds;
+        break;
+    }
+    case 62: {
+        cui_image_options options = cui_image_options_default();
+        options.geometry = (cui_image_geometry){280, 160, 0, (cui_image_fit)image_fit};
+        options.corners = (cui_corner_radii){18, 4, 18, 4};
+        options.grayscale = image_grayscale != 0;
+        options.opacity = image_half_opacity ? .5f : 1;
+        options.description = cui_string("Workspace preview image");
+        options.loading = gallery_image_placeholder;
+        options.fallback = gallery_image_placeholder;
+        options.clock = (cui_image_clock){true, true, reduced_motion, host_seconds};
+        image_result = cui_image(ui, cui_id_from(ui, "image-story"), &image_state,
+                                 (cui_image_source){.kind = CUI_IMAGE_ASSET,
+                                                    .name = cui_string("workspace-preview"),
+                                                    .identity = (unsigned)image_mode + 1},
+                                 gallery_image_loader, NULL, options);
+        next_wake = image_result.next_wake_seconds;
+        break;
+    }
+    case 63: {
+        cui_attachment_group_options options = cui_attachment_group_options_default();
+        options.width = width - 48;
+        options.height = 220;
+        options.gap = 12;
+        options.edge_fade = true;
+        options.now_seconds = host_seconds;
+        options.reduced_motion = reduced_motion;
+        options.children = gallery_attachment_cards;
+        attachment_group_result = cui_attachment_group(ui, cui_id_from(ui, "attachment-group"),
+                                                       &attachment_group_state, options);
+        next_wake = attachment_group_result.next_wake_seconds;
         break;
     }
     case 59: {
@@ -1761,6 +1899,12 @@ unsigned gallery_bitmap_pixels(unsigned i) {
                ? (unsigned)(uintptr_t)draw.commands[i].bitmap.bitmap.pixels
                : 0;
 }
+unsigned gallery_bitmap_revision(unsigned i, unsigned high) {
+    if (i >= draw.count || draw.commands[i].type != CUI_DRAW_IMAGE)
+        return 0;
+    uint64_t revision = draw.commands[i].bitmap.bitmap.revision;
+    return (unsigned)(high ? revision >> 32 : revision);
+}
 double gallery_bitmap(unsigned i, unsigned field) {
     if (i >= draw.count || draw.commands[i].type != CUI_DRAW_IMAGE)
         return 0;
@@ -2199,6 +2343,58 @@ int gallery_checkbox_state(int state) {
     if (state >= CUI_CHECK_UNCHECKED && state <= CUI_CHECK_MIXED)
         check_state = (cui_check_state)state;
     return check_state;
+}
+void gallery_image_options(int mode, int fit, int grayscale, int half_opacity) {
+    image_mode = mode;
+    image_fit = fit;
+    image_grayscale = grayscale;
+    image_half_opacity = half_opacity;
+}
+double gallery_image_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return image_result.valid;
+    case 1:
+        return image_result.status;
+    case 2:
+        return image_result.loading_visible;
+    case 3:
+        return image_state.frame;
+    case 4:
+        return image_result.next_wake_seconds;
+    default:
+        return 0;
+    }
+}
+void gallery_attachment_options(int status, int vertical) {
+    attachment_status = status;
+    attachment_vertical = vertical;
+}
+double gallery_attachment_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return attachment_clicks;
+    case 1:
+        return attachment_removes;
+    case 2:
+        return attachment_retries;
+    case 3:
+        return attachment_actions;
+    case 4:
+        return attachment_removed_mask;
+    case 5:
+        return attachment_group_result.maximum;
+    case 6:
+        return attachment_group_state.scroll.x;
+    case 7:
+        return attachment_group_result.leading_opacity;
+    case 8:
+        return attachment_group_result.trailing_opacity;
+    case 9:
+        return attachment_status;
+    default:
+        return 0;
+    }
 }
 double gallery_conversation(unsigned field) {
     switch (field) {

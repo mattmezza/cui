@@ -2,24 +2,38 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
+const bitmapCache=new Map();let bitmapCacheBytes=0;
+function cacheBitmap(key,bitmap,bytes){
+ if(bytes>16*1024*1024)return;
+ while(bitmapCache.size>=64||bitmapCacheBytes+bytes>16*1024*1024){
+  const oldest=bitmapCache.keys().next().value,entry=bitmapCache.get(oldest);
+  bitmapCacheBytes-=entry.bytes;bitmapCache.delete(oldest);
+ }
+ bitmapCache.set(key,{bitmap,bytes});bitmapCacheBytes+=bytes;
+}
 function paintBitmap(i,x,y,w,h,radii){
  const field=n=>wasm.gallery_bitmap(i,n),pointer=wasm.gallery_bitmap_pixels(i);
  const bw=field(0),bh=field(1),stride=field(2),sx=field(3),sy=field(4),sw=field(5),sh=field(6);
  if(!pointer||!bw||!bh||stride<bw*4||!sw||!sh)return;
- const source=new Uint8Array(wasm.memory.buffer,pointer,stride*bh),pixels=new Uint8ClampedArray(bw*bh*4);
  const gray=field(8),tinted=field(9),tint=tinted?[field(10),field(11),field(12),field(13)]:[255,255,255,255];
- for(let row=0;row<bh;row++)for(let col=0;col<bw;col++){
-  const at=row*stride+col*4,to=(row*bw+col)*4;
-  const shade=gray?Math.round(.2126*source[at]+.7152*source[at+1]+.0722*source[at+2]):0;
-  for(let channel=0;channel<3;channel++)pixels[to+channel]=Math.floor((gray?shade:source[at+channel])*tint[channel]/255);
-  pixels[to+3]=Math.floor(source[at+3]*tint[3]/255);
+ const key=[pointer,bw,bh,stride,wasm.gallery_bitmap_revision(i,1),wasm.gallery_bitmap_revision(i,0),gray,...tint].join(':');
+ let bitmap=bitmapCache.get(key)?.bitmap;
+ if(!bitmap){
+  const source=new Uint8Array(wasm.memory.buffer,pointer,stride*bh),pixels=new Uint8ClampedArray(bw*bh*4);
+  for(let row=0;row<bh;row++)for(let col=0;col<bw;col++){
+   const at=row*stride+col*4,to=(row*bw+col)*4;
+   const shade=gray?Math.round(.2126*source[at]+.7152*source[at+1]+.0722*source[at+2]):0;
+   for(let channel=0;channel<3;channel++)pixels[to+channel]=Math.floor((gray?shade:source[at+channel])*tint[channel]/255);
+   pixels[to+3]=Math.floor(source[at+3]*tint[3]/255);
+  }
+  bitmap=document.createElement('canvas');bitmap.width=bw;bitmap.height=bh;
+  bitmap.getContext('2d').putImageData(new ImageData(pixels,bw,bh),0,0);
+  cacheBitmap(key,bitmap,pixels.length);
  }
- const bitmap=document.createElement('canvas');bitmap.width=bw;bitmap.height=bh;
- bitmap.getContext('2d').putImageData(new ImageData(pixels,bw,bh),0,0);
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,radii);ctx.clip();ctx.globalAlpha=field(7);
  ctx.imageSmoothingEnabled=false;ctx.drawImage(bitmap,sx,sy,sw,sh,x,y,w,h);ctx.restore();
 }
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -70,7 +84,9 @@ const snippets = {
  Tabs:'cui_tabs(ui, id, &theme, items, 3,\n    &selection, options, draw_panel, user);',
  Avatar:'cui_avatar(ui, id, &theme,\n    cui_string("Alex Morgan"), 56);',
  Kbd:'cui_kbd(ui, id, &theme,\n    cui_string("Ctrl + K"));',
- Theme:'cui_theme theme = cui_theme_dark();\ncui_button(ui, id, &theme,\n    cui_string("Primary action"), false);'
+ Theme:'cui_theme theme = cui_theme_dark();\ncui_button(ui, id, &theme,\n    cui_string("Primary action"), false);',
+ Image:'cui_image(ui, id, &state, source, loader, user, options);\n/* The host loader supplies borrowed RGBA8 frames. */',
+ Attachment:'cui_attachment(ui, id, &theme, &state, options);\n/* Compose scrolling cards with cui_attachment_group. */'
 };
 let wasm, catalog, selected, framePending=false, wakeTimer, lastTime=performance.now();
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
@@ -94,7 +110,7 @@ function requestFrame(){if(framePending||!wasm)return;framePending=true;requestA
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Theme'?360:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='Theme'?360:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -103,6 +119,8 @@ function render(){
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
+ wasm.gallery_image_options(Number($('image-state').value),Number($('image-fit').value),Number($('image-grayscale').checked),Number($('image-opacity').checked));
+ wasm.gallery_attachment_options(Number($('attachment-status').value),Number($('attachment-vertical').checked));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
  wasm.gallery_dropdown_options(...['variant','size','halves','action','anchor'].map(k=>Number($('dropdown-'+k).value)),Number($('dropdown-outline').checked),Number($('dropdown-selected').checked));
  wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
@@ -142,6 +160,7 @@ function render(){
  while(clips-- >0)ctx.restore();
  syncSemantics();
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
+ if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
  $('table-selection').value=String(wasm.gallery_table_selection_mode(-1));
  window.cuiGallery.renderedComponent=selected.name;window.cuiGallery.frame=(window.cuiGallery.frame||0)+1;
  const clipboard=wasm.gallery_clipboard_request();if(clipboard)void clipboardAction(clipboard);
@@ -231,6 +250,8 @@ function selectComponent(){
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['message-alignment','message-variant','message-inset','message-avatar-control'])$(id).hidden=selected.name!=='Message';
  $('checkbox-state').hidden=selected.name!=='Checkbox';
+ for(const id of ['image-state','image-fit','image-grayscale-control','image-opacity-control'])$(id).hidden=selected.name!=='Image';
+ for(const id of ['attachment-status','attachment-vertical-control'])$(id).hidden=selected.name!=='Attachment';
  $('message-scrollbar-control').hidden=selected.name!=='MessageScroller';
  $('message-alignment').value='0';$('message-variant').value='1';$('message-inset').value='0';$('message-avatar').checked=true;$('message-scrollbar').checked=true;
  for(const id of ['dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline-control','dropdown-selected-control'])$(id).hidden=selected.name!=='DropdownButton';
@@ -284,6 +305,7 @@ reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if($('theme').value==='3')requestFrame();});
 $('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog)selectComponent();});
 $('theme').addEventListener('change',syncTheme);
+for(const id of ['image-state','image-fit','image-grayscale','image-opacity','attachment-status','attachment-vertical'])$(id).addEventListener('change',requestFrame);
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);

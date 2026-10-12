@@ -47,8 +47,7 @@ void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
     if (n < 0 || (size_t)n >= sizeof label)
         return;
     cui_str text = {label, (size_t)n};
-    cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, text, false, false,
-                 total ? (float)current / (float)total : 0);
+    cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, text, false, false, (float)current);
     cui_set_semantic_details(ui, id, (cui_semantic_details){.minimum = 0, .maximum = (float)total});
     cui_begin_box(ui, id, (cui_box){.width = -1});
     cui_text_ex(ui, text, o.size == CUI_QUESTIONNAIRE_LARGE ? 14 : 12, t->muted, 0,

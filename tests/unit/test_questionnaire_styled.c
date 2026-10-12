@@ -86,7 +86,32 @@ static void radio_keyboard(void) {
     assert(!s.complete && cui_questionnaire_item_error(&s, 0).kind == CUI_QUESTIONNAIRE_UNFILLED);
     cui_destroy(ui);
 }
+static void progress_semantics(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    assert(ui);
+    cui_questionnaire_item items[3] = {
+        {.name = cui_string("one")}, {.name = cui_string("two")}, {.name = cui_string("three")}};
+    cui_questionnaire_item_runtime runtime[3];
+    cui_questionnaire_state s = {0};
+    assert(cui_questionnaire_init(
+               &s, items, 3, (cui_questionnaire_workspace){.items = runtime, .item_capacity = 3},
+               NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    cui_theme theme = cui_theme_light();
+    for (size_t item = 0; item < 3; item++) {
+        assert(cui_questionnaire_set_current(&s, item, false) == CUI_QUESTIONNAIRE_OK);
+        assert(cui_begin_frame(ui, 400, 300, .016f));
+        cui_questionnaire_progress(ui, 31, &theme, &s, (cui_questionnaire_options){0});
+        cui_end_frame(ui);
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        assert(count == 1 && sem[0].role == CUI_ROLE_PROGRESSBAR);
+        assert(sem[0].value == (float)(item + 1));
+        assert(sem[0].details.minimum == 0 && sem[0].details.maximum == 3);
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    progress_semantics();
     radio_keyboard();
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);

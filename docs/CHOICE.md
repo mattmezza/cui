@@ -654,4 +654,16 @@ Tests route clicks, check initial fallback and paint order, reverse retargets,
 scroll displacement, disabled fallback, reduced motion, grayscale and colored
 HSL fading. Full-bar background/radius includes prefix and suffix, and the bar
 centers its children vertically. Segmented shadows, the full-width Tab/Underline
-baseline, and suffix/menu scroll-tail composition remain separate gaps.
+baseline remain separate gaps.
+
+A configured bar suffix or overflow menu now reserves the frozen 12-logical-pixel
+`last_empty_space` tail inside the scroll content, including the inter-item gap.
+It remains present when an overflow menu is configured but currently hidden.
+`last_empty_space_width` overrides its logical width; the accompanying custom
+flag permits explicit zero. An optional callback and user pointer compose a
+custom body within this fixed reservation. Arbitrary intrinsic tail widths remain
+a measurement-contract gap; explicit widths keep first-frame scrolling exact.
+Headless tests check tail placement, range and density, wheel-to-end plus button
+routing in a custom tail, and event suppression for an explicit zero-width tail.
+This changes a 100px tab with suffix in a 110px viewport from no overflow to a
+2px scroll range, as the 12px tail now participates in the range.

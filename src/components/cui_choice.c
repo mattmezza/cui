@@ -375,6 +375,11 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     tab_theme.padding = metrics.padding_x;
     tab_theme.gap = metrics.gap;
     theme = &tab_theme;
+    bool has_tail = options.suffix || options.overflow;
+    float tail_width = 12 * density;
+    if ((options.custom_last_empty_space_width || options.last_empty_space_width > 0) &&
+        isfinite(options.last_empty_space_width) && options.last_empty_space_width >= 0)
+        tail_width = options.last_empty_space_width * density;
     bool scrollable = options.scroll && isfinite(options.bar_extent) && options.bar_extent > 0;
     if (scrollable) {
         options.scroll->receiving_id = viewport_id;
@@ -385,6 +390,8 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
             if (isfinite(extent) && extent > 0)
                 content += extent;
         }
+        if (has_tail)
+            content += tail_width + (count ? theme->gap : 0);
         options.scroll->maximum = fmaxf(0, content - options.bar_extent);
         options.scroll->scrollbar_id = options.scrollbar && options.scroll->maximum > 0
                                            ? container ^ UINT64_C(0x973a1e35f90453bc)
@@ -553,6 +560,17 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                    .parent = list_id});
         if (items[i].id == *selected && !items[i].disabled)
             active = i;
+    }
+    if (has_tail) {
+        cui_begin_box(ui, container ^ UINT64_C(0x4c2c9f0875e4b4c0),
+                      (cui_box){.width = options.vertical ? 0 : tail_width,
+                                .height = options.vertical ? tail_width : metrics.height,
+                                .fixed_width = !options.vertical,
+                                .fixed_height = options.vertical,
+                                .clip = true});
+        if (options.last_empty_space)
+            options.last_empty_space(ui, options.last_empty_space_user);
+        cui_end_box(ui);
     }
     if (options.drag && options.drag->active && options.drag->drop_valid) {
         cui_rect bounds = {0};

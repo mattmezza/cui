@@ -1870,7 +1870,7 @@ static void test_tab_scrolling(void) {
         tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
         assert(scroll.offset == end && !scroll.changed);
         tab_scroll_scene(ui, &scroll, &value, vertical, false, 1);
-        assert(scroll.maximum == 0 && scroll.offset == 0);
+        assert(scroll.maximum == (vertical ? 0 : 2) && scroll.offset == scroll.maximum);
         cui_destroy(ui);
     }
 }
@@ -3115,7 +3115,82 @@ static void test_tab_shared_indicator(void) {
     assert(same_color(tab_label_color(draw, 11), theme.on_primary) && !animation.transitioning);
     cui_destroy(ui);
 }
+static unsigned tab_tail_calls;
+static bool tab_tail_activated;
+static void custom_tab_tail(cui_context *ui, void *user) {
+    assert(user == &tab_tail_calls);
+    tab_tail_calls++;
+    cui_theme theme = cui_theme_light();
+    theme.control_height = 20;
+    theme.font_size = 10;
+    theme.padding = 2;
+    tab_tail_activated |= cui_button(ui, 9501, &theme, cui_string("Tail"), false);
+}
+static void tab_tail_scene(cui_context *ui, cui_tab_scroll_state *scroll,
+                           cui_tabs_options options) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entry = {10, {"One", 3}, false};
+    cui_id selected = 10;
+    options.scroll = scroll;
+    options.bar_extent = 70;
+    options.variant = CUI_TAB_PILL;
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_tabs(ui, 1, &theme, &entry, 1, &selected, options, NULL, NULL);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void test_tab_scroll_tail(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_tab_scroll_state scroll = {0};
+    cui_tabs_options options = {.last_empty_space = custom_tab_tail,
+                                .last_empty_space_user = &tab_tail_calls};
+    tab_tail_calls = 0;
+    tab_tail_activated = false;
+    tab_tail_scene(ui, &scroll, options);
+    assert(tab_tail_calls == 0 && scroll.maximum == 0);
+    options.suffix = tab_scroll_suffix;
+    options.last_empty_space = NULL;
+    tab_tail_scene(ui, &scroll, options);
+    cui_rect first = cui_bounds(ui, 10);
+    cui_rect tail = cui_bounds(ui, 1 ^ UINT64_C(0x4c2c9f0875e4b4c0));
+    assert(tail.w == 12 && fabsf(tail.x - first.x - first.w - 4) < .01f);
+    assert(scroll.maximum == fmaxf(0, first.w + 4 + 12 - 70));
+    options.last_empty_space = custom_tab_tail;
+    options.last_empty_space_width = 32;
+    tab_tail_scene(ui, &scroll, options);
+    assert(tab_tail_calls == 1 && cui_bounds(ui, 1 ^ UINT64_C(0x4c2c9f0875e4b4c0)).w == 32);
+    assert(fabsf(scroll.maximum - first.w - 4 - 32 + 70) < .01f);
+    cui_rect viewport = cui_bounds(ui, 1 ^ UINT64_C(0x739b1b53a6cef421));
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = viewport.x + 2, .y = viewport.y + 2, .dx = -1000}));
+    tab_tail_scene(ui, &scroll, options);
+    assert(scroll.offset == scroll.maximum);
+    click(ui, 9501);
+    tab_tail_scene(ui, &scroll, options);
+    assert(tab_tail_activated);
+    options.last_empty_space_width = 0;
+    options.custom_last_empty_space_width = true;
+    tab_tail_scene(ui, &scroll, options);
+    assert(cui_bounds(ui, 1 ^ UINT64_C(0x4c2c9f0875e4b4c0)).w == 0 && scroll.maximum == 0);
+    tab_tail_activated = false;
+    click(ui, 9501);
+    tab_tail_scene(ui, &scroll, options);
+    assert(!tab_tail_activated);
+    options = (cui_tabs_options){.density = 2, .suffix = tab_scroll_suffix};
+    tab_tail_scene(ui, &scroll, options);
+    assert(cui_bounds(ui, 1 ^ UINT64_C(0x4c2c9f0875e4b4c0)).w == 24);
+    cui_tab_overflow overflow;
+    cui_menu_entry scratch[1];
+    cui_tab_overflow_init(&overflow, 9600, 9601, scratch, 1);
+    options = (cui_tabs_options){.overflow = &overflow};
+    tab_tail_scene(ui, &scroll, options);
+    assert(!overflow.visible && cui_bounds(ui, 1 ^ UINT64_C(0x4c2c9f0875e4b4c0)).w == 12);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_tab_scroll_tail();
     test_tab_shared_indicator();
     test_tab_retained_spring();
     test_tab_independent_palette();

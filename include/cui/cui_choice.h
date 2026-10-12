@@ -98,6 +98,10 @@ typedef struct {
     cui_tab_animation *animation; /* optional retained shared indicator; horizontal strips */
     float dt;
     bool reduced_motion;
+    cui_choice_content_fn last_empty_space; /* suffix/menu scroll tail; optional custom body */
+    void *last_empty_space_user;
+    float last_empty_space_width;       /* logical px; zero defaults to12 unless flag set */
+    bool custom_last_empty_space_width; /* permits an explicit zero-width tail */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

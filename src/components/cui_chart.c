@@ -512,14 +512,42 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float bottom = h - (o->hide_x_axis ? 0 : 20 * h / o->height);
             cui_color crosshair = o->grid.a ? o->grid : (cui_color){120, 120, 120, 150};
             crosshair.a = (unsigned char)lroundf(crosshair.a * opacity);
-            cui_begin_absolute_box(ui, id ^ UINT64_C(0x9f39c738cd235001),
-                                   (cui_box){.width = 1,
-                                             .height = bottom - top,
-                                             .fixed_width = true,
-                                             .fixed_height = true,
-                                             .background = crosshair},
-                                   (cui_rect){x, top, 1, bottom - top});
-            cui_end_box(ui);
+            if (bottom > 0 && bottom <= 16384 && state->hover_guide_pixels &&
+                state->hover_guide_capacity >= (size_t)ceilf(bottom) * 4) {
+                unsigned rows = (unsigned)ceilf(bottom);
+                for (unsigned row = 0; row < rows; row++) {
+                    unsigned char *pixel = state->hover_guide_pixels + (size_t)row * 4;
+                    pixel[0] = crosshair.r;
+                    pixel[1] = crosshair.g;
+                    pixel[2] = crosshair.b;
+                    pixel[3] = row % 6 < 4 ? crosshair.a : 0;
+                }
+                state->hover_guide_revision++;
+                if (!state->hover_guide_revision)
+                    state->hover_guide_revision = 1;
+                cui_begin_absolute_box(
+                    ui, id ^ UINT64_C(0x9f39c738cd235001),
+                    (cui_box){
+                        .width = 1, .height = bottom, .fixed_width = true, .fixed_height = true},
+                    (cui_rect){x, top, 1, bottom});
+                ok &= cui_paint_bitmap(
+                    ui, id ^ UINT64_C(0x9f39c738cd235002),
+                    (cui_bitmap_paint){.bitmap = {state->hover_guide_pixels, 1, rows, 4,
+                                                  state->hover_guide_revision},
+                                       .opacity = 1},
+                    (cui_box){
+                        .width = 1, .height = bottom, .fixed_width = true, .fixed_height = true});
+                cui_end_box(ui);
+            } else {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x9f39c738cd235001),
+                                       (cui_box){.width = 1,
+                                                 .height = bottom - top,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = crosshair},
+                                       (cui_rect){x, top, 1, bottom - top});
+                cui_end_box(ui);
+            }
             for (size_t series = 0; series <= o->extra_series_count; series++) {
                 float dot_x = state->hover_x;
                 float dot_y = state->hover_y[series];

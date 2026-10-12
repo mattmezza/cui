@@ -928,6 +928,23 @@ int main(void) {
         }
     assert(image && text && formatted && hover_crosshair && hover_halo && eased_crosshair);
     assert(state.hover_progress > 0 && state.hover_progress < 1);
+    unsigned char guide_pixels[48 * 4] = {0};
+    state.hover_guide_pixels = guide_pixels;
+    state.hover_guide_capacity = sizeof guide_pixels;
+    assert(cui_begin_frame(ui, 256, 256, .01));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool dashed_guide = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE &&
+            draw.commands[i].bitmap.bitmap.pixels == guide_pixels &&
+            draw.commands[i].bitmap.bitmap.width == 1 &&
+            draw.commands[i].bitmap.bitmap.height == 38 && fabsf(draw.commands[i].bounds.y) < .01f)
+            dashed_guide = true;
+    assert(dashed_guide && guide_pixels[3] > 0 && guide_pixels[3 + 3 * 4] > 0 &&
+           guide_pixels[3 + 4 * 4] == 0 && guide_pixels[3 + 6 * 4] > 0);
+    state.hover_guide_pixels = NULL;
+    state.hover_guide_capacity = 0;
     options.reduced_motion = true;
     assert(cui_begin_frame(ui, 256, 256, .04));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);

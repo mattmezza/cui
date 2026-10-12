@@ -240,7 +240,7 @@ static double cui_chart_plot_left(const cui_chart_options *o) {
                    : 0;
     if (o->kind == CUI_CHART_BAR &&
         (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT))
-        return 24;
+        return o->bar_alignment == CUI_CHART_BAR_LEFT ? (o->hide_x_axis ? 0 : 24) : 12;
     return o->show_y_axis && !o->y_axis_inside
                ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
                : 24;
@@ -248,6 +248,8 @@ static double cui_chart_plot_left(const cui_chart_options *o) {
 static double cui_chart_plot_right(const cui_chart_options *o, double left) {
     if (o->kind == CUI_CHART_CANDLESTICK)
         return o->width;
+    if (o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_RIGHT)
+        return o->width - (o->hide_x_axis ? 0 : 24);
     return o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA
                ? o->width - left
                : (o->width > 36 ? o->width - 12 : left);

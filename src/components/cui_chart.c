@@ -76,6 +76,11 @@ static void cui_chart_hover_dot(cui_context *ui, cui_id id, float x, float y, cu
                            (cui_rect){x - 4, y - 4, 8, 8});
     cui_end_box(ui);
 }
+static void cui_chart_horizontal_bar_extent(const cui_chart_options *o, float *left, float *right) {
+    float category_gap = o->hide_x_axis ? 0 : 24;
+    *left = o->bar_alignment == CUI_CHART_BAR_LEFT ? category_gap : 12;
+    *right = o->width - (o->bar_alignment == CUI_CHART_BAR_RIGHT ? category_gap : 12);
+}
 static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
                                          const cui_chart_sankey_node *node, size_t index,
                                          cui_chart_sankey_label out[16], size_t *count,
@@ -433,13 +438,17 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
             float thickness = horizontal ? (bar.y_max - bar.y_min) * h / o->height
                                          : (bar.x_max - bar.x_min) * w / o->width;
-            float band_x = horizontal ? 24 * w / o->width
+            float horizontal_left = 0, horizontal_right = 0;
+            if (horizontal)
+                cui_chart_horizontal_bar_extent(o, &horizontal_left, &horizontal_right);
+            float band_x = horizontal ? horizontal_left * w / o->width
                                       : state->emphasis_center * w / o->width - thickness / 2;
             float band_y = horizontal ? state->emphasis_center * h / o->height - thickness / 2
                            : o->bar_alignment == CUI_CHART_BAR_TOP && !o->hide_x_axis
                                ? 20 * h / o->height
                                : 0;
-            float band_w = horizontal ? (o->width - 36) * w / o->width : thickness;
+            float band_w =
+                horizontal ? (horizontal_right - horizontal_left) * w / o->width : thickness;
             float band_h = horizontal ? thickness : h - (o->hide_x_axis ? 0 : 20 * h / o->height);
             cui_color band = o->foreground.a ? o->foreground : (cui_color){32, 32, 32, 255};
             band.a = (unsigned char)lroundf(band.a * .08f * state->emphasis_focus);
@@ -652,9 +661,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     float fraction = (float)((0 - lo) / (hi - lo));
                     if (o->bar_alignment == CUI_CHART_BAR_LEFT ||
                         o->bar_alignment == CUI_CHART_BAR_RIGHT) {
+                        float bar_left, bar_right;
+                        cui_chart_horizontal_bar_extent(o, &bar_left, &bar_right);
                         float baseline = (o->bar_alignment == CUI_CHART_BAR_LEFT
-                                              ? 24 + (o->width - 36) * fraction
-                                              : o->width - 12 - (o->width - 36) * fraction) *
+                                              ? bar_left + (bar_right - bar_left) * fraction
+                                              : bar_right - (bar_right - bar_left) * fraction) *
                                          w / o->width;
                         box_x = o->bar_alignment == CUI_CHART_BAR_LEFT ? baseline - 2 - box_width
                                                                        : baseline + 2;
@@ -717,8 +728,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;
                 float label_width = o->y_axis_inside ? 48 : gutter - 4;
                 if (horizontal_bar) {
-                    float left = 24 * w / o->width;
-                    float right = (o->width - 12) * w / o->width;
+                    float bar_left, bar_right;
+                    cui_chart_horizontal_bar_extent(o, &bar_left, &bar_right);
+                    float left = bar_left * w / o->width;
+                    float right = bar_right * w / o->width;
                     float fraction = (float)tick / (count - 1);
                     x = (o->bar_alignment == CUI_CHART_BAR_LEFT
                              ? left + (right - left) * fraction

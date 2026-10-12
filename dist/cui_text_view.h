@@ -526,6 +526,22 @@ static cui_text_view_alignment cui_text_view_table_alignment(cui_str s, size_t a
     }
     return CUI_TEXT_VIEW_ALIGN_LEFT;
 }
+static bool cui_text_view_fence_close(cui_str input, size_t a, size_t b, char marker,
+                                      size_t length) {
+    unsigned indent = 0;
+    while (a < b && input.data[a] == ' ' && indent < 3) {
+        ++a;
+        ++indent;
+    }
+    size_t start = a;
+    while (a < b && input.data[a] == marker)
+        ++a;
+    if (a - start < length)
+        return false;
+    while (a < b && (input.data[a] == ' ' || input.data[a] == '\t'))
+        ++a;
+    return a == b;
+}
 static void cui_text_view_markdown(cui_text_view_parser *p) {
     size_t a = 0;
     unsigned table = 0, list_number = 0;
@@ -543,9 +559,16 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             (!memcmp(p->input.data + a, "```", 3) || !memcmp(p->input.data + a, "~~~", 3))) {
             prior_ordered = false;
             char fence = p->input.data[a];
-            size_t lang = a + 3, lang_end = b;
+            size_t fence_length = 3;
+            while (a + fence_length < b && p->input.data[a + fence_length] == fence)
+                ++fence_length;
+            size_t lang = a + fence_length, lang_end = b;
             while (lang < lang_end && p->input.data[lang] == ' ')
                 ++lang;
+            lang_end = lang;
+            while (lang_end < b && p->input.data[lang_end] != ' ' &&
+                   p->input.data[lang_end] != '\t')
+                ++lang_end;
             if (!cui_text_view_block_begin(p, CUI_TEXT_VIEW_CODE_BLOCK, start, 0))
                 return;
             if (p->write)
@@ -554,8 +577,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             size_t i = next, end = i;
             while (i < p->input.length) {
                 size_t e = cui_text_view_line_end(p->input, i);
-                if (e - i >= 3 && p->input.data[i] == fence && p->input.data[i + 1] == fence &&
-                    p->input.data[i + 2] == fence) {
+                if (cui_text_view_fence_close(p->input, i, e, fence, fence_length)) {
                     end = cui_text_view_next_line(p->input, e);
                     break;
                 }
@@ -566,7 +588,11 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                                        (cui_text_view_range){0});
                     j += n;
                 }
-                if (e < p->input.length)
+                size_t following = cui_text_view_next_line(p->input, e);
+                if (following < p->input.length &&
+                    !cui_text_view_fence_close(p->input, following,
+                                               cui_text_view_line_end(p->input, following), fence,
+                                               fence_length))
                     cui_text_view_emit(
                         p, (cui_str){"\n", 1},
                         (cui_text_view_range){e, cui_text_view_next_line(p->input, e)},
@@ -1389,9 +1415,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         }
     }
     b->actions_height = b->kind == CUI_TEXT_VIEW_CODE_BLOCK ? o.code_actions_height : 0;
-    b->bounds = (cui_rect){x, y, width,
-                           cursor_y + line + padding * 2 +
-                               (b->actions_height > 0 ? b->actions_height + 4 : 0)};
+    b->bounds = (cui_rect){x, y, width, cursor_y + line + padding * 2};
     return true;
 }
 cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_layout_options o,
@@ -1811,6 +1835,29 @@ static size_t cui_text_view_next(cui_str text, size_t at) {
     }
     return at;
 }
+static bool cui_text_view_selection_target(const cui_text_view_state *s, cui_id root,
+                                           cui_id target) {
+    if (target == root || target == (root ^ UINT64_C(0x891dd9c052ad9f04)))
+        return true;
+    for (size_t i = 0; i < s->glyph_count; ++i) {
+        const cui_text_view_glyph *g = &s->workspace.glyphs[i];
+        const cui_text_view_span *span = &s->workspace.spans[g->span];
+        if (span->link.begin == span->link.end)
+            continue;
+        if (i) {
+            const cui_text_view_glyph *prev = &s->workspace.glyphs[i - 1];
+            const cui_text_view_span *old = &s->workspace.spans[prev->span];
+            if (prev->bounds.y == g->bounds.y && old->link.begin == span->link.begin &&
+                old->link.end == span->link.end)
+                continue;
+        }
+        cui_id link = root ^ UINT64_C(0x951f5d7100000000) ^ (uint64_t)span->link.begin ^
+                      ((uint64_t)g->text.begin << 24);
+        if (target == link)
+            return true;
+    }
+    return false;
+}
 static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state *s,
                                  cui_text_view_options o) {
     if (!o.selectable || o.disabled) {
@@ -1833,7 +1880,8 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
         }
         bool pointer = e->type == CUI_EVENT_POINTER_DOWN || e->type == CUI_EVENT_POINTER_MOVE ||
                        e->type == CUI_EVENT_POINTER_UP;
-        bool owned = pointer && cui_event_within_scope(ui, i, id);
+        bool owned = pointer && cui_event_within_scope(ui, i, id) &&
+                     cui_text_view_selection_target(s, id, cui_event_target(ui, i));
         if (pointer && ((e->type == CUI_EVENT_POINTER_DOWN && owned) ||
                         (s->selecting && cui_pointer_scope_allowed(ui, id)))) {
             size_t at =
@@ -1990,7 +2038,6 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
             continue;
         cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
         if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
-            r.h -= b->actions_height > 0 ? b->actions_height + 4 : 0;
             cui_text_view_quad(ui, part, r, style.code_background);
         } else if (b->kind == CUI_TEXT_VIEW_TABLE_CELL) {
             if (s->clamped && r.y + 8 + style.line_height > s->height &&
@@ -2021,23 +2068,6 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
             (void)cui_paint_bitmap(ui, part ^ 1,
                                    (cui_bitmap_paint){.bitmap = b->image, .opacity = 1},
                                    (cui_box){.width = r.w, .height = r.h});
-            cui_end_box(ui);
-        }
-        if (b->actions_height > 0 && ((b->kind == CUI_TEXT_VIEW_CODE_BLOCK && o.code_actions) ||
-                                      (b->kind == CUI_TEXT_VIEW_TABLE_CELL && o.table_actions))) {
-            float y = b->kind == CUI_TEXT_VIEW_CODE_BLOCK
-                          ? b->bounds.y + b->bounds.h - b->actions_height
-                          : b->bounds.y + b->bounds.h + 4;
-            cui_id action_id = part ^ UINT64_C(0x513b5e17);
-            cui_begin_absolute_box(ui, action_id, (cui_box){0},
-                                   (cui_rect){0, y, s->width, b->actions_height});
-            if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK)
-                o.code_actions(ui, action_id, theme,
-                               cui_text_view_slice(cui_text_view_rendered_text(s), b->text),
-                               cui_text_view_slice(cui_text_view_source(s), b->resource),
-                               o.actions_user);
-            else
-                o.table_actions(ui, action_id, theme, s, b->table, o.actions_user);
             cui_end_box(ui);
         }
     }
@@ -2137,6 +2167,38 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         cui_end_box(ui);
 
         i = end;
+    }
+    /* Actions paint after document glyphs so the code overlay covers underlying text. */
+    for (size_t i = 0; i < s->block_count; ++i) {
+        cui_text_view_block *b = &s->workspace.blocks[i];
+        cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
+        if (b->actions_height > 0 && ((b->kind == CUI_TEXT_VIEW_CODE_BLOCK && o.code_actions) ||
+                                      (b->kind == CUI_TEXT_VIEW_TABLE_CELL && o.table_actions))) {
+            bool code = b->kind == CUI_TEXT_VIEW_CODE_BLOCK;
+            float y = code ? b->bounds.y + 8 : b->bounds.y + b->bounds.h + 4;
+            cui_rect action_bounds = {code ? 8 : 0, y, code ? fmaxf(1, s->width - 16) : s->width,
+                                      b->actions_height};
+            if (action_bounds.y + action_bounds.h <= scroll || action_bounds.y >= scroll + viewport)
+                continue;
+            cui_id action_id = part ^ UINT64_C(0x513b5e17);
+            cui_begin_absolute_box(ui, action_id,
+                                   (cui_box){.align_x = code ? CUI_ALIGN_END : CUI_ALIGN_START},
+                                   action_bounds);
+            if (code)
+                cui_begin_box(
+                    ui, action_id ^ UINT64_C(0x813b17),
+                    (cui_box){.background = style.code_background, .radius = theme->radius});
+            if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK)
+                o.code_actions(ui, action_id, theme,
+                               cui_text_view_slice(cui_text_view_rendered_text(s), b->text),
+                               cui_text_view_slice(cui_text_view_source(s), b->resource),
+                               o.actions_user);
+            else
+                o.table_actions(ui, action_id, theme, s, b->table, o.actions_user);
+            if (code)
+                cui_end_box(ui);
+            cui_end_box(ui);
+        }
     }
 }
 bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_view_state *s,

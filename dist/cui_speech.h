@@ -607,7 +607,8 @@ bool cui_speech_waveform(cui_context *ui, cui_id id, const cui_theme *theme,
         return false;
     static const float heights[] = {20, 16, 24, 12};
     float width = o.width ? o.width : 96, height = o.height ? o.height : heights[o.size];
-    bool capturing = cui_speech_capturing(s), animate = capturing && !o.reduced_motion;
+    bool capturing = cui_speech_capturing(s),
+         animate = capturing && !o.reduced_motion && !cui_reduced_motion(ui);
     float lead = animate ? cui_speech_meter_lead(&s->meter, now) : 0;
     cui_rect rects[256];
     size_t count = cui_speech_waveform_rects(&s->meter, width, height, lead, rects, 256);

@@ -71,6 +71,12 @@ static void panel(cui_context *context, size_t index, void *user) {
 static float slider = 40;
 static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
+static cui_input_state input_state;
+static cui_tree_model *tree;
+static cui_tree_state tree_state;
+static cui_id tree_selected;
+static cui_tree_node tree_nodes[6];
+static bool tree_expanded[6] = {true, true, false, false, false, false};
 static cui_size measure(void *user, cui_str text, float size) {
     (void)user;
     return (cui_size){host_measure(text.data, text.length, size), size * 1.25f};
@@ -101,6 +107,15 @@ int gallery_init(void) {
         cui_dock_insert(dock, cui_dock_root(dock), 1, 0);
         cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
     }
+    tree = cui_tree_create(6);
+    const char *tree_labels[6] = {"Workspace", "src", "core.c", "base.c", "docs", "README.md"};
+    const unsigned tree_depths[6] = {0, 1, 2, 2, 1, 2};
+    for (size_t i = 0; i < 6; i++)
+        tree_nodes[i] = (cui_tree_node){.key = i + 1,
+                                       .label = cui_string(tree_labels[i]),
+                                       .depth = tree_depths[i]};
+    if (!tree || cui_tree_rebuild(tree, tree_nodes, tree_expanded, 6) != CUI_TREE_OK)
+        return 0;
     number_state.edit = cui_edit_create((cui_edit_config){.buffer = number_buffer,
                                                           .capacity = sizeof(number_buffer),
                                                           .history_bytes = 2048,
@@ -214,7 +229,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                    disabled);
         break;
     case 6:
-        cui_input(ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit, disabled);
+        cui_input_ex(ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit,
+                     &input_state, (cui_input_options){.disabled = disabled,
+                                                       .width = width > 360 ? 280 : width - 48});
         break;
     case 7:
         cui_label(ui, &t, cui_string("A useful label, rendered by CUI."));
@@ -407,6 +424,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         snprintf(text, sizeof(text), "Selected: %04d-%02d-%02d", date_selection.start.year,
                  date_selection.start.month, date_selection.start.day);
         cui_label(ui, &t, cui_string(text));
+        break;
+    }
+    case 43: {
+        cui_tree(ui, cui_id_from(ui, "tree"), &t, tree, &tree_state, &tree_selected,
+                 (cui_tree_options){.disabled = disabled, .width = width - 48,
+                                     .height = 192, .row_height = 32, .dt = host_dt});
         break;
     }
     case 30:
@@ -690,6 +713,10 @@ const char *gallery_semantic_name(unsigned i) {
 }
 unsigned gallery_semantic_length(unsigned i) {
     return i < semantic_count ? (unsigned)semantics[i].name.length : 0;
+}
+unsigned gallery_input_selection(unsigned field) {
+    cui_edit_state state = cui_edit_get_state(edit);
+    return (unsigned)(field == 0 ? state.anchor : state.cursor);
 }
 int gallery_clicks(void) {
     return clicks;

@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -11,7 +11,8 @@ const snippets = {
  Toggle:'cui_toggle(ui, id, &theme,\n    cui_string("Pin this item"),\n    &pinned, false);',
  Radio:'cui_radio(ui, id, &theme,\n    cui_string("Priority"),\n    &selection, 1, false);',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
- Input:'cui_input(ui, id, &theme,\n    cui_string("Display name"),\n    edit, false);',
+ Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.width = 280});',
+ Tree:'cui_tree(ui, id, &theme, model, &state,\n    &selection, options);',
  Label:'cui_label(ui, &theme,\n    cui_string("A useful label"));',
  Badge:'cui_badge(ui, id, &theme,\n    cui_string("In review"));',
  Progress:'cui_progress(ui, id, &theme,\n    progress / 100.0f, 300);',
@@ -97,15 +98,16 @@ function syncSemantics(){
   const f=n=>wasm.gallery_semantic(i,n),role=roles[f(0)];if(!role||role==='text')continue;
   const id=`cui-semantic-${wasm.gallery_semantic_id(i)}`;seen.add(id);
   let el=semanticNodes.get(id);
-  if(!el){el=document.createElement(interactiveRoles.includes(f(0))?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
+  if(!el){el=document.createElement(interactiveRoles.includes(f(0))&&role!=='treeitem'?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
   el.setAttribute('role',role);
   const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
-  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=()=>{wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
+  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{e.stopPropagation();wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
   else el.setAttribute('aria-label',name);
   if(['checkbox','switch','radio','menuitemcheckbox','menuitemradio'].includes(role))el.setAttribute('aria-checked',String(Boolean(f(6))));
   el.setAttribute('aria-busy',String(Boolean(f(14))));
   if(['listbox','tree'].includes(role))el.setAttribute('aria-multiselectable',String(Boolean(f(15))));
-  if(role==='tab'||role==='option')el.setAttribute('aria-selected',String(Boolean(f(11))));
+  if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(8)+1));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
+  if(role==='tab'||role==='option'||role==='treeitem')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
   if(role==='slider'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
@@ -118,6 +120,7 @@ function syncSemantics(){
   if(seen.has(controls))el.setAttribute('aria-controls',controls);else el.removeAttribute('aria-controls');
   if(seen.has(labelledBy))el.setAttribute('aria-labelledby',labelledBy);else el.removeAttribute('aria-labelledby');
  }
+ for(const {el} of entries)if(el.getAttribute('role')==='treeitem'){const toggle=Array.from(el.children).find(child=>child.getAttribute('role')==='button'&&['Expand','Collapse'].includes(child.textContent));if(toggle)el.setAttribute('aria-expanded',String(toggle.textContent==='Collapse'));else el.removeAttribute('aria-expanded');}
 }
 function navigation(){
  const query=$('search').value.toLowerCase(), nav=$('catalog');nav.replaceChildren();let category='';
@@ -144,7 +147,7 @@ function selectComponent(){
  $('selection-mode').hidden=!['List','Select','Combobox'].includes(selected.name);$('selection-mode').value='0';
  $('disabled').checked=false;document.body.classList.remove('menu-open');navigation();requestFrame();
 }
-const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,a:13,A:13};
+const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,a:13,A:13,z:14,Z:14,y:15,Y:15,c:16,C:16,x:17,X:17,v:18,V:18};
 function mods(e){return(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);}
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const rect=canvas.getBoundingClientRect();if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);}wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,e.button===2?1:e.button===1?2:0);requestFrame();

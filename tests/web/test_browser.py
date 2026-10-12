@@ -83,6 +83,18 @@ def main():
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.evaluate('location.hash="Tree"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Tree"')
+            assert page.locator('#accessible [role=treeitem]').count() == 5
+            click_semantic('src')
+            page.keyboard.press('ArrowLeft')
+            page.wait_for_function('document.querySelectorAll("#accessible [role=treeitem]").length===3')
+            page.keyboard.press('ArrowRight')
+            page.wait_for_function('document.querySelectorAll("#accessible [role=treeitem]").length===5')
+            page.keyboard.press('ArrowDown')
+            page.wait_for_function('document.querySelector("#accessible [role=treeitem][aria-selected=true]")?.getAttribute("aria-label")==="core.c"')
+            assert page.locator('#accessible [role=treeitem][aria-label="core.c"]').get_attribute('aria-level') == '3'
+            assert page.locator('#accessible button button').count() == 0
             page.evaluate('location.hash="Calendar"')
             page.wait_for_function('document.querySelector("#name").textContent==="Calendar" && cuiGallery.renderedComponent==="Calendar"')
             page.wait_for_timeout(80)
@@ -275,6 +287,23 @@ def main():
             page.keyboard.press('Tab')
             page.keyboard.type('Z')
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{let e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)));}).some(s=>s.includes("Z"))')
+            page.keyboard.press('Control+a')
+            page.keyboard.type('Selection test')
+            page.wait_for_function('cuiGallery.exports.gallery_input_selection(1)===14')
+            page.keyboard.press('Control+z')
+            page.wait_for_function('cuiGallery.exports.gallery_input_selection(1)===13')
+            page.keyboard.press('Control+y')
+            page.wait_for_function('cuiGallery.exports.gallery_input_selection(1)===14')
+            bounds = page.evaluate('Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(0,i+1))')
+            rectangle = canvas.bounding_box()
+            y = rectangle['y'] + bounds[1] + bounds[3] - 16
+            page.mouse.move(rectangle['x']+bounds[0]+12, y)
+            page.mouse.down()
+            page.mouse.move(rectangle['x']+bounds[0]+100, y, steps=8)
+            page.mouse.up()
+            page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)!==cuiGallery.exports.gallery_input_selection(1)')
+            page.keyboard.type('Q')
+            page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)===cuiGallery.exports.gallery_input_selection(1)')
             page.evaluate('location.hash="Chart"')
             page.wait_for_function('document.querySelector("#name").textContent==="Chart" && cuiGallery.renderedComponent==="Chart"')
             assert page.locator('#pending').is_visible()
@@ -307,7 +336,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 42 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 43 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

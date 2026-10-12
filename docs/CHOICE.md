@@ -655,8 +655,7 @@ on later switches; custom body callbacks retain their own text presentation.
 Tests route clicks, check initial fallback and paint order, reverse retargets,
 scroll displacement, disabled fallback, reduced motion, grayscale and colored
 HSL fading. Full-bar background/radius includes prefix and suffix, and the bar
-centers its children vertically. Segmented shadows, the full-width Tab/Underline
-baseline remain separate gaps.
+centers its children vertically. Segmented shadows remain a separate gap.
 
 A configured bar suffix or overflow menu now reserves the frozen 12-logical-pixel
 `last_empty_space` tail inside the scroll content, including the inter-item gap.
@@ -712,3 +711,10 @@ activation in all five List/Select/Combobox modes. Shared glyph pixel rendering
 is covered by the core/component/backend owner; Choice tests inspect IMAGE
 commands and routing. Row palette and full density defaults remain separate
 source-parity work.
+
+Default and Underline bars paint their full-width one-pixel baseline as an
+anchored underlay, after the bar background and before tab children. Its width
+and bottom position resolve from the same frame's final bar bounds. Selected
+Underline edges and animated indicators therefore paint over the baseline.
+Headless tests change prefix width and height on consecutive frames and verify
+immediate baseline resizing, bottom anchoring and paint order.

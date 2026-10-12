@@ -3492,7 +3492,54 @@ static void test_choice_trailing_checks(void) {
         cui_destroy(ui);
     }
 }
+static void resizing_tab_prefix(cui_context *ui, void *user) {
+    const cui_size *size = user;
+    cui_begin_box(ui, 9901, (cui_box){.width = size->width, .height = size->height});
+    cui_end_box(ui);
+}
+static void test_tab_current_frame_baseline(void) {
+    for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_UNDERLINE; variant++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        const cui_choice_item entries[] = {{10, {"One", 3}, false}, {20, {"Two", 3}, false}};
+        cui_id selected = 10;
+        const cui_size sizes[] = {{20, 40}, {140, 56}, {80, 20}};
+        float previous_width = 0;
+        for (size_t frame = 0; frame < 3; frame++) {
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_tabs(ui, 1, &theme, entries, 2, &selected,
+                     (cui_tabs_options){.variant = variant,
+                                        .prefix = resizing_tab_prefix,
+                                        .content_user = (void *)&sizes[frame]},
+                     NULL, NULL);
+            cui_draw_list draw = cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_rect bar = cui_bounds(ui, 1 ^ UINT64_C(0xcda0312561f50cab));
+            assert(bar.w != previous_width);
+            previous_width = bar.w;
+            size_t baseline_index = SIZE_MAX, selected_border = SIZE_MAX;
+            for (size_t i = 0; i < draw.count; i++) {
+                cui_draw_command command = draw.commands[i];
+                if (command.type == CUI_DRAW_RECT && command.bounds.h == 1 &&
+                    same_color(command.color, theme.border)) {
+                    assert(command.bounds.x == bar.x && command.bounds.w == bar.w &&
+                           command.bounds.y == bar.y + bar.h - 1);
+                    assert(baseline_index == SIZE_MAX);
+                    baseline_index = i;
+                }
+                if (command.type == CUI_DRAW_BORDER && same_color(command.color, theme.primary))
+                    selected_border = i;
+            }
+            assert(baseline_index != SIZE_MAX);
+            if (variant == CUI_TAB_UNDERLINE)
+                assert(selected_border != SIZE_MAX && baseline_index < selected_border);
+        }
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_tab_current_frame_baseline();
     test_choice_trailing_checks();
     test_menu_check_glyphs();
     test_dropdown_reference_metrics();

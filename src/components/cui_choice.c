@@ -450,6 +450,12 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                        ? theme->radius_lg
                                        : theme->radius)
                                 : 0});
+    if (options.variant == CUI_TAB_DEFAULT || options.variant == CUI_TAB_UNDERLINE)
+        cui_set_underlay_ex(ui,
+                            (cui_underlay_layout){.bounds = {0, 0, 0, 1},
+                                                  .grow_width = true,
+                                                  .vertical = CUI_ALIGN_END},
+                            theme->border, (cui_corner_radii){0});
     if (options.prefix)
         options.prefix(ui, options.content_user);
     float bar_padding = options.vertical ? 0 : metrics.bar_padding_x;

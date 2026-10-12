@@ -600,21 +600,30 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                              o->bar_label_format, o->format_user);
             if (!label.length)
                 continue;
+            cui_size measured = cui_measure_text(ui, label, 10);
+            float label_width = fmaxf(1, measured.width);
+            float label_height = fmaxf(12, measured.height);
             float x, y;
             bool negative = o->data[i].value < 0;
             if (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT) {
                 bool right = (o->bar_alignment == CUI_CHART_BAR_LEFT) != negative;
-                x = (float)((right ? bar.x_max + 2 : bar.x_min - 66) * w / o->width);
-                y = (float)(((bar.y_min + bar.y_max) / 2 - 6) * h / o->height);
+                x = (float)((right ? bar.x_max + 2 : bar.x_min - 2) * w / o->width);
+                if (!right)
+                    x -= label_width;
+                y = (float)((bar.y_min + bar.y_max) / 2 * h / o->height) - label_height / 2;
             } else {
                 bool above = (o->bar_alignment == CUI_CHART_BAR_BOTTOM) != negative;
-                x = (float)(((bar.x_min + bar.x_max) / 2 - 32) * w / o->width);
-                y = (float)((above ? bar.y_min - 12 : bar.y_max + 2) * h / o->height);
+                x = (float)((bar.x_min + bar.x_max) / 2 * w / o->width) - label_width / 2;
+                y = (float)((above ? bar.y_min : bar.y_max + 2) * h / o->height);
+                if (above)
+                    y -= label_height;
             }
-            cui_begin_absolute_box(
-                ui, id ^ (UINT64_C(0x81ce703914b50000) + i),
-                (cui_box){.width = 64, .height = 12, .fixed_width = true, .fixed_height = true},
-                (cui_rect){x, y, 64, 12});
+            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x81ce703914b50000) + i),
+                                   (cui_box){.width = label_width,
+                                             .height = label_height,
+                                             .fixed_width = true,
+                                             .fixed_height = true},
+                                   (cui_rect){x, y, label_width, label_height});
             cui_color color = o->bar_label_color_fn
                                   ? o->bar_label_color_fn(&o->data[i], i, o->bar_label_color_user)
                                   : (o->bar_label_color.a ? o->bar_label_color : o->foreground);

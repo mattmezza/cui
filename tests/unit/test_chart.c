@@ -830,6 +830,20 @@ int main(void) {
             per_bar_color |= draw.commands[i].color.g == 211;
         }
     assert(formatted && per_bar_color);
+    options.bar_label_format = format_wide_tick;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    cui_str wide_label = {"123456789", 9};
+    float expected_width = cui_measure_text(ui, wide_label, 10).width;
+    bool measured_bar_label = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 9 &&
+            memcmp(draw.commands[i].text.data, wide_label.data, 9) == 0)
+            measured_bar_label |= fabsf(draw.commands[i].bounds.w - expected_width) < 1;
+    assert(measured_bar_label);
+    options.bar_label_format = format_q;
     options.bar_label_color_fn = NULL;
     options.bar_alignment = CUI_CHART_BAR_LEFT;
     options.show_y_axis = true;

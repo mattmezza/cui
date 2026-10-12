@@ -455,6 +455,36 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_nested_fenced_continuation(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "1. parent\n   - child\n\n   ```rust\n   one\n   two\n   ```\n\n   after";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 4 && f.blocks[2].kind == CUI_TEXT_VIEW_CODE_BLOCK &&
+           f.blocks[2].list_parent == 0 && f.blocks[2].list_continuation);
+    assert(f.blocks[3].list_parent == 0 && !f.blocks[3].list_repeat_marker);
+    size_t code = f.blocks[2].text.begin;
+    assert(!memcmp(f.rendered + code, "one\ntwo", 7));
+    cui_text_view_range selected;
+    assert(cui_text_view_select(&f.state, code, code + 3));
+    assert(cui_text_view_selected_source_range(&f.state, &selected));
+    assert(selected.begin == (size_t)(strstr(source, "one") - source) &&
+           selected.end == selected.begin + 3);
+    assert(cui_text_view_select(&f.state, code + 4, code + 7));
+    assert(cui_text_view_selected_source_range(&f.state, &selected));
+    assert(selected.begin == (size_t)(strstr(source, "two") - source) &&
+           selected.end == selected.begin + 3);
+    assert(cui_text_view_select(&f.state, code, code + 7));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "1. ```rust\n   one\n   two\n   ```"));
+    assert(cui_text_view_set_text(&f.state, text("  ```\n  a\\\\b\n  ```")) == CUI_TEXT_VIEW_OK);
+    assert(!memcmp(f.rendered, "a\\\\b", 4));
+    assert(f.mapping[0].source.begin == 8 && f.mapping[1].source.begin == 9 &&
+           f.mapping[2].source.begin == 10);
+}
 static void test_nested_list_continuations(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1088,6 +1118,59 @@ static void test_list_continuation_paint(void) {
     assert(checks == 1 && continuation);
     cui_destroy(ui);
 }
+static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *theme, cui_str code,
+                                 cui_str language, void *user) {
+    (void)user;
+    assert(code.length == 7 && !memcmp(code.data, "one\ntwo", 7));
+    assert(language.length == 4 && !memcmp(language.data, "rust", 4));
+    assert(action_count < 4);
+    cui_id button = id ^ UINT64_C(0x91831);
+    action_buttons[action_count++] = button;
+    if (cui_button_ex(ui, button, theme, text("Copy"),
+                      (cui_button_options){.size = CUI_CONTROL_SMALL}))
+        ++action_clicks;
+}
+static void test_nested_fenced_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("- parent\n  - child\n\n  ```rust\n  one\n  two\n  ```\n\n  after")) ==
+        CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 400;
+    o.code_actions = nested_code_controls;
+    action_count = 0;
+    cui_draw_list d = frame(ui, &f, o);
+    assert(action_count == 1 && f.blocks[2].bounds.x == 16 && f.blocks[3].bounds.x == 16);
+    bool code = false;
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 3 &&
+            !memcmp(d.commands[i].text.data, "one", 3))
+            code = d.commands[i].text_style.monospace && d.commands[i].bounds.x == 28;
+    assert(code);
+    cui_rect button = cui_bounds(ui, action_buttons[0]);
+    assert(button.x >= 16 && button.x + button.w <= 400);
+    unsigned clicks_before = action_clicks;
+    float x = button.x + button.w * .5f, y = button.y + button.h * .5f;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(!f.state.selecting);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    action_count = 0;
+    frame(ui, &f, o);
+    assert(action_clicks == clicks_before + 1 && !f.state.selecting);
+    cui_destroy(ui);
+}
 static void test_nested_continuation_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1299,6 +1382,7 @@ int main(void) {
     test_list_continuations();
     test_setext_headings();
     test_nested_list_continuations();
+    test_nested_fenced_continuation();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1316,6 +1400,7 @@ int main(void) {
     test_nested_list_paint();
     test_list_continuation_paint();
     test_nested_continuation_paint();
+    test_nested_fenced_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

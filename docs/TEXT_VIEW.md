@@ -156,8 +156,11 @@ paragraph after a nested list repeats the parent marker or passive task indicato
 later paragraphs use the continuation indent. Source copy groups an item's selected
 paragraphs before its nested lists, while plain copy and selection retain paint
 order. The bounded serialization order uses at most 8192 16-bit block indices and
-may take quadratic time in that fixed node bound. Loose-list spacing and nested
-tables/images/code/quotes are not yet represented as a complete list AST.
+may take quadratic time in that fixed node bound. Fenced code following an existing list paragraph retains parent membership and
+removes the opening indentation from content while keeping original byte mappings.
+It renders in the list continuation column with working code action callbacks.
+Loose-list spacing, first-child fences written directly after a list marker, and
+nested tables/images/quotes are not yet represented as a complete list AST.
 
 Ordinary list paragraphs join lazy continuation lines with spaces and preserve
 two-space hard breaks. A following indented paragraph stays attached to its

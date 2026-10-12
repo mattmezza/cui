@@ -90,6 +90,8 @@ typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef cui_color (*cui_chart_bar_label_color_fn)(const cui_chart_datum *, size_t index,
                                                   void *user);
+typedef cui_color (*cui_chart_region_fill_fn)(size_t series, float x, float y, cui_color fallback,
+                                              void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
 typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
@@ -181,7 +183,9 @@ typedef struct {
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
-    cui_color primary_fill; /* area/radar fill for the first series */
+    cui_color primary_fill;                         /* area/radar fill for the first series */
+    cui_chart_region_fill_fn area_radar_fill_pixel; /* chart-space gradients/patterns */
+    void *area_radar_fill_user;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

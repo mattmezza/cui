@@ -167,6 +167,22 @@ static void cui_chart_rect(cui_chart_state *s, const cui_chart_options *o, int x
         for (int x = x0; x < x1; x++)
             cui_chart_pixel(s, o, x, y, c);
 }
+static void cui_chart_area_rect(cui_chart_state *s, const cui_chart_options *o, int x0, int y0,
+                                int x1, int y1, cui_color fallback, size_t series) {
+    if (!o->area_radar_fill_pixel) {
+        cui_chart_rect(s, o, x0, y0, x1, y1, fallback);
+        return;
+    }
+    x0 = x0 < 0 ? 0 : x0;
+    y0 = y0 < 0 ? 0 : y0;
+    x1 = x1 > (int)o->width ? (int)o->width : x1;
+    y1 = y1 > (int)o->height ? (int)o->height : y1;
+    for (int y = y0; y < y1; y++)
+        for (int x = x0; x < x1; x++)
+            cui_chart_pixel(s, o, x, y,
+                            o->area_radar_fill_pixel(series, x + .5f, y + .5f, fallback,
+                                                     o->area_radar_fill_user));
+}
 static void cui_chart_rounded_rect(cui_chart_state *s, const cui_chart_options *o,
                                    cui_plot_rect bounds, double requested_radius, cui_color color) {
     double radius = fmin(requested_radius, fmin((bounds.x_max - bounds.x_min) / 2,
@@ -470,8 +486,9 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
     double first_x, first_y;
     cui_chart_series_point(o, series, 0, left, right, lo, hi, top, bottom, &first_x, &first_y);
     if (o->kind == CUI_CHART_AREA)
-        cui_chart_rect(s, o, (int)floor(first_x), (int)floor(fmin(first_y, baseline)),
-                       (int)ceil(first_x + 1), (int)ceil(fmax(first_y, baseline)), fill);
+        cui_chart_area_rect(s, o, (int)floor(first_x), (int)floor(fmin(first_y, baseline)),
+                            (int)ceil(first_x + 1), (int)ceil(fmax(first_y, baseline)), fill,
+                            series);
     for (size_t i = 1; i < o->count; i++) {
         double x0, y0, x1, y1;
         cui_chart_series_point(o, series, i - 1, left, right, lo, hi, top, bottom, &x0, &y0);
@@ -481,15 +498,15 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
             if (i + 1 < o->count)
                 cui_chart_line(s, o, x1, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
-                cui_chart_rect(s, o, (int)ceil(x0), (int)floor(fmin(y0, baseline)), (int)ceil(x1),
-                               (int)ceil(fmax(y0, baseline)), fill);
+                cui_chart_area_rect(s, o, (int)ceil(x0), (int)floor(fmin(y0, baseline)),
+                                    (int)ceil(x1), (int)ceil(fmax(y0, baseline)), fill, series);
         } else if (curve == CUI_CHART_CURVE_LINEAR) {
             cui_chart_line(s, o, x0, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
                 for (int x = (int)ceil(x0); x <= (int)floor(x1); x++) {
                     double y = y0 + (y1 - y0) * (x - x0) / (x1 - x0);
-                    cui_chart_rect(s, o, x, (int)floor(fmin(y, baseline)), x + 1,
-                                   (int)ceil(fmax(y, baseline)), fill);
+                    cui_chart_area_rect(s, o, x, (int)floor(fmin(y, baseline)), x + 1,
+                                        (int)ceil(fmax(y, baseline)), fill, series);
                 }
         } else {
             double prev_y = y0, prev_x = x0, p0y = y0, p3y = y1;
@@ -516,8 +533,9 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
                     y = bottom;
                 cui_chart_line(s, o, prev_x, prev_y, x, y, color);
                 if (o->kind == CUI_CHART_AREA)
-                    cui_chart_rect(s, o, (int)floor(x), (int)floor(fmin(y, baseline)),
-                                   (int)ceil(x + 1), (int)ceil(fmax(y, baseline)), fill);
+                    cui_chart_area_rect(s, o, (int)floor(x), (int)floor(fmin(y, baseline)),
+                                        (int)ceil(x + 1), (int)ceil(fmax(y, baseline)), fill,
+                                        series);
                 prev_x = x;
                 prev_y = y;
             }
@@ -820,7 +838,8 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     }
 }
 static void cui_chart_triangle(cui_chart_state *s, const cui_chart_options *o, double ax, double ay,
-                               double bx, double by, double cx, double cy, cui_color color) {
+                               double bx, double by, double cx, double cy, cui_color color,
+                               size_t series) {
     double left = fmax(0, floor(fmin(ax, fmin(bx, cx))));
     double right = fmin(o->width, ceil(fmax(ax, fmax(bx, cx))));
     double top = fmax(0, floor(fmin(ay, fmin(by, cy))));
@@ -835,8 +854,13 @@ static void cui_chart_triangle(cui_chart_state *s, const cui_chart_options *o, d
             double b = (cx - bx) * (py - by) - (cy - by) * (px - bx);
             double c = (ax - cx) * (py - cy) - (ay - cy) * (px - cx);
             if ((area > 0 && a >= 0 && b >= 0 && c >= 0) ||
-                (area < 0 && a <= 0 && b <= 0 && c <= 0))
-                cui_chart_pixel(s, o, x, y, color);
+                (area < 0 && a <= 0 && b <= 0 && c <= 0)) {
+                cui_color fill = o->area_radar_fill_pixel
+                                     ? o->area_radar_fill_pixel(series, x + .5f, y + .5f, color,
+                                                                o->area_radar_fill_user)
+                                     : color;
+                cui_chart_pixel(s, o, x, y, fill);
+            }
         }
 }
 static double cui_chart_radar_radius(const cui_chart_options *o) {
@@ -895,7 +919,7 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
         }
         for (size_t i = 0; i < o->count; i++) {
             size_t j = (i + 1) % o->count;
-            cui_chart_triangle(s, o, cx, cy, xs[i], ys[i], xs[j], ys[j], fill);
+            cui_chart_triangle(s, o, cx, cy, xs[i], ys[i], xs[j], ys[j], fill, series);
         }
         for (size_t i = 0; i < o->count; i++) {
             size_t j = (i + 1) % o->count;
@@ -1328,6 +1352,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     const unsigned char *primary_fill = (const unsigned char *)&o->primary_fill;
     for (size_t i = 0; i < sizeof(o->primary_fill); i++)
         h = cui_chart_mix(h, primary_fill[i]);
+    const unsigned char *region_fill = (const unsigned char *)&o->area_radar_fill_pixel;
+    for (size_t i = 0; i < sizeof(o->area_radar_fill_pixel); i++)
+        h = cui_chart_mix(h, region_fill[i]);
+    h = cui_chart_mix(h, (uintptr_t)o->area_radar_fill_user);
     return h ? h : 1;
 }
 cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o) {

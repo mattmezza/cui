@@ -34,6 +34,13 @@ static cui_color chart_bar_pattern(const cui_chart_datum *datum, size_t index, c
     (*calls)++;
     return ((int)x & 1) ? (cui_color){0, 240, 0, 255} : (cui_color){0, 0, 0, 0};
 }
+static cui_color chart_region_pattern(size_t series, float x, float y, cui_color fallback,
+                                      void *user) {
+    size_t *calls = user;
+    assert(series < 8 && x >= 0 && x < 128 && y >= 0 && y < 96 && fallback.a);
+    (*calls)++;
+    return ((int)x & 1) ? (cui_color){0, 230, 0, 255} : (cui_color){0, 0, 0, 0};
+}
 static double pie_outer_for_index(const cui_chart_datum *datum, size_t index, double default_radius,
                                   void *user) {
     (void)datum;
@@ -198,6 +205,18 @@ int main(void) {
     assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     options.y_padding_top = 0;
     options.custom_y_padding = false;
+    size_t region_calls = 0;
+    options.area_radar_fill_pixel = chart_region_pattern;
+    options.area_radar_fill_user = &region_calls;
+    options.kind = CUI_CHART_AREA;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(region_calls > 0 && green_pixel(pixels, options.width * options.height));
+    region_calls = 0;
+    options.kind = CUI_CHART_RADAR;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(region_calls > 0 && green_pixel(pixels, options.width * options.height));
+    options.area_radar_fill_pixel = NULL;
+    options.area_radar_fill_user = NULL;
     options.reveal_enabled = true;
     options.hide_grid = true;
     options.hide_axes = true;

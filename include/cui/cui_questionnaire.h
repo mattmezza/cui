@@ -183,6 +183,10 @@ bool cui_questionnaire_action_control(cui_context *, cui_id, const cui_theme *,
  * order, including disabled choices. Consumed/repeated/modified events are ignored. */
 bool cui_questionnaire_radio_keys(cui_context *, cui_questionnaire_state *,
                                   const cui_id *choice_ids, size_t count);
+/* Up/Down traverses enabled answers in schema order, including the optional
+ * input. Nonempty input drafts keep cursor movement. Call before rendering. */
+bool cui_questionnaire_answer_keys(cui_context *, cui_id scope, cui_questionnaire_state *,
+                                   const cui_id *choice_ids, size_t count, cui_id input_id);
 /* Composable parts: begin/end enclose caller-selected children. Choice parts
  * render only for the current item. Call tick from the host frame clock. */
 bool cui_questionnaire_begin(cui_context *, cui_id, const cui_theme *, cui_questionnaire_state *,

@@ -26,12 +26,15 @@ bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
     (void)cui_questionnaire_tick(s, cui_frame_time(ui));
     if (s->pending_confirm)
         cui_invalidate(ui);
+    if (!cui_begin_focus_scope(ui, id, false))
+        return false;
     cui_interact(ui, id, CUI_ROLE_GROUP, (cui_str){0}, o.disabled, false, 0);
     cui_begin_box(ui, id, (cui_box){.width = o.width > 0 ? o.width : -1, .gap = m.root_gap});
     return true;
 }
 void cui_questionnaire_end(cui_context *ui) {
     cui_end_box(ui);
+    cui_end_focus_scope(ui);
 }
 void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
                                 const cui_questionnaire_state *s, cui_questionnaire_options o) {
@@ -309,4 +312,50 @@ bool cui_questionnaire_radio_keys(cui_context *ui, cui_questionnaire_state *s, c
         }
     }
     return changed;
+}
+bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionnaire_state *s,
+                                   const cui_id *ids, size_t count, cui_id input_id) {
+    if (!ui || !scope || !s || !s->initialized || s->current >= s->count || (count && !ids) ||
+        count == SIZE_MAX || !cui_focus_within(ui, scope))
+        return false;
+    size_t item = s->current;
+    const cui_questionnaire_item *d = &s->items[item];
+    if (count != d->choice_count || s->storage.items[item].disabled)
+        return false;
+    bool input = d->input && !d->input_disabled && input_id;
+    size_t event_count;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    bool handled = false;
+    for (size_t e = 0; e < event_count && s->current == item; e++) {
+        if (cui_event_consumed(ui, e) || events[e].type != CUI_EVENT_KEY_DOWN || events[e].repeat ||
+            events[e].modifiers || (events[e].key != CUI_KEY_UP && events[e].key != CUI_KEY_DOWN))
+            continue;
+        cui_id focused = cui_focused(ui);
+        if (input && focused == input_id && cui_edit_get_text(d->input).length)
+            continue;
+        bool previous = events[e].key == CUI_KEY_UP;
+        size_t slots = count + 1, current = SIZE_MAX;
+        for (size_t c = 0; c < count; c++)
+            if (ids[c] && ids[c] == focused)
+                current = c;
+        if (input && focused == input_id)
+            current = count;
+        size_t start = current == SIZE_MAX ? (previous ? 0 : slots - 1) : current;
+        for (size_t step = 1; step <= slots; step++) {
+            size_t next = previous ? (start + slots - step) % slots : (start + step) % slots;
+            if (next == count
+                    ? !input
+                    : (!ids[next] ||
+                       s->storage.choices[s->storage.items[item].choice_offset + next].disabled))
+                continue;
+            if (next < count && !d->multiple)
+                (void)cui_questionnaire_activate(s, item, next);
+            cui_focus(ui, next == count ? input_id : ids[next]);
+            cui_consume_event(ui, e);
+            cui_invalidate(ui);
+            handled = true;
+            break;
+        }
+    }
+    return handled;
 }

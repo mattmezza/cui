@@ -6,7 +6,9 @@ static cui_questionnaire_input_state input_view;
 static void frame(cui_context *ui, cui_questionnaire_state *s, cui_questionnaire_options o) {
     assert(cui_begin_frame(ui, 400, 300, .016f));
     cui_theme t = cui_theme_light();
+    cui_id answer_id = 12;
     assert(cui_questionnaire_begin(ui, 10, &t, s, o));
+    (void)cui_questionnaire_answer_keys(ui, 10, s, &answer_id, 1, 19);
     cui_questionnaire_progress(ui, 11, &t, s, o);
     cui_questionnaire_heading(ui, 13, &t, s, 0, o);
     (void)cui_questionnaire_choice_control(ui, 12, &t, s, 0, 0, o);
@@ -174,6 +176,18 @@ int main(void) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     frame(ui, &s, o);
     assert(s.complete && cui_event_consumed(ui, 0));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_UP}));
+    frame(ui, &s, o);
+    assert(cui_focused(ui) == 19); /* Draft text retains cursor keys. */
+    assert(cui_questionnaire_set_input(&s, 0, (cui_str){0}) == CUI_QUESTIONNAIRE_OK);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_UP}));
+    frame(ui, &s, o);
+    assert(cui_focused(ui) == 12 && cui_questionnaire_choice_selected(&s, 0, 0));
+    assert(!s.pending_confirm);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    frame(ui, &s, o);
+    assert(cui_focused(ui) == 19 && cui_questionnaire_choice_selected(&s, 0, 0));
+    assert(cui_questionnaire_set_input(&s, 0, cui_string("custom")) == CUI_QUESTIONNAIRE_OK);
     o.disabled = true;
     frame(ui, &s, o);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "ignored"}));

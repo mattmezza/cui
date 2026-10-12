@@ -292,6 +292,37 @@ static void cui_text_view_link(cui_context *ui, cui_id id, cui_text_view_state *
         }
     }
 }
+static void cui_text_view_paint_list_prefix(cui_context *ui, cui_id part,
+                                            const cui_text_view_block *b, cui_rect r,
+                                            float prefix_width, cui_text_view_style style) {
+    if (b->task) {
+        cui_begin_absolute_box(
+            ui, part,
+            (cui_box){.width = 14,
+                      .height = 14,
+                      .border_width = 1,
+                      .border = style.foreground,
+                      .background = b->checked ? style.foreground : (cui_color){0},
+                      .padding = 1,
+                      .align_x = CUI_ALIGN_CENTER,
+                      .align_y = CUI_ALIGN_CENTER},
+            (cui_rect){r.x, r.y + fmaxf(0, (style.line_height - 14) * .5f), 14, 14});
+        if (b->checked) {
+            float brightness = style.foreground.r * .2126f + style.foreground.g * .7152f +
+                               style.foreground.b * .0722f;
+            cui_checkmark(ui, 10,
+                          brightness > 128 ? (cui_color){0, 0, 0, 255}
+                                           : (cui_color){255, 255, 255, 255});
+        }
+        cui_end_box(ui);
+    } else {
+        cui_begin_absolute_box(ui, part, (cui_box){0},
+                               (cui_rect){r.x, r.y, prefix_width, style.line_height});
+        cui_text_line(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
+                      style.foreground, style.line_height, (cui_text_style){0});
+        cui_end_box(ui);
+    }
+}
 static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_theme *theme,
                                       cui_text_view_state *s, cui_text_view_style style,
                                       cui_text_view_options o, float viewport, size_t begin,
@@ -309,6 +340,12 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         r.y -= origin_y;
         cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
         if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
+            if (b->list_item) {
+                cui_rect prefix = r;
+                prefix.x -= b->list_prefix_width;
+                cui_text_view_paint_list_prefix(ui, part ^ UINT64_C(0x70666978), b, prefix,
+                                                b->list_prefix_width, style);
+            }
             cui_text_view_quad(ui, part, r, style.code_background);
         } else if (b->kind == CUI_TEXT_VIEW_TABLE_CELL) {
             if (s->clamped && r.y + 4 + style.line_height > s->height &&
@@ -337,32 +374,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
         else if (b->kind == CUI_TEXT_VIEW_RULE)
             cui_text_view_quad(ui, part, r, style.border);
-        else if ((b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) && b->task) {
-            cui_begin_absolute_box(
-                ui, part,
-                (cui_box){.width = 14,
-                          .height = 14,
-                          .border_width = 1,
-                          .border = style.foreground,
-                          .background = b->checked ? style.foreground : (cui_color){0},
-                          .padding = 1,
-                          .align_x = CUI_ALIGN_CENTER,
-                          .align_y = CUI_ALIGN_CENTER},
-                (cui_rect){r.x, r.y + fmaxf(0, (style.line_height - 14) * .5f), 14, 14});
-            if (b->checked) {
-                float brightness = style.foreground.r * .2126f + style.foreground.g * .7152f +
-                                   style.foreground.b * .0722f;
-                cui_checkmark(ui, 10,
-                              brightness > 128 ? (cui_color){0, 0, 0, 255}
-                                               : (cui_color){255, 255, 255, 255});
-            }
-            cui_end_box(ui);
-        } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) {
-            cui_begin_absolute_box(ui, part, (cui_box){0},
-                                   (cui_rect){r.x, r.y, b->text_inset, style.line_height});
-            cui_text_line(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
-                          style.foreground, style.line_height, (cui_text_style){0});
-            cui_end_box(ui);
+        else if (b->list_item || b->list_repeat_marker) {
+            cui_text_view_paint_list_prefix(ui, part, b, r, b->text_inset, style);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);
             (void)cui_paint_bitmap(ui, part ^ 1,

@@ -455,6 +455,38 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_first_list_fence(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "- ```rust\n  one\n  two\n  ```\n  - child\n\n  after";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 3 && f.blocks[0].kind == CUI_TEXT_VIEW_CODE_BLOCK &&
+           f.blocks[0].list_item && f.blocks[1].list_parent == 0 && f.blocks[2].list_parent == 0);
+    assert(!memcmp(f.rendered, "one\ntwo\nchild\nafter", 19));
+    cui_text_view_range selected;
+    assert(cui_text_view_select(&f.state, 0, 3));
+    assert(cui_text_view_selected_source_range(&f.state, &selected));
+    assert(selected.begin == 12 && selected.end == 15);
+    assert(cui_text_view_select(&f.state, 4, 7));
+    assert(cui_text_view_selected_source_range(&f.state, &selected));
+    assert(selected.begin == 18 && selected.end == 21);
+    assert(cui_text_view_select(&f.state, 0, 7));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- ```rust\n  one\n  two\n  ```"));
+    cui_text_view_layout_options o = {
+        .width = 400, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.x == 14 && f.blocks[0].list_prefix_width == 14 &&
+           f.blocks[0].text_inset == 12);
+    assert(cui_text_view_set_text(&f.state, text("10. ~~~\n    a\\\\b\n    ~~~\n11. next")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].list_item && f.blocks[0].list_number == 10 && f.blocks[1].list_number == 11);
+    assert(!memcmp(f.rendered, "a\\\\b", 4));
+    assert(f.mapping[1].source.begin == 13 && f.mapping[2].source.begin == 14);
+}
 static void test_nested_fenced_continuation(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1130,6 +1162,45 @@ static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *th
                       (cui_button_options){.size = CUI_CONTROL_SMALL}))
         ++action_clicks;
 }
+static void test_first_list_fence_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("- ```rust\n  one\n  two\n  ```\n- next")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 300;
+    o.code_actions = nested_code_controls;
+    action_count = 0;
+    cui_draw_list d = frame(ui, &f, o);
+    bool marker = false, code = false, background = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *command = &d.commands[i];
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 4 &&
+            !memcmp(command->text.data, "\xe2\x80\xa2 ", 4))
+            marker |= command->bounds.x == 0 && command->bounds.y < 2;
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 3 &&
+            !memcmp(command->text.data, "one", 3))
+            code = command->text_style.monospace &&
+                   command->bounds.x == f.blocks[0].list_prefix_width + 12 &&
+                   command->bounds.y >= 12 && command->bounds.y < 20;
+        if (command->type == CUI_DRAW_RECT && command->bounds.x == f.blocks[0].list_prefix_width &&
+            command->bounds.y == 0 && command->bounds.w == 300 - f.blocks[0].list_prefix_width)
+            background = true;
+    }
+    assert(marker && code && background && action_count == 1);
+    assert(f.blocks[0].list_prefix_width > 0 && f.blocks[1].bounds.y == f.blocks[0].bounds.h);
+    assert(cui_text_view_set_text(&f.state, text("- [x] ```rust\n  one\n  two\n  ```")) ==
+           CUI_TEXT_VIEW_OK);
+    action_count = 0;
+    d = frame(ui, &f, o);
+    unsigned checks = 0;
+    for (size_t i = 0; i < d.count; ++i)
+        checks += d.commands[i].type == CUI_DRAW_IMAGE;
+    assert(checks == 1 && f.blocks[0].bounds.x == 20 && f.blocks[0].text_inset == 12);
+    cui_destroy(ui);
+}
 static void test_nested_fenced_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1383,6 +1454,7 @@ int main(void) {
     test_setext_headings();
     test_nested_list_continuations();
     test_nested_fenced_continuation();
+    test_first_list_fence();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1401,6 +1473,7 @@ int main(void) {
     test_list_continuation_paint();
     test_nested_continuation_paint();
     test_nested_fenced_paint();
+    test_first_list_fence_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

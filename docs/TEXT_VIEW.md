@@ -159,8 +159,11 @@ order. The bounded serialization order uses at most 8192 16-bit block indices an
 may take quadratic time in that fixed node bound. Fenced code following an existing list paragraph retains parent membership and
 removes the opening indentation from content while keeping original byte mappings.
 It renders in the list continuation column with working code action callbacks.
-Loose-list spacing, first-child fences written directly after a list marker, and
-nested tables/images/quotes are not yet represented as a complete list AST.
+Fences written directly after a list marker are real code blocks with independent
+list-item metadata: the marker or passive task indicator occupies a separate
+column, outside the code background. Such code blocks own nested-list ancestry and
+keep exact source mappings for literal backslashes and subsequent lines. Loose-list
+spacing and nested tables/images/quotes are not yet a complete list AST.
 
 Ordinary list paragraphs join lazy continuation lines with spaces and preserve
 two-space hard breaks. A following indented paragraph stays attached to its

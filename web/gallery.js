@@ -118,7 +118,29 @@ const snippets = {
  Settings:'cui_settings_state_init(&state, page_workspace, 2, search);\ncui_settings(ui, id, &theme, pages, 2, &state,\n    (cui_settings_options){.width = 800, .height = 500});',
  Carousel:'cui_carousel_state_init(&state, geometry, 4, 4);\ncui_carousel(ui, id, &theme, &state, slides, 4,\n    (cui_carousel_options){.width = 480, .height = 200,\n        .controls = draw_controls, .pagination = draw_pages});',
  Command:'cui_command_init(&state, rows, 32, query);\ncui_command(ui, id, &theme, &state, entries, count, options);',
- Questionnaire:'cui_questionnaire_init(&state, items, count, workspace, on_event, user);\ncui_questionnaire_begin(ui, id, &theme, &state, options);\ncui_questionnaire_choice_control(ui, choice_id, &theme, &state, item, choice, options);\ncui_questionnaire_end(ui);',
+ Questionnaire:`/* Application owns state and choice definitions. */
+static void draw_choice_content(cui_context *ui, cui_id id,
+    const cui_questionnaire_choice_view *view, void *user) {
+    const cui_theme *theme = user;
+    (void)id; (void)view;
+    cui_text(ui, cui_string("Custom answer"), theme->font_size, theme->text);
+}
+/* In a helper taking (ui, theme, state, ids, item, choice): */
+options.render_content = draw_choice_content;
+options.render_user = &theme;
+if (cui_questionnaire_begin(ui, root_id, &theme, &state, options)) {
+    cui_questionnaire_progress(ui, progress_id, &theme, &state, options);
+    if (cui_questionnaire_item_begin(ui, item_id, &state, item, options)) {
+        cui_questionnaire_heading(ui, heading_id, &theme, &state, item, options);
+        if (cui_questionnaire_choices_begin(ui, group_id, &state, item, options)) {
+            cui_questionnaire_choice_control(ui, choice_id, &theme, &state, item, choice, options);
+            cui_questionnaire_part_end(ui);
+        }
+        cui_questionnaire_part_end(ui);
+    }
+    cui_questionnaire_end(ui);
+}`,
+
  Speech:'cui_speech_init(&state, workspace, recognizer, input, on_event, user);\ncui_speech_button(ui, id, &theme, &state, options, now);\ncui_speech_waveform(ui, waveform_id, &theme, &state, waveform, now);',
  Chart:'cui_chart_options options = cui_chart_theme(config, &theme);\ncui_chart_render_animated(ui, &state, &options);\ncui_chart(ui, id, &state, &options, cui_string("Activity"));',
  TextView:'cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN);\ncui_text_view_set_text(&state, markdown);\ncui_text_view(ui, id, &theme, &state, options);',
@@ -224,7 +246,7 @@ function render(){
  wasm.gallery_text_view_options(Number($('text-view-format').value),Number($('text-view-scroll').checked),Number($('text-view-fade').checked));
  wasm.gallery_chart_options(Number($('chart-kind').value),Number($('chart-curve').value),Number($('chart-dots').checked),Number($('chart-labels').checked),Number($('chart-animate').checked));
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));
- wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),Number($('questionnaire-numbers').checked));
+ wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),Number($('questionnaire-numbers').checked),Number($('questionnaire-custom').checked));
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
@@ -286,10 +308,12 @@ async function clipboardAction(action){
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 const semanticNodes = new Map();
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar','separator','region'];
+let semanticStory = null;
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link','listitem','log','toolbar','separator','region','radiogroup'];
 const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
+ if(semanticStory!==selected.name){root.replaceChildren();semanticNodes.clear();semanticStory=selected.name;}
  for(let i=0;i<wasm.gallery_semantic_count();i++){
   const f=n=>wasm.gallery_semantic(i,n),role=roles[f(0)];if(!role)continue;
   const id=`cui-semantic-${wasm.gallery_semantic_id(i)}`;seen.add(id);
@@ -310,7 +334,8 @@ function syncSemantics(){
   if(role==='button'&&selected.name==='Toggle')el.setAttribute('aria-pressed',String(Boolean(f(6))));else el.removeAttribute('aria-pressed');
   el.setAttribute('aria-busy',String(Boolean(f(14))));
   if(['listbox','tree','grid'].includes(role))el.setAttribute('aria-multiselectable',String(Boolean(f(15))));
-  if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));if(f(31))el.setAttribute('aria-posinset',String(f(31)));if(f(32))el.setAttribute('aria-setsize',String(f(32)));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
+  if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
+  if(['treeitem','radio','checkbox'].includes(role)){if(f(31))el.setAttribute('aria-posinset',String(f(31)));else el.removeAttribute('aria-posinset');if(f(32))el.setAttribute('aria-setsize',String(f(32)));else el.removeAttribute('aria-setsize');}
   if(role==='tab'||role==='option'||role==='treeitem')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
   if(role==='separator'&&f(13)>f(12)){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
@@ -324,9 +349,13 @@ function syncSemantics(){
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }
  for(const [id,el] of semanticNodes)if(!seen.has(id)){el.remove();semanticNodes.delete(id);}
+ const byId=new Map(entries.map(entry=>[entry.el.id,entry]));
+ const depth=(entry,visited=new Set())=>{if(visited.has(entry.el.id))return 0;visited.add(entry.el.id);const parent=byId.get(entry.parent);return parent?1+depth(parent,visited):0;};
+ entries.sort((a,b)=>depth(a)-depth(b));
  const positions=new Map();
  for(const {el,parent,controls,labelledBy} of entries){
   const container=seen.has(parent)?semanticNodes.get(parent):root;
+  if(container===el||el.contains(container))throw Error(`semantic cycle: ${el.id} (${el.getAttribute('role')}) parent ${parent} (${container.getAttribute('role')}); logical ${byId.get(parent)?.parent}; existing ${Array.from({length:8},(_,i)=>{let node=container;for(let j=0;j<i;j++)node=node?.parentElement;return node?.id}).join('>')}`);
   const position=positions.get(container)||0,reference=container.children[position];
   if(reference!==el)container.insertBefore(el,reference||null);positions.set(container,position+1);
   if(seen.has(controls))el.setAttribute('aria-controls',controls);else el.removeAttribute('aria-controls');
@@ -403,8 +432,8 @@ function selectComponent(){
  for(const id of ['settings-size','settings-variant'])$(id).hidden=selected.name!=='Settings';
  for(const id of ['carousel-axis','carousel-loop-control'])$(id).hidden=selected.name!=='Carousel';
  for(const id of ['speech-size','speech-unavailable-control'])$(id).hidden=selected.name!=='Speech';
- for(const id of ['questionnaire-size','questionnaire-numbers-control'])$(id).hidden=selected.name!=='Questionnaire';
- $('questionnaire-size').value='0';$('questionnaire-numbers').checked=false;
+ for(const id of ['questionnaire-size','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
+ $('questionnaire-size').value='0';$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
  $('speech-size').value='0';$('speech-unavailable').checked=false;
  for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control'])$(id).hidden=selected.name!=='Chart';
  $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;
@@ -526,7 +555,7 @@ for(const id of ['image-state','image-fit','image-grayscale','image-opacity','at
 for(const id of ['description-columns','description-size','description-vertical','description-plain','status-right','status-custom','resizable-vertical','resizable-disabled','icon-choice','icon-size','icon-rotate','icon-color'])$(id).addEventListener('change',requestFrame);
 for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEventListener('change',requestFrame);
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);
-for(const id of ['questionnaire-size','questionnaire-numbers','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
+for(const id of ['questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
 for(const id of ['control-size','choice-required','choice-invalid','choice-skip-tab','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});
 $('selection-mode').addEventListener('change',requestFrame);

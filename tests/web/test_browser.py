@@ -2162,6 +2162,24 @@ def main():
             assert page.locator('#preview-card').is_visible()
             assert not page.locator('#pending').is_visible()
             wait_semantic('Question 1 of 2', 21)
+            group = page.locator('#accessible [role="radiogroup"]')
+            assert group.count() == 1
+            assert group.locator('[role="radio"]').count() == 3
+            assert group.locator('[role="radio"]').evaluate_all('(nodes)=>nodes.map(node=>[node.getAttribute("aria-posinset"),node.getAttribute("aria-setsize"),node.getAttribute("aria-description")])') == [
+                ['1', '3', 'Portable desktop UI'], ['2', '3', 'Browse the CUI catalog'], ['3', '3', 'Try a focused example']]
+            assert group.evaluate('(node)=>node.parentElement.getAttribute("role")') == 'group'
+            control_change('questionnaire-custom', True)
+            assert page.locator('#questionnaire-custom').is_checked()
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))).filter(text=>text==="Custom content slot").length') == 3
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).filter(type=>type===5).length') >= 3
+            assert group.locator('[role="radio"]').count() == 3
+            assert group.locator('[role="radio"]').first.get_attribute('aria-label') == 'Build a native app'
+            click_semantic('Build a native app', 4)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===1')
+            wait_semantic('Question 2 of 2', 21)
+            click_semantic('Start over', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===0&&cuiGallery.exports.gallery_questionnaire_stats(8)===0')
+            control_change('questionnaire-custom', False)
             click_semantic('Next', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(7)===1')
             wait_semantic('This question is required', 18)

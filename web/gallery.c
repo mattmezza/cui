@@ -140,7 +140,7 @@ static char questionnaire_input_buffer[128];
 static cui_edit *questionnaire_edit;
 static cui_questionnaire_input_state questionnaire_input_view;
 static unsigned questionnaire_events[4];
-static int questionnaire_size, questionnaire_numbers;
+static int questionnaire_size, questionnaire_numbers, questionnaire_custom;
 static const cui_questionnaire_choice questionnaire_choices[] = {
     {.value = {"build", 5},
      .label = {"Build a native app", 18},
@@ -151,6 +151,29 @@ static const cui_questionnaire_choice questionnaire_choices[] = {
     {.value = {"prototype", 9},
      .label = {"Prototype a screen", 18},
      .description = {"Try a focused example", 21}}};
+static void questionnaire_indicator(cui_context *context, cui_id id,
+                                    const cui_questionnaire_choice_view *view, void *user) {
+    const cui_theme *theme = user;
+    (void)cui_icon_named(context, id, theme,
+                         view->selected ? cui_string("circle-check") : cui_string("circle-user"),
+                         (cui_icon_options){.size = CUI_ICON_SMALL,
+                                            .color = view->selected ? theme->primary : theme->muted,
+                                            .custom_color = true});
+}
+static void questionnaire_content(cui_context *context, cui_id id,
+                                  const cui_questionnaire_choice_view *view, void *user) {
+    const cui_theme *theme = user;
+    (void)id;
+    cui_text(context, questionnaire_choices[view->choice].label, theme->font_size, theme->text);
+    cui_text(context, cui_string("Custom content slot"), theme->font_size - 2, theme->muted);
+}
+static void questionnaire_shortcut(cui_context *context, cui_id id,
+                                   const cui_questionnaire_choice_view *view, void *user) {
+    const cui_theme *theme = user;
+    (void)id;
+    char key[2] = {view->shortcut ? view->shortcut : '-', 0};
+    cui_text(context, cui_string(key), theme->font_size - 2, theme->muted);
+}
 static cui_questionnaire_item questionnaire_items[2];
 static void gallery_questionnaire_event(const cui_questionnaire_state *state,
                                         cui_questionnaire_event event, void *user) {
@@ -160,9 +183,10 @@ static void gallery_questionnaire_event(const cui_questionnaire_state *state,
         questionnaire_events[event.kind]++;
     redraw = true;
 }
-void gallery_questionnaire_options(int size, int numbers) {
+void gallery_questionnaire_options(int size, int numbers, int custom) {
     questionnaire_size = size >= 0 && size <= 3 ? size : 0;
     questionnaire_numbers = numbers != 0;
+    questionnaire_custom = custom != 0;
 }
 float gallery_questionnaire_stats(int field) {
     return field == 0    ? (float)questionnaire_state.current
@@ -2070,48 +2094,65 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                              .width = width > 520 ? 480 : width - 40,
                                              .disabled = disabled,
                                              .numeric_shortcuts = questionnaire_numbers != 0};
+        if (questionnaire_custom) {
+            options.render_indicator = questionnaire_indicator;
+            options.render_content = questionnaire_content;
+            options.render_shortcut = questionnaire_shortcut;
+            options.render_user = &t;
+        }
         cui_id root_id = cui_id_from(ui, "questionnaire-root");
         size_t item = questionnaire_state.current;
         if (cui_questionnaire_begin(ui, root_id, &t, &questionnaire_state, options)) {
             cui_questionnaire_progress(ui, cui_id_from(ui, "questionnaire-progress"), &t,
                                        &questionnaire_state, options);
-            cui_questionnaire_heading(ui, cui_id_from(ui, "questionnaire-heading"), &t,
-                                      &questionnaire_state, item, options);
-            cui_id choice_ids[3] = {cui_id_from(ui, "questionnaire-build"),
-                                    cui_id_from(ui, "questionnaire-explore"),
-                                    cui_id_from(ui, "questionnaire-prototype")};
-            cui_id input_id = cui_id_from(ui, "questionnaire-input");
-            size_t count = questionnaire_items[item].choice_count;
-            (void)cui_questionnaire_confirm_keys(ui, root_id, &questionnaire_state, choice_ids,
-                                                 count, input_id, CUI_MOD_CTRL);
-            (void)cui_questionnaire_radio_keys(ui, &questionnaire_state, choice_ids, count);
-            (void)cui_questionnaire_answer_keys(ui, root_id, &questionnaire_state, choice_ids,
-                                                count, input_id);
-            (void)cui_questionnaire_shortcut_keys(ui, root_id, &questionnaire_state, choice_ids,
-                                                  count, input_id, options.numeric_shortcuts);
-            for (size_t choice = 0; choice < count; choice++)
-                (void)cui_questionnaire_choice_control(ui, choice_ids[choice], &t,
-                                                       &questionnaire_state, item, choice, options);
-            if (questionnaire_items[item].input)
-                (void)cui_questionnaire_input_control(ui, input_id, &t, &questionnaire_state, item,
-                                                      &questionnaire_input_view, NULL, options);
-            cui_questionnaire_error_control(ui, cui_id_from(ui, "questionnaire-error"), &t,
-                                            &questionnaire_state, item, options);
-            cui_begin_box(ui, cui_id_from(ui, "questionnaire-actions"),
-                          (cui_box){.row = true, .gap = 8});
-            (void)cui_questionnaire_action_control(
-                ui, cui_id_from(ui, "questionnaire-previous"), &t, &questionnaire_state,
-                CUI_QUESTIONNAIRE_PREVIOUS, (cui_str){0}, options);
-            (void)cui_questionnaire_action_control(ui, cui_id_from(ui, "questionnaire-skip"), &t,
-                                                   &questionnaire_state, CUI_QUESTIONNAIRE_SKIP,
-                                                   (cui_str){0}, options);
-            (void)cui_questionnaire_action_control(ui, cui_id_from(ui, "questionnaire-next"), &t,
-                                                   &questionnaire_state, CUI_QUESTIONNAIRE_NEXT,
-                                                   (cui_str){0}, options);
-            (void)cui_questionnaire_action_control(ui, cui_id_from(ui, "questionnaire-finish"), &t,
-                                                   &questionnaire_state, CUI_QUESTIONNAIRE_FINISH,
-                                                   (cui_str){0}, options);
-            cui_end_box(ui);
+            if (cui_questionnaire_item_begin(ui, cui_id_from(ui, "questionnaire-item"),
+                                             &questionnaire_state, item, options)) {
+                cui_questionnaire_heading(ui, cui_id_from(ui, "questionnaire-heading"), &t,
+                                          &questionnaire_state, item, options);
+                cui_id choice_ids[3] = {cui_id_from(ui, "questionnaire-build"),
+                                        cui_id_from(ui, "questionnaire-explore"),
+                                        cui_id_from(ui, "questionnaire-prototype")};
+                cui_id input_id = cui_id_from(ui, "questionnaire-input");
+                size_t count = questionnaire_items[item].choice_count;
+                (void)cui_questionnaire_confirm_keys(ui, root_id, &questionnaire_state, choice_ids,
+                                                     count, input_id, CUI_MOD_CTRL);
+                (void)cui_questionnaire_radio_keys(ui, &questionnaire_state, choice_ids, count);
+                (void)cui_questionnaire_answer_keys(ui, root_id, &questionnaire_state, choice_ids,
+                                                    count, input_id);
+                (void)cui_questionnaire_shortcut_keys(ui, root_id, &questionnaire_state, choice_ids,
+                                                      count, input_id, options.numeric_shortcuts);
+                if (cui_questionnaire_choices_begin(ui, cui_id_from(ui, "questionnaire-choices"),
+                                                    &questionnaire_state, item, options)) {
+                    for (size_t choice = 0; choice < count; choice++)
+                        (void)cui_questionnaire_choice_control(ui, choice_ids[choice], &t,
+                                                               &questionnaire_state, item, choice,
+                                                               options);
+                    cui_questionnaire_part_end(ui);
+                }
+                if (questionnaire_items[item].input)
+                    (void)cui_questionnaire_input_control(ui, input_id, &t, &questionnaire_state,
+                                                          item, &questionnaire_input_view, NULL,
+                                                          options);
+                cui_questionnaire_error_control(ui, cui_id_from(ui, "questionnaire-error"), &t,
+                                                &questionnaire_state, item, options);
+                cui_questionnaire_part_end(ui);
+            }
+            if (cui_questionnaire_actions_begin(ui, cui_id_from(ui, "questionnaire-actions"),
+                                                &questionnaire_state, options)) {
+                (void)cui_questionnaire_action_control(
+                    ui, cui_id_from(ui, "questionnaire-previous"), &t, &questionnaire_state,
+                    CUI_QUESTIONNAIRE_PREVIOUS, (cui_str){0}, options);
+                (void)cui_questionnaire_action_control(
+                    ui, cui_id_from(ui, "questionnaire-skip"), &t, &questionnaire_state,
+                    CUI_QUESTIONNAIRE_SKIP, (cui_str){0}, options);
+                (void)cui_questionnaire_action_control(
+                    ui, cui_id_from(ui, "questionnaire-next"), &t, &questionnaire_state,
+                    CUI_QUESTIONNAIRE_NEXT, (cui_str){0}, options);
+                (void)cui_questionnaire_action_control(
+                    ui, cui_id_from(ui, "questionnaire-finish"), &t, &questionnaire_state,
+                    CUI_QUESTIONNAIRE_FINISH, (cui_str){0}, options);
+                cui_questionnaire_part_end(ui);
+            }
             cui_questionnaire_end(ui);
         }
         if (cui_button_ex(ui, cui_id_from(ui, "questionnaire-reset"), &t, cui_string("Start over"),
@@ -3928,7 +3969,7 @@ uint64_t gallery_semantic_id(unsigned i) {
     return i < semantic_count ? semantics[i].id : 0;
 }
 uint64_t gallery_semantic_parent(unsigned i) {
-    return i < semantic_count ? semantics[i].details.parent : 0;
+    return i < semantic_count ? cui_semantic_parent(ui, semantics[i].id) : 0;
 }
 uint64_t gallery_semantic_controls(unsigned i) {
     return i < semantic_count ? semantics[i].details.controls : 0;

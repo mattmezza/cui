@@ -9,6 +9,7 @@
 #include "cui_description.h"
 #include "cui_disclosure.h"
 #include "cui_form.h"
+#include "cui_icon.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
@@ -242,6 +243,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_RESIZABLE_IMPLEMENTATION
 #endif
 #include "cui_resizable.h"
+#ifndef CUI_ICON_IMPLEMENTATION
+#define CUI_ICON_IMPLEMENTATION
+#endif
+#include "cui_icon.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

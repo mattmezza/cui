@@ -1135,31 +1135,41 @@
       "reference_url": "https://gpui-kit.com/component/icon/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_icon.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_icon.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "106 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "original/licensed vector set",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon.c"
+          ]
         },
         {
           "name": "size/stroke/theme",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon.c"
+          ]
         },
         {
           "name": "accessible/decorative distinction",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon.c"
+          ]
         }
       ],
       "upstream_doc": {

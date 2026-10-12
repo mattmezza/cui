@@ -129,12 +129,19 @@ typedef struct {
     cui_chart_curve curve;     /* natural is source default */
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
+    float radar_label_gap;                      /* zero selects source 10px */
+    cui_color radar_label_color;
     cui_chart_sankey_align sankey_align;
     cui_chart_sankey_value_scale sankey_value_scale;
     unsigned sankey_iterations;  /* zero selects six relaxation passes; maximum 100 */
     float sankey_min_link_width; /* zero selects source 1px */
     bool custom_sankey_link_opacity;
-    float sankey_link_opacity;      /* default 0.3 */
+    float sankey_link_opacity;       /* default 0.3 */
+    float sankey_node_corner_radius; /* zero selects square nodes */
+    bool sankey_show_labels, sankey_show_values;
+    float sankey_label_gap; /* zero selects source 6px */
+    float sankey_font_size; /* zero selects 12px */
+    cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
     cui_color primary_fill; /* area/radar fill for the first series */
@@ -241,6 +248,10 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->sankey_value_scale > CUI_CHART_SANKEY_SQRT || !isfinite(o->sankey_min_link_width) ||
         o->sankey_min_link_width < 0 || !isfinite(o->sankey_link_opacity) ||
         o->sankey_link_opacity < 0 || o->sankey_link_opacity > 1 ||
+        !isfinite(o->sankey_node_corner_radius) || o->sankey_node_corner_radius < 0 ||
+        !isfinite(o->sankey_label_gap) || o->sankey_label_gap < 0 ||
+        !isfinite(o->sankey_font_size) || o->sankey_font_size < 0 ||
+        !isfinite(o->radar_label_gap) || o->radar_label_gap < 0 ||
         (o->reference_count && !o->reference_values) ||
         (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
@@ -324,6 +335,24 @@ static void cui_chart_rect(cui_chart_state *s, const cui_chart_options *o, int x
     for (int y = y0; y < y1; y++)
         for (int x = x0; x < x1; x++)
             cui_chart_pixel(s, o, x, y, c);
+}
+static void cui_chart_rounded_rect(cui_chart_state *s, const cui_chart_options *o,
+                                   cui_plot_rect bounds, double requested_radius, cui_color color) {
+    double radius = fmin(requested_radius, fmin((bounds.x_max - bounds.x_min) / 2,
+                                                (bounds.y_max - bounds.y_min) / 2));
+    int x0 = (int)fmax(0, floor(bounds.x_min)), x1 = (int)fmin(o->width, ceil(bounds.x_max));
+    int y0 = (int)fmax(0, floor(bounds.y_min)), y1 = (int)fmin(o->height, ceil(bounds.y_max));
+    for (int y = y0; y < y1; y++)
+        for (int x = x0; x < x1; x++) {
+            double px = x + .5, py = y + .5;
+            if (px < bounds.x_min || px >= bounds.x_max || py < bounds.y_min || py >= bounds.y_max)
+                continue;
+            double cx = fmax(bounds.x_min + radius, fmin(bounds.x_max - radius, px));
+            double cy = fmax(bounds.y_min + radius, fmin(bounds.y_max - radius, py));
+            if (radius > 0 && (px - cx) * (px - cx) + (py - cy) * (py - cy) > radius * radius)
+                continue;
+            cui_chart_pixel(s, o, x, y, color);
+        }
 }
 static void cui_chart_line(cui_chart_state *s, const cui_chart_options *o, double ax, double ay,
                            double bx, double by, cui_color c) {
@@ -1263,20 +1292,25 @@ static void cui_chart_sankey(cui_chart_state *s, const cui_chart_options *o,
         double x0 = nodes[source].x1, x1 = nodes[target].x0;
         if (x1 <= x0)
             continue;
-        cui_color color = link->color.a ? link->color : cui_chart_palette(o, source);
+        cui_color source_color = cui_chart_palette(o, source);
+        cui_color target_color = cui_chart_palette(o, target);
         double opacity = o->custom_sankey_link_opacity ? o->sankey_link_opacity : .3;
-        color.a = (unsigned char)lround(color.a * opacity);
         for (int x = (int)ceil(x0); x < (int)x1; x++) {
             double t = (x - x0) / (x1 - x0), smooth = t * t * (3 - 2 * t),
                    center = (1 - smooth) * start_y + smooth * end_y;
             double half = ((1 - t) * start_w + t * end_w) / 2;
+            cui_color color =
+                link->color.a ? link->color : cui_chart_blend_color(source_color, target_color, t);
+            color.a = (unsigned char)lround(color.a * opacity);
             cui_chart_rect(s, o, x, (int)floor(center - half), x + 1, (int)ceil(center + half),
                            color);
         }
     }
     for (size_t i = 0; i < o->count; i++)
-        cui_chart_rect(s, o, (int)floor(nodes[i].x0), (int)floor(nodes[i].y0),
-                       (int)ceil(nodes[i].x1), (int)ceil(nodes[i].y1), cui_chart_palette(o, i));
+        cui_chart_rounded_rect(s, o,
+                               (cui_plot_rect){nodes[i].x0, nodes[i].y0, nodes[i].x1,
+                                               fmax(nodes[i].y1, nodes[i].y0 + 1)},
+                               o->sankey_node_corner_radius, cui_chart_palette(o, i));
 }
 static uint64_t cui_chart_mix(uint64_t h, uint64_t v) {
     return (h ^ v) * UINT64_C(1099511628211);
@@ -1313,6 +1347,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->sankey_iterations);
     h = cui_chart_mix(h, o->custom_sankey_link_opacity);
     h = cui_chart_mix(h, cui_chart_bits(o->sankey_link_opacity));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_node_corner_radius));
     h = cui_chart_mix(h, cui_chart_bits(o->sankey_min_link_width));
     h = cui_chart_mix(h, o->hide_grid);
     h = cui_chart_mix(h, o->hide_axes);
@@ -1722,31 +1757,50 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             if (!label.length || !label.data)
                 continue;
             double angle = -3.14159265358979323846 / 2 + 2 * 3.14159265358979323846 * i / o->count;
-            float x = (float)(cx + (radius + 9) * cos(angle));
-            float y = (float)(cy + (radius + 9) * sin(angle));
+            float gap = o->radar_label_gap > 0 ? o->radar_label_gap : 10;
+            float x = (float)(cx + (radius + gap) * cos(angle));
+            float y = (float)(cy + (radius + gap) * sin(angle));
             cui_begin_absolute_box(
                 ui, id ^ (UINT64_C(0x25a41f7c9d310000) + i),
                 (cui_box){.width = 70, .height = 12, .fixed_width = true, .fixed_height = true},
                 (cui_rect){x - 35, y - 6, 70, 12});
-            cui_text(ui, label, 10, o->foreground);
+            cui_text(ui, label, 10, o->radar_label_color.a ? o->radar_label_color : o->foreground);
             cui_end_box(ui);
         }
     }
-    if (o->kind == CUI_CHART_SANKEY && o->count <= 64) {
+    if (o->kind == CUI_CHART_SANKEY && (o->sankey_show_labels || o->sankey_show_values) &&
+        o->count <= 64) {
         cui_chart_sankey_node nodes[256];
         if (cui_chart_sankey_layout(o, nodes, 256) == CUI_PLOT_OK)
             for (size_t i = 0; i < o->count; i++) {
                 cui_str label = o->data[i].label;
-                if (!label.length || !label.data)
-                    continue;
-                float x = nodes[i].x1 * w / o->width + 2;
+                float gap = o->sankey_label_gap > 0 ? o->sankey_label_gap : 6;
+                float size = o->sankey_font_size > 0 ? o->sankey_font_size : 12;
+                float x = nodes[i].x1 * w / o->width + gap * w / o->width;
                 float y = (nodes[i].y0 + nodes[i].y1) * h / (2 * o->height) - 6;
-                cui_begin_absolute_box(
-                    ui, id ^ (UINT64_C(0xe5374a8b09ef0000) + i),
-                    (cui_box){.width = 72, .height = 12, .fixed_width = true, .fixed_height = true},
-                    (cui_rect){x, y, 72, 12});
-                cui_text(ui, label, 10, o->foreground);
-                cui_end_box(ui);
+                if (o->sankey_show_labels && label.length && label.data) {
+                    cui_begin_absolute_box(ui, id ^ (UINT64_C(0xe5374a8b09ef0000) + i),
+                                           (cui_box){.width = 72,
+                                                     .height = size + 2,
+                                                     .fixed_width = true,
+                                                     .fixed_height = true},
+                                           (cui_rect){x, y, 72, size + 2});
+                    cui_text(ui, label, size, o->foreground);
+                    cui_end_box(ui);
+                }
+                if (o->sankey_show_values) {
+                    char value[48];
+                    cui_str formatted = cui_chart_number(value, sizeof value, nodes[i].throughput,
+                                                         o->sankey_value_format, o->format_user);
+                    cui_begin_absolute_box(ui, id ^ (UINT64_C(0x57bb8cf4e1b20000) + i),
+                                           (cui_box){.width = 72,
+                                                     .height = size + 2,
+                                                     .fixed_width = true,
+                                                     .fixed_height = true},
+                                           (cui_rect){x, y + size + 2, 72, size + 2});
+                    cui_text(ui, formatted, size, o->foreground);
+                    cui_end_box(ui);
+                }
             }
     }
     if (o->kind == CUI_CHART_BAR && o->show_bar_values && o->count <= 128) {

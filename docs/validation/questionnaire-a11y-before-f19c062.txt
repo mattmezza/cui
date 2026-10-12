@@ -1,0 +1,1 @@
+test_questionnaire_styled: /tmp/cui-questionnaire-containers/tests/unit/test_questionnaire_styled.c:543: choice_accessibility: Assertion `semantic->details.description.length == choices[i].description.length' failed.

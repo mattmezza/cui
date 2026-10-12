@@ -27,6 +27,8 @@ SOURCES = (
     "src/base/cui_plot.c",
     "src/theme/cui_theme.c",
     "src/components/cui_components.c",
+    "src/base/cui_numeric.c",
+    "src/components/cui_numeric.c",
     "src/base/cui_content.c",
     "src/components/cui_content.c",
     "src/base/cui_disclosure.c",
@@ -35,7 +37,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -148,6 +150,7 @@ def main() -> int:
         virtual_clock = ["-D_WASI_EMULATED_PROCESS_CLOCKS", "-lwasi-emulated-process-clocks"]
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("numeric_base_only", ["tests/unit/test_numeric.c", "src/core/cui.c", "src/base/cui_edit.c", "src/base/cui_numeric.c"], False, ["-DCUI_NUMERIC_BASE_ONLY=1"])]
         targets += [("implementation_embedding", ["tests/unit/test_core_embed.c"], False, [])]
         targets += [(f"example_{name}", [f"examples/{name}/main.c"], True, [])
                     for name in ("unstyled", "styled_settings")]

@@ -4,6 +4,8 @@ An experimental C11 native UI framework: Clay layout, unstyled interaction primi
 
 **Development snapshot, not production-ready or full GPUI Kit parity.** The complete 78-family target is tracked in [the feature manifest](docs/gpui-parity.json). Working partial controls include buttons, checked/pressed selection, sliders and a UTF-8 scalar Input preview. Core focus/capture, semantic snapshots, bounded undo/redo, modal scopes, popup reducers, Gregorian geometry and keyed variable-height virtualization and a retained docking tree have behavioral tests. Native accessibility bridges, complete text editing/IME/bidi/fallback, full compound widgets and other platform runtimes remain pending.
 
+[**Open the browser component gallery**](https://matteo.merola.co/cui/) — all 78 catalog entries, with interactive stories compiled from the same C11 implementation to WebAssembly. The HTML/Canvas browser host is an optional gallery adapter; native applications do not depend on it. See [browser build and validation](docs/WEB_GALLERY.md).
+
 ![Actual CUI software-rendered workbench](docs/screenshots/gallery-light.png)
 
 ## Build and run

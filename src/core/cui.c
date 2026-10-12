@@ -450,6 +450,12 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         .layout = {.sizing = {cui_core_axis(b.width), cui_core_axis(b.height)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
                    .childGap = cui_core_scalar(b.gap),
+                   .childAlignment = {.x = b.align_x == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER
+                                           : b.align_x == CUI_ALIGN_END  ? CLAY_ALIGN_X_RIGHT
+                                                                         : CLAY_ALIGN_X_LEFT,
+                                      .y = b.align_y == CUI_ALIGN_CENTER ? CLAY_ALIGN_Y_CENTER
+                                           : b.align_y == CUI_ALIGN_END  ? CLAY_ALIGN_Y_BOTTOM
+                                                                         : CLAY_ALIGN_Y_TOP},
                    .layoutDirection = b.row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM},
         .backgroundColor = {b.background.r, b.background.g, b.background.b, b.background.a},
         .cornerRadius = CLAY_CORNER_RADIUS(b.radius),

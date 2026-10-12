@@ -17,3 +17,36 @@ Headless tests cover input ordering, first-frame input, reordered IDs, capture a
 Focus scopes are explicit, independently nested declarations. A successful `cui_begin_focus_scope` must be paired with `cui_end_focus_scope`; failed begins must not be ended. At most 256 scopes can be declared per frame. The last declared modal scope is active, including nested scopes; enabled descendants receive initial focus by frame end. On the next input dispatch, Tab traversal and pointer hit testing are restricted to its descendants. Pointer down outside an active modal targets the scope ID without activating the underlying control. Escape targets the focused control's innermost scope, or the last declared scope when focus is outside all scopes; this also supports nonmodal popup dismissal. Nonmodal scopes alone do not restrict traversal or pointer routing. Omitted scopes stop trapping after the frame completes.
 
 `cui_focus_restore` checks that a trigger appeared as an enabled interactive semantic in the previous completed frame. It permits restoring a trigger while its former modal scope is being omitted. The completed frame clears focus if that trigger is now disabled or omitted, and an active current modal still enforces its own descendants. Scope IDs should be distinct from interactive control IDs when their dismissal events must be distinguished. These APIs provide routing and focus state; overlays own visibility, panel bounds, outside-dismiss policy, placement, and rendering.
+
+## Floating layers and compound controls
+
+`cui_begin_portal` opens a viewport-positioned box outside ancestor clipping and
+normal layout flow. Positive layers sort painting and interactive hit regions by
+layer, with later submitted regions winning ties. Close it with `cui_end_box`.
+Portals can clip their own content. Bounds must be finite and nonnegative; a
+malformed portal suppresses its subtree while preserving paired begin/end calls,
+even at the nesting budget. A portal does not itself trap focus: use a modal
+focus scope where appropriate. Passive portal content lets pointer events pass
+through; an active modal scope blocks underlying interactive controls.
+
+`cui_set_semantic_details` records expanded/selected/read-only/required/invalid
+state, numeric ranges, descriptions and relationships independently of painting.
+Description strings are frame-copied. Group, tab-list/panel, list/menu, status,
+alert, image and other roles distinguish container/content from focusable controls.
+`cui_set_tab_stop(false)` removes an item from Tab traversal while preserving
+pointer/programmatic focus, so composite controls can use roving focus.
+
+`cui_event_activation` preserves each validated pointer-release, Enter or
+released-Space activation even after `cui_interact` consumes the aggregate flag.
+Compound reducers process this alongside events in input order, so ArrowDown then
+Enter selects the newly navigated item within one frame. Core target IDs still
+refer to dispatch-time previous-frame focus; reducers apply their local cursor.
+
+Call `cui_dismiss_focus_scope` after reducing closing popup behavior and before
+painting it. It withdraws current semantic descendants, deactivates nested traps,
+and restores an enabled previous-frame trigger. Paired scope begin/end calls
+remain required. This avoids briefly forcing focus back into a closing popup.
+
+Boxes expose portable `align_x`/`align_y` start, center and end values. They align
+children inside the available content area after sizing/padding; default start
+alignment preserves existing layout behavior.

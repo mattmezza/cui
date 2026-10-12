@@ -88,8 +88,14 @@ typedef enum {
     CUI_ROLE_TREE,
     CUI_ROLE_TREEITEM
 } cui_role;
+typedef enum {
+    CUI_ORIENTATION_UNSPECIFIED,
+    CUI_ORIENTATION_HORIZONTAL,
+    CUI_ORIENTATION_VERTICAL
+} cui_orientation;
 typedef struct {
-    bool expanded, selected, readonly, multiline, required, invalid;
+    bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy;
+    cui_orientation orientation;
     cui_id controls, labelled_by, parent;
     cui_str description;
     float minimum, maximum;
@@ -107,11 +113,13 @@ typedef struct {
 typedef struct {
     bool hovered, pressed, focused, focus_visible, activated;
 } cui_interaction;
+typedef enum { CUI_ALIGN_START, CUI_ALIGN_CENTER, CUI_ALIGN_END } cui_align;
 typedef struct {
     float width, height, padding, gap, radius;
     bool row, clip;
     cui_color background, border;
     float border_width;
+    cui_align align_x, align_y;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,

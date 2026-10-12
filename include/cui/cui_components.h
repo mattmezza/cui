@@ -5,10 +5,31 @@
 #include "cui_choice.h"
 #include "cui_content.h"
 #include "cui_disclosure.h"
+#include "cui_numeric.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef enum {
+    CUI_BUTTON_PRIMARY,
+    CUI_BUTTON_SECONDARY,
+    CUI_BUTTON_OUTLINE,
+    CUI_BUTTON_GHOST,
+    CUI_BUTTON_DANGER,
+    CUI_BUTTON_LINK
+} cui_button_variant;
+typedef enum { CUI_CONTROL_MEDIUM, CUI_CONTROL_SMALL, CUI_CONTROL_LARGE } cui_control_size;
+typedef void (*cui_button_content_fn)(cui_context *, void *user);
+typedef struct {
+    cui_button_variant variant;
+    cui_control_size size;
+    bool disabled, loading, selected;
+    float width; /* zero fits contents; negative grows within parent */
+    cui_str leading, trailing;
+    cui_button_content_fn content; /* Optional arbitrary child content instead of label. */
+    void *content_user;
+} cui_button_options;
+bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);

@@ -47,9 +47,19 @@ bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open,
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.expanded = *open, .controls = id ^ UINT64_C(0x1d8f322539deca61)});
-    if (disabled || !interaction.activated)
+    (void)interaction;
+    if (disabled)
         return false;
-    *open = !*open;
+    bool changed = false;
+    size_t event_count = 0;
+    cui_frame_events(ui, &event_count);
+    for (size_t e = 0; e < event_count; e++)
+        if (cui_event_activation(ui, e) == id) {
+            *open = !*open;
+            changed = true;
+        }
+    if (!changed)
+        return false;
     cui_update_semantic(ui, id, *open, *open);
     cui_set_semantic_details(
         ui, id,
@@ -62,28 +72,15 @@ bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_
         return false;
     bool changed = false;
     for (size_t i = 0; i < count; ++i) {
-        cui_interaction interaction =
-            cui_interact(ui, items[i].id, CUI_ROLE_BUTTON, items[i].label,
-                         options.disabled || items[i].disabled, open[i], open[i]);
-        if (interaction.activated && !options.disabled && !items[i].disabled &&
-            (!open[i] || options.collapsible)) {
-            bool next = !open[i];
-            if (next && !options.multiple) {
-                for (size_t j = 0; j < count; ++j) {
-                    changed |= open[j];
-                    open[j] = false;
-                }
-            }
-            open[i] = next;
-            changed = true;
-        }
+        cui_interact(ui, items[i].id, CUI_ROLE_BUTTON, items[i].label,
+                     options.disabled || items[i].disabled, open[i], open[i]);
     }
     size_t event_count = 0;
     const cui_event *events = cui_frame_events(ui, &event_count);
     size_t cursor = count;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
-        if (events[e].type != CUI_EVENT_KEY_DOWN)
-            continue;
+        if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
+            cursor = count;
         size_t from = count;
         cui_id target = cui_event_target(ui, e);
         for (size_t i = 0; i < count; ++i)
@@ -93,6 +90,21 @@ bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_
             continue;
         if (cursor == count)
             cursor = from;
+        if (cui_event_activation(ui, e) && (events[e].type != CUI_EVENT_KEY_UP ||
+                                            items[cursor].id == cui_event_activation(ui, e))) {
+            if (events[e].type == CUI_EVENT_POINTER_UP)
+                cursor = from;
+            if (!open[cursor] || options.collapsible) {
+                bool next_open = !open[cursor];
+                if (next_open && !options.multiple)
+                    for (size_t j = 0; j < count; j++)
+                        open[j] = false;
+                open[cursor] = next_open;
+                changed = true;
+            }
+        }
+        if (events[e].type != CUI_EVENT_KEY_DOWN)
+            continue;
         cui_key key = events[e].key;
         int direction = key == CUI_KEY_DOWN || key == CUI_KEY_HOME ? 1 : -1;
         if (key != CUI_KEY_UP && key != CUI_KEY_DOWN && key != CUI_KEY_HOME && key != CUI_KEY_END)

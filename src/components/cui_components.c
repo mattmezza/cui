@@ -24,20 +24,81 @@ static void cui_components_mark(cui_context *ui, const cui_theme *t, const char 
              : selected ? t->on_primary
                         : t->text);
 }
-bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
+bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_button_options options) {
+    if (!ui || !t)
+        return false;
+    bool disabled = options.disabled || options.loading;
     cui_interaction state = cui_base_button(ui, id, name, disabled);
-    cui_box b = cui_components_control(t, disabled, true);
-    cui_components_focus(ui, id, t, &b);
+    cui_box b = cui_components_control(t, disabled, false);
+    float scale = options.size == CUI_CONTROL_SMALL   ? .8f
+                  : options.size == CUI_CONTROL_LARGE ? 1.2f
+                                                      : 1;
+    b.height *= scale;
+    b.padding *= scale;
+    b.width = isfinite(options.width) ? options.width : 0;
+    b.align_x = CUI_ALIGN_CENTER;
+    b.align_y = CUI_ALIGN_CENTER;
+    cui_color foreground = t->text;
+    switch (options.variant) {
+    case CUI_BUTTON_SECONDARY:
+        b.background = t->border;
+        break;
+    case CUI_BUTTON_OUTLINE:
+        b.background.a = 0;
+        break;
+    case CUI_BUTTON_GHOST:
+    case CUI_BUTTON_LINK:
+        b.background.a = 0;
+        b.border_width = 0;
+        if (options.variant == CUI_BUTTON_LINK)
+            foreground = t->primary;
+        break;
+    case CUI_BUTTON_DANGER:
+        b.background = t->danger;
+        foreground = t->background;
+        break;
+    default:
+        b.background = t->primary;
+        foreground = t->on_primary;
+        break;
+    }
+    if (options.selected && options.variant != CUI_BUTTON_DANGER) {
+        b.background = t->primary;
+        foreground = t->on_primary;
+    }
     if (!disabled && (state.hovered || state.pressed)) {
+        if (b.background.a == 0)
+            b.background = t->surface;
         float factor = state.pressed ? .75f : .9f;
         b.background.r = (uint8_t)(b.background.r * factor);
         b.background.g = (uint8_t)(b.background.g * factor);
         b.background.b = (uint8_t)(b.background.b * factor);
     }
+    if (disabled && b.background.a)
+        b.background = t->surface;
+    cui_components_focus(ui, id, t, &b);
+    cui_update_semantic(ui, id, options.selected, options.selected);
+    if (options.loading)
+        cui_set_semantic_details(
+            ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
     cui_begin_box(ui, id, b);
-    cui_text(ui, name, t->font_size, disabled ? t->muted : t->on_primary);
+    foreground = disabled ? t->muted : foreground;
+    if (options.loading)
+        cui_text(ui, cui_string("..."), t->font_size * scale, foreground);
+    else if (options.leading.length)
+        cui_text(ui, options.leading, t->font_size * scale, foreground);
+    if (options.content)
+        options.content(ui, options.content_user);
+    else
+        cui_text(ui, name, t->font_size * scale, foreground);
+    if (options.trailing.length)
+        cui_text(ui, options.trailing, t->font_size * scale, foreground);
     cui_end_box(ui);
     return state.activated;
+}
+bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
+    return cui_button_ex(ui, id, t, name, (cui_button_options){.disabled = disabled});
 }
 static bool cui_components_binary_control(cui_context *ui, cui_id id, const cui_theme *t,
                                           cui_str name, bool *value, bool disabled, int kind) {

@@ -423,6 +423,8 @@ static void test_semantic_details_and_roving(void) {
     cui_set_semantic_details(ui, 2,
                              (cui_semantic_details){.expanded = true,
                                                     .selected = true,
+                                                    .multiselectable = true,
+                                                    .orientation = CUI_ORIENTATION_VERTICAL,
                                                     .controls = 20,
                                                     .parent = 90,
                                                     .description = cui_string(description)});
@@ -433,6 +435,8 @@ static void test_semantic_details_and_roving(void) {
     const cui_semantic *nodes = cui_semantics(ui, &count);
     assert(count == 3 && nodes[1].tab_index == -1);
     assert(nodes[2].details.expanded && nodes[2].details.selected);
+    assert(nodes[2].details.multiselectable &&
+           nodes[2].details.orientation == CUI_ORIENTATION_VERTICAL);
     assert(nodes[2].details.controls == 20 && nodes[2].details.parent == 90);
     assert(nodes[2].details.description.length == 11);
     assert(memcmp(nodes[2].details.description.data, "description", 11) == 0);
@@ -512,6 +516,29 @@ static void test_invalid_portal_at_depth_limit(void) {
     cui_destroy(ui);
 }
 
+static void test_child_alignment(void) {
+    cui_context *ui = make();
+    begin(ui);
+    cui_begin_box(ui, 10, (cui_box){.width = 300, .height = 200, .row = true});
+    for (unsigned i = 0; i < 3; i++) {
+        cui_begin_box(
+            ui, 20 + i,
+            (cui_box){
+                .width = 100, .height = 40, .align_x = (cui_align)i, .align_y = (cui_align)i});
+        cui_begin_box(ui, 30 + i, (cui_box){.width = 20, .height = 10});
+        cui_end_box(ui);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    cui_rect start = cui_bounds(ui, 30), center = cui_bounds(ui, 31), end = cui_bounds(ui, 32);
+    assert(start.x == 0 && start.y == 0);
+    assert(center.x == 140 && center.y == 15);
+    assert(end.x == 280 && end.y == 30);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_input();
     test_strings_and_draw();
@@ -521,6 +548,7 @@ int main(void) {
     test_creation_overflow();
     test_focus_scopes();
     test_portals();
+    test_child_alignment();
     test_invalid_portal_at_depth_limit();
     test_scope_dismissal();
     test_semantic_details_and_roving();

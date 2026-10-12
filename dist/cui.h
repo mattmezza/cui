@@ -89,8 +89,14 @@ typedef enum {
     CUI_ROLE_TREE,
     CUI_ROLE_TREEITEM
 } cui_role;
+typedef enum {
+    CUI_ORIENTATION_UNSPECIFIED,
+    CUI_ORIENTATION_HORIZONTAL,
+    CUI_ORIENTATION_VERTICAL
+} cui_orientation;
 typedef struct {
-    bool expanded, selected, readonly, multiline, required, invalid;
+    bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy;
+    cui_orientation orientation;
     cui_id controls, labelled_by, parent;
     cui_str description;
     float minimum, maximum;
@@ -108,11 +114,13 @@ typedef struct {
 typedef struct {
     bool hovered, pressed, focused, focus_visible, activated;
 } cui_interaction;
+typedef enum { CUI_ALIGN_START, CUI_ALIGN_CENTER, CUI_ALIGN_END } cui_align;
 typedef struct {
     float width, height, padding, gap, radius;
     bool row, clip;
     cui_color background, border;
     float border_width;
+    cui_align align_x, align_y;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,
@@ -5705,6 +5713,12 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         .layout = {.sizing = {cui_core_axis(b.width), cui_core_axis(b.height)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
                    .childGap = cui_core_scalar(b.gap),
+                   .childAlignment = {.x = b.align_x == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER
+                                           : b.align_x == CUI_ALIGN_END  ? CLAY_ALIGN_X_RIGHT
+                                                                         : CLAY_ALIGN_X_LEFT,
+                                      .y = b.align_y == CUI_ALIGN_CENTER ? CLAY_ALIGN_Y_CENTER
+                                           : b.align_y == CUI_ALIGN_END  ? CLAY_ALIGN_Y_BOTTOM
+                                                                         : CLAY_ALIGN_Y_TOP},
                    .layoutDirection = b.row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM},
         .backgroundColor = {b.background.r, b.background.g, b.background.b, b.background.a},
         .cornerRadius = CLAY_CORNER_RADIUS(b.radius),

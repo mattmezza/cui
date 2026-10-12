@@ -38,7 +38,7 @@ static void cui_root_facilities(cui_context *ui, void *user) {
                                 root->notifications, frame->viewport, frame->now_seconds);
 }
 bool cui_root_render(cui_context *ui, cui_id id, cui_root *root, const cui_theme *theme,
-                     cui_rect viewport, const cui_root_style *instance_override,
+                     cui_rect viewport, const cui_root_style_override *instance_override,
                      cui_root_content_fn content, void *content_user, double now_seconds) {
     if (!theme || !root || root->dialog_capacity > 8 || (root->dialog_count && !root->dialogs))
         return false;

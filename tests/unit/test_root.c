@@ -23,12 +23,13 @@ typedef struct {
     window_state *window;
     char tag;
 } root_test_plugin;
-static root_test_plugin plugin_states[4];
+static root_test_plugin plugin_states[8];
 static size_t plugin_state_count;
+static unsigned destroyed;
 static void *build_plugin(void *user, void *window_user) {
     char tag = *(char *)user;
     window_state *window = window_user;
-    assert(window->count < 2 && plugin_state_count < 4);
+    assert(window->count < 2 && plugin_state_count < 8);
     plugin_state *state = &window->states[window->count++];
     state->tag = tag;
     root_test_plugin *instance = &plugin_states[plugin_state_count++];
@@ -46,12 +47,15 @@ static void style(cui_context *ui, void *user, cui_root_style *value) {
     root_test_plugin *plugin = user;
     mark(plugin->window, 'S', plugin->tag);
     value->background = (cui_color){(uint8_t)plugin->tag, 0, 0, 255};
+    value->foreground = (cui_color){55, 0, 0, 255};
+    value->padding = 6;
 }
 static void begin(cui_context *ui, void *user, cui_root_style value) {
     root_test_plugin *plugin = user;
     mark(plugin->window, 'B', plugin->tag);
-    assert(value.background.r == 77);
-    cui_begin_box(ui, 0, (cui_box){.width = 400, .height = 300});
+    assert(value.background.r == 77 && value.foreground.r == 55 && value.padding == 6);
+    cui_begin_box(ui, 700 + (unsigned char)plugin->tag,
+                  (cui_box){.width = 400, .height = 300, .padding = 10});
 }
 static void end(cui_context *ui, void *user) {
     root_test_plugin *plugin = user;
@@ -82,9 +86,20 @@ static bool copy_selection(cui_context *ui, void *user) {
     (*count)++;
     return true;
 }
+static void destroy_plugin(void *registration_user, void *state) {
+    (void)registration_user;
+    assert(state);
+    destroyed++;
+}
+static void *fail_plugin(void *registration_user, void *window_user) {
+    (void)registration_user;
+    (void)window_user;
+    return NULL;
+}
 static cui_root_plugin make_plugin(uint64_t key, char *tag) {
     return (cui_root_plugin){.key = key,
                              .build = build_plugin,
+                             .destroy = destroy_plugin,
                              .prepare = prepare,
                              .style = style,
                              .decorate_begin = begin,
@@ -100,25 +115,42 @@ static void test_registry_and_base_root(void) {
     assert(cui_root_register(&registry, make_plugin(1, &a)));
     assert(cui_root_register(&registry, make_plugin(2, &b)));
     assert(registry.count == 2);
+    cui_root_registry corrupt = registry;
+    corrupt.count = 3;
+    assert(!cui_root_register(&corrupt, make_plugin(3, &x)));
+    corrupt = registry;
+    corrupt.entries = NULL;
+    assert(!cui_root_register(&corrupt, make_plugin(3, &x)));
     cui_root first = {0}, second = {0};
     cui_root_plugin_instance first_entries[2], second_entries[2];
     window_state first_window = {0}, second_window = {0};
     assert(!cui_root_init(&first, first_entries, 1, &registry, &first_window));
     assert(!first.initialized && first_window.count == 0);
+    cui_root_registry failing = registry;
+    cui_root_plugin failure_entries[2] = {registrations[0], registrations[1]};
+    failure_entries[1].build = fail_plugin;
+    failing.entries = failure_entries;
+    assert(!cui_root_init(&first, first_entries, 2, &failing, &first_window));
+    assert(!first.initialized && first_window.count == 1 && destroyed == 1);
+    assert(!first_entries[0].state);
+    first_window.count = 0;
     assert(cui_root_init(&first, first_entries, 2, &registry, &first_window));
     assert(cui_root_register(&registry, make_plugin(1, &x)));
     assert(registry.count == 2);
     assert(cui_root_init(&second, second_entries, 2, &registry, &second_window));
     assert(cui_root_plugin_state(&first, 1) != cui_root_plugin_state(&second, 1));
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
-    cui_root_style override = {.background = {77, 0, 0, 255}, .padding = 2};
+    cui_root_style_override override = {.value = {.background = {77, 0, 0, 255}},
+                                        .background = true};
     assert(cui_begin_frame(ui, 400, 300, .016f));
     assert(cui_base_root_render(ui, 100, &first, (cui_rect){0, 0, 400, 300}, (cui_root_style){0},
                                 &override, app, &first_window, facility, &first_window));
     cui_draw_list draw = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
-    assert(strcmp(first_window.log, "PaPbSaSbBaBbC_OaObF_EbEa") == 0);
+    assert(strcmp(first_window.log, "PaPbSaSbBbBaC_OaObF_EaEb") == 0);
     assert(cui_bounds(ui, 100).w == 400 && cui_bounds(ui, 100).h == 300);
+    assert(cui_bounds(ui, 700 + 'b').x < cui_bounds(ui, 700 + 'a').x &&
+           cui_bounds(ui, 700 + 'a').x < cui_bounds(ui, 100).x);
     bool override_painted = false;
     for (size_t i = 0; i < draw.count; i++)
         override_painted |=
@@ -137,7 +169,10 @@ static void test_registry_and_base_root(void) {
     assert(cui_base_root_render(ui, 101, &second, (cui_rect){0, 0, 400, 300}, (cui_root_style){0},
                                 &override, app, &second_window, facility, &second_window));
     cui_end_frame(ui);
-    assert(strcmp(second_window.log, "PxPbSxSbBxBbC_OxObF_EbEx") == 0);
+    assert(strcmp(second_window.log, "PxPbSxSbBbBxC_OxObF_ExEb") == 0);
+    cui_root_dispose(&first);
+    cui_root_dispose(&second);
+    assert(destroyed == 5 && !first.initialized && !second.initialized);
     cui_destroy(ui);
 }
 #ifndef CUI_ROOT_BASE_ONLY

@@ -10,7 +10,8 @@ bool cui_root_registry_init(cui_root_registry *registry, cui_root_plugin *entrie
     return true;
 }
 bool cui_root_register(cui_root_registry *registry, cui_root_plugin plugin) {
-    if (!registry || !plugin.key || !plugin.build ||
+    if (!registry || registry->count > registry->capacity ||
+        (registry->capacity && !registry->entries) || !plugin.key || !plugin.build ||
         (!!plugin.decorate_begin != !!plugin.decorate_end))
         return false;
     for (size_t i = 0; i < registry->count; i++)
@@ -25,9 +26,9 @@ bool cui_root_register(cui_root_registry *registry, cui_root_plugin plugin) {
 }
 bool cui_root_init(cui_root *root, cui_root_plugin_instance *instances, size_t capacity,
                    const cui_root_registry *registry, void *window_user) {
-    if (!root || (capacity && !instances) ||
+    if (!root || root->initialized || (capacity && !instances) ||
         (registry && (registry->count > registry->capacity ||
-                      (registry->count && !registry->entries) || registry->count > capacity)))
+                      (registry->capacity && !registry->entries) || registry->count > capacity)))
         return false;
     size_t count = registry ? registry->count : 0;
     for (size_t i = 0; i < count; i++) {
@@ -38,8 +39,15 @@ bool cui_root_init(cui_root *root, cui_root_plugin_instance *instances, size_t c
     for (size_t i = 0; i < count; i++) {
         cui_root_plugin plugin = registry->entries[i];
         void *state = plugin.build(plugin.registration_user, window_user);
-        if (!state)
+        if (!state) {
+            for (size_t j = i; j > 0; j--) {
+                cui_root_plugin_instance *prior = &instances[j - 1];
+                if (prior->plugin.destroy)
+                    prior->plugin.destroy(prior->plugin.registration_user, prior->state);
+                *prior = (cui_root_plugin_instance){0};
+            }
             return false;
+        }
         instances[i] = (cui_root_plugin_instance){plugin, state};
     }
     *root = (cui_root){.plugins = instances,
@@ -47,6 +55,17 @@ bool cui_root_init(cui_root *root, cui_root_plugin_instance *instances, size_t c
                        .plugin_capacity = capacity,
                        .initialized = true};
     return true;
+}
+void cui_root_dispose(cui_root *root) {
+    if (!root || !root->initialized)
+        return;
+    for (size_t i = root->plugin_count; i > 0; i--) {
+        cui_root_plugin_instance *plugin = &root->plugins[i - 1];
+        if (plugin->plugin.destroy)
+            plugin->plugin.destroy(plugin->plugin.registration_user, plugin->state);
+        *plugin = (cui_root_plugin_instance){0};
+    }
+    *root = (cui_root){0};
 }
 void *cui_root_plugin_state(const cui_root *root, uint64_t key) {
     if (!root || !root->initialized || !key)
@@ -115,15 +134,15 @@ bool cui_root_set_copy_hook(cui_root *root, cui_root_copy_fn copy, void *user) {
     return true;
 }
 bool cui_base_root_render(cui_context *ui, cui_id id, cui_root *root, cui_rect viewport,
-                          cui_root_style defaults, const cui_root_style *instance_override,
+                          cui_root_style defaults, const cui_root_style_override *instance_override,
                           cui_root_content_fn content, void *content_user,
                           cui_root_content_fn facilities, void *facilities_user) {
     if (!ui || !id || !root || !root->initialized || !content || !isfinite(viewport.x) ||
         !isfinite(viewport.y) || !isfinite(viewport.w) || !isfinite(viewport.h) ||
         viewport.x != 0 || viewport.y != 0 || viewport.w <= 0 || viewport.h <= 0 ||
         !isfinite(defaults.padding) || defaults.padding < 0 ||
-        (instance_override &&
-         (!isfinite(instance_override->padding) || instance_override->padding < 0)))
+        (instance_override && instance_override->padding &&
+         (!isfinite(instance_override->value.padding) || instance_override->value.padding < 0)))
         return false;
     for (size_t i = 0; i < root->plugin_count; i++) {
         cui_root_plugin_instance *plugin = &root->plugins[i];
@@ -136,10 +155,18 @@ bool cui_base_root_render(cui_context *ui, cui_id id, cui_root *root, cui_rect v
         if (plugin->plugin.style)
             plugin->plugin.style(ui, plugin->state, &style);
     }
-    if (instance_override)
-        style = *instance_override;
-    for (size_t i = 0; i < root->plugin_count; i++) {
-        cui_root_plugin_instance *plugin = &root->plugins[i];
+    if (instance_override) {
+        if (instance_override->background)
+            style.background = instance_override->value.background;
+        if (instance_override->foreground)
+            style.foreground = instance_override->value.foreground;
+        if (instance_override->padding)
+            style.padding = instance_override->value.padding;
+    }
+    if (!isfinite(style.padding) || style.padding < 0)
+        return false;
+    for (size_t i = root->plugin_count; i > 0; i--) {
+        cui_root_plugin_instance *plugin = &root->plugins[i - 1];
         if (plugin->plugin.decorate_begin)
             plugin->plugin.decorate_begin(ui, plugin->state, style);
     }
@@ -167,8 +194,8 @@ bool cui_base_root_render(cui_context *ui, cui_id id, cui_root *root, cui_rect v
                 cui_consume_event(ui, i);
     }
     cui_end_box(ui);
-    for (size_t i = root->plugin_count; i > 0; i--) {
-        cui_root_plugin_instance *plugin = &root->plugins[i - 1];
+    for (size_t i = 0; i < root->plugin_count; i++) {
+        cui_root_plugin_instance *plugin = &root->plugins[i];
         if (plugin->plugin.decorate_end)
             plugin->plugin.decorate_end(ui, plugin->state);
     }

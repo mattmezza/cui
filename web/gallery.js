@@ -74,7 +74,7 @@ function requestFrame(){if(framePending||!wasm)return;framePending=true;requestA
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Theme'?360:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -82,6 +82,7 @@ function render(){
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
+ wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
  wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
  wasm.gallery_tag_options(Number($('tag-variant').value),Number($('tag-color').value),Number($('tag-outline').checked),Number($('tag-pill').checked));
  wasm.gallery_marker_options(Number($('marker-variant').value),Number($('marker-loading').value),Number($('marker-alignment').value),Number($('marker-icon').checked));
@@ -142,6 +143,7 @@ function syncSemantics(){
   const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
   if(role==='text')el.textContent=name;
   el.setAttribute('aria-label',name);
+  if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;}
   const description=stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
   if(description)el.setAttribute('aria-description',description);else el.removeAttribute('aria-description');
   if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
@@ -199,6 +201,8 @@ function selectComponent(){
  $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
  $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
+ $('disclosure-mode').hidden=!['Accordion','Collapsible'].includes(selected.name);$('disclosure-mode').value='0';
+ $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['notification-anchor','notification-kind','notification-autohide-control'])$(id).hidden=selected.name!=='Notification';
  $('notification-anchor').value='2';$('notification-kind').value='1';$('notification-autohide').checked=true;
  for(const id of ['tag-variant','tag-color','tag-outline-control','tag-pill-control'])$(id).hidden=selected.name!=='Tag';
@@ -232,7 +236,7 @@ canvas.addEventListener('blur',()=>{wasm?.gallery_event(7,0,0,0,0,0);wasm?.galle
 for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const key=keys[e.key]||0;
  if(e.key==='Tab'){
-  const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&interactiveRoles.includes(wasm.gallery_semantic(i,0)));
+  const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&(interactiveRoles.includes(wasm.gallery_semantic(i,0))||wasm.gallery_semantic(i,33)));
   const focused=enabled.findIndex(i=>wasm.gallery_semantic(i,7));
   if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
@@ -247,7 +251,7 @@ $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
-for(const id of ['notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
+for(const id of ['disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);
 $('group-mode').addEventListener('change',requestFrame);

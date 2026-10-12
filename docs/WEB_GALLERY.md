@@ -51,3 +51,7 @@ OtpInput normalizes ASCII and fullwidth digits through the actual C reducer, sup
 Tag demonstrates actual intent and named palette colors, outline/pill styling, passive labels and rich children. Marker demonstrates plain/separator/border layouts, alignment, typed text/icon and rich content, spinner suppression by typed icons, shimmer and reduced motion.
 
 Notification demonstrates actual in-app retained lifecycle timers, all eight anchors, collapsed/expanded stacks, arbitrary focusable content, actions and dismissal. Browser deadlines drive frames; OS notification delivery is not simulated.
+
+Accordion and Collapsible include optional retained spring reveals, interactive panels, custom header/box composition and multiple accordion panels. Closing subtrees continue painting while their semantics and input are inert; reduced motion snaps panels and leaves settled frames idle.
+
+Theme also demonstrates passive and explicitly focusable Log semantics. The host projects the core focusable flag into Canvas Tab routing while leaving passive logs and list items outside the tab sequence.

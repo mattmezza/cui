@@ -34,7 +34,21 @@ static bool checked, enabled = true, toggled;
 static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static cui_id selected_tab;
+static int disclosure_mode, disclosure_actions;
+static bool disclosure_multiple, disclosure_checked;
+static cui_disclosure_motion accordion_motion[3], collapsible_motion;
 static cui_theme current_theme;
+static void disclosure_header(cui_context *context, const cui_disclosure_item *item, size_t index,
+                              bool expanded, void *user) {
+    (void)index;
+    (void)user;
+    cui_text(context, cui_string(expanded ? "-" : "+"), current_theme.font_size,
+             current_theme.primary);
+    cui_text(context, item->label, current_theme.font_size,
+             item->disabled ? current_theme.muted : current_theme.text);
+    cui_text(context, cui_string(" (custom)"), current_theme.font_size, current_theme.muted);
+}
+
 static cui_hover_state tooltip_state, card_state;
 static cui_virtual_list *virtual_list;
 static float scroll_percent;
@@ -76,6 +90,15 @@ static void panel(cui_context *context, size_t index, void *user) {
     char text[64];
     snprintf(text, sizeof(text), "Content for item %zu", index + 1);
     cui_label(context, &current_theme, cui_string(text));
+}
+static void disclosure_panel(cui_context *context, size_t index, void *user) {
+    (void)user;
+    cui_checkbox(context, cui_id_from(context, "panel-updates") ^ (index + 1), &current_theme,
+                 cui_string("Panel updates"), &disclosure_checked, false);
+    if (cui_button(context, cui_id_from(context, "panel-apply") ^ (index + 1), &current_theme,
+                   cui_string("Apply panel"), false))
+        disclosure_actions++;
+    cui_label(context, &current_theme, cui_string("Application-owned interactive content."));
 }
 static float slider = 40;
 static char input_buffer[512] = "Hello, CUI";
@@ -719,6 +742,22 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                 .custom_border_edges = true,
                                 .border_edges = {0, 8, 4, 0}});
         cui_end_box(ui);
+        for (unsigned focusable = 0; focusable < 2; focusable++) {
+            cui_id id = cui_id_from(ui, focusable ? "focusable-log" : "passive-log");
+            cui_str name =
+                cui_string(focusable ? "Focusable semantic log" : "Passive semantic log");
+            cui_begin_box(ui, id,
+                          (cui_box){.width = width - 48,
+                                    .height = 30,
+                                    .padding = 5,
+                                    .border = cui_focused(ui) == id ? t.focus : t.border,
+                                    .border_width = 1});
+            cui_interact(ui, id, CUI_ROLE_LOG, name, false, false, 0);
+            cui_set_semantic_details(ui, id, (cui_semantic_details){.focusable = focusable != 0});
+            cui_set_tab_stop(ui, id, focusable != 0);
+            cui_text(ui, name, t.font_size, t.text);
+            cui_end_box(ui);
+        }
         break;
     case 12:
         cui_alert(ui, cui_id_from(ui, "alert"), &t,
@@ -768,16 +807,72 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_id_from(ui, "a1"), cui_string("Getting started"), false},
             {cui_id_from(ui, "a2"), cui_string("Configuration"), false},
             {cui_id_from(ui, "a3"), cui_string("More details"), false}};
-        cui_accordion(
-            ui, cui_id_from(ui, "accordion"), &t, items, 3, open,
-            (cui_accordion_options){.collapsible = true, .disabled = disabled, .bordered = true},
-            panel, NULL);
+        cui_box triggers[3], panels[3];
+        for (size_t i = 0; i < 3; i++) {
+            triggers[i] = (cui_box){.width = width - 48,
+                                    .height = t.control_height,
+                                    .padding = t.padding,
+                                    .row = true,
+                                    .gap = t.gap,
+                                    .radius = t.radius,
+                                    .background = t.background,
+                                    .border = t.success,
+                                    .border_width = 1};
+            panels[i] = (cui_box){.width = width - 48,
+                                  .padding = t.padding,
+                                  .gap = t.gap,
+                                  .background = t.surface,
+                                  .border = t.border,
+                                  .border_width = 1};
+        }
+        cui_accordion(ui, cui_id_from(ui, "accordion"), &t, items, 3, open,
+                      (cui_accordion_options){
+                          .collapsible = true,
+                          .disabled = disabled,
+                          .bordered = true,
+                          .multiple = disclosure_multiple,
+                          .render_header = disclosure_mode == 2 ? disclosure_header : NULL,
+                          .trigger_boxes = disclosure_mode == 2 ? triggers : NULL,
+                          .panel_boxes = disclosure_mode == 2 ? panels : NULL,
+                          .style_count = 3,
+                          .motion = disclosure_mode ? accordion_motion : NULL,
+                          .motion_count = 3,
+                          .dt = host_dt,
+                          .response = .45f,
+                          .reduced_motion = reduced_motion},
+                      disclosure_mode ? disclosure_panel : panel, NULL);
         break;
     }
-    case 21:
-        cui_collapsible(ui, cui_id_from(ui, "collapsible"), &t, cui_string("Show details"),
-                        &collapsed, disabled, panel, NULL);
+    case 21: {
+        cui_box trigger_box = {.width = width - 48,
+                               .height = t.control_height,
+                               .padding = t.padding,
+                               .row = true,
+                               .gap = t.gap,
+                               .radius = t.radius,
+                               .background = t.background,
+                               .border = t.success,
+                               .border_width = 1};
+        cui_box panel_box = {.width = width - 48,
+                             .padding = t.padding,
+                             .gap = t.gap,
+                             .background = t.surface,
+                             .border = t.border,
+                             .border_width = 1};
+        cui_collapsible_ex(ui, cui_id_from(ui, "collapsible"), &t, cui_string("Show details"),
+                           &collapsed,
+                           (cui_collapsible_options){
+                               .disabled = disabled,
+                               .render_header = disclosure_mode == 2 ? disclosure_header : NULL,
+                               .trigger_box = disclosure_mode == 2 ? &trigger_box : NULL,
+                               .panel_box = disclosure_mode == 2 ? &panel_box : NULL,
+                               .motion = disclosure_mode ? &collapsible_motion : NULL,
+                               .dt = host_dt,
+                               .response = .45f,
+                               .reduced_motion = reduced_motion},
+                           disclosure_mode ? disclosure_panel : panel, NULL);
         break;
+    }
     case 22: {
         cui_choice_item items[3] = {{cui_id_from(ui, "tab1"), cui_string("Overview"), false},
                                     {cui_id_from(ui, "tab2"), cui_string("Activity"), false},
@@ -1519,6 +1614,8 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.pos_in_set;
     case 32:
         return s->details.set_size;
+    case 33:
+        return s->details.focusable;
     default:
         return 0;
     }
@@ -1557,6 +1654,33 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_disclosure_options(int mode, int multiple) {
+    if (mode >= 0 && mode <= 2 && mode != disclosure_mode) {
+        disclosure_mode = mode;
+        memset(accordion_motion, 0, sizeof(accordion_motion));
+        memset(&collapsible_motion, 0, sizeof(collapsible_motion));
+    }
+    if (disclosure_multiple && !multiple) {
+        bool kept = false;
+        for (size_t i = 0; i < 3; i++) {
+            if (open[i] && !kept)
+                kept = true;
+            else
+                open[i] = false;
+        }
+    }
+    disclosure_multiple = multiple != 0;
+}
+float gallery_disclosure_progress(int index) {
+    const cui_disclosure_motion *motion = previous_story == 20 && index >= 0 && index < 3
+                                              ? &accordion_motion[index]
+                                              : &collapsible_motion;
+    return motion->initialized ? motion->progress : -1;
+}
+
+int gallery_disclosure_actions(void) {
+    return disclosure_actions;
 }
 void gallery_notification_options(int anchor, int kind, int autohide) {
     if (anchor >= 0 && anchor <= CUI_NOTIFICATION_RIGHT_CENTER)

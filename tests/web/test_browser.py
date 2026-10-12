@@ -82,6 +82,20 @@ def main():
             blue, orange = [29,100,220,255], [240,150,20,255]
             assert pixels[:5] == [blue,blue,orange,orange,blue], pixels
             assert pixels[5] not in [blue,orange], pixels
+            focusable_log = page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_semantic(i,0)===38&&cuiGallery.exports.gallery_semantic(i,33)===1)')
+            passive_log = page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_semantic(i,0)===38&&cuiGallery.exports.gallery_semantic(i,33)===0)')
+            assert focusable_log is not None and passive_log is not None
+            assert page.locator('#accessible [role=log]').count() == 2
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,9)', passive_log) == -1
+            theme_button = page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_semantic(i,0)===1)')
+            b = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', theme_button)
+            rect = canvas.bounding_box()
+            page.mouse.click(rect['x']+b[0]+b[2]/2,rect['y']+b[1]+b[3]/2)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=theme_button)
+            page.keyboard.press('Tab')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=focusable_log)
+            page.keyboard.press('Tab')
+            page.wait_for_function('document.activeElement!==document.querySelector("canvas")')
             for name in page.evaluate('Object.keys(cuiGallery.stories)'):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
@@ -205,6 +219,52 @@ def main():
             page.keyboard.press('Space')
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Show details"]`)?.getAttribute("aria-expanded")==="false"')
             assert panel.count() == 0
+            page.locator('#disclosure-mode').select_option('1')
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===0')
+            click_semantic('Show details', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)>0&&cuiGallery.exports.gallery_disclosure_progress(0)<1')
+            click_semantic('Show details', 1)
+            page.wait_for_function('document.querySelector(`#accessible button[aria-label="Show details"]`)?.getAttribute("aria-expanded")==="false"')
+            # Reversal uses the retained spring state rather than restarting a transition.
+            click_semantic('Show details', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===1')
+            apply_index = semantic_index('Apply panel', 1)
+            apply_bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', apply_index)
+            actions = page.evaluate('cuiGallery.exports.gallery_disclosure_actions()')
+            click_semantic('Apply panel', 1)
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_disclosure_actions()===n+1', arg=actions)
+            click_semantic('Show details', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)>0&&document.querySelector(`#accessible button[aria-label="Apply panel"]`)===null')
+            texts = 'Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>{let e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)));})'
+            assert page.evaluate(texts+'.includes("Apply panel")')
+            rect = canvas.bounding_box()
+            frame = page.evaluate('cuiGallery.frame')
+            page.mouse.click(rect['x']+apply_bounds[0]+apply_bounds[2]/2,rect['y']+apply_bounds[1]+apply_bounds[3]/2)
+            page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+            assert page.evaluate('cuiGallery.exports.gallery_disclosure_actions()') == actions + 1
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===0&&cuiGallery.exports.gallery_redraw()===0')
+            frame = page.evaluate('cuiGallery.frame')
+            page.wait_for_timeout(100)
+            assert page.evaluate('cuiGallery.frame') == frame
+            page.emulate_media(reduced_motion='reduce')
+            click_semantic('Show details', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===1')
+            click_semantic('Show details', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===0')
+            assert page.locator('#accessible button[aria-label="Apply panel"]').count() == 0
+            page.emulate_media(reduced_motion='no-preference')
+            page.locator('#disclosure-mode').select_option('2')
+            page.wait_for_function(texts+'.includes(" (custom)")')
+            click_semantic('Show details', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_disclosure_progress(0)===1')
+            page.evaluate('location.hash="Accordion"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Accordion"')
+            page.locator('#disclosure-mode').select_option('2')
+            page.locator('#disclosure-multiple').check()
+            click_semantic('Configuration', 1)
+            page.wait_for_function('document.querySelector(`#accessible button[aria-label="Getting started"]`)?.getAttribute("aria-expanded")==="true"&&document.querySelector(`#accessible button[aria-label="Configuration"]`)?.getAttribute("aria-expanded")==="true"')
+            assert page.locator('#accessible [role=group][aria-label="Getting started"]').count() == 1
+            assert page.locator('#accessible [role=group][aria-label="Configuration"]').count() == 1
             page.locator('#theme').select_option('0')
             page.evaluate('location.hash="Tag"')
             page.wait_for_function('cuiGallery.renderedComponent==="Tag"')

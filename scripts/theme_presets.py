@@ -53,7 +53,7 @@ def generate():
         colors.setdefault('accent.background', secondary)
         colors.setdefault('accent.foreground', fg)
         values = {'background': bg, 'surface': colors['popover.background'], 'text': fg,
-                  'muted': muted, 'primary': primary, 'on_primary': colors['primary.foreground'],
+                  'muted': muted, 'muted_background': muted_bg, 'primary': primary, 'on_primary': colors['primary.foreground'],
                   'border': border, 'focus': colors.get('ring', primary),
                   'input': colors.get('input.border', border),
                   'input_background': colors.get('input.background', bg),

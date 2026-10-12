@@ -53,6 +53,7 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
         (cui_spring_settings){.response = .18f, .damping = 1, .epsilon = .001f, .travel = true};
     t.popover = t.surface;
     t.secondary = secondary;
+    t.muted_background = secondary;
     t.radius_lg = t.radius == 0 ? 0 : t.radius + 2;
     t.secondary_hover = cui_theme_scale(t.secondary, .9f);
     t.tab_foreground = t.muted;
@@ -141,7 +142,8 @@ cui_theme cui_theme_dark(void) {
                                                   CUI_THEME_RGB(56, 189, 248),
                                                   CUI_THEME_RGB(14, 24, 38),
                                                   CUI_THEME_RGB(14, 24, 38),
-                                                  .spring_control = {0}});
+                                                  .spring_control = {0},
+                                                  .dark = true});
 }
 cui_theme cui_theme_high_contrast(void) {
     return cui_theme_control_defaults((cui_theme){CUI_THEME_RGB(0, 0, 0),
@@ -165,7 +167,8 @@ cui_theme cui_theme_high_contrast(void) {
                                                   CUI_THEME_RGB(0, 255, 255),
                                                   CUI_THEME_RGB(0, 0, 0),
                                                   CUI_THEME_RGB(0, 0, 0),
-                                                  .spring_control = {0}});
+                                                  .spring_control = {0},
+                                                  .dark = true});
 }
 cui_theme cui_theme_terminal(void) {
     return cui_theme_control_defaults((cui_theme){CUI_THEME_RGB(31, 29, 23),
@@ -189,7 +192,8 @@ cui_theme cui_theme_terminal(void) {
                                                   CUI_THEME_RGB(145, 205, 232),
                                                   CUI_THEME_RGB(31, 29, 23),
                                                   CUI_THEME_RGB(31, 29, 23),
-                                                  .spring_control = {0}});
+                                                  .spring_control = {0},
+                                                  .dark = true});
 }
 
 #undef CUI_THEME_RGB

@@ -26,6 +26,11 @@ static void test_named_themes(void) {
     for (size_t i = 0; i < cui_theme_preset_count(); ++i) {
         cui_theme theme;
         assert(cui_theme_preset_get(i, &theme));
+        assert(theme.dark == cui_theme_preset_is_dark(i));
+        assert(theme.muted_background.a > 0);
+        if (i == 0)
+            assert(theme.muted_background.r == 245 && theme.muted_background.g == 245 &&
+                   theme.muted_background.b == 245);
         cui_str name = cui_theme_preset_name(i);
         assert(name.data && name.length && theme.background.a == 255 && theme.text.a == 255);
         if (cui_theme_preset_is_dark(i))

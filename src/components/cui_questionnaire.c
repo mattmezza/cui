@@ -18,6 +18,10 @@ static cui_questionnaire_metrics cui_questionnaire_measure(cui_questionnaire_siz
         return (cui_questionnaire_metrics){16, 10, 2, 12, 10, 44, 16, 8, 20, 16, 24};
     }
 }
+static cui_color cui_questionnaire_opacity(cui_color color, float opacity) {
+    color.a = (uint8_t)(color.a * opacity + .5f);
+    return color;
+}
 bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
                              cui_questionnaire_state *s, cui_questionnaire_options o) {
     if (!ui || !id || !theme || !s || !s->initialized)
@@ -81,17 +85,25 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
                              (cui_semantic_details){.invalid = invalid,
                                                     .required = d->required,
                                                     .pointer_activatable = true});
+    float card_radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius
+                        : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius * 2
+                                                            : t->radius_lg;
+    cui_color card_background =
+        selected ? t->muted_background
+                 : cui_questionnaire_opacity(t->dark ? t->input : t->background, t->dark ? .2f : 0);
+    if (interaction.hovered && !disabled)
+        card_background = cui_questionnaire_opacity(t->muted_background, .5f);
     cui_begin_box(ui, id,
                   (cui_box){.width = -1,
                             .padding = m.py,
                             .row = true,
                             .gap = 0,
-                            .radius = t->radius_lg,
+                            .radius = card_radius,
                             .border_width = 1,
                             .border = invalid    ? t->danger
-                                      : selected ? t->primary
+                                      : selected ? cui_questionnaire_opacity(t->primary, .4f)
                                                  : t->input,
-                            .background = interaction.hovered ? t->surface : t->background,
+                            .background = card_background,
                             .custom_opacity = disabled,
                             .opacity = .5f});
     /* Side spacers supply independent horizontal padding and the card's minimum
@@ -104,7 +116,7 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
     cui_begin_box(ui, 0,
                   (cui_box){.width = m.indicator,
                             .height = m.indicator,
-                            .radius = d->multiple ? t->radius : m.indicator / 2,
+                            .radius = d->multiple ? t->radius / 2 : m.indicator / 2,
                             .border_width = 1,
                             .border = selected ? t->primary : t->input,
                             .background = selected ? t->primary : t->input_background,
@@ -139,10 +151,16 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
                                 .height = m.shortcut,
                                 .border_width = 1,
                                 .border = t->input,
-                                .radius = t->radius,
+                                .radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius / 2
+                                          : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius_lg
+                                                                              : t->radius,
                                 .align_x = CUI_ALIGN_CENTER,
                                 .align_y = CUI_ALIGN_CENTER});
-        cui_text_ex(ui, (cui_str){&key, 1}, m.font * .625f, t->muted, 0,
+        float shortcut_font = o.size == CUI_QUESTIONNAIRE_XSMALL  ? 8
+                              : o.size == CUI_QUESTIONNAIRE_SMALL ? 9
+                              : o.size == CUI_QUESTIONNAIRE_LARGE ? 12
+                                                                  : 10;
+        cui_text_ex(ui, (cui_str){&key, 1}, shortcut_font, t->muted, 0,
                     (cui_text_style){.weight = CUI_TEXT_WEIGHT_MEDIUM, .monospace = true});
         cui_end_box(ui);
         cui_end_box(ui);

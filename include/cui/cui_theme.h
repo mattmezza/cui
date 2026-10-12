@@ -54,6 +54,8 @@ typedef struct {
     uint64_t icon_revision; /* Increment when the same loader supplies new artwork. */
     cui_color caret;
     cui_color group_box, group_box_foreground;
+    cui_color muted_background;
+    bool dark; /* Explicit palette mode; independent of individual color luminance. */
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

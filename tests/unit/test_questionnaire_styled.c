@@ -136,6 +136,112 @@ static void radio_keyboard(void) {
 
     cui_destroy(ui);
 }
+static bool same_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static cui_draw_list card_frame(cui_context *ui, cui_questionnaire_state *s, const cui_theme *t,
+                                cui_questionnaire_options o) {
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    assert(cui_questionnaire_begin(ui, 10, t, s, o));
+    cui_questionnaire_choice_control(ui, 12, t, s, 0, 0, o);
+    cui_questionnaire_end(ui);
+    return cui_end_frame(ui);
+}
+static void card_paint(cui_context *ui, cui_draw_list list, cui_color fill, cui_color border,
+                       float radius, float shortcut_font, const cui_theme *theme, int size) {
+    cui_rect bounds = cui_bounds(ui, 12);
+    bool found_fill = false, found_border = false, found_shortcut = false;
+    bool found_indicator = false, found_badge = false;
+    const float indicators[] = {16, 14, 18, 12}, badges[] = {20, 18, 24, 16};
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *d = &list.commands[i];
+        if (d->type == CUI_DRAW_TEXT && d->text.length == 1 && d->text.data[0] == 'A') {
+            assert(d->font_size == shortcut_font);
+            found_shortcut = true;
+        }
+        if (d->type == CUI_DRAW_BORDER && d->bounds.w == indicators[size] &&
+            d->bounds.h == indicators[size]) {
+            assert(d->corner_radii.top_left == theme->radius / 2);
+            found_indicator = true;
+        }
+        if (d->type == CUI_DRAW_BORDER && d->bounds.w == badges[size] &&
+            d->bounds.h == badges[size]) {
+            float badge_radius = size == CUI_QUESTIONNAIRE_XSMALL  ? theme->radius / 2
+                                 : size == CUI_QUESTIONNAIRE_LARGE ? theme->radius_lg
+                                                                   : theme->radius;
+            assert(d->corner_radii.top_left == badge_radius);
+            found_badge = true;
+        }
+        if (d->bounds.x != bounds.x || d->bounds.y != bounds.y || d->bounds.w != bounds.w ||
+            d->bounds.h != bounds.h)
+            continue;
+        if (d->type == CUI_DRAW_RECT) {
+            assert(same_color(d->color, fill));
+            found_fill = true;
+        } else if (d->type == CUI_DRAW_BORDER) {
+            assert(same_color(d->color, border) && d->corner_radii.top_left == radius);
+            found_border = true;
+        }
+    }
+    assert(found_fill == (fill.a != 0) && found_border && found_shortcut && found_indicator &&
+           found_badge);
+}
+static void source_card_styles(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 128});
+    assert(ui);
+    cui_questionnaire_choice choice = {.value = cui_string("choice")};
+    cui_questionnaire_item item = {
+        .name = cui_string("item"), .choices = &choice, .choice_count = 1, .multiple = true};
+    cui_questionnaire_item_runtime runtime;
+    cui_questionnaire_choice_runtime selected;
+    cui_questionnaire_state s = {0};
+    assert(cui_questionnaire_init(&s, &item, 1,
+                                  (cui_questionnaire_workspace){.items = &runtime,
+                                                                .item_capacity = 1,
+                                                                .choices = &selected,
+                                                                .choice_capacity = 1},
+                                  NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    for (size_t palette = 0; palette < cui_theme_preset_count(); palette++) {
+        cui_theme t;
+        assert(cui_theme_preset_get(palette, &t));
+        for (int size = 0; size < 4; size++) {
+            cui_questionnaire_options o = {.width = 300, .size = (cui_questionnaire_size)size};
+            float radius = size == CUI_QUESTIONNAIRE_XSMALL  ? t.radius
+                           : size == CUI_QUESTIONNAIRE_LARGE ? t.radius * 2
+                                                             : t.radius_lg;
+            float font = size == CUI_QUESTIONNAIRE_XSMALL  ? 8
+                         : size == CUI_QUESTIONNAIRE_SMALL ? 9
+                         : size == CUI_QUESTIONNAIRE_LARGE ? 12
+                                                           : 10;
+            assert(cui_questionnaire_reset(&s));
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 390, .y = 290}));
+            cui_draw_list list = card_frame(ui, &s, &t, o);
+            cui_color fill = t.dark ? t.input : t.background;
+            fill.a = t.dark ? (uint8_t)(fill.a * .2f + .5f) : 0;
+            card_paint(ui, list, fill, t.input, radius, font, &t, size);
+            assert(cui_questionnaire_activate(&s, 0, 0) == CUI_QUESTIONNAIRE_OK);
+            list = card_frame(ui, &s, &t, o);
+            cui_color border = t.primary;
+            border.a = (uint8_t)(border.a * .4f + .5f);
+            card_paint(ui, list, t.muted_background, border, radius, font, &t, size);
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 20, .y = 20}));
+            list = card_frame(ui, &s, &t, o);
+            fill = t.muted_background;
+            fill.a = (uint8_t)(fill.a * .5f + .5f);
+            card_paint(ui, list, fill, border, radius, font, &t, size);
+            o.disabled = true;
+            list = card_frame(ui, &s, &t, o);
+            fill = t.muted_background;
+            fill.a = (uint8_t)(fill.a * .5f);
+            border.a = (uint8_t)(border.a * .5f);
+            card_paint(ui, list, fill, border, radius, font, &t, size);
+        }
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void progress_semantics(void) {
     cui_context *ui = cui_create((cui_config){0});
     assert(ui);
@@ -161,6 +267,7 @@ static void progress_semantics(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    source_card_styles();
     progress_semantics();
     radio_keyboard();
     cui_context *ui = cui_create((cui_config){.max_elements = 256});

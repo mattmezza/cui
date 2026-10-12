@@ -80,6 +80,16 @@ static cui_color bar_label_by_index(const cui_chart_datum *datum, size_t index, 
     (void)user;
     return index == 1 ? (cui_color){4, 211, 5, 255} : (cui_color){100, 20, 30, 255};
 }
+static size_t custom_sankey_lines(const cui_chart_datum *datum, size_t index, double raw,
+                                  cui_chart_sankey_label *out, size_t capacity, void *user) {
+    (void)datum;
+    assert(index < 3 && raw >= 0 && capacity == 16);
+    if (*(bool *)user)
+        return capacity + 1;
+    out[0] = (cui_chart_sankey_label){{"X", 1}, {0, 215, 0, 255}, 14};
+    out[1] = (cui_chart_sankey_label){{"Y", 1}, {0, 0, 215, 255}, 9};
+    return 2;
+}
 static cui_str tooltip_title_override(const cui_chart_datum *datum, size_t index, void *user) {
     (void)user;
     assert(datum && index == 0);
@@ -798,6 +808,7 @@ int main(void) {
     assert(cui_chart_measure_sankey_margins(ui, &options, &measured_margins) == CUI_PLOT_OK);
     assert(measured_margins.left > 0 && measured_margins.right > 0 && measured_margins.bottom > 0);
     options.sankey_margins = measured_margins;
+    state.hovered = SIZE_MAX;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Flow", 4}));
@@ -816,6 +827,32 @@ int main(void) {
                 terminal_label_right = draw.commands[i].bounds.x >= label_nodes[1].x1;
         }
     assert(sankey_label && sankey_value && first_label_left && terminal_label_right);
+    bool overflow_labels = false;
+    options.sankey_labels = custom_sankey_lines;
+    options.sankey_labels_user = &overflow_labels;
+    cui_chart_sankey_margins custom_margins = {0};
+    assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_OK);
+    assert(custom_margins.left > 0 && custom_margins.right > 0);
+    options.sankey_margins = custom_margins;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Flow", 4}));
+    draw = cui_end_frame(ui);
+    bool first_custom = false, second_custom = false, old_default = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1) {
+            char ch = draw.commands[i].text.data[0];
+            first_custom |= ch == 'X' && draw.commands[i].color.g == 215;
+            second_custom |= ch == 'Y' && draw.commands[i].color.b == 215;
+            old_default |= ch == 'A' || ch == 'Q';
+        }
+    assert(first_custom && second_custom && !old_default);
+    overflow_labels = true;
+    cui_chart_sankey_margins unchanged = custom_margins;
+    assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_INVALID);
+    assert(memcmp(&unchanged, &custom_margins, sizeof unchanged) == 0);
+    options.sankey_labels = NULL;
+    options.sankey_labels_user = NULL;
     options.sankey_margins = (cui_chart_sankey_margins){0};
     options.sankey_show_labels = false;
     options.sankey_show_values = false;

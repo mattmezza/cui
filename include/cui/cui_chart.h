@@ -46,6 +46,15 @@ typedef struct {
 } cui_chart_sankey_margins;
 typedef struct {
     cui_str text;
+    cui_color color; /* alpha zero uses chart foreground */
+    float font_size; /* zero uses source 10px */
+} cui_chart_sankey_label;
+/* At most 16 lines per node; return a count no larger than capacity. */
+typedef size_t (*cui_chart_sankey_labels_fn)(const cui_chart_datum *, size_t index,
+                                             double raw_throughput, cui_chart_sankey_label *out,
+                                             size_t capacity, void *user);
+typedef struct {
+    cui_str text;
     float edge_x, edge_y, anchor_x, anchor_y, text_x, text_y;
     bool visible, right;
 } cui_chart_pie_label;
@@ -164,8 +173,10 @@ typedef struct {
     float sankey_link_opacity;       /* default 0.3 */
     float sankey_node_corner_radius; /* zero selects square nodes */
     bool sankey_show_labels, sankey_show_values;
-    float sankey_label_gap;                  /* zero selects source 6px */
-    float sankey_font_size;                  /* zero selects 12px */
+    float sankey_label_gap;                   /* zero selects source 6px */
+    float sankey_font_size;                   /* zero selects source 10px */
+    cui_chart_sankey_labels_fn sankey_labels; /* overrides simple value/name lines */
+    void *sankey_labels_user;
     cui_chart_sankey_margins sankey_margins; /* measured before layout; zero preserves legacy */
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */

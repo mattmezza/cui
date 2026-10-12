@@ -1,0 +1,2 @@
+Installed 4 packages in 18ms
+PASS: Marker line, Pagination/Stepper text centering, graphical Rating, real Image pixels

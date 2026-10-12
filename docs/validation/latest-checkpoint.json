@@ -1,150 +1,48 @@
 {
-  "source": "f248d6e",
-  "published_source": "2be466c922bc396250781de5cc3e972256ec0357",
+  "source": "3d05c2a",
+  "published_source": "a70afe9",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Integration f248d6e adds automatic Chart appearance and Sankey margins, shared and block-aware TextView copy/selection, and source Questionnaire focus rings. Native77, sanitizers75, WASI67, browser78 and quality checks pass. Subsequent web22061e5 compiles all78 displayed usage excerpts and strict web build passes. This integration awaits publication; published2be466c remains HTTPS78 and seven-asset verified. Full78-entry parity remains incomplete.",
+  "summary": "First reported-defect batch: controlled Radio redraw, full/half/empty SVG Rating stars, Avatar/Tooltip and numeric-button centering, measured Marker width, original Image/Attachment asset. Integrated native77, sanitizer75, WASI67, Chromium78, targeted visual regressions and quality gates pass. Publication is pending. All78 entries remain in scope; full feature parity and remaining website feedback are unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "f248d6e",
+      "source": "3d05c2a",
       "passed": 77,
       "total": 77,
-      "log": "native-f248d6e.txt"
+      "log": "native-3d05c2a.txt"
     },
     {
       "name": "sanitizers",
-      "source": "f248d6e",
+      "source": "3d05c2a",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-f248d6e.txt"
+      "log": "sanitizers-3d05c2a.txt"
     },
     {
       "name": "WASI",
-      "source": "f248d6e",
+      "source": "3d05c2a",
       "passed": 67,
       "total": 67,
-      "log": "wasi-f248d6e.txt"
+      "log": "wasi-3d05c2a.txt"
     },
     {
       "name": "browser",
-      "source": "f248d6e",
+      "source": "3d05c2a",
       "passed": 78,
       "total": 78,
-      "log": "browser-f248d6e.txt"
-    },
-    {
-      "name": "Compiled gallery usage excerpts",
-      "source": "22061e5",
-      "passed": 78,
-      "total": 78,
-      "log": "snippets-22061e5.txt"
+      "log": "browser-3d05c2a.txt"
     }
   ],
-  "previous_deployment": {
-    "source": "1edb47d60bce812d15c74aa41fff975c217086a9",
-    "status": "failed",
-    "run": 38292612958,
-    "framework_ci_run": 38292613003,
-    "framework_ci_status": "success",
-    "reason": "Physical click helper failed elementFromPoint for first Start over after Skip completion. Investigating stale semantic index across awaited scrolling and viewport visibility. Public04e044e remains HTTPS78 verified.",
-    "log": "pages-failure-1edb47d.txt"
-  },
-  "published_evidence": "published-2be466c.txt",
-  "deployment": {
-    "source": "2be466c922bc396250781de5cc3e972256ec0357",
+  "visual_regressions": "visual-3d05c2a.txt",
+  "failing_before": "radio-failing-before-3d05c2a.txt",
+  "quality": "quality-3d05c2a.txt",
+  "published_evidence": "published-a70afe9.txt",
+  "latest_deployment": {
+    "source": "869d451",
     "status": "success",
-    "pages_run": 38298372417,
-    "ci_run": 38298372212
+    "pages_run": 38311899962,
+    "ci_run": 38311900050,
+    "direct_https_verification": "pending"
   },
-  "targeted_checks": [
-    {
-      "name": "Root overlay sanitizers",
-      "source": "5ccee5a",
-      "passed": 2,
-      "total": 2,
-      "log": "sanitizers-root-overlay-5ccee5a.txt"
-    },
-    {
-      "name": "Portable styled font metrics: native branch suite",
-      "source": "7fdfe35",
-      "passed": 75,
-      "total": 75,
-      "log": "native-font-metrics-7fdfe35.txt"
-    },
-    {
-      "name": "Portable styled font metrics: core/render/gallery sanitizers",
-      "source": "7fdfe35",
-      "passed": 3,
-      "total": 3,
-      "log": "sanitizers-font-metrics-7fdfe35.txt"
-    },
-    {
-      "name": "Composition-owned editor keys: native branch suite",
-      "source": "17cf96b",
-      "passed": 75,
-      "total": 75,
-      "log": "native-editor-ime-17cf96b.txt",
-      "failing_before": "editor-ime-before-17cf96b.txt"
-    },
-    {
-      "name": "Integrated font metrics/editor/chart native suite",
-      "source": "46f31e6",
-      "passed": 77,
-      "total": 77,
-      "log": "native-46f31e6.txt"
-    },
-    {
-      "name": "Integrated font metrics/editor/chart sanitizer suite",
-      "source": "46f31e6",
-      "passed": 75,
-      "total": 75,
-      "log": "sanitizers-46f31e6.txt"
-    },
-    {
-      "name": "Isolated Questionnaire containers and semantic-parent query: native suite",
-      "source": "74c9347",
-      "passed": 75,
-      "total": 75,
-      "log": "native-questionnaire-containers-74c9347.txt"
-    },
-    {
-      "name": "Isolated Questionnaire containers and semantic-parent query: sanitizers",
-      "source": "74c9347",
-      "passed": 2,
-      "total": 2,
-      "log": "sanitizers-questionnaire-containers-74c9347.txt"
-    }
-  ],
-  "previous_complete_checks": [
-    {
-      "name": "WASI",
-      "source": "882a5af",
-      "passed": 67,
-      "total": 67,
-      "log": "wasi-882a5af.txt"
-    },
-    {
-      "name": "native",
-      "source": "882a5af",
-      "passed": 77,
-      "total": 77,
-      "log": "native-882a5af.txt"
-    },
-    {
-      "name": "browser",
-      "source": "882a5af",
-      "passed": 78,
-      "total": 78,
-      "palettes": 38,
-      "log": "browser-882a5af.txt"
-    },
-    {
-      "name": "sanitizers",
-      "source": "882a5af",
-      "passed": 75,
-      "total": 75,
-      "log": "sanitizers-882a5af.txt"
-    }
-  ],
-  "web_source": "22061e5"
+  "feedback_audit": "../website-feedback.md"
 }

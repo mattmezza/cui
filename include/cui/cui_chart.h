@@ -99,6 +99,13 @@ typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index
                                            cui_plot_rect chart, float x, float y, void *user);
 typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
                                           double default_radius, void *user);
+typedef struct {
+    const cui_chart_datum *datum;
+    size_t index;
+    double value, start_angle, end_angle, pad_angle; /* source arc angles, radians from zero */
+} cui_chart_pie_arc;
+typedef double (*cui_chart_pie_arc_radius_fn)(const cui_chart_pie_arc *, double default_radius,
+                                              void *user);
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef cui_color (*cui_chart_bar_label_color_fn)(const cui_chart_datum *, size_t index,
                                                   void *user);
@@ -160,7 +167,8 @@ typedef struct {
     double inner_radius;     /* pie/donut pixels */
     double pie_outer_radius; /* zero selects 40% of pixel height */
     cui_chart_pie_radius_fn pie_inner_radius_fn, pie_outer_radius_fn;
-    void *pie_radius_user; /* callbacks must be stable during a render */
+    cui_chart_pie_arc_radius_fn pie_inner_arc_radius_fn, pie_outer_arc_radius_fn;
+    void *pie_radius_user; /* arc callbacks take precedence; stable during a render */
     bool pie_show_labels;  /* outside labels and leader lines */
     float pie_label_gap;   /* zero selects source 15px */
     cui_color pie_label_color, pie_label_line_color;

@@ -61,6 +61,22 @@ static double pie_bad_radius(const cui_chart_datum *datum, size_t index, double 
     (void)user;
     return NAN;
 }
+typedef struct {
+    unsigned seen[3];
+    double start[3], end[3], pad[3];
+    bool invalid;
+} pie_arc_calls;
+static double pie_outer_for_arc(const cui_chart_pie_arc *arc, double default_radius, void *user) {
+    pie_arc_calls *calls = user;
+    assert(arc && arc->datum && arc->index < 3 && arc->value > 0);
+    calls->seen[arc->index]++;
+    calls->start[arc->index] = arc->start_angle;
+    calls->end[arc->index] = arc->end_angle;
+    calls->pad[arc->index] = arc->pad_angle;
+    return calls->invalid && arc->index == 1 ? NAN
+           : arc->index == 0                 ? default_radius / 2
+                                             : default_radius;
+}
 static cui_color pie_green_line(const cui_chart_datum *datum, size_t index, void *user) {
     (void)datum;
     (void)user;
@@ -943,6 +959,27 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     assert(state.revision == old_revision && memcmp(pixels, saved, sizeof pixels) == 0);
     options.pie_inner_radius_fn = NULL;
+    cui_chart_datum arc_data[3];
+    memcpy(arc_data, points, sizeof arc_data);
+    arc_data[2].value = 0;
+    pie_arc_calls arc_calls = {0};
+    cui_chart_options arc_options = options;
+    arc_options.data = arc_data;
+    arc_options.pie_outer_arc_radius_fn = pie_outer_for_arc;
+    arc_options.pie_radius_user = &arc_calls;
+    arc_options.pad_angle = .02;
+    assert(cui_chart_render(&state, &arc_options) == CUI_PLOT_OK);
+    assert(arc_calls.seen[0] && arc_calls.seen[1] && !arc_calls.seen[2]);
+    assert(fabs(arc_calls.start[0]) < .0001 &&
+           fabs(arc_calls.end[0] - 2 * 3.14159265358979323846 / 3) < .0001 &&
+           fabs(arc_calls.start[1] - arc_calls.end[0]) < .0001 &&
+           fabs(arc_calls.end[1] - 2 * 3.14159265358979323846) < .0001 &&
+           fabs(arc_calls.pad[1] - .02) < .0001);
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    arc_calls.invalid = true;
+    assert(cui_chart_render(&state, &arc_options) == CUI_PLOT_INVALID);
+    assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     options.pie_label_gap = NAN;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     options.pie_label_gap = 0;

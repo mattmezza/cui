@@ -21,10 +21,38 @@ static double cui_chart_sankey_scaled(const cui_chart_options *o, double value) 
 static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *inner,
                                 double *outer) {
     double base_outer = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
-    *inner = o->pie_inner_radius_fn
+    cui_chart_pie_arc arc = {0};
+    bool use_arc =
+        o->data[i].value > 0 && (o->pie_inner_arc_radius_fn || o->pie_outer_arc_radius_fn);
+    if (use_arc) {
+        long double total = 0, before = 0;
+        for (size_t j = 0; j < o->count; j++) {
+            double value = o->data[j].value;
+            if (!isfinite(value) || value < 0)
+                return false;
+            total += value;
+            if (j < i)
+                before += value;
+        }
+        if (total <= 0 || total > DBL_MAX)
+            return false;
+        arc.datum = &o->data[i];
+        arc.index = i;
+        arc.value = o->data[i].value;
+        arc.start_angle = (double)(2 * CUI_CHART_PI * before / total);
+        arc.end_angle = (double)(2 * CUI_CHART_PI * (before + arc.value) / total);
+        arc.pad_angle = o->pad_angle;
+    }
+    *inner = o->pie_inner_arc_radius_fn
+                 ? (use_arc ? o->pie_inner_arc_radius_fn(&arc, o->inner_radius, o->pie_radius_user)
+                            : o->inner_radius)
+             : o->pie_inner_radius_fn
                  ? o->pie_inner_radius_fn(&o->data[i], i, o->inner_radius, o->pie_radius_user)
                  : o->inner_radius;
-    *outer = o->pie_outer_radius_fn
+    *outer = o->pie_outer_arc_radius_fn
+                 ? (use_arc ? o->pie_outer_arc_radius_fn(&arc, base_outer, o->pie_radius_user)
+                            : base_outer)
+             : o->pie_outer_radius_fn
                  ? o->pie_outer_radius_fn(&o->data[i], i, base_outer, o->pie_radius_user)
                  : base_outer;
     return isfinite(*inner) && isfinite(*outer) && *inner >= 0 && *outer >= *inner &&
@@ -1681,6 +1709,12 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
         h = cui_chart_mix(h, inner_callback[i]);
     for (size_t i = 0; i < sizeof(o->pie_outer_radius_fn); i++)
         h = cui_chart_mix(h, outer_callback[i]);
+    const unsigned char *inner_arc_callback = (const unsigned char *)&o->pie_inner_arc_radius_fn;
+    const unsigned char *outer_arc_callback = (const unsigned char *)&o->pie_outer_arc_radius_fn;
+    for (size_t i = 0; i < sizeof(o->pie_inner_arc_radius_fn); i++)
+        h = cui_chart_mix(h, inner_arc_callback[i]);
+    for (size_t i = 0; i < sizeof(o->pie_outer_arc_radius_fn); i++)
+        h = cui_chart_mix(h, outer_arc_callback[i]);
     h = cui_chart_mix(h, (uintptr_t)o->pie_radius_user);
     h = cui_chart_mix(h, o->pie_show_labels);
     h = cui_chart_mix(h, cui_chart_bits(o->pie_label_gap));

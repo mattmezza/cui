@@ -1,0 +1,18 @@
+Test project /home/matteo/dev/cui/build
+    Start 36: root
+1/2 Test #36: root .............................Subprocess aborted***Exception:   0.16 sec
+test_root: /home/matteo/dev/cui/tests/unit/test_root.c:158: test_registry_and_base_root: Assertion `first_overlay.x == root_bounds.x && first_overlay.y == root_bounds.y' failed.
+
+    Start 69: root_base_only
+2/2 Test #69: root_base_only ...................Subprocess aborted***Exception:   0.13 sec
+test_root_base: /home/matteo/dev/cui/tests/unit/test_root.c:158: test_registry_and_base_root: Assertion `first_overlay.x == root_bounds.x && first_overlay.y == root_bounds.y' failed.
+
+
+0% tests passed, 2 tests failed out of 2
+
+Total Test time (real) =   0.29 sec
+
+The following tests FAILED:
+	 36 - root (Subprocess aborted)
+	 69 - root_base_only (Subprocess aborted)
+Errors while running CTest

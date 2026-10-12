@@ -1,0 +1,9 @@
+Test project /home/matteo/dev/cui/build-asan
+    Start 36: root
+1/2 Test #36: root .............................   Passed    0.04 sec
+    Start 67: root_base_only
+2/2 Test #67: root_base_only ...................   Passed    0.03 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   0.07 sec

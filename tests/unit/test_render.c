@@ -45,6 +45,22 @@ static void test_text(void) {
     cui_str str = {text, strlen(text)};
     cui_size size = cui_font_measure(font, str, 18);
     assert(size.width > 40 && size.height > 18);
+    cui_font_metrics metrics;
+    assert(cui_font_get_metrics(font, 18, (cui_text_style){0}, &metrics));
+    assert(metrics.ascent > 0 && metrics.descent >= 0 && metrics.line_height == size.height);
+    cui_font_metrics doubled;
+    assert(cui_font_get_metrics(font, 36, (cui_text_style){0}, &doubled));
+    assert(doubled.ascent > metrics.ascent * 1.8f && doubled.descent >= metrics.descent);
+    cui_font_metrics saved = metrics;
+    assert(!cui_font_get_metrics(font, NAN, (cui_text_style){0}, &metrics));
+    assert(!cui_font_get_metrics(font, 0, (cui_text_style){0}, &metrics));
+    assert(!cui_font_get_metrics(font, 4097, (cui_text_style){0}, &metrics));
+    assert(!cui_font_get_metrics(NULL, 18, (cui_text_style){0}, &metrics));
+    assert(!cui_font_get_metrics(font, 18, (cui_text_style){0}, NULL));
+    assert(
+        !cui_font_get_metrics(font, 18, (cui_text_style){.weight = (cui_text_weight)99}, &metrics));
+    assert(metrics.ascent == saved.ascent && metrics.descent == saved.descent &&
+           metrics.line_height == saved.line_height);
     cui_size double_size = cui_font_measure(font, str, 36);
     assert(double_size.width > size.width * 1.8f);
     glyph_stats stats = {0};
@@ -85,6 +101,17 @@ static void test_styled_font_faces(void) {
     if (bold_face && mono_face) {
         assert(cui_font_set_style(font, strong, bold_face));
         assert(cui_font_set_style(font, code, mono_face));
+        cui_font_metrics selected_metrics, face_metrics;
+        assert(cui_font_get_metrics(font, 24, code, &selected_metrics));
+        assert(cui_font_get_metrics(mono_face, 24, (cui_text_style){0}, &face_metrics));
+        assert(selected_metrics.ascent == face_metrics.ascent &&
+               selected_metrics.descent == face_metrics.descent &&
+               selected_metrics.line_height == face_metrics.line_height);
+        assert(cui_font_get_metrics(font, 24, strong, &selected_metrics));
+        assert(cui_font_get_metrics(bold_face, 24, (cui_text_style){0}, &face_metrics));
+        assert(selected_metrics.ascent == face_metrics.ascent &&
+               selected_metrics.descent == face_metrics.descent &&
+               selected_metrics.line_height == face_metrics.line_height);
         cui_size bold_size = cui_font_measure_styled(font, sample, 24, strong);
         cui_size mono_size = cui_font_measure_styled(font, sample, 24, code);
         assert(bold_size.width > 0 && mono_size.width > 0 && bold_size.width != normal.width &&

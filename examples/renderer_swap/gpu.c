@@ -84,6 +84,7 @@ int main(int argc, char **argv) {
                                  .height = 480,
                                  .measure = cui_font_measure,
                                  .measure_styled = cui_font_measure_styled,
+                                 .font_metrics = cui_font_get_metrics,
                                  .measure_user = font});
     if (!ui)
         goto cleanup;

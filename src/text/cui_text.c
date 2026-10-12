@@ -97,6 +97,20 @@ static hb_buffer_t *shape(cui_font *f, cui_str s, float size) {
     hb_shape(f->shaper, b, NULL, 0);
     return b;
 }
+bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font_metrics *out) {
+    cui_font *f = selected(font, style);
+    if (!f || !out || !isfinite(size) || size <= 0 || size > 4096 ||
+        FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72))
+        return false;
+    cui_font_metrics result = {(float)f->face->size->metrics.ascender / 64,
+                               -(float)f->face->size->metrics.descender / 64,
+                               (float)f->face->size->metrics.height / 64};
+    if (result.ascent < 0 || result.descent < 0 || result.line_height <= 0 ||
+        result.ascent + result.descent <= 0)
+        return false;
+    *out = result;
+    return true;
+}
 cui_size cui_font_measure_styled(void *font, cui_str s, float size, cui_text_style style) {
     cui_size result = {0, 0};
     cui_font *f = selected(font, style);

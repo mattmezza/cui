@@ -328,6 +328,13 @@ typedef struct {
 typedef cui_size (*cui_measure_fn)(void *user, cui_str text, float font_size);
 typedef cui_size (*cui_measure_styled_fn)(void *user, cui_str text, float font_size,
                                           cui_text_style style);
+/* Distances from the baseline in logical pixels. Descent is nonnegative;
+ * line_height is the face's preferred line spacing, independent of ink bounds. */
+typedef struct {
+    float ascent, descent, line_height;
+} cui_font_metrics;
+typedef bool (*cui_font_metrics_fn)(void *user, float font_size, cui_text_style style,
+                                    cui_font_metrics *out);
 typedef struct {
     float width, height;
     size_t max_elements, max_commands, frame_bytes;
@@ -337,6 +344,7 @@ typedef struct {
     /* Context resources: zero selects 128 slots and 1 MiB of payload storage.
      * Nested allocations owned by payloads require their own explicit limits. */
     size_t max_resources, resource_bytes;
+    cui_font_metrics_fn font_metrics; /* Optional; shares measure_user. */
 } cui_config;
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
@@ -383,6 +391,10 @@ void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_
 void cui_text_line(cui_context *, cui_str, float font_size, cui_color, float line_height,
                    cui_text_style);
 /* Uses the same configured font measurement as layout; no frame allocation. */
+/* Returns false without a provider or for invalid arguments/results. Failure
+ * preserves out; no approximate baseline is fabricated from text height. */
+bool cui_measure_font_metrics(cui_context *, float font_size, cui_text_style,
+                              cui_font_metrics *out);
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);
 /* Call after changing a host font registry or styled measurement policy. */

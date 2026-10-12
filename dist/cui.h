@@ -329,6 +329,13 @@ typedef struct {
 typedef cui_size (*cui_measure_fn)(void *user, cui_str text, float font_size);
 typedef cui_size (*cui_measure_styled_fn)(void *user, cui_str text, float font_size,
                                           cui_text_style style);
+/* Distances from the baseline in logical pixels. Descent is nonnegative;
+ * line_height is the face's preferred line spacing, independent of ink bounds. */
+typedef struct {
+    float ascent, descent, line_height;
+} cui_font_metrics;
+typedef bool (*cui_font_metrics_fn)(void *user, float font_size, cui_text_style style,
+                                    cui_font_metrics *out);
 typedef struct {
     float width, height;
     size_t max_elements, max_commands, frame_bytes;
@@ -338,6 +345,7 @@ typedef struct {
     /* Context resources: zero selects 128 slots and 1 MiB of payload storage.
      * Nested allocations owned by payloads require their own explicit limits. */
     size_t max_resources, resource_bytes;
+    cui_font_metrics_fn font_metrics; /* Optional; shares measure_user. */
 } cui_config;
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
@@ -384,6 +392,10 @@ void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_
 void cui_text_line(cui_context *, cui_str, float font_size, cui_color, float line_height,
                    cui_text_style);
 /* Uses the same configured font measurement as layout; no frame allocation. */
+/* Returns false without a provider or for invalid arguments/results. Failure
+ * preserves out; no approximate baseline is fabricated from text height. */
+bool cui_measure_font_metrics(cui_context *, float font_size, cui_text_style,
+                              cui_font_metrics *out);
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);
 /* Call after changing a host font registry or styled measurement policy. */
@@ -5693,6 +5705,20 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         result.height < 0)
         return (cui_size){0};
     return result;
+}
+bool cui_measure_font_metrics(cui_context *ui, float size, cui_text_style style,
+                              cui_font_metrics *out) {
+    if (!ui || !out || !ui->config.font_metrics || !isfinite(size) || size <= 0 ||
+        !cui_core_text_style_valid(style))
+        return false;
+    cui_font_metrics result = {0};
+    if (!ui->config.font_metrics(ui->config.measure_user, fminf(size, 65535), style, &result) ||
+        !isfinite(result.ascent) || !isfinite(result.descent) || !isfinite(result.line_height) ||
+        result.ascent < 0 || result.descent < 0 || result.line_height <= 0 ||
+        result.ascent + result.descent <= 0 || !isfinite(result.ascent + result.descent))
+        return false;
+    *out = result;
+    return true;
 }
 cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
     return cui_measure_text_ex(ui, text, size, (cui_text_style){0});

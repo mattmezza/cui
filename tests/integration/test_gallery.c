@@ -12,8 +12,16 @@ int main(void) {
                                               .height = 740,
                                               .measure = cui_font_measure,
                                               .measure_styled = cui_font_measure_styled,
+                                              .font_metrics = cui_font_get_metrics,
                                               .measure_user = font});
     assert(ui);
+    cui_font_metrics via_context, via_font;
+    assert(cui_measure_font_metrics(ui, 16, (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD},
+                                    &via_context));
+    assert(cui_font_get_metrics(font, 16, (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD},
+                                &via_font));
+    assert(via_context.ascent == via_font.ascent && via_context.descent == via_font.descent &&
+           via_context.line_height == via_font.line_height);
     char text[128] = "Workspace";
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = text, .capacity = sizeof(text)});
     assert(edit);

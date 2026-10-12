@@ -128,6 +128,7 @@ int main(int argc, char **argv) {
     } else {
         config.measure = cui_font_measure;
         config.measure_styled = cui_font_measure_styled;
+        config.font_metrics = cui_font_get_metrics;
         config.measure_user = font;
     }
 #endif

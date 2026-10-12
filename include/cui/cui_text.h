@@ -19,6 +19,8 @@ bool cui_font_set_style(cui_font *font, cui_text_style style, cui_font *variant)
 /* Convenience path registration owns the opened face. Failure preserves the
  * previous registration; replacement and font_close release owned faces. */
 bool cui_font_register_style(cui_font *font, cui_text_style style, const char *path);
+/* Selected-face metrics suitable for cui_config.font_metrics. Failure preserves out. */
+bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font_metrics *out);
 cui_size cui_font_measure(void *font, cui_str text, float size);
 cui_size cui_font_measure_styled(void *font, cui_str text, float size, cui_text_style style);
 bool cui_font_draw(cui_font *font, cui_str text, float size, float x, float y, cui_glyph_fn emit,

@@ -299,6 +299,7 @@ int main(int argc, char **argv) {
                                               .height = (float)height,
                                               .measure = cui_font_measure,
                                               .measure_styled = cui_font_measure_styled,
+                                              .font_metrics = cui_font_get_metrics,
                                               .measure_user = font});
     if (!ui) {
         cui_font_close(font);

@@ -25,6 +25,65 @@ static cui_size styled_measure(void *user, cui_str text, float size, cui_text_st
                           (10 + 3 * style.weight + 2 * style.italic + 7 * style.monospace) * scale,
                       size + style.weight};
 }
+typedef struct {
+    cui_font_metrics value;
+    cui_text_style style;
+    float size;
+    unsigned calls;
+    bool ok;
+} metrics_probe;
+static bool font_metrics_probe(void *user, float size, cui_text_style style,
+                               cui_font_metrics *out) {
+    metrics_probe *p = user;
+    p->calls++;
+    p->size = size;
+    p->style = style;
+    *out = p->value;
+    return p->ok;
+}
+static void test_font_metrics(void) {
+    cui_font_metrics sentinel = {31, 7, 45}, out = sentinel;
+    cui_context *plain = make();
+    assert(!cui_measure_font_metrics(plain, 14, (cui_text_style){0}, &out));
+    assert(out.ascent == 31 && out.descent == 7 && out.line_height == 45);
+    cui_destroy(plain);
+    metrics_probe p = {.value = {15, 4, 17.5f}, .ok = true};
+    cui_context *ui = cui_create((cui_config){
+        .width = 300, .height = 200, .measure_user = &p, .font_metrics = font_metrics_probe});
+    assert(ui);
+    cui_text_style style = {.weight = CUI_TEXT_WEIGHT_SEMIBOLD, .italic = true, .monospace = true};
+    assert(cui_measure_font_metrics(ui, 14.5f, style, &out));
+    assert(p.calls == 1 && p.size == 14.5f && p.style.weight == style.weight && p.style.italic &&
+           p.style.monospace);
+    /* Font line spacing can legitimately be smaller than ascent + descent. */
+    assert(out.ascent == 15 && out.descent == 4 && out.line_height == 17.5f);
+    out = sentinel;
+    assert(!cui_measure_font_metrics(NULL, 14, style, &out));
+    assert(!cui_measure_font_metrics(ui, 14, style, NULL));
+    assert(!cui_measure_font_metrics(ui, NAN, style, &out));
+    assert(!cui_measure_font_metrics(ui, INFINITY, style, &out));
+    assert(!cui_measure_font_metrics(ui, 0, style, &out));
+    assert(!cui_measure_font_metrics(ui, -1, style, &out));
+    assert(
+        !cui_measure_font_metrics(ui, 14, (cui_text_style){.weight = (cui_text_weight)99}, &out));
+    assert(p.calls == 1 && out.ascent == 31);
+    const cui_font_metrics invalid[] = {{NAN, 4, 20}, {15, INFINITY, 20}, {15, 4, NAN}, {-1, 4, 20},
+                                        {15, -1, 20}, {15, 4, 0},         {0, 0, 20}};
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+        p.value = invalid[i];
+        assert(!cui_measure_font_metrics(ui, 14, style, &out));
+        assert(out.ascent == 31 && out.descent == 7 && out.line_height == 45);
+    }
+    p.value = (cui_font_metrics){15, 4, 20};
+    p.ok = false;
+    assert(!cui_measure_font_metrics(ui, 14, style, &out) && out.ascent == 31);
+    p.ok = true;
+    assert(cui_measure_font_metrics(ui, 70000, style, &out) && p.size == 65535);
+    p.value = (cui_font_metrics){20, 5, 30};
+    cui_text_metrics_changed(ui);
+    assert(cui_measure_font_metrics(ui, 20, style, &out) && out.ascent == 20);
+    cui_destroy(ui);
+}
 static void test_styled_text_pipeline(void) {
     float scale = 1;
     cui_context *ui = cui_create((cui_config){
@@ -2250,6 +2309,7 @@ static void test_bitmap_underlay(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    test_font_metrics();
     test_styled_text_pipeline();
     test_bitmap_underlay();
     test_context_resources();

@@ -150,6 +150,20 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         return (cui_size){0};
     return result;
 }
+bool cui_measure_font_metrics(cui_context *ui, float size, cui_text_style style,
+                              cui_font_metrics *out) {
+    if (!ui || !out || !ui->config.font_metrics || !isfinite(size) || size <= 0 ||
+        !cui_core_text_style_valid(style))
+        return false;
+    cui_font_metrics result = {0};
+    if (!ui->config.font_metrics(ui->config.measure_user, fminf(size, 65535), style, &result) ||
+        !isfinite(result.ascent) || !isfinite(result.descent) || !isfinite(result.line_height) ||
+        result.ascent < 0 || result.descent < 0 || result.line_height <= 0 ||
+        result.ascent + result.descent <= 0 || !isfinite(result.ascent + result.descent))
+        return false;
+    *out = result;
+    return true;
+}
 cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
     return cui_measure_text_ex(ui, text, size, (cui_text_style){0});
 }

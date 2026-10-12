@@ -4,6 +4,7 @@
 #include "cui/cui_content.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
+#include "cui/cui_form.h"
 #include "cui/cui_numeric.h"
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
@@ -79,6 +80,47 @@ static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
 static cui_input_state input_state;
 static int input_mode;
+static int form_mode, form_submissions;
+static char form_name_buffer[128] = "Ada Lovelace";
+static char form_email_buffer[128] = "ada@example.com";
+static cui_edit *form_name_edit, *form_email_edit;
+static cui_input_state form_name_state, form_email_state;
+static char form_status[96] = "Values and validation belong to the application.";
+typedef struct {
+    cui_id id;
+    cui_edit *edit;
+    cui_input_state *state;
+    const char *name;
+    bool disabled, readonly, invalid;
+} gallery_form_control;
+static bool form_email_valid(void) {
+    return strchr(form_email_buffer, '@') && strchr(form_email_buffer, '.');
+}
+static void form_control(cui_context *context, const cui_theme *theme, void *user, float width) {
+    gallery_form_control *control = user;
+    cui_input_result result = cui_input_ex(context, control->id, theme, cui_string(control->name),
+                                           control->edit, control->state,
+                                           (cui_input_options){.width = width,
+                                                               .disabled = control->disabled,
+                                                               .readonly = control->readonly,
+                                                               .required = true,
+                                                               .invalid = control->invalid});
+    if (result.changed)
+        redraw = true;
+}
+static void form_footer(cui_context *context, const cui_theme *theme, void *user, float width) {
+    bool disabled = *(bool *)user;
+    (void)width;
+    if (cui_button(context, cui_id_from(context, "form-save"), theme, cui_string("Save profile"),
+                   disabled)) {
+        if (form_name_buffer[0] && form_email_valid()) {
+            form_submissions++;
+            snprintf(form_status, sizeof(form_status), "Profile saved. Submissions: %d",
+                     form_submissions);
+        } else
+            snprintf(form_status, sizeof(form_status), "Correct the highlighted fields.");
+    }
+}
 static cui_scroll_state scroll_state;
 static cui_table_model *table;
 static cui_table_state table_state;
@@ -156,6 +198,14 @@ int gallery_init(void) {
                                              .capacity = sizeof(input_buffer),
                                              .history_bytes = 8192,
                                              .max_history_steps = 64});
+    form_name_edit = cui_edit_create((cui_edit_config){.buffer = form_name_buffer,
+                                                       .capacity = sizeof(form_name_buffer),
+                                                       .history_bytes = 2048,
+                                                       .max_history_steps = 16});
+    form_email_edit = cui_edit_create((cui_edit_config){.buffer = form_email_buffer,
+                                                        .capacity = sizeof(form_email_buffer),
+                                                        .history_bytes = 2048,
+                                                        .max_history_steps = 16});
     virtual_list = cui_virtual_create((cui_virtual_config){100000, 24});
     uint64_t *keys = malloc(100000 * sizeof(*keys));
     if (!keys || !virtual_list)
@@ -219,7 +269,8 @@ int gallery_init(void) {
                      CUI_SURFACE_ALERT);
     cui_surface_init(&sheet_surface, cui_id_from(ui, "sheet-surface"), CUI_SURFACE_SHEET);
     cui_surface_init(&popover_surface, cui_id_from(ui, "popover-surface"), CUI_SURFACE_POPOVER);
-    return ui && edit && dock && query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
+    return ui && edit && form_name_edit && form_email_edit && dock && query && number_state.edit &&
+           rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
     if (ui)
@@ -340,6 +391,52 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 53: {
+        bool readonly = form_mode == 2;
+        bool field_disabled = disabled || form_mode == 3;
+        bool name_invalid = !form_name_buffer[0], email_invalid = !form_email_valid();
+        gallery_form_control controls[] = {
+            {cui_id_from(ui, "form-name"), form_name_edit, &form_name_state, "Name", field_disabled,
+             readonly, name_invalid},
+            {cui_id_from(ui, "form-email"), form_email_edit, &form_email_state, "Work email",
+             field_disabled, readonly, email_invalid}};
+        const cui_form_field fields[] = {
+            {.id = cui_id_from(ui, "form-name-field"),
+             .control = controls[0].id,
+             .label = cui_string("Name"),
+             .description = cui_string("Shown to other workspace members."),
+             .error = cui_string("Enter a name."),
+             .required = true,
+             .invalid = name_invalid,
+             .disabled = field_disabled,
+             .readonly = readonly,
+             .render_control = form_control,
+             .user = &controls[0]},
+            {.id = cui_id_from(ui, "form-email-field"),
+             .control = controls[1].id,
+             .label = cui_string("Work email"),
+             .description = cui_string("Used for workspace notifications."),
+             .error = cui_string("Enter an address containing @ and a dot."),
+             .required = true,
+             .invalid = email_invalid,
+             .disabled = field_disabled,
+             .readonly = readonly,
+             .render_control = form_control,
+             .user = &controls[1]}};
+        bool save_disabled = field_disabled || readonly;
+        cui_form(ui, cui_id_from(ui, "profile-form"), &t, fields, 2,
+                 (cui_form_options){.width = width - 48,
+                                    .columns = width > 580 ? 2 : 1,
+                                    .name = cui_string("Profile form"),
+                                    .render_footer = form_footer,
+                                    .footer_user = &save_disabled});
+        cui_id status_id = cui_id_from(ui, "form-status");
+        cui_begin_box(ui, status_id, (cui_box){.width = -1});
+        cui_interact(ui, status_id, CUI_ROLE_STATUS, cui_string(form_status), false, false, 0);
+        cui_label(ui, &t, cui_string(form_status));
+        cui_end_box(ui);
+        break;
+    }
     case 7:
         cui_label(ui, &t, cui_string("A useful label, rendered by CUI."));
         break;
@@ -1199,6 +1296,19 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_form_mode(int mode) {
+    if (mode == form_mode || mode < 0 || mode > 3)
+        return;
+    form_mode = mode;
+    if (mode == 0 || mode == 1) {
+        cui_edit_select(form_email_edit, 0, cui_edit_get_text(form_email_edit).length);
+        cui_edit_insert(form_email_edit,
+                        cui_string(mode == 1 ? "ada.example.com" : "ada@example.com"));
+    }
+}
+int gallery_form_submissions(void) {
+    return form_submissions;
 }
 void gallery_surface_variant(int variant) {
     if (surface_variant != variant)

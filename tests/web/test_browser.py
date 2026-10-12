@@ -87,15 +87,57 @@ def main():
                 page.wait_for_timeout(50)
                 assert page.locator('#preview-card').is_visible()
                 assert 'draw commands' in page.locator('#preview-note').inner_text()
-            def semantic_index(name):
-                return page.evaluate('(name)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)!==27&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', name)
-            def click_semantic(name):
-                index = semantic_index(name)
+            def semantic_index(name, role=None):
+                return page.evaluate('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', {'name':name,'role':role})
+            def click_semantic(name, role=None):
+                index = semantic_index(name, role)
                 assert index is not None, name
                 canvas.scroll_into_view_if_needed()
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.evaluate('location.hash="Form"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Form"')
+            assert page.locator('#accessible [role=textbox]').count() == 2
+            for name in ['Name','Work email']:
+                field = page.locator(f'#accessible [role=textbox][aria-label="{name}"]')
+                assert field.get_attribute('aria-required') == 'true'
+                label_id = field.get_attribute('aria-labelledby')
+                assert label_id and page.locator(f'#{label_id}').get_attribute('aria-label') == name
+                assert field.get_attribute('aria-description')
+            count = page.evaluate('cuiGallery.exports.gallery_form_submissions()')
+            click_semantic('Save profile')
+            page.wait_for_function('(count)=>cuiGallery.exports.gallery_form_submissions()===count+1', arg=count)
+            assert 'Profile saved' in page.locator('#accessible [role=status]').get_attribute('aria-label')
+            page.locator('#form-mode').select_option('1')
+            email = page.locator('#accessible [role=textbox][aria-label="Work email"]')
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Work email"]`)?.getAttribute("aria-invalid")==="true"')
+            assert 'containing @' in email.get_attribute('aria-description')
+            click_semantic('Save profile')
+            page.wait_for_function('document.querySelector("#accessible [role=status]")?.getAttribute("aria-label")==="Correct the highlighted fields."')
+            assert page.evaluate('cuiGallery.exports.gallery_form_submissions()') == count + 1
+            click_semantic('Work email', 6)
+            page.keyboard.press('Control+a')
+            page.keyboard.type('grace@example.com')
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Work email"]`)?.getAttribute("aria-invalid")==="false"')
+            click_semantic('Save profile')
+            page.wait_for_function('(count)=>cuiGallery.exports.gallery_form_submissions()===count+2', arg=count)
+            page.locator('#form-mode').select_option('2')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=textbox]")).every(e=>e.getAttribute("aria-readonly")==="true")')
+            email_index = semantic_index('Work email', 6)
+            email_length = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', email_index)
+            click_semantic('Work email', 6)
+            page.keyboard.press('Control+a')
+            page.keyboard.type('invalid')
+            page.wait_for_timeout(40)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', email_index) == email_length
+            assert email.get_attribute('aria-invalid') == 'false'
+            page.locator('#form-mode').select_option('0')
+            click_semantic('Save profile')
+            page.wait_for_function('(count)=>cuiGallery.exports.gallery_form_submissions()===count+3', arg=count)
+            page.locator('#form-mode').select_option('3')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=textbox]")).every(e=>e.disabled)')
+            assert page.locator('#accessible button[aria-label="Save profile"]').is_disabled()
             page.evaluate('location.hash="Dialog"')
             page.wait_for_function('cuiGallery.renderedComponent==="Dialog"')
             click_semantic('Edit preferences')
@@ -667,7 +709,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 51 real WASM stories, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 52 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

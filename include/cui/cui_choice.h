@@ -120,6 +120,52 @@ cui_combobox_result cui_combobox_multi(cui_context *, cui_id input, const cui_th
                                        cui_choice_item *filtered, bool *filtered_selected,
                                        size_t filtered_capacity, bool *selected, cui_choice_popup *,
                                        cui_choice_popup_options);
+
+#define CUI_MENU_DEPTH_MAX 16
+typedef enum {
+    CUI_MENU_ACTION,
+    CUI_MENU_CHECK,
+    CUI_MENU_RADIO,
+    CUI_MENU_SEPARATOR,
+    CUI_MENU_LABEL,
+    CUI_MENU_SUBMENU
+} cui_menu_kind;
+typedef struct cui_menu_entry {
+    cui_id id;
+    cui_str label, icon, shortcut;
+    bool disabled;
+    cui_menu_kind kind;
+    bool *checked;
+    int *radio_value;
+    int radio_option;
+    const struct cui_menu_entry *children;
+    size_t child_count;
+} cui_menu_entry;
+typedef struct {
+    cui_overlay overlay;
+    cui_list_state levels[CUI_MENU_DEPTH_MAX];
+    cui_id path[CUI_MENU_DEPTH_MAX - 1];
+    cui_rect panels[CUI_MENU_DEPTH_MAX];
+    size_t depth;
+    bool depth_limit;
+    float row_height, padding; /* previous painted metrics for pointer hover */
+} cui_menu_tree_state;
+typedef struct {
+    cui_choice_popup_options popup;
+    bool keep_open_checks;
+} cui_menu_tree_options;
+void cui_menu_tree_init(cui_menu_tree_state *, cui_id popup);
+/* Ordered reducer before painting. Descriptors and pointed-to check/radio values
+ * are borrowed; IDs must be globally unique throughout the tree. */
+bool cui_base_menu_tree(cui_context *, cui_id trigger, cui_str name, const cui_menu_entry *,
+                        size_t count, cui_id *action, cui_menu_tree_state *, bool disabled,
+                        float dt, bool keep_open_checks);
+bool cui_menu_entry_is_disabled(const cui_menu_entry *);
+void cui_base_menu_entry(cui_context *, const cui_menu_entry *, bool disabled, bool expanded,
+                         cui_id parent);
+bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
+                   const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
+                   cui_menu_tree_options);
 #ifdef __cplusplus
 }
 #endif

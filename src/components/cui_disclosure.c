@@ -46,6 +46,8 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
         return false;
     bool changed = cui_base_accordion(ui, items, count, open, options);
     cui_interact(ui, container, CUI_ROLE_GROUP, cui_string(""), options.disabled, false, 0);
+    cui_set_semantic_details(ui, container,
+                             (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL});
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     for (size_t i = 0; i < count; ++i) {
         cui_disclosure_trigger(ui, items[i].id, theme, items[i].label, open[i],

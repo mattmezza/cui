@@ -356,11 +356,181 @@ static void test_multi_combobox(void) {
     cui_edit_destroy(query);
     cui_destroy(ui);
 }
+
+static bool menu_checked;
+static int menu_radio;
+static cui_menu_entry deep_entries[] = {
+    {.id = 72, .label = {"Deep action", 11}, .kind = CUI_MENU_ACTION}};
+static cui_menu_entry child_entries[] = {
+    {.id = 61, .label = {"Export formats", 14}, .kind = CUI_MENU_LABEL},
+    {.id = 62, .label = {"Export", 6}, .kind = CUI_MENU_ACTION},
+    {.id = 63,
+     .label = {"Advanced", 8},
+     .kind = CUI_MENU_SUBMENU,
+     .children = deep_entries,
+     .child_count = 1}};
+static cui_menu_entry tree_entries[] = {
+    {.id = 41, .label = {"File", 4}, .kind = CUI_MENU_LABEL},
+    {.id = 42,
+     .label = {"Open", 4},
+     .icon = {"+", 1},
+     .shortcut = {"Ctrl+O", 6},
+     .kind = CUI_MENU_ACTION},
+    {.id = 43, .kind = CUI_MENU_SEPARATOR},
+    {.id = 44, .label = {"Disabled", 8}, .disabled = true, .kind = CUI_MENU_ACTION},
+    {.id = 45, .label = {"Sidebar", 7}, .kind = CUI_MENU_CHECK, .checked = &menu_checked},
+    {.id = 46,
+     .label = {"Compact", 7},
+     .kind = CUI_MENU_RADIO,
+     .radio_value = &menu_radio,
+     .radio_option = 1},
+    {.id = 47,
+     .label = {"Comfortable", 11},
+     .kind = CUI_MENU_RADIO,
+     .radio_value = &menu_radio,
+     .radio_option = 2},
+    {.id = 48,
+     .label = {"Formats", 7},
+     .kind = CUI_MENU_SUBMENU,
+     .children = child_entries,
+     .child_count = 3}};
+static bool tree_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *action, bool disabled) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    bool activated =
+        cui_menu_tree(ui, 2, &theme, cui_string("File menu"), tree_entries, 8, action, state,
+                      (cui_menu_tree_options){.popup = {.disabled = disabled,
+                                                        .viewport = {0, 0, 640, 540},
+                                                        .width = 220,
+                                                        .dt = .016f},
+                                              .keep_open_checks = true});
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return activated;
+}
+static void test_menu_tree(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    assert(ui);
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 1100);
+    cui_id action = 0;
+    tree_scene(ui, &state, &action, false);
+    click(ui, 2);
+    tree_scene(ui, &state, &action, false);
+    assert(state.overlay.open && state.depth == 1 && cui_focused(ui) == 42);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    key(ui, CUI_KEY_ENTER);
+    assert(tree_scene(ui, &state, &action, false));
+    assert(!menu_checked && state.overlay.open && action == 45);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(tree_scene(ui, &state, &action, false));
+    assert(menu_radio == 1);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(tree_scene(ui, &state, &action, false));
+    assert(menu_radio == 2);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_RIGHT);
+    assert(!tree_scene(ui, &state, &action, false));
+    assert(state.depth == 2 && cui_focused(ui) == 62);
+    cui_rect parent = cui_bounds(ui, 48), child = cui_bounds(ui, 62);
+    assert(child.x > parent.x && child.w > 0);
+    key(ui, CUI_KEY_END);
+    key(ui, CUI_KEY_RIGHT);
+    tree_scene(ui, &state, &action, false);
+    assert(state.depth == 3 && cui_focused(ui) == 72);
+    key(ui, CUI_KEY_ESCAPE);
+    tree_scene(ui, &state, &action, false);
+    assert(state.depth == 2 && cui_focused(ui) == 63);
+    key(ui, CUI_KEY_LEFT);
+    tree_scene(ui, &state, &action, false);
+    assert(state.depth == 1 && cui_focused(ui) == 48);
+    key(ui, CUI_KEY_RIGHT);
+    key(ui, CUI_KEY_ENTER);
+    assert(tree_scene(ui, &state, &action, false));
+    assert(action == 62 && !state.overlay.open && cui_focused(ui) == 2);
+    size_t n = 0;
+    cui_semantics(ui, &n);
+    assert(n == 1);
+    /* Hover opens a submenu, and parent items remain clickable with it open. */
+    click(ui, 2);
+    tree_scene(ui, &state, &action, false);
+    parent = cui_bounds(ui, 48);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = parent.x + 3, .y = parent.y + 3}));
+    tree_scene(ui, &state, &action, false);
+    assert(state.depth == 2 && cui_focused(ui) == 62);
+    click(ui, 45);
+    assert(tree_scene(ui, &state, &action, false));
+    assert(menu_checked && state.depth == 1 && state.overlay.open && cui_focused(ui) == 45);
+    const cui_semantic *semantics = cui_semantics(ui, &n);
+    bool check_role = false, radio_role = false;
+    for (size_t i = 0; i < n; i++) {
+        if (semantics[i].id == 45)
+            check_role = semantics[i].role == CUI_ROLE_MENUITEMCHECKBOX && semantics[i].checked;
+        if (semantics[i].id == 47)
+            radio_role = semantics[i].role == CUI_ROLE_MENUITEMRADIO && semantics[i].checked;
+    }
+    assert(check_role && radio_role);
+    key(ui, CUI_KEY_ESCAPE);
+    tree_scene(ui, &state, &action, false);
+    assert(!state.overlay.open && cui_focused(ui) == 2);
+    key(ui, CUI_KEY_UP);
+    tree_scene(ui, &state, &action, false);
+    assert(state.overlay.open && cui_focused(ui) == 48);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "c"}));
+    tree_scene(ui, &state, &action, false);
+    assert(cui_focused(ui) == 46);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "c"}));
+    tree_scene(ui, &state, &action, false);
+    assert(cui_focused(ui) == 47);
+    tree_scene(ui, &state, &action, true);
+    assert(!state.overlay.open && state.depth == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 639, .y = 539}));
+    tree_scene(ui, &state, &action, false);
+    assert(!state.overlay.open);
+    cui_destroy(ui);
+}
+
+static void test_menu_depth_bound(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    assert(ui);
+    cui_menu_entry chain[CUI_MENU_DEPTH_MAX + 1];
+    for (size_t i = 0; i < CUI_MENU_DEPTH_MAX + 1; i++)
+        chain[i] =
+            (cui_menu_entry){.id = 4000 + i,
+                             .label = {"Level", 5},
+                             .kind = i < CUI_MENU_DEPTH_MAX ? CUI_MENU_SUBMENU : CUI_MENU_ACTION,
+                             .children = i < CUI_MENU_DEPTH_MAX ? &chain[i + 1] : NULL,
+                             .child_count = i < CUI_MENU_DEPTH_MAX ? 1 : 0};
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 3900);
+    cui_id action = 0;
+    cui_theme theme = cui_theme_light();
+    for (size_t frame = 0; frame < CUI_MENU_DEPTH_MAX + 2; frame++) {
+        if (frame == 1)
+            click(ui, 2);
+        if (frame >= 2)
+            key(ui, CUI_KEY_RIGHT);
+        assert(cui_begin_frame(ui, 640, 540, .016f));
+        cui_menu_tree(ui, 2, &theme, cui_string("Depth"), chain, 1, &action, &state,
+                      (cui_menu_tree_options){.popup = {.viewport = {0, 0, 640, 540}}});
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        assert(state.depth <= CUI_MENU_DEPTH_MAX);
+    }
+    assert(state.depth == CUI_MENU_DEPTH_MAX && state.depth_limit && !action);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
     test_multi_select();
     test_multi_combobox();
+    test_menu_tree();
+    test_menu_depth_bound();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

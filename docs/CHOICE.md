@@ -173,3 +173,64 @@ selected choices, pointer toggling of filtered suggestions and focus restoration
 The chip ID is its source item ID XOR `0x45f2b82e6c9bf447`; the chip container is
 the trigger/input ID XOR `0x97c22bb751e0d56a`. Multi Select's outer container uses
 `0x471d50d3bf973ac9`. Reserve those IDs as with other component internals.
+
+## Hierarchical menus
+
+`cui_menu_tree` renders actual menu descriptors instead of limiting entries to the
+flat `cui_choice_item` array. Initialize `cui_menu_tree_state` once with a unique
+popup ID; the application owns descriptor arrays and check/radio values.
+
+```c
+cui_menu_entry commands[] = {
+    {.id = 101, .label = cui_string("Open"), .shortcut = cui_string("Ctrl+O")},
+    {.id = 102, .kind = CUI_MENU_SEPARATOR},
+    {.id = 103, .label = cui_string("Show sidebar"),
+     .kind = CUI_MENU_CHECK, .checked = &sidebar_visible},
+    {.id = 104, .label = cui_string("Export"), .kind = CUI_MENU_SUBMENU,
+     .children = export_commands, .child_count = export_count},
+};
+if (cui_menu_tree(ui, 100, &theme, cui_string("File"), commands, 4,
+        &last_action, &menu_state,
+        (cui_menu_tree_options){.popup.viewport = {0, 0, width, height}})) {
+    dispatch_command(last_action);
+}
+```
+
+The reducer runs before painting. Normal actions, checked items, mutually selected
+radio items, noninteractive section labels, separators and nested submenus have
+real behavior and distinct visual treatment. Check/radio values are modified before
+the activated action ID is returned. `keep_open_checks` keeps the menu open for
+these actions; ordinary actions close the whole tree and restore the trigger.
+The semantic roles distinguish normal, checkbox and radio menu items; checked
+state, submenu expansion, controlled child menu IDs and semantic parent links are
+reported independently of styling.
+
+Up/Down and Home/End skip labels, separators and disabled entries. Right or
+activation opens a submenu; Left returns to its parent. Escape closes the innermost
+focused submenu before the root. Keyboard navigation and activation are processed
+in event order, so Right followed by Enter in one batch activates the first child
+rather than the submenu trigger. Per-level ASCII prefix search follows the list
+behavior. Hovering a submenu opens it, and parent entries remain clickable while
+children are open. Secondary pointer buttons do not dispatch ordinary menu actions.
+
+Nested menus are separate floating portals with increasing paint layers. They
+place beside their parent item and flip/clamp against the supplied viewport. Each
+level paints a bounded keyboard window and exposes one active Tab stop. The root
+focus scope traps background focus while child scopes preserve parent hit testing.
+An empty submenu or one with invalid child storage is disabled rather than opening
+an unreachable empty scope.
+
+Tree depth is bounded by `CUI_MENU_DEPTH_MAX` (16 levels). Attempting a deeper
+submenu leaves the existing tree open and sets `state.depth_limit`; there is no
+unbounded recursion or allocation. Descriptor trees must be acyclic and all IDs
+must be globally unique. A child scope ID is its parent entry ID XOR
+`0x4b64d23e91a738c1`. Arrays and pointed-to values must remain valid for the call.
+The state stores stable IDs and metrics, not borrowed descriptor pointers.
+
+The tests run check/radio mutations, repeated toggles, labels/separator/disabled
+skipping, three-level navigation and Escape restoration, batched child activation,
+real pointer hover, parent clicking with a child open, typeahead and the 16-level
+depth limit. Theme metrics supply menu density; text icons and shortcut hints are
+caller-provided and do not install key bindings. Context opening, URL dispatch,
+custom menu bodies, delayed hover/grace areas, wheel/touch scrolling, arbitrary
+item heights and a native OS accessibility bridge are still parity gaps.

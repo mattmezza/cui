@@ -87,6 +87,46 @@ cui_id cui_switch_thumb_id(cui_id);
 bool cui_switch_ex(cui_context *, cui_id, const cui_theme *, cui_str label, bool *value,
                    cui_switch_state *, cui_switch_options);
 bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+typedef enum { CUI_TOGGLE_GHOST, CUI_TOGGLE_OUTLINE } cui_toggle_variant;
+typedef struct {
+    cui_toggle_variant variant;
+    cui_control_size size;
+    bool disabled, skip_tab, focus_ring;
+    float width;
+    cui_str accessibility_label, tooltip;
+    cui_button_content_fn content;
+    void *content_user;
+    cui_boolean_change_fn on_change;
+    void *change_user;
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges;
+    bool custom_corners, custom_border_edges;
+    cui_hover_options tooltip_options;
+} cui_toggle_options;
+cui_toggle_options cui_toggle_options_default(void);
+bool cui_toggle_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
+                   cui_hover_state *tooltip_state, cui_toggle_options);
+typedef struct {
+    cui_id id;
+    cui_str label;
+    cui_toggle_options options;
+    cui_hover_state *tooltip_state;
+} cui_toggle_item;
+typedef void (*cui_toggle_group_change_fn)(void *, const bool *requested_values, size_t count);
+typedef struct {
+    cui_control_size size;
+    cui_toggle_variant variant;
+    bool disabled, segmented, custom_gap;
+    float gap;
+    cui_str accessibility_label;
+    cui_toggle_group_change_fn on_change;
+    void *change_user;
+    /* Required with on_change; borrowed synchronous request scratch, separate from values. */
+    bool *requested_values;
+    size_t requested_capacity;
+} cui_toggle_group_style_options;
+bool cui_toggle_group_ex(cui_context *, cui_id, const cui_theme *, const cui_toggle_item *,
+                         bool *values, size_t count, cui_toggle_group_style_options);
 bool cui_toggle(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 typedef cui_checkbox_options cui_radio_options;
 bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,

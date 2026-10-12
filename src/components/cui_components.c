@@ -17,13 +17,6 @@ static void cui_components_focus(cui_context *ui, cui_id id, const cui_theme *t,
         b->border_width = 2;
     }
 }
-static void cui_components_mark(cui_context *ui, const cui_theme *t, const char *text,
-                                bool selected, bool disabled) {
-    cui_text(ui, cui_string(text), t->font_size,
-             disabled   ? t->muted
-             : selected ? t->on_primary
-                        : t->text);
-}
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_button_options options) {
     if (!ui || !t)
@@ -105,25 +98,6 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
     return cui_button_ex(ui, id, t, name, (cui_button_options){.disabled = disabled});
-}
-static bool cui_components_binary_control(cui_context *ui, cui_id id, const cui_theme *t,
-                                          cui_str name, bool *value, bool disabled, int kind) {
-    if (!value)
-        return false;
-    bool changed = kind == 0   ? cui_base_checkbox(ui, id, name, value, disabled)
-                   : kind == 1 ? cui_base_switch(ui, id, name, value, disabled)
-                               : cui_base_toggle(ui, id, name, value, disabled);
-    cui_box b = cui_components_control(t, disabled, kind == 2 && *value);
-    cui_components_focus(ui, id, t, &b);
-    cui_begin_box(ui, id, b);
-    const char *indicator = kind == 1 ? (*value ? "ON" : "OFF") : (*value ? "+" : "-");
-    cui_components_mark(ui, t, indicator, kind == 2 && *value, disabled);
-    cui_text(ui, name, t->font_size,
-             disabled              ? t->muted
-             : kind == 2 && *value ? t->on_primary
-                                   : t->text);
-    cui_end_box(ui);
-    return changed;
 }
 static const unsigned char cui_components_check_pixels[16 * 16 * 4] = {
     255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255, 0,   255, 255, 255,
@@ -336,19 +310,18 @@ static void cui_components_spring_step(cui_switch_state *s, double target,
 }
 static void cui_components_switch_label(cui_context *ui, const cui_theme *t, cui_str label,
                                         cui_switch_options o, float font) {
-    cui_begin_box(ui, 0,
-                  (cui_box){.width = o.width ? -1 : 0,
-                            .height = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL
-                                          ? 16
-                                      : o.size == CUI_CONTROL_LARGE ? 24
-                                                                    : 20,
-                            .align_y = CUI_ALIGN_CENTER});
+    cui_begin_box(ui, 0, (cui_box){.width = o.width ? -1 : 0});
     if (o.content)
         o.content(ui, o.content_user);
-    else if (label.length)
-        cui_text(ui, label, font, o.disabled ? t->muted : t->text);
+    else if (label.length) {
+        float line_height = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL ? 16
+                            : o.size == CUI_CONTROL_LARGE                               ? 24
+                                                                                        : 20;
+        cui_text_with_line_height(ui, label, font, o.disabled ? t->muted : t->text, line_height);
+    }
     cui_end_box(ui);
 }
+
 bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
                    cui_switch_state *state, cui_switch_options o) {
     if (!ui || !id || !t || !value || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
@@ -442,9 +415,184 @@ bool cui_switch(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bo
                 bool disabled) {
     return cui_switch_ex(ui, id, t, name, value, NULL, (cui_switch_options){.disabled = disabled});
 }
-bool cui_toggle(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v, bool d) {
-    return cui_components_binary_control(u, i, t, n, v, d, 2);
+
+cui_toggle_options cui_toggle_options_default(void) {
+    return (cui_toggle_options){0};
 }
+static bool cui_components_toggle_valid(cui_str label, cui_toggle_options o) {
+    float radii[] = {o.corner_radii.top_left, o.corner_radii.top_right, o.corner_radii.bottom_left,
+                     o.corner_radii.bottom_right};
+    float edges[] = {o.border_edges.left, o.border_edges.right, o.border_edges.top,
+                     o.border_edges.bottom};
+    for (size_t i = 0; i < 4; i++) {
+        if (o.custom_corners && (!isfinite(radii[i]) || radii[i] < 0))
+            return false;
+        if (o.custom_border_edges && (!isfinite(edges[i]) || edges[i] < 0))
+            return false;
+    }
+    return o.size >= CUI_CONTROL_MEDIUM && o.size <= CUI_CONTROL_XSMALL &&
+           o.variant >= CUI_TOGGLE_GHOST && o.variant <= CUI_TOGGLE_OUTLINE && isfinite(o.width) &&
+           (!label.length || label.data) &&
+           (!o.accessibility_label.length || o.accessibility_label.data) &&
+           (!o.tooltip.length || o.tooltip.data);
+}
+
+bool cui_toggle_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
+                   cui_hover_state *tooltip_state, cui_toggle_options o) {
+    if (!ui || !id || !t || !value || !cui_components_toggle_valid(label, o) ||
+        !isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
+        return false;
+    cui_str name = o.accessibility_label.length ? o.accessibility_label
+                   : o.tooltip.length           ? o.tooltip
+                                                : label;
+    bool requested = *value;
+    bool changed = cui_base_toggle(ui, id, name, &requested, o.disabled);
+    if (changed) {
+        if (o.on_change)
+            o.on_change(o.change_user, requested);
+        else
+            *value = requested;
+    }
+    cui_update_semantic(ui, id, *value, *value ? 1 : 0);
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    bool accent = *value || (!o.disabled && cui_hovered(ui, id));
+    float side = o.size == CUI_CONTROL_XSMALL  ? 20
+                 : o.size == CUI_CONTROL_SMALL ? 24
+                 : o.size == CUI_CONTROL_LARGE ? 36
+                                               : 32;
+    float padding = o.size == CUI_CONTROL_XSMALL  ? 2
+                    : o.size == CUI_CONTROL_SMALL ? 4
+                    : o.size == CUI_CONTROL_LARGE ? 12
+                                                  : 8;
+    float font = (o.size == CUI_CONTROL_XSMALL  ? 12
+                  : o.size == CUI_CONTROL_LARGE ? 16
+                                                : 14) *
+                 t->font_size / 16;
+    cui_box box = {.width = o.width,
+                   .height = side,
+                   .radius = t->radius,
+                   .background = accent                            ? t->accent
+                                 : o.variant == CUI_TOGGLE_OUTLINE ? t->background
+                                                                   : (cui_color){0},
+                   .border = t->border,
+                   .border_width = o.variant == CUI_TOGGLE_OUTLINE ? 1 : 0,
+                   .align_x = CUI_ALIGN_CENTER,
+                   .align_y = CUI_ALIGN_CENTER,
+                   .custom_corners = o.custom_corners,
+                   .corner_radii = o.corner_radii,
+                   .custom_border_edges = o.custom_border_edges && o.variant == CUI_TOGGLE_OUTLINE,
+                   .border_edges = o.border_edges};
+    if (o.focus_ring && !o.disabled)
+        cui_components_focus(ui, id, t, &box);
+    cui_begin_box(ui, id, box);
+    /* A zero-height minimum spacer preserves min-width without constraining arbitrary children. */
+    if (o.width == 0) {
+        cui_begin_box(ui, 0, (cui_box){.width = side, .height = 0, .fixed_height = true});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, 0, (cui_box){.row = true, .height = -1, .align_y = CUI_ALIGN_CENTER});
+    cui_begin_box(ui, 0, (cui_box){.width = padding, .height = 0, .fixed_height = true});
+    cui_end_box(ui);
+    if (o.content)
+        o.content(ui, o.content_user);
+    else if (label.length)
+        cui_text_with_line_height(ui, label, font, accent ? t->accent_foreground : t->text,
+                                  font * 1.25f);
+    cui_begin_box(ui, 0, (cui_box){.width = padding, .height = 0, .fixed_height = true});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    if (tooltip_state && o.tooltip.length) {
+        cui_hover_options tooltip = o.tooltip_options;
+        tooltip.trigger = id;
+        tooltip.disabled |= o.disabled;
+        cui_tooltip(ui, cui_components_child_id(id, 5100), t, tooltip_state, o.tooltip, tooltip);
+    }
+    return changed;
+}
+bool cui_toggle(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
+                bool disabled) {
+    return cui_toggle_ex(ui, id, t, label, value, NULL, (cui_toggle_options){.disabled = disabled});
+}
+typedef struct {
+    cui_toggle_group_style_options *options;
+    size_t count, index;
+    const bool *values;
+} cui_components_toggle_request;
+static void cui_components_toggle_group_request(void *user, bool requested) {
+    cui_components_toggle_request *r = user;
+    for (size_t i = 0; i < r->count; i++)
+        r->options->requested_values[i] = r->values[i];
+    r->options->requested_values[r->index] = requested;
+    r->options->on_change(r->options->change_user, r->options->requested_values, r->count);
+}
+bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                         const cui_toggle_item *items, bool *values, size_t count,
+                         cui_toggle_group_style_options o) {
+    if (!ui || !id || !t || (count && (!items || !values)) || o.size < CUI_CONTROL_MEDIUM ||
+        o.size > CUI_CONTROL_XSMALL || o.variant < CUI_TOGGLE_GHOST ||
+        o.variant > CUI_TOGGLE_OUTLINE || !isfinite(o.gap) || o.gap < 0 ||
+        (o.accessibility_label.length && !o.accessibility_label.data) ||
+        (o.on_change &&
+         (!o.requested_values || o.requested_capacity < count || o.requested_values == values)))
+        return false;
+    if (!isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
+        return false;
+    if (o.on_change) {
+        uintptr_t a = (uintptr_t)values, b = (uintptr_t)o.requested_values;
+        if ((a > b ? a - b : b - a) < count * sizeof(bool))
+            return false;
+    }
+    for (size_t i = 0; i < count; i++) {
+        if (!items[i].id || items[i].id == id ||
+            !cui_components_toggle_valid(items[i].label, items[i].options))
+            return false;
+        for (size_t j = 0; j < i; j++)
+            if (items[i].id == items[j].id)
+                return false;
+    }
+    if (o.on_change)
+        for (size_t i = 0; i < count; i++)
+            o.requested_values[i] = values[i];
+    cui_interact(ui, id, CUI_ROLE_TOOLBAR, o.accessibility_label, o.disabled, false, 0);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.orientation = CUI_ORIENTATION_HORIZONTAL});
+    cui_begin_box(ui, id,
+                  (cui_box){.row = true,
+                            .gap = o.custom_gap  ? o.gap
+                                   : o.segmented ? 0
+                                                 : 8});
+    bool changed = false;
+    for (size_t i = 0; i < count; i++) {
+        cui_toggle_options child = items[i].options;
+        child.size = o.size;
+        child.variant = o.variant;
+        child.disabled |= o.disabled;
+        child.on_change = NULL;
+        child.change_user = NULL;
+        if (o.segmented) {
+            child.custom_corners = true;
+            child.corner_radii = (cui_corner_radii){.top_left = i == 0 ? t->radius : 0,
+                                                    .bottom_left = i == 0 ? t->radius : 0,
+                                                    .top_right = i + 1 == count ? t->radius : 0,
+                                                    .bottom_right = i + 1 == count ? t->radius : 0};
+            child.custom_border_edges = true;
+            float border = o.variant == CUI_TOGGLE_OUTLINE ? 1 : 0;
+            child.border_edges = (cui_border_edges){
+                .left = i == 0 ? border : 0, .right = border, .top = border, .bottom = border};
+        }
+        cui_components_toggle_request request = {&o, count, i, values};
+        if (o.on_change) {
+            child.on_change = cui_components_toggle_group_request;
+            child.change_user = &request;
+        }
+        changed |= cui_toggle_ex(ui, items[i].id, t, items[i].label, &values[i],
+                                 items[i].tooltip_state, child);
+    }
+    cui_end_box(ui);
+    return changed;
+}
+
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
     if (!ui || !t || !value)

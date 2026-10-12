@@ -909,21 +909,24 @@ int main(void) {
          hover_halo = false, eased_crosshair = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_IMAGE) {
-            image = true;
-            assert(draw.commands[i].bitmap.bitmap.pixels == pixels);
-            assert(draw.commands[i].bounds.w == 64 && draw.commands[i].bounds.h == 48);
+            if (draw.commands[i].bitmap.bitmap.pixels == pixels) {
+                image = true;
+                assert(draw.commands[i].bounds.w == 64 && draw.commands[i].bounds.h == 48);
+            } else if (draw.commands[i].bitmap.bitmap.width == 1 &&
+                       draw.commands[i].bitmap.bitmap.height == 38) {
+                hover_crosshair = draw.commands[i].bounds.w == 1 &&
+                                  fabsf(draw.commands[i].bounds.y) < .01f &&
+                                  fabsf(draw.commands[i].bounds.h - 38) < .01f;
+                const unsigned char *guide = draw.commands[i].bitmap.bitmap.pixels;
+                eased_crosshair = guide[3] > 0 && guide[3 + 4 * 4] == 0 &&
+                                  fabsf(guide[3] - (options.grid.a ? options.grid.a : 150) *
+                                                       state.tooltip_focus) <= 1;
+            }
         } else if (draw.commands[i].type == CUI_DRAW_TEXT) {
             text = true;
             if (draw.commands[i].text.length == 1 && draw.commands[i].text.data[0] == 'Q')
                 formatted = true;
         } else if (draw.commands[i].type == CUI_DRAW_RECT) {
-            hover_crosshair |= draw.commands[i].bounds.w == 1 &&
-                               fabsf(draw.commands[i].bounds.y) < .01f &&
-                               fabsf(draw.commands[i].bounds.h - 38) < .01f;
-            if (draw.commands[i].bounds.w == 1 && draw.commands[i].bounds.h > 20)
-                eased_crosshair |=
-                    fabsf(draw.commands[i].color.a -
-                          (options.grid.a ? options.grid.a : 150) * state.tooltip_focus) <= 1;
             hover_halo |= draw.commands[i].bounds.w == 10 && draw.commands[i].bounds.h == 10;
         }
     assert(image && text && formatted && hover_crosshair && hover_halo && eased_crosshair);

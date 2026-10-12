@@ -512,11 +512,17 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float bottom = h - (o->hide_x_axis ? 0 : 20 * h / o->height);
             cui_color crosshair = o->grid.a ? o->grid : (cui_color){120, 120, 120, 150};
             crosshair.a = (unsigned char)lroundf(crosshair.a * opacity);
-            if (bottom > 0 && bottom <= 16384 && state->hover_guide_pixels &&
-                state->hover_guide_capacity >= (size_t)ceilf(bottom) * 4) {
+            unsigned char *guide_pixels = state->hover_guide_pixels;
+            if (bottom > 0 && bottom <= 4096 &&
+                (!guide_pixels || state->hover_guide_capacity < (size_t)ceilf(bottom) * 4))
+                guide_pixels =
+                    cui_resource_get(ui, id, UINT64_C(0xc168179b47d043a2), 4096 * 4, NULL, NULL);
+            if (bottom > 0 && bottom <= 16384 && guide_pixels &&
+                (guide_pixels != state->hover_guide_pixels ||
+                 state->hover_guide_capacity >= (size_t)ceilf(bottom) * 4)) {
                 unsigned rows = (unsigned)ceilf(bottom);
                 for (unsigned row = 0; row < rows; row++) {
-                    unsigned char *pixel = state->hover_guide_pixels + (size_t)row * 4;
+                    unsigned char *pixel = guide_pixels + (size_t)row * 4;
                     pixel[0] = crosshair.r;
                     pixel[1] = crosshair.g;
                     pixel[2] = crosshair.b;
@@ -532,9 +538,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     (cui_rect){x, top, 1, bottom});
                 ok &= cui_paint_bitmap(
                     ui, id ^ UINT64_C(0x9f39c738cd235002),
-                    (cui_bitmap_paint){.bitmap = {state->hover_guide_pixels, 1, rows, 4,
-                                                  state->hover_guide_revision},
-                                       .opacity = 1},
+                    (cui_bitmap_paint){
+                        .bitmap = {guide_pixels, 1, rows, 4, state->hover_guide_revision},
+                        .opacity = 1},
                     (cui_box){
                         .width = 1, .height = bottom, .fixed_width = true, .fixed_height = true});
                 cui_end_box(ui);

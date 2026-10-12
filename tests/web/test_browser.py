@@ -313,14 +313,27 @@ def main():
             def wait_semantic(name, role):
                 page.wait_for_function('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', arg={'name':name,'role':role})
             def click_semantic(name, role=None):
-                index = semantic_index(name, role)
-                assert index is not None, name
                 canvas.scroll_into_view_if_needed()
-                bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
-                page.evaluate('y=>{const rect=document.querySelector("canvas").getBoundingClientRect(),header=document.querySelector("header").getBoundingClientRect(),target=rect.top+y;if(target<header.bottom+8)window.scrollBy(0,target-header.bottom-8);}', bounds[1]+bounds[3]/2)
-                rectangle = canvas.bounding_box()
-                assert page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x':rectangle['x']+bounds[0]+bounds[2]/2,'y':rectangle['y']+bounds[1]+bounds[3]/2}), name
-                page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+                for attempt in range(12):
+                    target = page.evaluate('''({name,role})=>{
+                        const e=cuiGallery.exports,canvas=document.querySelector('canvas');
+                        const index=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>
+                            (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&
+                            new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
+                        if(index===undefined)return null;
+                        const rect=canvas.getBoundingClientRect();
+                        const x=rect.left+e.gallery_semantic(index,1)+e.gallery_semantic(index,3)/2;
+                        const y=rect.top+e.gallery_semantic(index,2)+e.gallery_semantic(index,4)/2;
+                        const top=document.querySelector('header').getBoundingClientRect().bottom+8;
+                        const bottom=innerHeight-8;
+                        if(y<top){window.scrollBy(0,y-top);return null;}
+                        if(y>bottom){window.scrollBy(0,y-bottom);return null;}
+                        return document.elementFromPoint(x,y)===canvas?[x,y]:null;
+                    }''', {'name':name,'role':role})
+                    if target is not None:
+                        break
+                assert target is not None, name
+                page.mouse.click(*target)
             def dropdown_select(control, value, role=None):
                 control_change('dropdown-'+control, value)
                 if role is not None:
@@ -2148,6 +2161,7 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(1)===1&&cuiGallery.exports.gallery_questionnaire_stats(6)===1')
             assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(5)') == 1
             assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(11)') == 2
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))).includes("Responses submitted")')
             click_semantic('Start over', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===0&&cuiGallery.exports.gallery_questionnaire_stats(1)===0')
             control_change('questionnaire-size', '3')

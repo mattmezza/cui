@@ -6,6 +6,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* Optional application SVG source override; false uses the bundled artwork.
+ * Bytes are borrowed only while the icon is prepared. No implicit I/O. */
+typedef bool (*cui_theme_icon_loader_fn)(void *user, cui_str path, cui_str *svg);
 typedef enum {
     CUI_THEME_BUTTON_DEFAULT,
     CUI_THEME_BUTTON_PRIMARY,
@@ -47,6 +50,9 @@ typedef struct {
     cui_color title_bar, title_bar_border;
     cui_color sidebar, sidebar_foreground, sidebar_border, sidebar_accent,
         sidebar_accent_foreground;
+    cui_theme_icon_loader_fn icon_loader;
+    void *icon_loader_user;
+    uint64_t icon_revision; /* Increment when the same loader supplies new artwork. */
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

@@ -48,6 +48,17 @@ introduced by CUI are removed afterward. Including both implementations in the
 same translation unit is unsupported because their private types and static
 functions share names.
 
+Built-in artwork can be replaced across a theme by assigning `theme.icon_loader`
+and `theme.icon_loader_user`. The callback receives a canonical path such as
+`icons/close.svg` or `icons/chevron-down.svg`; return your SVG bytes and `true`
+to replace it, or `false` to use the bundled default. `cui_icon_named` and
+`cui_icon_spinner` use this provider, including the component controls that call
+them. Increment `theme.icon_revision` when artwork changes without changing the
+callback or user pointer. Cached masks otherwise survive ordinary redraws.
+The theme is borrowed during rendering; its provider user data must stay valid
+while the application uses that theme. SVG colors become a monochrome alpha
+mask, tinted with the control's semantic foreground color.
+
 ## Size, color and transforms
 
 Zero options inherit `theme.font_size` and `theme.text`. Hosts with their own text

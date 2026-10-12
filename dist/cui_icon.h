@@ -16171,6 +16171,9 @@ typedef struct {
     size_t catalog_index;
     double started;
     bool initialized;
+    cui_theme_icon_loader_fn loader;
+    void *loader_user;
+    uint64_t revision;
 } cui_icon_resource;
 static void cui_icon_resource_collect(void *payload) {
     cui_icon_state_collect(&((cui_icon_resource *)payload)->state);
@@ -16213,10 +16216,16 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
     cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0xe8e2ea151d9d14b4));
     if (!resource)
         return CUI_ICON_ALLOCATION;
-    if (resource->catalog_index != index) {
-        if (!cui_icon_set_name(&resource->state, cui_icon_catalog_name(index), NULL, NULL))
+    if (resource->catalog_index != index || resource->loader != theme->icon_loader ||
+        resource->loader_user != theme->icon_loader_user ||
+        resource->revision != theme->icon_revision) {
+        if (!cui_icon_set_name(&resource->state, cui_icon_catalog_name(index), theme->icon_loader,
+                               theme->icon_loader_user))
             return resource->state.error;
         resource->catalog_index = index;
+        resource->loader = theme->icon_loader;
+        resource->loader_user = theme->icon_loader_user;
+        resource->revision = theme->icon_revision;
     }
     return cui_icon(ui, id, theme, &resource->state, options);
 }
@@ -16227,10 +16236,16 @@ cui_icon_error cui_icon_spinner(cui_context *ui, cui_id id, const cui_theme *the
     cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0x81f69ad695af247d));
     if (!resource)
         return CUI_ICON_ALLOCATION;
-    if (resource->catalog_index == SIZE_MAX) {
-        if (!cui_icon_set_name(&resource->state, cui_string("loader"), NULL, NULL))
+    if (resource->catalog_index == SIZE_MAX || resource->loader != theme->icon_loader ||
+        resource->loader_user != theme->icon_loader_user ||
+        resource->revision != theme->icon_revision) {
+        if (!cui_icon_set_name(&resource->state, cui_string("loader"), theme->icon_loader,
+                               theme->icon_loader_user))
             return resource->state.error;
         resource->catalog_index = 0;
+        resource->loader = theme->icon_loader;
+        resource->loader_user = theme->icon_loader_user;
+        resource->revision = theme->icon_revision;
     }
     float phase =
         cui_reduced_motion(ui) ? 0 : (float)fmod((cui_frame_time(ui) - resource->started) / .8, 1);

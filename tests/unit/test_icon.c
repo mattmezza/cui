@@ -295,6 +295,60 @@ static cui_bitmap first_image(cui_draw_list draw) {
             return draw.commands[i].bitmap.bitmap;
     return (cui_bitmap){0};
 }
+typedef struct {
+    unsigned calls;
+    const char *svg;
+    bool fallback;
+} theme_icons;
+static bool theme_icon_loader(void *user, cui_str path, cui_str *svg) {
+    theme_icons *icons = user;
+    assert(path.length > 6 && !memcmp(path.data, "icons/", 6));
+    icons->calls++;
+    *svg = cui_string(icons->svg);
+    return !icons->fallback;
+}
+static void test_theme_artwork(void) {
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
+    cui_theme theme = cui_theme_light();
+    theme_icons icons = {.svg = asymmetric};
+    theme.icon_loader = theme_icon_loader;
+    theme.icon_loader_user = &icons;
+    cui_bitmap previous = {0};
+    for (unsigned frame = 0; frame < 4; ++frame) {
+        if (frame == 2) {
+            icons.svg = wide;
+            theme.icon_revision++;
+        }
+        if (frame == 3) {
+            icons.fallback = true;
+            theme.icon_revision++;
+        }
+        assert(cui_begin_frame(ui, 100, 100, 0));
+        assert(cui_icon_named(ui, 1, &theme, cui_string("close"), (cui_icon_options){0}) ==
+               CUI_ICON_OK);
+        cui_bitmap bitmap = first_image(cui_end_frame(ui));
+        assert(cui_bitmap_valid(bitmap) && covered(bitmap));
+        assert(icons.calls == (frame ? frame : 1));
+        if (frame == 1)
+            assert(bitmap.pixels == previous.pixels);
+        if (frame < 2) {
+            float x, y;
+            centroid(bitmap, &x, &y);
+            assert(x < 6);
+        }
+        if (frame == 2) {
+            float x, y;
+            centroid(bitmap, &x, &y);
+            assert(x > 7);
+        }
+        previous = bitmap;
+    }
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_icon_spinner(ui, 2, &theme, (cui_icon_options){0}) == CUI_ICON_OK);
+    assert(cui_bitmap_valid(first_image(cui_end_frame(ui))) && icons.calls == 4);
+    cui_destroy(ui);
+}
 static void test_context_convenience(void) {
     cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
     cui_theme theme = cui_theme_light();
@@ -350,6 +404,7 @@ static void test_context_convenience(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    test_theme_artwork();
     test_context_convenience();
     test_assets();
     test_source_and_raster();

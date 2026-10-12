@@ -455,6 +455,46 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_first_list_table(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source =
+        "10. | a | b |\n    | --- | --- |\n    | x | y |\n    - child\n\n    after\n11. next";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 7 && f.blocks[0].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+           f.blocks[0].list_item && f.blocks[0].list_ordered && f.blocks[0].list_number == 10);
+    assert(f.blocks[1].list_parent == 0 && f.blocks[3].list_parent == 0 &&
+           f.blocks[4].list_parent == 0 && f.blocks[5].list_parent == 0 &&
+           f.blocks[6].list_number == 11);
+    assert(cui_text_view_select(&f.state, 0, f.blocks[6].text.end));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(
+        output,
+        "10. | a | b |\n    | :-- | :-- |\n    | x | y |\n    after\n    - child\n11. next"));
+    cui_text_view_layout_options o = {
+        .width = 400, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].table_frame.x == 28 && f.blocks[0].table_frame.w == 372 &&
+           f.blocks[0].text_inset == 8 && f.blocks[4].bounds.y == f.blocks[0].table_frame.h);
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("- | abcdefghijklmnopqrstuvwxyz | b |\n  | --- | --- |\n  | x | y |")) ==
+        CUI_TEXT_VIEW_OK);
+    o.width = 100;
+    o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    f.blocks[0].table_scroll.x = 3;
+    assert(cui_text_view_set_text(&f.state, text("- | abcdefghijklmnopqrstuvwxyz | b |\n  | --- | "
+                                                 "--- |\n  | x | y |\n  | next | row |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].table_scroll.x == 3);
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].table_frame.x == 14 && f.blocks[0].table_frame.w == 86 &&
+           f.blocks[0].table_track_width > 86);
+}
 static void test_nested_table_structure(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1276,6 +1316,59 @@ static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *th
                       (cui_button_options){.size = CUI_CONTROL_SMALL}))
         ++action_clicks;
 }
+static void test_first_list_table_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(
+        cui_text_view_set_text(
+            &f.state, text("- | abcdefghijklmnopqrstuvwxyz | b |\n  | --- | --- |\n  | x | y |")) ==
+        CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 100;
+    o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    cui_draw_list d = frame(ui, &f, o);
+    bool marker = false, clip = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *command = &d.commands[i];
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 4 &&
+            !memcmp(command->text.data, "\xe2\x80\xa2 ", 4))
+            marker = command->bounds.x == 0 && command->bounds.y < 2;
+        if (command->type == CUI_DRAW_CLIP_PUSH && command->bounds.x == f.blocks[0].table_frame.x &&
+            command->bounds.w == f.blocks[0].table_frame.w)
+            clip = true;
+    }
+    assert(marker && clip && f.blocks[0].table_frame.x == f.blocks[0].list_prefix_width &&
+           f.blocks[0].table_track_width > f.blocks[0].table_frame.w);
+    frame(ui, &f, o);
+    float x = f.blocks[0].table_frame.x + 4;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = x,
+                                           .y = 10,
+                                           .dx = -5,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_STARTED}));
+    d = frame(ui, &f, o);
+    marker = false;
+    for (size_t i = 0; i < d.count; ++i)
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 4 &&
+            !memcmp(d.commands[i].text.data, "\xe2\x80\xa2 ", 4))
+            marker = d.commands[i].bounds.x == 0;
+    assert(f.blocks[0].table_scroll.x == 5 && marker);
+    assert(
+        cui_text_view_set_text(&f.state, text("- [x] | a | b |\n  | --- | --- |\n  | x | y |")) ==
+        CUI_TEXT_VIEW_OK);
+    o.table_mode = CUI_TEXT_VIEW_TABLE_WRAP;
+    o.width = 400;
+    d = frame(ui, &f, o);
+    unsigned checks = 0;
+    for (size_t i = 0; i < d.count; ++i)
+        checks += d.commands[i].type == CUI_DRAW_IMAGE;
+    assert(checks == 1 && f.blocks[0].table_frame.x == 20 && f.blocks[0].bounds.x == 20 &&
+           f.blocks[0].text_inset == 8);
+    cui_destroy(ui);
+}
 static void test_nested_table_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1780,6 +1873,7 @@ int main(void) {
     test_quote_paragraph_lines();
     test_list_image_structure();
     test_nested_table_structure();
+    test_first_list_table();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1804,6 +1898,7 @@ int main(void) {
     test_list_image_paint();
     test_wrapped_link_decoration_ids();
     test_nested_table_paint();
+    test_first_list_table_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

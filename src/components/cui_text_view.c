@@ -339,7 +339,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         r.x -= origin_x;
         r.y -= origin_y;
         cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
-        if (b->list_item && b->kind != CUI_TEXT_VIEW_LIST_ITEM) {
+        if (b->list_item && b->kind != CUI_TEXT_VIEW_LIST_ITEM &&
+            b->kind != CUI_TEXT_VIEW_TABLE_CELL) {
             cui_rect prefix = r;
             prefix.x -= b->list_prefix_width;
             cui_text_view_paint_list_prefix(ui, part ^ UINT64_C(0x70666978), b, prefix,
@@ -570,6 +571,15 @@ static cui_id cui_text_view_table_scroll_id(cui_id id, size_t first) {
 static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                                 cui_text_view_state *s, cui_text_view_style style,
                                 cui_text_view_options o, float viewport) {
+    for (size_t i = 0; i < s->block_count; ++i) {
+        const cui_text_view_block *block = &s->workspace.blocks[i];
+        if (block->kind != CUI_TEXT_VIEW_TABLE_CELL || !block->list_item)
+            continue;
+        cui_rect prefix = block->table_frame;
+        prefix.x -= block->list_prefix_width;
+        cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i ^ UINT64_C(0x70666978);
+        cui_text_view_paint_list_prefix(ui, part, block, prefix, block->list_prefix_width, style);
+    }
     if (o.table_mode == CUI_TEXT_VIEW_TABLE_WRAP) {
         cui_text_view_paint_range(ui, id, theme, s, style, o, viewport, 0, s->block_count, 0, 0,
                                   false);

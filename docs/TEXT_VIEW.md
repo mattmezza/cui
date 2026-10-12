@@ -163,8 +163,7 @@ Fences written directly after a list marker are real code blocks with independen
 list-item metadata: the marker or passive task indicator occupies a separate
 column, outside the code background. Such code blocks own nested-list ancestry and
 keep exact source mappings for literal backslashes and subsequent lines. Loose-list
-spacing, first-child tables written directly after a list marker, and multi-paragraph
-quote containers are not yet a complete list AST. First-child headings and single-paragraph quotes use real block
+spacing and multi-paragraph quote containers are not yet a complete list AST. First-child headings and single-paragraph quotes use real block
 styles with a separate normal-size list marker column. Following indented headings
 and quotes remain children of the enclosing item. List ordering is independent of
 heading level, preserving bullet versus decimal prefixes and subsequent counters.
@@ -215,4 +214,8 @@ the parent item's own blocks, indents every table row beneath its marker, and ke
 nested child lists after that content. Tables within a list omit inter-block
 paragraph space; the list still separates from following root content. A final
 root table also omits trailing paragraph space, matching the document's last-block
-rule. First-child tables introduced directly by a list marker remain unsupported.
+rule. First-child tables introduced directly by a list marker preserve list-item metadata
+on the first cell. Other cells and nested children retain that item as their parent.
+The separate marker column stays outside the horizontal mask and does not move
+when the table scrolls; table-body snapshots preserve its scroll offset when
+appending rows.

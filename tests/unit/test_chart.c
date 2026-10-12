@@ -146,11 +146,12 @@ static void custom_tooltip(cui_context *ui, cui_id id, size_t index, const cui_c
     cui_text(ui, (cui_str){"Custom", 6}, 11, (cui_color){10, 20, 30, 255});
     cui_end_box(ui);
 }
+static cui_size custom_tooltip_size = {220, 90};
 static cui_size custom_tooltip_measure(cui_context *ui, size_t index, const cui_chart_datum *datum,
                                        void *user) {
     (void)user;
     assert(ui && index == 0 && datum->label.length == 1);
-    return (cui_size){220, 90};
+    return custom_tooltip_size;
 }
 #endif
 int main(void) {
@@ -1092,6 +1093,32 @@ int main(void) {
             fabsf(draw.commands[i].bounds.h - 106) < .01f)
             measured_custom = true;
     assert(measured_custom && tooltip_calls == 2);
+    const cui_size bad_sizes[] = {{NAN, 20}, {-1, 20}, {16369, 20}, {20, INFINITY}};
+    for (size_t bad = 0; bad < sizeof bad_sizes / sizeof bad_sizes[0]; bad++) {
+        custom_tooltip_size = bad_sizes[bad];
+        assert(cui_begin_frame(ui, 256, 256, 0));
+        assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+        draw = cui_end_frame(ui);
+        bool fallback = false;
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type == CUI_DRAW_RECT &&
+                fabsf(draw.commands[i].bounds.w - 150) < .01f &&
+                fabsf(draw.commands[i].bounds.h - 64) < .01f)
+                fallback = true;
+        assert(fallback);
+    }
+    custom_tooltip_size = (cui_size){0, 0};
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    draw = cui_end_frame(ui);
+    bool zero_content = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT &&
+            fabsf(draw.commands[i].bounds.w - 150) < .01f &&
+            fabsf(draw.commands[i].bounds.h - 16) < .01f)
+            zero_content = true;
+    assert(zero_content);
+    custom_tooltip_size = (cui_size){220, 90};
     options.tooltip_measure = NULL;
     options.tooltip_content = NULL;
     options.tooltip_title = tooltip_title_override;

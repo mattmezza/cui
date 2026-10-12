@@ -99,8 +99,8 @@ typedef cui_color (*cui_chart_region_fill_fn)(size_t series, float x, float y, c
                                               void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
-/* Content size excludes the tooltip's 8px padding on each side. Return a finite, nonnegative size.
- */
+/* Content size excludes 8px padding per side. Finite dimensions in [0, 16368] are accepted;
+ * invalid or larger dimensions fall back to the legacy 150x64 portal. */
 typedef cui_size (*cui_chart_tooltip_measure_fn)(cui_context *, size_t index,
                                                  const cui_chart_datum *, void *user);
 typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);

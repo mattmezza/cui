@@ -375,26 +375,53 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                           ? (left + (right - left) * (float)i / (float)(slots - 1)) * w / o->width
                           : w / 2;
             float y = h - 14;
+            cui_size measured = cui_measure_text(ui, label, 10);
+            float box_width = fmaxf(1, measured.width);
+            float box_height = fmaxf(12, measured.height);
+            float box_x = x - box_width / 2;
             if (o->kind == CUI_CHART_CANDLESTICK) {
                 cui_chart_candle_geometry candle;
-                if (cui_chart_candle_bounds(o, i, &candle) == CUI_PLOT_OK)
+                if (cui_chart_candle_bounds(o, i, &candle) == CUI_PLOT_OK) {
                     x = (float)(candle.wick.x_min * w / o->width);
+                    box_x = x - box_width / 2;
+                }
             }
             if (o->kind == CUI_CHART_BAR) {
                 cui_plot_rect bar;
                 if (cui_chart_bar_bounds(o, i, &bar) == CUI_PLOT_OK) {
+                    double lo, hi;
+                    if (!cui_chart_value_domain(o, &lo, &hi))
+                        continue;
+                    float fraction = (float)((0 - lo) / (hi - lo));
                     if (o->bar_alignment == CUI_CHART_BAR_LEFT ||
                         o->bar_alignment == CUI_CHART_BAR_RIGHT) {
-                        x = 28;
-                        y = (float)((bar.y_min + bar.y_max) * h / (2 * o->height) - 6);
-                    } else
+                        float baseline = (o->bar_alignment == CUI_CHART_BAR_LEFT
+                                              ? 24 + (o->width - 36) * fraction
+                                              : o->width - 12 - (o->width - 36) * fraction) *
+                                         w / o->width;
+                        box_x = o->bar_alignment == CUI_CHART_BAR_LEFT ? baseline - 2 - box_width
+                                                                       : baseline + 2;
+                        y = (float)((bar.y_min + bar.y_max) * h / (2 * o->height) - box_height / 2);
+                    } else {
                         x = (float)((bar.x_min + bar.x_max) * w / (2 * o->width));
+                        box_x = x - box_width / 2;
+                        float top = 12 * h / o->height;
+                        float bottom = (o->height > 32 ? o->height - 20 : 12) * h / o->height;
+                        float baseline = o->bar_alignment == CUI_CHART_BAR_BOTTOM
+                                             ? bottom - (bottom - top) * fraction
+                                             : top + (bottom - top) * fraction;
+                        bool below =
+                            (o->data[i].value < 0) == (o->bar_alignment == CUI_CHART_BAR_TOP);
+                        y = baseline + (below ? 2 : -12);
+                    }
                 }
             }
-            cui_begin_absolute_box(
-                ui, id ^ (UINT64_C(0x5db92a387c4e1100) + i),
-                (cui_box){.width = 56, .height = 12, .fixed_width = true, .fixed_height = true},
-                (cui_rect){x - 28, y, 56, 12});
+            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x5db92a387c4e1100) + i),
+                                   (cui_box){.width = box_width,
+                                             .height = box_height,
+                                             .fixed_width = true,
+                                             .fixed_height = true},
+                                   (cui_rect){box_x, y, box_width, box_height});
             cui_text(ui, label, 10, o->foreground);
             cui_end_box(ui);
         }

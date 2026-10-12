@@ -822,8 +822,45 @@ int main(void) {
             last_tick_x = fmaxf(last_tick_x, draw.commands[i].bounds.x);
         }
     assert(horizontal_ticks >= 4 && last_tick_x - first_tick_x > 30);
+    float left_category_x = NAN;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].text.data[0] == 'A')
+            left_category_x = draw.commands[i].bounds.x;
+    assert(isfinite(left_category_x));
+    options.bar_alignment = CUI_CHART_BAR_RIGHT;
+    assert(cui_begin_frame(ui, 256, 256, .055));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    float right_category_x = NAN;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].text.data[0] == 'A')
+            right_category_x = draw.commands[i].bounds.x;
+    assert(isfinite(right_category_x) && right_category_x > left_category_x + 30);
     options.bar_alignment = CUI_CHART_BAR_BOTTOM;
     options.show_y_axis = false;
+    options.x_tick_count = 0;
+    options.x_tick_margin = 1;
+    points[0].value = -20;
+    cui_plot_rect negative_bar;
+    assert(cui_chart_bar_bounds(&options, 0, &negative_bar) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, .06));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    float negative_label_y = NAN, positive_label_y = NAN;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1) {
+            if (draw.commands[i].text.data[0] == 'A')
+                negative_label_y = draw.commands[i].bounds.y;
+            if (draw.commands[i].text.data[0] == 'B')
+                positive_label_y = draw.commands[i].bounds.y;
+        }
+    assert(isfinite(negative_label_y) && isfinite(positive_label_y) &&
+           negative_label_y < positive_label_y);
+    points[0].value = 20;
     options.kind = CUI_CHART_CANDLESTICK;
     options.tooltip_format = NULL;
     assert(cui_begin_frame(ui, 256, 256, 0));

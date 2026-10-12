@@ -774,7 +774,8 @@ static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
     ui->string_used += s.length + 1;
     return (cui_str){p, s.length};
 }
-void cui_text(cui_context *ui, cui_str t, float size, cui_color c) {
+void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
+                               float line_height) {
     if (!cui_core_active(ui))
         return;
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
@@ -788,7 +789,11 @@ void cui_text(cui_context *ui, cui_str t, float size, cui_color c) {
     Clay__OpenTextElement((Clay_String){false, (int32_t)t.length, t.data},
                           (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? ui : NULL,
                                                    .fontSize = cui_core_scalar(size),
+                                                   .lineHeight = cui_core_scalar(line_height),
                                                    .textColor = {c.r, c.g, c.b, c.a}});
+}
+void cui_text(cui_context *ui, cui_str text, float size, cui_color color) {
+    cui_text_with_line_height(ui, text, size, color, 0);
 }
 static uint64_t cui_core_hash(uint64_t h, const char *s) {
     if (s)

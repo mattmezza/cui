@@ -1427,6 +1427,30 @@ static void test_anchored_underlay(void) {
     }
     cui_destroy(ui);
 }
+static void test_explicit_text_line_height(void) {
+    cui_context *ui = make();
+    begin(ui);
+    cui_begin_box(ui, 55, (cui_box){.width = 100});
+    cui_interact(ui, 55, CUI_ROLE_TOOLBAR, cui_string("Tools"), false, false, 0);
+    cui_text_with_line_height(ui, cui_string("one\ntwo"), 10, (cui_color){1, 2, 3, 255}, 24);
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    cui_rect bounds;
+    bounds = cui_bounds(ui, 55);
+    assert(bounds.h == 48);
+    assert(list.count == 2 && list.commands[1].bounds.y - list.commands[0].bounds.y == 24);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 0);
+    cui_begin_box(ui, 55, (cui_box){.width = 100});
+    cui_text_with_line_height(ui, cui_string("one\ntwo"), 10, (cui_color){1, 2, 3, 255}, 0);
+    cui_end_box(ui);
+    list = cui_end_frame(ui);
+    bounds = cui_bounds(ui, 55);
+    assert(bounds.h == 26);
+    assert(list.count == 2 && list.commands[1].bounds.y - list.commands[0].bounds.y == 13);
+    cui_destroy(ui);
+}
 static void test_bitmap_leaf(void) {
     unsigned char pixels[24] = {255};
     cui_context *ui = make();
@@ -1456,6 +1480,7 @@ static void test_bitmap_leaf(void) {
 }
 int main(void) {
     test_bitmap_leaf();
+    test_explicit_text_line_height();
     test_anchored_underlay();
     test_hover_scope();
     test_layout_only_and_zero_size();

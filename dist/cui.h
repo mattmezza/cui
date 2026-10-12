@@ -114,7 +114,8 @@ typedef enum {
     CUI_ROLE_ALERTDIALOG,
     CUI_ROLE_LINK,
     CUI_ROLE_LISTITEM,
-    CUI_ROLE_LOG
+    CUI_ROLE_LOG,
+    CUI_ROLE_TOOLBAR
 } cui_role;
 typedef enum {
     CUI_ORIENTATION_UNSPECIFIED,
@@ -264,6 +265,9 @@ void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, int16_t layer);
 void cui_end_box(cui_context *ui);
 void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
+/* Explicit logical line height; zero selects the measured natural line height. */
+void cui_text_with_line_height(cui_context *, cui_str, float font_size, cui_color,
+                               float line_height);
 /* Uses the same configured font measurement as layout; no frame allocation. */
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
@@ -6154,7 +6158,8 @@ static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
     ui->string_used += s.length + 1;
     return (cui_str){p, s.length};
 }
-void cui_text(cui_context *ui, cui_str t, float size, cui_color c) {
+void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
+                               float line_height) {
     if (!cui_core_active(ui))
         return;
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
@@ -6168,7 +6173,11 @@ void cui_text(cui_context *ui, cui_str t, float size, cui_color c) {
     Clay__OpenTextElement((Clay_String){false, (int32_t)t.length, t.data},
                           (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? ui : NULL,
                                                    .fontSize = cui_core_scalar(size),
+                                                   .lineHeight = cui_core_scalar(line_height),
                                                    .textColor = {c.r, c.g, c.b, c.a}});
+}
+void cui_text(cui_context *ui, cui_str text, float size, cui_color color) {
+    cui_text_with_line_height(ui, text, size, color, 0);
 }
 static uint64_t cui_core_hash(uint64_t h, const char *s) {
     if (s)

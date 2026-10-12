@@ -108,6 +108,31 @@ int main(void) {
     cui_chart_sankey_node nodes[4];
     assert(cui_chart_sankey_layout(&flow_options, nodes, 3) == CUI_PLOT_CAPACITY);
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    cui_chart_link skewed[] = {{0, 1, 100, {0}}, {0, 2, 1, {0}}};
+    cui_chart_options scaled_flow = flow_options;
+    scaled_flow.count = 3;
+    scaled_flow.links = skewed;
+    scaled_flow.link_count = 2;
+    cui_chart_sankey_link_geometry scaled_ribbons[2];
+    assert(cui_chart_sankey_layout(&scaled_flow, nodes, 4) == CUI_PLOT_OK);
+    assert(nodes[0].throughput == 101);
+    assert(cui_chart_sankey_link_bounds(&scaled_flow, nodes, scaled_ribbons, 2) == CUI_PLOT_OK);
+    double linear_ratio = scaled_ribbons[0].source_width / scaled_ribbons[1].source_width;
+    scaled_flow.sankey_value_scale = CUI_CHART_SANKEY_SQRT;
+    assert(cui_chart_sankey_layout(&scaled_flow, nodes, 4) == CUI_PLOT_OK);
+    assert(nodes[0].throughput == 101);
+    assert(cui_chart_sankey_link_bounds(&scaled_flow, nodes, scaled_ribbons, 2) == CUI_PLOT_OK);
+    double sqrt_ratio = scaled_ribbons[0].source_width / scaled_ribbons[1].source_width;
+    assert(linear_ratio > 90 && sqrt_ratio > 9 && sqrt_ratio < 11);
+    scaled_flow.custom_sankey_link_opacity = true;
+    scaled_flow.sankey_link_opacity = 0;
+    assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
+    unsigned char transparent_links[sizeof pixels];
+    memcpy(transparent_links, pixels, sizeof pixels);
+    scaled_flow.sankey_link_opacity = 1;
+    assert(cui_chart_render(&state, &scaled_flow) == CUI_PLOT_OK);
+    assert(memcmp(transparent_links, pixels, sizeof pixels) != 0);
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
     assert(nodes[0].depth == 0 && nodes[1].depth == 1 && nodes[2].depth == 2 &&
            nodes[3].depth == 2);
     assert(nodes[0].throughput == 30 && nodes[1].throughput == 30 && nodes[2].throughput == 20 &&
@@ -358,6 +383,10 @@ int main(void) {
     assert(first_candle.wick.y_min > 12 && first_candle.wick.y_max < 76);
     assert(first_candle.body.x_max - first_candle.body.x_min > 14);
     assert(first_candle.wick.x_min < second_candle.wick.x_min);
+    options.max_bar_width = 5;
+    assert(cui_chart_candle_bounds(&options, 0, &second_candle) == CUI_PLOT_OK);
+    assert(second_candle.body.x_max - second_candle.body.x_min <= 4.01);
+    options.max_bar_width = 0;
     options.candle_body_ratio = .5f;
     cui_chart_candle_geometry narrow_candle;
     assert(cui_chart_candle_bounds(&options, 0, &narrow_candle) == CUI_PLOT_OK);

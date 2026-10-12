@@ -32,6 +32,7 @@ typedef enum {
     CUI_CHART_SANKEY_RIGHT,
     CUI_CHART_SANKEY_CENTER
 } cui_chart_sankey_align;
+typedef enum { CUI_CHART_SANKEY_LINEAR, CUI_CHART_SANKEY_SQRT } cui_chart_sankey_value_scale;
 typedef struct {
     size_t depth, height, layer;
     double throughput;
@@ -125,8 +126,11 @@ typedef struct {
     bool show_dots;
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     cui_chart_sankey_align sankey_align;
-    unsigned sankey_iterations;     /* zero selects six relaxation passes; maximum 100 */
-    float sankey_min_link_width;    /* zero selects source 1px */
+    cui_chart_sankey_value_scale sankey_value_scale;
+    unsigned sankey_iterations;  /* zero selects six relaxation passes; maximum 100 */
+    float sankey_min_link_width; /* zero selects source 1px */
+    bool custom_sankey_link_opacity;
+    float sankey_link_opacity;      /* default 0.3 */
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
 } cui_chart_options;

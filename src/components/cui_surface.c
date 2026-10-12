@@ -7,7 +7,17 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     if (!t || bounds.w <= 0 || bounds.h <= 0 ||
         !cui_base_surface_begin(ui, s, title, description, o))
         return false;
-    int16_t layer = o.layer > 0 && o.layer < 32767 ? o.layer : 100;
+    bounds = cui_surface_current_geometry(s, o);
+    int16_t layer = o.layer > 0 && o.layer < 32766 ? o.layer : 100;
+    cui_rect handle = cui_surface_resize_bounds(s, o);
+    if (handle.w > 0 && handle.h > 0) {
+        cui_id resize = cui_surface_part_id(s->overlay.id, 5);
+        cui_begin_portal(ui, resize,
+                         (cui_box){.background = cui_focused(ui) == resize ? t->focus : t->border},
+                         handle, (int16_t)(layer + 2));
+        cui_base_surface_submit_resize(ui, s, o);
+        cui_end_box(ui);
+    }
     if (s->overlay.modal) {
         cui_begin_portal(ui, s->overlay.id ^ UINT64_C(0x86a3e3d76bc1d909),
                          (cui_box){.background = {0, 0, 0, 100}}, o.viewport, layer);

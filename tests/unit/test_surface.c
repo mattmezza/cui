@@ -31,9 +31,16 @@ static bool begin(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
     if (!cui_base_surface_begin(ui, s, cui_string("Surface title"), cui_string("Description"),
                                 options))
         return false;
-    cui_rect bounds = cui_surface_geometry(s->kind, options);
+    cui_rect bounds = cui_surface_current_geometry(s, options);
     cui_begin_portal(ui, s->overlay.id, (cui_box){0}, bounds,
                      options.layer ? (int16_t)(options.layer + 1) : 101);
+    cui_rect handle = cui_surface_resize_bounds(s, options);
+    if (handle.w > 0 && handle.h > 0) {
+        cui_begin_portal(ui, cui_surface_part_id(s->overlay.id, 5), (cui_box){0}, handle,
+                         options.layer ? (int16_t)(options.layer + 2) : 102);
+        cui_base_surface_submit_resize(ui, s, options);
+        cui_end_box(ui);
+    }
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 4), (cui_box){.width = 100, .height = 20});
     cui_end_box(ui);
     if (!options.hide_close && (s->kind != CUI_SURFACE_ALERT || options.show_alert_close))
@@ -336,6 +343,92 @@ static void nested_surfaces(void) {
     assert(!parent.overlay.open && cui_focused(ui) == 1);
     cui_destroy(ui);
 }
+static void resize_sheets(void) {
+#ifdef CUI_SURFACE_BASE_ONLY
+    cui_theme themes[4] = {0};
+#else
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+#endif
+    for (unsigned theme = 0; theme < 4; ++theme)
+        for (unsigned edge = 0; edge < 4; ++edge) {
+            cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+            cui_surface_state s;
+            cui_surface_init(&s, 100, CUI_SURFACE_SHEET);
+            cui_surface_options o = {.viewport = {0, 0, 600, 400},
+                                     .width = 300,
+                                     .height = 300,
+                                     .sheet_minimum = 160,
+                                     .sheet_maximum = 360,
+                                     .edge = (cui_sheet_edge)edge};
+            bool vertical = edge == CUI_SHEET_TOP || edge == CUI_SHEET_BOTTOM;
+            float direction = edge == CUI_SHEET_RIGHT || edge == CUI_SHEET_BOTTOM ? -1 : 1;
+            scene(ui, &themes[theme], &s, o, false);
+            cui_surface_open(ui, &s, 1);
+            scene(ui, &themes[theme], &s, o, false);
+            cui_id resize = cui_surface_part_id(100, 5);
+            cui_rect handle = cui_bounds(ui, resize);
+            assert(handle.w > 0 && handle.h > 0);
+            float x = handle.x + handle.w / 2, y = handle.y + handle.h / 2;
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y}));
+            scene(ui, &themes[theme], &s, o, false);
+            assert(s.resizing && cui_focused(ui) == resize);
+            x += vertical ? 0 : direction * 40;
+            y += vertical ? direction * 40 : 0;
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x, .y = y}));
+            scene(ui, &themes[theme], &s, o, false);
+            cui_rect bounds = cui_bounds(ui, 100);
+            assert(s.sheet_size == 340 && (vertical ? bounds.h : bounds.w) == 340);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y}));
+            scene(ui, &themes[theme], &s, o, false);
+            assert(!s.resizing);
+            key(ui, CUI_KEY_HOME);
+            scene(ui, &themes[theme], &s, o, false);
+            assert(s.sheet_size == 160);
+            key(ui, vertical ? CUI_KEY_DOWN : CUI_KEY_RIGHT);
+            scene(ui, &themes[theme], &s, o, false);
+            assert(s.sheet_size == (direction > 0 ? 170 : 160));
+            key(ui, CUI_KEY_END);
+            scene(ui, &themes[theme], &s, o, false);
+            assert(s.sheet_size == 360);
+            size_t count;
+            const cui_semantic *nodes = cui_semantics(ui, &count);
+            bool found = false;
+            for (size_t i = 0; i < count; ++i)
+                if (nodes[i].id == resize) {
+                    found = true;
+                    assert(nodes[i].value == 360 && nodes[i].details.minimum == 160 &&
+                           nodes[i].details.maximum == 360 && nodes[i].details.controls == 100);
+                }
+            assert(found);
+            handle = cui_bounds(ui, resize);
+            x = handle.x + handle.w / 2;
+            y = handle.y + handle.h / 2;
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                   .x = x,
+                                                   .y = y,
+                                                   .pointer_button = CUI_POINTER_SECONDARY}));
+            scene(ui, &themes[theme], &s, o, false);
+            assert(!s.resizing && s.sheet_size == 360);
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y}));
+            scene(ui, &themes[theme], &s, o, false);
+            assert(s.resizing);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+            scene(ui, &themes[theme], &s, o, false);
+            assert(!s.resizing && s.sheet_size == 360);
+            o.no_sheet_resize = true;
+            key(ui, CUI_KEY_HOME);
+            scene(ui, &themes[theme], &s, o, false);
+            assert(s.sheet_size == 360 && !s.resizing);
+            nodes = cui_semantics(ui, &count);
+            for (size_t i = 0; i < count; ++i)
+                assert(nodes[i].id != resize);
+            cui_destroy(ui);
+        }
+}
 static void geometry(void) {
     cui_surface_options o = {.viewport = {10, 20, 600, 400}, .width = 200, .height = 150};
     const cui_rect expected[] = {
@@ -357,6 +450,7 @@ int main(void) {
     dialog_events();
     confirmation_and_popover();
     sheet_events();
+    resize_sheets();
     nested_surfaces();
 #ifndef CUI_SURFACE_BASE_ONLY
     styled_confirmation();

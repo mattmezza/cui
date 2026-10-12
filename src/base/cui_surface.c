@@ -22,6 +22,7 @@ void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result
     if (!ui || !s || !s->overlay.open)
         return;
     s->result = result;
+    s->resizing = false;
     cui_dismiss_focus_scope(ui, s->overlay.id, s->overlay.trigger);
     cui_overlay_close(ui, &s->overlay);
 }
@@ -57,10 +58,100 @@ cui_rect cui_surface_geometry(cui_surface_kind kind, cui_surface_options o) {
     }
     return (cui_rect){area.x + (area.w - width) / 2, area.y + (area.h - height) / 2, width, height};
 }
+static bool cui_surface_vertical_sheet(cui_surface_options o) {
+    return o.edge == CUI_SHEET_TOP || o.edge == CUI_SHEET_BOTTOM;
+}
+static void cui_surface_sheet_limits(cui_surface_options o, float *minimum, float *maximum) {
+    cui_surface_options full = o;
+    full.width = o.viewport.w;
+    full.height = o.viewport.h;
+    cui_rect area = cui_surface_geometry(CUI_SURFACE_SHEET, full);
+    float extent = cui_surface_vertical_sheet(o) ? area.h : area.w;
+    *maximum = fminf(extent, cui_surface_positive(o.sheet_maximum, extent));
+    *minimum = fminf(*maximum, cui_surface_positive(o.sheet_minimum, 120));
+}
+cui_rect cui_surface_current_geometry(const cui_surface_state *s, cui_surface_options o) {
+    if (!s)
+        return (cui_rect){0};
+    if (s->kind == CUI_SURFACE_SHEET && isfinite(s->sheet_size) && s->sheet_size > 0) {
+        float minimum, maximum;
+        cui_surface_sheet_limits(o, &minimum, &maximum);
+        float size = fminf(maximum, fmaxf(minimum, s->sheet_size));
+        if (cui_surface_vertical_sheet(o))
+            o.height = size;
+        else
+            o.width = size;
+    }
+    return cui_surface_geometry(s->kind, o);
+}
+cui_rect cui_surface_resize_bounds(const cui_surface_state *s, cui_surface_options o) {
+    if (!s || s->kind != CUI_SURFACE_SHEET || o.no_sheet_resize)
+        return (cui_rect){0};
+    cui_rect b = cui_surface_current_geometry(s, o);
+    if (cui_surface_vertical_sheet(o)) {
+        float size = fminf(6, b.h);
+        if (o.edge == CUI_SHEET_TOP)
+            b.y += b.h - size;
+        b.h = size;
+    } else {
+        float size = fminf(6, b.w);
+        if (o.edge == CUI_SHEET_LEFT)
+            b.x += b.w - size;
+        b.w = size;
+    }
+    return b;
+}
+static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_surface_options o,
+                                     cui_event e, size_t i) {
+    if (e.type == CUI_EVENT_CANCEL || o.no_sheet_resize || s->kind != CUI_SURFACE_SHEET)
+        s->resizing = false;
+    if (o.no_sheet_resize || s->kind != CUI_SURFACE_SHEET ||
+        cui_event_target(ui, i) != cui_surface_part_id(s->overlay.id, 5))
+        return;
+    bool vertical = cui_surface_vertical_sheet(o);
+    float pointer = vertical ? e.y : e.x;
+    float minimum, maximum;
+    cui_surface_sheet_limits(o, &minimum, &maximum);
+    cui_rect b = cui_surface_current_geometry(s, o);
+    float size = vertical ? b.h : b.w;
+    float direction = o.edge == CUI_SHEET_RIGHT || o.edge == CUI_SHEET_BOTTOM ? -1 : 1;
+    bool change = false;
+    if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY &&
+        isfinite(pointer)) {
+        s->resizing = true;
+        s->resize_origin = pointer;
+        s->resize_size = size;
+    } else if (s->resizing && isfinite(pointer) &&
+               (e.type == CUI_EVENT_POINTER_MOVE ||
+                (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY))) {
+        size = s->resize_size + (pointer - s->resize_origin) * direction;
+        change = true;
+        if (e.type == CUI_EVENT_POINTER_UP)
+            s->resizing = false;
+    } else if (e.type == CUI_EVENT_KEY_DOWN) {
+        if (e.key == CUI_KEY_HOME)
+            size = minimum;
+        else if (e.key == CUI_KEY_END)
+            size = maximum;
+        else if ((!vertical && e.key == CUI_KEY_LEFT) || (vertical && e.key == CUI_KEY_UP))
+            size -= 10 * direction;
+        else if ((!vertical && e.key == CUI_KEY_RIGHT) || (vertical && e.key == CUI_KEY_DOWN))
+            size += 10 * direction;
+        else
+            return;
+        change = true;
+    }
+    if (change) {
+        s->sheet_size = fminf(maximum, fmaxf(minimum, size));
+        cui_invalidate(ui);
+    }
+}
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
     if (!ui || !s || !s->overlay.open)
         return false;
     s->overlay.modal = s->kind != CUI_SURFACE_POPOVER || o.modal_popover;
+    if (o.no_sheet_resize || s->kind != CUI_SURFACE_SHEET)
+        s->resizing = false;
     cui_rect previous = cui_bounds(ui, s->overlay.id);
     if (previous.w > 0 && previous.h > 0)
         cui_overlay_set_bounds(&s->overlay, previous);
@@ -68,6 +159,7 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count && s->overlay.open; ++i) {
         cui_event e = events[i];
+        cui_surface_resize_event(ui, s, o, e, i);
         cui_id activation = cui_event_activation(ui, i);
         cui_surface_result reason = CUI_SURFACE_NONE;
         if (s->kind == CUI_SURFACE_ALERT && activation == cui_surface_part_id(s->overlay.id, 2))
@@ -114,4 +206,28 @@ bool cui_base_surface_begin(cui_context *ui, cui_surface_state *s, cui_str title
 }
 void cui_base_surface_end(cui_context *ui) {
     cui_overlay_end(ui);
+}
+
+void cui_base_surface_submit_resize(cui_context *ui, const cui_surface_state *s,
+                                    cui_surface_options o) {
+    if (!ui || !s || !s->overlay.open)
+        return;
+    if (s->kind == CUI_SURFACE_SHEET && !o.no_sheet_resize) {
+        cui_id resize = cui_surface_part_id(s->overlay.id, 5);
+        bool vertical = cui_surface_vertical_sheet(o);
+        float minimum, maximum;
+        cui_surface_sheet_limits(o, &minimum, &maximum);
+        cui_rect b = cui_surface_current_geometry(s, o);
+        cui_interact(ui, resize, CUI_ROLE_SLIDER,
+                     vertical ? cui_string("Sheet height") : cui_string("Sheet width"),
+                     maximum <= minimum, false, vertical ? b.h : b.w);
+        cui_set_semantic_details(
+            ui, resize,
+            (cui_semantic_details){.parent = s->overlay.id,
+                                   .controls = s->overlay.id,
+                                   .minimum = minimum,
+                                   .maximum = maximum,
+                                   .orientation = vertical ? CUI_ORIENTATION_VERTICAL
+                                                           : CUI_ORIENTATION_HORIZONTAL});
+    }
 }

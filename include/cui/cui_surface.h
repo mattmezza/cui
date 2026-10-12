@@ -25,6 +25,8 @@ typedef struct {
     cui_overlay overlay;
     cui_surface_kind kind;
     cui_surface_result result;
+    float sheet_size, resize_origin, resize_size;
+    bool resizing;
 } cui_surface_state;
 typedef struct {
     cui_rect viewport, anchor;
@@ -34,6 +36,8 @@ typedef struct {
     bool modal_popover, no_escape_dismiss, no_outside_dismiss, alert_outside_dismiss, hide_close,
         show_alert_close;
     int16_t layer; /* Zero chooses 100; nested surfaces should use a higher layer. */
+    bool no_sheet_resize;
+    float sheet_minimum, sheet_maximum;
     cui_surface_decision_fn decide; /* False keeps the surface open. */
     void *decision_user;
 } cui_surface_options;
@@ -42,12 +46,16 @@ void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
 void cui_surface_close(cui_context *, cui_surface_state *, cui_surface_result);
 cui_surface_result cui_surface_take_result(cui_surface_state *);
 cui_rect cui_surface_geometry(cui_surface_kind, cui_surface_options);
-cui_id cui_surface_part_id(cui_id, unsigned part); /* 1=close,2=confirm,3=cancel,4=title */
+cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_options);
+cui_rect cui_surface_resize_bounds(const cui_surface_state *, cui_surface_options);
+cui_id cui_surface_part_id(cui_id, unsigned part); /* 1=close,2=confirm,3=cancel,4=title,5=resize */
 /* Reduction happens before submission, so closing leaves no current modal. */
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
 bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, cui_str description,
                             cui_surface_options);
 void cui_base_surface_end(cui_context *);
+/* Submit inside a box/portal with resize part ID, after base begin. */
+void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cui_surface_options);
 /* Caller composes arbitrary children, then ends the surface. */
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);

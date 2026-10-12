@@ -270,6 +270,19 @@ int main(void) {
     assert(cui_chart_render(&emphasis_state, &flow_options) == CUI_PLOT_OK);
     assert(emphasis_state.revision == flow_revision + 1 &&
            memcmp(saved, pixels, sizeof pixels) != 0);
+    cui_chart_sankey_node hover_nodes[4];
+    cui_chart_sankey_link_geometry hover_links[3];
+    assert(cui_chart_sankey_layout(&flow_options, hover_nodes, 4) == CUI_PLOT_OK);
+    assert(cui_chart_sankey_link_bounds(&flow_options, hover_nodes, hover_links, 3) == CUI_PLOT_OK);
+    size_t unrelated_x = (size_t)((hover_nodes[0].x1 + hover_nodes[1].x0) / 2);
+    size_t unrelated_y = (size_t)((hover_links[0].source_y + hover_links[0].target_y) / 2);
+    size_t unrelated_pixel = (unrelated_y * flow_options.width + unrelated_x) * 4;
+    assert(pixels[unrelated_pixel] != saved[unrelated_pixel] ||
+           pixels[unrelated_pixel + 1] != saved[unrelated_pixel + 1]);
+    size_t related_x = (size_t)((hover_nodes[1].x1 + hover_nodes[2].x0) / 2);
+    size_t related_y = (size_t)((hover_links[1].source_y + hover_links[1].target_y) / 2);
+    size_t related_pixel = (related_y * flow_options.width + related_x) * 4;
+    assert(memcmp(pixels + related_pixel, saved + related_pixel, 4) == 0);
     flow_revision = emphasis_state.revision;
     assert(cui_chart_render(&emphasis_state, &flow_options) == CUI_PLOT_OK);
     assert(emphasis_state.revision == flow_revision);
@@ -500,6 +513,12 @@ int main(void) {
                           4;
     assert(pixels[dimmed_pixel] != saved[dimmed_pixel] ||
            pixels[dimmed_pixel + 1] != saved[dimmed_pixel + 1]);
+    cui_plot_rect focused_bar;
+    assert(cui_chart_bar_bounds(&options, 0, &focused_bar) == CUI_PLOT_OK);
+    size_t focused_pixel = ((size_t)((focused_bar.y_min + focused_bar.y_max) / 2) * options.width +
+                            (size_t)((focused_bar.x_min + focused_bar.x_max) / 2)) *
+                           4;
+    assert(memcmp(pixels + focused_pixel, saved + focused_pixel, 4) == 0);
     state.emphasis_focus = 0;
     state.hovered = SIZE_MAX;
     cui_plot_rect first_bar, second_bar;
@@ -701,6 +720,23 @@ int main(void) {
     options.pie_outer_radius = 0;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(state.revision == old_revision + 1 && memcmp(saved, pixels, sizeof pixels) != 0);
+    memcpy(saved, pixels, sizeof pixels);
+    state.hovered = 1;
+    state.emphasis_focus = 1;
+    state.pie_lift[1] = 1;
+    old_revision = state.revision;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(state.revision == old_revision + 1);
+    size_t lifted_pixel = ((size_t)87 * options.width + 78) * 4;
+    assert(saved[lifted_pixel] == options.background.r &&
+           (pixels[lifted_pixel] != saved[lifted_pixel] ||
+            pixels[lifted_pixel + 1] != saved[lifted_pixel + 1]));
+    size_t faded_pixel = ((size_t)20 * options.width + 64) * 4;
+    assert(pixels[faded_pixel] != saved[faded_pixel] ||
+           pixels[faded_pixel + 1] != saved[faded_pixel + 1]);
+    state.pie_lift[1] = 0;
+    state.emphasis_focus = 0;
+    state.hovered = SIZE_MAX;
     options.data_revision = 0;
     options.pie_show_labels = true;
     options.pie_label_line_color_fn = pie_green_line;
@@ -1045,6 +1081,25 @@ int main(void) {
             (draw.commands[i].text.data[0] == 'A' || draw.commands[i].text.data[0] == 'B'))
             outside_label = true;
     assert(outside_label);
+    options.reduced_motion = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 80,
+                                           .y = state.bounds.y + 55}));
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
+    (void)cui_end_frame(ui);
+    assert(state.hovered == 1 && state.emphasis_focus == 1 && state.pie_lift[1] == 1 &&
+           state.pie_lift[0] == 0);
+    options.reduced_motion = false;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 2,
+                                           .y = state.bounds.y + 2}));
+    assert(cui_begin_frame(ui, 256, 256, .06f));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
+    (void)cui_end_frame(ui);
+    assert(state.hovered == SIZE_MAX && state.emphasis_focus > 0 && state.emphasis_focus < 1 &&
+           state.pie_lift[1] > 0 && state.pie_lift[1] < 1);
     options.pie_show_labels = false;
     options.pie_outer_radius = 0;
     options.pie_label_gap = 0;

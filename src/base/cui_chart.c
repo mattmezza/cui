@@ -834,7 +834,10 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     double edges[257] = {0}, inners[256], outers[256];
     for (size_t i = 0; i < o->count; i++) {
         (void)cui_chart_pie_radii(o, i, &inners[i], &outers[i]);
-        r = fmax(r, outers[i]);
+        double lift = !o->noninteractive
+                          ? fmin(1, fmax(0, s->pie_lift[i])) * fmin(1, fmax(0, s->emphasis_focus))
+                          : 0;
+        r = fmax(r, outers[i] + 6 * lift);
     }
     double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
     for (size_t i = 0; i < o->count; i++)
@@ -861,9 +864,14 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
             if (low == o->count || angle < edges[low] + o->pad_angle / 2 ||
                 angle >= edges[low + 1] - o->pad_angle / 2)
                 continue;
-            if (rr < inners[low] * inners[low] || rr > outers[low] * outers[low])
+            double focus = !o->noninteractive ? fmin(1, fmax(0, s->emphasis_focus)) : 0;
+            double lift = fmin(1, fmax(0, s->pie_lift[low])) * focus;
+            double outer = outers[low] + 6 * lift;
+            if (rr < inners[low] * inners[low] || rr > outer * outer)
                 continue;
-            cui_chart_pixel(s, o, x, y, cui_chart_palette(o, low));
+            cui_color color = cui_chart_palette(o, low);
+            color.a = (unsigned char)lround(color.a * (1 - .35 * focus * (1 - lift)));
+            cui_chart_pixel(s, o, x, y, color);
         }
     if (o->pie_show_labels) {
         cui_chart_pie_label labels[256];
@@ -874,6 +882,18 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
                                  : (o->grid.a ? o->grid : (cui_color){120, 120, 120, 255});
             for (size_t i = 0; i < o->count; i++)
                 if (labels[i].visible) {
+                    double focus = !o->noninteractive ? fmin(1, fmax(0, s->emphasis_focus)) : 0;
+                    double lift = fmin(1, fmax(0, s->pie_lift[i])) * focus;
+                    double label_radius =
+                        o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
+                    label_radius += o->pie_label_gap > 0 ? o->pie_label_gap : 15;
+                    double edge_radius = fmin(outers[i] + 6 * lift, label_radius);
+                    double dx = labels[i].edge_x - cx, dy = labels[i].edge_y - cy;
+                    double previous_radius = hypot(dx, dy);
+                    if (previous_radius > 0) {
+                        labels[i].edge_x = (float)(cx + dx * edge_radius / previous_radius);
+                        labels[i].edge_y = (float)(cy + dy * edge_radius / previous_radius);
+                    }
                     cui_color slice_line = o->pie_label_line_color_fn
                                                ? o->pie_label_line_color_fn(
                                                      &o->data[i], i, o->pie_label_line_color_user)

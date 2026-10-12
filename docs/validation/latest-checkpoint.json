@@ -35,13 +35,13 @@
     }
   ],
   "previous_deployment": {
-    "source": "5ced994bae34dec46293a32a9317b14a77af2d42",
+    "source": "2b917ab720f8ccd9f7a0683cc0e1e836631aab47",
     "status": "failed",
-    "reason": "Hosted Skip-after-validation test read old button coordinates and clicked shifted Start over. Reproduced and fixed in cb48d0b by waiting for the rendered alert and asserting the layout shift; full local78-story browser revalidation passed.",
-    "run": 38287215259,
-    "framework_ci_run": 38287215256,
+    "run": 38290133858,
+    "framework_ci_run": 38290133884,
     "framework_ci_status": "success",
-    "log": "pages-failure-5ced994.txt"
+    "reason": "Hosted browser timed out after Questionnaire Start over in shortcut coverage (line2141). Investigating; published04e044e remains full HTTPS78 verified.",
+    "log": "pages-failure-2b917ab.txt"
   },
   "published_evidence": "published-04e044e.txt",
   "deployment": {

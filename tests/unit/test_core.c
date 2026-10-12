@@ -39,6 +39,10 @@ static void test_input(void) {
     assert(cui_event_target(ui, 0) == a);
     assert(cui_event_target(ui, 1) == a);
     assert(cui_event_target(ui, 2) == a);
+    assert(cui_event_activation(ui, 0) == 0);
+    assert(cui_event_activation(ui, 1) == 0);
+    assert(cui_event_activation(ui, 2) == a);
+    assert(cui_event_activation(ui, 3) == 0);
     assert(!control(ui, b, false).activated);
     assert(control(ui, a, false).activated);
     cui_end_frame(ui);
@@ -65,6 +69,7 @@ static void test_input(void) {
     begin(ui);
     control(ui, b, false);
     assert(control(ui, a, false).activated);
+    assert(cui_event_activation(ui, 2) == a); /* Released Space, after Tab. */
     cui_end_frame(ui);
     queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
     begin(ui);

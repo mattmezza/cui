@@ -59,7 +59,7 @@ struct cui_context {
     size_t id_count, activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_EVENT_MAX];
     size_t queued_count, event_count;
-    cui_id event_targets[CUI_CORE_EVENT_MAX];
+    cui_id event_targets[CUI_CORE_EVENT_MAX], event_activations[CUI_CORE_EVENT_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
     size_t scope_count;
     bool opened[CUI_CORE_STACK_MAX];
@@ -311,6 +311,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->activation_count = 0;
     for (size_t i = 0; i < ui->event_count; i++) {
         cui_event e = ui->events[i];
+        size_t before_activation = ui->activation_count;
+        ui->event_activations[i] = 0;
         ui->event_targets[i] = ui->focus;
         if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_UP)
             ui->event_targets[i] = ui->capture;
@@ -368,6 +370,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 cui_core_activate(ui, ui->focus);
             ui->space_capture = 0;
         }
+        if (ui->activation_count > before_activation)
+            ui->event_activations[i] = ui->activations[ui->activation_count - 1];
     }
     ui->node_count = 0;
     ui->overflow_depth = 0;
@@ -782,6 +786,10 @@ void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value) 
 }
 cui_id cui_event_target(cui_context *ui, size_t index) {
     return ui && index < ui->event_count ? ui->event_targets[index] : 0;
+}
+
+cui_id cui_event_activation(cui_context *ui, size_t index) {
+    return ui && index < ui->event_count ? ui->event_activations[index] : 0;
 }
 
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {

@@ -16,6 +16,30 @@ static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
         length = capacity ? capacity - 1 : 0;
     return (cui_str){buffer, length};
 }
+float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_options *o) {
+    if (!ui || !o || !o->show_y_axis || o->y_axis_inside || !o->data || !o->count ||
+        o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_RADAR || o->kind == CUI_CHART_SANKEY)
+        return 0;
+    double lo, hi;
+    if (!cui_chart_value_domain(o, &lo, &hi))
+        return 0;
+    unsigned count = o->tick_count ? o->tick_count : 5;
+    if (count < 2 || count > 1000)
+        return 0;
+    unsigned visible = count < 32 ? count : 32;
+    float gutter = 32;
+    for (unsigned i = 0; i < visible; i++) {
+        unsigned tick = (count - 1) * i / (visible - 1);
+        double value = hi - (hi - lo) * tick / (count - 1);
+        char buffer[48];
+        cui_str label =
+            cui_chart_number(buffer, sizeof buffer, value, o->y_tick_format, o->format_user);
+        cui_size measured = cui_measure_text(ui, label, 10);
+        if (isfinite(measured.width))
+            gutter = fmaxf(gutter, measured.width + 4);
+    }
+    return gutter;
+}
 static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
     if (!o->x_tick_count) {
         size_t margin = o->x_tick_margin ? o->x_tick_margin : 1;
@@ -132,7 +156,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_str label = o->data[i].label;
             if (!label.length || !label.data)
                 continue;
-            float left = o->show_y_axis && !o->y_axis_inside ? 50 : 24;
+            float left = o->show_y_axis && !o->y_axis_inside
+                             ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
+                             : 24;
             float x = slots > 1 ? (left + (o->width - 12 - left) * (float)i / (float)(slots - 1)) *
                                       w / o->width
                                 : w / 2;
@@ -182,11 +208,15 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 cui_str label =
                     cui_chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
                 float y = (float)(pixel_y * h / o->height);
+                float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 50;
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;
-                cui_begin_absolute_box(
-                    ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
-                    (cui_box){.width = 48, .height = 12, .fixed_width = true, .fixed_height = true},
-                    (cui_rect){x, y - 6, 48, 12});
+                float label_width = o->y_axis_inside ? 48 : gutter - 4;
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
+                                       (cui_box){.width = label_width,
+                                                 .height = 12,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){x, y - 6, label_width, 12});
                 cui_text(ui, label, 10, o->foreground);
                 cui_end_box(ui);
             }

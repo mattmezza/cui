@@ -67,6 +67,14 @@ static size_t format_q(double value, char *buffer, size_t capacity, void *user) 
         buffer[0] = 'Q';
     return capacity ? 1 : 0;
 }
+static size_t format_wide_tick(double value, char *buffer, size_t capacity, void *user) {
+    (void)value;
+    (void)user;
+    const char text[] = "123456789";
+    size_t count = capacity < sizeof text ? capacity : sizeof text - 1;
+    memcpy(buffer, text, count);
+    return count;
+}
 static cui_color bar_label_by_index(const cui_chart_datum *datum, size_t index, void *user) {
     (void)datum;
     (void)user;
@@ -594,6 +602,28 @@ int main(void) {
     options.x_tick_count = 2;
     options.y_tick_format = format_q;
     options.tooltip_format = format_q;
+    float short_gutter = cui_chart_measure_value_axis_gutter(ui, &options);
+    options.y_tick_format = format_wide_tick;
+    float wide_gutter = cui_chart_measure_value_axis_gutter(ui, &options);
+    assert(short_gutter >= 32 && wide_gutter > short_gutter);
+    options.value_axis_gutter = wide_gutter;
+    options.kind = CUI_CHART_BAR;
+    cui_plot_rect shifted_bar;
+    assert(cui_chart_bar_bounds(&options, 0, &shifted_bar) == CUI_PLOT_OK);
+    options.value_axis_gutter = short_gutter;
+    cui_plot_rect narrow_bar;
+    assert(cui_chart_bar_bounds(&options, 0, &narrow_bar) == CUI_PLOT_OK);
+    assert(shifted_bar.x_min > narrow_bar.x_min);
+    options.value_axis_gutter = wide_gutter;
+    options.kind = CUI_CHART_LINE;
+    options.y_tick_format = format_q;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    options.value_axis_gutter = NAN;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
+    assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
+    options.value_axis_gutter = wide_gutter;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));

@@ -103,7 +103,8 @@ typedef struct {
     unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;
     bool hide_x_axis, show_y_axis, y_axis_inside, grid_solid;
-    bool custom_y_padding; /* line/area value scale; defaults source 10px top, 0 bottom */
+    float value_axis_gutter; /* measured outside y-axis width; zero uses legacy 50px */
+    bool custom_y_padding;   /* line/area value scale; defaults source 10px top, 0 bottom */
     float y_padding_top, y_padding_bottom;
     const double *reference_values;
     size_t reference_count; /* at most 16 */
@@ -193,6 +194,9 @@ cui_plot_result cui_chart_render(cui_chart_state *, const cui_chart_options *);
 /* Styled one-second ease-out-quart appear using core frame time and reduced motion. */
 cui_plot_result cui_chart_render_animated(cui_context *, cui_chart_state *,
                                           const cui_chart_options *);
+/* Measure source's max(32px, widest visible tick + 4px) before render; copy
+ * result to options.value_axis_gutter for consistent paint and hit geometry. */
+float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,

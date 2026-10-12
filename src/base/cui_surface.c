@@ -176,11 +176,24 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
     cui_rect previous = cui_bounds(ui, s->overlay.id);
     if (previous.w > 0 && previous.h > 0)
         cui_overlay_set_bounds(&s->overlay, previous);
+    cui_rect viewport = s->body_viewport;
+    cui_rect content = s->body_content;
+    float previous_maximum = s->body_maximum;
+    s->body_maximum = fmaxf(0, content.h - viewport.h);
+    s->body_scroll =
+        isfinite(s->body_scroll) ? fminf(s->body_maximum, fmaxf(0, s->body_scroll)) : 0;
+    if (previous_maximum != s->body_maximum)
+        cui_invalidate(ui);
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count && s->overlay.open; ++i) {
         cui_event e = events[i];
         cui_surface_resize_event(ui, s, o, e, i);
+        if (e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&
+            cui_event_target(ui, i) == cui_surface_part_id(s->overlay.id, 6)) {
+            s->body_scroll = fminf(s->body_maximum, fmaxf(0, s->body_scroll - e.dy * 48));
+            cui_invalidate(ui);
+        }
         cui_id activation = cui_event_activation(ui, i);
         cui_surface_result reason = CUI_SURFACE_NONE;
         if (s->kind == CUI_SURFACE_ALERT && activation == cui_surface_part_id(s->overlay.id, 2))
@@ -251,4 +264,18 @@ void cui_base_surface_submit_resize(cui_context *ui, const cui_surface_state *s,
                                    .orientation = vertical ? CUI_ORIENTATION_VERTICAL
                                                            : CUI_ORIENTATION_HORIZONTAL});
     }
+}
+
+void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
+    if (!ui || !s || !s->overlay.open)
+        return;
+    cui_id body = cui_surface_part_id(s->overlay.id, 6);
+    cui_track_bounds(ui, body, &s->body_viewport);
+    cui_track_bounds(ui, cui_surface_part_id(s->overlay.id, 7), &s->body_content);
+    cui_interact(ui, body, CUI_ROLE_GROUP, cui_string("Surface content"), false, false, 0);
+    cui_set_semantic_details(ui, body,
+                             (cui_semantic_details){.parent = s->overlay.id,
+                                                    .scrollable = true,
+                                                    .scroll_y = s->body_scroll,
+                                                    .scroll_max_y = s->body_maximum});
 }

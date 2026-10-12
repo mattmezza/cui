@@ -41,18 +41,24 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_end_box(ui);
     if (description.length)
         cui_text(ui, description, t->font_size, t->muted);
-    cui_begin_box(ui, 0, (cui_box){.width = -1, .height = -1, .gap = t->gap, .clip = true});
+    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 6),
+                  (cui_box){.width = -1, .height = -1, .clip = true, .offset_y = -s->body_scroll});
+    cui_base_surface_submit_body(ui, s);
+    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7), (cui_box){.width = -1, .gap = t->gap});
     cui_overlay_set_bounds(&s->overlay, bounds);
     return true;
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)
         return;
-    cui_end_box(ui);
+    cui_end_box(ui); /* body content */
+    cui_end_box(ui); /* body viewport */
+    cui_begin_box(ui, 0, (cui_box){.width = -1});
     cui_begin_box(ui, 0,
                   (cui_box){.width = -1, .row = true, .gap = t->gap, .align_x = CUI_ALIGN_END});
 }
 void cui_surface_end(cui_context *ui) {
+    cui_end_box(ui);
     cui_end_box(ui);
     cui_end_box(ui);
     cui_base_surface_end(ui);

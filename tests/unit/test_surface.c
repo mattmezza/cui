@@ -485,14 +485,16 @@ static void requested_close(void) {
     cui_destroy(ui);
 }
 #ifndef CUI_SURFACE_BASE_ONLY
-static void footer_scene(cui_context *ui, const cui_theme *theme, cui_surface_state *s) {
+static void footer_scene(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
+                         float height) {
     assert(cui_begin_frame(ui, 600, 400, .016f));
     cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400});
     button(ui, 1, theme, cui_string("Open"), false);
     if (cui_surface_begin(
             ui, theme, s, cui_string("Fixed footer"), cui_string("Long body"),
             (cui_surface_options){.viewport = {0, 0, 600, 400}, .width = 360, .height = 300})) {
-        cui_begin_box(ui, 40, (cui_box){.width = -1, .height = 1000, .background = theme->primary});
+        cui_begin_box(ui, 40,
+                      (cui_box){.width = -1, .height = height, .background = theme->primary});
         cui_end_box(ui);
         cui_surface_footer_begin(ui, theme);
         if (button(ui, 41, theme, cui_string("Save"), false))
@@ -510,16 +512,85 @@ static void fixed_footer(void) {
         cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
         cui_surface_state s;
         cui_surface_init(&s, 100, CUI_SURFACE_DIALOG);
-        footer_scene(ui, &themes[i], &s);
+        footer_scene(ui, &themes[i], &s, 1000);
         cui_surface_open(ui, &s, 1);
-        footer_scene(ui, &themes[i], &s);
+        footer_scene(ui, &themes[i], &s, 1000);
+        footer_scene(ui, &themes[i], &s,
+                     1000); /* Measure the body's previous-frame content extent. */
         cui_rect panel = cui_bounds(ui, 100), footer = cui_bounds(ui, 41);
+        cui_rect viewport = cui_bounds(ui, cui_surface_part_id(100, 6));
+        assert(s.body_maximum > 500);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = viewport.x + viewport.w / 2,
+                                               .y = viewport.y + viewport.h / 2,
+                                               .dy = -1}));
+        footer_scene(ui, &themes[i], &s, 1000);
+        assert(s.body_scroll == 48 && cui_bounds(ui, 41).y == footer.y);
+        cui_rect content = cui_bounds(ui, cui_surface_part_id(100, 7));
+        assert(fabsf(content.y - (viewport.y - 48)) < .01f);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = viewport.x + viewport.w / 2,
+                                               .y = viewport.y + viewport.h / 2,
+                                               .dy = -100}));
+        footer_scene(ui, &themes[i], &s, 1000);
+        assert(s.body_scroll == s.body_maximum && cui_bounds(ui, 41).y == footer.y);
         assert(footer.h > 0 && footer.y >= panel.y && footer.y + footer.h <= panel.y + panel.h);
+        for (unsigned settle = 0; settle < 4; ++settle)
+            footer_scene(ui, &themes[i], &s, 1000);
+        assert(!cui_needs_redraw(ui));
+        footer_scene(ui, &themes[i], &s, 100);
+        assert(cui_needs_redraw(ui)); /* New measured content schedules its correction frame. */
+        for (unsigned settle = 0; settle < 4; ++settle)
+            footer_scene(ui, &themes[i], &s, 100);
+        assert(s.body_maximum == 0 && s.body_scroll == 0 && !cui_needs_redraw(ui));
         pointer(ui, footer.x + footer.w / 2, footer.y + footer.h / 2);
-        footer_scene(ui, &themes[i], &s);
+        footer_scene(ui, &themes[i], &s, 1000);
         assert(!s.overlay.open && cui_focused(ui) == 1 && s.result == CUI_SURFACE_ACCEPTED);
         cui_destroy(ui);
     }
+}
+#endif
+#ifdef CUI_SURFACE_BASE_ONLY
+static void base_scroll_scene(cui_context *ui, cui_surface_state *s) {
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    if (cui_base_surface_begin(ui, s, cui_string("Scroll body"), (cui_str){0},
+                               (cui_surface_options){.viewport = {0, 0, 600, 400}})) {
+        cui_begin_portal(ui, s->overlay.id, (cui_box){0}, (cui_rect){0, 0, 300, 300}, 101);
+        cui_begin_box(
+            ui, cui_surface_part_id(100, 6),
+            (cui_box){.width = 300, .height = 200, .clip = true, .offset_y = -s->body_scroll});
+        cui_base_surface_submit_body(ui, s);
+        cui_begin_box(ui, cui_surface_part_id(100, 7), (cui_box){.width = 300});
+        cui_begin_box(ui, 50, (cui_box){.width = 300, .height = 800});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_base_surface_end(ui);
+    }
+    cui_draw_list list = cui_end_frame(ui);
+    for (size_t i = 0; i < list.count; ++i)
+        assert(list.commands[i].type == CUI_DRAW_CLIP_PUSH ||
+               list.commands[i].type == CUI_DRAW_CLIP_POP);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void base_scroll_body(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    cui_surface_state s;
+    cui_surface_init(&s, 100, CUI_SURFACE_DIALOG);
+    cui_surface_open(ui, &s, 0);
+    base_scroll_scene(ui, &s);
+    base_scroll_scene(ui, &s);
+    assert(s.body_maximum == 600);
+    assert(
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 150, .y = 100, .dy = -2}));
+    base_scroll_scene(ui, &s);
+    assert(s.body_scroll == 96 && cui_bounds(ui, 50).y == -96);
+    assert(
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 150, .y = 100, .dy = 100}));
+    base_scroll_scene(ui, &s);
+    assert(s.body_scroll == 0);
+    cui_destroy(ui);
 }
 #endif
 static void geometry(void) {
@@ -549,6 +620,8 @@ int main(void) {
 #ifndef CUI_SURFACE_BASE_ONLY
     styled_confirmation();
     fixed_footer();
+#else
+    base_scroll_body();
 #endif
     return 0;
 }

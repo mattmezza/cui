@@ -32,6 +32,8 @@ typedef struct {
     cui_surface_result pending_close;
     cui_surface_closed_fn on_close;
     void *close_user;
+    float body_scroll, body_maximum;
+    cui_rect body_viewport, body_content;
 } cui_surface_state;
 typedef struct {
     cui_rect viewport, anchor;
@@ -57,7 +59,8 @@ cui_surface_result cui_surface_take_result(cui_surface_state *);
 cui_rect cui_surface_geometry(cui_surface_kind, cui_surface_options);
 cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_options);
 cui_rect cui_surface_resize_bounds(const cui_surface_state *, cui_surface_options);
-cui_id cui_surface_part_id(cui_id, unsigned part); /* 1=close,2=confirm,3=cancel,4=title,5=resize */
+/* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport, 7 body content. */
+cui_id cui_surface_part_id(cui_id, unsigned part);
 /* Reduction happens before submission, so closing leaves no current modal. */
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
 bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, cui_str description,
@@ -65,6 +68,7 @@ bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, c
 void cui_base_surface_end(cui_context *);
 /* Submit inside a box/portal with resize part ID, after base begin. */
 void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cui_surface_options);
+void cui_base_surface_submit_body(cui_context *, cui_surface_state *);
 /* Caller composes arbitrary children, then ends the surface. */
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);
@@ -261,11 +265,24 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
     cui_rect previous = cui_bounds(ui, s->overlay.id);
     if (previous.w > 0 && previous.h > 0)
         cui_overlay_set_bounds(&s->overlay, previous);
+    cui_rect viewport = s->body_viewport;
+    cui_rect content = s->body_content;
+    float previous_maximum = s->body_maximum;
+    s->body_maximum = fmaxf(0, content.h - viewport.h);
+    s->body_scroll =
+        isfinite(s->body_scroll) ? fminf(s->body_maximum, fmaxf(0, s->body_scroll)) : 0;
+    if (previous_maximum != s->body_maximum)
+        cui_invalidate(ui);
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count && s->overlay.open; ++i) {
         cui_event e = events[i];
         cui_surface_resize_event(ui, s, o, e, i);
+        if (e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&
+            cui_event_target(ui, i) == cui_surface_part_id(s->overlay.id, 6)) {
+            s->body_scroll = fminf(s->body_maximum, fmaxf(0, s->body_scroll - e.dy * 48));
+            cui_invalidate(ui);
+        }
         cui_id activation = cui_event_activation(ui, i);
         cui_surface_result reason = CUI_SURFACE_NONE;
         if (s->kind == CUI_SURFACE_ALERT && activation == cui_surface_part_id(s->overlay.id, 2))
@@ -338,6 +355,20 @@ void cui_base_surface_submit_resize(cui_context *ui, const cui_surface_state *s,
     }
 }
 
+void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
+    if (!ui || !s || !s->overlay.open)
+        return;
+    cui_id body = cui_surface_part_id(s->overlay.id, 6);
+    cui_track_bounds(ui, body, &s->body_viewport);
+    cui_track_bounds(ui, cui_surface_part_id(s->overlay.id, 7), &s->body_content);
+    cui_interact(ui, body, CUI_ROLE_GROUP, cui_string("Surface content"), false, false, 0);
+    cui_set_semantic_details(ui, body,
+                             (cui_semantic_details){.parent = s->overlay.id,
+                                                    .scrollable = true,
+                                                    .scroll_y = s->body_scroll,
+                                                    .scroll_max_y = s->body_maximum});
+}
+
 /* src/components/cui_surface.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -382,18 +413,24 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_end_box(ui);
     if (description.length)
         cui_text(ui, description, t->font_size, t->muted);
-    cui_begin_box(ui, 0, (cui_box){.width = -1, .height = -1, .gap = t->gap, .clip = true});
+    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 6),
+                  (cui_box){.width = -1, .height = -1, .clip = true, .offset_y = -s->body_scroll});
+    cui_base_surface_submit_body(ui, s);
+    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7), (cui_box){.width = -1, .gap = t->gap});
     cui_overlay_set_bounds(&s->overlay, bounds);
     return true;
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)
         return;
-    cui_end_box(ui);
+    cui_end_box(ui); /* body content */
+    cui_end_box(ui); /* body viewport */
+    cui_begin_box(ui, 0, (cui_box){.width = -1});
     cui_begin_box(ui, 0,
                   (cui_box){.width = -1, .row = true, .gap = t->gap, .align_x = CUI_ALIGN_END});
 }
 void cui_surface_end(cui_context *ui) {
+    cui_end_box(ui);
     cui_end_box(ui);
     cui_end_box(ui);
     cui_base_surface_end(ui);

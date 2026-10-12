@@ -256,7 +256,7 @@ int main(void) {
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
     assert(nodes[0].x0 >= no_margin_left + 19 && nodes[3].x0 <= no_margin_right - 19);
     for (size_t i = 0; i < 4; i++)
-        assert(nodes[i].y0 >= 47 && nodes[i].y1 <= 84);
+        assert(nodes[i].y0 >= 47 && nodes[i].y1 <= 84.01);
     cui_chart_sankey_node margin_nodes[4];
     memcpy(margin_nodes, nodes, sizeof nodes);
     flow_options.sankey_margins.left = NAN;

@@ -1111,7 +1111,7 @@ static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
     }
 }
 static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count, size_t layer,
-                                     double padding, double top, double bottom) {
+                                     double padding, double top, double bottom, double beta) {
     size_t indices[256], n = 0;
     for (size_t i = 0; i < count; i++)
         if (nodes[i].layer == layer)
@@ -1124,23 +1124,40 @@ static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count,
         }
         indices[j] = item;
     }
-    double cursor = top;
-    for (size_t i = 0; i < n; i++) {
+    if (!n)
+        return;
+    size_t middle = n / 2;
+    double cursor = nodes[indices[middle]].y0 - padding;
+    for (size_t i = middle; i > 0; i--) {
+        cui_chart_sankey_node *node = &nodes[indices[i - 1]];
+        double shift = fmax(0, node->y1 - cursor) * beta;
+        node->y0 -= (float)shift;
+        node->y1 -= (float)shift;
+        cursor = node->y0 - padding;
+    }
+    cursor = nodes[indices[middle]].y1 + padding;
+    for (size_t i = middle + 1; i < n; i++) {
         cui_chart_sankey_node *node = &nodes[indices[i]];
-        double height = node->y1 - node->y0;
-        double y = fmax(cursor, node->y0);
-        node->y0 = (float)y;
-        node->y1 = (float)(y + height);
+        double shift = fmax(0, cursor - node->y0) * beta;
+        node->y0 += (float)shift;
+        node->y1 += (float)shift;
         cursor = node->y1 + padding;
     }
     cursor = bottom;
     for (size_t i = n; i > 0; i--) {
         cui_chart_sankey_node *node = &nodes[indices[i - 1]];
-        double height = node->y1 - node->y0;
-        double y = fmin(cursor - height, node->y0);
-        node->y0 = (float)y;
-        node->y1 = (float)(y + height);
-        cursor = y - padding;
+        double shift = fmax(0, node->y1 - cursor) * beta;
+        node->y0 -= (float)shift;
+        node->y1 -= (float)shift;
+        cursor = node->y0 - padding;
+    }
+    cursor = top;
+    for (size_t i = 0; i < n; i++) {
+        cui_chart_sankey_node *node = &nodes[indices[i]];
+        double shift = fmax(0, cursor - node->y0) * beta;
+        node->y0 += (float)shift;
+        node->y1 += (float)shift;
+        cursor = node->y1 + padding;
     }
 }
 static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
@@ -1148,6 +1165,7 @@ static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_
     unsigned iterations = o->sankey_iterations ? o->sankey_iterations : 6;
     for (unsigned pass = 0; pass < iterations; pass++) {
         double alpha = pow(.99, pass);
+        double beta = fmax(1 - alpha, (pass + 1.0) / iterations);
         for (int direction = 0; direction < 2; direction++)
             for (size_t step = 0; step < layers; step++) {
                 size_t layer = direction == 0 ? layers - 1 - step : step;
@@ -1179,7 +1197,7 @@ static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_
                     }
                 }
                 cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8 + o->sankey_margins.top,
-                                         o->height - 8 - o->sankey_margins.bottom);
+                                         o->height - 8 - o->sankey_margins.bottom, beta);
             }
     }
 }

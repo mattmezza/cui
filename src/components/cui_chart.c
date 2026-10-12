@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_chart.h"
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 uint64_t cui_chart_frame_key(const cui_chart_options *, const cui_chart_state *);
 static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
@@ -10,9 +12,33 @@ static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
     if (formatter)
         length = formatter(value, buffer, capacity, user);
     else {
-        int written = snprintf(buffer, capacity, "%.3g", value);
-        length = written > 0 ? (size_t)written : 0;
+        length = 0;
+        for (int precision = 0; precision <= DBL_DECIMAL_DIG; precision++) {
+            int written = snprintf(buffer, capacity, "%.*f", precision, value);
+            if (written <= 0 || (size_t)written >= capacity)
+                break;
+            char *end = NULL;
+            if (strtod(buffer, &end) == value && end && !*end) {
+                length = (size_t)written;
+                break;
+            }
+        }
+        if (!length) {
+            int written = snprintf(buffer, capacity, "%.*g", DBL_DECIMAL_DIG, value);
+            length = written > 0 ? (size_t)written : 0;
+        }
     }
+    if (length >= capacity)
+        length = capacity ? capacity - 1 : 0;
+    return (cui_str){buffer, length};
+}
+static cui_str cui_chart_tick_number(char *buffer, size_t capacity, double value,
+                                     cui_chart_format_fn formatter, void *user) {
+    if (formatter)
+        return cui_chart_number(buffer, capacity, value, formatter, user);
+    int written =
+        snprintf(buffer, capacity, fabs(value - round(value)) < .001 ? "%.0f" : "%.1f", value);
+    size_t length = written > 0 ? (size_t)written : 0;
     if (length >= capacity)
         length = capacity ? capacity - 1 : 0;
     return (cui_str){buffer, length};
@@ -145,7 +171,7 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
         }
         char buffer[48];
         cui_str label =
-            cui_chart_number(buffer, sizeof buffer, value, o->y_tick_format, o->format_user);
+            cui_chart_tick_number(buffer, sizeof buffer, value, o->y_tick_format, o->format_user);
         cui_size measured = cui_measure_text(ui, label, 10);
         if (isfinite(measured.width))
             gutter = fmaxf(gutter, measured.width + 4);
@@ -873,8 +899,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     value = lo + (hi - lo) * tick / (count - 1);
                 else
                     (void)cui_plot_inverse(&scale, pixel_y, &value);
-                cui_str label =
-                    cui_chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
+                cui_str label = cui_chart_tick_number(text, sizeof text, value, o->y_tick_format,
+                                                      o->format_user);
                 float y = (float)(pixel_y * h / o->height);
                 float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 32;
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;

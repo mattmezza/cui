@@ -1156,6 +1156,71 @@ int main(void) {
     cui_chart_options no_candle_axis = options;
     no_candle_axis.kind = CUI_CHART_CANDLESTICK;
     assert(cui_chart_measure_value_axis_gutter(ui, &no_candle_axis) == 0);
+    cui_chart_datum fractional_data[] = {{.label = {"A", 1}, .value = 1},
+                                         {.label = {"B", 1}, .value = 2},
+                                         {.label = {"C", 1}, .value = 3}};
+    cui_chart_options fractional_axis = options;
+    fractional_axis.kind = CUI_CHART_BAR;
+    fractional_axis.data = fractional_data;
+    fractional_axis.y_tick_format = NULL;
+    fractional_axis.tooltip_format = NULL;
+    fractional_axis.has_domain = true;
+    fractional_axis.domain_min = 0;
+    fractional_axis.domain_max = 3.14159;
+    fractional_axis.y_axis_inside = true;
+    fractional_axis.disable_appear = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 909, &state, &fractional_axis, (cui_str){"Fraction ticks", 14}));
+    cui_draw_list tick_draw = cui_end_frame(ui);
+    bool source_fraction_tick = false, old_fraction_tick = false;
+    for (size_t i = 0; i < tick_draw.count; i++)
+        if (tick_draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str item = tick_draw.commands[i].text;
+            source_fraction_tick |= item.length == 3 && memcmp(item.data, "3.1", 3) == 0;
+            old_fraction_tick |= item.length == 4 && memcmp(item.data, "3.14", 4) == 0;
+        }
+    assert(source_fraction_tick && !old_fraction_tick);
+    cui_chart_datum raw_data[] = {{.label = {"A", 1}, .value = 12.3456},
+                                  {.label = {"B", 1}, .value = 2}};
+    cui_chart_options raw_tooltip = options;
+    raw_tooltip.data = raw_data;
+    raw_tooltip.count = 2;
+    raw_tooltip.show_y_axis = false;
+    raw_tooltip.tooltip_format = NULL;
+    raw_tooltip.y_tick_format = NULL;
+    raw_tooltip.disable_appear = true;
+    unsigned char raw_pixels[sizeof pixels] = {0};
+    cui_chart_state raw_state = {.pixels = raw_pixels, .byte_capacity = sizeof raw_pixels};
+    assert(cui_chart_render(&raw_state, &raw_tooltip) == CUI_PLOT_OK);
+    raw_state.hovered = 0;
+    raw_state.tooltip_cursor_valid = true;
+    raw_state.tooltip_cursor_x = 16;
+    raw_state.tooltip_cursor_y = 20;
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 908, &raw_state, &raw_tooltip, (cui_str){"Raw tooltip", 11}));
+    cui_draw_list raw_draw = cui_end_frame(ui);
+    cui_set_reduced_motion(ui, false);
+    bool raw_source_value = false, raw_short_value = false;
+    for (size_t i = 0; i < raw_draw.count; i++)
+        if (raw_draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str item = raw_draw.commands[i].text;
+            raw_source_value |= item.length == 7 && memcmp(item.data, "12.3456", 7) == 0;
+            raw_short_value |= item.length == 4 && memcmp(item.data, "12.3", 4) == 0;
+        }
+    assert(raw_source_value && !raw_short_value);
+    raw_data[0].value = 1000;
+    assert(cui_begin_frame(ui, 256, 256, .01f));
+    assert(cui_chart(ui, 908, &raw_state, &raw_tooltip, (cui_str){"Raw tooltip", 11}));
+    raw_draw = cui_end_frame(ui);
+    bool raw_integer = false, scientific_integer = false;
+    for (size_t i = 0; i < raw_draw.count; i++)
+        if (raw_draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str item = raw_draw.commands[i].text;
+            raw_integer |= item.length == 4 && memcmp(item.data, "1000", 4) == 0;
+            scientific_integer |= item.length == 5 && memcmp(item.data, "1e+03", 5) == 0;
+        }
+    assert(raw_integer && !scientific_integer);
     cui_chart_options styled_axis_auto = options, styled_axis_manual = options;
     styled_axis_auto.value_axis_gutter = 0;
     styled_axis_auto.disable_appear = true;

@@ -10,6 +10,8 @@ The adapter covers seven chart families. Line and area accept natural, linear, a
 
 For Line and Area, grid ticks, value-axis labels, and pointer hit testing cover the full plot height while the value scale retains its top/bottom headroom; tick values extrapolate at the plot edges as in the source. A Cartesian `tick_count` of one clamps to two like the source value/y tick setters; Radar accepts one ring and defaults to four rings.
 
+Default Cartesian tick labels follow the pinned formatter: whole numbers without decimals and other values to one decimal place. Unformatted tooltip and value-label numbers use the shortest fixed decimal that round-trips within the bounded C buffer; extreme magnitudes fall back to scientific notation. The source uses its host number formatter for those extremes.
+
 This remains partial against the pinned GPUI Kit source. The method audit below lists the remaining gaps in labels, fills, axes, Sankey options, and hover effects. Outside value-axis gutters can be measured before rasterization with the helper above. `cui_plot` remains available for independent scales, ticks, pan/zoom, and clipping.
 
 ## Frozen source method audit

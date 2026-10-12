@@ -929,6 +929,22 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(state.hovered == 1 && state.emphasis_focus == 1);
     options.reduced_motion = false;
+    float old_band_center = state.emphasis_center;
+    assert(cui_chart_bar_bounds(&options, 0, &hovered_bar) == CUI_PLOT_OK);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                        .x = state.bounds.x + (hovered_bar.x_min + hovered_bar.x_max) / 2 *
+                                                  options.logical_width / options.width,
+                        .y = state.bounds.y + (hovered_bar.y_min + hovered_bar.y_max) / 2 *
+                                                  options.logical_height / options.height}));
+    assert(cui_begin_frame(ui, 256, 256, .016f));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    float target_band_center;
+    assert(cui_chart_bar_band_center(&options, 0, &target_band_center) == CUI_PLOT_OK);
+    assert(state.hovered == 0 && state.emphasis_center > target_band_center &&
+           state.emphasis_center < old_band_center && cui_needs_redraw(ui));
+    (void)cui_end_frame(ui);
     options.bar_label_format = format_wide_tick;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);

@@ -251,6 +251,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         state->emphasis_focus =
             instant ? (active ? 1 : 0)
                     : fmaxf(0, fminf(1, state->emphasis_focus + (active ? dt : -dt) / duration));
+        bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
         if (o->kind == CUI_CHART_BAR && active) {
             float target;
             if (cui_chart_bar_band_center(o, state->hovered, &target) == CUI_PLOT_OK) {
@@ -261,9 +262,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 } else
                     cui_chart_hover_spring(&state->emphasis_center, &state->emphasis_velocity,
                                            target, dt, duration);
+                moving |= fabsf(state->emphasis_center - target) > .1f ||
+                          fabsf(state->emphasis_velocity) > .1f;
             }
         }
-        bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
         if (o->kind == CUI_CHART_PIE)
             for (size_t i = 0; i < o->count && i < 256; i++) {
                 float target = active && state->hovered == i ? 1 : 0;

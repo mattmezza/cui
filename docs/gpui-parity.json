@@ -2327,13 +2327,14 @@
       "public_header": "include/cui/cui_picker.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_picker.c"
+        "tests/unit/test_picker.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
         "wasi": "tested_partial",
-        "wasm_browser": "partial_model_story"
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Actual one-to-three month Gregorian grid, ordered keyboard navigation, controlled date/range selection, disabled/min/max predicates and roving semantic days tested. Locale labels, week numbers, today markers, hover range previews and neighboring-day interaction remain pending."
@@ -2427,14 +2428,16 @@
       "category": "forms",
       "base_behavior": [],
       "public_header": "include/cui/cui_picker.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_picker.c"
+        "tests/unit/test_picker.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "wasi": "tested_partial"
+        "wasi": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Actual HSV plane, hue/alpha/RGBA sliders and palettes; pointer capture, keyboard edits, disabled/readonly and 20,000 conversion/hex round trips tested. Editable text channels, continuous gradients, eyedropper and popup presentation remain pending."
@@ -2528,7 +2531,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Editable UTF-8 query, ASCII filtering, single/multiple selection, removable protected chips, filtered masks preserving hidden selections, ordered activations and popup dismissal tested. Remote data, Unicode case folding and fully interleaved text/activation reduction remain pending."
+        "Editable UTF-8 query, ASCII filtering, single/multiple selection, removable protected chips, filtered masks preserving hidden selections, ordered activations and popup dismissal tested. Remote data, Unicode case folding and fully interleaved text/activation reduction remain pending.",
+        "Same-frame wheel+Enter and text+activation event ordering are still being completed; no full interaction parity claim."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2554,6 +2558,13 @@
         },
         {
           "name": "ordered multiple selection and disabled-protected removable chips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "custom option body delegates and bounded wheel scrolling",
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
@@ -2593,14 +2604,16 @@
       "category": "forms",
       "base_behavior": [],
       "public_header": "include/cui/cui_picker.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_picker.c"
+        "tests/unit/test_picker.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "wasi": "tested_partial"
+        "wasi": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Real collision-placed calendar portal, date/range selection, trapped Tab and same-frame focus restoration tested. Editable date masks, custom formats/locales, clear controls, presets and responsive scrolling remain pending."
@@ -2830,7 +2843,9 @@
       "public_header": "include/cui/cui_components.h",
       "sample": "gallery/main.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_input.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2838,7 +2853,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Real UTF-8 scalar editor with bounded undo/redo; no caret/selection painting, graphemes, IME, clipboard integration or pointer position."
+        "Actual single-line caret/selection painting, UTF-8 scalar pointer positioning, horizontal scrolling, disabled/readonly/required/invalid semantics, host clipboard and bounded undo/redo shortcuts tested. Multiline presentation, graphemes, IME, bidi, shaping cluster hit testing and asynchronous browser clipboard integration remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2862,6 +2877,27 @@
           "name": "validation/disabled/error/semantic states",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "ordered host clipboard and undo/redo shortcuts",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c"
+          ]
+        },
+        {
+          "name": "single-line pointer selection, caret painting and horizontal scroll",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c"
+          ]
+        },
+        {
+          "name": "readonly/required/invalid semantic states",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3173,7 +3209,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled single/multiple selection, removable protected chips, ordered activations, keyboard/typeahead, collision placement and modal focus/restore tested. Custom option slots, remote loading, pointer wheel scrolling and full virtualization remain pending."
+        "Controlled single/multiple selection, removable protected chips, ordered activations, keyboard/typeahead, collision placement and modal focus/restore tested. remote loading, full virtualization remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3201,6 +3237,13 @@
         },
         {
           "name": "ordered multiple selection and disabled-protected removable chips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "custom option body delegates and bounded wheel scrolling",
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
@@ -3419,14 +3462,16 @@
       "category": "forms",
       "base_behavior": [],
       "public_header": "include/cui/cui_picker.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_picker.c"
+        "tests/unit/test_picker.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "wasi": "tested_partial"
+        "wasi": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
         "Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending."
@@ -3749,7 +3794,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Stable keyed single/multiple selection, per-event activations, roving keyboard/typeahead, disabled items, semantic options and bounded visible window tested. Mouse wheel scrolling, remote data, custom rows and full virtualization remain pending."
+        "Stable keyed single/multiple selection, per-event activations, roving keyboard/typeahead, disabled items, semantic options and bounded visible window tested. remote data, full virtualization remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3777,6 +3822,13 @@
         },
         {
           "name": "ordered multiple selection and disabled-protected removable chips",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "custom option body delegates and bounded wheel scrolling",
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
@@ -3826,7 +3878,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Flat portal menu actions, keyboard/typeahead, collision placement, outside/Escape dismissal, disabled controls and immediate focus restoration tested. Nested submenus, separators, check/radio items and custom rows pending."
+        "Actual flat/nested menus, check/radio, separators, text adornments, custom row delegates, context opening with modal guard, bounded collision placement and immediate focus restoration tested. OS shortcuts/link activation, arbitrary nested viewport scrolling and complete upstream behavior remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3840,11 +3892,20 @@
         },
         {
           "name": "nested popup collision",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "dismissal/restore/disabled semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "secondary-pointer context opening and modal ancestry guard",
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
@@ -4048,31 +4109,48 @@
       "reference_url": "https://gpui-kit.com/component/scrollable/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_scroll.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_scroll.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Auto-measured/grow sizing, inertia/touch, auto-hide and native system behavior remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "scroll bounds and nested clipping",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_scroll.c"
+          ]
         },
         {
           "name": "wheel/drag scrollbar",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_scroll.c"
+          ]
         },
         {
           "name": "keyboard and coordinate hit testing",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_scroll.c"
+          ]
+        },
+        {
+          "name": "independent headless reducers and actual themed rendering",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_scroll.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4100,7 +4178,8 @@
           "Chat Messages with Auto-scroll",
           "Data Table with Virtual Scrolling"
         ]
-      }
+      },
+      "last_tested_commit": "2c2de4b167275f3d75b16990088321ea5d5d8a30"
     },
     {
       "name": "Settings",
@@ -4596,31 +4675,49 @@
       "reference_url": "https://gpui-kit.com/component/tree/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "public_header": "include/cui/cui_tree.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_tree.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
+      },
+      "limitations": [
+        "Actual bounded keyed hierarchy, controlled expand/select, ordered parent/child navigation, fractional virtual viewport and clipped wheel routing tested. Variable row heights, drag/drop, custom row slots, full context actions and native accessibility remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "hierarchical model/expand/selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_tree.c"
+          ]
         },
         {
           "name": "keyboard parent/child navigation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_tree.c"
+          ]
         },
         {
           "name": "virtualization and tree semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_tree.c"
+          ]
+        },
+        {
+          "name": "independent headless reducers and actual themed rendering",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_tree.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4646,7 +4743,8 @@
           "Multi-Select Tree",
           "Keyboard Navigation"
         ]
-      }
+      },
+      "last_tested_commit": "2c2de4b167275f3d75b16990088321ea5d5d8a30"
     },
     {
       "name": "VirtualList",
@@ -4882,15 +4980,19 @@
       "reference_url": "https://gpui-kit.com/component/data-table/",
       "category": "advanced",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_table.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_table.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Actual keyed rows/columns, controlled sort and selection, pointer/keyboard resize/reorder, frozen headers, row/column virtualization, stable context requests and load-range signaling tested. Pinned columns, multiple selection, remote data adapters and complete upstream behavior remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -4900,8 +5002,10 @@
         },
         {
           "name": "cell/row selection keyboard and mouse",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c"
+          ]
         },
         {
           "name": "row virtualization/remote callbacks",
@@ -4912,6 +5016,13 @@
           "name": "header/footer/table semantics",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "independent headless reducers and actual themed rendering",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4945,7 +5056,8 @@
           "Methods",
           "Events"
         ]
-      }
+      },
+      "last_tested_commit": "2c2de4b167275f3d75b16990088321ea5d5d8a30"
     },
     {
       "name": "Plot",
@@ -5025,15 +5137,19 @@
       "reference_url": "https://gpui-kit.com/component/table/",
       "category": "advanced",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_table.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_table.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Real themed semantic table/row/cell composition and associated data-table behavior tested. Section/caption/span primitives, exhaustive sizing and complete upstream composition remain pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
@@ -5050,6 +5166,13 @@
           "name": "themed cells and keyboard behavior",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "independent headless reducers and actual themed rendering",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5071,7 +5194,8 @@
           "TableHeader / TableBody / TableFooter / TableRow / TableCaption",
           "Table vs DataTable"
         ]
-      }
+      },
+      "last_tested_commit": "2c2de4b167275f3d75b16990088321ea5d5d8a30"
     },
     {
       "name": "TextView",

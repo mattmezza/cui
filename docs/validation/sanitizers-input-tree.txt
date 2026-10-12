@@ -1,0 +1,71 @@
+Test project /home/matteo/dev/cui/build-asan
+      Start  1: bootstrap
+ 1/33 Test  #1: bootstrap ........................   Passed    0.09 sec
+      Start  2: core
+ 2/33 Test  #2: core .............................   Passed    0.19 sec
+      Start  3: base
+ 3/33 Test  #3: base .............................   Passed    0.09 sec
+      Start  4: components
+ 4/33 Test  #4: components .......................   Passed    0.07 sec
+      Start  5: render
+ 5/33 Test  #5: render ...........................   Passed    0.06 sec
+      Start  6: edit
+ 6/33 Test  #6: edit .............................   Passed    0.24 sec
+      Start  7: overlay
+ 7/33 Test  #7: overlay ..........................   Passed    0.06 sec
+      Start  8: virtual
+ 8/33 Test  #8: virtual ..........................   Passed    0.16 sec
+      Start  9: dock
+ 9/33 Test  #9: dock .............................   Passed    1.38 sec
+      Start 10: plot
+10/33 Test #10: plot .............................   Passed    0.03 sec
+      Start 11: content
+11/33 Test #11: content ..........................   Passed    0.04 sec
+      Start 12: disclosure
+12/33 Test #12: disclosure .......................   Passed    0.03 sec
+      Start 13: choice
+13/33 Test #13: choice ...........................   Passed    0.07 sec
+      Start 14: numeric
+14/33 Test #14: numeric ..........................   Passed    0.07 sec
+      Start 15: picker
+15/33 Test #15: picker ...........................   Passed    0.18 sec
+      Start 16: tree
+16/33 Test #16: tree .............................   Passed    0.14 sec
+      Start 17: input
+17/33 Test #17: input ............................   Passed    0.05 sec
+      Start 18: example_unstyled
+18/33 Test #18: example_unstyled .................   Passed    0.02 sec
+      Start 19: example_styled_settings
+19/33 Test #19: example_styled_settings ..........   Passed    0.02 sec
+      Start 20: manifest
+20/33 Test #20: manifest .........................   Passed    0.15 sec
+      Start 21: licenses
+21/33 Test #21: licenses .........................   Passed    0.19 sec
+      Start 22: distribution
+22/33 Test #22: distribution .....................   Passed    0.19 sec
+      Start 23: cpp_embedding
+23/33 Test #23: cpp_embedding ....................   Passed    0.02 sec
+      Start 24: distribution_single
+24/33 Test #24: distribution_single ..............   Passed    0.02 sec
+      Start 25: distribution_multi
+25/33 Test #25: distribution_multi ...............   Passed    0.03 sec
+      Start 26: sdl3_services
+26/33 Test #26: sdl3_services ....................   Passed    0.77 sec
+      Start 27: gallery_layout
+27/33 Test #27: gallery_layout ...................   Passed    0.04 sec
+      Start 28: gallery_capture
+28/33 Test #28: gallery_capture ..................   Passed    0.49 sec
+      Start 29: implementation_embedding
+29/33 Test #29: implementation_embedding .........   Passed    0.03 sec
+      Start 30: numeric_base_only
+30/33 Test #30: numeric_base_only ................   Passed    0.05 sec
+      Start 31: picker_base_only
+31/33 Test #31: picker_base_only .................   Passed    0.12 sec
+      Start 32: tree_base_only
+32/33 Test #32: tree_base_only ...................   Passed    0.07 sec
+      Start 33: input_base_only
+33/33 Test #33: input_base_only ..................   Passed    0.03 sec
+
+100% tests passed out of 33
+
+Total Test time (real) =   5.22 sec

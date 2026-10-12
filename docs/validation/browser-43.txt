@@ -1,0 +1,1 @@
+PASS: 78 catalog entries, 43 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting

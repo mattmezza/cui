@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `b582fde631fa7440ad2ed7d0660fdbb49f75f309`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `377ee9f1c9a35b2fa6d62c4c3a8be26dc13a319f`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -12,38 +12,51 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 
 | Status | Families |
 |---|---:|
-| not_started | 35 |
+| not_started | 31 |
 | scaffolded | 0 |
 | implemented | 4 |
-| tested | 39 |
+| tested | 43 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-Native strict GCC31/31 (including GPU/readback and picker base-only), source b582fde; instrumented ASan/UBSan29/29 and WASI22/22 at picker integration6bbb664; actual Chromium39-story gallery passed against b582fde with the same production sources. Earlier optimized Release24/24 applies before picker additions. See validation logs for exact scope. Full78-family feature parity remains unfinished.
+Native strict GCC39/39 at input-painter source377ee9f; instrumented ASan/UBSan37/37 and WASI30/30 at earlier table/scroll source2c2de4b; Chromium43 local stories at2c2de4b. Published source3ef6c49 passed all six framework CI jobs (portable34/34 Windows/macOS), browser42-story build/deploy, and a direct HTTPS Chromium visit. Subsequent table multi-selection, tree metadata and input-painter refactoring require their own expanded checks; native checks pass. Full78-family parity remains unfinished.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
 - [browser-39.txt](validation/browser-39.txt)
+- [browser-42.txt](validation/browser-42.txt)
+- [browser-43.txt](validation/browser-43.txt)
 - [ci-01865d5.txt](validation/ci-01865d5.txt)
 - [clang-zig-headless.txt](validation/clang-zig-headless.txt)
+- [deployed-42.txt](validation/deployed-42.txt)
+- [gcc-choice-wheel.txt](validation/gcc-choice-wheel.txt)
+- [gcc-input-paint.txt](validation/gcc-input-paint.txt)
+- [gcc-input-tree.txt](validation/gcc-input-tree.txt)
 - [gcc-offset.txt](validation/gcc-offset.txt)
 - [gcc-pickers.txt](validation/gcc-pickers.txt)
 - [gcc-pointer.txt](validation/gcc-pointer.txt)
 - [gcc-resumed.txt](validation/gcc-resumed.txt)
+- [gcc-scroll-table.txt](validation/gcc-scroll-table.txt)
+- [gcc-table-navigation.txt](validation/gcc-table-navigation.txt)
+- [gcc-wheel.txt](validation/gcc-wheel.txt)
 - [gcc-xorg.txt](validation/gcc-xorg.txt)
 - [release-headless.txt](validation/release-headless.txt)
 - [release-resumed.txt](validation/release-resumed.txt)
+- [sanitizers-input-tree.txt](validation/sanitizers-input-tree.txt)
 - [sanitizers-pickers.txt](validation/sanitizers-pickers.txt)
 - [sanitizers-resumed.txt](validation/sanitizers-resumed.txt)
+- [sanitizers-scroll-table.txt](validation/sanitizers-scroll-table.txt)
 - [sanitizers.txt](validation/sanitizers.txt)
 - [sokol-asan-xorg.txt](validation/sokol-asan-xorg.txt)
 - [wasi-initial.txt](validation/wasi-initial.txt)
+- [wasi-input-tree.txt](validation/wasi-input-tree.txt)
 - [wasi-pickers.txt](validation/wasi-pickers.txt)
 - [wasi-resumed-initial.txt](validation/wasi-resumed-initial.txt)
 - [wasi-resumed.txt](validation/wasi-resumed.txt)
+- [wasi-scroll-table.txt](validation/wasi-scroll-table.txt)
 - [wasi.txt](validation/wasi.txt)
 
 Commands: `cmake -S . -B build -G Ninja -DCUI_GPU_TESTS=ON`; `cmake --build build`; `ctest --test-dir build --output-on-failure`. ASan/UBSan config uses `-DCUI_SANITIZE=ON`; portable Clang 21.1.8 is supplied by Zig 0.16.0 with `-DCMAKE_LINK_DEPENDS_USE_LINKER=FALSE` to avoid a Zig/CMake linker dependency-file crash. This workaround is not required by ordinary GCC builds.
@@ -62,9 +75,9 @@ Linux Xorg and headless: tested partial. Wayland: untested. Windows/macOS: hoste
 
 ## Risks and next tasks
 
-1. Input is a preview: scalar boundaries, no painted caret/selection/pointer placement, IME, clipboard editor path, graphemes, paragraph bidi or font fallback. Finish this usable foundation before claiming Editor.
-2. Menus, selects, comboboxes, disclosure/tabs and floating content have working styled slices. Complete nested/menu/selection features and styled dialogs/sheets remain in progress.
-3. Virtualization is a real efficient keyed model, but a scroll/focus/widget layer and data table remain. Dock/advanced model progress must retain widget-level gaps.
+1. Single-line Input now has caret/selection painting, scalar pointer placement, scrolling, host clipboard and bounded history. Complete multiline presentation, IME, graphemes, shaping clusters, paragraph bidi and font fallback before claiming Editor.
+2. Nested/context menus, multiple selection, custom row delegates, pickers and disclosure/tabs have tested styled slices. Complete reference-specific behavior and styled dialogs/sheets.
+3. Tree, table and scroll widgets now use clipped virtual viewports and keyboard models. Complete table pinning/multiple selection, variable heights and advanced integration; Dock and Plot remain partial model stories.
 4. Complete independent renderer/resource lifecycle/device-loss contracts, broader GPU shader formats, OS accessibility and native platform adapters.
 5. Implement remaining catalog families against feature requirements, then add real stories/behavior/semantic/theme tests before verified status.
 
@@ -133,16 +146,16 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Tooltip | tested | Delayed pointer/focus opening, collision placement, viewport portals, Escape suppression, disabled omission and trigger description tested. configurable layer policy and native accessibility bridge pending. |
 | Calendar | tested | Actual one-to-three month Gregorian grid, ordered keyboard navigation, controlled date/range selection, disabled/min/max predicates and roving semantic days tested. Locale labels, week numbers, today markers, hover range previews and neighboring-day interaction remain pending. |
 | ColorPicker | tested | Actual HSV plane, hue/alpha/RGBA sliders and palettes; pointer capture, keyboard edits, disabled/readonly and 20,000 conversion/hex round trips tested. Editable text channels, continuous gradients, eyedropper and popup presentation remain pending. |
-| Combobox | tested | Editable UTF-8 query, ASCII filtering, single/multiple selection, removable protected chips, filtered masks preserving hidden selections, ordered activations and popup dismissal tested. Remote data, Unicode case folding and fully interleaved text/activation reduction remain pending. |
+| Combobox | tested | Editable UTF-8 query, ASCII filtering, single/multiple selection, removable protected chips, filtered masks preserving hidden selections, ordered activations and popup dismissal tested. Remote data, Unicode case folding and fully interleaved text/activation reduction remain pending.; Same-frame wheel+Enter and text+activation event ordering are still being completed; no full interaction parity claim. |
 | DatePicker | tested | Real collision-placed calendar portal, date/range selection, trapped Tab and same-frame focus restoration tested. Editable date masks, custom formats/locales, clear controls, presets and responsive scrolling remain pending. |
 | Editor | implemented | Reusable bounded UTF-8 scalar editing model exists. No source editor, gutter, highlighting, diagnostics, grapheme editing or200K-line validation. |
 | Form | not_started | Full documented behavior pending implementation and audit. |
-| Input | tested | Real UTF-8 scalar editor with bounded undo/redo; no caret/selection painting, graphemes, IME, clipboard integration or pointer position. |
+| Input | tested | Actual single-line caret/selection painting, UTF-8 scalar pointer positioning, horizontal scrolling, disabled/readonly/required/invalid semantics, host clipboard and bounded undo/redo shortcuts tested. Multiline presentation, graphemes, IME, bidi, shaping cluster hit testing and asynchronous browser clipboard integration remain pending. |
 | Input Group | not_started | Full documented behavior pending implementation and audit. |
 | NumberInput | tested | Independent headless and styled finite numeric editing, draft validation, CJK normalization, locale-aware ASCII parsing/formatting, bounds, steps, readonly/disabled and semantics tested. Thousands separators, full custom pattern/appearance, caret/selection painting, pointer positioning and IME pending. |
 | OtpInput | not_started | Full documented behavior pending implementation and audit. |
 | Questionnaire | not_started | Full documented behavior pending implementation and audit. |
-| Select | tested | Controlled single/multiple selection, removable protected chips, ordered activations, keyboard/typeahead, collision placement and modal focus/restore tested. Custom option slots, remote loading, pointer wheel scrolling and full virtualization remain pending. |
+| Select | tested | Controlled single/multiple selection, removable protected chips, ordered activations, keyboard/typeahead, collision placement and modal focus/restore tested. remote loading, full virtualization remain pending. |
 | Slider | tested | Capture drag, keyboard step/clamp and disabled tests pass; tick/handle geometry and touch pending. |
 | Speech | not_started | Full documented behavior pending implementation and audit. |
 | Textarea | not_started | Full documented behavior pending implementation and audit. |
@@ -151,12 +164,12 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | DescriptionList | not_started | Full documented behavior pending implementation and audit. |
 | Dialog | not_started | Full documented behavior pending implementation and audit. |
 | Dock | tested | Retained split/tab tree, stable keys, constrained geometry and transactional versioned persistence tested. Styled Dock, drag/drop, resize gestures, floating windows and keyboard/focus integration pending. |
-| List | tested | Stable keyed single/multiple selection, per-event activations, roving keyboard/typeahead, disabled items, semantic options and bounded visible window tested. Mouse wheel scrolling, remote data, custom rows and full virtualization remain pending. |
-| Menu | tested | Flat portal menu actions, keyboard/typeahead, collision placement, outside/Escape dismissal, disabled controls and immediate focus restoration tested. Nested submenus, separators, check/radio items and custom rows pending. |
+| List | tested | Stable keyed single/multiple selection, per-event activations, roving keyboard/typeahead, disabled items, semantic options and bounded visible window tested. remote data, full virtualization remain pending. |
+| Menu | tested | Actual flat/nested menus, check/radio, separators, text adornments, custom row delegates, context opening with modal guard, bounded collision placement and immediate focus restoration tested. OS shortcuts/link activation, arbitrary nested viewport scrolling and complete upstream behavior remain pending. |
 | Popover | tested | Base collision placement and popup dismissal reducer only. No styled portal/anchor UI or semantic relationship. |
 | Resizable | not_started | Full documented behavior pending implementation and audit. |
 | Root View | not_started | Full documented behavior pending implementation and audit. |
-| Scrollable | not_started | Full documented behavior pending implementation and audit. |
+| Scrollable | tested | Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Auto-measured/grow sizing, inertia/touch, auto-hide and native system behavior remain pending. |
 | Settings | not_started | Full documented behavior pending implementation and audit. |
 | Sheet | not_started | Full documented behavior pending implementation and audit. |
 | Sidebar | not_started | Full documented behavior pending implementation and audit. |
@@ -165,13 +178,13 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Theme | tested | Four runtime token structs tested; system integration, comprehensive tokens and reduced motion pending. |
 | TitleBar | not_started | Full documented behavior pending implementation and audit. |
 | Toolbar | not_started | Full documented behavior pending implementation and audit. |
-| Tree | not_started | Full documented behavior pending implementation and audit. |
+| Tree | tested | Actual bounded keyed hierarchy, controlled expand/select, ordered parent/child navigation, fractional virtual viewport and clipped wheel routing tested. Variable row heights, drag/drop, custom row slots, full context actions and native accessibility remain pending. |
 | VirtualList | tested | Retained keyed variable-height Fenwick model tested including anchor restoration. No styled scroll/focus/navigation widget yet. |
 | Chart | not_started | Full documented behavior pending implementation and audit. |
 | Command | not_started | Full documented behavior pending implementation and audit. |
-| DataTable | not_started | Full documented behavior pending implementation and audit. |
+| DataTable | tested | Actual keyed rows/columns, controlled sort and selection, pointer/keyboard resize/reorder, frozen headers, row/column virtualization, stable context requests and load-range signaling tested. Pinned columns, multiple selection, remote data adapters and complete upstream behavior remain pending. |
 | Plot | tested | Allocation-free linear/log scales, inverse mapping, ticks, pan/anchored zoom and clipped line/bar geometry tested. Band/ordinal/category/time scales, retained series, axes/labels/legend, missing-data segmentation, stacks, hover/selection, styled output and chart accessibility pending. |
-| Table | not_started | Full documented behavior pending implementation and audit. |
+| Table | tested | Real themed semantic table/row/cell composition and associated data-table behavior tested. Section/caption/span primitives, exhaustive sizing and complete upstream composition remain pending. |
 | TextView | not_started | Full documented behavior pending implementation and audit. |
 
 ## Publishing/CI checkpoint

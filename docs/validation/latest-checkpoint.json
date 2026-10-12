@@ -1,36 +1,43 @@
 {
-  "source": "b582fde",
-  "published_source": "8d670694cb63d7074c1f59ec717bccf848d45ac1",
+  "source": "377ee9f",
+  "published_source": "3ef6c49e66cf6ce0fd89b084ed30f9628bfd96e9",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Native strict GCC31/31 (including GPU/readback and picker base-only), source b582fde; instrumented ASan/UBSan29/29 and WASI22/22 at picker integration6bbb664; actual Chromium39-story gallery passed against b582fde with the same production sources. Earlier optimized Release24/24 applies before picker additions. See validation logs for exact scope. Full78-family feature parity remains unfinished.",
+  "summary": "Native strict GCC39/39 at input-painter source377ee9f; instrumented ASan/UBSan37/37 and WASI30/30 at earlier table/scroll source2c2de4b; Chromium43 local stories at2c2de4b. Published source3ef6c49 passed all six framework CI jobs (portable34/34 Windows/macOS), browser42-story build/deploy, and a direct HTTPS Chromium visit. Subsequent table multi-selection, tree metadata and input-painter refactoring require their own expanded checks; native checks pass. Full78-family parity remains unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "b582fde",
-      "passed": 31,
-      "total": 31,
-      "log": "gcc-offset.txt"
+      "source": "377ee9f",
+      "passed": 39,
+      "total": 39,
+      "log": "gcc-input-paint.txt"
     },
     {
       "name": "sanitizers",
-      "source": "6bbb664",
-      "passed": 29,
-      "total": 29,
-      "log": "sanitizers-pickers.txt"
+      "source": "2c2de4b",
+      "passed": 37,
+      "total": 37,
+      "log": "sanitizers-scroll-table.txt"
     },
     {
       "name": "WASI",
-      "source": "6bbb664",
-      "passed": 22,
-      "total": 22,
-      "log": "wasi-pickers.txt"
+      "source": "2c2de4b",
+      "passed": 30,
+      "total": 30,
+      "log": "wasi-scroll-table.txt"
     },
     {
       "name": "browser",
-      "source": "b582fde",
-      "stories": 39,
+      "source": "2c2de4b",
+      "stories": 43,
       "catalog_entries": 78,
-      "log": "browser-39.txt"
+      "log": "browser-43.txt"
+    },
+    {
+      "name": "deployed browser",
+      "source": "3ef6c49",
+      "stories": 42,
+      "catalog_entries": 78,
+      "log": "deployed-42.txt"
     }
   ]
 }

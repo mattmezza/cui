@@ -120,7 +120,7 @@ uses a 14px foreground border box, a foreground fill when checked, and the share
 10px checkmark drawing helper; the indicator has no interactive semantics.
 The checkmark chooses black or white contrast against the supplied foreground,
 which preserves the source defaults while also supporting custom palettes.
-Multi-paragraph list continuation and nested non-list blocks remain parser limitations.
+Continuations after nested child blocks and nested non-list blocks remain parser limitations.
 
 `cui_text_view_decode_resource` decodes the bounded parser entity subset and
 Markdown ASCII punctuation escapes into a separate caller buffer. HTML attribute
@@ -138,13 +138,11 @@ they do not impose a synthetic minimum or extra gap. Task indicators retain thei
 separate 14px box plus 6px gap. Prefix bytes live in the caller block workspace so
 draw-command text remains valid through renderer completion.
 
-Horizontal table routing currently uses Scroll's dominant axis per wheel event.
-Horizontal wheel input is consumed at an edge or without overflow. The source
-native mask additionally retains the starting axis within a precise scroll
-gesture; that bounded gesture refinement remains pending shared Scroll support. The frozen source
-itself disables persistent gesture locking on WASM. Ordinary vertical chaining is
-preserved. These remaining differences do not affect the implemented geometry,
-clipping, translated links or source-copy behavior.
+Horizontal table routing consumes horizontal wheel input at an edge or without
+overflow. Native precise gestures retain their initial axis until an end phase,
+a 28ms quiet interval, or a strong axis change. The frozen source disables this
+persistent gesture locking on WASM; ordinary vertical chaining is preserved.
+Host adapters must provide precise gesture phase metadata explicitly.
 
 Markdown list item nesting is tracked with parent block indices, source starts,
 and independent per-level ordered counters. Nested ordered markers use uppercase
@@ -153,5 +151,19 @@ numeric prefixes. Bullet shapes vary across five depths. Each rendered nesting
 level adds 16px, while partial Source copy uses parent marker widths to indent
 children and includes empty ancestor markers for a selection confined to children.
 The parser supports at most 32 list levels and rejects deeper input transactionally.
-It does not yet provide a complete list AST for multi-paragraph continuations,
-loose-list spacing, or nested tables/images/code/quotes.
+It does not yet provide a complete list AST for continuations after nested child
+blocks, loose-list spacing, or nested tables/images/code/quotes.
+
+Ordinary list paragraphs join lazy continuation lines with spaces and preserve
+two-space hard breaks. A following indented paragraph stays attached to its
+list item, paints at a 16px continuation indent, and does not repeat a task
+indicator or marker. Partial Source copy prefixes the first selected item
+paragraph and indents subsequent paragraphs and hard-break lines under its marker.
+More complex continuation placement after nested child blocks remains separate.
+
+Setext headings recognize one or more equals signs or hyphens after a paragraph,
+including joined paragraph lines. Leading indentation is limited to three spaces.
+Without an opt-in frontmatter parser, a leading horizontal rule followed by a
+Setext heading retains Markdown meaning; YAML frontmatter plugins remain absent.
+Prepared glyph lines use core's explicit no-wrap text leaf so Clay cannot wrap a
+measured line a second time because of fractional font measurements.

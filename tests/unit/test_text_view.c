@@ -455,6 +455,57 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_setext_headings(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("first\nsecond\n===\n\n---\nSome text\n---")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 3);
+    assert(f.blocks[0].kind == CUI_TEXT_VIEW_HEADING && f.blocks[0].level == 1);
+    assert(f.blocks[1].kind == CUI_TEXT_VIEW_RULE);
+    assert(f.blocks[2].kind == CUI_TEXT_VIEW_HEADING && f.blocks[2].level == 2);
+    char output[128];
+    size_t length;
+    assert(cui_text_view_select(&f.state, f.blocks[0].text.begin, f.blocks[0].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "# first second"));
+    assert(cui_text_view_set_text(&f.state, text("ordinary\n    ===")) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].kind != CUI_TEXT_VIEW_HEADING);
+}
+static void test_list_continuations(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state, text("12. first\nlazy continuation  \nwith hard\n\n    second paragraph\n "
+                              "   wrap continues\n\noutside")) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 3 && f.blocks[1].list_continuation &&
+           f.blocks[1].list_parent == 0 && !f.blocks[2].list_continuation);
+    assert(!memcmp(f.rendered,
+                   "first lazy continuation\nwith hard\nsecond paragraph wrap continues\noutside\n",
+                   f.state.text_length));
+    cui_text_view_layout_options o = {
+        .width = 400, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.h == 40 && f.blocks[1].bounds.x == 16 && f.blocks[1].bounds.y == 40 &&
+           f.blocks[2].bounds.y == 76);
+    char output[256];
+    size_t length;
+    assert(cui_text_view_select(&f.state, 0, f.blocks[1].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(
+        output,
+        "12. first lazy continuation  \n    with hard\n    second paragraph wrap continues"));
+    assert(cui_text_view_select(&f.state, f.blocks[1].text.begin, f.blocks[1].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "12. second paragraph wrap continues"));
+    strcpy(output, "untouched");
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, 3, &length) ==
+           CUI_TEXT_VIEW_CAPACITY);
+    assert(!strcmp(output, "untouched") && length == strlen("12. second paragraph wrap continues"));
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -840,6 +891,7 @@ static void test_horizontal_table_interaction(void) {
                                            .y = 10,
                                            .dx = -1,
                                            .dy = -2,
+                                           .scroll_phase = CUI_SCROLL_PHASE_STARTED,
                                            .scroll_precise = true}));
     frame(ui, &f, o);
     assert(f.state.scroll.y == 2 && f.blocks[0].table_scroll.x == horizontal);
@@ -850,6 +902,7 @@ static void test_horizontal_table_interaction(void) {
                                            .y = 10,
                                            .dx = -2,
                                            .dy = -1,
+                                           .scroll_phase = CUI_SCROLL_PHASE_STARTED,
                                            .scroll_precise = true}));
     frame(ui, &f, o);
     assert(f.state.scroll.y == 2 && f.blocks[0].table_scroll.x == 2);
@@ -973,6 +1026,93 @@ static void test_nested_list_paint(void) {
     assert(upper && lower);
     cui_destroy(ui);
 }
+static void test_list_continuation_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("- [x] first\n\n  second paragraph\n\noutside")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 400;
+    cui_draw_list d = frame(ui, &f, o);
+    unsigned checks = 0;
+    bool continuation = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        if (d.commands[i].type == CUI_DRAW_IMAGE)
+            ++checks;
+        if (d.commands[i].type == CUI_DRAW_TEXT &&
+            d.commands[i].text.length == strlen("second paragraph") &&
+            !memcmp(d.commands[i].text.data, "second paragraph", d.commands[i].text.length))
+            continuation = d.commands[i].bounds.x == 16 && d.commands[i].bounds.y >= 20 &&
+                           d.commands[i].bounds.y < 22;
+    }
+    assert(checks == 1 && continuation);
+    cui_destroy(ui);
+}
+static void test_horizontal_table_gesture(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state, text("| abcdefghijklmnopqrstuvwxyz | abcdefghijklmnopqrstuvwxyz |\n| --- "
+                              "| --- |\n| x | y |\n\ntrailing paragraph")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 100;
+    o.height = 35;
+    o.scrollable = true;
+    o.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    frame(ui, &f, o);
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -40,
+                                           .dy = -10,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_STARTED}));
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x == 40 && f.state.scroll.y == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -10,
+                                           .dy = -15,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_MOVED}));
+    frame(ui, &f, o);
+#ifndef __wasm__
+    assert(f.blocks[0].table_scroll.x == 50 && f.state.scroll.y == 0);
+#else
+    assert(f.blocks[0].table_scroll.x == 40 && f.state.scroll.y == 15);
+#endif
+    float x = f.blocks[0].table_scroll.x;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -10,
+                                           .dy = -25,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_MOVED}));
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x == x && f.state.scroll.y >= 25);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .scroll_precise = true,
+                                           .scroll_phase = CUI_SCROLL_PHASE_ENDED}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = 20,
+                                           .y = 10,
+                                           .dx = -2,
+                                           .dy = -1,
+                                           .scroll_precise = true}));
+    frame(ui, &f, o);
+    assert(f.blocks[0].table_scroll.x == x + 2);
+    cui_destroy(ui);
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1057,6 +1197,8 @@ int main(void) {
     test_task_list_model();
     test_resource_decoding();
     test_nested_list_model();
+    test_list_continuations();
+    test_setext_headings();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1072,6 +1214,8 @@ int main(void) {
     test_passive_task_paint();
     test_decoded_resource_callbacks();
     test_nested_list_paint();
+    test_list_continuation_paint();
+    test_horizontal_table_gesture();
 #endif
     return 0;
 }

@@ -360,8 +360,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
             cui_begin_absolute_box(ui, part, (cui_box){0},
                                    (cui_rect){r.x, r.y, b->text_inset, style.line_height});
-            cui_text_ex(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
-                        style.foreground, style.line_height, (cui_text_style){0});
+            cui_text_line(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
+                          style.foreground, style.line_height, (cui_text_style){0});
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);
@@ -488,11 +488,11 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (selected)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x521e8438), r, style.selection);
         cui_begin_absolute_box(ui, leaf, (cui_box){.custom_opacity = true, .opacity = opacity}, r);
-        cui_text_ex(ui,
-                    cui_text_view_slice(cui_text_view_rendered_text(s),
-                                        (cui_text_view_range){first->text.begin, last->text.end}),
-                    first->font_size, color, first->line_height,
-                    cui_text_view_text_style(first->flags));
+        cui_text_line(ui,
+                      cui_text_view_slice(cui_text_view_rendered_text(s),
+                                          (cui_text_view_range){first->text.begin, last->text.end}),
+                      first->font_size, color, first->line_height,
+                      cui_text_view_text_style(first->flags));
         if (is_link)
             cui_text_view_quad(ui, leaf ^ 1, (cui_rect){0, r.h - 2, r.w, 1}, color);
         if (first->flags & CUI_TEXT_VIEW_STRIKE)
@@ -582,6 +582,7 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                                          .trap_horizontal = true,
                                          .hide_scrollbars = true,
                                          .axis_lock = true,
+                                         .gesture_lock = true,
                                          .disabled = o.disabled};
             cui_theme scroll_theme = *theme;
             scroll_theme.surface = style.table_background;

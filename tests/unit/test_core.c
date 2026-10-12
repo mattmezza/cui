@@ -30,6 +30,7 @@ static void scope_event_scene(cui_context *ui, bool check) {
     if (check) {
         assert(cui_event_within_scope(ui, 0, 900));
         assert(cui_event_within_scope(ui, 0, 901));
+        assert(cui_event_hit_within_scope(ui, 0, 901));
         assert(!cui_event_within_scope(ui, 0, 999));
         assert(!cui_event_within_scope(ui, 1, 900));
         assert(!cui_event_consumed(ui, 0));
@@ -779,6 +780,7 @@ static void scroll_regions(cui_context *ui, float inner_scroll, bool portal) {
     cui_interact(ui, 10, CUI_ROLE_GROUP, cui_string("Outer"), false, false, 0);
     cui_set_semantic_details(
         ui, 10, (cui_semantic_details){.scrollable = true, .scroll_y = 50, .scroll_max_y = 300});
+    assert(cui_begin_focus_scope(ui, 920, false));
     cui_begin_box(ui, 20, (cui_box){.width = 100, .height = 80, .clip = true});
     cui_interact(ui, 20, CUI_ROLE_GROUP, cui_string("Inner"), false, false, 0);
     cui_set_semantic_details(
@@ -786,6 +788,7 @@ static void scroll_regions(cui_context *ui, float inner_scroll, bool portal) {
         (cui_semantic_details){.scrollable = true, .scroll_y = inner_scroll, .scroll_max_y = 100});
     cui_end_box(ui);
     cui_end_box(ui);
+    cui_end_focus_scope(ui);
     if (portal) {
         cui_begin_portal(ui, 30, (cui_box){0}, (cui_rect){0, 0, 100, 80}, 4);
         cui_interact(ui, 30, CUI_ROLE_BUTTON, cui_string("Popup"), false, false, 0);
@@ -808,17 +811,31 @@ static void test_nested_wheel_routing(void) {
     assert(cui_event_target(ui, 0) == 10 && cui_event_target(ui, 1) == 20);
     assert(cui_event_target(ui, 2) == 10 && !cui_event_target(ui, 3));
     scroll_regions(ui, 100, false);
+    assert(cui_event_hit_within_scope(ui, 0, 920));
+    assert(!cui_event_within_scope(ui, 0, 920));
+    assert(!cui_event_hit_within_scope(ui, 2, 920));
+    assert(!cui_event_hit_within_scope(ui, 3, 920));
+    assert(!cui_defer_scroll_event(ui, 1, 999));
+    assert(cui_defer_scroll_event(ui, 1, 20));
+    assert(cui_event_target(ui, 1) == 10);
+    assert(cui_event_hit_within_scope(ui, 1, 920));
+    assert(!cui_defer_scroll_event(ui, 1, 20));
+    assert(!cui_defer_scroll_event(ui, 1, 10));
     cui_end_frame(ui);
     wheel(ui, 20, 20, -1); /* Inner is at its end. */
     wheel(ui, 20, 20, 1);
     begin(ui);
     assert(cui_event_target(ui, 0) == 10 && cui_event_target(ui, 1) == 20);
     scroll_regions(ui, 50, true);
+    assert(cui_consume_event(ui, 1));
+    assert(!cui_defer_scroll_event(ui, 1, 20));
+    assert(cui_event_target(ui, 1) == 20);
     cui_end_frame(ui);
     wheel(ui, 20, 20, -1); /* An interactive higher portal blocks background scrolling. */
     begin(ui);
     assert(!cui_event_target(ui, 0));
     scroll_regions(ui, 50, false);
+    assert(!cui_event_hit_within_scope(ui, 0, 920));
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);

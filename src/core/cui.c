@@ -76,7 +76,7 @@ struct cui_context {
     cui_core_box_node *nodes;
     cui_core_bounds_track *bounds_tracks;
     size_t bounds_track_count;
-    size_t *semantic_nodes;
+    size_t *semantic_nodes, *previous_parents;
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
     cui_rect *previous_hits;
     int16_t *previous_layers;
@@ -258,6 +258,7 @@ cui_context *cui_create(cui_config config) {
     ui->nodes = calloc(config.max_elements, sizeof(*ui->nodes));
     ui->bounds_tracks = calloc(config.max_elements, sizeof(*ui->bounds_tracks));
     ui->semantic_nodes = calloc(config.max_elements, sizeof(*ui->semantic_nodes));
+    ui->previous_parents = calloc(config.max_elements, sizeof(*ui->previous_parents));
     ui->previous_hits = calloc(config.max_elements, sizeof(*ui->previous_hits));
     ui->previous_layers = calloc(config.max_elements, sizeof(*ui->previous_layers));
     ui->previous_order = calloc(config.max_elements, sizeof(*ui->previous_order));
@@ -270,9 +271,9 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->resources || !ui->text_styles || !ui->commands || !ui->semantics || !ui->previous ||
         !ui->ids || !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes ||
-        !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_hits ||
-        !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order || !ui->clip_containers ||
-        !ui->arena) {
+        !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_parents ||
+        !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order ||
+        !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -314,6 +315,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->nodes);
     free(ui->bounds_tracks);
     free(ui->semantic_nodes);
+    free(ui->previous_parents);
     free(ui->previous_hits);
     free(ui->previous_layers);
     free(ui->previous_order);
@@ -412,7 +414,7 @@ cui_cursor cui_pointer_cursor(cui_context *ui) {
     }
     return CUI_CURSOR_DEFAULT;
 }
-static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
+static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from) {
     cui_id hit = 0;
     int16_t layer = INT16_MIN, blocking_layer = INT16_MIN;
     for (size_t i = 0; i < ui->previous_count; ++i) {
@@ -423,6 +425,13 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
         if ((cui_core_focusable(node) || (!node->disabled && node->details.pointer_activatable)) &&
             ui->previous_layers[i] > blocking_layer)
             blocking_layer = ui->previous_layers[i];
+        if (from != SIZE_MAX) {
+            size_t parent = ui->previous_parents[from];
+            while (parent != SIZE_MAX && parent != i)
+                parent = ui->previous_parents[parent];
+            if (parent == SIZE_MAX)
+                continue;
+        }
         cui_semantic_details d = node->details;
         bool can_x =
             (event.dx > 0 && d.scroll_x > 0) || (event.dx < 0 && d.scroll_x < d.scroll_max_x);
@@ -548,7 +557,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
         }
         if (e.type == CUI_EVENT_SCROLL)
-            ui->event_targets[i] = cui_core_scroll_hit(ui, e);
+            ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX);
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
             size_t scope = ui->previous_focus_scope_count;
@@ -1267,6 +1276,19 @@ cui_core_commands_done:
         Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = cui_core_folded(s->id)});
         s->bounds =
             (cui_rect){d.boundingBox.x, d.boundingBox.y, d.boundingBox.width, d.boundingBox.height};
+        ui->previous_parents[i] = SIZE_MAX;
+        size_t ancestor = ui->semantic_nodes[i];
+        if (ancestor != SIZE_MAX)
+            ancestor = ui->nodes[ancestor].parent;
+        for (; ancestor != SIZE_MAX; ancestor = ui->nodes[ancestor].parent) {
+            for (size_t j = 0; j < ui->semantic_count; ++j)
+                if (ui->semantic_nodes[j] == ancestor) {
+                    ui->previous_parents[i] = j;
+                    break;
+                }
+            if (ui->previous_parents[i] != SIZE_MAX)
+                break;
+        }
         cui_rect clipped = s->bounds;
         for (size_t n = ui->semantic_nodes[i]; n != SIZE_MAX; n = ui->nodes[n].parent) {
             if (ui->nodes[n].clip) {
@@ -1437,6 +1459,22 @@ cui_id cui_event_target(cui_context *ui, size_t index) {
     return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_targets[index] : 0;
 }
 
+bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {
+    if (!ui || !ui->in_frame || cui_core_inert(ui) || !from || index >= ui->event_count ||
+        ui->event_consumed[index] || ui->events[index].type != CUI_EVENT_SCROLL ||
+        ui->event_targets[index] != from)
+        return false;
+    for (size_t i = 0; i < ui->previous_count; ++i)
+        if (ui->previous[i].id == from && cui_core_previous_allowed(ui, i)) {
+            cui_id target = cui_core_scroll_hit(ui, ui->events[index], i);
+            if (!target)
+                return false;
+            ui->event_targets[index] = target;
+            return true;
+        }
+    return false;
+}
+
 cui_id cui_event_activation(cui_context *ui, size_t index) {
     return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_activations[index] : 0;
 }
@@ -1460,7 +1498,8 @@ bool cui_cancel_event_activation(cui_context *ui, size_t index) {
     ui->event_activations[index] = 0;
     return true;
 }
-bool cui_event_within_scope(cui_context *ui, size_t index, cui_id scope) {
+static bool cui_core_event_target_in_scope(cui_context *ui, size_t index, cui_id scope,
+                                           cui_id target) {
     if (!ui || !ui->in_frame || cui_core_inert(ui) || !scope || index >= ui->event_count)
         return false;
     bool active = false;
@@ -1469,7 +1508,6 @@ bool cui_event_within_scope(cui_context *ui, size_t index, cui_id scope) {
             active = true;
     if (!active || !cui_pointer_scope_allowed(ui, scope))
         return false;
-    cui_id target = ui->event_targets[index];
     for (size_t i = 0; target && i < ui->previous_count; ++i) {
         if (ui->previous[i].id != target || !cui_core_previous_allowed(ui, i))
             continue;
@@ -1485,6 +1523,30 @@ bool cui_event_within_scope(cui_context *ui, size_t index, cui_id scope) {
         }
     }
     return false;
+}
+
+bool cui_event_within_scope(cui_context *ui, size_t index, cui_id scope) {
+    return ui && index < ui->event_count &&
+           cui_core_event_target_in_scope(ui, index, scope, ui->event_targets[index]);
+}
+bool cui_event_hit_within_scope(cui_context *ui, size_t index, cui_id scope) {
+    if (!ui || !ui->in_frame || index >= ui->event_count || cui_core_inert(ui))
+        return false;
+    cui_event e = ui->events[index];
+    if (e.type != CUI_EVENT_SCROLL && e.type != CUI_EVENT_POINTER_DOWN &&
+        e.type != CUI_EVENT_POINTER_MOVE && e.type != CUI_EVENT_POINTER_UP)
+        return false;
+    size_t hit = SIZE_MAX;
+    for (size_t i = 0; i < ui->previous_count; ++i) {
+        const cui_semantic *s = &ui->previous[i];
+        if (!s->disabled &&
+            (cui_core_focusable(s) || s->details.pointer_activatable || s->details.scrollable) &&
+            cui_core_previous_allowed(ui, i) && cui_core_inside(ui->previous_hits[i], e.x, e.y) &&
+            cui_core_above(ui, i, hit))
+            hit = i;
+    }
+    return hit != SIZE_MAX &&
+           cui_core_event_target_in_scope(ui, index, scope, ui->previous[hit].id);
 }
 
 bool cui_pointer_scope_allowed(cui_context *ui, cui_id owned_scope) {

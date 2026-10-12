@@ -54,6 +54,8 @@ typedef struct {
     void *content_user;
     bool outline; /* Orthogonal colored outline; selected is presentation only. */
 } cui_button_options;
+/* Paint an independently registered button without reducing events or submitting semantics. */
+void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 /* Paint-only antialiased check glyph for composed selection indicators. */

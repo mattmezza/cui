@@ -18,14 +18,12 @@ static void cui_components_focus(cui_context *ui, cui_id id, const cui_theme *t,
         b->border_width = 2;
     }
 }
-bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_button_options options) {
+void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                      cui_button_options options) {
     if (!ui || !t)
-        return false;
+        return;
     bool disabled = options.disabled || options.loading;
-    cui_interaction state = cui_base_button(ui, id, name, disabled);
-    if (options.variant == CUI_BUTTON_LINK)
-        (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
+    cui_interaction state = {.hovered = cui_hovered(ui, id), .pressed = cui_pressed(ui, id)};
     cui_box b = cui_components_control(t, disabled, false);
     float density = isfinite(t->font_size) && t->font_size > 0 ? t->font_size / 16 : 1;
     float font = (options.size == CUI_CONTROL_XSMALL  ? 12
@@ -92,11 +90,6 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
             b.background.a = 0;
     }
     cui_components_focus(ui, id, t, &b);
-    /* Selected paint is distinct from an accessibility toggle state. */
-    cui_update_semantic(ui, id, false, 0);
-    if (options.loading)
-        cui_set_semantic_details(
-            ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
     cui_begin_box(ui, id, b);
     cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
     cui_end_box(ui);
@@ -140,6 +133,20 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
     cui_end_box(ui);
     cui_end_box(ui);
+}
+bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_button_options options) {
+    if (!ui || !t)
+        return false;
+    cui_interaction state = cui_base_button(ui, id, name, options.disabled || options.loading);
+    if (options.variant == CUI_BUTTON_LINK)
+        (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
+    /* Selected paint is distinct from an accessibility toggle state. */
+    cui_update_semantic(ui, id, false, 0);
+    if (options.loading)
+        cui_set_semantic_details(
+            ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
+    cui_button_paint(ui, id, t, name, options);
     return state.activated;
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {

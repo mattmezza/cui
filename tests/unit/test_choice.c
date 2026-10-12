@@ -4107,7 +4107,64 @@ static void test_dropdown_real_artwork(void) {
     assert(!dropdown_scene(ui, &state, &action, &t, options).action_activated);
     cui_destroy(ui);
 }
+static void test_menu_popup_paint_composition(void) {
+    cui_context *ui = cui_create((cui_config){.width = 320, .height = 240});
+    cui_theme theme = cui_theme_light();
+    bool checked = true;
+    cui_menu_entry rows[] = {
+        {.id = 8701, .label = {"Checked", 7}, .kind = CUI_MENU_CHECK, .checked = &checked}};
+    cui_menu_tree_state menu;
+    cui_menu_tree_init(&menu, 8700);
+    cui_menu_tree_options options = {.popup = {.viewport = {0, 0, 320, 240},
+                                               .width = 140,
+                                               .side = CUI_POPUP_BELOW,
+                                               .align_end = true}};
+    for (unsigned frame_index = 0; frame_index < 3; frame_index++) {
+        assert(cui_begin_frame(ui, 320, 240, .016f));
+        cui_begin_box(ui, 8600, (cui_box){.width = 80, .height = 32});
+        cui_interact(ui, 8600, CUI_ROLE_BUTTON, cui_string("Custom trigger"), false, false, 0);
+        cui_end_box(ui);
+        if (!frame_index) {
+            assert(!cui_menu_popup_paint(ui, &theme, cui_string("Menu"), rows, 1, &menu,
+                                         (cui_rect){100, 40, 80, 32}, options));
+        } else {
+            if (frame_index == 1) {
+                cui_overlay_open(ui, &menu.overlay, 8600);
+                menu.depth = 1;
+                menu.levels[0].active = 8701;
+            }
+            assert(cui_menu_popup_paint(ui, &theme, cui_string("Menu"), rows, 1, &menu,
+                                        (cui_rect){100, 40, 80, 32}, options));
+        }
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && checked);
+        if (frame_index == 1) {
+            cui_rect popup = cui_bounds(ui, 8700);
+            assert(popup.x == 40 && popup.y == 76 && popup.w == 140);
+            assert(cui_bounds(ui, 8701).h == 26);
+            cui_focus(ui, 8701);
+            key(ui, CUI_KEY_ENTER); /* Paint must not reduce this check activation. */
+        }
+    }
+    assert(menu.overlay.open && checked);
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    size_t triggers = 0;
+    bool row_found = false;
+    for (size_t i = 0; i < count; i++) {
+        triggers += semantics[i].id == 8600;
+        row_found |= semantics[i].id == 8701 && semantics[i].role == CUI_ROLE_MENUITEMCHECKBOX;
+    }
+    assert(triggers == 1 && row_found);
+    assert(cui_begin_frame(ui, 320, 240, .016f));
+    options.popup.viewport.h = NAN;
+    assert(!cui_menu_popup_paint(ui, &theme, cui_string("Menu"), rows, 1, &menu,
+                                 (cui_rect){100, 40, 80, 32}, options));
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_menu_popup_paint_composition();
     test_dropdown_real_artwork();
     test_tabs_toolbar_consumption();
     test_searchable_popup_height_cap();

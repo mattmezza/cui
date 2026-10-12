@@ -291,6 +291,22 @@ static void test_input_number_and_sizes(void) {
     for (unsigned i = 0; i < 4; i++) {
         options.size = (cui_settings_size)i;
         frame(ui, &page, 1, &state, options);
+        cui_rect input_frame = cui_bounds(ui, cui_settings_part_id(11, 0, 0, 0, 24));
+        cui_rect number_frame =
+            cui_bounds(ui, cui_numeric_part_id(cui_settings_part_id(11, 0, 0, 1, 24), 0));
+        float expected_height = i == CUI_SETTINGS_XSMALL  ? 20
+                                : i == CUI_SETTINGS_SMALL ? 24
+                                : i == CUI_SETTINGS_LARGE ? 44
+                                                          : 32;
+        assert(input_frame.h == expected_height && input_frame.w == 256);
+        assert(number_frame.h == expected_height && number_frame.w == 128);
+        float expected_font = i == CUI_SETTINGS_XSMALL ? 12 : i == CUI_SETTINGS_LARGE ? 16 : 14;
+        bool text_font = false;
+        for (size_t j = 0; j < drawing.count; j++)
+            if (drawing.commands[j].type == CUI_DRAW_TEXT && drawing.commands[j].text.length == 7 &&
+                memcmp(drawing.commands[j].text.data, "default", 7) == 0)
+                text_font = drawing.commands[j].font_size == expected_font;
+        assert(text_font);
         cui_rect track = cui_bounds(ui, cui_switch_track_id(cui_settings_part_id(11, 0, 0, 2, 24)));
         assert(track.h == (i == CUI_SETTINGS_XSMALL || i == CUI_SETTINGS_SMALL ? 16
                            : i == CUI_SETTINGS_LARGE                           ? 24
@@ -303,10 +319,138 @@ static void test_input_number_and_sizes(void) {
     cui_edit_destroy(number_edit);
     cui_destroy(ui);
 }
+static void click_settings(cui_context *ui, cui_id id) {
+    cui_rect bounds = cui_bounds(ui, id);
+    assert(bounds.w > 0 && bounds.h > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h / 2}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h / 2}));
+}
+static void test_dropdown_menu_and_reset_tooltip(void) {
+    cui_context *ui = cui_create((cui_config){.width = 1000, .height = 600});
+    assert(ui);
+    cui_id selected_choice = 9101;
+    cui_choice_item choices[] = {
+        {9101, {"First", 5}, false}, {9102, {"Disabled", 8}, true}, {9103, {"Last", 4}, false}};
+    cui_menu_entry entries[3];
+    bool checks[3];
+    cui_settings_dropdown_state dropdown_state;
+    assert(!cui_settings_dropdown_init(NULL, 9900, entries, checks, 3));
+    assert(!cui_settings_dropdown_init(&dropdown_state, 0, entries, checks, 3));
+    assert(cui_settings_dropdown_init(&dropdown_state, 9900, entries, checks, 3));
+    cui_setting_item item = {.title = {"Mode", 4},
+                             .kind = CUI_SETTING_DROPDOWN,
+                             .choices = choices,
+                             .choice_count = 3,
+                             .choice = &selected_choice,
+                             .dropdown_state = &dropdown_state,
+                             .has_default = true,
+                             .default_choice = 9101,
+                             .on_change = changed};
+    cui_setting_group group = {.items = &item, .count = 1};
+    cui_setting_page page = {.title = {"General", 7}, .groups = &group, .count = 1};
+    cui_settings_state state;
+    cui_settings_page_state workspace[1];
+    assert(cui_settings_state_init(&state, workspace, 1, NULL));
+    cui_settings_options options = cui_settings_default();
+    options.width = 1000;
+    options.height = 500;
+    dropdown_state.capacity = 2;
+    assert(frame(ui, &page, 1, &state, options).invalid);
+    dropdown_state.capacity = 3;
+    dropdown_state.checked = NULL;
+    assert(frame(ui, &page, 1, &state, options).invalid);
+    dropdown_state.checked = checks;
+    cui_id saved_popup = dropdown_state.menu.overlay.id;
+    dropdown_state.menu.overlay.id = 0;
+    assert(frame(ui, &page, 1, &state, options).invalid);
+    dropdown_state.menu.overlay.id = saved_popup;
+    assert(!frame(ui, &page, 1, &state, options).invalid);
+    cui_id trigger = cui_settings_part_id(11, 0, 0, 0, 24);
+    cui_rect button = cui_bounds(ui, trigger);
+    assert(button.h == 32 && button.w < 128); /* Source intrinsic outline trigger. */
+    bool outline = false, caret = false;
+    for (size_t i = 0; i < drawing.count; i++) {
+        cui_draw_command command = drawing.commands[i];
+        outline |= command.type == CUI_DRAW_BORDER && fabsf(command.bounds.x - button.x) < .01f &&
+                   fabsf(command.bounds.w - button.w) < .01f;
+        caret |= command.type == CUI_DRAW_IMAGE;
+    }
+    assert(outline && caret);
+    click_settings(ui, trigger);
+    frame(ui, &page, 1, &state, options);
+    assert(dropdown_state.menu.overlay.open && cui_focused(ui) == 9101 && checks[0]);
+    cui_rect popup = cui_bounds(ui, 9900);
+    assert(fabsf(popup.x + popup.w - button.x - button.w) < .01f);
+    assert(cui_bounds(ui, 9101).h == 26);
+    size_t semantic_count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    bool checked_semantic = false, disabled_semantic = false, expanded = false;
+    for (size_t i = 0; i < semantic_count; i++) {
+        if (semantics[i].id == 9101)
+            checked_semantic =
+                semantics[i].role == CUI_ROLE_MENUITEMCHECKBOX && semantics[i].checked;
+        if (semantics[i].id == 9102)
+            disabled_semantic = semantics[i].disabled;
+        if (semantics[i].id == trigger)
+            expanded = semantics[i].details.expanded;
+    }
+    assert(checked_semantic && disabled_semantic && expanded);
+    unsigned before = changes;
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    frame(ui, &page, 1, &state, options);
+    assert(selected_choice == 9103 && !dropdown_state.menu.overlay.open && changes == before + 1);
+    assert(cui_focused(ui) == trigger && checks[2] && !checks[0]);
+    /* Controlled external selection updates checked rows and visible label. */
+    selected_choice = 9101;
+    frame(ui, &page, 1, &state, options);
+    cui_focus(ui, trigger);
+    key(ui, CUI_KEY_DOWN);
+    frame(ui, &page, 1, &state, options);
+    click_settings(ui, 9102);
+    frame(ui, &page, 1, &state, options);
+    assert(selected_choice == 9101 && dropdown_state.menu.overlay.open);
+    click_settings(ui, 9103);
+    frame(ui, &page, 1, &state, options);
+    assert(selected_choice == 9103 && !dropdown_state.menu.overlay.open);
+    cui_id reset_id = cui_settings_part_id(11, 0, 0, 0, 34);
+    cui_focus(ui, reset_id);
+    for (unsigned i = 0; i < 35; i++)
+        frame(ui, &page, 1, &state, options);
+    assert(state.pages[0].reset_tooltip.open);
+    assert(cui_bounds(ui, cui_settings_part_id(11, 0, 0, 0, 49)).w > 0);
+    key(ui, CUI_KEY_ESCAPE);
+    frame(ui, &page, 1, &state, options);
+    assert(!state.pages[0].reset_tooltip.open);
+    click_settings(ui, reset_id);
+    assert(frame(ui, &page, 1, &state, options).reset && selected_choice == 9101);
+    assert(!state.pages[0].reset_tooltip.open);
+    item.disabled = true;
+    frame(ui, &page, 1, &state, options);
+    click_settings(ui, trigger);
+    frame(ui, &page, 1, &state, options);
+    assert(!dropdown_state.menu.overlay.open && selected_choice == 9101);
+    /* Existing initialized Select descriptors remain usable. */
+    cui_choice_popup legacy;
+    cui_choice_popup_init(&legacy, 9910);
+    item.disabled = false;
+    item.dropdown_state = NULL;
+    item.popup = &legacy;
+    assert(!frame(ui, &page, 1, &state, options).invalid);
+    click_settings(ui, trigger);
+    frame(ui, &page, 1, &state, options);
+    assert(legacy.overlay.open);
+    cui_destroy(ui);
+}
 int main(void) {
     test_input_number_and_sizes();
     test_search_reset_resize_scroll();
     test_filter();
     test_navigation_and_fields();
+    test_dropdown_menu_and_reset_tooltip();
     return 0;
 }

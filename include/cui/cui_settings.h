@@ -39,6 +39,15 @@ typedef void (*cui_setting_render_fn)(cui_context *, cui_id, const cui_theme *,
                                       cui_settings_render_options, void *);
 typedef bool (*cui_setting_dirty_fn)(void *);
 typedef void (*cui_setting_reset_fn)(void *);
+/* Borrowed workspace; capacity must cover every choice. No per-frame allocation. */
+typedef struct {
+    cui_menu_tree_state menu;
+    cui_menu_entry *entries;
+    bool *checked;
+    size_t capacity;
+} cui_settings_dropdown_state;
+bool cui_settings_dropdown_init(cui_settings_dropdown_state *, cui_id popup, cui_menu_entry *,
+                                bool *checked, size_t capacity);
 typedef struct {
     cui_str title, description;
     const cui_str *keywords;
@@ -68,6 +77,8 @@ typedef struct {
     cui_setting_dirty_fn dirty;
     cui_setting_reset_fn reset;
     void *user;
+    cui_settings_dropdown_state *dropdown_state; /* Source Menu; NULL keeps legacy Select. */
+    bool dropdown_scrollable;
 } cui_setting_item;
 typedef struct {
     cui_str title, description;
@@ -93,6 +104,7 @@ typedef struct {
     cui_scroll_state scroll_state;
     float scroll, maximum;
     cui_rect viewport, content;
+    cui_hover_state reset_tooltip;
 } cui_settings_page_state;
 typedef struct {
     cui_settings_page_state *pages;

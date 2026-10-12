@@ -753,7 +753,55 @@ static void test_button_loading_artwork(void) {
     assert(images == 1 && !cui_needs_redraw(ui) && cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_button_paint_composition(void) {
+    cui_context *ui = cui_create((cui_config){.width = 320, .height = 200});
+    cui_theme theme = cui_theme_light();
+    cui_button_options options = {.variant = CUI_BUTTON_OUTLINE, .width = 160};
+    cui_color active = theme.buttons[CUI_THEME_BUTTON_DEFAULT].outline_active;
+    for (unsigned frame_index = 0; frame_index < 3; frame_index++) {
+        assert(cui_begin_frame(ui, 320, 200, .016f));
+        cui_interaction interaction = cui_base_button(ui, 451, cui_string("Composed"), false);
+        cui_set_semantic_details(ui, 451,
+                                 (cui_semantic_details){.expanded = true, .controls = 999});
+        cui_button_paint(ui, 451, &theme, cui_string("Composed"), options);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        size_t count = 0;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        assert(count == 1 && semantics[0].id == 451 && semantics[0].details.expanded &&
+               semantics[0].details.controls == 999);
+        assert(cui_bounds(ui, 451).h == 32);
+        if (frame_index == 0) {
+            cui_rect bounds = cui_bounds(ui, 451);
+            assert(cui_queue_event(
+                ui,
+                (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = bounds.x + 4, .y = bounds.y + 4}));
+        } else if (frame_index == 1) {
+            assert(!interaction.activated && interaction.pressed);
+            bool held_color = false;
+            for (size_t i = 0; i < list.count; i++)
+                held_color |= list.commands[i].type == CUI_DRAW_RECT &&
+                              memcmp(&list.commands[i].color, &active, sizeof active) == 0;
+            assert(held_color);
+            cui_rect bounds = cui_bounds(ui, 451);
+            assert(cui_queue_event(
+                ui,
+                (cui_event){.type = CUI_EVENT_POINTER_UP, .x = bounds.x + 4, .y = bounds.y + 4}));
+        } else {
+            assert(interaction.activated && !interaction.pressed);
+        }
+    }
+    /* Painting alone never adds a semantic or callback-driven activation. */
+    assert(cui_begin_frame(ui, 320, 200, .016f));
+    cui_button_paint(ui, 452, &theme, cui_string("Decorative"), options);
+    cui_end_frame(ui);
+    size_t count = 0;
+    cui_semantics(ui, &count);
+    assert(count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_button_paint_composition();
     test_button_loading_artwork();
     test_theme_list_tokens();
     test_toggle();

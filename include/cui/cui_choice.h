@@ -320,6 +320,12 @@ void cui_base_menu_entry(cui_context *, const cui_menu_entry *, bool disabled, b
 bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
                    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                    cui_menu_tree_options);
+/* Paint an already reduced Menu popup anchored to a caller-painted trigger.
+ * Does not submit the trigger, reduce events or mutate action/check values.
+ * Registers visible popup/row semantics and retains measured window metrics. */
+bool cui_menu_popup_paint(cui_context *, const cui_theme *, cui_str name, const cui_menu_entry *,
+                          size_t count, cui_menu_tree_state *, cui_rect anchor,
+                          cui_menu_tree_options);
 /* Context-menu target is an existing visible box; this does not submit or paint
  * that target again. Secondary press within its previous bounds opens at the
  * pointer. Call once per state after rendering the receiving area. */

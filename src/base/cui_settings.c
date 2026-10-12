@@ -118,9 +118,17 @@ cui_settings_result cui_settings_filter(const cui_setting_page *pages, size_t co
                                 !cui_edit_get_state(item->number_state->edit).multiline;
                         break;
                     case CUI_SETTING_DROPDOWN:
-                        valid = item->choice && item->popup && item->popup->overlay.id &&
-                                (!item->choice_count || item->choices) &&
+                        valid = item->choice && (!item->choice_count || item->choices) &&
                                 item->choice_count <= 4096;
+                        if (item->dropdown_state) {
+                            const cui_settings_dropdown_state *dropdown = item->dropdown_state;
+                            valid =
+                                valid && dropdown->menu.overlay.id &&
+                                dropdown->capacity >= item->choice_count &&
+                                (!item->choice_count || (dropdown->entries && dropdown->checked));
+                        } else {
+                            valid = valid && item->popup && item->popup->overlay.id;
+                        }
                         break;
                     default:
                         break;

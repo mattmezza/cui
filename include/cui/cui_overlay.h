@@ -17,7 +17,7 @@ void cui_overlay_open(cui_context *, cui_overlay *, cui_id trigger);
 void cui_overlay_close(cui_context *, cui_overlay *);
 void cui_overlay_set_bounds(cui_overlay *, cui_rect);
 /* Call after begin_frame, innermost overlay first, before submitting controls.
- * Returns true when an input event closes this overlay. */
+ * Consumed events are ignored. Returns true when an input event closes this overlay. */
 bool cui_overlay_update(cui_context *, cui_overlay *);
 /* Pair only when begin returns true. Layout/paint remain application-owned. */
 bool cui_overlay_begin(cui_context *, const cui_overlay *);

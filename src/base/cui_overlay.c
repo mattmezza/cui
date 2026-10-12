@@ -36,6 +36,8 @@ bool cui_overlay_update(cui_context *ui, cui_overlay *overlay) {
     size_t count = 0;
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count; ++i) {
+        if (cui_event_consumed(ui, i))
+            continue;
         cui_event event = events[i];
         cui_id target = cui_event_target(ui, i);
         bool escape = overlay->dismiss_on_escape && event.type == CUI_EVENT_KEY_DOWN &&

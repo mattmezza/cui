@@ -6,6 +6,7 @@ static cui_context *ui;
 static cui_overlay outer, inner;
 static bool trigger_visible = true, trigger_disabled;
 static unsigned trigger_activations;
+static bool consume_first;
 static cui_id last_activation;
 static void button(cui_id id, bool disabled) {
     cui_begin_box(ui, id, (cui_box){.width = 100, .height = 30});
@@ -18,6 +19,8 @@ static void button(cui_id id, bool disabled) {
 }
 static void frame(void) {
     assert(cui_begin_frame(ui, 400, 400, .016f));
+    if (consume_first)
+        cui_consume_event(ui, 0);
     cui_overlay_update(ui, &inner);
     cui_overlay_update(ui, &outer);
     cui_begin_box(ui, 1000, (cui_box){.width = 400, .gap = 5});
@@ -83,12 +86,20 @@ int main(void) {
     assert(cui_focused(ui) == 302);
     key(CUI_KEY_TAB, 0);
     assert(cui_focused(ui) == 301);
+    consume_first = true;
+    key(CUI_KEY_ESCAPE, 0);
+    assert(inner.open && outer.open && cui_focused(ui) == 301);
+    consume_first = false;
     key(CUI_KEY_ESCAPE, 0);
     assert(!inner.open && outer.open && cui_focused(ui) == 203);
     key(CUI_KEY_ESCAPE, 0);
     assert(!outer.open && cui_focused(ui) == 1);
     cui_overlay_open(ui, &outer, 1);
     frame();
+    consume_first = true;
+    click(cui_bounds(ui, 1));
+    assert(outer.open && trigger_activations == 0);
+    consume_first = false;
     click(cui_bounds(ui, 1));
     assert(!outer.open && trigger_activations == 0 && cui_focused(ui) == 1);
     click(cui_bounds(ui, 1));

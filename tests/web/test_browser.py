@@ -96,6 +96,37 @@ def main():
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.evaluate('location.hash="Input Group"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Input Group"')
+            group_input = page.locator('#accessible [role=textbox][aria-label="Workspace address"]')
+            assert group_input.count() == 1
+            action_count = page.evaluate('cuiGallery.exports.gallery_group_actions()')
+            click_semantic('https://')
+            page.keyboard.press('Control+a')
+            page.keyboard.type('studio')
+            page.wait_for_function('document.querySelector("#accessible [role=status]")?.getAttribute("aria-label")?.includes("https://studio.example.com")')
+            click_semantic('Open address')
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_group_actions()===n+1', arg=action_count)
+            page.locator('#group-mode').select_option('1')
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Workspace address"]`)?.getAttribute("aria-readonly")==="true"')
+            click_semantic('Workspace address', 6)
+            page.keyboard.press('Control+a')
+            page.keyboard.type('blocked')
+            page.wait_for_timeout(40)
+            assert 'https://studio.example.com' in page.locator('#accessible [role=status]').get_attribute('aria-label')
+            # Read-only editors leave application actions available.
+            click_semantic('Open address')
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_group_actions()===n+2', arg=action_count)
+            page.locator('#group-mode').select_option('3')
+            page.wait_for_function('document.querySelector(`#accessible button[aria-label="Open address"]`)?.disabled===true')
+            assert page.locator('#accessible button[aria-label="Open address"]').get_attribute('aria-busy') == 'true'
+            click_semantic('Open address')
+            page.wait_for_timeout(40)
+            assert page.evaluate('cuiGallery.exports.gallery_group_actions()') == action_count + 2
+            page.locator('#group-mode').select_option('2')
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="Workspace address"]`)?.disabled===true')
+            assert page.locator('#accessible button[aria-label="Open address"]').is_disabled()
+            page.locator('#group-mode').select_option('0')
             page.evaluate('location.hash="Form"')
             page.wait_for_function('cuiGallery.renderedComponent==="Form"')
             assert page.locator('#accessible [role=textbox]').count() == 2
@@ -709,7 +740,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 52 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 53 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

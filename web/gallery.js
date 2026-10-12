@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54};
 const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -12,6 +12,7 @@ const snippets = {
  Radio:'cui_radio(ui, id, &theme,\n    cui_string("Priority"),\n    &selection, 1, false);',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
  Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.width = 280});',
+ 'Input Group':'cui_input_group(ui, group_id, input_id, &theme, editor, &state,\n    addons, addon_count, options);',
  Form:'/* Application owns editors, validation and callbacks. */\ncui_form(ui, id, &theme, fields, count,\n    (cui_form_options){.columns = 2,\n        .name = cui_string("Profile"),\n        .render_footer = draw_save_button});',
  Scrollable:'if (cui_scrollable_begin(ui, id, &theme,\n    &state, options)) {\n    draw_content(ui);\n    cui_scrollable_end(ui, id, &theme, &state, options);\n}',
  DataTable:'cui_data_table(ui, id, &theme, model,\n    &state, options, cell_label, draw_cell, user);',
@@ -76,6 +77,7 @@ function render(){
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
+ wasm.gallery_group_mode(Number($('group-mode').value));
  wasm.gallery_form_mode(Number($('form-mode').value));
  wasm.gallery_density(Number($('density').value));
  wasm.gallery_selection_mode(Number($('selection-mode').value));
@@ -187,6 +189,7 @@ function selectComponent(){
  $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
  $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
+ $('group-mode').hidden=selected.name!=='Input Group';$('group-mode').value='0';
  $('form-mode').hidden=selected.name!=='Form';$('form-mode').value='0';
  $('input-mode').hidden=selected.name!=='Input';$('input-mode').value='0';
  $('menu-kind').hidden=selected.name!=='Menu';$('menu-kind').value='0';
@@ -216,7 +219,7 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
   if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
  if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
- if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){
+ if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Input Group'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
 });
@@ -226,6 +229,7 @@ $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
+$('group-mode').addEventListener('change',requestFrame);
 $('form-mode').addEventListener('change',requestFrame);
 $('table-pin').addEventListener('change',requestFrame);
  $('table-mode').addEventListener('change',requestFrame);

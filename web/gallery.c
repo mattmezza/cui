@@ -81,6 +81,10 @@ static cui_edit *edit;
 static cui_input_state input_state;
 static int input_mode;
 static int form_mode, form_submissions;
+static int group_mode, group_actions;
+static char group_buffer[128] = "cui";
+static cui_edit *group_edit;
+static cui_input_group_state group_state;
 static char form_name_buffer[128] = "Ada Lovelace";
 static char form_email_buffer[128] = "ada@example.com";
 static cui_edit *form_name_edit, *form_email_edit;
@@ -206,6 +210,10 @@ int gallery_init(void) {
                                                         .capacity = sizeof(form_email_buffer),
                                                         .history_bytes = 2048,
                                                         .max_history_steps = 16});
+    group_edit = cui_edit_create((cui_edit_config){.buffer = group_buffer,
+                                                   .capacity = sizeof(group_buffer),
+                                                   .history_bytes = 2048,
+                                                   .max_history_steps = 16});
     virtual_list = cui_virtual_create((cui_virtual_config){100000, 24});
     uint64_t *keys = malloc(100000 * sizeof(*keys));
     if (!keys || !virtual_list)
@@ -269,8 +277,8 @@ int gallery_init(void) {
                      CUI_SURFACE_ALERT);
     cui_surface_init(&sheet_surface, cui_id_from(ui, "sheet-surface"), CUI_SURFACE_SHEET);
     cui_surface_init(&popover_surface, cui_id_from(ui, "popover-surface"), CUI_SURFACE_POPOVER);
-    return ui && edit && form_name_edit && form_email_edit && dock && query && number_state.edit &&
-           rebuilt == CUI_VIRTUAL_OK;
+    return ui && edit && group_edit && form_name_edit && form_email_edit && dock && query &&
+           number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
     if (ui)
@@ -391,6 +399,50 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 54: {
+        cui_id action = cui_id_from(ui, "group-open");
+        const cui_input_group_addon addons[] = {{.id = cui_id_from(ui, "group-prefix"),
+                                                 .alignment = CUI_INPUT_GROUP_INLINE_START,
+                                                 .label = cui_string("https://"),
+                                                 .width = 70},
+                                                {.id = action,
+                                                 .alignment = CUI_INPUT_GROUP_INLINE_END,
+                                                 .kind = CUI_INPUT_GROUP_BUTTON,
+                                                 .variant = CUI_INPUT_GROUP_PRIMARY,
+                                                 .label = cui_string("Open address"),
+                                                 .width = 100,
+                                                 .loading = group_mode == 3},
+                                                {.id = cui_id_from(ui, "group-title"),
+                                                 .alignment = CUI_INPUT_GROUP_BLOCK_START,
+                                                 .label = cui_string("Workspace address"),
+                                                 .width = 190},
+                                                {.id = cui_id_from(ui, "group-suffix"),
+                                                 .alignment = CUI_INPUT_GROUP_BLOCK_END,
+                                                 .label = cui_string(".example.com"),
+                                                 .width = 130}};
+        cui_input_group_result result = cui_input_group(
+            ui, cui_id_from(ui, "address-group"), cui_id_from(ui, "address-input"), &t, group_edit,
+            &group_state, addons, 4,
+            (cui_input_group_options){
+                .width = width > 460 ? 400 : width - 48,
+                .size = compact_density ? CUI_FORM_SMALL : CUI_FORM_MEDIUM,
+                .name = cui_string("Workspace address"),
+                .placeholder = cui_string("workspace"),
+                .input = {.disabled = disabled || group_mode == 2, .readonly = group_mode == 1}});
+        if (result.activated_addon == action)
+            group_actions++;
+        if (result.input.changed)
+            redraw = true;
+        char status[160];
+        snprintf(status, sizeof(status), "Address: https://%s.example.com; opens: %d", group_buffer,
+                 group_actions);
+        cui_id status_id = cui_id_from(ui, "group-status");
+        cui_begin_box(ui, status_id, (cui_box){.width = -1});
+        cui_interact(ui, status_id, CUI_ROLE_STATUS, cui_string(status), false, false, 0);
+        cui_label(ui, &t, cui_string(status));
+        cui_end_box(ui);
+        break;
+    }
     case 53: {
         bool readonly = form_mode == 2;
         bool field_disabled = disabled || form_mode == 3;
@@ -1296,6 +1348,13 @@ int gallery_table_selection_mode(int mode) {
     if (mode >= CUI_TABLE_SELECT_ROW && mode <= CUI_TABLE_SELECT_CELL)
         table_selection_mode = (cui_table_selection_mode)mode;
     return table_selection_mode;
+}
+void gallery_group_mode(int mode) {
+    if (mode >= 0 && mode <= 3)
+        group_mode = mode;
+}
+int gallery_group_actions(void) {
+    return group_actions;
 }
 void gallery_form_mode(int mode) {
     if (mode == form_mode || mode < 0 || mode > 3)

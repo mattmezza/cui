@@ -796,6 +796,14 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===0')
             page.evaluate('location.hash="DropdownButton"')
             page.wait_for_function('cuiGallery.renderedComponent==="DropdownButton"')
+            assert page.locator('#dropdown-variant').input_value() == '0'
+            assert page.locator('#dropdown-variant option:checked').inner_text() == 'Default'
+            default_colors = page.evaluate('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).filter(i=>e.gallery_command(i,0)===0).map(i=>[5,6,7,8].map(f=>e.gallery_command(i,f)).join()).join("|")}')
+            dropdown_select('variant', '1')
+            assert page.locator('#dropdown-variant option:checked').inner_text() == 'Primary'
+            primary_colors = page.evaluate('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).filter(i=>e.gallery_command(i,0)===0).map(i=>[5,6,7,8].map(f=>e.gallery_command(i,f)).join()).join("|")}')
+            assert default_colors != primary_colors
+            dropdown_select('variant', '0')
             count = page.evaluate('cuiGallery.exports.gallery_clicks()')
             click_semantic('Export workspace')
             page.wait_for_function('(count)=>cuiGallery.exports.gallery_clicks()===count+1', arg=count)
@@ -859,9 +867,15 @@ def main():
                 heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Export workspace', 1)))
             assert heights == sorted(heights) and heights[0] < heights[-1], heights
             dropdown_select('size', '0')
+            def dropdown_label_alpha():
+                return page.evaluate('()=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Export workspace");return i===undefined?-1:e.gallery_command(i,8)}')
+            normal_alpha = dropdown_label_alpha()
+            assert normal_alpha > 0
             for state in ['1','2']:
                 dropdown_select('action', state)
                 page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,5)===1', arg=semantic_index('Export workspace', 1))
+                if state == '2':
+                    assert abs(dropdown_label_alpha()-normal_alpha*.8) <= 1
                 action_count = page.evaluate('cuiGallery.exports.gallery_clicks()')
                 click_semantic('Export workspace', 1)
                 click_semantic('Export options', 1)
@@ -916,6 +930,8 @@ def main():
             click_semantic('Show hidden')
             page.wait_for_function('document.querySelector("#accessible [role=menuitemcheckbox]")?.getAttribute("aria-checked")==="true"')
             assert page.evaluate('cuiGallery.exports.gallery_modal()') == 1
+            page.keyboard.press('End')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=menuitemradio]")).some(e=>e.textContent==="Compact")')
             click_semantic('Compact')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=menuitemradio]")).some(e=>e.textContent==="Compact"&&e.getAttribute("aria-checked")==="true")')
             page.keyboard.press('Escape')

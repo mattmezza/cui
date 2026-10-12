@@ -223,6 +223,9 @@ cui_draw_list cui_end_frame(cui_context *ui);
 cui_id cui_id_from(cui_context *ui, const char *key);
 bool cui_push_id(cui_context *ui, const char *key);
 void cui_pop_id(cui_context *ui);
+/* Paint one rectangle below children of the current open box, clipped to it.
+ * Coordinates are relative to the box's current-frame origin; last call wins. */
+bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Floating viewport coordinates, independent of ancestor clipping/layout.
  * layer must be positive. Close with cui_end_box. Portal dimensions come from

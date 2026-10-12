@@ -31,6 +31,9 @@ typedef struct {
     size_t parent;
     bool clip, layout_only, inert;
     int16_t layer;
+    cui_rect underlay_bounds;
+    cui_color underlay_color;
+    cui_corner_radii underlay_radii;
 } cui_core_box_node;
 typedef struct {
     cui_id id;
@@ -621,8 +624,12 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         parent = SIZE_MAX;
     else if (parent != SIZE_MAX)
         layer = ui->nodes[parent].layer;
-    ui->nodes[ui->node_count] =
-        (cui_core_box_node){internal_id, parent, b.clip, layout_only, inert, layer};
+    ui->nodes[ui->node_count] = (cui_core_box_node){.clay_id = internal_id,
+                                                    .parent = parent,
+                                                    .clip = b.clip,
+                                                    .layout_only = layout_only,
+                                                    .inert = inert,
+                                                    .layer = layer};
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
@@ -662,6 +669,20 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                  .childOffset = {isfinite(b.offset_x) ? b.offset_x : 0,
                                  isfinite(b.offset_y) ? b.offset_y : 0}},
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
+}
+bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_corner_radii radii) {
+    if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
+        !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
+        bounds.w < 0 || bounds.h < 0 || !isfinite(radii.top_left) || !isfinite(radii.top_right) ||
+        !isfinite(radii.bottom_left) || !isfinite(radii.bottom_right) || radii.top_left < 0 ||
+        radii.top_right < 0 || radii.bottom_left < 0 || radii.bottom_right < 0)
+        return false;
+    cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    node->underlay_bounds = bounds;
+    node->underlay_color = color;
+    node->underlay_radii = radii;
+    Clay__GetOpenLayoutElement()->config.custom.customData = node;
+    return true;
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
     cui_core_begin_box(ui, id, b, NULL, 0);
@@ -856,6 +877,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         cui_end_box(ui);
     Clay_RenderCommandArray a = Clay_EndLayout(ui->dt);
     ui->count = 0;
+    uint32_t underlay_background_id = 0;
     for (int32_t i = 0; i < a.length; i++) {
         Clay_RenderCommand *c = &a.internalArray[i];
         if (c->userData == ui && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
@@ -865,6 +887,9 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                          c->boundingBox.height}};
         switch (c->commandType) {
         case CLAY_RENDER_COMMAND_TYPE_RECTANGLE:
+            /* The custom underlay already painted this element background. */
+            if (c->id == underlay_background_id)
+                continue;
             d.type = CUI_DRAW_RECT;
             d.color = cui_core_color(c->renderData.rectangle.backgroundColor);
             d.radius = c->renderData.rectangle.cornerRadius.topLeft;
@@ -888,6 +913,39 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 c->renderData.border.width.top, c->renderData.border.width.bottom};
             d.custom_corners = d.custom_border_edges = true;
             break;
+        case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
+            underlay_background_id = c->id;
+            const cui_core_box_node *node = c->renderData.custom.customData;
+            cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
+            size_t needed = 3 + (background.a ? 1 : 0);
+            if (needed > ui->config.max_commands - ui->count) {
+                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                ui->count = 0;
+                goto cui_core_commands_done;
+            }
+            if (background.a) {
+                Clay_CornerRadius radius = c->renderData.custom.cornerRadius;
+                ui->commands[ui->count++] =
+                    (cui_draw_command){.type = CUI_DRAW_RECT,
+                                       .bounds = d.bounds,
+                                       .color = background,
+                                       .custom_corners = true,
+                                       .corner_radii = {radius.topLeft, radius.topRight,
+                                                        radius.bottomLeft, radius.bottomRight}};
+            }
+            ui->commands[ui->count++] =
+                (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds};
+            ui->commands[ui->count++] =
+                (cui_draw_command){.type = CUI_DRAW_RECT,
+                                   .bounds = {d.bounds.x + node->underlay_bounds.x,
+                                              d.bounds.y + node->underlay_bounds.y,
+                                              node->underlay_bounds.w, node->underlay_bounds.h},
+                                   .color = node->underlay_color,
+                                   .corner_radii = node->underlay_radii,
+                                   .custom_corners = true};
+            ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
+            continue;
+        }
         case CLAY_RENDER_COMMAND_TYPE_TEXT:
             d.type = CUI_DRAW_TEXT;
             d.text = (cui_str){c->renderData.text.stringContents.chars,
@@ -911,6 +969,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         }
         ui->commands[ui->count++] = d;
     }
+cui_core_commands_done:
     for (size_t i = 0; i < ui->bounds_track_count; i++) {
         cui_core_bounds_track track = ui->bounds_tracks[i];
         uint32_t folded = cui_core_folded(track.id);

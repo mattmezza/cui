@@ -828,6 +828,65 @@ static void test_pointer_only_container(void) {
     cui_destroy(ui);
 }
 
+static void test_underlay_order_and_layout(void) {
+    cui_context *ui = make();
+    assert(!cui_set_underlay(ui, (cui_rect){0, 0, 20, 10}, (cui_color){0}, (cui_corner_radii){0}));
+    begin(ui);
+    cui_begin_box(
+        ui, 80, (cui_box){.width = 100, .height = 40, .clip = true, .background = {1, 2, 3, 255}});
+    assert(cui_set_underlay(ui, (cui_rect){-10, 5, 130, 20}, (cui_color){4, 5, 6, 255},
+                            (cui_corner_radii){1, 2, 3, 4}));
+    assert(!cui_set_underlay(ui, (cui_rect){0, 0, -1, 20}, (cui_color){0}, (cui_corner_radii){0}));
+    cui_text(ui, cui_string("Above indicator"), 12, (cui_color){7, 8, 9, 255});
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    size_t background = SIZE_MAX, underlay = SIZE_MAX, label = SIZE_MAX;
+    int clips = 0;
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *c = &list.commands[i];
+        if (c->type == CUI_DRAW_RECT && c->color.r == 1)
+            background = i;
+        if (c->type == CUI_DRAW_RECT && c->color.r == 4) {
+            underlay = i;
+            assert(clips > 0 && c->bounds.x == -10 && c->bounds.y == 5 && c->bounds.w == 130);
+            assert(c->custom_corners && c->corner_radii.bottom_right == 4);
+        }
+        if (c->type == CUI_DRAW_TEXT)
+            label = i;
+        if (c->type == CUI_DRAW_CLIP_PUSH)
+            clips++;
+        if (c->type == CUI_DRAW_CLIP_POP)
+            clips--;
+        assert(clips >= 0);
+    }
+    assert(!clips && background < underlay && underlay < label);
+    cui_rect box = cui_bounds(ui, 80);
+    assert(box.w == 100 && box.h == 40 && cui_last_error(ui) == CUI_OK);
+    size_t semantics;
+    cui_semantics(ui, &semantics);
+    assert(!semantics);
+    cui_destroy(ui);
+}
+
+static void test_underlay_capacity_and_hidden(void) {
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100, .max_commands = 2});
+    assert(ui && cui_begin_frame(ui, 100, 100, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 40, .height = 40});
+    assert(cui_set_underlay(ui, (cui_rect){0, 0, 20, 20}, (cui_color){255, 0, 0, 255},
+                            (cui_corner_radii){0}));
+    cui_end_box(ui);
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_destroy(ui);
+    ui = make();
+    begin(ui);
+    cui_begin_box(ui, 1, (cui_box){.width = 40, .height = 40, .layout_only = true});
+    assert(cui_set_underlay(ui, (cui_rect){0, 0, 20, 20}, (cui_color){255, 0, 0, 255},
+                            (cui_corner_radii){0}));
+    cui_end_box(ui);
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void test_perceptual_color_mix(void) {
     cui_color black = {0, 0, 0, 255}, white = {255, 255, 255, 255};
     cui_color middle = cui_color_mix_oklab(black, white, .5f);
@@ -1338,6 +1397,8 @@ int main(void) {
     test_perceptual_color_mix();
     test_focusable_container();
     test_pointer_only_container();
+    test_underlay_order_and_layout();
+    test_underlay_capacity_and_hidden();
     test_table_semantic_roles();
     test_input();
     test_strings_and_draw();

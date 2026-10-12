@@ -102,7 +102,28 @@ static void asymmetric_shapes(void) {
     assert(!cui_software_render(r, &list, (cui_color){0}));
     cui_software_destroy(r);
 }
+static void test_underlay_pixels(void) {
+    cui_context *ui = cui_create((cui_config){.width = 64, .height = 48});
+    cui_software *renderer = cui_software_create(64, 48, NULL);
+    assert(ui && renderer && cui_begin_frame(ui, 64, 48, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 40, .height = 40, .background = {255, 255, 255, 255}});
+    assert(cui_set_underlay(ui, (cui_rect){-20, 10, 80, 20}, (cui_color){255, 0, 0, 255},
+                            (cui_corner_radii){0}));
+    cui_begin_box(ui, 2, (cui_box){.width = 20, .height = 20, .background = {0, 0, 255, 255}});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &list, (cui_color){0, 0, 0, 255}));
+    assert(pixel(renderer, 5, 15)[2] == 255 && pixel(renderer, 5, 15)[0] == 0);
+    assert(pixel(renderer, 30, 15)[0] == 255 && pixel(renderer, 30, 15)[2] == 0);
+    assert(pixel(renderer, 45, 15)[0] == 0);
+    assert(pixel(renderer, 30, 30)[0] == 255 && pixel(renderer, 30, 30)[2] == 255);
+    cui_destroy(ui);
+    cui_software_destroy(renderer);
+}
+
 int main(void) {
+    test_underlay_pixels();
     asymmetric_shapes();
     cui_software *r = cui_software_create(16, 16, NULL);
     assert(r);

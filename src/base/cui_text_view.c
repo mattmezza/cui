@@ -1576,11 +1576,29 @@ cui_str cui_text_view_selected_text(const cui_text_view_state *s) {
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
     return (cui_str){s->workspace.rendered + a, b - a};
 }
+/* Images at paragraph boundaries belong to the adjacent selected text run. */
+static void cui_text_view_source_selection(const cui_text_view_state *s, size_t *a, size_t *b) {
+    if (*a == *b)
+        return;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        cui_text_view_range r = s->workspace.blocks[i].text;
+        size_t first = r.begin, last = r.end;
+        while (first < last && (s->workspace.mapping[first].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            ++first;
+        while (last > first && (s->workspace.mapping[last - 1].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            --last;
+        if (*a == first && first < last && *b > first)
+            *a = r.begin;
+        if (*b == last && first < last && *a < last)
+            *b = r.end;
+    }
+}
 bool cui_text_view_selected_source_range(const cui_text_view_state *s, cui_text_view_range *out) {
     if (!s || s->format == CUI_TEXT_VIEW_HTML)
         return false;
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    cui_text_view_source_selection(s, &a, &b);
     size_t start = SIZE_MAX, end = 0;
     for (size_t i = a; i < b; ++i) {
         cui_text_view_range m = s->workspace.mapping[i].source;
@@ -2600,6 +2618,8 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
     cui_str direct = {0};
     bool plain = f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN;
+    if (!plain)
+        cui_text_view_source_selection(s, &a, &b);
     if (!plain && a == 0 && b == s->text_length && a != b)
         direct = cui_text_view_source(s);
     cui_text_view_copy_writer w = {0};

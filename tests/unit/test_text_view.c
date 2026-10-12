@@ -195,6 +195,32 @@ static void test_html_image_dimensions(void) {
            f.spans[1].image_bounds.x == f.glyphs[1].bounds.x &&
            f.glyphs[0].line_top == f.glyphs[1].line_top);
 }
+static void test_image_source_boundaries(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "![first](one.png)![second](two.png) after";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_select(&f.state, 2, 8));
+    cui_text_view_range range;
+    assert(cui_text_view_selected_source_range(&f.state, &range) && range.begin == 0 &&
+           range.end == strlen(source));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK &&
+           !strcmp(output, source));
+    assert(cui_text_view_select(&f.state, 3, 8));
+    assert(cui_text_view_selected_source_range(&f.state, &range) && range.begin > 0);
+    source = "before![first](one.png)![second](two.png)";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_select(&f.state, 0, 6));
+    assert(cui_text_view_selected_source_range(&f.state, &range) && range.end == strlen(source));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK &&
+           !strcmp(output, source));
+    assert(cui_text_view_select(&f.state, 0, 5));
+    assert(cui_text_view_selected_source_range(&f.state, &range) && range.end == 5);
+}
 static void test_image_plain_copy(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -2550,6 +2576,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_image_source_boundaries();
     test_image_plain_copy();
     test_markdown_html_image_model();
     test_root_html_image_object();

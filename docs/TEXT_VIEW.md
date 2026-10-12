@@ -294,3 +294,10 @@ The frozen implementation selects shared text runs around images and includes
 images in Source copy when selection spans the adjacent run boundaries. CUI still
 uses a flat coordinate space with atomic image slots, so independent image selection
 and complete shared-window selection identity are not yet source-equivalent.
+
+Markdown Source copy and selected source ranges include consecutive images at a
+paragraph boundary when selection begins at the first text byte after leading
+images or ends at the last text byte before trailing images. Selecting only a
+middle portion of that text does not include the boundary images. This follows
+the frozen paragraph's pending-image rule while leaving Plain output and raw
+selection coordinates unchanged.

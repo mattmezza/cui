@@ -140,7 +140,8 @@ typedef struct {
     float logical_width, logical_height; /* zero selects pixel dimensions */
     uint64_t data_revision;              /* nonzero enables a cache with stable input pointers */
     size_t point_count;                  /* zero means count */
-    unsigned tick_count;                 /* zero means 5 */
+    unsigned
+        tick_count; /* zero: 5 Cartesian ticks, 4 Radar rings; one clamps to two for Cartesian */
     unsigned x_tick_count, grid_columns; /* zero: source stride/all, no columns */
     unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;

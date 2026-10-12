@@ -122,7 +122,9 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
     if (!cui_chart_value_domain(o, &lo, &hi))
         return 0;
     unsigned count = o->tick_count ? o->tick_count : 5;
-    if (count < 2 || count > 1000)
+    if (count < 2)
+        count = 2;
+    if (count > 1000)
         return 0;
     unsigned visible = count < 32 ? count : 32;
     float gutter = 32;
@@ -807,6 +809,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         double lo, hi;
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
+            if (count < 2)
+                count = 2;
             unsigned visible = count < 32 ? count : 32;
             bool horizontal_bar =
                 o->kind == CUI_CHART_BAR &&

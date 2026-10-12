@@ -80,20 +80,19 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->pie_outer_radius < 0 || !isfinite(o->pie_label_gap) || o->pie_label_gap < 0 ||
         !isfinite(o->candle_body_ratio) || o->candle_body_ratio < 0 || o->candle_body_ratio > 1 ||
         !isfinite(o->pad_angle) || o->pad_angle < 0 || o->pad_angle > 2 * CUI_CHART_PI ||
-        !isfinite(o->bar_ratio) || o->bar_ratio < 0 || o->bar_ratio > 1 || o->tick_count == 1 ||
-        o->tick_count > 1000 || o->bar_alignment < CUI_CHART_BAR_BOTTOM ||
-        o->bar_alignment > CUI_CHART_BAR_RIGHT || !isfinite(o->bar_padding_inner) ||
-        !isfinite(o->bar_padding_outer) || !isfinite(o->max_bar_width) ||
-        !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 || o->bar_padding_inner > 1 ||
-        o->bar_padding_outer < 0 || o->bar_padding_outer > 1 || o->max_bar_width < 0 ||
-        o->min_bar_length < 0 || !isfinite(o->radar_max_value) || !isfinite(o->bar_corner_radius) ||
-        o->bar_corner_radius < 0 || !isfinite(o->reveal_progress) || o->reveal_progress < 0 ||
-        o->reveal_progress > 1 || !isfinite(o->appear_duration) || o->appear_duration < 0 ||
-        !isfinite(o->hover_duration) || o->hover_duration < 0 ||
-        (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
-        !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
-        o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
-        o->sankey_value_scale < CUI_CHART_SANKEY_LINEAR ||
+        !isfinite(o->bar_ratio) || o->bar_ratio < 0 || o->bar_ratio > 1 || o->tick_count > 1000 ||
+        o->bar_alignment < CUI_CHART_BAR_BOTTOM || o->bar_alignment > CUI_CHART_BAR_RIGHT ||
+        !isfinite(o->bar_padding_inner) || !isfinite(o->bar_padding_outer) ||
+        !isfinite(o->max_bar_width) || !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 ||
+        o->bar_padding_inner > 1 || o->bar_padding_outer < 0 || o->bar_padding_outer > 1 ||
+        o->max_bar_width < 0 || o->min_bar_length < 0 || !isfinite(o->radar_max_value) ||
+        !isfinite(o->bar_corner_radius) || o->bar_corner_radius < 0 ||
+        !isfinite(o->reveal_progress) || o->reveal_progress < 0 || o->reveal_progress > 1 ||
+        !isfinite(o->appear_duration) || o->appear_duration < 0 || !isfinite(o->hover_duration) ||
+        o->hover_duration < 0 || (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) ||
+        o->radar_max_value < 0 || !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 ||
+        o->x_tick_count > 1000 || o->grid_columns > 1000 || o->reference_count > 16 ||
+        o->sankey_iterations > 100 || o->sankey_value_scale < CUI_CHART_SANKEY_LINEAR ||
         o->sankey_value_scale > CUI_CHART_SANKEY_SQRT || !isfinite(o->sankey_min_link_width) ||
         o->sankey_min_link_width < 0 || !isfinite(o->sankey_link_opacity) ||
         o->sankey_link_opacity < 0 || o->sankey_link_opacity > 1 ||
@@ -760,6 +759,8 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
     cui_color grid = o->grid.a ? o->grid : (cui_color){120, 120, 120, 80};
     if (!o->hide_grid) {
         unsigned n = o->tick_count ? o->tick_count : 5;
+        if (n < 2)
+            n = 2;
         for (unsigned i = 0; i + 1 < n; i++) {
             if (horizontal) {
                 double x = o->bar_alignment == CUI_CHART_BAR_LEFT
@@ -1100,7 +1101,7 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
     if (max <= 0 || radius <= 0)
         return;
     cui_color grid = o->grid.a ? o->grid : (cui_color){120, 120, 120, 80};
-    unsigned levels = o->tick_count ? o->tick_count : 5;
+    unsigned levels = o->tick_count ? o->tick_count : 4;
     if (!o->hide_grid) {
         for (unsigned level = 1; level <= levels; level++) {
             double r = radius * level / levels;

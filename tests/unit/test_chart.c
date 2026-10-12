@@ -248,6 +248,31 @@ int main(void) {
     }
     options.data_revision = 0;
     options.kind = CUI_CHART_LINE;
+    for (int kind = CUI_CHART_LINE; kind <= CUI_CHART_BAR; kind++) {
+        cui_chart_options tick_options = options;
+        tick_options.kind = (cui_chart_kind)kind;
+        tick_options.tick_count = 2;
+        assert(cui_chart_render(&state, &tick_options) == CUI_PLOT_OK);
+        memcpy(saved, pixels, sizeof pixels);
+        tick_options.tick_count = 1;
+        assert(cui_chart_render(&state, &tick_options) == CUI_PLOT_OK);
+        assert(memcmp(saved, pixels, sizeof pixels) == 0);
+    }
+    cui_chart_options radar_ticks = options;
+    radar_ticks.kind = CUI_CHART_RADAR;
+    radar_ticks.tick_count = 1;
+    assert(cui_chart_render(&state, &radar_ticks) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    radar_ticks.tick_count = 2;
+    assert(cui_chart_render(&state, &radar_ticks) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    radar_ticks.tick_count = 4;
+    assert(cui_chart_render(&state, &radar_ticks) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    radar_ticks.tick_count = 0;
+    assert(cui_chart_render(&state, &radar_ticks) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) == 0);
+    options.kind = CUI_CHART_LINE;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     state.hovered = 1;
     state.hovered_value = points[1].value;
@@ -1014,8 +1039,9 @@ int main(void) {
     assert(state.revision == old_revision && memcmp(pixels, saved, sizeof pixels) == 0);
     options.inner_radius = 0;
     options.tick_count = 1;
-    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
-    assert(state.revision == old_revision && memcmp(pixels, saved, sizeof pixels) == 0);
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    old_revision = state.revision;
+    memcpy(saved, pixels, sizeof pixels);
     options.tick_count = 0;
     state.byte_capacity = sizeof pixels - 1;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_CAPACITY);

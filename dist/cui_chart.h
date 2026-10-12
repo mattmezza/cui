@@ -100,6 +100,10 @@ typedef cui_color (*cui_chart_region_fill_fn)(size_t series, float x, float y, c
                                               void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
+/* Content size excludes the tooltip's 8px padding on each side. Return a finite, nonnegative size.
+ */
+typedef cui_size (*cui_chart_tooltip_measure_fn)(cui_context *, size_t index,
+                                                 const cui_chart_datum *, void *user);
 typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef size_t (*cui_chart_tooltip_value_fn)(const cui_chart_datum *, size_t index, size_t series,
                                              double value, char *buffer, size_t capacity,
@@ -130,7 +134,8 @@ typedef struct {
     size_t reference_count; /* at most 16 */
     cui_chart_format_fn y_tick_format, tooltip_format, bar_label_format;
     void *format_user;
-    cui_chart_tooltip_fn tooltip_content; /* replaces default hover title and rows */
+    cui_chart_tooltip_fn tooltip_content;         /* replaces default hover title and rows */
+    cui_chart_tooltip_measure_fn tooltip_measure; /* optional intrinsic custom content size */
     void *tooltip_user;
     cui_chart_tooltip_title_fn tooltip_title;
     cui_chart_tooltip_value_fn tooltip_value;
@@ -2433,12 +2438,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         float dt = cui_frame_delta(ui);
         if (!isfinite(dt) || dt < 0)
             dt = 0;
-        if (dt == 0 && active && state->emphasis_focus == 0)
+        if (dt == 0 && active && !instant)
             dt = 1.f / 60;
         dt = fminf(dt, .25f);
-        state->emphasis_focus =
-            instant ? (active ? 1 : 0)
-                    : fmaxf(0, fminf(1, state->emphasis_focus + (active ? dt : -dt) / duration));
+        state->emphasis_focus = state->tooltip_focus;
         bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
         if (o->kind == CUI_CHART_BAR && active) {
             float target;
@@ -2578,8 +2581,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 state->hover_visual_started = false;
         }
         if (state->hover_visual_started && state->hover_progress > 0) {
-            float progress = state->hover_progress;
-            float opacity = progress * progress * (3 - 2 * progress);
+            float opacity = state->tooltip_focus;
             float x = state->hover_x;
             float top = (o->custom_y_padding ? o->y_padding_top : 10) * h / o->height;
             float bottom =
@@ -3033,6 +3035,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         float tooltip_height =
             o->tooltip_content ? 64
                                : 16 + (title.length && title.data ? 18 : 0) + 16 * (float)row_count;
+        if (o->tooltip_content && o->tooltip_measure) {
+            cui_size content = o->tooltip_measure(ui, tooltip_index, datum, o->tooltip_user);
+            if (isfinite(content.width) && isfinite(content.height) && content.width >= 0 &&
+                content.height >= 0 && content.width <= 16368 && content.height <= 16368) {
+                tooltip_width = fmaxf(150, content.width + 16);
+                tooltip_height = content.height + 16;
+            }
+        }
         float cursor_x = state->tooltip_cursor_valid ? state->tooltip_cursor_x : 0;
         float cursor_y = state->tooltip_cursor_valid ? state->tooltip_cursor_y : 0;
         float tooltip_x = cursor_x < w / 2 ? cursor_x + 8 : cursor_x - 8 - tooltip_width;

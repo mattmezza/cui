@@ -750,7 +750,13 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         size_t next_end = cui_text_view_line_end(p->input, next);
         if (cui_text_view_find(p->input, a, b, "|", 1) != SIZE_MAX && next < p->input.length &&
             cui_text_view_table_separator(p->input, next, next_end)) {
-            list_count = 0;
+            while (list_count > 1 && indent < lists[list_count - 1].content_indent)
+                --list_count;
+            bool nested_table = list_count && indent >= lists[list_count - 1].content_indent;
+            if (!nested_table)
+                list_count = 0;
+            else
+                lists[list_count - 1].nested = false;
             ++table;
             unsigned row = 0;
             size_t line = start, line_end = b;
@@ -775,6 +781,18 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                     if (p->write) {
                         cui_text_view_block *block = &p->state->workspace.blocks[p->block];
                         block->table = table;
+                        if (nested_table) {
+                            unsigned depth = list_count - 1;
+                            const cui_text_view_block *owner =
+                                &p->state->workspace.blocks[lists[depth].item];
+                            block->list_continuation = true;
+                            block->list_parent = lists[depth].item;
+                            block->list_depth = depth;
+                            block->list_source_indent =
+                                owner->list_source_indent +
+                                (owner->list_ordered ? (unsigned)strlen(owner->marker_text) + 1
+                                                     : 2);
+                        }
                         block->row = row;
                         block->column = col;
                         block->table_header = row == 0;
@@ -1865,7 +1883,10 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
             if (b == 0 || s->workspace.blocks[b - 1].kind != CUI_TEXT_VIEW_TABLE_CELL ||
                 s->workspace.blocks[b - 1].table != table) {
                 table_first = b;
-                s->workspace.blocks[b].table_frame = (cui_rect){0, y, o.width, 0};
+                float indent = block->list_continuation ? (block->list_depth + 1) * 16.f : 0;
+                cui_text_view_layout_options table_options = o;
+                table_options.width = fmaxf(1, o.width - indent);
+                s->workspace.blocks[b].table_frame = (cui_rect){indent, y, table_options.width, 0};
                 if (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP)
                     y += 1;
                 size_t end = b + 1;
@@ -1873,8 +1894,10 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
                        s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
                        s->workspace.blocks[end].table == table)
                     ++end;
-                if (!cui_text_view_table_widths(s, b, end, o, measure, user))
+                if (!cui_text_view_table_widths(s, b, end, table_options, measure, user))
                     return CUI_TEXT_VIEW_INVALID;
+                for (size_t cell = b; cell < end; ++cell)
+                    s->workspace.blocks[cell].bounds.x += indent;
             }
             float height = 0;
             size_t first = b;
@@ -1903,11 +1926,16 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
                 for (size_t cell = table_first; cell < b; ++cell)
                     track_end = fmaxf(track_end, s->workspace.blocks[cell].bounds.x +
                                                      s->workspace.blocks[cell].bounds.w);
-                first_cell->table_track_width =
-                    track_end + (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
+                first_cell->table_track_width = track_end - first_cell->table_frame.x +
+                                                (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
                 last_cell->actions_height = o.table_actions_height;
-                y +=
-                    o.paragraph_gap + (o.table_actions_height > 0 ? o.table_actions_height + 4 : 0);
+                bool following = b < s->block_count;
+                bool list_following = following && (s->workspace.blocks[b].list_item ||
+                                                    s->workspace.blocks[b].list_continuation);
+                y += (following && (!first_cell->list_continuation || !list_following)
+                          ? o.paragraph_gap
+                          : 0) +
+                     (o.table_actions_height > 0 ? o.table_actions_height + 4 : 0);
             }
         } else {
             float indent =
@@ -2182,23 +2210,6 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
         const cui_text_view_block *block = &s->workspace.blocks[i];
         if (block->text.end <= a || block->text.begin >= b)
             continue;
-        if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
-            size_t start = i, end = i + 1;
-            while (start && s->workspace.blocks[start - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
-                   s->workspace.blocks[start - 1].table == block->table)
-                --start;
-            while (end < s->block_count &&
-                   s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
-                   s->workspace.blocks[end].table == block->table)
-                ++end;
-            if (prior)
-                cui_text_view_copy_literal(w, "\n\n");
-            cui_text_view_copy_table(s, w, start, end, a, b);
-            prior = true;
-            prior_list = false;
-            position += end - i - 1;
-            continue;
-        }
         size_t begin = block->text.begin > a ? block->text.begin : a;
         size_t end = block->text.end < b ? block->text.end : b;
         if (block->list_continuation && block->list_parent >= i)
@@ -2240,6 +2251,23 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
                 cui_text_view_copy_list_prefix(w, &s->workspace.blocks[block->list_parent], true);
             else
                 cui_text_view_copy_repeat(w, " ", block->list_source_indent);
+        }
+        if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
+            size_t start = i, end = i + 1;
+            while (start && s->workspace.blocks[start - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                   s->workspace.blocks[start - 1].table == block->table)
+                --start;
+            while (end < s->block_count &&
+                   s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                   s->workspace.blocks[end].table == block->table)
+                ++end;
+            if (block->list_continuation)
+                w->newline_indent = block->list_source_indent;
+            cui_text_view_copy_table(s, w, start, end, a, b);
+            w->newline_indent = 0;
+            w->indent_pending = false;
+            position += end - i - 1;
+            continue;
         }
         if (block->kind == CUI_TEXT_VIEW_HEADING) {
             cui_text_view_copy_repeat(w, "#", block->level);
@@ -2861,6 +2889,15 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                                  (o.table_mode != CUI_TEXT_VIEW_TABLE_WRAP ? 1 : 0);
             cui_rect action_bounds = {code ? 8 : 0, y, code ? fmaxf(1, s->width - 16) : s->width,
                                       b->actions_height};
+            if (!code) {
+                size_t first = i;
+                while (first > begin &&
+                       s->workspace.blocks[first - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                       s->workspace.blocks[first - 1].table == b->table)
+                    --first;
+                action_bounds.x = s->workspace.blocks[first].table_frame.x;
+                action_bounds.w = s->workspace.blocks[first].table_frame.w;
+            }
             if (action_bounds.y + action_bounds.h <= scroll || action_bounds.y >= scroll + viewport)
                 continue;
             action_bounds.x -= origin_x;

@@ -1353,14 +1353,16 @@ static cui_draw_list menu_config_scene(cui_context *ui, cui_menu_tree_state *sta
 }
 static void marker_positions(cui_draw_list list, float *marker, float *label) {
     *marker = *label = -1;
-    for (size_t i = 0; i < list.count; i++)
-        if (list.commands[i].type == CUI_DRAW_TEXT) {
-            cui_draw_command command = list.commands[i];
-            if (command.text.length == 3 && !memcmp(command.text.data, "[x]", 3))
-                *marker = command.bounds.x;
-            if (command.text.length == 6 && !memcmp(command.text.data, "Toggle", 6))
-                *label = command.bounds.x;
+    for (size_t i = 0; i < list.count; i++) {
+        cui_draw_command command = list.commands[i];
+        if (command.type == CUI_DRAW_IMAGE) {
+            assert(command.bounds.w == 12 && command.bounds.h == 12 && command.bitmap.custom_tint);
+            *marker = command.bounds.x;
         }
+        if (command.type == CUI_DRAW_TEXT && command.text.length == 6 &&
+            !memcmp(command.text.data, "Toggle", 6))
+            *label = command.bounds.x;
+    }
     assert(*marker >= 0 && *label >= 0);
 }
 static void test_menu_configuration(void) {
@@ -3327,7 +3329,172 @@ static void test_dropdown_reference_metrics(void) {
         cui_destroy(ui);
     }
 }
+static cui_draw_list selection_menu_scene(cui_context *ui, cui_menu_tree_state *state,
+                                          cui_menu_entry *entries, cui_id *action, bool right) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_menu_tree(ui, 2, &theme, cui_string("Selection"), entries, 4, action, state,
+                  (cui_menu_tree_options){.popup = {.viewport = {0, 0, 640, 480}, .width = 240},
+                                          .checks_on_right = right,
+                                          .keep_open_checks = true});
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static size_t selection_images(cui_draw_list draw) {
+    size_t count = 0;
+    for (size_t i = 0; i < draw.count; i++) {
+        cui_draw_command command = draw.commands[i];
+        if (command.type == CUI_DRAW_IMAGE) {
+            assert(command.bounds.w == 12 && command.bounds.h == 12 && command.bitmap.custom_tint &&
+                   cui_bitmap_valid(command.bitmap.bitmap));
+            count++;
+        }
+        if (command.type == CUI_DRAW_TEXT)
+            assert(
+                !(command.text.length == 3 &&
+                  (!memcmp(command.text.data, "[x]", 3) || !memcmp(command.text.data, "[ ]", 3) ||
+                   !memcmp(command.text.data, "(*)", 3) || !memcmp(command.text.data, "( )", 3))));
+    }
+    return count;
+}
+static void test_menu_check_glyphs(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 9700);
+    cui_id action = 0;
+    bool checked = true;
+    int radio = 1;
+    cui_menu_entry entries[] = {
+        {.id = 51, .label = {"Check", 5}, .kind = CUI_MENU_CHECK, .checked = &checked},
+        {.id = 52,
+         .label = {"Radio one", 9},
+         .kind = CUI_MENU_RADIO,
+         .radio_value = &radio,
+         .radio_option = 1},
+        {.id = 53,
+         .label = {"Radio two", 9},
+         .kind = CUI_MENU_RADIO,
+         .radio_value = &radio,
+         .radio_option = 2},
+        {.id = 54, .label = {"Plain", 5}, .kind = CUI_MENU_ACTION}};
+    selection_menu_scene(ui, &state, entries, &action, false);
+    click(ui, 2);
+    cui_draw_list draw = selection_menu_scene(ui, &state, entries, &action, false);
+    assert(state.overlay.open && selection_images(draw) == 2);
+    float label_x = -1;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT &&
+            draw.commands[i].bounds.y >= state.panels[0].y &&
+            (draw.commands[i].text.length == 5 || draw.commands[i].text.length == 9)) {
+            if (label_x < 0)
+                label_x = draw.commands[i].bounds.x;
+            assert(draw.commands[i].bounds.x == label_x);
+        }
+    click(ui, 53);
+    draw = selection_menu_scene(ui, &state, entries, &action, false);
+    assert(radio == 2 && selection_images(draw) == 2 && state.overlay.open);
+    click(ui, 51);
+    draw = selection_menu_scene(ui, &state, entries, &action, false);
+    assert(!checked && selection_images(draw) == 1);
+    entries[2].disabled = true;
+    draw = selection_menu_scene(ui, &state, entries, &action, false);
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE)
+            assert(same_color(draw.commands[i].bitmap.tint, cui_theme_light().muted));
+    click(ui, 53);
+    selection_menu_scene(ui, &state, entries, &action, false);
+    assert(radio == 2);
+    entries[0].icon = cui_string("I");
+    checked = true;
+    draw = selection_menu_scene(ui, &state, entries, &action, false);
+    assert(selection_images(draw) == 1); /* explicit icon replaces the left check */
+    draw = selection_menu_scene(ui, &state, entries, &action, true);
+    assert(selection_images(draw) == 2); /* right checks coexist with left icons */
+    cui_destroy(ui);
+}
+static cui_draw_list choice_indicator_scene(cui_context *ui, unsigned mode, cui_choice_popup *popup,
+                                            cui_edit *query, cui_id *selected, bool *chosen) {
+    const cui_choice_item entries[] = {
+        {10, {"One", 3}, false}, {20, {"Two", 3}, false}, {30, {"Three", 5}, false}};
+    cui_theme theme = cui_theme_light();
+    cui_choice_item scratch[3];
+    bool scratch_selected[3];
+    cui_choice_popup_options options = {.viewport = {0, 0, 640, 480}, .width = 220};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    if (mode == 0)
+        cui_list_multi(ui, 90, &theme, entries, 3, chosen, &popup->list, (cui_list_options){0});
+    else if (mode == 1)
+        cui_select(ui, 2, &theme, cui_string("Picker"), cui_string("Choose"), entries, 3, selected,
+                   popup, options);
+    else if (mode == 2)
+        cui_select_multi(ui, 2, &theme, cui_string("Picker"), cui_string("Choose"), entries, 3,
+                         chosen, popup, options);
+    else if (mode == 3)
+        cui_combobox(ui, 2, &theme, cui_string("Picker"), query, entries, 3, scratch, 3, selected,
+                     popup, options);
+    else
+        cui_combobox_multi(ui, 2, &theme, cui_string("Picker"), query, entries, 3, scratch,
+                           scratch_selected, 3, chosen, popup, options);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void test_choice_trailing_checks(void) {
+    for (unsigned mode = 0; mode < 5; mode++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_choice_popup popup;
+        cui_choice_popup_init(&popup, 9800);
+        char buffer[32] = "";
+        cui_edit *query =
+            cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+        assert(query);
+        cui_id selected = 10;
+        bool chosen[] = {true, false, true};
+        cui_draw_list draw = choice_indicator_scene(ui, mode, &popup, query, &selected, chosen);
+        if (mode) {
+            click(ui, 2);
+            draw = choice_indicator_scene(ui, mode, &popup, query, &selected, chosen);
+            assert(popup.overlay.open);
+        }
+        size_t checks = 0;
+        for (size_t i = 0; i < draw.count; i++) {
+            cui_draw_command command = draw.commands[i];
+            if (command.type == CUI_DRAW_IMAGE) {
+                checks++;
+                assert(command.bounds.w == (mode == 0 ? 14 : 12) &&
+                       command.bounds.h == command.bounds.w && command.bitmap.custom_tint);
+                assert(same_color(command.bitmap.tint,
+                                  mode == 0 ? cui_theme_light().muted : cui_theme_light().text));
+            }
+        }
+        assert(checks == (mode == 1 || mode == 3 ? 1 : 2));
+        for (cui_id id = 10; id <= 30; id += 10) {
+            cui_rect body = cui_bounds(ui, id ^ UINT64_C(0x9e3f5d2a91bca002));
+            cui_rect slot = cui_bounds(ui, id ^ UINT64_C(0x4b705ad687e1a963));
+            assert(slot.w == (mode == 0 ? 20 : 12) && body.x + body.w <= slot.x + .01f);
+        }
+        click(ui, 20);
+        draw = choice_indicator_scene(ui, mode, &popup, query, &selected, chosen);
+        if (mode == 1 || mode == 3) {
+            assert(selected == 20);
+            click(ui, 2);
+            draw = choice_indicator_scene(ui, mode, &popup, query, &selected, chosen);
+        } else
+            assert(chosen[1]);
+        checks = 0;
+        for (size_t i = 0; i < draw.count; i++)
+            checks += draw.commands[i].type == CUI_DRAW_IMAGE;
+        assert(checks == (mode == 1 || mode == 3 ? 1 : 3));
+        cui_edit_destroy(query);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_choice_trailing_checks();
+    test_menu_check_glyphs();
     test_dropdown_reference_metrics();
     test_dropdown_loading_keeps_content();
     test_first_tab_border_policy();

@@ -309,10 +309,11 @@ depth limit. Theme metrics supply menu density; text icons and shortcut hints ar
 caller-provided and do not install key bindings. Entry `render` callbacks can paint
 custom row bodies synchronously while retaining the entry's accessible label and
 interaction. They must fit the fixed row height; they do not add independent
-menu actions. `checks_on_right` places check/radio indicators after the shortcut.
+menu actions. `checks_on_right` places checked-item glyphs after the label and before shortcut hints.
 Popup options choose the preferred anchor side; placement still flips and clamps.
-URL dispatch, delayed hover/grace areas, wheel/touch scrolling, arbitrary item
-heights and a native OS accessibility bridge are still parity gaps.
+URL dispatch, kinetic gesture scrolling, arbitrary item heights and a native OS
+accessibility bridge are still parity gaps. The frozen submenu triangle/grace
+behavior is itself an upstream TODO.
 
 ## Context menus
 
@@ -695,3 +696,19 @@ density and height overrides, and Link action routing. This changes a standard
 supplied theme settings. The caret remains a text fallback pending a proper
 portable icon primitive; intrinsic custom-body sizing and built-in capped-label
 ellipsis remain separate presentation gaps.
+
+Choice selection marks now use the shared antialiased `cui_checkmark` bitmap,
+not ASCII checkbox/radio strings. Popup Menu checked and radio entries paint the
+source 12px check glyph. A left glyph/icon column aligns every row whenever any
+left glyph/icon exists; explicit icons win over left checks. Right checks appear
+only on checked rows and coexist with left icons. Flat multiselect Lists reserve
+a trailing 20px slot with a 14px muted check; Select and Combobox reserve a
+trailing 12px foreground check slot, including single-selection popups. Metrics
+scale with theme font_size/16. Unchecked slots stay blank. Existing roles,
+checked/selected states and radio exclusivity remain semantic properties.
+Headless tests route check/radio toggles and disabled clicks, inspect left/right
+placement, icon precedence and tints, and verify selection/check bounds and
+activation in all five List/Select/Combobox modes. Shared glyph pixel rendering
+is covered by the core/component/backend owner; Choice tests inspect IMAGE
+commands and routing. Row palette and full density defaults remain separate
+source-parity work.

@@ -2,10 +2,10 @@
 const $ = id => document.getElementById(id);
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37};
-const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Calendar']);
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39};
+const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Calendar','Focus Trap']);
 const snippets = {
- Button:'if (cui_button(ui, id, &theme,\n    cui_string("Run action"), false)) {\n    run_action();\n}',
+ Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
  Checkbox:'cui_checkbox(ui, id, &theme,\n    cui_string("Receive updates"),\n    &checked, false);',
  Switch:'cui_switch(ui, id, &theme,\n    cui_string("Notifications"),\n    &enabled, false);',
  Toggle:'cui_toggle(ui, id, &theme,\n    cui_string("Pin this item"),\n    &pinned, false);',
@@ -71,8 +71,15 @@ function render(){
  }
  while(clips-- >0)ctx.restore();
  syncSemantics();
+ const clipboard=wasm.gallery_clipboard_request();if(clipboard)void clipboardAction(clipboard);
  if(wasm.gallery_redraw())requestFrame();
  $('preview-note').textContent=`${modelStories.has(selected.name)?'Partial base model · ':''}${wasm.gallery_count()} draw commands · ${wasm.gallery_semantic_count()} semantic nodes · Mouse, Tab, Enter / Space and arrow keys`;
+}
+async function clipboardAction(action){
+ let okay=1,text;
+ try {if(!navigator.clipboard)throw Error('unavailable');if(action===1){await navigator.clipboard.writeText('Hello from CUI');text='Copied: Hello from CUI';}else text=`Read: ${await navigator.clipboard.readText()}`;}
+ catch {okay=0;text='';}
+ const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 function syncSemantics(){
  const root=$('accessible');root.replaceChildren();
@@ -81,7 +88,9 @@ function syncSemantics(){
   if(!role || ![1,2,3,4,5,6,8,14,16,23].includes(f(0)))continue;
   const el=document.createElement('button');el.type='button';el.tabIndex=-1;el.textContent=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));el.setAttribute('role',role);el.disabled=Boolean(f(5));
   if(['checkbox','switch','radio'].includes(role))el.setAttribute('aria-checked',String(Boolean(f(6))));
+  if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');
   if(role==='slider'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
+  if(f(14))el.setAttribute('aria-busy','true');
   if(role==='tab'||role==='option')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));
   el.onclick=()=>{wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};
@@ -97,7 +106,7 @@ function navigation(){
  }
 }
 function selectComponent(){
- const name=decodeURIComponent(location.hash.slice(1))||'Button';selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
+ let name='Button';try{name=decodeURIComponent(location.hash.slice(1))||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
  document.title=`${selected.name} · CUI`; $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
  const live=selected.name in stories;
  if(modelStories.has(selected.name))$('status').textContent+=' / base model'; $('preview-card').hidden=!live; $('pending').hidden=live;
@@ -134,7 +143,7 @@ $('search').addEventListener('input',navigation);window.addEventListener('hashch
 $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',$('theme').value==='1');document.body.classList.toggle('contrast',$('theme').value==='2');requestFrame();});
 $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
 try{
- const [response,data]=await Promise.all([fetch('./gallery.wasm'),fetch('./catalog.json').then(r=>r.json())]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;
+ const [response,data]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json())]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;
  const module=await WebAssembly.compile(await response.arrayBuffer());
  const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=`${size}px system-ui`;return ctx.measureText(stringAt(ptr,len)).width;}}};
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();if(!wasm.gallery_init())throw Error('CUI initialization failed');

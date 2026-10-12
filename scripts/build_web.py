@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build the static browser gallery with pinned Zig 0.16.0. No Node build toolchain."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -15,7 +16,7 @@ SOURCES = ['src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
            'src/base/cui_choice.c', 'src/components/cui_choice.c',
            'src/theme/cui_theme.c', 'src/components/cui_components.c', 'web/gallery.c']
 EXPORTS = ['gallery_init', 'gallery_event', 'gallery_text', 'gallery_focus', 'gallery_frame',
-           'gallery_modal', 'gallery_time', 'gallery_redraw', 'gallery_count', 'gallery_command', 'gallery_command_text', 'gallery_command_length',
+           'gallery_clipboard_request', 'gallery_clipboard_result', 'gallery_modal', 'gallery_time', 'gallery_redraw', 'gallery_count', 'gallery_command', 'gallery_command_text', 'gallery_command_length',
            'gallery_semantic_count', 'gallery_semantic', 'gallery_semantic_name',
            'gallery_semantic_length', 'gallery_clicks', 'malloc', 'free']
 
@@ -34,11 +35,14 @@ def main():
         '-I', str(ROOT / 'include'), '-I', str(ROOT / 'third_party/clay'),
         *[str(ROOT / s) for s in SOURCES], '-lm', '-Wl,-z,stack-size=8388608',
         *[f'-Wl,--export={s}' for s in EXPORTS], '-o', str(out / 'gallery.wasm')], check=True)
-    for name in ['index.html', 'gallery.js', 'gallery.css']:
+    for name in ['index.html', 'gallery.css']:
         shutil.copyfile(ROOT / 'web' / name, out / name)
-    manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text())
+    wasm_version = hashlib.sha256((out / 'gallery.wasm').read_bytes()).hexdigest()[:16]
+    javascript = (ROOT / 'web/gallery.js').read_text(encoding='utf-8').replace('__CUI_WASM_VERSION__', wasm_version)
+    (out / 'gallery.js').write_text(javascript, encoding='utf-8', newline='\n')
+    manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8'))
     (out / 'catalog.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    notices = (ROOT / 'LICENSE').read_text() + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text() + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text()
+    notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
     (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
     (out / '.nojekyll').touch()
     print(f'Gallery built at {out}; serve over HTTP, e.g. python -m http.server -d {out}')

@@ -37,6 +37,9 @@ static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
 static bool redraw;
 static float host_seconds, host_dt = 1.0f / 60;
 static bool reduced_motion;
+static cui_overlay trap;
+static int clipboard_request;
+static char clipboard_status[128] = "Clipboard access requires a secure browser context.";
 static cui_choice_popup select_popup, menu_popup, combo_popup;
 static cui_edit *query;
 static char query_buffer[128];
@@ -93,6 +96,7 @@ int gallery_init(void) {
                                                           .capacity = sizeof(number_buffer),
                                                           .history_bytes = 2048,
                                                           .max_history_steps = 16});
+    cui_overlay_init(&trap, cui_id_from(ui, "focus-trap"), true);
     cui_choice_popup_init(&select_popup, cui_id_from(ui, "select-popup"));
     query = cui_edit_create((cui_edit_config){.buffer = query_buffer,
                                               .capacity = sizeof(query_buffer),
@@ -132,6 +136,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_overlay_close(ui, &select_popup.overlay);
         cui_overlay_close(ui, &menu_popup.overlay);
         cui_overlay_close(ui, &combo_popup.overlay);
+        cui_overlay_close(ui, &trap);
         previous_story = story;
     }
     redraw = false;
@@ -146,10 +151,27 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     switch (story) {
     case 0: {
         char label[64];
-        snprintf(label, sizeof(label), "Clicked %d times", clicks);
         if (cui_button(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"), disabled))
             clicks++;
+        snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
+        for (int row = 0; row < 2; row++) {
+            cui_begin_box(ui, cui_id_from(ui, row ? "variant-row-2" : "variant-row-1"),
+                          (cui_box){.row = true, .gap = 8});
+            const char *names[6] = {"Secondary", "Outline", "Ghost", "Danger", "Link", "Loading"};
+            cui_button_variant variants[6] = {CUI_BUTTON_SECONDARY, CUI_BUTTON_OUTLINE,
+                                              CUI_BUTTON_GHOST,     CUI_BUTTON_DANGER,
+                                              CUI_BUTTON_LINK,      CUI_BUTTON_PRIMARY};
+            for (int column = 0; column < 3; column++) {
+                int v = row * 3 + column;
+                cui_button_ex(ui, cui_id_from(ui, names[v]), &t, cui_string(names[v]),
+                              (cui_button_options){.variant = variants[v],
+                                                   .size = CUI_CONTROL_SMALL,
+                                                   .disabled = disabled || v == 2,
+                                                   .loading = v == 5});
+            }
+            cui_end_box(ui);
+        }
         break;
     }
     case 1:
@@ -453,6 +475,62 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string(text));
         break;
     }
+    case 38: {
+        cui_id trigger = cui_id_from(ui, "trap-trigger"), close = cui_id_from(ui, "trap-close");
+        cui_overlay_update(ui, &trap);
+        if (cui_button(ui, trigger, &t, cui_string("Open focus trap"), disabled))
+            cui_overlay_open(ui, &trap, trigger);
+        size_t count;
+        cui_frame_events(ui, &count);
+        for (size_t i = 0; i < count; i++)
+            if (cui_event_activation(ui, i) == close)
+                cui_overlay_close(ui, &trap);
+        if (trap.open) {
+            cui_rect bounds = {24, 80, width - 48, 156};
+            cui_overlay_set_bounds(&trap, bounds);
+            if (cui_overlay_begin(ui, &trap)) {
+                cui_begin_portal(ui, trap.id,
+                                 (cui_box){.padding = 12,
+                                           .gap = 8,
+                                           .background = t.surface,
+                                           .border = t.border,
+                                           .border_width = 1,
+                                           .radius = t.radius},
+                                 bounds, 100);
+                cui_label(ui, &t, cui_string("Tab cycles within this scope."));
+                cui_button(ui, cui_id_from(ui, "trap-first"), &t, cui_string("First control"),
+                           false);
+                cui_button(ui, close, &t, cui_string("Close scope"), false);
+                cui_end_box(ui);
+                cui_overlay_end(ui);
+            }
+        }
+        break;
+    }
+    case 39: {
+        cui_label(ui, &t, cui_string("Browser host clipboard integration"));
+        cui_begin_box(ui, cui_id_from(ui, "clipboard-actions"), (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "copy"), &t, cui_string("Copy text"), disabled))
+            clipboard_request = 1;
+        if (cui_button(ui, cui_id_from(ui, "paste"), &t, cui_string("Read text"), disabled))
+            clipboard_request = 2;
+        cui_end_box(ui);
+        char preview[132];
+        size_t length = strlen(clipboard_status);
+        memcpy(preview, clipboard_status, length + 1);
+        bool shortened = false;
+        while (length && host_measure(preview, length, t.font_size) > width - 68) {
+            shortened = true;
+            length--;
+            while (length && ((unsigned char)preview[length] & 0xc0) == 0x80)
+                length--;
+            preview[length] = 0;
+        }
+        if (shortened)
+            memcpy(preview + length, "...", 4);
+        cui_label(ui, &t, cui_string(preview));
+        break;
+    }
     default:
         cui_label(ui, &t, cui_string("This component has no browser story yet."));
         break;
@@ -540,6 +618,12 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.minimum;
     case 13:
         return s->details.maximum;
+    case 14:
+        return s->details.busy;
+    case 15:
+        return s->details.multiselectable;
+    case 16:
+        return s->details.orientation;
     default:
         return 0;
     }
@@ -565,5 +649,26 @@ void gallery_time(float seconds, float dt, int reduced) {
 }
 
 int gallery_modal(void) {
-    return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open;
+    return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open ||
+           trap.open;
+}
+
+int gallery_clipboard_request(void) {
+    int request = clipboard_request;
+    clipboard_request = 0;
+    return request;
+}
+void gallery_clipboard_result(int okay, const char *text, size_t length) {
+    if (!okay) {
+        snprintf(clipboard_status, sizeof(clipboard_status),
+                 "Clipboard access denied or unavailable.");
+        return;
+    }
+    if (length > sizeof(clipboard_status) - 1) {
+        length = sizeof(clipboard_status) - 1;
+        while (length && ((unsigned char)text[length] & 0xc0) == 0x80)
+            length--;
+    }
+    memcpy(clipboard_status, text, length);
+    clipboard_status[length] = 0;
 }

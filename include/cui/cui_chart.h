@@ -42,6 +42,9 @@ typedef struct {
     float source_y, target_y, source_width, target_width;
 } cui_chart_sankey_link_geometry;
 typedef struct {
+    float left, right, top, bottom;
+} cui_chart_sankey_margins;
+typedef struct {
     cui_str text;
     float edge_x, edge_y, anchor_x, anchor_y, text_x, text_y;
     bool visible, right;
@@ -161,8 +164,9 @@ typedef struct {
     float sankey_link_opacity;       /* default 0.3 */
     float sankey_node_corner_radius; /* zero selects square nodes */
     bool sankey_show_labels, sankey_show_values;
-    float sankey_label_gap; /* zero selects source 6px */
-    float sankey_font_size; /* zero selects 12px */
+    float sankey_label_gap;                  /* zero selects source 6px */
+    float sankey_font_size;                  /* zero selects 12px */
+    cui_chart_sankey_margins sankey_margins; /* measured before layout; zero preserves legacy */
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
@@ -197,6 +201,11 @@ cui_plot_result cui_chart_render_animated(cui_context *, cui_chart_state *,
 /* Measure source's max(32px, widest visible tick + 4px) before render; copy
  * result to options.value_axis_gutter for consistent paint and hit geometry. */
 float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options *);
+/* Measures source-style label margins using the host's text metrics. Call before
+ * render, assign the result to options.sankey_margins, then reuse those options
+ * for layout, hit testing, and styled painting. Output is unchanged on failure. */
+cui_plot_result cui_chart_measure_sankey_margins(cui_context *, const cui_chart_options *,
+                                                 cui_chart_sankey_margins *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,

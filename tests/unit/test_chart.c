@@ -191,6 +191,18 @@ int main(void) {
     cui_chart_sankey_node nodes[4];
     assert(cui_chart_sankey_layout(&flow_options, nodes, 3) == CUI_PLOT_CAPACITY);
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    float no_margin_left = nodes[0].x0, no_margin_right = nodes[3].x0;
+    flow_options.sankey_margins = (cui_chart_sankey_margins){20, 20, 40, 4};
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    assert(nodes[0].x0 >= no_margin_left + 19 && nodes[3].x0 <= no_margin_right - 19);
+    for (size_t i = 0; i < 4; i++)
+        assert(nodes[i].y0 >= 47 && nodes[i].y1 <= 84);
+    cui_chart_sankey_node margin_nodes[4];
+    memcpy(margin_nodes, nodes, sizeof nodes);
+    flow_options.sankey_margins.left = NAN;
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_INVALID);
+    assert(memcmp(margin_nodes, nodes, sizeof nodes) == 0);
+    flow_options.sankey_margins = (cui_chart_sankey_margins){0};
     cui_chart_link skewed[] = {{0, 1, 100, {0}}, {0, 2, 1, {0}}};
     cui_chart_options scaled_flow = flow_options;
     scaled_flow.count = 3;
@@ -782,6 +794,10 @@ int main(void) {
     options.sankey_show_labels = true;
     options.sankey_show_values = true;
     options.sankey_value_format = format_q;
+    cui_chart_sankey_margins measured_margins = {0};
+    assert(cui_chart_measure_sankey_margins(ui, &options, &measured_margins) == CUI_PLOT_OK);
+    assert(measured_margins.left > 0 && measured_margins.right > 0 && measured_margins.bottom > 0);
+    options.sankey_margins = measured_margins;
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Flow", 4}));
@@ -800,6 +816,7 @@ int main(void) {
                 terminal_label_right = draw.commands[i].bounds.x >= label_nodes[1].x1;
         }
     assert(sankey_label && sankey_value && first_label_left && terminal_label_right);
+    options.sankey_margins = (cui_chart_sankey_margins){0};
     options.sankey_show_labels = false;
     options.sankey_show_values = false;
     options.sankey_value_format = NULL;

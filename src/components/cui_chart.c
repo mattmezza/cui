@@ -40,6 +40,66 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
     }
     return gutter;
 }
+cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_chart_options *o,
+                                                 cui_chart_sankey_margins *out) {
+    if (!ui || !o || !out || o->kind != CUI_CHART_SANKEY || !o->width || !o->height ||
+        !isfinite(o->sankey_font_size) || o->sankey_font_size < 0 ||
+        !isfinite(o->sankey_label_gap) || o->sankey_label_gap < 0)
+        return CUI_PLOT_INVALID;
+    cui_chart_options plain = *o;
+    plain.sankey_margins = (cui_chart_sankey_margins){0};
+    cui_chart_sankey_node nodes[256];
+    cui_plot_result status = cui_chart_sankey_layout(&plain, nodes, 256);
+    if (status != CUI_PLOT_OK)
+        return status;
+    cui_chart_sankey_margins measured = {0};
+    if (!o->sankey_show_labels && !o->sankey_show_values) {
+        *out = measured;
+        return CUI_PLOT_OK;
+    }
+    size_t last_layer = 0;
+    for (size_t i = 0; i < o->count; i++)
+        if (nodes[i].layer > last_layer)
+            last_layer = nodes[i].layer;
+    float size = o->sankey_font_size > 0 ? o->sankey_font_size : 12;
+    float gap = o->sankey_label_gap > 0 ? o->sankey_label_gap : 6;
+    for (size_t i = 0; i < o->count; i++) {
+        cui_str label = o->data[i].label;
+        bool has_name = o->sankey_show_labels && label.length && label.data;
+        unsigned lines = (unsigned)has_name + (unsigned)o->sankey_show_values;
+        if (!lines)
+            continue;
+        float width = has_name ? cui_measure_text(ui, label, size).width : 0;
+        if (o->sankey_show_values) {
+            char buffer[48];
+            cui_str value = cui_chart_number(buffer, sizeof buffer, nodes[i].throughput,
+                                             o->sankey_value_format, o->format_user);
+            width = fmaxf(width, cui_measure_text(ui, value, size).width);
+        }
+        if (!isfinite(width) || width < 0)
+            return CUI_PLOT_INVALID;
+        if (nodes[i].layer == 0)
+            measured.left = fmaxf(measured.left, width + gap);
+        else if (nodes[i].layer == last_layer)
+            measured.right = fmaxf(measured.right, width + gap);
+        else
+            measured.top = fmaxf(measured.top, lines * (size + 2) + 2);
+    }
+    measured.left = fminf(measured.left, o->width * .2f);
+    measured.right = fminf(measured.right, o->width * .2f);
+    measured.bottom = 2;
+    float vertical = measured.top + measured.bottom;
+    if (vertical > o->height * .6f) {
+        float scale = o->height * .6f / vertical;
+        measured.top *= scale;
+        measured.bottom *= scale;
+    }
+    plain.sankey_margins = measured;
+    if (cui_chart_sankey_layout(&plain, nodes, 256) != CUI_PLOT_OK)
+        return CUI_PLOT_INVALID;
+    *out = measured;
+    return CUI_PLOT_OK;
+}
 static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
     if (!o->x_tick_count) {
         size_t margin = o->x_tick_margin ? o->x_tick_margin : 1;

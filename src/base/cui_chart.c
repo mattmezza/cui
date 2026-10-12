@@ -30,6 +30,14 @@ static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *in
     return isfinite(*inner) && isfinite(*outer) && *inner >= 0 && *outer >= *inner &&
            *outer <= 8192;
 }
+static bool cui_chart_sankey_margins_valid(const cui_chart_options *o) {
+    cui_chart_sankey_margins m = o->sankey_margins;
+    double width = o->node_width > 0 ? o->node_width : 10;
+    return isfinite(m.left) && isfinite(m.right) && isfinite(m.top) && isfinite(m.bottom) &&
+           m.left >= 0 && m.right >= 0 && m.top >= 0 && m.bottom >= 0 &&
+           (double)m.left + m.right + width + 16 < o->width &&
+           (double)m.top + m.bottom + 16 < o->height;
+}
 static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_chart_options *o) {
     if (!s || !o || !s->pixels || !o->data || !o->count || o->count > CUI_CHART_MAX_ITEMS ||
         o->kind < CUI_CHART_LINE || o->kind > CUI_CHART_SANKEY || !o->width || !o->height ||
@@ -77,6 +85,8 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         return CUI_PLOT_INVALID;
     if (s->byte_capacity < (size_t)o->width * o->height * 4)
         return CUI_PLOT_CAPACITY;
+    if (o->kind == CUI_CHART_SANKEY && !cui_chart_sankey_margins_valid(o))
+        return CUI_PLOT_INVALID;
     for (size_t i = 0; i < 4; i++)
         if (!isfinite(o->bar_corner_radii[i]) || o->bar_corner_radii[i] < 0)
             return CUI_PLOT_INVALID;
@@ -865,6 +875,8 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         o->sankey_value_scale < CUI_CHART_SANKEY_LINEAR ||
         o->sankey_value_scale > CUI_CHART_SANKEY_SQRT || o->sankey_min_link_width < 0)
         return CUI_PLOT_INVALID;
+    if (!cui_chart_sankey_margins_valid(o))
+        return CUI_PLOT_INVALID;
     if (capacity < o->count)
         return CUI_PLOT_CAPACITY;
     cui_chart_sankey_node nodes[256] = {{0}};
@@ -938,17 +950,22 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
     }
     double width = o->node_width ? o->node_width : 10;
     double padding = o->node_padding ? o->node_padding : 16;
-    if (width >= o->width || o->height <= 16)
+    double plot_left = 8 + o->sankey_margins.left;
+    double plot_right = o->width - 8 - o->sankey_margins.right;
+    double plot_top = 8 + o->sankey_margins.top;
+    double plot_bottom = o->height - 8 - o->sankey_margins.bottom;
+    double plot_height = plot_bottom - plot_top;
+    if (width >= plot_right - plot_left || plot_height <= 0)
         return CUI_PLOT_INVALID;
     size_t max_count = 1;
     for (size_t l = 0; l < layers; l++)
         if (counts[l] > max_count)
             max_count = counts[l];
-    padding = fmin(padding, (o->height - 16.0) / (max_count > 1 ? max_count - 1 : 1));
+    padding = fmin(padding, plot_height / (max_count > 1 ? max_count - 1 : 1));
     long double ky = LDBL_MAX;
     for (size_t l = 0; l < layers; l++)
         if (sums[l] > 0) {
-            long double available = o->height - 16.0 - padding * (counts[l] - 1);
+            long double available = plot_height - padding * (counts[l] - 1);
             long double candidate = available / sums[l];
             if (candidate < ky)
                 ky = candidate;
@@ -959,12 +976,13 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         return CUI_PLOT_OVERFLOW;
     for (size_t l = 0; l < layers; l++) {
         long double total = sums[l] * ky + padding * (counts[l] ? counts[l] - 1 : 0);
-        long double y = (o->height - total) / 2;
+        long double y = plot_top + (plot_height - total) / 2;
         if (!isfinite(y) || y < -4096 || y > 4096)
             return CUI_PLOT_OVERFLOW;
         for (size_t i = 0; i < o->count; i++)
             if (nodes[i].layer == l) {
-                double x = 8 + (layers > 1 ? (o->width - 16.0 - width) * l / (layers - 1) : 0);
+                double x = plot_left +
+                           (layers > 1 ? (plot_right - plot_left - width) * l / (layers - 1) : 0);
                 nodes[i].x0 = (float)x;
                 nodes[i].x1 = (float)(x + width);
                 nodes[i].y0 = (float)y;
@@ -1047,7 +1065,8 @@ static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_
                         node->y1 += (float)delta;
                     }
                 }
-                cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8, o->height - 8);
+                cui_chart_sankey_resolve(nodes, o->count, layer, padding, 8 + o->sankey_margins.top,
+                                         o->height - 8 - o->sankey_margins.bottom);
             }
     }
 }
@@ -1252,6 +1271,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->radar_outer_radius));
     h = cui_chart_mix(h, cui_chart_bits(o->node_width));
     h = cui_chart_mix(h, cui_chart_bits(o->node_padding));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.left));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.right));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.top));
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_margins.bottom));
     h = cui_chart_mix(h, o->reference_count);
     for (size_t i = 0; i < o->reference_count; i++)
         h = cui_chart_mix(h, cui_chart_bits(o->reference_values[i]));

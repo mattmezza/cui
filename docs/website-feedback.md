@@ -15,7 +15,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Rating: proper empty, filled and partially filled star graphics. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Stepper: make navigation and its current status visibly work. — 9741448 passes native75, sanitizers75, WASI67 and Chromium78; rendered-selection regression fails old code. Publication pending.
 - [x] Tooltip: center text in the panel. — first polish batch; native/browser geometry and interaction evidence below.
-- [ ] Calendar and DatePicker: use SVG navigation icons; center popup content.
+- [x] Calendar and DatePicker: use SVG navigation icons; center popup content. — d55aeb7 passes native75, sanitizers75, WASI67 and Chromium78. Day cells are checked at three sizes; DatePicker trigger/opened icons are checked headlessly. Publication pending.
 - [ ] ColorPicker: screen eyedropper through an explicit host capability.
 - [ ] Combobox and Select: options span the field width.
 - [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.

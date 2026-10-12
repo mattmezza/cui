@@ -1,0 +1,3 @@
+Portable source: d55aeb7 (docs-only followup 9099437).
+Scope: centered calendar cells, SVG navigation, DatePicker centered trigger and popup.
+test_picker: /tmp/cui-calendar-presentation/tests/unit/test_picker.c:245: calendar_presentation: Assertion `fabsf(c->bounds.x + c->bounds.w / 2 - day.x - day.w / 2) < .01f' failed.

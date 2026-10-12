@@ -143,6 +143,43 @@ static void test_button_intent_outlines(void) {
             cui_destroy(ui);
         }
 }
+
+static void test_button_palette_overrides(void) {
+    cui_context *ui = cui_create((cui_config){.width = 300, .height = 200});
+    assert(ui);
+    cui_theme t = cui_theme_light();
+    t.buttons[CUI_THEME_BUTTON_PRIMARY] =
+        (cui_theme_button_colors){.normal = {10, 20, 30, 255},
+                                  .hover = {40, 50, 60, 255},
+                                  .active = {70, 80, 90, 255},
+                                  .foreground = {255, 255, 255, 255},
+                                  .outline_normal = {1, 2, 3, 255},
+                                  .outline_foreground = {4, 5, 6, 255}};
+    for (int state = 0; state < 4; state++) {
+        if (state == 1)
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 20, .y = 20}));
+        if (state == 2)
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 20, .y = 20}));
+        if (state == 3)
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+        assert(cui_begin_frame(ui, 300, 200, .016f));
+        cui_button_ex(ui, 1, &t, cui_string("Palette"),
+                      (cui_button_options){.width = 160, .selected = state == 3});
+        cui_draw_list list = cui_end_frame(ui);
+        unsigned expected = state == 0 ? 10 : state == 1 ? 40 : 70;
+        bool found = false;
+        for (size_t i = 0; i < list.count; i++)
+            if (list.commands[i].type == CUI_DRAW_RECT) {
+                assert(list.commands[i].color.r == expected);
+                found = true;
+            }
+        assert(found);
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static double theme_luminance(cui_color c) {
     double channels[] = {c.r / 255.0, c.g / 255.0, c.b / 255.0};
     for (size_t i = 0; i < 3; i++)
@@ -171,6 +208,7 @@ static void test_semantic_theme_contrast(void) {
 int main(void) {
     test_semantic_theme_contrast();
     test_button_intent_outlines();
+    test_button_palette_overrides();
     test_button_options();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

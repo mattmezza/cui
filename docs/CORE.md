@@ -91,3 +91,9 @@ available and the retained frame before those nodes have been resubmitted.
 Disabled nodes, inactive/dismissed scopes and calls from inert subtrees return
 false. It does not infer ownership from overlapping rectangles; notification
 stacks can use it to pause a timer when any custom child has keyboard focus.
+
+`cui_box.max_width` and `max_height` cap natural (FIT), growing and explicitly
+sized boxes when positive and finite. Caps constrain a fixed minimum as well;
+short natural content stays short, and an explicit zero dimension stays zero.
+Nonpositive/nonfinite caps mean unbounded. Combine a cap with `clip` to bound
+arbitrary custom children without a previous-frame measurement flash.

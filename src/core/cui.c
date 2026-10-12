@@ -502,10 +502,18 @@ static Clay_SizingAxis cui_core_axis(float n) {
     return (Clay_SizingAxis){.size = {.minMax = {0, 0}},
                              .type = n < 0 ? CLAY__SIZING_TYPE_GROW : CLAY__SIZING_TYPE_FIT};
 }
-static Clay_SizingAxis cui_core_box_axis(float n, bool fixed) {
-    if (!fixed)
-        return cui_core_axis(n);
+static Clay_SizingAxis cui_core_box_axis(float n, bool fixed, float maximum) {
+    if (!fixed) {
+        Clay_SizingAxis axis = cui_core_axis(n);
+        if (isfinite(maximum) && maximum > 0) {
+            axis.size.minMax.max = maximum;
+            axis.size.minMax.min = fminf(axis.size.minMax.min, maximum);
+        }
+        return axis;
+    }
     n = isfinite(n) ? fmaxf(0, n) : 0;
+    if (isfinite(maximum) && maximum > 0)
+        n = fminf(n, maximum);
     /* Clay normalizes fixed max=0 to unbounded. Zero percent is exactly zero
      * for every parent extent and avoids an epsilon-sized collapsed panel. */
     if (n == 0)
@@ -569,8 +577,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                  : (Clay_BorderWidth){bw, bw, bw, bw, 0};
     Clay__ConfigureOpenElement((Clay_ElementDeclaration){
         .userData = layout_only ? ui : NULL,
-        .layout = {.sizing = {cui_core_box_axis(b.width, b.fixed_width),
-                              cui_core_box_axis(b.height, b.fixed_height)},
+        .layout = {.sizing = {cui_core_box_axis(b.width, b.fixed_width, b.max_width),
+                              cui_core_box_axis(b.height, b.fixed_height, b.max_height)},
                    .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
                    .childGap = cui_core_scalar(b.gap),
                    .childAlignment = {.x = b.align_x == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER

@@ -181,70 +181,46 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     b.width = isfinite(options.width) ? options.width : 0;
     b.align_x = CUI_ALIGN_CENTER;
     b.align_y = CUI_ALIGN_CENTER;
-    cui_color foreground = t->text;
-    switch (options.variant) {
-    case CUI_BUTTON_SECONDARY:
-        b.background = t->border;
-        break;
-    case CUI_BUTTON_OUTLINE:
-        b.background.a = 0;
-        break;
-    case CUI_BUTTON_GHOST:
-    case CUI_BUTTON_LINK:
-        b.background.a = 0;
+    cui_theme_button_kind kind = options.variant == CUI_BUTTON_SECONDARY
+                                     ? CUI_THEME_BUTTON_SECONDARY
+                                 : options.variant == CUI_BUTTON_DANGER  ? CUI_THEME_BUTTON_DANGER
+                                 : options.variant == CUI_BUTTON_WARNING ? CUI_THEME_BUTTON_WARNING
+                                 : options.variant == CUI_BUTTON_SUCCESS ? CUI_THEME_BUTTON_SUCCESS
+                                 : options.variant == CUI_BUTTON_INFO    ? CUI_THEME_BUTTON_INFO
+                                 : options.variant == CUI_BUTTON_OUTLINE ? CUI_THEME_BUTTON_DEFAULT
+                                                                         : CUI_THEME_BUTTON_PRIMARY;
+    cui_theme_button_colors palette = t->buttons[kind];
+    bool outlined = options.outline || options.variant == CUI_BUTTON_OUTLINE;
+    bool active = state.pressed || options.selected;
+    cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
+    b.background = outlined ? (active          ? palette.outline_active
+                               : state.hovered ? palette.outline_hover
+                                               : palette.outline_normal)
+                            : (active          ? palette.active
+                               : state.hovered ? palette.hover
+                                               : palette.normal);
+    b.border = outlined ? palette.outline_border : palette.border;
+    if (options.variant == CUI_BUTTON_GHOST) {
+        b.background = active          ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
+                       : state.hovered ? t->accent
+                                       : (cui_color){0};
+        foreground = state.hovered ? t->accent_foreground : t->secondary_foreground;
         b.border_width = 0;
-        if (options.variant == CUI_BUTTON_LINK)
-            foreground = t->primary;
-        break;
-    case CUI_BUTTON_DANGER:
-        b.background = t->danger;
-        foreground = t->on_danger;
-        break;
-    case CUI_BUTTON_WARNING:
-        b.background = t->warning;
-        foreground = t->on_warning;
-        break;
-    case CUI_BUTTON_SUCCESS:
-        b.background = t->success;
-        foreground = t->on_success;
-        break;
-    case CUI_BUTTON_INFO:
-        b.background = t->info;
-        foreground = t->on_info;
-        break;
-    default:
-        b.background = t->primary;
-        foreground = t->on_primary;
-        break;
+        if (state.pressed)
+            b.background = t->buttons[CUI_THEME_BUTTON_DEFAULT].active;
+    } else if (options.variant == CUI_BUTTON_LINK) {
+        b.background = (cui_color){0};
+        b.border_width = 0;
+        foreground = active ? t->link_active : state.hovered ? t->link_hover : t->link;
     }
-    if (options.selected && options.variant != CUI_BUTTON_DANGER &&
-        options.variant != CUI_BUTTON_WARNING && options.variant != CUI_BUTTON_SUCCESS &&
-        options.variant != CUI_BUTTON_INFO) {
-        b.background = t->primary;
-        foreground = t->on_primary;
+    if (disabled) {
+        b.background = outlined ? palette.outline_normal : palette.normal;
+        float opacity = outlined ? .5f : kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
+        b.background.a = (uint8_t)fminf(255, b.background.a * opacity);
+        b.border.a = (uint8_t)(b.border.a * .5f);
+        if (options.variant == CUI_BUTTON_GHOST || options.variant == CUI_BUTTON_LINK)
+            b.background.a = 0;
     }
-    if (options.outline && options.variant != CUI_BUTTON_GHOST &&
-        options.variant != CUI_BUTTON_LINK) {
-        cui_color intent = options.variant == CUI_BUTTON_PRIMARY   ? t->primary
-                           : options.variant == CUI_BUTTON_DANGER  ? t->danger
-                           : options.variant == CUI_BUTTON_WARNING ? t->warning
-                           : options.variant == CUI_BUTTON_SUCCESS ? t->success
-                           : options.variant == CUI_BUTTON_INFO    ? t->info
-                                                                   : t->text;
-        b.background = t->surface;
-        b.border = intent;
-        foreground = intent;
-    }
-    if (!disabled && (state.hovered || state.pressed)) {
-        if (b.background.a == 0)
-            b.background = t->surface;
-        float factor = state.pressed ? .75f : .9f;
-        b.background.r = (uint8_t)(b.background.r * factor);
-        b.background.g = (uint8_t)(b.background.g * factor);
-        b.background.b = (uint8_t)(b.background.b * factor);
-    }
-    if (disabled && b.background.a)
-        b.background = t->surface;
     cui_components_focus(ui, id, t, &b);
     /* Selected paint is distinct from an accessibility toggle state. */
     cui_update_semantic(ui, id, false, 0);

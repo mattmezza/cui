@@ -1120,6 +1120,40 @@ static void test_focus_within_scopes(void) {
     cui_destroy(ui);
 }
 
+static void test_box_maximum_axes(void) {
+    cui_context *ui = make();
+    for (int mode = 0; mode < 3; mode++) {
+        cui_rect r = {0};
+        begin(ui);
+        cui_track_bounds(ui, 1, &r);
+        cui_begin_box(ui, 1,
+                      (cui_box){.width = mode == 0   ? 0
+                                         : mode == 1 ? -1
+                                                     : 100,
+                                .max_width = 40,
+                                .max_height = 20,
+                                .clip = true});
+        cui_begin_box(ui, 2, (cui_box){.width = 80, .height = 60});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_frame(ui);
+        assert(r.w == 40 && r.h == 20 && cui_last_error(ui) == CUI_OK);
+    }
+    cui_rect short_box = {0}, zero = {0};
+    begin(ui);
+    cui_track_bounds(ui, 1, &short_box);
+    cui_track_bounds(ui, 3, &zero);
+    cui_begin_box(ui, 1, (cui_box){.max_width = 100});
+    cui_begin_box(ui, 2, (cui_box){.width = 20, .height = 10});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_begin_box(ui, 3, (cui_box){.fixed_width = true, .max_width = 40, .height = 10});
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(short_box.w == 20 && zero.w == 0);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
@@ -1127,6 +1161,7 @@ int main(void) {
     test_pressed_query();
     test_pointer_focus_proxy();
     test_focus_within_scopes();
+    test_box_maximum_axes();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

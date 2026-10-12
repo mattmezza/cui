@@ -168,6 +168,8 @@ typedef struct {
     bool layout_only;
     /* Preserve painting/layout but suppress descendant semantics and input. */
     bool inert;
+    /* Positive finite caps apply to FIT/GROW/fixed; zero means unbounded. */
+    float max_width, max_height;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,

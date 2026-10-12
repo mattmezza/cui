@@ -201,15 +201,20 @@ typedef struct {
     cui_list_state levels[CUI_MENU_DEPTH_MAX];
     cui_id path[CUI_MENU_DEPTH_MAX - 1];
     cui_rect panels[CUI_MENU_DEPTH_MAX];
+    size_t visible_rows[CUI_MENU_DEPTH_MAX]; /* previous painted window per level */
     size_t depth;
     bool depth_limit;
     float row_height, padding; /* previous painted metrics for pointer hover */
     bool contextual;
     cui_rect anchor;
+    bool drag_scroll, scroll_pending, scroll_dragging;
+    size_t scroll_level;
+    float scroll_start_y, scroll_last_y;
 } cui_menu_tree_state;
 typedef struct {
     cui_choice_popup_options popup;
     bool keep_open_checks, checks_on_right;
+    bool drag_scroll; /* opt-in primary-pointer drag, usable by touch adapters */
 } cui_menu_tree_options;
 struct cui_tab_overflow {
     cui_menu_tree_state menu;
@@ -1287,11 +1292,67 @@ void cui_base_menu_entry(cui_context *ui, const cui_menu_entry *entry, bool disa
                                                : 0,
                                .description = entry->shortcut});
 }
+static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries, size_t count,
+                                  cui_menu_tree_state *state, size_t level, cui_id target,
+                                  cui_event event) {
+    cui_id scope =
+        level ? state->path[level - 1] ^ UINT64_C(0x4b64d23e91a738c1) : state->overlay.id;
+    cui_rect bounds = state->panels[level];
+    size_t rows = state->visible_rows[level];
+    if (event.type != CUI_EVENT_SCROLL || target != scope || !isfinite(event.dy) || !rows ||
+        count <= rows || event.x < bounds.x || event.x >= bounds.x + bounds.w ||
+        event.y < bounds.y || event.y >= bounds.y + bounds.h ||
+        !cui_pointer_scope_allowed(ui, state->overlay.id))
+        return false;
+    cui_list_state *cursor = &state->levels[level];
+    size_t maximum = count - rows;
+    if (cursor->first_visible > maximum)
+        cursor->first_visible = maximum;
+    float amount = cursor->scroll_remainder - event.dy;
+    if (!isfinite(amount))
+        amount = event.dy > 0 ? -(float)count : (float)count;
+    float whole = truncf(amount);
+    cursor->scroll_remainder = amount - whole;
+    size_t before = cursor->first_visible;
+    if (whole < 0)
+        cursor->first_visible = -whole >= (float)before ? 0 : before - (size_t)-whole;
+    else {
+        size_t remaining = maximum - before;
+        cursor->first_visible += whole >= (float)remaining ? remaining : (size_t)whole;
+    }
+    if (before == cursor->first_visible)
+        return false;
+    bool focused = false, active_visible = false;
+    for (size_t i = 0; i < count; i++) {
+        focused |= cui_focused(ui) == entries[i].id;
+        active_visible |= i >= cursor->first_visible && i < cursor->first_visible + rows &&
+                          entries[i].id == cursor->active &&
+                          !cui_menu_entry_is_disabled(&entries[i]);
+    }
+    if (!active_visible) {
+        cursor->active = 0;
+        for (size_t i = cursor->first_visible; i < cursor->first_visible + rows; i++)
+            if (!cui_menu_entry_is_disabled(&entries[i])) {
+                cursor->active = entries[i].id;
+                break;
+            }
+        if (focused)
+            cui_focus(ui, cursor->active);
+    }
+    if (state->depth > level + 1) {
+        state->depth = level + 1;
+        cui_focus(ui, cursor->active);
+    }
+    cui_invalidate(ui);
+    return true;
+}
 bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui_menu_entry *items,
                         size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
                         float dt, bool keep_open_checks) {
     if (!state || !state->overlay.id || !action || (!items && count))
         return false;
+    if (!state->drag_scroll)
+        state->scroll_pending = state->scroll_dragging = false;
     bool was_open = state->overlay.open;
     if (state->contextual) {
         cui_overlay_update(ui, &state->overlay);
@@ -1304,6 +1365,7 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
     }
     if (!state->overlay.open) {
         state->depth = 0;
+        state->scroll_pending = state->scroll_dragging = false;
         return false;
     }
     if (!was_open || !state->depth) {
@@ -1356,10 +1418,73 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         }
     }
     size_t event_count = 0, logical_level = state->depth - 1;
-    bool redirected = false, activated_any = false;
+    bool redirected = false, activated_any = false, pointer_window_changed = false;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count; e++) {
         cui_id target = cui_event_target(ui, e);
+        cui_event event = events[e];
+        if (!state->drag_scroll || event.type == CUI_EVENT_CANCEL ||
+            (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE))
+            state->scroll_pending = state->scroll_dragging = false;
+        if (state->drag_scroll && event.type == CUI_EVENT_POINTER_DOWN &&
+            event.pointer_button == CUI_POINTER_PRIMARY && isfinite(event.y) &&
+            cui_pointer_scope_allowed(ui, state->overlay.id)) {
+            for (size_t reverse = state->depth; reverse > 0; reverse--) {
+                size_t level = reverse - 1;
+                cui_rect bounds = state->panels[level];
+                cui_id scope = level ? state->path[level - 1] ^ UINT64_C(0x4b64d23e91a738c1)
+                                     : state->overlay.id;
+                if (event.x >= bounds.x && event.x < bounds.x + bounds.w && event.y >= bounds.y &&
+                    event.y < bounds.y + bounds.h &&
+                    (target == scope ||
+                     cui_menu_find(menus[level], counts[level], target) < counts[level]) &&
+                    state->visible_rows[level] && counts[level] > state->visible_rows[level]) {
+                    state->levels[level].scroll_remainder = 0;
+                    state->scroll_level = level;
+                    state->scroll_pending = true;
+                    state->scroll_dragging = false;
+                    state->scroll_start_y = state->scroll_last_y = event.y;
+                    break;
+                }
+            }
+        }
+        if (state->scroll_pending && event.type == CUI_EVENT_POINTER_MOVE && isfinite(event.y)) {
+            if (fabsf(event.y - state->scroll_start_y) > 4)
+                state->scroll_dragging = true;
+            if (state->scroll_dragging && state->scroll_level < state->depth &&
+                state->row_height > 0) {
+                size_t level = state->scroll_level;
+                cui_rect bounds = state->panels[level];
+                cui_id scope = level ? state->path[level - 1] ^ UINT64_C(0x4b64d23e91a738c1)
+                                     : state->overlay.id;
+                cui_menu_scroll_event(
+                    ui, menus[level], counts[level], state, level, scope,
+                    (cui_event){.type = CUI_EVENT_SCROLL,
+                                .x = bounds.x + 1,
+                                .y = bounds.y + 1,
+                                .dy = (event.y - state->scroll_last_y) / state->row_height});
+                state->scroll_last_y = event.y;
+                logical_level = level;
+                redirected = true;
+                pointer_window_changed = true;
+                continue;
+            }
+        }
+        if (event.type == CUI_EVENT_POINTER_UP && event.pointer_button == CUI_POINTER_PRIMARY) {
+            pointer_window_changed |= state->scroll_dragging;
+            state->scroll_pending = state->scroll_dragging = false;
+        }
+        if (events[e].type == CUI_EVENT_SCROLL) {
+            for (size_t level = 0; level < state->depth; level++)
+                if (cui_menu_scroll_event(ui, menus[level], counts[level], state, level, target,
+                                          events[e])) {
+                    pointer_window_changed = true;
+                    logical_level = level;
+                    redirected = true;
+                    break;
+                }
+            continue;
+        }
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE) {
             size_t escape_level = state->depth;
             if (target == state->overlay.id)
@@ -1428,7 +1553,8 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
             logical_level = level;
             redirected = true;
         }
-        bool activation = cui_event_activation(ui, e) != 0;
+        bool activation = cui_event_activation(ui, e) != 0 &&
+                          !(pointer_window_changed && events[e].type == CUI_EVENT_POINTER_UP);
         if (events[e].type == CUI_EVENT_KEY_UP && entry->id != cui_event_activation(ui, e))
             activation = false;
         bool open_child =
@@ -2424,8 +2550,10 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
     if (rows > 4096)
         rows = 4096;
-    if (cursor->first_visible >= count)
-        cursor->first_visible = 0;
+    state->visible_rows[level] = rows;
+    size_t maximum = count > rows ? count - rows : 0;
+    if (cursor->first_visible > maximum)
+        cursor->first_visible = maximum;
     size_t active = count;
     for (size_t i = 0; i < count; i++)
         if (entries[i].id == cursor->active)
@@ -2470,10 +2598,14 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                .radius = theme->radius},
                      placement.bounds, (int16_t)(100 + level));
     cui_interact(ui, scope, CUI_ROLE_MENU, name, false, false, 0);
-    cui_set_semantic_details(ui, scope,
-                             (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
-                                                    .labelled_by = level ? state->path[level - 1]
-                                                                         : state->overlay.trigger});
+    cui_set_semantic_details(
+        ui, scope,
+        (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
+                               .labelled_by =
+                                   level ? state->path[level - 1] : state->overlay.trigger,
+                               .scrollable = count > rows,
+                               .scroll_y = cursor->first_visible * theme->control_height,
+                               .scroll_max_y = maximum * theme->control_height});
     size_t begin = cursor->first_visible, end = rows > count - begin ? count : begin + rows;
     for (size_t i = begin; i < end; i++) {
         const cui_menu_entry *entry = &entries[i];
@@ -2536,7 +2668,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         for (size_t i = 0; i < count; i++)
             if (entries[i].id == state->path[level])
                 parent = i;
-        if (parent < count) {
+        if (parent >= begin && parent < end) {
             cui_rect child_anchor = {placement.bounds.x,
                                      placement.bounds.y + theme->padding +
                                          (float)(parent - begin) * theme->control_height,
@@ -2558,6 +2690,7 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
         !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
         options.popup.viewport.h <= 2 * theme->padding)
         return false;
+    state->drag_scroll = options.drag_scroll;
     bool activated =
         cui_base_menu_tree(ui, trigger, name, items, count, action, state, options.popup.disabled,
                            options.popup.dt, options.keep_open_checks);
@@ -2581,6 +2714,7 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
         !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
         options.popup.viewport.h <= 2 * theme->padding)
         return false;
+    state->drag_scroll = options.drag_scroll;
     bool activated =
         cui_base_context_menu(ui, target, items, count, action, state, options.popup.disabled,
                               options.popup.dt, options.keep_open_checks);
@@ -2757,6 +2891,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     if (options.inherit_action_size)
         options.size = options.action_size;
     options.selected = options.selected || (!options.hide_action && options.action_selected);
+    state->drag_scroll = options.menu.drag_scroll;
     result = cui_base_dropdown_button(
         ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
         menu_name, items, count, menu_action, state,

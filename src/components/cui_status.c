@@ -271,7 +271,7 @@ static void cui_status_shimmer(cui_context *ui, cui_id id, cui_rect b, cui_str t
         return;
     float half = absolute ? fmaxf(1, spread) : b.w * fmaxf(.05f, fminf(spread, 1)),
           padding = half / b.w + .05f, center = (phase * (1 + 2 * padding) - padding) * b.w;
-    color.a = (uint8_t)(255 * (1 - powf(1 - (dark ? .6f : .75f), 1.0f / 12)));
+    color.a = (uint8_t)(color.a * (1 - powf(1 - (dark ? .6f : .75f), 1.0f / 12)));
     for (size_t layer = 0; layer < 12; layer++) {
         float radius = half * (1 - (float)layer / 12), left = fmaxf(0, center - radius),
               right = fminf(b.w, center + radius);
@@ -298,11 +298,48 @@ static float cui_status_lightness(cui_color c) {
     float lo = fminf(c.r, fminf(c.g, c.b)), hi = fmaxf(c.r, fmaxf(c.g, c.b));
     return (lo + hi) / 510;
 }
-static cui_color cui_status_highlight(const cui_theme *t, bool dark) {
+static cui_color cui_status_highlight(const cui_theme *t, cui_color text, bool dark) {
     cui_color target = dark ? t->text : t->background;
-    if (fabsf(cui_status_lightness(target) - cui_status_lightness(t->muted)) < .1f)
+    if (fabsf(cui_status_lightness(target) - cui_status_lightness(text)) < .1f)
         target = dark ? t->background : t->text;
-    return cui_color_mix_oklab(t->muted, target, .8f);
+    return cui_color_mix_oklab(text, target, .8f);
+}
+bool cui_shimmer_text(cui_context *ui, cui_id id, const cui_theme *t, cui_shimmer_state *state,
+                      cui_str text, cui_shimmer_options o) {
+    cui_shimmer_plan plan;
+    if (!ui || !id || !t || !state || (text.length && !text.data) || !cui_base_shimmer(o, &plan))
+        return false;
+    float font = o.font_size > 0 ? o.font_size : t->font_size;
+    if (!isfinite(font) || font <= 0)
+        return false;
+    cui_color color = o.custom_color ? o.color : t->text;
+    if (plan.animated && (!state->initialized || state->last_phase != plan.phase))
+        cui_invalidate(ui);
+    state->initialized = true;
+    state->last_phase = plan.phase;
+    cui_size size = cui_measure_text(ui, text, font);
+    cui_begin_box(ui, id, (cui_box){.max_width = o.max_width, .clip = o.max_width > 0});
+    if (o.role != CUI_ROLE_NONE) {
+        cui_interact(ui, id, o.role, text, false, false, 0);
+        cui_set_tab_stop(ui, id, false);
+    }
+    cui_id glyphs = cui_status_child_id(id, 500);
+    cui_begin_box(
+        ui, glyphs,
+        (cui_box){
+            .width = size.width, .height = size.height, .fixed_width = true, .fixed_height = true});
+    cui_text(ui, text, font, color);
+    cui_track_bounds(ui, glyphs, &state->text_bounds);
+    cui_end_box(ui);
+    if (!o.reduced_motion && text.length) {
+        bool dark = t->background.r + t->background.g + t->background.b < 384;
+        cui_color highlight =
+            o.custom_highlight ? o.highlight : cui_status_highlight(t, color, dark);
+        cui_status_shimmer(ui, cui_status_child_id(id, 501), state->text_bounds, text, font,
+                           highlight, plan.phase, o.spread, o.absolute_spread, dark);
+    }
+    cui_end_box(ui);
+    return true;
 }
 bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state *state,
                 const cui_marker_child *children, size_t count, cui_marker_options o) {
@@ -382,7 +419,8 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
         if (c->kind == CUI_MARKER_TEXT && o.loading && !o.reduced_motion &&
             o.loading_style == CUI_MARKER_SHIMMER) {
             bool dark = t->background.r + t->background.g + t->background.b < 384;
-            cui_color highlight = o.custom_highlight ? o.highlight : cui_status_highlight(t, dark);
+            cui_color highlight =
+                o.custom_highlight ? o.highlight : cui_status_highlight(t, t->muted, dark);
             cui_status_shimmer(ui, cui_status_child_id(child, 50), state->text_bounds[i], c->text,
                                font, highlight, p.phase, o.shimmer_spread, o.absolute_spread, dark);
         }

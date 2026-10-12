@@ -48,6 +48,25 @@ bool cui_base_marker(cui_marker_options o, const cui_marker_child *children, siz
     *out = p;
     return true;
 }
+cui_shimmer_options cui_shimmer_options_default(void) {
+    return (cui_shimmer_options){.duration = 2, .spread = .3f, .role = CUI_ROLE_LABEL};
+}
+bool cui_base_shimmer(cui_shimmer_options o, cui_shimmer_plan *out) {
+    if (!out || !isfinite(o.now_seconds) || o.now_seconds < 0 || !isfinite(o.duration) ||
+        o.duration < 0 || !isfinite(o.spread) || o.spread < 0 || !isfinite(o.font_size) ||
+        o.font_size < 0 || !isfinite(o.max_width) || o.max_width < 0 || o.role < CUI_ROLE_NONE ||
+        o.role > CUI_ROLE_LOG)
+        return false;
+    double elapsed = o.now_seconds / fmax(.001, o.duration);
+    if (!isfinite(elapsed))
+        return false;
+    float phase = (float)(o.once ? fmin(1, elapsed) : fmod(elapsed, 1));
+    bool animated = !o.reduced_motion && !(o.once && elapsed >= 1);
+    *out = (cui_shimmer_plan){.phase = o.reverse ? 1 - phase : phase,
+                              .animated = animated,
+                              .next_wake_seconds = animated ? o.now_seconds + 1.0 / 60 : 0};
+    return true;
+}
 static bool cui_status_notification_id_equal(cui_notification_id a, cui_notification_id b) {
     return a.type == b.type && a.key == b.key;
 }

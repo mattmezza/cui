@@ -12,6 +12,29 @@ static bool equal(cui_color a, cui_color b) {
     return memcmp(&a, &b, sizeof(a)) == 0;
 }
 #endif
+static void shimmer_models(void) {
+    cui_shimmer_options o = cui_shimmer_options_default();
+    cui_shimmer_plan p;
+    o.now_seconds = .5;
+    assert(cui_base_shimmer(o, &p) && p.phase == .25f && p.animated && p.next_wake_seconds > .5);
+    o.reverse = true;
+    assert(cui_base_shimmer(o, &p) && p.phase == .75f);
+    o.once = true;
+    o.now_seconds = 3;
+    assert(cui_base_shimmer(o, &p) && p.phase == 0 && !p.animated && !p.next_wake_seconds);
+    o.once = false;
+    o.reduced_motion = true;
+    assert(cui_base_shimmer(o, &p) && !p.animated && !p.next_wake_seconds);
+    o.now_seconds = NAN;
+    p.phase = 123;
+    assert(!cui_base_shimmer(o, &p) && p.phase == 123);
+    o.now_seconds = 0;
+    o.duration = 0;
+    o.reduced_motion = false;
+    assert(cui_base_shimmer(o, &p) && p.animated);
+    o.spread = -1;
+    assert(!cui_base_shimmer(o, &p));
+}
 static void marker_models(void) {
     cui_marker_options o = cui_marker_options_default();
     cui_marker_plan p;
@@ -36,6 +59,60 @@ static void marker_models(void) {
     assert(!cui_base_marker(o, &text, CUI_MARKER_MAX_CHILDREN + 1, &p));
 }
 #ifndef CUI_STATUS_BASE_ONLY
+static void shimmer_render(void) {
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 300});
+    assert(ui);
+    cui_theme t = cui_theme_dark();
+    cui_shimmer_options o = cui_shimmer_options_default();
+    o.now_seconds = 1;
+    o.font_size = 19;
+    o.max_width = 40;
+    o.custom_color = o.custom_highlight = true;
+    o.color = (cui_color){23, 45, 67, 255};
+    o.highlight = (cui_color){201, 211, 221, 128};
+    cui_shimmer_state state = {0};
+    for (int frame = 0; frame < 3; frame++) {
+        assert(cui_begin_frame(ui, 500, 300, .016f));
+        assert(cui_shimmer_text(ui, 81, &t, &state, cui_string("Long processing label"), o));
+        cui_draw_list list = cui_end_frame(ui);
+        size_t count;
+        const cui_semantic *nodes = cui_semantics(ui, &count);
+        assert(count == 1 && nodes[0].role == CUI_ROLE_LABEL && nodes[0].bounds.w == 40);
+        assert(state.text_bounds.w > 40);
+        if (frame == 2) {
+            size_t texts = 0;
+            int clips = 0;
+            for (size_t i = 0; i < list.count; i++) {
+                const cui_draw_command *c = &list.commands[i];
+                if (c->type == CUI_DRAW_CLIP_PUSH)
+                    clips++;
+                if (c->type == CUI_DRAW_CLIP_POP)
+                    clips--;
+                assert(clips >= 0);
+                if (c->type == CUI_DRAW_TEXT) {
+                    assert(c->font_size == 19);
+                    assert(equal(c->color, o.color) ||
+                           (c->color.r == 201 && c->color.a >= 8 && c->color.a <= 10));
+                    texts++;
+                }
+            }
+            assert(texts > 1 && !clips);
+        }
+    }
+    o.reduced_motion = true;
+    for (int frame = 0; frame < 3; frame++) {
+        assert(cui_begin_frame(ui, 500, 300, .016f));
+        assert(cui_shimmer_text(ui, 81, &t, &state, cui_string("Long processing label"), o));
+        cui_draw_list list = cui_end_frame(ui);
+        size_t texts = 0;
+        for (size_t i = 0; i < list.count; i++)
+            texts += list.commands[i].type == CUI_DRAW_TEXT;
+        assert(texts == 1);
+    }
+    assert(!cui_needs_redraw(ui) && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void marker_highlight_colors(void) {
     cui_context *ui = cui_create((cui_config){.width = 500, .height = 300});
     assert(ui);
@@ -622,9 +699,11 @@ static void notification_models(void) {
 }
 int main(void) {
     marker_models();
+    shimmer_models();
     notification_models();
 #ifndef CUI_STATUS_BASE_ONLY
     marker_render();
+    shimmer_render();
     marker_highlight_colors();
     notification_render();
     notification_interactions();

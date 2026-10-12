@@ -133,3 +133,20 @@ specific icons/typography. Core text wrapping refinements remain limitations des
 platform or renderer parity.
 
 Notification cards consume independent `theme.popover` and `theme.radius_lg` tokens for card fill, corners and shadow shape. Marker default highlight now uses the frozen perceptual blend and lightness fallback; exact custom highlight remains supported.
+
+
+Standalone Shimmer uses `cui_shimmer_text` with caller-owned retained bounds and
+`cui_shimmer_options_default`. It paints the unchanged base glyphs plus twelve
+clipped highlight layers, using the same alpha-aware perceptual highlight as
+Marker. Custom highlight alpha multiplies layer opacity. Duration, relative or
+absolute spread, reverse, once and reduced motion follow the frozen source;
+`cui_base_shimmer` returns the next absolute host deadline, or zero when settled.
+The host supplies elapsed animation seconds and schedules redraws. Explicit IDs
+allow identical sibling labels to animate independently. Font size/color may be
+set per instance; otherwise theme text styling is used. Optional maximum width
+clips the single line without changing glyph positions. Default Label semantics
+can be disabled with role None. State must live through `cui_end_frame`.
+
+Standalone Shimmer remains partial: inherited styled-text runs, wrapping,
+truncation/ellipsis and font weight depend on the future rich text pipeline.
+Reduced-motion text remains visible and settles without continuous redraw.

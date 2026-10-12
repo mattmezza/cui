@@ -128,6 +128,29 @@ bool cui_base_marker(cui_marker_options options, const cui_marker_child *childre
                      cui_marker_plan *plan);
 bool cui_marker(cui_context *ui, cui_id id, const cui_theme *theme, cui_marker_state *state,
                 const cui_marker_child *children, size_t count, cui_marker_options options);
+/* Standalone single-line shimmer. Caller supplies elapsed animation time. */
+typedef struct {
+    double now_seconds, duration;
+    float spread, font_size, max_width;
+    bool absolute_spread, reverse, once, reduced_motion, custom_color, custom_highlight;
+    cui_color color, highlight;
+    cui_role role;
+} cui_shimmer_options;
+typedef struct {
+    cui_rect text_bounds;
+    float last_phase;
+    bool initialized;
+} cui_shimmer_state;
+typedef struct {
+    float phase;
+    bool animated;
+    double next_wake_seconds;
+} cui_shimmer_plan;
+cui_shimmer_options cui_shimmer_options_default(void);
+bool cui_base_shimmer(cui_shimmer_options, cui_shimmer_plan *);
+/* State remains alive through end_frame; max_width clips without changing glyph positions. */
+bool cui_shimmer_text(cui_context *, cui_id, const cui_theme *, cui_shimmer_state *, cui_str,
+                      cui_shimmer_options);
 #define CUI_NOTIFICATION_MAX_ITEMS 128
 typedef struct {
     uint64_t type, key;

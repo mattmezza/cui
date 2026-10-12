@@ -95,9 +95,12 @@ typedef struct {
     size_t search_length;
     float search_time;
     size_t first_visible;
-    float scroll_remainder; /* fractional wheel rows carried across frames */
+    float scroll_remainder;  /* fractional wheel rows carried across frames */
+    cui_id secondary_active; /* independent optional context-click highlight */
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
+typedef void (*cui_choice_confirm_fn)(cui_id item, bool secondary, void *user);
+typedef void (*cui_choice_cancel_fn)(void *user);
 typedef struct {
     bool disabled, menu;
     float dt;
@@ -110,6 +113,10 @@ typedef struct {
     cui_id scroll_target;   /* eligible scrolling semantic ID */
     cui_id scroll_scope;    /* popup scope, or zero for a standalone list */
     bool window_changed;    /* discard pointer activation against pre-scroll layout */
+    cui_choice_confirm_fn on_confirm; /* same event order, after on_activate */
+    cui_choice_cancel_fn on_cancel;   /* Escape, independent of selection change */
+    unsigned secondary_modifiers;     /* zero uses CTRL|META; caller selects host policy */
+    bool track_secondary;             /* highlight secondary presses without confirming */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -810,8 +817,21 @@ static bool cui_choice_scroll_event(cui_context *ui, const cui_choice_item *item
 }
 bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_list_state *state, cui_list_options options) {
-    if (!items || !selected || !state || !count)
+    if ((!items && count) || !selected || !state)
         return false;
+    if (!count) {
+        state->first_visible = 0;
+        state->secondary_active = 0;
+        size_t event_count = 0;
+        const cui_event *events = cui_frame_events(ui, &event_count);
+        for (size_t e = 0; e < event_count && !options.disabled; e++)
+            if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE &&
+                !events[e].repeat && options.on_cancel &&
+                ((options.scroll_target && cui_event_target(ui, e) == options.scroll_target) ||
+                 (options.scroll_scope && cui_event_target(ui, e) == options.scroll_scope)))
+                options.on_cancel(options.activation_user);
+        return false;
+    }
     bool activated = false;
     if (state->search_length >= sizeof(state->search))
         state->search_length = 0;
@@ -842,8 +862,23 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             if (items[i].id == state->active)
                 from = i;
         }
+        bool owned_target =
+            (target < count && !items[target].disabled) ||
+            (options.scroll_target && cui_event_target(ui, e) == options.scroll_target) ||
+            (options.scroll_scope && cui_event_target(ui, e) == options.scroll_scope);
+        if (owned_target && event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE &&
+            !event.repeat) {
+            state->secondary_active = 0;
+            if (options.on_cancel)
+                options.on_cancel(options.activation_user);
+        }
         if (target == count || items[target].disabled)
             continue;
+        if (options.track_secondary && event.type == CUI_EVENT_POINTER_DOWN &&
+            event.pointer_button == CUI_POINTER_SECONDARY) {
+            state->secondary_active = items[target].id;
+            cui_invalidate(ui);
+        }
         if (from == count || items[from].disabled)
             from = target;
         if (cui_event_activation(ui, e) && !(scrolled && event.type == CUI_EVENT_POINTER_UP) &&
@@ -851,8 +886,15 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             size_t chosen = events[e].type == CUI_EVENT_POINTER_UP ? target : from;
             *selected = state->active = items[chosen].id;
             activated = true;
+            state->secondary_active = 0;
             if (options.on_activate)
                 options.on_activate(items[chosen].id, options.activation_user);
+            if (options.on_confirm) {
+                unsigned modifiers = options.secondary_modifiers ? options.secondary_modifiers
+                                                                 : CUI_MOD_CTRL | CUI_MOD_META;
+                options.on_confirm(items[chosen].id, (event.modifiers & modifiers) != 0,
+                                   options.activation_user);
+            }
         }
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             size_t next = cui_choice_navigate(items, count, from, events[e].key, true);
@@ -889,6 +931,15 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
                 }
             }
         }
+    }
+    if (!options.track_secondary || options.disabled)
+        state->secondary_active = 0;
+    if (state->secondary_active) {
+        bool retained = false;
+        for (size_t i = window_begin; i < window_begin + window_length; i++)
+            retained |= items[i].id == state->secondary_active && !items[i].disabled;
+        if (!retained)
+            state->secondary_active = 0;
     }
     size_t begin = window_begin;
     if (begin >= count)
@@ -2171,22 +2222,27 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                        .padding = theme->padding,
                        .row = true,
                        .gap = theme->gap,
-                       .background = state->active == items[i].id ? theme->primary : theme->surface,
+                       .background =
+                           (state->active == items[i].id || state->secondary_active == items[i].id)
+                               ? theme->primary
+                               : theme->surface,
                        .border = cui_focused(ui) == items[i].id ? theme->focus : theme->surface,
                        .border_width = cui_focused(ui) == items[i].id ? 1 : 0};
         cui_begin_box(ui, items[i].id, box);
         if (multiple_selected)
             cui_text(ui, cui_string(multiple_selected[i] ? "[x]" : "[ ]"), theme->font_size,
                      options.disabled || items[i].disabled ? theme->muted
-                     : state->active == items[i].id        ? theme->on_primary
-                                                           : theme->text);
+                     : (state->active == items[i].id || state->secondary_active == items[i].id)
+                         ? theme->on_primary
+                         : theme->text);
         if (options.render)
             options.render(ui, &items[i], i, options.render_user);
         else
             cui_text(ui, items[i].label, theme->font_size,
                      options.disabled || items[i].disabled ? theme->muted
-                     : state->active == items[i].id        ? theme->on_primary
-                                                           : theme->text);
+                     : (state->active == items[i].id || state->secondary_active == items[i].id)
+                         ? theme->on_primary
+                         : theme->text);
         cui_end_box(ui);
         bool checked = multiple_selected ? multiple_selected[i] : *selected == items[i].id;
         cui_update_semantic(ui, items[i].id, checked, (float)i);
@@ -2198,7 +2254,7 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
 bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
               cui_list_options options) {
-    if (!theme || !items || !selected || !state)
+    if (!theme || (!items && count) || !selected || !state)
         return false;
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;

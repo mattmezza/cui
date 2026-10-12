@@ -17,6 +17,7 @@
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_resizable.h"
+#include "cui/cui_root.h"
 #include "cui/cui_scroll.h"
 #include "cui/cui_settings.h"
 #include "cui/cui_sidebar.h"
@@ -101,6 +102,121 @@ static int command_modal, command_loading, command_filterable = 1;
 static unsigned command_actions, command_confirms, command_cancels;
 static cui_command_index command_last;
 static bool command_focus_pending;
+typedef struct {
+    unsigned builds, prepares, styles, overlays, content, dialogs, sheets, notices;
+} gallery_root_counts;
+static gallery_root_counts root_counts;
+static cui_root_registry root_registry;
+static cui_root_plugin root_plugin_entries[1];
+static cui_root_plugin_instance root_plugin_instances[1];
+static cui_root root_view;
+static cui_root_surface root_dialog_slots[2];
+static cui_surface_state root_dialog_surface, root_sheet_surface;
+static cui_notification_state root_notices;
+static cui_notification_entry root_notice_entries[4];
+static char root_notice_titles[4][40];
+static bool root_dialog_checked;
+static bool root_disabled;
+static void *gallery_root_plugin_build(void *registration_user, void *window_user) {
+    (void)window_user;
+    gallery_root_counts *counts = registration_user;
+    counts->builds++;
+    return counts;
+}
+static void gallery_root_plugin_prepare(cui_context *context, void *state) {
+    (void)context;
+    ((gallery_root_counts *)state)->prepares++;
+}
+static void gallery_root_plugin_style(cui_context *context, void *state, cui_root_style *style) {
+    (void)context;
+    ((gallery_root_counts *)state)->styles++;
+    style->padding = 18;
+}
+static void gallery_root_plugin_overlay(cui_context *context, void *state, cui_rect viewport) {
+    ((gallery_root_counts *)state)->overlays++;
+    cui_id id = cui_id_from(context, "root-plugin-overlay");
+    cui_begin_absolute_box(context, id,
+                           (cui_box){.width = 152,
+                                     .height = 30,
+                                     .padding = 5,
+                                     .background = current_theme.secondary,
+                                     .radius = current_theme.radius},
+                           (cui_rect){viewport.w - 168, 12, 152, 30});
+    cui_interact(context, id, CUI_ROLE_GROUP, cui_string("Root plugin overlay"), false, false, 0);
+    cui_text(context, cui_string("Plugin overlay"), 12, current_theme.text);
+    cui_end_box(context);
+}
+static void gallery_root_dialog_content(cui_context *context, void *user) {
+    (void)user;
+    root_counts.dialogs++;
+    cui_checkbox(context, cui_id_from(context, "root-dialog-option"), &current_theme,
+                 cui_string("Enable plugin option"), &root_dialog_checked, false);
+    if (cui_button(context, cui_id_from(context, "root-dialog-apply"), &current_theme,
+                   cui_string("Apply root dialog"), false))
+        cui_surface_close(context, &root_dialog_surface, CUI_SURFACE_ACCEPTED);
+}
+static void gallery_root_sheet_content(cui_context *context, void *user) {
+    (void)user;
+    root_counts.sheets++;
+    cui_label(context, &current_theme, cui_string("Sheet mounted by Root"));
+    if (cui_button(context, cui_id_from(context, "root-sheet-close"), &current_theme,
+                   cui_string("Close root sheet"), false))
+        cui_surface_close(context, &root_sheet_surface, CUI_SURFACE_CLOSED);
+}
+static void gallery_root_content(cui_context *context, void *user) {
+    (void)user;
+    root_counts.content++;
+    cui_begin_box(context, cui_id_from(context, "root-app-content"),
+                  (cui_box){.width = 260, .gap = 10});
+    cui_label(context, &current_theme, cui_string("Application content renders once"));
+    cui_id dialog = cui_id_from(context, "root-dialog-trigger");
+    if (cui_button(context, dialog, &current_theme, cui_string("Open root dialog"), root_disabled))
+        (void)cui_root_dialog_open(
+            &root_view, context,
+            (cui_root_surface){.surface = &root_dialog_surface,
+                               .title = cui_string("Root dialog"),
+                               .description = cui_string("Mounted after application content."),
+                               .options = {.width = 400, .height = 220, .margin = 16},
+                               .content = gallery_root_dialog_content},
+            dialog);
+    cui_id sheet = cui_id_from(context, "root-sheet-trigger");
+    if (cui_button(context, sheet, &current_theme, cui_string("Open root sheet"), root_disabled))
+        (void)cui_root_sheet_open(
+            &root_view, context,
+            (cui_root_surface){.surface = &root_sheet_surface,
+                               .title = cui_string("Root sheet"),
+                               .description = cui_string("Notifications avoid this sheet."),
+                               .options = {.edge = CUI_SHEET_RIGHT, .width = 320, .margin = 16},
+                               .content = gallery_root_sheet_content},
+            sheet);
+    if (cui_button(context, cui_id_from(context, "root-notify"), &current_theme,
+                   cui_string("Notify workspace"), root_disabled) &&
+        root_counts.notices < 4) {
+        unsigned index = root_counts.notices++;
+        snprintf(root_notice_titles[index], sizeof(root_notice_titles[index]), "Root notice %u",
+                 index + 1);
+        cui_notification notice = cui_notification_default();
+        notice.id = (cui_notification_id){2, index + 1};
+        notice.title = cui_string(root_notice_titles[index]);
+        notice.message = cui_string("Mounted above app content.");
+        notice.autohide = false;
+        (void)cui_root_notification_push(&root_view, notice, host_seconds);
+    }
+    cui_end_box(context);
+}
+float gallery_root_stats(int field) {
+    return field == 0   ? root_counts.builds
+           : field == 1 ? root_counts.prepares
+           : field == 2 ? root_counts.styles
+           : field == 3 ? root_counts.overlays
+           : field == 4 ? root_counts.content
+           : field == 5 ? root_counts.dialogs
+           : field == 6 ? root_counts.sheets
+           : field == 7 ? root_notices.count
+           : field == 8 ? root_dialog_surface.overlay.open
+           : field == 9 ? root_sheet_surface.overlay.open
+                        : 0;
+}
 static void gallery_command_action(void *user) {
     (void)user;
     command_actions++;
@@ -994,6 +1110,24 @@ int gallery_init(void) {
     if (!command_query || !cui_command_init(&command_state, command_rows, 32, command_query))
         return 0;
     cui_surface_init(&command_surface, cui_id_from(ui, "command-dialog"), CUI_SURFACE_DIALOG);
+    if (!cui_root_registry_init(&root_registry, root_plugin_entries, 1) ||
+        !cui_root_register(&root_registry, (cui_root_plugin){.key = 1,
+                                                             .build = gallery_root_plugin_build,
+                                                             .prepare = gallery_root_plugin_prepare,
+                                                             .style = gallery_root_plugin_style,
+                                                             .overlay = gallery_root_plugin_overlay,
+                                                             .registration_user = &root_counts}) ||
+        !cui_root_init(&root_view, root_plugin_instances, 1, &root_registry, NULL))
+        return 0;
+    cui_surface_init(&root_dialog_surface, cui_id_from(ui, "root-dialog"), CUI_SURFACE_DIALOG);
+    cui_surface_init(&root_sheet_surface, cui_id_from(ui, "root-sheet"), CUI_SURFACE_SHEET);
+    cui_notification_settings root_notice_settings = cui_notification_settings_default();
+    root_notice_settings.width = 280;
+    root_notice_settings.max_visible = 2;
+    if (!cui_notification_init(&root_notices, root_notice_entries, 4, root_notice_settings,
+                               (cui_notification_host){0}) ||
+        !cui_root_bind_facilities(&root_view, root_dialog_slots, 2, &root_notices))
+        return 0;
     return ui && edit && group_edit && form_name_edit && form_email_edit && dock && query &&
            number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
@@ -1054,6 +1188,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_overlay_close(ui, &alert_dialog_surface.overlay);
         cui_overlay_close(ui, &sheet_surface.overlay);
         cui_overlay_close(ui, &popover_surface.overlay);
+        cui_overlay_close(ui, &root_dialog_surface.overlay);
+        cui_overlay_close(ui, &root_sheet_surface.overlay);
         previous_story = story;
     }
     redraw = false;
@@ -1063,12 +1199,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     current_theme = t;
     cui_begin_frame(ui, width, height, host_dt);
     cui_set_reduced_motion(ui, reduced_motion);
-    cui_begin_box(ui, cui_id_from(ui, "preview"),
-                  (cui_box){.width = width,
-                            .height = height,
-                            .padding = 24,
-                            .gap = 16,
-                            .background = t.background});
+    if (story != 75)
+        cui_begin_box(ui, cui_id_from(ui, "preview"),
+                      (cui_box){.width = width,
+                                .height = height,
+                                .padding = 24,
+                                .gap = 16,
+                                .background = t.background});
     switch (story) {
     case 64: {
         cui_description_item items[] = {
@@ -1425,6 +1562,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         break;
     }
+    case 75:
+        root_disabled = disabled != 0;
+        (void)cui_root_render(ui, cui_id_from(ui, "root-view"), &root_view, &t,
+                              (cui_rect){0, 0, width, height}, NULL, gallery_root_content, NULL,
+                              host_seconds);
+        break;
     case 0: {
         char label[64];
         if (cui_button_ex(
@@ -2631,7 +2774,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string("This component has no browser story yet."));
         break;
     }
-    cui_end_box(ui);
+    if (story != 75)
+        cui_end_box(ui);
     draw = cui_end_frame(ui);
     if (notification_clear) {
         cui_notification_clear(&notification_state, host_seconds);

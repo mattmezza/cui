@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 73
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 74
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -361,11 +361,38 @@ def main():
             assert semantic_index('Command palette', 6) is not None
             page.keyboard.type('save')
             page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===4&&cuiGallery.exports.gallery_command_palette_stats(1)===1')
-            before_clear = page.evaluate('cuiGallery.frame')
             page.keyboard.press('Escape')
-            page.wait_for_function('(before)=>cuiGallery.frame>before&&cuiGallery.exports.gallery_command_palette_stats(5)===0&&cuiGallery.exports.gallery_command_palette_stats(8)===1', arg=before_clear)
+            page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(5)===0&&cuiGallery.exports.gallery_command_palette_stats(8)===1')
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===6&&cuiGallery.exports.gallery_semantic(i,7)===1&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Command palette")')
             page.keyboard.press('Escape')
             page.wait_for_function('cuiGallery.exports.gallery_command_palette_stats(8)===0&&cuiGallery.exports.gallery_command_palette_stats(4)>=1')
+            page.evaluate('location.hash="Root View"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Root View"')
+            assert page.evaluate('cuiGallery.exports.gallery_root_stats(0)') == 1
+            assert all(page.evaluate('(field)=>cuiGallery.exports.gallery_root_stats(field)', field) > 0 for field in (1,2,3,4))
+            app_button = semantic_index('Open root dialog', 1)
+            overlay = semantic_index('Root plugin overlay', 9)
+            assert app_button is not None and overlay is not None
+            assert page.evaluate('([app,overlay])=>cuiGallery.exports.gallery_semantic(overlay,1)>cuiGallery.exports.gallery_semantic(app,1)+200', [app_button,overlay])
+            click_semantic('Notify workspace', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_root_stats(7)===1')
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===9&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Notifications")')
+            click_semantic('Open root dialog', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_root_stats(8)===1')
+            assert semantic_index('Enable plugin option', 2) is not None
+            click_semantic('Enable plugin option', 2)
+            click_semantic('Apply root dialog', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_root_stats(8)===0')
+            click_semantic('Open root sheet', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_root_stats(9)===1')
+            assert semantic_index('Close root sheet', 1) is not None
+            click_semantic('Close root sheet', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_root_stats(9)===0')
+            control_change('disabled', True)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,5)', semantic_index('Open root dialog', 1)) == 1
+            click_semantic('Open root dialog', 1)
+            assert page.evaluate('cuiGallery.exports.gallery_root_stats(8)') == 0
+            control_change('disabled', False)
             page.evaluate('location.hash="Sidebar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
             assert semantic_index('Workspace sidebar', 9) is not None
@@ -1987,7 +2014,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 73 real WASM stories, Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 74 real WASM stories, Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

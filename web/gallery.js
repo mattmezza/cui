@@ -123,8 +123,8 @@ async function clipboardAction(action){
  const bytes=encoder.encode(text),pointer=wasm.malloc(bytes.length+1);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_clipboard_result(okay,pointer,bytes.length);wasm.free(pointer);requestFrame();
 }
 const semanticNodes = new Map();
-const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog'];
-const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33];
+const roles=['','button','checkbox','switch','radio','slider','textbox','text','tab','group','tablist','tabpanel','list','listbox','option','menu','menuitem','dialog','alert','status','img','progressbar','tree','treeitem','menuitemcheckbox','menuitemradio','table','row','cell','columnheader','gridcell','grid','scrollbar','rowheader','rowgroup','alertdialog','link'];
+const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
  for(let i=0;i<wasm.gallery_semantic_count();i++){

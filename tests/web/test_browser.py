@@ -43,6 +43,7 @@ def main():
             assert page.request.get(f'http://127.0.0.1:{server.server_port}/cui/LICENSE.txt').ok
             assert page.locator('#catalog a').count() == 78
             assert page.locator('#name').inner_text() == 'Button'
+            assert page.locator('#accessible [role=link][aria-label="Link"]').count() == 1
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == 0
             assert page.locator('#accessible [aria-busy=true]').count() == 1
             canvas = page.locator('canvas')
@@ -156,6 +157,17 @@ def main():
             group_input = page.locator('#accessible [role=textbox][aria-label="Workspace address"]')
             assert group_input.count() == 1
             action_count = page.evaluate('cuiGallery.exports.gallery_group_actions()')
+            # Hold one host frame so pointer focus and all keyboard events route together.
+            # No intermediate native focus wait: the prefix must proxy focus during routing.
+            page.evaluate('(()=>{window.__cuiHeldFrames=[];window.__cuiOriginalRAF=requestAnimationFrame;window.requestAnimationFrame=cb=>{__cuiHeldFrames.push(cb);return 0;};})()')
+            try:
+                click_semantic('https://')
+                page.keyboard.press('Control+a')
+                page.keyboard.type('batch')
+                assert page.evaluate('__cuiHeldFrames.length') > 0
+            finally:
+                page.evaluate('window.requestAnimationFrame=__cuiOriginalRAF;for(const cb of __cuiHeldFrames)requestAnimationFrame(cb);delete window.__cuiHeldFrames;delete window.__cuiOriginalRAF;')
+            page.wait_for_function('document.querySelector("#accessible [role=status]")?.getAttribute("aria-label")?.includes("https://batch.example.com")')
             click_semantic('https://')
             # Passive addon focus is applied by the C reducer on its next frame.
             # Await that focus before sending keyboard events, including on slow CI hosts.

@@ -35,7 +35,8 @@ const snippets = {
  Stepper:'cui_stepper(ui, id, &theme, steps, 3,\n    &current_step, true, false);',
  List:'cui_list(ui, id, &theme, items, 3,\n    &selection, &state, options);',
  Select:'cui_select(ui, id, &theme, label, placeholder,\n    items, 3, &selection, &popup, options);',
- Menu:'if (cui_menu(ui, id, &theme, label,\n    items, 3, &action, &popup, options)) {\n    dispatch(action);\n}',
+ Menu:'cui_menu_tree(ui, id, &theme, label, entries,\n    count, &action, &state, options);',
+ ContextMenu:'/* Call after painting the receiving area. */\ncui_context_menu(ui, target, &theme, label,\n    entries, count, &action, &state, options);',
  Accordion:'cui_accordion(ui, id, &theme, items, 3,\n    expanded, options, draw_panel, user);',
  Collapsible:'cui_collapsible(ui, id, &theme, label,\n    &open, false, draw_panel, user);',
  Tabs:'cui_tabs(ui, id, &theme, items, 3,\n    &selection, options, draw_panel, user);',
@@ -61,13 +62,13 @@ function wasiImports(){
 function requestFrame(){if(framePending||!wasm)return;framePending=true;requestAnimationFrame(()=>{framePending=false;try{render();}catch(e){fatal(e);}});}
 function render(){
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_density(Number($('density').value));
  wasm.gallery_selection_mode(Number($('selection-mode').value));
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(reducedMotion.matches));lastTime=now;
- if(!wasm.gallery_frame(stories[selected.name],Number($('theme').value),Number($('disabled').checked),width,height))throw Error('CUI layout failed');
+ if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:stories[selected.name],Number($('theme').value),Number($('disabled').checked),width,height))throw Error('CUI layout failed');
  let clips=0;
  for(let i=0;i<wasm.gallery_count();i++){
   const f=n=>wasm.gallery_command(i,n);const type=f(0),x=f(1),y=f(2),w=f(3),h=f(4);
@@ -152,6 +153,7 @@ function selectComponent(){
  $('reference').href=selected.reference_url;
  $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
  $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental. IME composition and a complete platform accessibility bridge remain pending.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
+ $('menu-kind').hidden=selected.name!=='Menu';$('menu-kind').value='0';
  $('selection-mode').hidden=!['List','Select','Combobox'].includes(selected.name);$('selection-mode').value='0';
  $('disabled').checked=false;document.body.classList.remove('menu-open');navigation();requestFrame();
 }
@@ -178,7 +180,7 @@ for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(ev
   if(!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
  if(key){e.preventDefault();wasm.gallery_event(type,0,0,key,mods(e),Number(e.repeat));}
- if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField')){
+ if(type===3 && e.key.length===1 && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||['Tree','List','Select','Menu','ContextMenu'].includes(selected.name))){
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
 });
@@ -186,6 +188,7 @@ reducedMotion.addEventListener('change',requestFrame);
 $('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog)selectComponent();});
 $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',$('theme').value==='1');document.body.classList.toggle('contrast',$('theme').value==='2');requestFrame();});
 $('selection-mode').addEventListener('change',requestFrame);
+$('menu-kind').addEventListener('change',requestFrame);
 $('density').addEventListener('change',requestFrame);
 $('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
 try{

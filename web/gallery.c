@@ -52,6 +52,9 @@ static cui_overlay trap;
 static int clipboard_request;
 static char clipboard_status[128] = "Clipboard access requires a secure browser context.";
 static cui_choice_popup select_popup, menu_popup, combo_popup;
+static cui_menu_tree_state menu_tree, context_menu;
+static bool menu_checked;
+static int menu_radio;
 static cui_edit *query;
 static char query_buffer[128];
 static cui_id combo_selection;
@@ -163,6 +166,8 @@ int gallery_init(void) {
                                               .max_history_steps = 16});
     cui_choice_popup_init(&combo_popup, cui_id_from(ui, "combo-popup"));
     cui_choice_popup_init(&menu_popup, cui_id_from(ui, "menu-popup"));
+    cui_menu_tree_init(&menu_tree, cui_id_from(ui, "nested-menu-popup"));
+    cui_menu_tree_init(&context_menu, cui_id_from(ui, "context-menu-popup"));
     return ui && edit && dock && query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
@@ -206,6 +211,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     if (previous_story != story) {
         cui_overlay_close(ui, &select_popup.overlay);
         cui_overlay_close(ui, &menu_popup.overlay);
+        cui_overlay_close(ui, &menu_tree.overlay);
+        cui_overlay_close(ui, &context_menu.overlay);
         cui_overlay_close(ui, &combo_popup.overlay);
         cui_overlay_close(ui, &date_picker.overlay);
         cui_overlay_close(ui, &trap);
@@ -537,9 +544,66 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                     .dt = host_dt});
         break;
     }
+    case 32:
+    case 47: {
+        const cui_menu_entry children[] = {
+            {.id = cui_id_from(ui, "export-json"),
+             .label = cui_string("JSON"),
+             .shortcut = cui_string("Ctrl+J")},
+            {.id = cui_id_from(ui, "export-text"), .label = cui_string("Plain text")}};
+        const cui_menu_entry entries[] = {
+            {.id = cui_id_from(ui, "menu-standard"), .label = cui_string("Standard")},
+            {.id = cui_id_from(ui, "menu-priority"), .label = cui_string("Priority")},
+            {.id = cui_id_from(ui, "menu-unavailable"),
+             .label = cui_string("Unavailable"),
+             .disabled = true},
+            {.id = cui_id_from(ui, "menu-separator"), .kind = CUI_MENU_SEPARATOR},
+            {.id = cui_id_from(ui, "menu-export"),
+             .label = cui_string("Export"),
+             .kind = CUI_MENU_SUBMENU,
+             .children = children,
+             .child_count = 2},
+            {.id = cui_id_from(ui, "menu-hidden"),
+             .label = cui_string("Show hidden"),
+             .kind = CUI_MENU_CHECK,
+             .checked = &menu_checked},
+            {.id = cui_id_from(ui, "menu-density"),
+             .label = cui_string("Density"),
+             .kind = CUI_MENU_LABEL},
+            {.id = cui_id_from(ui, "menu-comfortable"),
+             .label = cui_string("Comfortable"),
+             .kind = CUI_MENU_RADIO,
+             .radio_value = &menu_radio,
+             .radio_option = 0},
+            {.id = cui_id_from(ui, "menu-compact"),
+             .label = cui_string("Compact"),
+             .kind = CUI_MENU_RADIO,
+             .radio_value = &menu_radio,
+             .radio_option = 1}};
+        cui_menu_tree_options options = {.popup = {.disabled = disabled,
+                                                   .viewport = {0, 0, width, height},
+                                                   .width = width > 500 ? 240 : (width - 48) * .7f,
+                                                   .dt = host_dt},
+                                         .keep_open_checks = true};
+        bool invoked;
+        if (story == 47) {
+            cui_id target = cui_id_from(ui, "context-target");
+            cui_button_ex(ui, target, &t, cui_string("Right-click this area"),
+                          (cui_button_options){.disabled = disabled, .width = width - 48});
+            invoked = cui_context_menu(ui, target, &t, cui_string("Context actions"), entries, 9,
+                                       &menu_action, &context_menu, options);
+        } else
+            invoked = cui_menu_tree(ui, cui_id_from(ui, "menu"), &t, cui_string("Actions"), entries,
+                                    9, &menu_action, &menu_tree, options);
+        if (invoked)
+            menu_invocations++;
+        char text[64];
+        snprintf(text, sizeof(text), "Actions invoked: %d", menu_invocations);
+        cui_label(ui, &t, cui_string(text));
+        break;
+    }
     case 30:
-    case 31:
-    case 32: {
+    case 31: {
         cui_choice_item items[3] = {{cui_id_from(ui, "choice-a"), cui_string("Standard"), false},
                                     {cui_id_from(ui, "choice-b"), cui_string("Priority"), false},
                                     {cui_id_from(ui, "choice-c"), cui_string("Unavailable"), true}};
@@ -857,7 +921,8 @@ void gallery_time(float seconds, float dt, int reduced) {
 
 int gallery_modal(void) {
     return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open ||
-           trap.open || date_picker.overlay.open;
+           trap.open || date_picker.overlay.open || menu_tree.overlay.open ||
+           context_menu.overlay.open;
 }
 
 int gallery_clipboard_request(void) {

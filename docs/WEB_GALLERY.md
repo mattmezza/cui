@@ -33,3 +33,5 @@ The minimal WASI host grants no filesystem or environment access. WebAssembly ex
 Input demonstrates the styled single-line editor with pointer caret placement, drag selection, horizontal scrolling and keyboard undo/redo. Tree demonstrates retained expansion, selection, keyboard traversal and typeahead over borrowed preorder nodes.
 
 Scrollable renders actual clipped translated content and interactive horizontal/vertical scrollbars. DataTable renders a virtual window over 1,000 keyed rows, with selection, sort requests, column resize and reorder, and two-axis wheel scrolling; sort requests are displayed without pretending that caller data was reordered. Table demonstrates the stateless composition API.
+
+The Menu story provides dropdown and context triggers and uses real nested menu descriptors: disabled items, separators, labels, keyboard submenus, checkbox and radio items and shortcut hints. ContextMenu opens only from a secondary click within its receiving CUI area.

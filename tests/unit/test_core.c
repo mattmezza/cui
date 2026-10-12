@@ -2427,7 +2427,23 @@ static void test_unpainted_semantic_does_not_own_ancestor(void) {
     }
     cui_destroy(ui);
 }
+static void test_pointer_click_metadata(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    assert(ui);
+    for (unsigned clicks = 0; clicks < 5; clicks++)
+        assert(cui_queue_event(ui,
+                               (cui_event){.type = CUI_EVENT_POINTER_DOWN, .click_count = clicks}));
+    assert(cui_begin_frame(ui, 200, 100, 0));
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    assert(count == 5);
+    for (size_t i = 0; i < count; i++)
+        assert(events[i].click_count == i && events[i].type == CUI_EVENT_POINTER_DOWN);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_pointer_click_metadata();
     test_unpainted_semantic_does_not_own_ancestor();
     test_semantic_parent_query();
     test_font_metrics();

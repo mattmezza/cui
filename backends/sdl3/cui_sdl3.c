@@ -160,6 +160,7 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             v.pointer_button = e.button.button == SDL_BUTTON_RIGHT    ? CUI_POINTER_SECONDARY
                                : e.button.button == SDL_BUTTON_MIDDLE ? CUI_POINTER_MIDDLE
                                                                       : CUI_POINTER_PRIMARY;
+            v.click_count = e.button.clicks;
             v.x = e.button.x;
             v.y = e.button.y;
             break;

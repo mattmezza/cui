@@ -209,6 +209,7 @@ int main(int argc, char **argv) {
         event = (SDL_Event){0};
         event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
         event.button.button = buttons[i];
+        event.button.clicks = (Uint8)(i + 1);
         event.button.x = 11;
         event.button.y = 12;
         assert(SDL_PushEvent(&event));
@@ -220,6 +221,7 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < count; ++i)
         if (events[i].type == CUI_EVENT_POINTER_DOWN && events[i].x == 11 && events[i].y == 12) {
             assert(events[i].pointer_button == (cui_pointer_button)observed);
+            assert(events[i].click_count == observed + 1);
             observed++;
         }
     assert(observed == 3);

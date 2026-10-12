@@ -158,6 +158,11 @@ typedef struct {
      * side by adapters; border widths use the same integer layout units as
      * border_width. Negative/nonfinite box values normalize to zero. */
     bool custom_corners, custom_border_edges;
+    /* Explicit zero dimensions; otherwise zero retains the FIT convention. */
+    bool fixed_width, fixed_height;
+    /* Measure/layout descendants, including portals, without paint, input or
+     * semantics. Application callbacks still run and must avoid side effects. */
+    bool layout_only;
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,

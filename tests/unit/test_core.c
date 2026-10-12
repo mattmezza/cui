@@ -893,7 +893,68 @@ static void test_bounds_tracking(void) {
     cui_destroy(ui);
 }
 
+static void test_layout_only_and_zero_size(void) {
+    cui_context *ui = make();
+    cui_rect body = {0}, zero = {0}, child = {0};
+    begin(ui);
+    control(ui, 31, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 31);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    cui_track_bounds(ui, 30, &body);
+    cui_track_bounds(ui, 32, &zero);
+    cui_track_bounds(ui, 33, &child);
+    cui_begin_box(
+        ui, 30,
+        (cui_box){.width = 100, .layout_only = true, .clip = true, .background = {255, 0, 0, 255}});
+    assert(!cui_focused(ui));
+    assert(!cui_event_target(ui, 0) && !cui_event_activation(ui, 0));
+    cui_focus(ui, 99);
+    assert(cui_begin_focus_scope(ui, 70, true));
+    assert(!control(ui, 31, false).activated);
+    cui_text(ui, cui_string("Measured, not painted"), 16, (cui_color){255, 255, 255, 255});
+    cui_begin_portal(ui, 40, (cui_box){.background = {0, 255, 0, 255}}, (cui_rect){10, 10, 80, 30},
+                     100);
+    control(ui, 41, false);
+    cui_end_box(ui);
+    cui_end_focus_scope(ui);
+    cui_end_box(ui);
+    cui_begin_box(ui, 32, (cui_box){.width = 100, .fixed_height = true, .clip = true});
+    cui_begin_box(ui, 33, (cui_box){.width = 80, .height = 60});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    control(ui, 50, false);
+    cui_draw_list dl = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(body.w == 100 && body.h > 30 && zero.h == 0 && child.h == 60);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 1 && sem[0].id == 50 && cui_focused(ui) == 0);
+    int clips = 0;
+    size_t paints = 0;
+    for (size_t i = 0; i < dl.count; i++) {
+        if (dl.commands[i].type == CUI_DRAW_CLIP_PUSH)
+            clips++;
+        else if (dl.commands[i].type == CUI_DRAW_CLIP_POP)
+            clips--;
+        else {
+            paints++;
+            assert(dl.commands[i].type == CUI_DRAW_RECT);
+        }
+        assert(clips >= 0);
+    }
+    assert(!clips && paints == 1);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    control(ui, 50, false);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 50);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_layout_only_and_zero_size();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

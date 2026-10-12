@@ -52,3 +52,16 @@ children inside the available content area after sizing/padding; default start
 alignment preserves existing layout behavior.
 
 Clipped boxes accept `offset_x`/`offset_y` to translate children while preserving the box viewport and ancestor clips; negative offsets scroll content forward. Fractional offsets are retained. Secondary/middle pointer events carry `pointer_button`, hit-route to previous regions, and never change ordinary primary capture/focus/activation. SDL3 maps all three buttons.
+
+`cui_box.fixed_width` and `fixed_height` explicitly constrain a dimension,
+including exactly zero; without the flags, zero retains the existing FIT rule.
+Negative/nonfinite explicit dimensions normalize to zero. This supports collapsed
+viewports without a visible epsilon-sized remnant.
+
+`cui_box.layout_only` measures its complete subtree but suppresses paint, semantic
+nodes and routed input, including nested portals. Bounds tracking still works;
+callbacks still execute and applications must avoid unrelated side effects.
+Focus requests from the subtree are ignored; hidden modal scopes do not trap
+outside focus. Clipping commands remain balanced even when all enclosed paint is
+suppressed. This is useful for measuring a disclosure before animating its outer
+viewport. The application retains measured bounds through `cui_track_bounds`.

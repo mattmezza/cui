@@ -51,6 +51,13 @@ typedef struct {
 typedef struct {
     float size, line_height;
 } cui_core_text_style;
+typedef struct {
+    cui_id owner, namespace_id;
+    void *payload;
+    size_t bytes;
+    cui_resource_fn collect, destroy;
+    bool touched;
+} cui_core_resource;
 struct cui_context {
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
         previous_focus_scopes[CUI_CORE_STACK_MAX];
@@ -90,6 +97,10 @@ struct cui_context {
     size_t string_used;
     cui_id focus, capture, space_capture;
     float pointer_x, pointer_y, dt;
+    double frame_time;
+    bool reduced_motion;
+    cui_core_resource *resources;
+    size_t resource_bytes;
     cui_error error;
     bool in_frame, focus_visible, dirty;
 };
@@ -206,9 +217,15 @@ cui_context *cui_create(cui_config config) {
         config.max_commands = 8192;
     if (!config.frame_bytes)
         config.frame_bytes = 262144;
+    if (!config.max_resources)
+        config.max_resources = 128;
+    if (!config.resource_bytes)
+        config.resource_bytes = 1024 * 1024;
     /* Clay reports arena sizes through uint32_t, so retain a conservative
        supported element ceiling before its sizing or any allocations. */
-    if (config.frame_bytes > (size_t)PTRDIFF_MAX || config.max_elements > 1000000 ||
+    if (config.max_resources > 1000000 || config.resource_bytes > (size_t)PTRDIFF_MAX ||
+        config.max_resources > SIZE_MAX / sizeof(cui_core_resource) ||
+        config.frame_bytes > (size_t)PTRDIFF_MAX || config.max_elements > 1000000 ||
         config.max_commands > (size_t)PTRDIFF_MAX / sizeof(cui_draw_command) ||
         config.max_elements > SIZE_MAX / sizeof(cui_semantic) ||
         config.max_elements > SIZE_MAX / sizeof(cui_id) ||
@@ -225,6 +242,7 @@ cui_context *cui_create(cui_config config) {
     ui->top_modal = ui->previous_top_modal = SIZE_MAX;
     ui->text_style_capacity = config.max_elements > 32767 ? 65535 : config.max_elements * 2;
     ui->text_styles = calloc(ui->text_style_capacity, sizeof(*ui->text_styles));
+    ui->resources = calloc(config.max_resources, sizeof(*ui->resources));
     ui->commands = calloc(config.max_commands, sizeof(*ui->commands));
     ui->semantics = calloc(config.max_elements, sizeof(*ui->semantics));
     ui->previous = calloc(config.max_elements, sizeof(*ui->previous));
@@ -248,10 +266,11 @@ cui_context *cui_create(cui_config config) {
     Clay_SetMaxElementCount((int32_t)(config.max_elements * 2 + 32));
     size_t n = Clay_MinMemorySize();
     ui->arena = malloc(n);
-    if (!ui->text_styles || !ui->commands || !ui->semantics || !ui->previous || !ui->ids ||
-        !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings ||
-        !ui->nodes || !ui->semantic_nodes || !ui->previous_hits || !ui->bounds_tracks ||
-        !ui->previous_layers || !ui->previous_order || !ui->clip_containers || !ui->arena) {
+    if (!ui->resources || !ui->text_styles || !ui->commands || !ui->semantics || !ui->previous ||
+        !ui->ids || !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes ||
+        !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_hits ||
+        !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order || !ui->clip_containers ||
+        !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -279,6 +298,14 @@ void cui_destroy(cui_context *ui) {
         return;
     if (Clay_GetCurrentContext() == ui->clay)
         Clay_SetCurrentContext(NULL);
+    if (ui->resources)
+        for (size_t i = 0; i < ui->config.max_resources; ++i) {
+            cui_core_resource *r = &ui->resources[i];
+            if (r->payload && r->destroy)
+                r->destroy(r->payload);
+            free(r->payload);
+        }
+    free(ui->resources);
     free(ui->semantic_scopes);
     free(ui->previous_semantic_scopes);
     free(ui->text_styles);
@@ -466,6 +493,24 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
     }
+    for (size_t i = 0; i < ui->config.max_resources; ++i) {
+        cui_core_resource *r = &ui->resources[i];
+        if (!r->payload)
+            continue;
+        if (!r->touched) {
+            if (r->destroy)
+                r->destroy(r->payload);
+            ui->resource_bytes -= r->bytes;
+            free(r->payload);
+            *r = (cui_core_resource){0};
+        } else {
+            if (r->collect)
+                r->collect(r->payload);
+            r->touched = false;
+        }
+    }
+    if (isfinite(ui->frame_time + (double)dt))
+        ui->frame_time += dt;
     if (ui->previous_top_modal != SIZE_MAX) {
         bool allowed = false;
         for (size_t i = 0; i < ui->previous_count; i++)
@@ -1298,6 +1343,58 @@ bool cui_needs_redraw(cui_context *ui) {
 void cui_invalidate(cui_context *ui) {
     if (ui)
         ui->dirty = true;
+}
+
+void *cui_resource_get(cui_context *ui, cui_id owner, cui_id namespace_id, size_t bytes,
+                       cui_resource_fn collect, cui_resource_fn destroy) {
+    if (!ui || !ui->in_frame || !owner || !namespace_id || !bytes) {
+        if (ui)
+            cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        return NULL;
+    }
+    size_t free_slot = SIZE_MAX;
+    for (size_t i = 0; i < ui->config.max_resources; ++i) {
+        cui_core_resource *r = &ui->resources[i];
+        if (!r->payload) {
+            if (free_slot == SIZE_MAX)
+                free_slot = i;
+        } else if (r->owner == owner && r->namespace_id == namespace_id) {
+            if (r->bytes != bytes || r->collect != collect || r->destroy != destroy) {
+                cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+                return NULL;
+            }
+            r->touched = true;
+            return r->payload;
+        }
+    }
+    if (free_slot == SIZE_MAX || bytes > ui->config.resource_bytes - ui->resource_bytes) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return NULL;
+    }
+    void *payload = calloc(1, bytes);
+    if (!payload) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return NULL;
+    }
+    ui->resources[free_slot] =
+        (cui_core_resource){owner, namespace_id, payload, bytes, collect, destroy, true};
+    ui->resource_bytes += bytes;
+    return payload;
+}
+float cui_frame_delta(cui_context *ui) {
+    return ui ? ui->dt : 0;
+}
+double cui_frame_time(cui_context *ui) {
+    return ui ? ui->frame_time : 0;
+}
+bool cui_reduced_motion(cui_context *ui) {
+    return ui && ui->reduced_motion;
+}
+void cui_set_reduced_motion(cui_context *ui, bool reduced) {
+    if (ui && ui->reduced_motion != reduced) {
+        ui->reduced_motion = reduced;
+        cui_invalidate(ui);
+    }
 }
 
 void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value) {

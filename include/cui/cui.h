@@ -254,6 +254,9 @@ typedef struct {
     size_t max_elements, max_commands, frame_bytes;
     cui_measure_fn measure;
     void *measure_user;
+    /* Context resources: zero selects 128 slots and 1 MiB of payload storage.
+     * Nested allocations owned by payloads require their own explicit limits. */
+    size_t max_resources, resource_bytes;
 } cui_config;
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
@@ -348,6 +351,18 @@ cui_error cui_last_error(cui_context *ui);
 void cui_clear_error(cui_context *ui);
 bool cui_needs_redraw(cui_context *ui);
 void cui_invalidate(cui_context *ui);
+/* Stable zeroed context storage keyed by owner and namespace. Use only in-frame.
+ * Finish rendering a draw list before the next begin_frame: that call collects
+ * resources used last frame and destroys those omitted for a complete frame.
+ * Callbacks must not reenter this context. Existing keys require identical size
+ * and callbacks. Capacity/allocation failure reports CUI_ERROR_CAPACITY. */
+typedef void (*cui_resource_fn)(void *payload);
+void *cui_resource_get(cui_context *, cui_id owner, cui_id namespace_id, size_t bytes,
+                       cui_resource_fn collect, cui_resource_fn destroy);
+float cui_frame_delta(cui_context *);
+double cui_frame_time(cui_context *);
+bool cui_reduced_motion(cui_context *);
+void cui_set_reduced_motion(cui_context *, bool);
 #ifdef __cplusplus
 }
 #endif

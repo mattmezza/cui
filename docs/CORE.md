@@ -161,3 +161,23 @@ focus scope and wraps; call it after children. Nested scopes participate, while
 inert content, disabled controls, explicit non-Tab stops and controls outside
 the active modal are excluded. Missing scopes or removed focused children leave
 focus untouched. This is an opt-in traversal primitive; ordinary Tab is unchanged.
+
+`cui_resource_get` supplies stable zero-initialized context storage keyed by an
+owner ID and a namespace ID. The default limits are 128 entries and 1 MiB of
+payload bytes; configure `max_resources` and `resource_bytes` independently.
+Payload-owned allocations need their own limits. Reusing a key requires the
+same size and callbacks, preventing accidental reinterpretation. Exhaustion
+reports `CUI_ERROR_CAPACITY` without discarding another component's live data.
+
+Finish rendering each draw list before the next `cui_begin_frame`. At that
+boundary, the resource collector runs for entries used in the preceding frame;
+entries omitted for an entire frame are destroyed and their capacity reclaimed.
+`cui_destroy` releases every remaining entry exactly once. Callbacks must not
+reenter the context. This supports immutable bitmap versions until rendering
+finishes, without global mutable component caches.
+
+`cui_frame_time` accumulates validated frame deltas; `cui_frame_delta` exposes the
+current delta. Failed begins do not advance the clock or collect resources.
+Hosts set `cui_set_reduced_motion`; changes request redraw, and components query
+`cui_reduced_motion` to choose static presentation. Animated components still
+request their next frame explicitly through `cui_invalidate`.

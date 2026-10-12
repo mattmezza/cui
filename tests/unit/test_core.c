@@ -1763,7 +1763,63 @@ static void test_scoped_focus_and_consumption(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+static unsigned resource_collects, resource_destroys;
+static void resource_collect(void *payload) {
+    unsigned *value = payload;
+    assert(*value == 42);
+    resource_collects++;
+}
+static void resource_destroy(void *payload) {
+    unsigned *value = payload;
+    assert(*value == 42);
+    resource_destroys++;
+}
+static void test_context_resources(void) {
+    cui_context *ui = cui_create(
+        (cui_config){.width = 100, .height = 100, .max_resources = 2, .resource_bytes = 8});
+    assert(ui);
+    assert(!cui_resource_get(ui, 1, 1, 4, resource_collect, resource_destroy));
+    cui_clear_error(ui);
+    assert(cui_begin_frame(ui, 100, 100, .25f));
+    assert(cui_frame_time(ui) == .25 && cui_frame_delta(ui) == .25f);
+    assert(!cui_reduced_motion(ui));
+    cui_set_reduced_motion(ui, true);
+    assert(cui_reduced_motion(ui) && cui_needs_redraw(ui));
+    unsigned *a = cui_resource_get(ui, 1, 1, sizeof(*a), resource_collect, resource_destroy);
+    unsigned *b = cui_resource_get(ui, 1, 2, sizeof(*b), resource_collect, resource_destroy);
+    assert(a && b && a != b && !*a && !*b);
+    *a = *b = 42;
+    assert(cui_resource_get(ui, 1, 1, sizeof(*a), resource_collect, resource_destroy) == a);
+    assert(!resource_collects && !resource_destroys);
+    assert(!cui_resource_get(ui, 2, 1, 1, NULL, NULL));
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_clear_error(ui);
+    assert(!cui_resource_get(ui, 1, 1, 3, resource_collect, resource_destroy));
+    assert(cui_last_error(ui) == CUI_ERROR_LIFECYCLE);
+    cui_clear_error(ui);
+    cui_end_frame(ui);
+    /* Failed begin does not reclaim payloads or advance time. */
+    assert(!cui_begin_frame(ui, 100, 100, NAN));
+    assert(cui_frame_time(ui) == .25 && !resource_collects);
+    cui_clear_error(ui);
+    assert(cui_begin_frame(ui, 100, 100, .5f));
+    assert(resource_collects == 2 && resource_destroys == 0 && cui_frame_time(ui) == .75);
+    assert(cui_resource_get(ui, 1, 1, 4, resource_collect, resource_destroy) == a);
+    cui_end_frame(ui);
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    assert(resource_collects == 3 && resource_destroys == 1);
+    /* Untouched previous-frame resource has released both slot and bytes. */
+    unsigned *c = cui_resource_get(ui, 2, 1, 4, resource_collect, resource_destroy);
+    assert(c && !*c);
+    *c = 42;
+    assert(cui_resource_get(ui, 1, 1, 4, resource_collect, resource_destroy) == a);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    assert(resource_destroys == 3);
+    assert(!cui_create((cui_config){.max_resources = SIZE_MAX}));
+}
 int main(void) {
+    test_context_resources();
     test_scoped_focus_and_consumption();
     test_percentage_dimensions();
     test_layout_hit_order();

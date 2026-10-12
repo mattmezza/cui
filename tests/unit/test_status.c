@@ -627,7 +627,7 @@ int main(void) {
         cui_theme *t = &themes[i];
         cui_tag_style s;
         assert(cui_tag_resolve(t, o, false, &s));
-        assert(equal(s.background, t->surface));
+        assert(equal(s.background, t->secondary));
         assert(s.padding_x == 10 && s.padding_y == 4 && s.radius == t->radius);
         for (int v = CUI_TAG_PRIMARY; v <= CUI_TAG_INFO; v++) {
             o.variant = (cui_tag_variant)v;
@@ -667,6 +667,18 @@ int main(void) {
         cui_destroy(ui);
 #endif
     }
+    cui_theme custom_secondary = themes[0];
+    custom_secondary.secondary = (cui_color){17, 33, 49, 255};
+    custom_secondary.secondary_foreground = (cui_color){201, 211, 221, 255};
+    cui_tag_style secondary_style;
+    cui_tag_options secondary_options = cui_tag_options_default();
+    assert(cui_tag_resolve(&custom_secondary, secondary_options, false, &secondary_style));
+    assert(equal(secondary_style.background, custom_secondary.secondary));
+    assert(equal(secondary_style.foreground, custom_secondary.secondary_foreground));
+    secondary_options.outline = true;
+    assert(cui_tag_resolve(&custom_secondary, secondary_options, false, &secondary_style));
+    assert(secondary_style.background.a == 0 &&
+           equal(secondary_style.foreground, custom_secondary.muted));
     cui_tag_style s = {.radius = 123};
     o = cui_tag_options_default();
     o.radius = NAN;
@@ -706,7 +718,7 @@ int main(void) {
     bool geometry = false;
     for (size_t i = 0; i < list.count; i++)
         if (list.commands[i].type == CUI_DRAW_RECT &&
-            equal(list.commands[i].color, themes[0].surface)) {
+            equal(list.commands[i].color, themes[0].secondary)) {
             assert(list.commands[i].bounds.w == 60 && list.commands[i].bounds.h == 28);
             geometry = true;
         }

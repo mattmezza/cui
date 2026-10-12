@@ -3,7 +3,7 @@
 Tag follows the frozen 0.7.1 Tag implementation: `cui_tag_options_default()` is
 secondary, medium, filled. Primary/danger/success/warning/info use semantic theme
 colors and readable foregrounds. Outline uses a transparent background and intent
-foreground. Secondary uses the theme surface/text pair and muted outline text.
+foreground. Secondary uses independent secondary/secondary_foreground theme tokens and muted outline text.
 Custom colors preserve all three application colors. Palette tags accept the exact
 50/200/300/600/800/950 scale colors and explicit dark mode, so applications can
 supply their named palette without silently substituting a different palette.

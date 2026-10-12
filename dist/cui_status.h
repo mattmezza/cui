@@ -578,7 +578,8 @@ bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_ta
         o.radius < 0 || !isfinite(t->radius) || t->radius < 0 || !isfinite(t->font_size) ||
         t->font_size <= 0)
         return false;
-    cui_color bg = t->surface, fg = o.outline ? t->muted : t->text, border = t->border;
+    cui_color bg = t->secondary, fg = o.outline ? t->muted : t->secondary_foreground,
+              border = t->border;
     switch (o.variant) {
     case CUI_TAG_PRIMARY:
         bg = border = t->primary;

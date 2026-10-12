@@ -26,3 +26,5 @@ motion settings are configuration; components still own their retained motion
 state and the host supplies time/redraw scheduling.
 
 `popover` and `radius_lg` independently style notification surfaces. Built-in themes initialize popover to surface and the large radius to radius+2 (zero remains square); applications can override both without changing ordinary controls.
+
+The independent `secondary` background and `secondary_foreground` tokens style semantic secondary content such as Tag. Button palettes remain separately overridable.

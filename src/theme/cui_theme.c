@@ -51,6 +51,7 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
     t.spring_control =
         (cui_spring_settings){.response = .18f, .damping = 1, .epsilon = .001f, .travel = true};
     t.popover = t.surface;
+    t.secondary = secondary;
     t.radius_lg = t.radius == 0 ? 0 : t.radius + 2;
     return t;
 }

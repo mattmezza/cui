@@ -34,7 +34,7 @@ typedef struct {
     cui_color link, link_hover, link_active, input, input_background;
     cui_color secondary_foreground, accent, accent_foreground;
     cui_spring_settings spring_control;
-    cui_color popover;
+    cui_color popover, secondary;
     float radius_lg;
 } cui_theme;
 cui_theme cui_theme_light(void);
@@ -103,6 +103,7 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
     t.spring_control =
         (cui_spring_settings){.response = .18f, .damping = 1, .epsilon = .001f, .travel = true};
     t.popover = t.surface;
+    t.secondary = secondary;
     t.radius_lg = t.radius == 0 ? 0 : t.radius + 2;
     return t;
 }

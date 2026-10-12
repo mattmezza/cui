@@ -11,6 +11,7 @@
 #include "cui_otp.h"
 #include "cui_picker.h"
 #include "cui_scroll.h"
+#include "cui_status.h"
 #include "cui_surface.h"
 #include "cui_table.h"
 #include "cui_theme.h"
@@ -131,6 +132,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_OTP_IMPLEMENTATION
 #endif
 #include "cui_otp.h"
+#ifndef CUI_STATUS_IMPLEMENTATION
+#define CUI_STATUS_IMPLEMENTATION
+#endif
+#include "cui_status.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

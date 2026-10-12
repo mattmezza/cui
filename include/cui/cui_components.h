@@ -10,6 +10,7 @@
 #include "cui_otp.h"
 #include "cui_picker.h"
 #include "cui_scroll.h"
+#include "cui_status.h"
 #include "cui_surface.h"
 #include "cui_table.h"
 #include "cui_theme.h"

@@ -255,7 +255,11 @@ typedef enum {
     CUI_DROPDOWN_BUTTON_DANGER,
     CUI_DROPDOWN_BUTTON_WARNING,
     CUI_DROPDOWN_BUTTON_SUCCESS,
-    CUI_DROPDOWN_BUTTON_INFO
+    CUI_DROPDOWN_BUTTON_INFO,
+    CUI_DROPDOWN_BUTTON_DEFAULT,
+    CUI_DROPDOWN_BUTTON_LINK,
+    CUI_DROPDOWN_BUTTON_TEXT,
+    CUI_DROPDOWN_BUTTON_CUSTOM
 } cui_dropdown_button_variant;
 typedef enum {
     CUI_DROPDOWN_BUTTON_MEDIUM,
@@ -270,11 +274,15 @@ typedef enum {
     CUI_DROPDOWN_ANCHOR_BOTTOM_LEFT
 } cui_dropdown_button_anchor;
 typedef struct {
+    cui_color color, foreground, hover, active;
+} cui_dropdown_button_palette;
+typedef struct {
     bool disabled, action_disabled, action_loading, selected;
     bool outline;                         /* orthogonal to filled color variants */
     bool action_selected, action_outline; /* preserve inner button presentation */
     float width; /* action-half width: zero fits contents; negative grows */
     cui_dropdown_button_variant variant;
+    cui_dropdown_button_palette custom; /* custom variant palette, both halves */
     cui_dropdown_button_size size;
     cui_str leading, trailing;
     cui_choice_content_fn content;
@@ -2601,6 +2609,13 @@ static cui_color cui_dropdown_intent(const cui_theme *theme, cui_dropdown_button
 }
 static cui_color cui_dropdown_foreground(const cui_theme *theme,
                                          cui_dropdown_button_options options) {
+    if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM)
+        return options.outline ? options.custom.color : options.custom.foreground;
+    if (options.variant == CUI_DROPDOWN_BUTTON_LINK)
+        return theme->primary;
+    if (options.variant == CUI_DROPDOWN_BUTTON_TEXT ||
+        options.variant == CUI_DROPDOWN_BUTTON_DEFAULT)
+        return theme->text;
     if (options.outline)
         return options.variant == CUI_DROPDOWN_BUTTON_SECONDARY ||
                        options.variant == CUI_DROPDOWN_BUTTON_OUTLINE ||
@@ -2654,14 +2669,34 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     }
     if (options.selected && options.variant < CUI_DROPDOWN_BUTTON_DANGER)
         box.background = theme->primary;
-    bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
-                           options.variant != CUI_DROPDOWN_BUTTON_OUTLINE;
-    if (colored_outline) {
-        box.background = cui_dropdown_intent(theme, options.variant);
-        box.border = box.background;
-        box.background.a = options.selected ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
+    bool active = options.selected || (!disabled && cui_pressed(ui, id));
+    bool transparent =
+        options.variant == CUI_DROPDOWN_BUTTON_LINK || options.variant == CUI_DROPDOWN_BUTTON_TEXT;
+    if (transparent) {
+        box.background.a = 0;
+        box.border_width = 0;
+    } else if (options.variant == CUI_DROPDOWN_BUTTON_DEFAULT) {
+        box.background = theme->surface;
+        if (options.selected)
+            box.border = theme->primary;
+    } else if (options.variant == CUI_DROPDOWN_BUTTON_CUSTOM) {
+        box.background = active ? options.custom.active : options.custom.color;
+        box.border = options.custom.color;
+        if (!disabled && cui_hovered(ui, id) && !active)
+            box.background = options.custom.hover;
     }
-    if (!disabled && cui_hovered(ui, id)) {
+    bool colored_outline = options.outline && options.variant != CUI_DROPDOWN_BUTTON_GHOST &&
+                           options.variant != CUI_DROPDOWN_BUTTON_OUTLINE && !transparent;
+    if (colored_outline) {
+        box.background = options.variant == CUI_DROPDOWN_BUTTON_CUSTOM ? options.custom.color
+                         : options.variant == CUI_DROPDOWN_BUTTON_DEFAULT
+                             ? theme->border
+                             : cui_dropdown_intent(theme, options.variant);
+        box.border = box.background;
+        box.background.a = active ? 102 : (!disabled && cui_hovered(ui, id)) ? 51 : 26;
+    }
+    if (!disabled && cui_hovered(ui, id) && !transparent &&
+        options.variant != CUI_DROPDOWN_BUTTON_CUSTOM) {
         if (!box.background.a)
             box.background = theme->surface;
         box.background.r = (uint8_t)(box.background.r * .9f);
@@ -2690,6 +2725,19 @@ static cui_box cui_dropdown_button_box(cui_context *ui, cui_id id, const cui_the
     return box;
 }
 
+static void cui_dropdown_label(cui_context *ui, cui_id id, cui_str text, float size,
+                               cui_color color, bool underline) {
+    if (underline)
+        cui_begin_box(ui, id ^ UINT64_C(0xc8134e39119b750d), (cui_box){0});
+    cui_text(ui, text, size, color);
+    if (underline) {
+        cui_size measured = cui_measure_text(ui, text, size);
+        cui_begin_box(ui, id ^ UINT64_C(0xc8134e39119b751d),
+                      (cui_box){.width = measured.width, .height = 1, .background = color});
+        cui_end_box(ui);
+        cui_end_box(ui);
+    }
+}
 cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container, cui_id action_id,
                                                cui_id trigger_id, const cui_theme *theme,
                                                cui_str action_name, cui_str menu_name,
@@ -2714,6 +2762,12 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         menu_name, items, count, menu_action, state,
         options.disabled || options.menu.popup.disabled, options.action_disabled,
         options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks);
+    if (options.variant == CUI_DROPDOWN_BUTTON_LINK) {
+        if (!options.hide_action)
+            cui_set_semantic_role(ui, action_id, CUI_ROLE_LINK);
+        if (!options.hide_menu)
+            cui_set_semantic_role(ui, trigger_id, CUI_ROLE_LINK);
+    }
     bool all_disabled = options.disabled || options.menu.popup.disabled;
     bool action_disabled = all_disabled || options.action_disabled || options.action_loading;
     bool pair_surfaced = state->overlay.open ||
@@ -2723,6 +2777,12 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     cui_dropdown_button_options foreground_options = options;
     foreground_options.outline = options.outline || options.action_outline;
     cui_color action_foreground = cui_dropdown_foreground(theme, foreground_options);
+    if (options.variant == CUI_DROPDOWN_BUTTON_TEXT) {
+        if (!cui_hovered(ui, action_id))
+            action_foreground.a = (uint8_t)(action_foreground.a * .9f);
+        if (!cui_hovered(ui, trigger_id))
+            trigger_foreground.a = (uint8_t)(trigger_foreground.a * .9f);
+    }
     if (action_disabled)
         action_foreground = theme->muted;
     if (all_disabled)
@@ -2746,7 +2806,8 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
             if (options.content)
                 options.content(ui, options.content_user);
             else
-                cui_text(ui, action_name, theme->font_size * scale, action_foreground);
+                cui_dropdown_label(ui, action_id, action_name, theme->font_size * scale,
+                                   action_foreground, options.variant == CUI_DROPDOWN_BUTTON_LINK);
             if (options.trailing.length)
                 cui_text(ui, options.trailing, theme->font_size * scale, action_foreground);
         }
@@ -2756,7 +2817,8 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         cui_box trigger_box = cui_dropdown_button_box(ui, trigger_id, theme, options, true,
                                                       all_disabled, pair_surfaced);
         cui_begin_box(ui, trigger_id, trigger_box);
-        cui_text(ui, cui_string("v"), theme->font_size * scale, trigger_foreground);
+        cui_dropdown_label(ui, trigger_id, cui_string("v"), theme->font_size * scale,
+                           trigger_foreground, options.variant == CUI_DROPDOWN_BUTTON_LINK);
         cui_end_box(ui);
     }
     cui_end_box(ui);

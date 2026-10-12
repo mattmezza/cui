@@ -17,11 +17,26 @@ typedef struct {
 /* Custom title/icon body; trigger semantics and activation remain item-owned. */
 typedef void (*cui_disclosure_header_fn)(cui_context *, const cui_disclosure_item *, size_t index,
                                          bool expanded, void *user);
+/* Caller-owned, stable per-panel motion/measurement storage. Zero initialize. */
+typedef struct {
+    cui_id id;
+    cui_rect measured;
+    float progress, velocity;
+    bool initialized;
+} cui_disclosure_motion;
+/* Critically damped, reversible reveal; initial state and reduced motion snap.
+ * dt is seconds; response is settling seconds (zero defaults to .2). */
+void cui_disclosure_motion_step(cui_disclosure_motion *, bool open, float dt, float response,
+                                bool reduced_motion);
 typedef struct {
     bool multiple, collapsible, disabled, bordered;
     cui_disclosure_header_fn render_header;
     void *header_user;
     const cui_box *trigger_boxes, *panel_boxes; /* optional per-item full box styles */
+    cui_disclosure_motion *motion; /* optional per-item array, stable through end_frame */
+    size_t motion_count;
+    float dt, response;
+    bool reduced_motion;
     size_t style_count; /* available entries in either nonnull style array */
 } cui_accordion_options;
 typedef struct {
@@ -29,13 +44,16 @@ typedef struct {
     cui_disclosure_header_fn render_header;
     void *header_user;
     const cui_box *trigger_box, *panel_box; /* optional full box styles */
+    cui_disclosure_motion *motion;          /* optional stable through end_frame */
+    float dt, response;
+    bool reduced_motion;
 } cui_collapsible_options;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
 /* Base submits semantic triggers without layout or painting. */
 bool cui_base_collapsible(cui_context *, cui_id, cui_str, bool *open, bool disabled);
 bool cui_base_accordion(cui_context *, const cui_disclosure_item *, size_t count, bool *open,
                         cui_accordion_options);
-/* Styled components render panels synchronously only while expanded. Size and
+/* Without motion, styled components render panels only while expanded. Size and
  * colors come from the supplied theme; callbacks can compose arbitrary CUI. */
 bool cui_collapsible_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *open,
                         cui_collapsible_options, cui_disclosure_panel_fn, void *);
@@ -53,6 +71,36 @@ bool cui_accordion(cui_context *, cui_id container, const cui_theme *, const cui
 #define CUI_DISCLOSURE_IMPLEMENTATION_ONCE
 /* src/base/cui_disclosure.c */
 /* SPDX-License-Identifier: MIT */
+
+#include <math.h>
+void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float dt, float response,
+                                bool reduced_motion) {
+    if (!motion)
+        return;
+    float target = open ? 1 : 0;
+    if (!motion->initialized || reduced_motion || !isfinite(motion->progress) ||
+        !isfinite(motion->velocity)) {
+        motion->progress = target;
+        motion->velocity = 0;
+        motion->initialized = true;
+        return;
+    }
+    if (!isfinite(dt) || dt <= 0)
+        return;
+    if (!isfinite(response) || response <= 0)
+        response = .2f;
+    float omega = 6 / fmaxf(response, .001f);
+    float displacement = motion->progress - target;
+    float sum = motion->velocity + omega * displacement;
+    float decay = expf(-omega * fminf(dt, 10));
+    motion->progress = target + (displacement + sum * fminf(dt, 10)) * decay;
+    motion->velocity = (motion->velocity - omega * sum * fminf(dt, 10)) * decay;
+    motion->progress = fminf(1, fmaxf(0, motion->progress));
+    if (fabsf(motion->progress - target) < .001f && fabsf(motion->velocity) < .01f) {
+        motion->progress = target;
+        motion->velocity = 0;
+    }
+}
 
 bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled) {
     if (!open)
@@ -147,6 +195,7 @@ bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_
 /* src/components/cui_disclosure.c */
 /* SPDX-License-Identifier: MIT */
 
+#include <math.h>
 static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *theme,
                                    cui_str label, bool open, bool disabled, bool bordered,
                                    const cui_disclosure_item *item, size_t index,
@@ -178,6 +227,39 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
     }
     cui_end_box(ui);
 }
+static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent, cui_str label,
+                                 bool open, cui_box box, cui_disclosure_motion *motion, float dt,
+                                 float response, bool reduced_motion, size_t index,
+                                 cui_disclosure_panel_fn panel, void *user) {
+    if (!panel || (!open && !motion))
+        return;
+    cui_id panel_id = trigger ^ UINT64_C(0x1d8f322539deca61);
+    if (motion) {
+        if (motion->id != trigger) {
+            *motion = (cui_disclosure_motion){.id = trigger};
+        }
+        cui_disclosure_motion_step(motion, open, dt, response, reduced_motion);
+        float height = isfinite(motion->measured.h) ? fmaxf(0, motion->measured.h) : 0;
+        cui_begin_box(ui, trigger ^ UINT64_C(0x48aaf2a21d3ed09f),
+                      (cui_box){.height = height * motion->progress,
+                                .fixed_height = true,
+                                .clip = true,
+                                .layout_only = motion->progress == 0,
+                                .inert = !open});
+        if (motion->progress != (open ? 1 : 0))
+            cui_invalidate(ui);
+    }
+    cui_begin_box(ui, panel_id, box);
+    cui_interact(ui, panel_id, CUI_ROLE_GROUP, label, false, false, 0);
+    cui_set_semantic_details(ui, panel_id,
+                             (cui_semantic_details){.labelled_by = trigger, .parent = parent});
+    if (motion)
+        cui_track_bounds(ui, panel_id, &motion->measured);
+    panel(ui, index, user);
+    cui_end_box(ui);
+    if (motion)
+        cui_end_box(ui);
+}
 bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                         bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
                         void *user) {
@@ -189,17 +271,10 @@ bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     cui_disclosure_trigger(ui, id, theme, label, *open, options.disabled, !options.borderless,
                            &item, 0, options.render_header, options.header_user,
                            options.trigger_box);
-    if (*open && panel) {
-        cui_id panel_id = id ^ UINT64_C(0x1d8f322539deca61);
-        cui_interact(ui, panel_id, CUI_ROLE_GROUP, label, false, false, 0);
-        cui_set_semantic_details(ui, panel_id, (cui_semantic_details){.labelled_by = id});
-        cui_box panel_box = options.panel_box
-                                ? *options.panel_box
-                                : (cui_box){.padding = theme->padding, .gap = theme->gap};
-        cui_begin_box(ui, id ^ UINT64_C(0x1d8f322539deca61), panel_box);
-        panel(ui, 0, user);
-        cui_end_box(ui);
-    }
+    cui_box panel_box = options.panel_box ? *options.panel_box
+                                          : (cui_box){.padding = theme->padding, .gap = theme->gap};
+    cui_disclosure_panel(ui, id, 0, label, *open, panel_box, options.motion, options.dt,
+                         options.response, options.reduced_motion, 0, panel, user);
     cui_end_box(ui);
     return changed;
 }
@@ -228,19 +303,13 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
             (cui_semantic_details){.expanded = open[i],
                                    .controls = items[i].id ^ UINT64_C(0x1d8f322539deca61),
                                    .parent = container});
-        if (open[i] && panel) {
-            cui_id panel_id = items[i].id ^ UINT64_C(0x1d8f322539deca61);
-            cui_interact(ui, panel_id, CUI_ROLE_GROUP, items[i].label, false, false, 0);
-            cui_set_semantic_details(
-                ui, panel_id,
-                (cui_semantic_details){.labelled_by = items[i].id, .parent = container});
-            cui_box panel_box = options.panel_boxes && i < options.style_count
-                                    ? options.panel_boxes[i]
-                                    : (cui_box){.padding = theme->padding, .gap = theme->gap};
-            cui_begin_box(ui, items[i].id ^ UINT64_C(0x1d8f322539deca61), panel_box);
-            panel(ui, i, user);
-            cui_end_box(ui);
-        }
+        cui_box panel_box = options.panel_boxes && i < options.style_count
+                                ? options.panel_boxes[i]
+                                : (cui_box){.padding = theme->padding, .gap = theme->gap};
+        cui_disclosure_motion *motion =
+            options.motion && i < options.motion_count ? &options.motion[i] : NULL;
+        cui_disclosure_panel(ui, items[i].id, container, items[i].label, open[i], panel_box, motion,
+                             options.dt, options.response, options.reduced_motion, i, panel, user);
     }
     cui_end_box(ui);
     return changed;

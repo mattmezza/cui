@@ -83,6 +83,7 @@ function render(){
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
+ wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
  wasm.gallery_shimmer_mode(Number($('shimmer-mode').value));
  wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
  wasm.gallery_tag_options(Number($('tag-variant').value),Number($('tag-color').value),Number($('tag-outline').checked),Number($('tag-pill').checked));
@@ -204,6 +205,8 @@ function selectComponent(){
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
  $('disclosure-mode').hidden=!['Accordion','Collapsible'].includes(selected.name);$('disclosure-mode').value='0';
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
+ for(const id of ['tabs-mode','tabs-size','tabs-variant','tabs-manual-control'])$(id).hidden=selected.name!=='Tabs';
+ $('tabs-mode').value='0';$('tabs-size').value='0';$('tabs-variant').value='1';$('tabs-manual').checked=false;
  $('shimmer-mode').hidden=selected.name!=='Shimmer';$('shimmer-mode').value='0';
  for(const id of ['notification-anchor','notification-kind','notification-autohide-control'])$(id).hidden=selected.name!=='Notification';
  $('notification-anchor').value='2';$('notification-kind').value='1';$('notification-autohide').checked=true;
@@ -253,7 +256,7 @@ $('theme').addEventListener('change',()=>{document.body.classList.toggle('dark',
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
-for(const id of ['shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
+for(const id of ['tabs-mode','tabs-size','tabs-variant','tabs-manual','shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);
 $('group-mode').addEventListener('change',requestFrame);

@@ -34,6 +34,11 @@ static bool checked, enabled = true, toggled;
 static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static cui_id selected_tab;
+static int tabs_mode, tabs_size, tabs_variant = CUI_TAB_UNDERLINE;
+static bool tabs_manual;
+static cui_tab_scroll_state tabs_scroll;
+static cui_tab_overflow tabs_overflow;
+static cui_menu_entry tabs_entries[12];
 static int disclosure_mode, disclosure_actions;
 static bool disclosure_multiple, disclosure_checked;
 static cui_disclosure_motion accordion_motion[3], collapsible_motion;
@@ -898,14 +903,42 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 22: {
-        cui_choice_item items[3] = {{cui_id_from(ui, "tab1"), cui_string("Overview"), false},
-                                    {cui_id_from(ui, "tab2"), cui_string("Activity"), false},
-                                    {cui_id_from(ui, "tab3"), cui_string("Settings"), false}};
+        const char *names[12] = {"Overview",      "Activity",        "Settings",
+                                 "Team members",  "Deployments",     "Build history",
+                                 "Permissions",   "Integrations",    "Notifications",
+                                 "Usage reports", "Billing details", "Audit history"};
+        cui_choice_item items[12];
+        for (size_t i = 0; i < 12; i++) {
+            char id[24];
+            snprintf(id, sizeof(id), "tab%zu", i + 1);
+            items[i] = (cui_choice_item){cui_id_from(ui, id), cui_string(names[i]), false};
+        }
         if (!selected_tab)
             selected_tab = items[0].id;
-        cui_tabs(ui, cui_id_from(ui, "tabs"), &t, items, 3, &selected_tab,
-                 (cui_tabs_options){.disabled = disabled, .variant = CUI_TAB_UNDERLINE}, panel,
-                 NULL);
+        if (!tabs_overflow.trigger)
+            cui_tab_overflow_init(&tabs_overflow, cui_id_from(ui, "tabs-popup"),
+                                  cui_id_from(ui, "tabs-all"), tabs_entries, 12);
+        tabs_overflow.options.popup.viewport = (cui_rect){0, 0, width, height};
+        tabs_overflow.options.popup.dt = host_dt;
+        tabs_overflow.options.popup.width = 200;
+        if (tabs_mode && cui_button(ui, cui_id_from(ui, "tabs-reveal"), &t,
+                                    cui_string("Reveal last tab"), disabled)) {
+            selected_tab = items[11].id;
+            tabs_scroll.reveal_id = selected_tab;
+        }
+        cui_tabs(ui, cui_id_from(ui, "tabs"), &t, items, tabs_mode ? 12 : 3, &selected_tab,
+                 (cui_tabs_options){.disabled = disabled,
+                                    .variant = (cui_tab_variant)tabs_variant,
+                                    .size = (cui_tab_size)tabs_size,
+                                    .vertical = tabs_mode == 2,
+                                    .manual_activation = tabs_manual,
+                                    .scroll = tabs_mode ? &tabs_scroll : NULL,
+                                    .bar_extent = tabs_mode == 2 ? 140 : width - 100,
+                                    .max_width = tabs_mode == 2 ? 140 : 0,
+                                    .overflow = tabs_mode ? &tabs_overflow : NULL,
+                                    .reveal_selected = true,
+                                    .scrollbar = true},
+                 panel, NULL);
         break;
     }
     case 23:
@@ -1906,4 +1939,34 @@ void gallery_shimmer_mode(int mode) {
 }
 float gallery_shimmer_phase(void) {
     return shimmer_state.last_phase;
+}
+
+void gallery_tabs_options(int mode, int size, int variant, int manual) {
+    if (mode != tabs_mode) {
+        tabs_mode = mode;
+        memset(&tabs_scroll, 0, sizeof(tabs_scroll));
+        selected_tab = 0;
+        cui_overlay_close(ui, &tabs_overflow.menu.overlay);
+    }
+    tabs_size = size;
+    tabs_variant = variant;
+    tabs_manual = manual != 0;
+}
+float gallery_tabs_scroll(unsigned field) {
+    switch (field) {
+    case 0:
+        return tabs_scroll.offset;
+    case 1:
+        return tabs_scroll.maximum;
+    case 2:
+        return tabs_scroll.viewport.x;
+    case 3:
+        return tabs_scroll.viewport.y;
+    case 4:
+        return tabs_scroll.viewport.w;
+    case 5:
+        return tabs_scroll.viewport.h;
+    default:
+        return 0;
+    }
 }

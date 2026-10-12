@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_picker.h"
 #include <assert.h>
+#include <math.h>
+#include <stdint.h>
 #include <string.h>
 static void key(cui_context *ui, cui_key code, unsigned modifiers) {
     assert(cui_queue_event(
@@ -188,6 +190,17 @@ static void time_events(void) {
     cui_focus(ui, cui_time_segment_id(20, 3));
     cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "p"});
     assert(time_scene(ui, &theme, &state, &time, options) && time.hour == 12);
+    cui_focus(ui, cui_time_segment_id(20, 0));
+    key(ui, CUI_KEY_HOME, 0);
+    assert(time_scene(ui, &theme, &state, &time, options) && time.hour == 13);
+    key(ui, CUI_KEY_END, 0);
+    assert(time_scene(ui, &theme, &state, &time, options) && time.hour == 12);
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    for (size_t i = 0; i < semantic_count; ++i)
+        if (semantics[i].id == cui_time_segment_id(20, 0))
+            assert(semantics[i].value == 12 && semantics[i].details.minimum == 1 &&
+                   semantics[i].details.maximum == 12);
     options.readonly = true;
     key(ui, CUI_KEY_DOWN, 0);
     assert(!time_scene(ui, &theme, &state, &time, options) && time.hour == 12);
@@ -248,7 +261,115 @@ static void picker_events(void) {
     cui_destroy(ui);
 }
 #endif
+static bool equal_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static void color_models(void) {
+    cui_color red = {255, 0, 0, 255}, color;
+    assert(equal_color(cui_color_from_hsv((cui_hsv){0, 1, 1, 1}), red));
+    assert(equal_color(cui_color_from_hsv((cui_hsv){360, 1, 1, 1}), red));
+    assert(equal_color(cui_color_from_hsv((cui_hsv){120, 1, 1, 1}), (cui_color){0, 255, 0, 255}));
+    assert(equal_color(cui_color_from_hsv((cui_hsv){-120, 1, 1, 1}), (cui_color){0, 0, 255, 255}));
+    assert(equal_color(cui_color_from_hsv((cui_hsv){NAN, NAN, INFINITY, NAN}),
+                       (cui_color){0, 0, 0, 0}));
+    uint32_t random = 91827;
+    for (unsigned i = 0; i < 20000; ++i) {
+        random = random * 1664525u + 1013904223u;
+        color = (cui_color){(uint8_t)random, (uint8_t)(random >> 8), (uint8_t)(random >> 16),
+                            (uint8_t)(random >> 24)};
+        assert(equal_color(cui_color_from_hsv(cui_color_to_hsv(color)), color));
+        char hex[10];
+        assert(cui_color_format_hex(color, true, hex, sizeof(hex)) == 9);
+        cui_color parsed;
+        assert(cui_color_parse_hex(cui_string(hex), &parsed) && equal_color(parsed, color));
+    }
+    assert(cui_color_parse_hex(cui_string("#12aBCd"), &color) &&
+           equal_color(color, (cui_color){18, 171, 205, 255}));
+    assert(!cui_color_parse_hex(cui_string("#123"), &color));
+    assert(!cui_color_parse_hex(cui_string("#GGFFFF"), &color));
+    assert(!cui_color_parse_hex(cui_string("123456"), &color));
+}
+static bool color_scene(cui_context *ui, const cui_theme *t, cui_color_state *state,
+                        cui_color *color, cui_color_picker_options options) {
+    assert(cui_begin_frame(ui, 800, 800, .016f));
+#ifdef CUI_PICKER_BASE_ONLY
+    (void)t;
+    bool changed = cui_base_color_picker(ui, 50, state, color, options);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i) {
+        cui_begin_box(ui, sem[i].id, (cui_box){.width = 240, .height = 100});
+        cui_end_box(ui);
+    }
+    assert(cui_end_frame(ui).count == 0);
+#else
+    bool changed = cui_color_picker(ui, 50, t, state, color, options);
+    cui_draw_list list = cui_end_frame(ui);
+    bool white = false, black = false;
+    for (size_t i = 0; i < list.count; ++i) {
+        if (list.commands[i].type != CUI_DRAW_RECT)
+            continue;
+        cui_color c = list.commands[i].color;
+        if (equal_color(c, (cui_color){255, 255, 255, 255}))
+            white = true;
+        if (equal_color(c, (cui_color){0, 0, 0, 255}))
+            black = true;
+    }
+    assert(white && black);
+    cui_rect plane = cui_bounds(ui, cui_color_part_id(50, 2));
+    assert(plane.w == 240 && plane.h == 144);
+#endif
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void color_events(void) {
+#ifdef CUI_PICKER_BASE_ONLY
+    cui_theme themes[4] = {0};
+#else
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+#endif
+    for (unsigned i = 0; i < 4; ++i) {
+        cui_context *ui = cui_create((cui_config){.width = 800, .height = 800});
+        assert(ui);
+        cui_color color = {255, 0, 0, 255}, palette[] = {{0, 0, 255, 64}, {0, 255, 0, 255}};
+        cui_color_state state = {0};
+        cui_color_picker_options options = {.alpha = true, .palette = palette, .palette_count = 2};
+        color_scene(ui, &themes[i], &state, &color, options);
+        cui_focus(ui, cui_color_part_id(50, 20));
+        key(ui, CUI_KEY_DOWN, 0);
+        assert(color_scene(ui, &themes[i], &state, &color, options) && color.r == 254);
+        click(ui, cui_bounds(ui, cui_color_part_id(50, 100)));
+        assert(color_scene(ui, &themes[i], &state, &color, options) &&
+               equal_color(color, palette[0]));
+        cui_focus(ui, cui_color_part_id(50, 3));
+        key(ui, CUI_KEY_END, 0);
+        assert(color_scene(ui, &themes[i], &state, &color, options) && color.a == 255);
+        cui_rect plane = cui_bounds(ui, cui_color_part_id(50, 2));
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                        .x = plane.x + plane.w * .5f,
+                                        .y = plane.y + plane.h * .5f});
+        assert(color_scene(ui, &themes[i], &state, &color, options));
+        assert(fabsf(state.hsv.saturation - .5f) < .001f && fabsf(state.hsv.value - .5f) < .001f);
+        cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = plane.x + plane.w, .y = plane.y});
+        assert(color_scene(ui, &themes[i], &state, &color, options) && state.hsv.saturation == 1 &&
+               state.hsv.value == 1 && !state.dragging);
+        cui_color before = color;
+        options.readonly = true;
+        key(ui, CUI_KEY_HOME, 0);
+        assert(!color_scene(ui, &themes[i], &state, &color, options) && equal_color(color, before));
+        options.readonly = false;
+        options.disabled = true;
+        click(ui, cui_bounds(ui, cui_color_part_id(50, 101)));
+        assert(!color_scene(ui, &themes[i], &state, &color, options) && equal_color(color, before));
+        cui_destroy(ui);
+    }
+}
+
 int main(void) {
+    color_models();
+    color_events();
     models();
     calendar_events();
     time_events();

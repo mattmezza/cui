@@ -221,3 +221,109 @@ bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name
     cui_end_box(ui);
     return changed;
 }
+bool cui_color_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_color_state *state,
+                      cui_color *color, cui_color_picker_options options) {
+    if (!t || !state || !color || (!options.palette && options.palette_count) ||
+        options.palette_count > 64)
+        return false;
+    bool changed = cui_base_color_picker(ui, id, state, color, options);
+    float width =
+        isfinite(options.width) && options.width >= 120 ? fminf(options.width, 1000) : 240;
+    cui_begin_box(
+        ui, id,
+        (cui_box){
+            .gap = t->gap, .padding = t->padding, .radius = t->radius, .background = t->surface});
+    cui_begin_box(ui, cui_color_part_id(id, 2), (cui_box){.width = width, .height = width * .6f});
+    for (unsigned y = 0; y < 8; ++y) {
+        cui_begin_box(ui, cui_picker_style_id(id, 1000 + y),
+                      (cui_box){.row = true, .height = width * .6f / 8});
+        for (unsigned x = 0; x < 12; ++x) {
+            cui_hsv hsv = {state->hsv.hue, x / 11.f, 1 - y / 7.f, 1};
+            bool marker = (unsigned)lroundf(state->hsv.saturation * 11) == x &&
+                          (unsigned)lroundf((1 - state->hsv.value) * 7) == y;
+            cui_begin_box(ui, cui_picker_style_id(id, 1100 + y * 12 + x),
+                          (cui_box){.width = width / 12,
+                                    .height = width * .6f / 8,
+                                    .background = cui_color_from_hsv(hsv),
+                                    .border = marker ? t->focus : (cui_color){0},
+                                    .border_width = marker ? 2 : 0});
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    cui_begin_box(ui, cui_color_part_id(id, 1),
+                  (cui_box){.row = true, .width = width, .height = 20});
+    for (unsigned x = 0; x < 24; ++x) {
+        cui_begin_box(ui, cui_picker_style_id(id, 1300 + x),
+                      (cui_box){.width = width / 24,
+                                .height = 20,
+                                .background = cui_color_from_hsv((cui_hsv){x * 15.f, 1, 1, 1})});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    if (options.alpha) {
+        cui_begin_box(
+            ui, cui_color_part_id(id, 3),
+            (cui_box){.row = true, .width = width, .height = 20, .background = t->border});
+        for (unsigned x = 0; x < 16; ++x) {
+            cui_color c = *color;
+            c.a = (uint8_t)(x * 17);
+            cui_begin_box(ui, cui_picker_style_id(id, 1400 + x),
+                          (cui_box){.width = width / 16, .height = 20, .background = c});
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    const char *names[] = {"R", "G", "B", "A"};
+    unsigned channels[] = {color->r, color->g, color->b, color->a};
+    for (unsigned i = 0; i < (options.alpha ? 4u : 3u); ++i) {
+        char label[24];
+        snprintf(label, sizeof(label), "%s %u", names[i], channels[i]);
+        cui_id part = cui_color_part_id(id, 20 + i);
+        cui_begin_box(ui, part,
+                      (cui_box){.width = width,
+                                .height = 40,
+                                .gap = 4,
+                                .radius = t->radius,
+                                .border = cui_focused(ui) == part ? t->focus : t->border,
+                                .border_width = 1});
+        cui_text(ui, cui_string(label), t->font_size, options.disabled ? t->muted : t->text);
+        if (channels[i]) {
+            cui_begin_box(ui, cui_picker_style_id(id, 1500 + i),
+                          (cui_box){.width = width * channels[i] / 255.f,
+                                    .height = 4,
+                                    .background = t->primary});
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    char hex[10];
+    cui_color_format_hex(*color, options.alpha, hex, sizeof(hex));
+    cui_begin_box(ui, cui_picker_style_id(id, 1600), (cui_box){.row = true, .gap = t->gap});
+    cui_begin_box(ui, cui_picker_style_id(id, 1601),
+                  (cui_box){.width = 24,
+                            .height = 24,
+                            .background = *color,
+                            .border = t->border,
+                            .border_width = 1});
+    cui_end_box(ui);
+    cui_text(ui, cui_string(hex), t->font_size, t->text);
+    cui_end_box(ui);
+    if (options.palette_count) {
+        cui_begin_box(ui, cui_picker_style_id(id, 1700), (cui_box){.row = true, .gap = 4});
+        for (size_t i = 0; i < options.palette_count; ++i) {
+            cui_begin_box(ui, cui_color_part_id(id, 100 + (unsigned)i),
+                          (cui_box){.width = 24,
+                                    .height = 24,
+                                    .background = options.palette[i],
+                                    .border = t->border,
+                                    .border_width = 1,
+                                    .radius = t->radius});
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return changed;
+}

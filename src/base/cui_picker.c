@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_picker.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 static cui_id cui_picker_part(cui_id id, uint64_t index) {
@@ -384,9 +385,13 @@ bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_stat
                 if (state->segment == 3)
                     time->hour = (time->hour + 12) % 24;
                 else if (key == CUI_KEY_HOME)
-                    *value = 0;
+                    *value = state->segment == 0 && options.twelve_hour
+                                 ? 1 + (time->hour >= 12 ? 12 : 0)
+                                 : 0;
                 else if (key == CUI_KEY_END)
-                    *value = maximum - 1;
+                    *value = state->segment == 0 && options.twelve_hour
+                                 ? (time->hour >= 12 ? 12 : 0)
+                                 : maximum - 1;
                 else
                     *value = key == CUI_KEY_UP ? (*value + 1) % maximum
                                                : (*value ? *value - 1 : maximum - 1);
@@ -436,19 +441,272 @@ bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_stat
                          : i == 1 ? time->minute
                          : i == 2 ? time->second
                                   : time->hour >= 12;
+        if (i == 0 && options.twelve_hour)
+            value = time->hour % 12 ? time->hour % 12 : 12;
         cui_interact(ui, segment, CUI_ROLE_TEXTBOX, cui_string(labels[i]), options.disabled, false,
                      (float)value);
-        cui_set_semantic_details(ui, segment,
-                                 (cui_semantic_details){.readonly = options.readonly,
-                                                        .parent = id,
-                                                        .minimum = 0,
-                                                        .maximum = i == 0   ? 23
-                                                                   : i == 3 ? 1
-                                                                            : 59});
+        cui_set_semantic_details(
+            ui, segment,
+            (cui_semantic_details){.readonly = options.readonly,
+                                   .parent = id,
+                                   .minimum = i == 0 && options.twelve_hour ? 1 : 0,
+                                   .maximum = i == 0   ? (options.twelve_hour ? 12 : 23)
+                                              : i == 3 ? 1
+                                                       : 59});
         cui_set_tab_stop(ui, segment, i == state->segment);
     }
     bool changed =
         before.hour != time->hour || before.minute != time->minute || before.second != time->second;
+    if (changed)
+        cui_invalidate(ui);
+    return changed;
+}
+static float cui_picker_unit(float value) {
+    return !isfinite(value) ? 0 : value < 0 ? 0 : value > 1 ? 1 : value;
+}
+cui_hsv cui_color_to_hsv(cui_color c) {
+    float r = c.r / 255.f, g = c.g / 255.f, b = c.b / 255.f;
+    float maximum = fmaxf(r, fmaxf(g, b)), minimum = fminf(r, fminf(g, b)),
+          delta = maximum - minimum;
+    cui_hsv result = {
+        .value = maximum, .saturation = maximum > 0 ? delta / maximum : 0, .alpha = c.a / 255.f};
+    if (delta > 0) {
+        result.hue = maximum == r   ? 60 * fmodf((g - b) / delta, 6)
+                     : maximum == g ? 60 * ((b - r) / delta + 2)
+                                    : 60 * ((r - g) / delta + 4);
+        if (result.hue < 0)
+            result.hue += 360;
+    }
+    return result;
+}
+cui_color cui_color_from_hsv(cui_hsv hsv) {
+    float hue = isfinite(hsv.hue) ? fmodf(hsv.hue, 360) : 0;
+    if (hue < 0)
+        hue += 360;
+    float s = cui_picker_unit(hsv.saturation), v = cui_picker_unit(hsv.value),
+          a = cui_picker_unit(hsv.alpha);
+    float c = v * s, x = c * (1 - fabsf(fmodf(hue / 60, 2) - 1)), m = v - c, r = 0, g = 0, b = 0;
+    if (hue < 60) {
+        r = c;
+        g = x;
+    } else if (hue < 120) {
+        r = x;
+        g = c;
+    } else if (hue < 180) {
+        g = c;
+        b = x;
+    } else if (hue < 240) {
+        g = x;
+        b = c;
+    } else if (hue < 300) {
+        r = x;
+        b = c;
+    } else {
+        r = c;
+        b = x;
+    }
+    return (cui_color){(uint8_t)lroundf((r + m) * 255), (uint8_t)lroundf((g + m) * 255),
+                       (uint8_t)lroundf((b + m) * 255), (uint8_t)lroundf(a * 255)};
+}
+static int cui_picker_hex(char c) {
+    return c >= '0' && c <= '9'   ? c - '0'
+           : c >= 'A' && c <= 'F' ? c - 'A' + 10
+           : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                                  : -1;
+}
+bool cui_color_parse_hex(cui_str text, cui_color *color) {
+    if (!color || !text.data || (text.length != 7 && text.length != 9) || text.data[0] != '#')
+        return false;
+    uint8_t channels[4] = {0, 0, 0, 255};
+    for (size_t i = 0; i < (text.length - 1) / 2; ++i) {
+        int hi = cui_picker_hex(text.data[1 + i * 2]), lo = cui_picker_hex(text.data[2 + i * 2]);
+        if (hi < 0 || lo < 0)
+            return false;
+        channels[i] = (uint8_t)(hi * 16 + lo);
+    }
+    *color = (cui_color){channels[0], channels[1], channels[2], channels[3]};
+    return true;
+}
+size_t cui_color_format_hex(cui_color color, bool alpha, char *out, size_t capacity) {
+    char text[10];
+    int written = alpha ? snprintf(text, sizeof(text), "#%02X%02X%02X%02X", color.r, color.g,
+                                   color.b, color.a)
+                        : snprintf(text, sizeof(text), "#%02X%02X%02X", color.r, color.g, color.b);
+    size_t length = written > 0 ? (size_t)written : 0;
+    if (out && capacity) {
+        size_t copy = length < capacity ? length : capacity - 1;
+        memcpy(out, text, copy);
+        out[copy] = 0;
+    }
+    return length;
+}
+cui_id cui_color_part_id(cui_id id, unsigned part) {
+    return cui_picker_part(id, part);
+}
+static bool cui_picker_equal_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+bool cui_base_color_picker(cui_context *ui, cui_id id, cui_color_state *s, cui_color *color,
+                           cui_color_picker_options o) {
+    if (!ui || !s || !color || (!o.palette && o.palette_count) || o.palette_count > 64)
+        return false;
+    if (!s->initialized || !cui_picker_equal_color(*color, s->last_color)) {
+        s->hsv = cui_color_to_hsv(*color);
+        s->initialized = true;
+    }
+    cui_color before = *color;
+    cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Color"), o.disabled, false, 0);
+    cui_set_tab_stop(ui, id, false);
+    bool pressed[7] = {0};
+    const char *labels[] = {"Hue", "Saturation/value", "Alpha", "Red", "Green", "Blue", "Opacity"};
+    const unsigned parts[] = {1, 2, 3, 20, 21, 22, 23};
+    for (unsigned i = 0; i < 7; ++i) {
+        if (!o.alpha && (i == 2 || i == 6))
+            continue;
+        cui_interaction interaction =
+            cui_interact(ui, cui_color_part_id(id, parts[i]), CUI_ROLE_SLIDER,
+                         cui_string(labels[i]), o.disabled, false, 0);
+        pressed[i] = interaction.pressed || (s->dragging & (1u << i));
+    }
+    for (size_t i = 0; i < o.palette_count; ++i) {
+        char label[10];
+        cui_color_format_hex(o.palette[i], o.alpha, label, sizeof(label));
+        cui_interact(ui, cui_color_part_id(id, 100 + (unsigned)i), CUI_ROLE_BUTTON,
+                     cui_string(label), o.disabled || o.readonly, false, 0);
+    }
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    if (o.disabled || o.readonly) {
+        s->dragging = 0;
+        memset(pressed, 0, sizeof(pressed));
+    }
+    for (size_t e = 0; e < count && !o.disabled && !o.readonly; ++e) {
+        if (events[e].type == CUI_EVENT_CANCEL) {
+            s->dragging = 0;
+            memset(pressed, 0, sizeof(pressed));
+        }
+        cui_id activation = cui_event_activation(ui, e), target = cui_event_target(ui, e);
+        for (size_t p = 0; p < o.palette_count; ++p)
+            if (activation == cui_color_part_id(id, 100 + (unsigned)p)) {
+                uint8_t alpha = color->a;
+                *color = o.palette[p];
+                if (!o.alpha)
+                    color->a = alpha;
+                s->hsv = cui_color_to_hsv(*color);
+            }
+        for (unsigned i = 0; i < 7; ++i) {
+            if ((!o.alpha && (i == 2 || i == 6)) || target != cui_color_part_id(id, parts[i]))
+                continue;
+            cui_event event = events[e];
+            cui_rect bounds = cui_bounds(ui, target);
+            if (event.type == CUI_EVENT_POINTER_DOWN)
+                pressed[i] = true;
+            bool pointer = pressed[i] && (event.type == CUI_EVENT_POINTER_DOWN ||
+                                          event.type == CUI_EVENT_POINTER_MOVE ||
+                                          event.type == CUI_EVENT_POINTER_UP);
+            float value = i == 0   ? s->hsv.hue
+                          : i == 1 ? s->hsv.saturation
+                          : i == 2 ? s->hsv.alpha
+                          : i == 3 ? color->r
+                          : i == 4 ? color->g
+                          : i == 5 ? color->b
+                                   : color->a;
+            float maximum = i == 0  ? 360
+                            : i < 3 ? 1
+                                    : 255,
+                  increment = i == 0  ? 1
+                              : i < 3 ? .01f
+                                      : 1;
+            bool changed = false;
+            if (pointer && bounds.w > 0) {
+                value = cui_picker_unit((event.x - bounds.x) / bounds.w) * maximum;
+                changed = true;
+            }
+            if (event.type == CUI_EVENT_KEY_DOWN) {
+                if (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_DOWN) {
+                    value -= increment;
+                    changed = true;
+                } else if (event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_UP) {
+                    value += increment;
+                    changed = true;
+                } else if (event.key == CUI_KEY_HOME) {
+                    value = 0;
+                    changed = true;
+                } else if (event.key == CUI_KEY_END) {
+                    value = maximum;
+                    changed = true;
+                }
+            }
+            if (i == 1) {
+                if (pointer && bounds.h > 0)
+                    s->hsv.value = 1 - cui_picker_unit((event.y - bounds.y) / bounds.h);
+                else if (event.type == CUI_EVENT_KEY_DOWN &&
+                         (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN)) {
+                    s->hsv.value =
+                        cui_picker_unit(s->hsv.value + (event.key == CUI_KEY_UP ? .01f : -.01f));
+                    value = s->hsv.saturation;
+                }
+            }
+            if (changed) {
+                value = fmaxf(0, fminf(maximum, value));
+                if (i == 0)
+                    s->hsv.hue = value;
+                else if (i == 1)
+                    s->hsv.saturation = value;
+                else if (i == 2)
+                    s->hsv.alpha = value;
+                else {
+                    uint8_t channel = (uint8_t)lroundf(value);
+                    if (i == 3)
+                        color->r = channel;
+                    else if (i == 4)
+                        color->g = channel;
+                    else if (i == 5)
+                        color->b = channel;
+                    else
+                        color->a = channel;
+                    float old_hue = s->hsv.hue;
+                    s->hsv = cui_color_to_hsv(*color);
+                    if (!s->hsv.saturation)
+                        s->hsv.hue = old_hue;
+                }
+                if (i < 3)
+                    *color = cui_color_from_hsv(s->hsv);
+            }
+            if (event.type == CUI_EVENT_POINTER_UP || event.type == CUI_EVENT_CANCEL)
+                pressed[i] = false;
+        }
+    }
+    for (unsigned i = 0; i < 7; ++i) {
+        if (!o.alpha && (i == 2 || i == 6))
+            continue;
+        float value = i == 0   ? s->hsv.hue
+                      : i == 1 ? s->hsv.saturation
+                      : i == 2 ? s->hsv.alpha
+                      : i == 3 ? color->r
+                      : i == 4 ? color->g
+                      : i == 5 ? color->b
+                               : color->a;
+        cui_id part = cui_color_part_id(id, parts[i]);
+        cui_update_semantic(ui, part, false, value);
+        cui_set_semantic_details(
+            ui, part,
+            (cui_semantic_details){
+                .readonly = o.readonly,
+                .parent = id,
+                .minimum = 0,
+                .maximum = i == 0  ? 360
+                           : i < 3 ? 1
+                                   : 255,
+                .description = i == 1 ? cui_string("Left/Right saturation; Up/Down brightness")
+                                      : (cui_str){0}});
+    }
+    s->dragging = 0;
+    for (unsigned i = 0; i < 7; ++i)
+        if (pressed[i])
+            s->dragging |= 1u << i;
+    s->last_color = *color;
+    bool changed = !cui_picker_equal_color(before, *color);
     if (changed)
         cui_invalidate(ui);
     return changed;

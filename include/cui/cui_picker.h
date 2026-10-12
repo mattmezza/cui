@@ -82,6 +82,31 @@ bool cui_base_time_field(cui_context *, cui_id, cui_str, cui_time_state *, cui_t
                          cui_time_options);
 bool cui_time_field(cui_context *, cui_id, const cui_theme *, cui_str, cui_time_state *, cui_time *,
                     cui_time_options);
+typedef struct {
+    float hue, saturation, value, alpha;
+} cui_hsv;
+typedef struct {
+    cui_hsv hsv;
+    cui_color last_color;
+    bool initialized;
+    unsigned dragging;
+} cui_color_state;
+typedef struct {
+    bool alpha, disabled, readonly;
+    float width;
+    const cui_color *palette;
+    size_t palette_count;
+} cui_color_picker_options;
+cui_hsv cui_color_to_hsv(cui_color);
+cui_color cui_color_from_hsv(cui_hsv);
+bool cui_color_parse_hex(cui_str, cui_color *);
+size_t cui_color_format_hex(cui_color, bool alpha, char *output, size_t capacity);
+/* Parts 1=hue,2=saturation/value plane,3=alpha;20..23=RGBA,100+i=palette. */
+cui_id cui_color_part_id(cui_id, unsigned part);
+bool cui_base_color_picker(cui_context *, cui_id, cui_color_state *, cui_color *,
+                           cui_color_picker_options);
+bool cui_color_picker(cui_context *, cui_id, const cui_theme *, cui_color_state *, cui_color *,
+                      cui_color_picker_options);
 #ifdef __cplusplus
 }
 #endif

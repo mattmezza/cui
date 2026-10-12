@@ -2,7 +2,7 @@
 
 The static site uses the same portable CUI C implementation as native applications, compiled to a WebAssembly reactor. The browser supplies Canvas text measurement, Canvas painting of CUI draw commands, and pointer/keyboard events. HTML supplies documentation navigation, search, themes and code snippets. It is an optional host, not a dependency of native CUI applications.
 
-Each live catalog entry now has a public C usage excerpt. These are frame-level fragments: create a context and theme, retain any state and IDs, and provide named callbacks before invoking them. `tests/web/test_snippets.py` checks all 78 entries against public function names, argument counts and constants, and compiles 29 displayed excerpts, including controls, content, media, hover, focus, message and clipboard examples, under C11 warnings as errors. The Chromium suite runs that check before exercising the copy button.
+Each live catalog entry has a public C usage excerpt. These are frame-level fragments: create a context and theme, retain any state and IDs, and provide named callbacks before invoking them. `tests/web/test_snippets.py` checks all 78 entries against public function names, argument counts and constants, then compiles every displayed excerpt with typed setup scaffolds under C11 warnings as errors. The Chromium suite runs that check before exercising the copy button.
 
 Build with Python 3 and **Zig 0.16.0**:
 

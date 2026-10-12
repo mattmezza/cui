@@ -2097,8 +2097,12 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===1')
             assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(8)') == 1
             wait_semantic('Question 2 of 2', 21)
+            skip_before_error = page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,2)', semantic_index('Skip', 1))
             click_semantic('Submit', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(7)===2')
+            wait_semantic('Answer or skip this question', 18)
+            skip_after_error = page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,2)', semantic_index('Skip', 1))
+            assert skip_after_error > skip_before_error, (skip_before_error, skip_after_error)
             click_semantic('Skip', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(1)===1&&cuiGallery.exports.gallery_questionnaire_stats(6)===1')
             assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(5)') == 1

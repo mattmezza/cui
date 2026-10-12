@@ -104,6 +104,9 @@ typedef struct {
     cui_hover_options tooltip_options;
 } cui_toggle_options;
 cui_toggle_options cui_toggle_options_default(void);
+/* Paint only; compose with independently registered headless toggle behavior.
+ * Does not register semantics, mutate state, invoke on_change or open tooltips. */
+void cui_toggle_paint(cui_context *, cui_id, const cui_theme *, cui_str, bool, cui_toggle_options);
 bool cui_toggle_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
                    cui_hover_state *tooltip_state, cui_toggle_options);
 typedef struct {

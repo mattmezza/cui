@@ -437,25 +437,12 @@ static bool cui_components_toggle_valid(cui_str label, cui_toggle_options o) {
            (!o.tooltip.length || o.tooltip.data);
 }
 
-bool cui_toggle_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
-                   cui_hover_state *tooltip_state, cui_toggle_options o) {
-    if (!ui || !id || !t || !value || !cui_components_toggle_valid(label, o) ||
-        !isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
-        return false;
-    cui_str name = o.accessibility_label.length ? o.accessibility_label
-                   : o.tooltip.length           ? o.tooltip
-                                                : label;
-    bool requested = *value;
-    bool changed = cui_base_toggle(ui, id, name, &requested, o.disabled);
-    if (changed) {
-        if (o.on_change)
-            o.on_change(o.change_user, requested);
-        else
-            *value = requested;
-    }
-    cui_update_semantic(ui, id, *value, *value ? 1 : 0);
-    cui_set_tab_stop(ui, id, !o.skip_tab);
-    bool accent = *value || (!o.disabled && cui_hovered(ui, id));
+void cui_toggle_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool value,
+                      cui_toggle_options o) {
+    if (!ui || !id || !t || !cui_components_toggle_valid(label, o) || !isfinite(t->font_size) ||
+        t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
+        return;
+    bool accent = value || (!o.disabled && cui_hovered(ui, id));
     float side = o.size == CUI_CONTROL_XSMALL  ? 20
                  : o.size == CUI_CONTROL_SMALL ? 24
                  : o.size == CUI_CONTROL_LARGE ? 36
@@ -502,6 +489,26 @@ bool cui_toggle_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label
     cui_end_box(ui);
     cui_end_box(ui);
     cui_end_box(ui);
+}
+bool cui_toggle_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
+                   cui_hover_state *tooltip_state, cui_toggle_options o) {
+    if (!ui || !id || !t || !value || !cui_components_toggle_valid(label, o) ||
+        !isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
+        return false;
+    cui_str name = o.accessibility_label.length ? o.accessibility_label
+                   : o.tooltip.length           ? o.tooltip
+                                                : label;
+    bool requested = *value;
+    bool changed = cui_base_toggle(ui, id, name, &requested, o.disabled);
+    if (changed) {
+        if (o.on_change)
+            o.on_change(o.change_user, requested);
+        else
+            *value = requested;
+    }
+    cui_update_semantic(ui, id, *value, *value ? 1 : 0);
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    cui_toggle_paint(ui, id, t, label, *value, o);
     if (tooltip_state && o.tooltip.length) {
         cui_hover_options tooltip = o.tooltip_options;
         tooltip.trigger = id;

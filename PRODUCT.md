@@ -1,5 +1,4 @@
 # Product
-<!-- impeccable:product-schema 1 -->
 ## Platform
 Native desktop C UI; portable architecture for additional targets.
 ## Stack

@@ -30,6 +30,7 @@ typedef struct {
     uint32_t clay_id;
     size_t parent;
     bool clip;
+    int16_t layer;
 } cui_core_box_node;
 typedef struct {
     cui_id id;
@@ -51,6 +52,7 @@ struct cui_context {
     size_t *semantic_nodes;
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
     cui_rect *previous_hits;
+    int16_t *previous_layers;
     cui_semantic *semantics, *previous;
     size_t semantic_count, previous_count;
     cui_id *ids, *activations;
@@ -146,6 +148,7 @@ cui_context *cui_create(cui_config config) {
     ui->nodes = calloc(config.max_elements, sizeof(*ui->nodes));
     ui->semantic_nodes = calloc(config.max_elements, sizeof(*ui->semantic_nodes));
     ui->previous_hits = calloc(config.max_elements, sizeof(*ui->previous_hits));
+    ui->previous_layers = calloc(config.max_elements, sizeof(*ui->previous_layers));
     Clay_Context *saved = Clay_GetCurrentContext();
     Clay_SetCurrentContext(NULL);
     Clay_SetMaxElementCount((int32_t)(config.max_elements + 32));
@@ -153,7 +156,7 @@ cui_context *cui_create(cui_config config) {
     ui->arena = malloc(n);
     if (!ui->commands || !ui->semantics || !ui->previous || !ui->ids || !ui->activations ||
         !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings || !ui->nodes ||
-        !ui->semantic_nodes || !ui->previous_hits || !ui->arena) {
+        !ui->semantic_nodes || !ui->previous_hits || !ui->previous_layers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -180,6 +183,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->nodes);
     free(ui->semantic_nodes);
     free(ui->previous_hits);
+    free(ui->previous_layers);
     free(ui->commands);
     free(ui->semantics);
     free(ui->previous);
@@ -193,7 +197,23 @@ static bool cui_core_inside(cui_rect r, float x, float y) {
     return r.w > 0 && r.h > 0 && x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
 }
 static bool cui_core_focusable(const cui_semantic *s) {
-    return !s->disabled && s->role != CUI_ROLE_NONE && s->role != CUI_ROLE_LABEL;
+    if (s->disabled)
+        return false;
+    switch (s->role) {
+    case CUI_ROLE_BUTTON:
+    case CUI_ROLE_CHECKBOX:
+    case CUI_ROLE_SWITCH:
+    case CUI_ROLE_RADIO:
+    case CUI_ROLE_SLIDER:
+    case CUI_ROLE_TEXTBOX:
+    case CUI_ROLE_TAB:
+    case CUI_ROLE_OPTION:
+    case CUI_ROLE_MENUITEM:
+    case CUI_ROLE_TREEITEM:
+        return true;
+    default:
+        return false;
+    }
 }
 static bool cui_core_scope_contains(const cui_core_focus_scope *scopes, size_t child,
                                     size_t ancestor) {
@@ -211,11 +231,15 @@ static bool cui_core_previous_allowed(cui_context *ui, size_t i) {
                                    ui->previous_top_modal);
 }
 static cui_id cui_core_hit(cui_context *ui, float x, float y) {
-    for (size_t i = ui->previous_count; i > 0; i--)
-        if (cui_core_focusable(&ui->previous[i - 1]) && cui_core_previous_allowed(ui, i - 1) &&
-            cui_core_inside(ui->previous_hits[i - 1], x, y))
-            return ui->previous[i - 1].id;
-    return 0;
+    cui_id hit = 0;
+    int16_t layer = INT16_MIN;
+    for (size_t i = 0; i < ui->previous_count; i++)
+        if (cui_core_focusable(&ui->previous[i]) && cui_core_previous_allowed(ui, i) &&
+            cui_core_inside(ui->previous_hits[i], x, y) && ui->previous_layers[i] >= layer) {
+            hit = ui->previous[i].id;
+            layer = ui->previous_layers[i];
+        }
+    return hit;
 }
 static void cui_core_activate(cui_context *ui, cui_id id) {
     if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
@@ -232,7 +256,8 @@ static void cui_core_tab(cui_context *ui, bool reverse) {
                                   : (found + ui->previous_count - step) % ui->previous_count)
                            : (found == ui->previous_count ? step - 1
                                                           : (found + step) % ui->previous_count);
-        if (cui_core_focusable(&ui->previous[i]) && cui_core_previous_allowed(ui, i)) {
+        if (cui_core_focusable(&ui->previous[i]) && ui->previous[i].tab_index >= 0 &&
+            cui_core_previous_allowed(ui, i)) {
             ui->focus = ui->previous[i].id;
             break;
         }
@@ -375,7 +400,8 @@ static Clay_SizingAxis cui_core_axis(float n) {
 static uint16_t cui_core_scalar(float x) {
     return !isfinite(x) || x < 0 ? 0 : x > 65535 ? 65535 : (uint16_t)x;
 }
-void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
+static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_rect *portal,
+                               int16_t layer) {
     if (!cui_core_active(ui))
         return;
     if (ui->depth == CUI_CORE_STACK_MAX || ui->overflow_depth) {
@@ -403,7 +429,11 @@ void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
         ui->ids[ui->id_count++] = id;
     uint32_t internal_id = cui_core_folded(id ? id : (cui_id)(ui->element_count + 0x80000000u));
     size_t parent = ui->depth > 1 ? ui->node_stack[ui->depth - 2] : SIZE_MAX;
-    ui->nodes[ui->node_count] = (cui_core_box_node){internal_id, parent, b.clip};
+    if (portal)
+        parent = SIZE_MAX;
+    else if (parent != SIZE_MAX)
+        layer = ui->nodes[parent].layer;
+    ui->nodes[ui->node_count] = (cui_core_box_node){internal_id, parent, b.clip, layer};
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
@@ -414,9 +444,32 @@ void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
                    .layoutDirection = b.row ? CLAY_LEFT_TO_RIGHT : CLAY_TOP_TO_BOTTOM},
         .backgroundColor = {b.background.r, b.background.g, b.background.b, b.background.a},
         .cornerRadius = CLAY_CORNER_RADIUS(b.radius),
+        .floating = {.offset = portal ? (Clay_Vector2){portal->x, portal->y} : (Clay_Vector2){0},
+                     .zIndex = layer,
+                     .attachTo = portal ? CLAY_ATTACH_TO_ROOT : CLAY_ATTACH_TO_NONE,
+                     .clipTo = CLAY_CLIP_TO_NONE},
         .clip = {.horizontal = b.clip, .vertical = b.clip},
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a},
                    .width = {bw, bw, bw, bw, 0}}});
+}
+void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
+    cui_core_begin_box(ui, id, b, NULL, 0);
+}
+void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, int16_t layer) {
+    if (!isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
+        bounds.w < 0 || bounds.h < 0 || layer <= 0) {
+        /* Preserve the begin/end stack contract while suppressing malformed content. */
+        cui_begin_box(ui, id, (cui_box){0});
+        if (ui && ui->depth && ui->opened[ui->depth - 1]) {
+            Clay__CloseElement();
+            ui->opened[ui->depth - 1] = false;
+        }
+        cui_core_fail(ui, CUI_ERROR_LAYOUT);
+        return;
+    }
+    box.width = bounds.w;
+    box.height = bounds.h;
+    cui_core_begin_box(ui, id, box, &bounds, layer);
 }
 void cui_end_box(cui_context *ui) {
     if (!cui_core_active(ui))
@@ -544,8 +597,14 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
         ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX;
     ui->semantic_nodes[ui->semantic_count] =
         ui->depth && ui->opened[ui->depth - 1] ? ui->node_stack[ui->depth - 1] : SIZE_MAX;
-    ui->semantics[ui->semantic_count++] = (cui_semantic){
-        id, role, bounds, cui_core_copy_string(ui, name), disabled, checked, out.focused, value};
+    ui->semantics[ui->semantic_count++] = (cui_semantic){.id = id,
+                                                         .role = role,
+                                                         .bounds = bounds,
+                                                         .name = cui_core_copy_string(ui, name),
+                                                         .disabled = disabled,
+                                                         .checked = checked,
+                                                         .focused = out.focused,
+                                                         .value = value};
     return out;
 }
 static cui_color cui_core_color(Clay_Color c) {
@@ -620,6 +679,8 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             }
         }
         ui->previous_hits[i] = clipped;
+        ui->previous_layers[i] =
+            ui->semantic_nodes[i] == SIZE_MAX ? 0 : ui->nodes[ui->semantic_nodes[i]].layer;
         if (cui_core_focusable(s)) {
             retained |= s->id == ui->focus;
             if (cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
@@ -759,5 +820,41 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
             return true;
         }
     ui->focus = 0;
+    return false;
+}
+
+void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details) {
+    if (!cui_core_active(ui))
+        return;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            details.description = cui_core_copy_string(ui, details.description);
+            ui->semantics[i].details = details;
+            return;
+        }
+}
+void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
+    if (!cui_core_active(ui))
+        return;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            ui->semantics[i].tab_index = enabled ? 0 : -1;
+            return;
+        }
+}
+
+bool cui_hovered(cui_context *ui, cui_id id) {
+    if (!ui || !id)
+        return false;
+    for (size_t i = 0; i < ui->previous_count; i++)
+        if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i) &&
+            cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y)) {
+            for (size_t j = 0; j < ui->previous_count; j++)
+                if (ui->previous_layers[j] > ui->previous_layers[i] &&
+                    cui_core_previous_allowed(ui, j) && cui_core_focusable(&ui->previous[j]) &&
+                    cui_core_inside(ui->previous_hits[j], ui->pointer_x, ui->pointer_y))
+                    return false;
+            return true;
+        }
     return false;
 }

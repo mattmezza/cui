@@ -71,8 +71,29 @@ typedef enum {
     CUI_ROLE_SLIDER,
     CUI_ROLE_TEXTBOX,
     CUI_ROLE_LABEL,
-    CUI_ROLE_TAB
+    CUI_ROLE_TAB,
+    CUI_ROLE_GROUP,
+    CUI_ROLE_TABLIST,
+    CUI_ROLE_TABPANEL,
+    CUI_ROLE_LIST,
+    CUI_ROLE_LISTBOX,
+    CUI_ROLE_OPTION,
+    CUI_ROLE_MENU,
+    CUI_ROLE_MENUITEM,
+    CUI_ROLE_DIALOG,
+    CUI_ROLE_ALERT,
+    CUI_ROLE_STATUS,
+    CUI_ROLE_IMAGE,
+    CUI_ROLE_PROGRESSBAR,
+    CUI_ROLE_TREE,
+    CUI_ROLE_TREEITEM
 } cui_role;
+typedef struct {
+    bool expanded, selected, readonly, multiline, required, invalid;
+    cui_id controls, labelled_by, parent;
+    cui_str description;
+    float minimum, maximum;
+} cui_semantic_details;
 typedef struct {
     cui_id id;
     cui_role role;
@@ -80,6 +101,8 @@ typedef struct {
     cui_str name;
     bool disabled, checked, focused;
     float value;
+    cui_semantic_details details;
+    int tab_index; /* 0: Tab stop; -1: pointer/programmatic focus only. */
 } cui_semantic;
 typedef struct {
     bool hovered, pressed, focused, focus_visible, activated;
@@ -129,16 +152,24 @@ cui_id cui_id_from(cui_context *ui, const char *key);
 bool cui_push_id(cui_context *ui, const char *key);
 void cui_pop_id(cui_context *ui);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
+/* Floating viewport coordinates, independent of ancestor clipping/layout.
+ * layer must be positive. Close with cui_end_box. Portal dimensions come from
+ * bounds (zero dimensions fit contents); box controls styling and child layout. */
+void cui_begin_portal(cui_context *ui, cui_id id, cui_box box, cui_rect bounds, int16_t layer);
 void cui_end_box(cui_context *ui);
 void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */
 void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value);
+void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details);
+void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled);
 /* Target resolved in input order against previous frame regions. */
 cui_id cui_event_target(cui_context *ui, size_t index);
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
+/* Previous-frame clipped region, excluding higher interactive layers/modal scopes. */
+bool cui_hovered(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);
 void cui_focus(cui_context *ui, cui_id id);
 bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal);

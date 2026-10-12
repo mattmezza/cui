@@ -350,6 +350,106 @@ static void test_focus_scopes(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void portal_frame(cui_context *ui, bool *high, bool *low, bool *back) {
+    cui_begin_box(ui, 90, (cui_box){.width = 40, .height = 40, .clip = true});
+    /* Submit highest first: hit testing must follow paint layer, not source order. */
+    cui_begin_portal(ui, 91, (cui_box){.background = {255, 0, 0, 255}}, (cui_rect){80, 70, 100, 30},
+                     20);
+    *high = cui_interact(ui, 91, CUI_ROLE_BUTTON, cui_string("high"), false, false, 0).activated;
+    cui_end_box(ui);
+    cui_begin_portal(ui, 92, (cui_box){.background = {0, 255, 0, 255}}, (cui_rect){80, 70, 100, 30},
+                     10);
+    *low = cui_interact(ui, 92, CUI_ROLE_BUTTON, cui_string("low"), false, false, 0).activated;
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_begin_portal(ui, 93, (cui_box){.background = {0, 0, 255, 255}}, (cui_rect){80, 70, 100, 30},
+                     1);
+    *back = cui_interact(ui, 93, CUI_ROLE_BUTTON, cui_string("back"), false, false, 0).activated;
+    cui_end_box(ui);
+}
+static void test_portals(void) {
+    cui_context *ui = make();
+    bool high, low, back;
+    begin(ui);
+    portal_frame(ui, &high, &low, &back);
+    cui_draw_list list = cui_end_frame(ui);
+    int red = -1, green = -1, blue = -1;
+    for (size_t i = 0; i < list.count; i++) {
+        cui_draw_command c = list.commands[i];
+        if (c.type != CUI_DRAW_RECT || c.bounds.w != 100)
+            continue;
+        assert(c.bounds.x == 80 && c.bounds.y == 70 && c.bounds.h == 30);
+        if (c.color.r == 255)
+            red = (int)i;
+        if (c.color.g == 255)
+            green = (int)i;
+        if (c.color.b == 255)
+            blue = (int)i;
+    }
+    assert(blue >= 0 && green > blue && red > green);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 90, 80, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 90, 80, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 91);
+    assert(cui_hovered(ui, 91));
+    assert(!cui_hovered(ui, 92));
+    assert(!cui_hovered(ui, 93));
+    portal_frame(ui, &high, &low, &back);
+    cui_end_frame(ui);
+    assert(high && !low && !back);
+    assert(cui_last_error(ui) == CUI_OK);
+    begin(ui);
+    cui_begin_portal(ui, 100, (cui_box){0}, (cui_rect){0, 0, -1, 10}, 1);
+    cui_text(ui, cui_string("suppressed"), 12, (cui_color){0});
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_ERROR_LAYOUT);
+    cui_destroy(ui);
+}
+static void test_semantic_details_and_roving(void) {
+    cui_context *ui = make();
+    begin(ui);
+    cui_begin_box(ui, 90, (cui_box){.width = 200, .height = 200});
+    cui_interact(ui, 90, CUI_ROLE_GROUP, cui_string("group"), false, false, 0);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_set_tab_stop(ui, 1, false);
+    char description[] = "description";
+    cui_set_semantic_details(ui, 2,
+                             (cui_semantic_details){.expanded = true,
+                                                    .selected = true,
+                                                    .controls = 20,
+                                                    .parent = 90,
+                                                    .description = cui_string(description)});
+    memset(description, 'X', sizeof(description) - 1);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    assert(count == 3 && nodes[1].tab_index == -1);
+    assert(nodes[2].details.expanded && nodes[2].details.selected);
+    assert(nodes[2].details.controls == 20 && nodes[2].details.parent == 90);
+    assert(nodes[2].details.description.length == 11);
+    assert(memcmp(nodes[2].details.description.data, "description", 11) == 0);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 2);
+    control(ui, 1, false);
+    cui_set_tab_stop(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    /* A roving item remains pointer focusable. */
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 1);
+    control(ui, 1, false);
+    cui_set_tab_stop(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_input();
     test_strings_and_draw();
@@ -358,6 +458,8 @@ int main(void) {
     test_numeric_id_text_domains();
     test_creation_overflow();
     test_focus_scopes();
+    test_portals();
+    test_semantic_details_and_roving();
     puts("core tests passed");
     return 0;
 }

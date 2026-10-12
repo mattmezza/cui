@@ -74,6 +74,19 @@ static void test_inline_image_objects(void) {
     assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
     assert(f.glyphs[0].bounds.y == f.glyphs[2].bounds.y && f.glyphs[2].bounds.x == 37 &&
            (f.glyphs[2].flags & CUI_TEXT_VIEW_BOLD));
+    o.body_metrics = (cui_font_metrics){40, 0, 40};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.h == 30 && f.spans[1].image_bounds.y == 15 &&
+           f.glyphs[1].bounds.h == 30);
+    o.width = 30;
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.spans[1].image_bounds.y == 35 && f.glyphs[2].bounds.y == 50 &&
+           f.blocks[0].bounds.h == 70);
+    o.width = 200;
+    o.body_metrics = (cui_font_metrics){0, 40, 40};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[0].bounds.y == 10 && f.spans[1].image_bounds.y == 0 &&
+           f.blocks[0].bounds.h == 30);
     assert(cui_text_view_select(&f.state, 1, 2));
     cui_text_view_range range;
     assert(cui_text_view_selected_source_range(&f.state, &range) && range.begin == 1 &&
@@ -87,6 +100,21 @@ static void test_inline_image_objects(void) {
            CUI_TEXT_VIEW_OK);
     assert(f.state.span_count == 3 && f.spans[0].text.end == 1 && f.spans[1].text.begin == 1 &&
            f.spans[1].text.end == 2);
+    assert(cui_text_view_set_text(&f.state, text("| a![alt](asset)b |\n| :---: |")) ==
+           CUI_TEXT_VIEW_OK);
+    o.width = 200;
+    o.body_metrics = (cui_font_metrics){8, 2, 10};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    bool aligned = false;
+    for (size_t i = 0; i < f.state.glyph_count; ++i) {
+        cui_text_view_glyph *glyph = &f.glyphs[i];
+        cui_text_view_span *span = &f.spans[glyph->span];
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            aligned = true;
+            assert(glyph->bounds.x > 50 && span->image_bounds.x == glyph->bounds.x);
+        }
+    }
+    assert(aligned);
 }
 static void test_image_font_metrics(void) {
     fixture f;

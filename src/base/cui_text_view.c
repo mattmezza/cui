@@ -1463,6 +1463,46 @@ static bool cui_text_view_metrics_valid(cui_font_metrics m) {
            m.descent >= 0 && m.line_height > 0 && m.line_height <= 10000000 &&
            m.ascent + m.descent > 0 && m.ascent + m.descent <= 10000000;
 }
+static float cui_text_view_finish_inline_line(cui_text_view_state *s, size_t first, float y,
+                                              float line, cui_text_view_layout_options o) {
+    float baseline =
+        o.font_metrics_available
+            ? (line - o.body_metrics.ascent - o.body_metrics.descent) * .5f + o.body_metrics.ascent
+            : 0;
+    float ascent = o.font_metrics_available ? baseline : 0;
+    float descent = o.font_metrics_available ? line - baseline : line;
+    bool image = false;
+    for (size_t i = first; i < s->glyph_count; ++i) {
+        cui_text_view_span *span = &s->workspace.spans[s->workspace.glyphs[i].span];
+        if (!(span->flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        image = true;
+        float h = span->image_bounds.h;
+        float b =
+            o.font_metrics_available ? fminf(h, fmaxf(0, h * .5f + baseline - line * .5f)) : 0;
+        ascent = fmaxf(ascent, b);
+        descent = fmaxf(descent, h - b);
+    }
+    if (!image)
+        return line;
+    float height = ascent + descent;
+    if (!isfinite(height) || height <= 0 || height > 10000000)
+        return NAN;
+    for (size_t i = first; i < s->glyph_count; ++i) {
+        cui_text_view_glyph *glyph = &s->workspace.glyphs[i];
+        cui_text_view_span *span = &s->workspace.spans[glyph->span];
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+            float h = span->image_bounds.h;
+            float b =
+                o.font_metrics_available ? fminf(h, fmaxf(0, h * .5f + baseline - line * .5f)) : 0;
+            span->image_bounds.y = y + ascent - b;
+            glyph->bounds.y = y;
+            glyph->bounds.h = height;
+        } else
+            glyph->bounds.y += ascent - baseline;
+    }
+    return height;
+}
 static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, float x, float y,
                                        float width, cui_text_view_layout_options o,
                                        cui_text_view_measure_fn measure, void *user) {
@@ -1504,7 +1544,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     b->image_line = (cui_rect){0};
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
     float cursor_x = 0, cursor_y = 0;
-    size_t first_glyph = s->glyph_count;
+    size_t first_glyph = s->glyph_count, line_first = first_glyph;
     if (b->kind == CUI_TEXT_VIEW_RULE) {
         b->bounds = (cui_rect){x, y, width, 1};
         return true;
@@ -1546,7 +1586,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
                   o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
                 cursor_x = 0;
-                cursor_y += line;
+                float height = cui_text_view_finish_inline_line(s, line_first,
+                                                                y + padding + cursor_y, line, o);
+                if (!isfinite(height))
+                    return false;
+                cursor_y += height;
+                line_first = s->glyph_count;
             }
             float top = 0;
             if (o.font_metrics_available) {
@@ -1575,7 +1620,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 return false;
             if (s->workspace.rendered[i] == '\n') {
                 cursor_x = 0;
-                cursor_y += line;
+                float height = cui_text_view_finish_inline_line(s, line_first,
+                                                                y + padding + cursor_y, line, o);
+                if (!isfinite(height))
+                    return false;
+                cursor_y += height;
+                line_first = s->glyph_count;
                 i += n;
                 segment = i;
                 measured = 0;
@@ -1597,7 +1647,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                     return false;
                 if (word_size.width > available - cursor_x) {
                     cursor_x = 0;
-                    cursor_y += line;
+                    float height = cui_text_view_finish_inline_line(
+                        s, line_first, y + padding + cursor_y, line, o);
+                    if (!isfinite(height))
+                        return false;
+                    cursor_y += height;
+                    line_first = s->glyph_count;
                     segment = i;
                     measured = 0;
                 }
@@ -1611,7 +1666,12 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                 !(b->kind == CUI_TEXT_VIEW_TABLE_CELL &&
                   o.table_mode == CUI_TEXT_VIEW_TABLE_NOWRAP)) {
                 cursor_x = 0;
-                cursor_y += line;
+                float height = cui_text_view_finish_inline_line(s, line_first,
+                                                                y + padding + cursor_y, line, o);
+                if (!isfinite(height))
+                    return false;
+                cursor_y += height;
+                line_first = s->glyph_count;
                 segment = i;
                 measured = 0;
                 m = measure(user, (cui_str){s->workspace.rendered + i, n}, size, flags);
@@ -1648,8 +1708,18 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
             first = last;
         }
     }
+    for (size_t i = first_glyph; i < s->glyph_count; ++i) {
+        cui_text_view_glyph *glyph = &s->workspace.glyphs[i];
+        cui_text_view_span *span = &s->workspace.spans[glyph->span];
+        if (span->flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+            span->image_bounds.x = glyph->bounds.x;
+    }
     b->actions_height = b->kind == CUI_TEXT_VIEW_CODE_BLOCK ? o.code_actions_height : 0;
-    b->bounds = (cui_rect){x, y, width, cursor_y + line + padding * 2};
+    float final_height =
+        cui_text_view_finish_inline_line(s, line_first, y + padding + cursor_y, line, o);
+    if (!isfinite(final_height))
+        return false;
+    b->bounds = (cui_rect){x, y, width, cursor_y + final_height + padding * 2};
     return true;
 }
 static bool cui_text_view_table_widths(cui_text_view_state *s, size_t first, size_t end,

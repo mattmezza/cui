@@ -238,3 +238,8 @@ image uses heading metrics rather than regular body metrics. The callback supers
 fixed body metrics and may decline measurement; unavailable or invalid callback
 metrics use top alignment. Host bitmap validity follows the shared core contract,
 and invalid loader output becomes an unloaded slot instead of a malformed draw.
+
+Each mixed image line expands its logical ascent and descent from the actual body
+baseline and image baseline. Wrapped following lines begin after that complete
+logical extent, including fonts whose ascent or descent exceeds the requested line
+height. Text-only lines retain their requested logical height.

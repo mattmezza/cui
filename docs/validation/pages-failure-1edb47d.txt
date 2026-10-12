@@ -1,0 +1,22 @@
+build	Exercise component behavior in Chromium	﻿2026-10-12T18:42:17.4008377Z ##[group]Run uv run tests/web/test_browser.py
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4008600Z ^[[36;1muv run tests/web/test_browser.py^[[0m
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4062200Z shell: /usr/bin/bash -e {0}
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4062346Z env:
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4062500Z   pythonLocation: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4062747Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib/pkgconfig
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4062988Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4063202Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4063412Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.12.15/x64
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4063625Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.12.15/x64/lib
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4063808Z ##[endgroup]
+build	Exercise component behavior in Chromium	2026-10-12T18:42:17.4478392Z Installed 4 packages in 8ms
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5404581Z Traceback (most recent call last):
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5410653Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 2274, in <module>
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5411247Z     main()
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5411575Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 2151, in main
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5411931Z     click_semantic('Start over', 1)
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5412310Z   File "/home/runner/work/cui/cui/tests/web/test_browser.py", line 322, in click_semantic
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5413102Z     assert page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x':rectangle['x']+bounds[0]+bounds[2]/2,'y':rectangle['y']+bounds[1]+bounds[3]/2}), name
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5413900Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5414147Z AssertionError: Start over
+build	Exercise component behavior in Chromium	2026-10-12T18:43:12.5783684Z ##[error]Process completed with exit code 1.

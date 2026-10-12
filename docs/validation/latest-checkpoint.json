@@ -35,13 +35,13 @@
     }
   ],
   "previous_deployment": {
-    "source": "2b917ab720f8ccd9f7a0683cc0e1e836631aab47",
+    "source": "1edb47d60bce812d15c74aa41fff975c217086a9",
     "status": "failed",
-    "run": 38290133858,
-    "framework_ci_run": 38290133884,
+    "run": 38292612958,
+    "framework_ci_run": 38292613003,
     "framework_ci_status": "success",
-    "reason": "Hosted browser timed out after Questionnaire Start over in shortcut coverage (line2141). Investigating; published04e044e remains full HTTPS78 verified.",
-    "log": "pages-failure-2b917ab.txt"
+    "reason": "Physical click helper failed elementFromPoint for first Start over after Skip completion. Investigating stale semantic index across awaited scrolling and viewport visibility. Public04e044e remains HTTPS78 verified.",
+    "log": "pages-failure-1edb47d.txt"
   },
   "published_evidence": "published-04e044e.txt",
   "deployment": {

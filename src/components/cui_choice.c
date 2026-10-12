@@ -212,6 +212,8 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
         box.align_y = CUI_ALIGN_CENTER;
         tab_foreground =
             cui_tab_palette(&box, theme, variant, selected, disabled, cui_hovered(ui, item->id));
+        if (variant == CUI_TAB_DEFAULT && index == 0 && parts && parts->omit_leading_border)
+            box.border_edges.left = 0;
     }
     if (metrics && indicator_ready && selected && !disabled) {
         if (variant == CUI_TAB_PILL)

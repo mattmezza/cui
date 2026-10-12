@@ -667,3 +667,8 @@ Headless tests check tail placement, range and density, wheel-to-end plus button
 routing in a custom tail, and event suppression for an explicit zero-width tail.
 This changes a 100px tab with suffix in a 110px viewport from no overflow to a
 2px scroll range, as the 12px tail now participates in the range.
+
+Per-item parts also expose `omit_leading_border`, matching the frozen first
+Default tab's `tab_bar_prefix(false)` policy. It removes only that first tab's
+left edge; later tabs and other variants keep their own edge policy. Rendered
+edge tests cover default, opted-out, disabled selected and a later selected tab.

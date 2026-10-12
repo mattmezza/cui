@@ -3189,7 +3189,41 @@ static void test_tab_scroll_tail(void) {
     assert(!overflow.visible && cui_bounds(ui, 1 ^ UINT64_C(0x4c2c9f0875e4b4c0)).w == 12);
     cui_destroy(ui);
 }
+static void test_first_tab_border_policy(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {{10, {"First", 5}, false}, {20, {"Second", 6}, false}};
+    cui_tab_parts parts[] = {{0}, {.omit_leading_border = true}};
+    cui_id selected = 10;
+    for (int phase = 0; phase < 4; phase++) {
+        parts[0].omit_leading_border = phase >= 1;
+        if (phase == 3)
+            selected = 20;
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        cui_tabs(ui, 1, &theme, entries, 2, &selected,
+                 (cui_tabs_options){.parts = parts, .parts_count = 2, .disabled = phase == 2}, NULL,
+                 NULL);
+        cui_draw_list draw = cui_end_frame(ui);
+        cui_rect bounds = cui_bounds(ui, selected);
+        bool border = false;
+        for (size_t i = 0; i < draw.count; i++) {
+            cui_draw_command command = draw.commands[i];
+            if (command.type == CUI_DRAW_BORDER && command.bounds.x == bounds.x &&
+                command.bounds.y == bounds.y && command.bounds.w == bounds.w &&
+                command.bounds.h == bounds.h) {
+                assert(command.custom_border_edges && command.border_edges.right == 1 &&
+                       command.border_edges.top == 0 && command.border_edges.bottom == 0);
+                assert(command.border_edges.left == (phase == 1 || phase == 2 ? 0 : 1));
+                border = true;
+            }
+        }
+        assert(border);
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    test_first_tab_border_policy();
     test_tab_scroll_tail();
     test_tab_shared_indicator();
     test_tab_retained_spring();

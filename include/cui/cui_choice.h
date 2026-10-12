@@ -75,6 +75,7 @@ typedef struct {
     cui_choice_render_fn prefix, suffix, icon;
     void *user;
     float prefix_width, suffix_width;
+    bool omit_leading_border; /* first Default tab: source tab_bar_prefix(false) */
 } cui_tab_parts;
 typedef struct {
     bool vertical, disabled, manual_activation;

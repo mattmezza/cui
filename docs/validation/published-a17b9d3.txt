@@ -1,0 +1,5 @@
+Pages run 38299778642 succeeded. All seven served asset files match its downloaded github-pages artifact byte for byte.
+Portable CI run 38299778656 failed on Windows because Chart and shared TextView test buffers exceeded the 1 MiB stack; fix 0a32585 is undergoing CI.
+
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting

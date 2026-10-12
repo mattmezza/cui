@@ -4,3 +4,5 @@
 *.ppm binary
 *.spv binary
 *.wasm binary
+# Preserve pinned upstream license bytes for dependency hash verification.
+third_party/nanosvg/LICENSE -text

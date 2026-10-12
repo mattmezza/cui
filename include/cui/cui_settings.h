@@ -3,7 +3,9 @@
 #define CUI_SETTINGS_H
 #include "cui.h"
 #include "cui_choice.h"
+#ifndef CUI_COMPONENTS_H
 #include "cui_components.h"
+#endif
 #include "cui_edit.h"
 #include "cui_resizable.h"
 #include "cui_sidebar.h"

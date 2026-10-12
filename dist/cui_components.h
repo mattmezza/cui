@@ -170,6 +170,7 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #ifdef __cplusplus
 }
 #endif
+#include "cui_settings.h"
 #endif
 
 #if defined(CUI_COMPONENTS_IMPLEMENTATION) && !defined(CUI_COMPONENTS_IMPLEMENTATION_ONCE)
@@ -262,6 +263,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_TEXTAREA_IMPLEMENTATION
 #endif
 #include "cui_textarea.h"
+#ifndef CUI_SETTINGS_IMPLEMENTATION
+#define CUI_SETTINGS_IMPLEMENTATION
+#endif
+#include "cui_settings.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

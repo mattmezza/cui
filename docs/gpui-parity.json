@@ -3759,29 +3759,44 @@
       "reference_url": "https://gpui-kit.com/component/textarea/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_textarea.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_textarea.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Measured wrap, selection, clipboard, history, XS/S/M/L and auto-grow have headless tests. Tab indentation, grapheme shaping/bidi, IME, atomic inline tokens and complete first-frame grow layout remain unfinished; see docs/TEXTAREA.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "multiline editing/selection",
-          "status": "not_started",
-          "evidence": []
+          "name": "UTF-8 scalar multiline editing and selection",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_textarea.c"
+          ]
         },
         {
-          "name": "wrap and auto-grow",
-          "status": "not_started",
-          "evidence": []
+          "name": "measured wrapping, auto-grow and viewport navigation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_textarea.c"
+          ]
         },
         {
-          "name": "clipboard/IME/undo/semantics",
+          "name": "clipboard, undo history and multiline semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_textarea.c"
+          ]
+        },
+        {
+          "name": "complete documented source behavior and visual parity",
           "status": "not_started",
           "evidence": []
         }
@@ -4606,29 +4621,44 @@
       "reference_url": "https://gpui-kit.com/component/settings/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_settings.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_settings.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Searchable pages/groups, filtered reset and actual field composition tested. Input/NumberInput sizes, exact Dropdown presentation, reset tooltip, Unicode search, virtualization and rich descriptions remain partial; see docs/SETTINGS.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "grouped settings models",
-          "status": "not_started",
-          "evidence": []
+          "name": "grouped settings and filtered reset",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_settings.c"
+          ]
         },
         {
-          "name": "validation and persistence hooks",
-          "status": "not_started",
-          "evidence": []
+          "name": "controlled fields, custom callbacks and search selection",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_settings.c"
+          ]
         },
         {
-          "name": "keyboard/accessibility composition",
+          "name": "keyboard controls, sidebar resizing and group scrolling",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_settings.c"
+          ]
+        },
+        {
+          "name": "complete documented source behavior and visual parity",
           "status": "not_started",
           "evidence": []
         }
@@ -4787,29 +4817,44 @@
       "reference_url": "https://gpui-kit.com/component/sidebar/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_sidebar.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_sidebar.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Variable-height bounded navigation, nested items, independent carets, callbacks and animated Icon/Offcanvas collapse are tested. Full font-weight styling, intrinsic virtual measurement and host popup placement remain partial; see docs/SIDEBAR.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "hierarchical navigation",
-          "status": "not_started",
-          "evidence": []
+          "name": "hierarchical navigation and virtual rows",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_sidebar.c"
+          ]
         },
         {
-          "name": "collapsed/selected/disabled state",
-          "status": "not_started",
-          "evidence": []
+          "name": "controlled collapse, selection and disabled state",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_sidebar.c"
+          ]
         },
         {
-          "name": "keyboard and accessible navigation",
+          "name": "keyboard activation, semantics and composed callbacks",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_sidebar.c"
+          ]
+        },
+        {
+          "name": "complete documented source behavior and visual parity",
           "status": "not_started",
           "evidence": []
         }

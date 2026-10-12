@@ -35,6 +35,8 @@ SOURCES = (
     "src/components/cui_sidebar.c",
     "src/base/cui_textarea.c",
     "src/components/cui_textarea.c",
+    "src/base/cui_settings.c",
+    "src/components/cui_settings.c",
     "src/base/cui_icon.c",
     "src/components/cui_icon.c",
     "src/base/cui_resizable.c",
@@ -71,7 +73,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:

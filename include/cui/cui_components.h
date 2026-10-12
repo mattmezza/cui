@@ -169,4 +169,5 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #ifdef __cplusplus
 }
 #endif
+#include "cui_settings.h"
 #endif

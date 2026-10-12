@@ -1111,7 +1111,10 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     double edges[257] = {0}, inners[256], outers[256];
     for (size_t i = 0; i < o->count; i++) {
         (void)cui_chart_pie_radii(o, i, &inners[i], &outers[i]);
-        r = fmax(r, outers[i]);
+        double lift = !o->noninteractive
+                          ? fmin(1, fmax(0, s->pie_lift[i])) * fmin(1, fmax(0, s->emphasis_focus))
+                          : 0;
+        r = fmax(r, outers[i] + 6 * lift);
     }
     double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
     for (size_t i = 0; i < o->count; i++)
@@ -1138,9 +1141,14 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
             if (low == o->count || angle < edges[low] + o->pad_angle / 2 ||
                 angle >= edges[low + 1] - o->pad_angle / 2)
                 continue;
-            if (rr < inners[low] * inners[low] || rr > outers[low] * outers[low])
+            double focus = !o->noninteractive ? fmin(1, fmax(0, s->emphasis_focus)) : 0;
+            double lift = fmin(1, fmax(0, s->pie_lift[low])) * focus;
+            double outer = outers[low] + 6 * lift;
+            if (rr < inners[low] * inners[low] || rr > outer * outer)
                 continue;
-            cui_chart_pixel(s, o, x, y, cui_chart_palette(o, low));
+            cui_color color = cui_chart_palette(o, low);
+            color.a = (unsigned char)lround(color.a * (1 - .35 * focus * (1 - lift)));
+            cui_chart_pixel(s, o, x, y, color);
         }
     if (o->pie_show_labels) {
         cui_chart_pie_label labels[256];
@@ -1151,6 +1159,18 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
                                  : (o->grid.a ? o->grid : (cui_color){120, 120, 120, 255});
             for (size_t i = 0; i < o->count; i++)
                 if (labels[i].visible) {
+                    double focus = !o->noninteractive ? fmin(1, fmax(0, s->emphasis_focus)) : 0;
+                    double lift = fmin(1, fmax(0, s->pie_lift[i])) * focus;
+                    double label_radius =
+                        o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
+                    label_radius += o->pie_label_gap > 0 ? o->pie_label_gap : 15;
+                    double edge_radius = fmin(outers[i] + 6 * lift, label_radius);
+                    double dx = labels[i].edge_x - cx, dy = labels[i].edge_y - cy;
+                    double previous_radius = hypot(dx, dy);
+                    if (previous_radius > 0) {
+                        labels[i].edge_x = (float)(cx + dx * edge_radius / previous_radius);
+                        labels[i].edge_y = (float)(cy + dy * edge_radius / previous_radius);
+                    }
                     cui_color slice_line = o->pie_label_line_color_fn
                                                ? o->pie_label_line_color_fn(
                                                      &o->data[i], i, o->pie_label_line_color_user)
@@ -2347,6 +2367,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         state->emphasis_focus =
             instant ? (active ? 1 : 0)
                     : fmaxf(0, fminf(1, state->emphasis_focus + (active ? dt : -dt) / duration));
+        bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
         if (o->kind == CUI_CHART_BAR && active) {
             float target;
             if (cui_chart_bar_band_center(o, state->hovered, &target) == CUI_PLOT_OK) {
@@ -2357,9 +2378,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 } else
                     cui_chart_hover_spring(&state->emphasis_center, &state->emphasis_velocity,
                                            target, dt, duration);
+                moving |= fabsf(state->emphasis_center - target) > .1f ||
+                          fabsf(state->emphasis_velocity) > .1f;
             }
         }
-        bool moving = state->emphasis_focus > 0 && state->emphasis_focus < 1;
         if (o->kind == CUI_CHART_PIE)
             for (size_t i = 0; i < o->count && i < 256; i++) {
                 float target = active && state->hovered == i ? 1 : 0;
@@ -2376,7 +2398,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->emphasis_started = false;
         if (!instant && moving)
             cui_invalidate(ui);
-        if (cui_chart_render(state, o) != CUI_PLOT_OK)
+        cui_chart_options frame = *o;
+        if (!frame.reveal_enabled && state->appear_started && state->rendered_reveal_progress < 1) {
+            frame.reveal_enabled = true;
+            frame.reveal_progress = state->rendered_reveal_progress;
+        }
+        if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
             return false;
     }
     cui_begin_box(

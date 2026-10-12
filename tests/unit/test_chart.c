@@ -17,6 +17,15 @@ static bool green_pixel(const unsigned char *pixels, size_t count) {
             return true;
     return false;
 }
+static unsigned first_red_row(const unsigned char *pixels, unsigned width, unsigned height) {
+    for (unsigned y = 0; y < height; y++)
+        for (unsigned x = 0; x < width; x++) {
+            size_t i = ((size_t)y * width + x) * 4;
+            if (pixels[i] > 200 && pixels[i + 1] < 50 && pixels[i + 2] < 50)
+                return y;
+        }
+    return height;
+}
 static cui_color chart_bar_pattern(const cui_chart_datum *datum, size_t index, cui_plot_rect bar,
                                    cui_plot_rect chart, float x, float y, void *user) {
     size_t *calls = user;
@@ -98,6 +107,8 @@ int main(void) {
     };
     cui_chart_link links[] = {{0, 1, 20, {0}}, {0, 2, 10, {0}}};
     unsigned char pixels[128 * 96 * 4];
+    unsigned char saved[sizeof pixels];
+    uint64_t old_revision;
     memset(pixels, 77, sizeof pixels);
     cui_chart_state state = {.pixels = pixels, .byte_capacity = sizeof pixels};
     cui_chart_options options = {.data = points,
@@ -122,6 +133,23 @@ int main(void) {
         assert(cui_chart_render(&state, &options) == CUI_PLOT_OK && state.revision == revision + 1);
     }
     options.data_revision = 0;
+    options.kind = CUI_CHART_LINE;
+    options.hide_grid = true;
+    options.hide_axes = true;
+    options.custom_y_padding = true;
+    options.y_padding_top = 0;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    unsigned row_without_padding = first_red_row(pixels, options.width, options.height);
+    options.y_padding_top = 24;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(first_red_row(pixels, options.width, options.height) > row_without_padding + 15);
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    options.y_padding_top = NAN;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
+    assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
+    options.y_padding_top = 0;
+    options.custom_y_padding = false;
     options.reveal_enabled = true;
     options.hide_grid = true;
     options.hide_axes = true;
@@ -138,8 +166,6 @@ int main(void) {
     options.reveal_progress = 0;
     options.hide_grid = false;
     options.hide_axes = false;
-    unsigned char saved[sizeof pixels];
-    uint64_t old_revision;
     cui_chart_datum flow[] = {
         {.label = {"A", 1}}, {.label = {"B", 1}}, {.label = {"C", 1}}, {.label = {"D", 1}}};
     cui_chart_link flow_links[] = {{0, 1, 30, {0}}, {1, 2, 20, {0}}, {1, 3, 10, {0}}};

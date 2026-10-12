@@ -167,12 +167,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
             unsigned visible = count < 32 ? count : 32;
-            cui_plot_scale scale = {
-                CUI_PLOT_LINEAR, lo, hi, o->height > 32 ? o->height - 20 : 12, 12, true};
+            bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+            double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 12;
+            double bottom = point_chart
+                                ? o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)
+                                : (o->height > 32 ? o->height - 20 : 12);
+            cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
-                double pixel_y = 12 + (o->height - 32) * (double)tick / (count - 1);
+                double pixel_y = top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
                 (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label =

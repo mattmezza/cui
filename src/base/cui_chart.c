@@ -67,7 +67,10 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         (o->reference_count && !o->reference_values) ||
         (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
-        o->logical_height < 0 ||
+        o->logical_height < 0 || !isfinite(o->y_padding_top) || !isfinite(o->y_padding_bottom) ||
+        o->y_padding_top < 0 || o->y_padding_bottom < 0 ||
+        (o->custom_y_padding && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) &&
+         (double)o->y_padding_top + o->y_padding_bottom >= o->height - 20) ||
         (o->has_domain &&
          (!isfinite(o->domain_min) || !isfinite(o->domain_max) || o->domain_min >= o->domain_max)))
         return CUI_PLOT_INVALID;
@@ -529,6 +532,10 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
 static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) {
     double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left, top = 12,
            bottom = o->height > 32 ? o->height - 20 : 12;
+    if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
+        top = o->custom_y_padding ? o->y_padding_top : 10;
+        bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
+    }
     if (right <= left || bottom <= top)
         return;
     double lo, hi;
@@ -1174,6 +1181,9 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->bar_alignment);
     h = cui_chart_mix(h, o->custom_bar_padding);
     h = cui_chart_mix(h, o->show_dots);
+    h = cui_chart_mix(h, o->custom_y_padding);
+    h = cui_chart_mix(h, cui_chart_bits(o->y_padding_top));
+    h = cui_chart_mix(h, cui_chart_bits(o->y_padding_bottom));
     h = cui_chart_mix(h, o->sankey_align);
     h = cui_chart_mix(h, o->sankey_value_scale);
     h = cui_chart_mix(h, o->sankey_iterations);

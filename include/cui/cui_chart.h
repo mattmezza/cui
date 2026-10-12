@@ -101,6 +101,8 @@ typedef struct {
     unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;
     bool hide_x_axis, show_y_axis, y_axis_inside, grid_solid;
+    bool custom_y_padding; /* line/area value scale; defaults source 10px top, 0 bottom */
+    float y_padding_top, y_padding_bottom;
     const double *reference_values;
     size_t reference_count; /* at most 16 */
     cui_chart_format_fn y_tick_format, tooltip_format, bar_label_format;

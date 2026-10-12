@@ -1735,6 +1735,95 @@ static void test_tab_max_width(void) {
         cui_destroy(ui);
     }
 }
+static void tab_scroll_prefix(cui_context *ui, void *user) {
+    (void)user;
+    cui_begin_box(ui, 3000, (cui_box){.width = 20, .height = 20});
+    cui_end_box(ui);
+}
+static void tab_scroll_suffix(cui_context *ui, void *user) {
+    (void)user;
+    cui_begin_box(ui, 3001, (cui_box){.width = 20, .height = 20});
+    cui_end_box(ui);
+}
+static bool tab_scroll_scene(cui_context *ui, cui_tab_scroll_state *scroll, cui_id *value,
+                             bool vertical, bool disabled, size_t count) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {{10, {"First long tab", 14}, false},
+                                       {20, {"Second long tab", 15}, false},
+                                       {30, {"Third long tab", 14}, false}};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    bool changed = cui_tabs(ui, 1, &theme, entries, count, value,
+                            (cui_tabs_options){.vertical = vertical,
+                                               .disabled = disabled,
+                                               .max_width = 100,
+                                               .scroll = scroll,
+                                               .bar_extent = vertical ? 48 : 110,
+                                               .prefix = tab_scroll_prefix,
+                                               .suffix = tab_scroll_suffix},
+                            NULL, NULL);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void test_tab_scrolling(void) {
+    for (int vertical = 0; vertical < 2; vertical++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_tab_scroll_state scroll = {0};
+        cui_id value = 10;
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
+        assert(scroll.maximum > 0 && scroll.offset == 0);
+        cui_rect prefix = cui_bounds(ui, 3000), suffix = cui_bounds(ui, 3001);
+        cui_rect viewport = scroll.viewport, first = cui_bounds(ui, 10);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = viewport.x + 2,
+                                               .y = viewport.y + 2,
+                                               .dx = vertical ? 0 : -1,
+                                               .dy = vertical ? -1 : 0}));
+        assert(!tab_scroll_scene(ui, &scroll, &value, vertical, false, 3));
+        assert(scroll.changed && scroll.offset == 32 && value == 10);
+        cui_rect moved = cui_bounds(ui, 10);
+        assert((vertical ? moved.y : moved.x) == (vertical ? first.y : first.x) - 32);
+        assert(cui_bounds(ui, 3000).x == prefix.x && cui_bounds(ui, 3000).y == prefix.y);
+        assert(cui_bounds(ui, 3001).x == suffix.x && cui_bounds(ui, 3001).y == suffix.y);
+        if (!vertical) {
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                                   .x = viewport.x + 2,
+                                                   .y = viewport.y + 2,
+                                                   .dx = -1}));
+            click(ui, 20);
+            assert(!tab_scroll_scene(ui, &scroll, &value, vertical, false, 3));
+            assert(scroll.offset == 64 && value == 10);
+            scroll.offset = 32;
+        }
+        value = 30;
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
+        assert(scroll.offset == 32);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = viewport.x + 2,
+                                               .y = viewport.y + 2,
+                                               .dx = vertical ? 0 : -1000,
+                                               .dy = vertical ? -1000 : 0}));
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
+        assert(scroll.offset == scroll.maximum);
+        float end = scroll.offset;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = viewport.x + 2,
+                                               .y = viewport.y + 2,
+                                               .dx = vertical ? 0 : 1000,
+                                               .dy = vertical ? 1000 : 0}));
+        tab_scroll_scene(ui, &scroll, &value, vertical, true, 3);
+        assert(scroll.offset == end && !scroll.changed);
+        assert(cui_queue_event(ui,
+                               (cui_event){.type = CUI_EVENT_SCROLL, .x = 600, .y = 450, .dy = 1}));
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
+        assert(scroll.offset == end && !scroll.changed);
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 1);
+        assert(scroll.maximum == 0 && scroll.offset == 0);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1760,6 +1849,7 @@ int main(void) {
     test_dropdown_anchor_corners();
     test_dropdown_action_tooltip();
     test_tab_max_width();
+    test_tab_scrolling();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

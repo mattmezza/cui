@@ -383,5 +383,25 @@ Short labels keep their natural width. Label prefixes end at UTF-8 codepoint
 boundaries, and the semantic name keeps the full original label. The five tab
 variants share this behavior. Custom `render` callbacks own their body layout and
 are not truncated, so nested close buttons retain their composition contract.
-Tabs still lack built-in overflow menus, scrolling and drag reordering. UTF-8
+Tabs still lack built-in overflow menus and drag reordering. UTF-8
 truncation preserves codepoints but does not promise grapheme-cluster boundaries.
+
+## Bounded tab scrolling
+
+Provide an application-owned `cui_tab_scroll_state` and positive `bar_extent`
+to clip the tab strip to that width (or height for vertical tabs). Wheel input
+inside the previous viewport scrolls along the tab axis: horizontal
+wheel deltas for a horizontal strip and vertical deltas for vertical tabs. One wheel unit moves 32 pixels. Off-viewport,
+modal-blocked and disabled scrolling is ignored, and the offset clamps to the
+current content extent. Prefix and suffix slots remain outside the translated
+viewport. Manual scrolling survives selection and label changes; applications
+can set `offset` directly to reveal an explicit target. No automatic selection
+reveal is imposed. Accessibility exposes the current offset and maximum.
+
+The base reducer consumes wheel input and suppresses pointer activation against
+pre-scroll geometry in a scrolling event batch. Standalone base users provide
+the state's viewport, receiving ID and maximum themselves. Built-in labels have
+immediate measured extents; custom bodies use previous-frame tab widths. Tests
+cover both axes, translation, fixed slots, selection preservation, clamps,
+disabled and off-viewport input and removing tabs while scrolled. Overflow menus,
+automatic reveal, draggable reordering and native scrollbars remain gaps.

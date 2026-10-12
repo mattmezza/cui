@@ -96,6 +96,27 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
     if (!theme || !items || !selected)
         return false;
+    cui_id viewport_id = container ^ UINT64_C(0x739b1b53a6cef421);
+    bool scrollable = options.scroll && isfinite(options.bar_extent) && options.bar_extent > 0;
+    if (scrollable) {
+        options.scroll->receiving_id = viewport_id;
+        options.scroll->viewport = cui_bounds(ui, viewport_id);
+        float content = count > 1 ? (float)(count - 1) * theme->gap : 0;
+        for (size_t i = 0; i < count; i++) {
+            float extent = options.vertical ? theme->control_height
+                           : options.render
+                               ? cui_bounds(ui, items[i].id).w
+                               : cui_measure_text(ui, items[i].label, theme->font_size).width +
+                                     2 * theme->padding;
+            if (!options.vertical && !options.render && options.max_width > 0 &&
+                extent > options.max_width)
+                extent = options.max_width;
+            if (isfinite(extent) && extent > 0)
+                content += extent;
+        }
+        options.scroll->maximum = fmaxf(0, content - options.bar_extent);
+    } else
+        options.scroll = NULL;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
@@ -108,6 +129,28 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                   (cui_box){.row = !options.vertical, .gap = theme->gap});
     if (options.prefix)
         options.prefix(ui, options.content_user);
+    if (scrollable) {
+        cui_interact(ui, viewport_id, CUI_ROLE_GROUP, cui_string("Tab viewport"), options.disabled,
+                     false, 0);
+        cui_set_tab_stop(ui, viewport_id, false);
+        cui_set_semantic_details(
+            ui, viewport_id,
+            (cui_semantic_details){.parent = list_id,
+                                   .scrollable = true,
+                                   .scroll_x = options.vertical ? 0 : options.scroll->offset,
+                                   .scroll_y = options.vertical ? options.scroll->offset : 0,
+                                   .scroll_max_x = options.vertical ? 0 : options.scroll->maximum,
+                                   .scroll_max_y = options.vertical ? options.scroll->maximum : 0});
+        cui_begin_box(
+            ui, viewport_id,
+            (cui_box){.row = !options.vertical,
+                      .gap = theme->gap,
+                      .clip = true,
+                      .width = options.vertical ? 0 : options.bar_extent,
+                      .height = options.vertical ? options.bar_extent : theme->control_height,
+                      .offset_x = options.vertical ? 0 : -options.scroll->offset,
+                      .offset_y = options.vertical ? -options.scroll->offset : 0});
+    }
     size_t active = count;
     for (size_t i = 0; i < count; ++i) {
         cui_choice_draw_ex(ui, &items[i], theme, items[i].id == *selected,
@@ -121,6 +164,8 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         if (items[i].id == *selected && !items[i].disabled)
             active = i;
     }
+    if (scrollable)
+        cui_end_box(ui);
     if (options.suffix)
         options.suffix(ui, options.content_user);
     cui_end_box(ui);

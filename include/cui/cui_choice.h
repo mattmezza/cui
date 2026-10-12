@@ -28,13 +28,21 @@ typedef enum {
     CUI_TAB_SEGMENTED
 } cui_tab_variant;
 typedef struct {
+    float offset, maximum;
+    cui_rect viewport;
+    cui_id receiving_id;
+    bool changed;
+} cui_tab_scroll_state;
+typedef struct {
     bool vertical, disabled, manual_activation;
     cui_tab_variant variant;
     cui_choice_render_fn render; /* optional tab body, preserving the label semantics */
     void *render_user;
     cui_choice_content_fn prefix, suffix;
     void *content_user;
-    float max_width; /* zero unconstrained; built-in labels ellipsize to fit */
+    float max_width;              /* zero unconstrained; built-in labels ellipsize to fit */
+    cui_tab_scroll_state *scroll; /* optional application-owned bounded viewport */
+    float bar_extent;             /* scroll viewport width, or height for vertical tabs */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

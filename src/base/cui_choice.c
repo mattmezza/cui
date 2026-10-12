@@ -28,6 +28,41 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
                    cui_tabs_options options) {
     if (!items || !selected || !count)
         return false;
+    if (options.scroll) {
+        cui_tab_scroll_state *scroll = options.scroll;
+        scroll->changed = false;
+        if (!isfinite(scroll->maximum) || scroll->maximum < 0)
+            scroll->maximum = 0;
+        if (!isfinite(scroll->offset) || scroll->offset < 0)
+            scroll->offset = 0;
+        if (scroll->offset > scroll->maximum)
+            scroll->offset = scroll->maximum;
+        size_t n = 0;
+        const cui_event *events = cui_frame_events(ui, &n);
+        for (size_t e = 0; e < n && !options.disabled; e++) {
+            cui_event event = events[e];
+            cui_id target = cui_event_target(ui, e);
+            bool eligible = scroll->receiving_id && target == scroll->receiving_id;
+            for (size_t i = 0; i < count; i++)
+                eligible |= target == items[i].id;
+            cui_rect bounds = scroll->viewport;
+            if (event.type != CUI_EVENT_SCROLL || !eligible || bounds.w <= 0 || bounds.h <= 0 ||
+                event.x < bounds.x || event.x >= bounds.x + bounds.w || event.y < bounds.y ||
+                event.y >= bounds.y + bounds.h)
+                continue;
+            float delta = options.vertical ? event.dy : event.dx;
+            if (!isfinite(delta))
+                continue;
+            float before = scroll->offset;
+            float after = before - delta * 32;
+            if (!isfinite(after))
+                after = delta < 0 ? scroll->maximum : 0;
+            scroll->offset = fminf(scroll->maximum, fmaxf(0, after));
+            scroll->changed |= before != scroll->offset;
+        }
+        if (scroll->changed)
+            cui_invalidate(ui);
+    }
     cui_id old = *selected;
     for (size_t i = 0; i < count; ++i) {
         cui_interact(ui, items[i].id, CUI_ROLE_TAB, items[i].label,
@@ -36,6 +71,9 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (options.scroll && options.scroll->changed &&
+            (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_POINTER_UP))
+            continue;
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
             cursor = count;
         size_t from = count;

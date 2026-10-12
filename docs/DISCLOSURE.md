@@ -44,7 +44,17 @@ are diagnosed by the core rather than silently reused.
 clicks, Enter and Space, disabled triggers, single/multiple expansion, required
 expansion, keyboard traversal, and removal of focused hidden content. Portable
 C11 and renderer-independent draw lists are supported; OS accessibility is not
-claimed. Compared with GPUI Kit 0.7.1, animated measured reveal, custom styled
-header parts/icons, and a demonstrated native/browser gallery remain unfinished.
+claimed. Compared with GPUI Kit 0.7.1, animated measured reveal and a demonstrated native/browser gallery remain unfinished.
 Immediate mount/unmount behavior is implemented. Full family parity is not yet
 verified.
+
+Set Accordion `render_header` and `header_user` to compose a custom title, icon,
+badge or other header body. `cui_collapsible_ex` exposes the same callback and
+optional `borderless` appearance; `cui_collapsible` retains its existing defaults.
+The callback replaces the default title/indicator body, receives the current
+expanded state and effective disabled item, and executes inside the themed trigger
+box. The original item's label remains the accessible name. Trigger activation,
+keyboard navigation and panel mounting continue to use base behavior. Callback
+item pointers are borrowed only for that invocation. Headless tests verify custom
+headers, semantic names, individual/group disabled propagation and actual pointer
+and keyboard activation of both components.

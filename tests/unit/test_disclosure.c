@@ -31,7 +31,71 @@ static void click(cui_context *ui, cui_id id) {
     assert(
         cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = b.x + 2, .y = b.y + 2}));
 }
+static unsigned headers, expanded_headers, disabled_headers;
+static void custom_header(cui_context *ui, const cui_disclosure_item *item, size_t index,
+                          bool expanded, void *user) {
+    assert(user == &headers);
+    headers |= 1u << index;
+    if (expanded)
+        expanded_headers |= 1u << index;
+    if (item->disabled)
+        disabled_headers |= 1u << index;
+    cui_text(ui, cui_string(expanded ? "[open]" : "[closed]"), 12, (cui_color){1, 2, 3, 255});
+    cui_text(ui, cui_string("Custom title"), 12, (cui_color){4, 5, 6, 255});
+}
+static void test_custom_disclosure_headers(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    for (size_t i = 0; i < 3; i++)
+        opened[i] = false;
+    cui_accordion_options options = {
+        .collapsible = true, .render_header = custom_header, .header_user = &headers};
+    headers = expanded_headers = disabled_headers = 0;
+    scene(ui, options, &theme);
+    assert(headers == 7 && expanded_headers == 0 && disabled_headers == 2);
+    click(ui, 10);
+    assert(scene(ui, options, &theme));
+    assert(expanded_headers == 1 && opened[0] && panels == 1);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    bool named = false;
+    for (size_t i = 0; i < count; i++)
+        named |=
+            semantics[i].id == 10 && semantics[i].name.length == 3 && semantics[i].details.expanded;
+    assert(named);
+    options.disabled = true;
+    disabled_headers = 0;
+    scene(ui, options, &theme);
+    assert(disabled_headers == 7);
+    bool open = false;
+    cui_collapsible_options collapse = {
+        .borderless = true, .render_header = custom_header, .header_user = &headers};
+    headers = expanded_headers = 0;
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_collapsible_ex(ui, 200, &theme, cui_string("Accessible title"), &open, collapse, panel,
+                       NULL);
+    cui_end_frame(ui);
+    assert(headers == 1 && !expanded_headers);
+    click(ui, 200);
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    assert(cui_collapsible_ex(ui, 200, &theme, cui_string("Accessible title"), &open, collapse,
+                              panel, NULL));
+    cui_end_frame(ui);
+    assert(open && expanded_headers == 1);
+    cui_focus(ui, 200);
+    key(ui, CUI_KEY_ENTER);
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    assert(cui_collapsible_ex(ui, 200, &theme, cui_string("Accessible title"), &open, collapse,
+                              panel, NULL));
+    cui_end_frame(ui);
+    assert(!open);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_custom_disclosure_headers();
+    for (size_t i = 0; i < 3; i++)
+        opened[i] = false;
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

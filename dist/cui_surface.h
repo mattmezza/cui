@@ -375,8 +375,9 @@ void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
 /* SPDX-License-Identifier: MIT */
 
 
+#include <math.h>
 static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s,
-                                   bool centered) {
+                                   bool centered, float width) {
     cui_begin_box(
         ui, cui_surface_part_id(s->overlay.id, 6),
         (cui_box){.width = -1,
@@ -387,7 +388,10 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
     cui_base_surface_submit_body(ui, s);
     if (centered && s->body_content.h <= 0)
         cui_invalidate(ui);
-    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7), (cui_box){.width = -1, .gap = t->gap});
+    /* Clipped viewports allow horizontal overflow in Clay. Bound the content
+     * explicitly so wrapping text cannot expand the action row past its hit clip. */
+    cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7),
+                  (cui_box){.width = width, .fixed_width = true, .gap = t->gap});
 }
 bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o) {
@@ -420,8 +424,9 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
                                .border_width = 1},
                      bounds, (int16_t)(layer + 1));
     bool centered = s->kind == CUI_SURFACE_ALERT;
+    float body_width = fmaxf(0, bounds.w - 2 * fmaxf(0, t->padding));
     if (centered)
-        cui_surface_body_begin(ui, t, s, true);
+        cui_surface_body_begin(ui, t, s, true, body_width);
     cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = t->gap});
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 4), (cui_box){.width = -1});
     cui_text(ui, title, t->font_size * 1.1f, t->text);
@@ -436,7 +441,7 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     if (description.length)
         cui_text(ui, description, t->font_size, t->muted);
     if (!centered)
-        cui_surface_body_begin(ui, t, s, false);
+        cui_surface_body_begin(ui, t, s, false, body_width);
     cui_overlay_set_bounds(&s->overlay, bounds);
     return true;
 }

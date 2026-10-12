@@ -642,7 +642,52 @@ static void geometry(void) {
     o.viewport.w = NAN;
     assert(cui_surface_geometry(CUI_SURFACE_DIALOG, o).w == 0);
 }
+#ifndef CUI_SURFACE_BASE_ONLY
+static cui_size wide_measure(void *user, cui_str text, float size) {
+    (void)user;
+    return (cui_size){(float)text.length * size * .7f, size * 1.25f};
+}
+static void alert_wrapped_confirmation(void) {
+    cui_context *ui =
+        cui_create((cui_config){.width = 600, .height = 400, .measure = wide_measure});
+    cui_theme theme = cui_theme_light();
+    cui_surface_state state;
+    cui_surface_init(&state, 777, CUI_SURFACE_ALERT);
+    cui_surface_open(ui, &state, 0);
+    cui_surface_options options = {
+        .viewport = {0, 0, 600, 400}, .width = 420, .height = 220, .decide = decide};
+    decisions = 0;
+    allow_accept = false;
+    for (unsigned frame = 0; frame < 6; ++frame) {
+        if (frame == 2 || frame == 5) {
+            cui_rect confirm = cui_bounds(ui, cui_surface_part_id(state.overlay.id, 2));
+            pointer(ui, confirm.x + confirm.w / 2, confirm.y + confirm.h / 2);
+            allow_accept = frame == 5;
+        }
+        assert(cui_begin_frame(ui, 600, 400, .016f));
+        cui_alert_dialog(ui, &theme, &state, cui_string("Delete workspace?"),
+                         cui_string(decisions
+                                        ? "Deletion was rejected once. Confirm again to proceed."
+                                        : "The first confirmation is deliberately rejected."),
+                         cui_string("Delete"), cui_string("Keep workspace"), options);
+        cui_end_frame(ui);
+        if (frame == 4) {
+            cui_rect viewport = state.body_viewport, content = state.body_content;
+            cui_rect confirm = cui_bounds(ui, cui_surface_part_id(state.overlay.id, 2));
+            assert(content.w <= viewport.w + .1f);
+            assert(confirm.x >= viewport.x &&
+                   confirm.x + confirm.w <= viewport.x + viewport.w + .1f);
+            assert(state.overlay.open && decisions == 1);
+        }
+    }
+    assert(!state.overlay.open && decisions == 2);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifndef CUI_SURFACE_BASE_ONLY
+    alert_wrapped_confirmation();
+#endif
     geometry();
     dialog_events();
     confirmation_and_popover();

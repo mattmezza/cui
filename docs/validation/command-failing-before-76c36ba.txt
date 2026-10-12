@@ -1,0 +1,3 @@
+Source: 76c36ba
+Scope: choice list popup width and command scroll panel width.
+test_command: /home/matteo/.cache/cui-worktrees/choice-width/tests/unit/test_command.c:289: test_panel_width: Assertion `fabsf(list.w - panel.w + 2) < .01f' failed.

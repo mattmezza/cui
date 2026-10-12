@@ -17,7 +17,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Tooltip: center text in the panel. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Calendar and DatePicker: use SVG navigation icons; center popup content. — d55aeb7 passes native75, sanitizers75, WASI67 and Chromium78. Day cells are checked at three sizes; DatePicker trigger/opened icons are checked headlessly. Publication pending.
 - [ ] ColorPicker: screen eyedropper through an explicit host capability.
-- [ ] Combobox and Select: options span the field width.
+- [x] Combobox and Select: options span the field width. — 76c36ba passes native75, sanitizers75, WASI67 and Chromium78; popup-width regression fails old code. Publication pending.
 - [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.
 - [ ] Input Group: constrain the field so addons stay on the same row.
 - [ ] Textarea: word/vertical navigation is implemented/tested in the navigation batch; repeated Down/content visibility remains under investigation.
@@ -28,7 +28,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] Theme: understandable, functional token demonstration.
 - [ ] VirtualList: visibly scroll a genuinely virtualized large list.
 - [ ] Chart: continuous, adequately thick curved line rendering.
-- [ ] Command: content spans panel width.
+- [x] Command: content spans panel width. — 76c36ba checks full scroll/row width at two panel sizes, passes the same gates and fails old code. Publication pending.
 - [ ] DataTable: clickable header sorting with SVG indicators.
 - [ ] Plot: visible, interactive plot with clear instructions.
 - [ ] TextView: Markdown fenced-code example.

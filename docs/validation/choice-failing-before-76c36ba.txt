@@ -1,0 +1,3 @@
+Source: 76c36ba
+Scope: choice list popup width and command scroll panel width.
+test_choice: /home/matteo/.cache/cui-worktrees/choice-width/tests/unit/test_choice.c:3647: test_searchable_reference_metrics: Assertion `fabsf(first.w - (popup.overlay.bounds.w - 8 * metrics.density)) < .001f' failed.

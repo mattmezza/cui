@@ -134,6 +134,8 @@ typedef struct {
     float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
     /* Route only dominant-axis wheel motion for the declared orientation. */
     bool scroll_axis_lock;
+    /* Opt a normally passive semantic container into keyboard/pointer focus. */
+    bool focusable;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

@@ -735,6 +735,51 @@ static void test_nested_wheel_routing(void) {
     cui_destroy(ui);
 }
 
+static void focusable_log(cui_context *ui, bool enabled, bool disabled, bool tabstop) {
+    cui_begin_box(ui, 40, (cui_box){.width = 200, .height = 150});
+    cui_interact(ui, 40, CUI_ROLE_LOG, cui_string("Messages"), disabled, false, 0);
+    cui_set_semantic_details(ui, 40, (cui_semantic_details){.focusable = enabled});
+    cui_set_tab_stop(ui, 40, tabstop);
+    control(ui, 41, disabled);
+    cui_end_box(ui);
+}
+static void test_focusable_container(void) {
+    cui_context *ui = make();
+    begin(ui);
+    focusable_log(ui, false, false, true);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 41); /* Passive log is skipped. */
+    focusable_log(ui, true, false, true);
+    cui_focus(ui, 0);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 40);
+    focusable_log(ui, true, false, true);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 41); /* Child takes precedence over container. */
+    focusable_log(ui, true, false, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 150, 100, 0, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 40); /* Blank region remains pointer focusable. */
+    focusable_log(ui, true, false, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_END, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 40);
+    focusable_log(ui, true, true, true);
+    cui_end_frame(ui);
+    assert(!cui_focused(ui));
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void test_perceptual_color_mix(void) {
     cui_color black = {0, 0, 0, 255}, white = {255, 255, 255, 255};
     cui_color middle = cui_color_mix_oklab(black, white, .5f);
@@ -1243,6 +1288,7 @@ int main(void) {
     test_nested_wheel_routing();
     test_dominant_axis_scroll();
     test_perceptual_color_mix();
+    test_focusable_container();
     test_table_semantic_roles();
     test_input();
     test_strings_and_draw();

@@ -135,6 +135,8 @@ typedef struct {
     float scroll_x, scroll_y, scroll_max_x, scroll_max_y;
     /* Route only dominant-axis wheel motion for the declared orientation. */
     bool scroll_axis_lock;
+    /* Opt a normally passive semantic container into keyboard/pointer focus. */
+    bool focusable;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -5621,6 +5623,8 @@ static bool cui_core_inside(cui_rect r, float x, float y) {
 static bool cui_core_focusable(const cui_semantic *s) {
     if (s->disabled)
         return false;
+    if (s->details.focusable)
+        return true;
     switch (s->role) {
     case CUI_ROLE_BUTTON:
     case CUI_ROLE_LINK:

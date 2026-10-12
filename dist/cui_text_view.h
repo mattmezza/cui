@@ -68,7 +68,7 @@ typedef struct {
     unsigned list_number, list_start, list_depth, list_source_indent;
     size_t list_parent;
     char marker_text[12], prefix_text[16];
-    bool table_header, image_ready, task, checked;
+    bool table_header, image_ready, task, checked, list_continuation;
     cui_text_view_alignment alignment;
     cui_bitmap image;
     cui_rect bounds, table_frame;
@@ -630,6 +630,22 @@ static bool cui_text_view_fence_close(cui_str input, size_t a, size_t b, char ma
         ++a;
     return a == b;
 }
+static unsigned cui_text_view_setext(cui_str source, size_t begin, size_t end) {
+    unsigned indent = 0;
+    while (begin < end && source.data[begin] == ' ' && indent < 3) {
+        ++begin;
+        ++indent;
+    }
+    if (begin == end || (source.data[begin] != '=' && source.data[begin] != '-'))
+        return 0;
+    char marker = source.data[begin];
+    do {
+        ++begin;
+    } while (begin < end && source.data[begin] == marker);
+    while (begin < end && (source.data[begin] == ' ' || source.data[begin] == '\t'))
+        ++begin;
+    return begin == end ? marker == '=' ? 1 : 2 : 0;
+}
 static void cui_text_view_markdown(cui_text_view_parser *p) {
     size_t a = 0;
     unsigned table = 0, list_number = 0;
@@ -865,14 +881,26 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             lists[depth].copy_indent = copy_indent;
             list_start = lists[depth].start;
             list_number = lists[depth].number;
+        } else if (kind == CUI_TEXT_VIEW_PARAGRAPH && list_count &&
+                   indent >= lists[list_count - 1].content_indent) {
+            depth = list_count - 1;
+            parent = lists[depth].item;
+            unsigned digits = 1, ordinal = lists[depth].number;
+            while (ordinal >= 10) {
+                ++digits;
+                ordinal /= 10;
+            }
+            copy_indent = lists[depth].copy_indent + (lists[depth].ordered ? digits + 2 : 2);
         } else
             list_count = 0;
+        bool continuation = kind == CUI_TEXT_VIEW_PARAGRAPH && parent != SIZE_MAX;
         if (!cui_text_view_block_begin(p, kind, start, level))
             return;
         if (kind == CUI_TEXT_VIEW_LIST_ITEM)
             lists[depth].item = p->block;
         if (p->write) {
             cui_text_view_block *block = &p->state->workspace.blocks[p->block];
+            block->list_continuation = continuation;
             block->list_depth = depth;
             block->list_parent = parent;
             block->list_start = list_start;
@@ -896,18 +924,38 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         if (kind != CUI_TEXT_VIEW_RULE) {
             size_t inline_end = b;
-            if (kind == CUI_TEXT_VIEW_PARAGRAPH && b >= a + 2 && p->input.data[b - 1] == ' ' &&
-                p->input.data[b - 2] == ' ')
+            if ((kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_LIST_ITEM) &&
+                b >= a + 2 && p->input.data[b - 1] == ' ' && p->input.data[b - 2] == ' ')
                 inline_end -= 2;
             cui_text_view_inline(p, a, inline_end, 0, (cui_text_view_range){0}, 0);
         }
-        if (kind == CUI_TEXT_VIEW_PARAGRAPH) {
+        if (kind == CUI_TEXT_VIEW_PARAGRAPH || kind == CUI_TEXT_VIEW_LIST_ITEM) {
             while (next < p->input.length) {
                 size_t end = cui_text_view_line_end(p->input, next), first = next;
-                while (first < end && (p->input.data[first] == ' ' || p->input.data[first] == '\t'))
+                unsigned next_indent = 0;
+                while (first < end &&
+                       (p->input.data[first] == ' ' || p->input.data[first] == '\t')) {
+                    next_indent =
+                        p->input.data[first] == '\t' ? (next_indent + 4) & ~3u : next_indent + 1;
                     ++first;
+                }
+                if (continuation && next_indent < lists[depth].content_indent)
+                    break;
                 if (first == end)
                     break;
+                unsigned setext = kind == CUI_TEXT_VIEW_PARAGRAPH && !continuation
+                                      ? cui_text_view_setext(p->input, next, end)
+                                      : 0;
+                if (setext) {
+                    kind = CUI_TEXT_VIEW_HEADING;
+                    if (p->write) {
+                        p->state->workspace.blocks[p->block].kind = kind;
+                        p->state->workspace.blocks[p->block].level = setext;
+                    }
+                    b = end;
+                    next = cui_text_view_next_line(p->input, end);
+                    break;
+                }
                 char lead = p->input.data[first];
                 size_t digits = first;
                 while (digits < end && p->input.data[digits] >= '0' && p->input.data[digits] <= '9')
@@ -1757,14 +1805,17 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
                     o.paragraph_gap + (o.table_actions_height > 0 ? o.table_actions_height + 4 : 0);
             }
         } else {
-            float indent = block->kind == CUI_TEXT_VIEW_LIST_ITEM ? block->list_depth * 16.f : 0;
+            float indent = block->kind == CUI_TEXT_VIEW_LIST_ITEM || block->list_continuation
+                               ? block->list_depth * 16.f + (block->list_continuation ? 16 : 0)
+                               : 0;
             if (!cui_text_view_layout_block(s, b, indent, y, fmaxf(1, o.width - indent), o, measure,
                                             user))
                 return CUI_TEXT_VIEW_INVALID;
             y += block->bounds.h;
             if (b + 1 < s->block_count &&
-                (block->kind != CUI_TEXT_VIEW_LIST_ITEM ||
-                 s->workspace.blocks[b + 1].kind != CUI_TEXT_VIEW_LIST_ITEM))
+                ((block->kind != CUI_TEXT_VIEW_LIST_ITEM && !block->list_continuation) ||
+                 (s->workspace.blocks[b + 1].kind != CUI_TEXT_VIEW_LIST_ITEM &&
+                  !s->workspace.blocks[b + 1].list_continuation)))
                 y += block->kind == CUI_TEXT_VIEW_HEADING ? o.font_size * (16.f / 14) * .3f
                                                           : o.paragraph_gap;
             ++b;
@@ -1811,9 +1862,26 @@ size_t cui_text_view_hit(const cui_text_view_state *s, float x, float y) {
 typedef struct {
     char *output;
     size_t length;
-    bool flatten;
+    bool flatten, indent_pending;
+    unsigned newline_indent;
 } cui_text_view_copy_writer;
 static void cui_text_view_copy_write(cui_text_view_copy_writer *w, cui_str t) {
+    if (w->newline_indent && !w->flatten) {
+        for (size_t i = 0; i < t.length; ++i) {
+            if (w->indent_pending) {
+                if (w->output)
+                    memset(w->output + w->length, ' ', w->newline_indent);
+                w->length += w->newline_indent;
+                w->indent_pending = false;
+            }
+            if (w->output)
+                w->output[w->length] = t.data[i];
+            ++w->length;
+            if (t.data[i] == '\n')
+                w->indent_pending = true;
+        }
+        return;
+    }
     if (w->output && t.length) {
         memcpy(w->output + w->length, t.data, t.length);
         if (w->flatten)
@@ -1994,10 +2062,15 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
         }
         size_t begin = block->text.begin > a ? block->text.begin : a;
         size_t end = block->text.end < b ? block->text.end : b;
-        if (block->kind == CUI_TEXT_VIEW_LIST_ITEM) {
+        if (block->list_continuation && block->list_parent >= i)
+            return CUI_TEXT_VIEW_INVALID;
+        bool first_continuation = block->list_continuation && !listed[block->list_parent];
+        if (block->kind == CUI_TEXT_VIEW_LIST_ITEM || block->list_continuation) {
             size_t parents[CUI_TEXT_VIEW_LIST_DEPTH_LIMIT], count = 0;
-            for (size_t parent = block->list_parent; parent != SIZE_MAX;
-                 parent = s->workspace.blocks[parent].list_parent) {
+            for (size_t parent = first_continuation
+                                     ? s->workspace.blocks[block->list_parent].list_parent
+                                     : block->list_parent;
+                 parent != SIZE_MAX; parent = s->workspace.blocks[parent].list_parent) {
                 if (parent >= i || count == CUI_TEXT_VIEW_LIST_DEPTH_LIMIT)
                     return CUI_TEXT_VIEW_INVALID;
                 parents[count++] = parent;
@@ -2013,12 +2086,16 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
                 prior = prior_list = true;
             }
             listed[i] = true;
+            if (block->list_continuation)
+                listed[block->list_parent] = true;
         }
         if (prior)
-            cui_text_view_copy_literal(
-                w, prior_list && block->kind == CUI_TEXT_VIEW_LIST_ITEM ? "\n" : "\n\n");
+            cui_text_view_copy_literal(w, prior_list && (block->kind == CUI_TEXT_VIEW_LIST_ITEM ||
+                                                         block->list_continuation)
+                                              ? "\n"
+                                              : "\n\n");
         prior = true;
-        prior_list = block->kind == CUI_TEXT_VIEW_LIST_ITEM;
+        prior_list = block->kind == CUI_TEXT_VIEW_LIST_ITEM || block->list_continuation;
         if (block->kind == CUI_TEXT_VIEW_HEADING) {
             cui_text_view_copy_repeat(w, "#", block->level);
             cui_text_view_copy_literal(w, " ");
@@ -2026,6 +2103,12 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
             cui_text_view_copy_literal(w, "> ");
         else if (block->kind == CUI_TEXT_VIEW_LIST_ITEM)
             cui_text_view_copy_list_prefix(w, block, true);
+        else if (block->list_continuation) {
+            if (first_continuation)
+                cui_text_view_copy_list_prefix(w, &s->workspace.blocks[block->list_parent], true);
+            else
+                cui_text_view_copy_repeat(w, " ", block->list_source_indent);
+        }
         if (block->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
             cui_str t = {s->workspace.rendered + begin, end - begin};
             unsigned ticks = cui_text_view_copy_ticks(t);
@@ -2049,8 +2132,16 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
                                                 block->resource.end - block->resource.begin},
                                       true);
             cui_text_view_copy_literal(w, ")");
-        } else
+        } else {
+            if (block->kind == CUI_TEXT_VIEW_LIST_ITEM)
+                w->newline_indent = block->list_source_indent +
+                                    (block->level ? (unsigned)strlen(block->marker_text) + 1 : 2);
+            else if (block->list_continuation)
+                w->newline_indent = block->list_source_indent;
             cui_text_view_copy_inline(s, w, (cui_text_view_range){begin, end}, i);
+            w->newline_indent = 0;
+            w->indent_pending = false;
+        }
     }
     return CUI_TEXT_VIEW_OK;
 }
@@ -2451,8 +2542,8 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         } else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
             cui_begin_absolute_box(ui, part, (cui_box){0},
                                    (cui_rect){r.x, r.y, b->text_inset, style.line_height});
-            cui_text_ex(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
-                        style.foreground, style.line_height, (cui_text_style){0});
+            cui_text_line(ui, (cui_str){b->prefix_text, strlen(b->prefix_text)}, style.font_size,
+                          style.foreground, style.line_height, (cui_text_style){0});
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);
@@ -2579,11 +2670,11 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         if (selected)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x521e8438), r, style.selection);
         cui_begin_absolute_box(ui, leaf, (cui_box){.custom_opacity = true, .opacity = opacity}, r);
-        cui_text_ex(ui,
-                    cui_text_view_slice(cui_text_view_rendered_text(s),
-                                        (cui_text_view_range){first->text.begin, last->text.end}),
-                    first->font_size, color, first->line_height,
-                    cui_text_view_text_style(first->flags));
+        cui_text_line(ui,
+                      cui_text_view_slice(cui_text_view_rendered_text(s),
+                                          (cui_text_view_range){first->text.begin, last->text.end}),
+                      first->font_size, color, first->line_height,
+                      cui_text_view_text_style(first->flags));
         if (is_link)
             cui_text_view_quad(ui, leaf ^ 1, (cui_rect){0, r.h - 2, r.w, 1}, color);
         if (first->flags & CUI_TEXT_VIEW_STRIKE)
@@ -2673,6 +2764,7 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                                          .trap_horizontal = true,
                                          .hide_scrollbars = true,
                                          .axis_lock = true,
+                                         .gesture_lock = true,
                                          .disabled = o.disabled};
             cui_theme scroll_theme = *theme;
             scroll_theme.surface = style.table_background;

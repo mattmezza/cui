@@ -737,11 +737,21 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             for (size_t i = 0; i < o->count; i++) {
                 if (!labels[i].visible || !color.a)
                     continue;
-                cui_begin_absolute_box(
-                    ui, id ^ (UINT64_C(0xa6a9f030b2543000) + i),
-                    (cui_box){.width = 64, .height = 12, .fixed_width = true, .fixed_height = true},
-                    (cui_rect){labels[i].text_x * w / o->width, labels[i].text_y * h / o->height,
-                               64, 12});
+                cui_size measured = cui_measure_text(ui, labels[i].text, 10);
+                float label_width = fmaxf(1, fminf(w, measured.width));
+                float label_height = fmaxf(12, measured.height);
+                float anchor_x = labels[i].anchor_x * w / o->width;
+                float anchor_y = labels[i].anchor_y * h / o->height;
+                float label_x = labels[i].right ? anchor_x + 4 : anchor_x - 4 - label_width;
+                float label_y = anchor_y - label_height / 2;
+                label_x = fmaxf(0, fminf(w - label_width, label_x));
+                label_y = fmaxf(0, fminf(h - label_height, label_y));
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0xa6a9f030b2543000) + i),
+                                       (cui_box){.width = label_width,
+                                                 .height = label_height,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true},
+                                       (cui_rect){label_x, label_y, label_width, label_height});
                 cui_text(ui, labels[i].text, 10, color);
                 cui_end_box(ui);
             }

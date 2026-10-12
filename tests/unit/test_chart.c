@@ -1099,11 +1099,20 @@ int main(void) {
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Shares", 6}));
     draw = cui_end_frame(ui);
     bool outside_label = false;
+    cui_chart_pie_label styled_pie_labels[3];
+    assert(cui_chart_pie_labels(&options, styled_pie_labels, 3) == CUI_PLOT_OK);
+    bool measured_pie_labels = false, left_pie_label = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
-            (draw.commands[i].text.data[0] == 'A' || draw.commands[i].text.data[0] == 'B'))
+            (draw.commands[i].text.data[0] == 'A' || draw.commands[i].text.data[0] == 'B')) {
             outside_label = true;
+            measured_pie_labels |= fabsf(draw.commands[i].bounds.w -
+                                         cui_measure_text(ui, draw.commands[i].text, 10).width) < 1;
+        } else if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+                   draw.commands[i].text.data[0] == 'C')
+            left_pie_label = draw.commands[i].bounds.x <= styled_pie_labels[2].anchor_x;
     assert(outside_label);
+    assert(measured_pie_labels && left_pie_label);
     options.reduced_motion = true;
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
                                            .x = state.bounds.x + 80,

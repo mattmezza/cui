@@ -73,6 +73,8 @@ typedef struct {
 typedef size_t (*cui_chart_format_fn)(double value, char *buffer, size_t capacity, void *user);
 typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index, cui_plot_rect bar,
                                            cui_plot_rect chart, float x, float y, void *user);
+typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
+                                          double default_radius, void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
 typedef struct {
@@ -102,8 +104,10 @@ typedef struct {
     double domain_min, domain_max;
     double inner_radius;     /* pie/donut pixels */
     double pie_outer_radius; /* zero selects 40% of pixel height */
-    bool pie_show_labels;    /* outside labels and leader lines */
-    float pie_label_gap;     /* zero selects source 15px */
+    cui_chart_pie_radius_fn pie_inner_radius_fn, pie_outer_radius_fn;
+    void *pie_radius_user; /* callbacks must be stable during a render */
+    bool pie_show_labels;  /* outside labels and leader lines */
+    float pie_label_gap;   /* zero selects source 15px */
     cui_color pie_label_color, pie_label_line_color;
     double pad_angle; /* pie radians */
     double bar_ratio; /* zero means 0.6 */

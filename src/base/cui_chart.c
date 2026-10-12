@@ -18,6 +18,18 @@ static bool cui_chart_valid_str(cui_str s) {
 static double cui_chart_sankey_scaled(const cui_chart_options *o, double value) {
     return o->sankey_value_scale == CUI_CHART_SANKEY_SQRT ? sqrt(value) : value;
 }
+static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *inner,
+                                double *outer) {
+    double base_outer = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
+    *inner = o->pie_inner_radius_fn
+                 ? o->pie_inner_radius_fn(&o->data[i], i, o->inner_radius, o->pie_radius_user)
+                 : o->inner_radius;
+    *outer = o->pie_outer_radius_fn
+                 ? o->pie_outer_radius_fn(&o->data[i], i, base_outer, o->pie_radius_user)
+                 : base_outer;
+    return isfinite(*inner) && isfinite(*outer) && *inner >= 0 && *outer >= *inner &&
+           *outer <= 8192;
+}
 static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_chart_options *o) {
     if (!s || !o || !s->pixels || !o->data || !o->count || o->count > CUI_CHART_MAX_ITEMS ||
         o->kind < CUI_CHART_LINE || o->kind > CUI_CHART_SANKEY || !o->width || !o->height ||
@@ -75,6 +87,11 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
             return CUI_PLOT_INVALID;
         if ((o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) && d->value < 0)
             return CUI_PLOT_INVALID;
+        if (o->kind == CUI_CHART_PIE) {
+            double inner, outer;
+            if (!cui_chart_pie_radii(o, i, &inner, &outer))
+                return CUI_PLOT_INVALID;
+        }
     }
     for (size_t series = 0; series < o->extra_series_count; series++) {
         const cui_chart_series *extra = &o->extra_series[series];
@@ -604,6 +621,9 @@ cui_plot_result cui_chart_pie_labels(const cui_chart_options *o, cui_chart_pie_l
         if (!isfinite(o->data[i].value) || o->data[i].value < 0 ||
             !cui_chart_valid_str(o->data[i].label))
             return CUI_PLOT_INVALID;
+        double inner, outer;
+        if (!cui_chart_pie_radii(o, i, &inner, &outer))
+            return CUI_PLOT_INVALID;
         total += o->data[i].value;
     }
     if (total <= 0 || total > DBL_MAX)
@@ -623,8 +643,10 @@ cui_plot_result cui_chart_pie_labels(const cui_chart_options *o, cui_chart_pie_l
         label->text = o->data[i].label;
         label->visible = true;
         label->right = sin(midpoint) >= 0;
-        label->edge_x = (float)(cx + sin(midpoint) * radius);
-        label->edge_y = (float)(cy - cos(midpoint) * radius);
+        double slice_inner, slice_outer;
+        (void)cui_chart_pie_radii(o, i, &slice_inner, &slice_outer);
+        label->edge_x = (float)(cx + sin(midpoint) * slice_outer);
+        label->edge_y = (float)(cy - cos(midpoint) * slice_outer);
         label->anchor_x = (float)(cx + sin(midpoint) * (radius + gap));
         label->anchor_y = (float)(cy - cos(midpoint) * (radius + gap));
     }
@@ -674,7 +696,11 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     double r = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
     if (r <= 0)
         return;
-    double inner = fmin(o->inner_radius, r), edges[257] = {0};
+    double edges[257] = {0}, inners[256], outers[256];
+    for (size_t i = 0; i < o->count; i++) {
+        (void)cui_chart_pie_radii(o, i, &inners[i], &outers[i]);
+        r = fmax(r, outers[i]);
+    }
     double progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
     for (size_t i = 0; i < o->count; i++)
         edges[i + 1] = edges[i] + 2 * CUI_CHART_PI * progress * (double)(o->data[i].value / sum);
@@ -684,7 +710,7 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     for (int y = y0; y <= y1; y++)
         for (int x = x0; x <= x1; x++) {
             double dx = x + .5 - cx, dy = y + .5 - cy, rr = dx * dx + dy * dy;
-            if (rr < inner * inner || rr > r * r)
+            if (rr > r * r)
                 continue;
             double angle = atan2(dy, dx) + CUI_CHART_PI / 2;
             if (angle < 0)
@@ -699,6 +725,8 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
             }
             if (low == o->count || angle < edges[low] + o->pad_angle / 2 ||
                 angle >= edges[low + 1] - o->pad_angle / 2)
+                continue;
+            if (rr < inners[low] * inners[low] || rr > outers[low] * outers[low])
                 continue;
             cui_chart_pixel(s, o, x, y, cui_chart_palette(o, low));
         }
@@ -1160,6 +1188,13 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->domain_max));
     h = cui_chart_mix(h, cui_chart_bits(o->inner_radius));
     h = cui_chart_mix(h, cui_chart_bits(o->pie_outer_radius));
+    const unsigned char *inner_callback = (const unsigned char *)&o->pie_inner_radius_fn;
+    const unsigned char *outer_callback = (const unsigned char *)&o->pie_outer_radius_fn;
+    for (size_t i = 0; i < sizeof(o->pie_inner_radius_fn); i++)
+        h = cui_chart_mix(h, inner_callback[i]);
+    for (size_t i = 0; i < sizeof(o->pie_outer_radius_fn); i++)
+        h = cui_chart_mix(h, outer_callback[i]);
+    h = cui_chart_mix(h, (uintptr_t)o->pie_radius_user);
     h = cui_chart_mix(h, o->pie_show_labels);
     h = cui_chart_mix(h, cui_chart_bits(o->pie_label_gap));
     const unsigned char *pie_label_colors = (const unsigned char *)&o->pie_label_color;
@@ -1280,10 +1315,7 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
     size_t index = 0;
     if (o->kind == CUI_CHART_PIE) {
         double cx = o->width / 2.0, cy = o->height / 2.0;
-        double r = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
         double dx = x - cx, dy = y - cy;
-        if (dx * dx + dy * dy > r * r || dx * dx + dy * dy < o->inner_radius * o->inner_radius)
-            return hit;
         double sum = 0;
         for (size_t i = 0; i < o->count; i++)
             sum += o->data[i].value;
@@ -1303,6 +1335,11 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
             }
         }
         if (index == o->count)
+            return hit;
+        double slice_inner, slice_outer;
+        if (!cui_chart_pie_radii(o, index, &slice_inner, &slice_outer) ||
+            dx * dx + dy * dy < slice_inner * slice_inner ||
+            dx * dx + dy * dy > slice_outer * slice_outer)
             return hit;
     } else if (o->kind == CUI_CHART_RADAR) {
         double dx = x - o->width / 2.0, dy = y - o->height / 2.0;

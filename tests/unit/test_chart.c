@@ -25,6 +25,26 @@ static cui_color chart_bar_pattern(const cui_chart_datum *datum, size_t index, c
     (*calls)++;
     return ((int)x & 1) ? (cui_color){0, 240, 0, 255} : (cui_color){0, 0, 0, 0};
 }
+static double pie_outer_for_index(const cui_chart_datum *datum, size_t index, double default_radius,
+                                  void *user) {
+    (void)datum;
+    (void)user;
+    return index == 0 ? default_radius / 2 : default_radius;
+}
+static double pie_inner_for_index(const cui_chart_datum *datum, size_t index, double default_radius,
+                                  void *user) {
+    (void)datum;
+    (void)user;
+    return index == 0 ? 8 : default_radius;
+}
+static double pie_bad_radius(const cui_chart_datum *datum, size_t index, double default_radius,
+                             void *user) {
+    (void)datum;
+    (void)index;
+    (void)default_radius;
+    (void)user;
+    return NAN;
+}
 #ifndef CUI_CHART_BASE_ONLY
 static size_t format_q(double value, char *buffer, size_t capacity, void *user) {
     (void)value;
@@ -458,6 +478,23 @@ int main(void) {
     assert(cui_chart_pie_labels(&options, pie_labels, 3) == CUI_PLOT_OK);
     assert(pie_labels[0].visible && pie_labels[1].visible && pie_labels[2].visible);
     assert(hypot(pie_labels[0].edge_x - 64, pie_labels[0].edge_y - 48) > 35);
+    options.pie_outer_radius_fn = pie_outer_for_index;
+    assert(cui_chart_pie_labels(&options, pie_labels, 3) == CUI_PLOT_OK);
+    assert(hypot(pie_labels[0].edge_x - 64, pie_labels[0].edge_y - 48) < 21);
+    assert(hypot(pie_labels[1].edge_x - 64, pie_labels[1].edge_y - 48) > 35);
+    float outside_x = (float)((64 + (pie_labels[0].edge_x - 64) * 1.5) / 2);
+    float outside_y = (float)((48 + (pie_labels[0].edge_y - 48) * 1.5) / 2);
+    assert(!cui_chart_hit_test(&options, outside_x, outside_y).valid);
+    options.pie_outer_radius_fn = NULL;
+    assert(cui_chart_hit_test(&options, outside_x, outside_y).valid);
+    options.pie_inner_radius_fn = pie_inner_for_index;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    options.pie_inner_radius_fn = pie_bad_radius;
+    memcpy(saved, pixels, sizeof pixels);
+    old_revision = state.revision;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
+    assert(state.revision == old_revision && memcmp(pixels, saved, sizeof pixels) == 0);
+    options.pie_inner_radius_fn = NULL;
     options.pie_label_gap = NAN;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     options.pie_label_gap = 0;

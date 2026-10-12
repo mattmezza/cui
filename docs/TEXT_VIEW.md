@@ -20,7 +20,7 @@ first-frame wrapping. Grow dimensions use retained bounds and a first-frame
 estimate (320 by 240); bounds changes schedule a follow-up measurement frame.
 
 Markdown handles headings, emphasis, strikethrough, inline/fenced code, links,
-entities, escaped punctuation, flat lists, rules, pipe tables and block images.
+entities, escaped punctuation, flat lists with source starting numbers and consecutive numbering, rules, pipe tables and block images. Soft paragraph breaks join with spaces; two-space hard breaks retain line breaks.
 HTML handles the corresponding safe presentation tags and strips script/style
 bodies; it never executes markup or loads resources itself. Each rendered scalar
 maps to its original source bytes, including entity atoms, while block separators
@@ -62,17 +62,27 @@ and drawing; register matching native faces for the desired typography. The regu
 face remains the renderer fallback. No Content rich-text parser existed to reuse.
 
 Remaining frozen-source gaps are tracked explicitly: complete CommonMark/HTML5
-and nested lists, soft paragraph joining, ordered numbering, inline/linked images,
-MDX/plugins/YAML front matter, image alignment/error UI, source-format copy
-reconstruction, global selection spanning multiple views, touch selection menus
+and nested lists, inline/linked images, MDX/plugins/YAML front matter, image
+alignment/error UI, global selection spanning multiple views, touch selection menus
 and handles, grapheme/BiDi shaping, inherited parent foreground palettes, adaptive
 horizontal table scrolling/actions styling, table-row-specific highlight removal,
 custom word/CJK stagger and easing, automatic enclosing-list reveal, background
 syntax styles, cached/asynchronous parsing and layout. Current tables divide the
-available width equally; current ordered list markers show `1.`. These limitations
-must not be presented as full source parity.
+available width equally rather than measuring intrinsic column widths. These
+limitations must not be presented as full source parity.
 
 Headless tests cover transactional bounded parsing and randomized syntax, Unicode
 mapping/selection, edit tracking, entities, safe HTML, tables, clipping, fade state,
 real styled draw commands, separate-frame selection and focus, primary/secondary
 link callbacks, drag suppression, bitmap drawing and invalid geometry.
+
+Source-format copy uses `cui_text_view_copy_selection` with a separate caller-owned
+output buffer. It reconstructs partial inline emphasis, links, code, headings,
+quotes, lists, aligned table rows and fenced code. Table selections preserve all
+table rows, emit blank unselected cells and retain the delimiter alignment row.
+Select-all returns the original Markdown verbatim;
+HTML and plain documents use rendered text. Capacity queries report required bytes
+without writing output, and insufficient capacity preserves existing output.
+For Ctrl+C, provide `options.copy_buffer/copy_capacity` and set `copy_format` to
+Source. Scrollable views copy plain text, matching the frozen source's effective
+format. Insufficient output capacity leaves the clipboard unchanged.

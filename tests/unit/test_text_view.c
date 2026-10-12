@@ -141,6 +141,101 @@ static void test_unicode_ranges_and_stream(void) {
     s->reduced_motion = true;
     assert(!cui_text_view_advance(s, 0));
 }
+static void test_paragraphs_and_numbered_markers(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("one\ntwo  \nthree\n\n12. item\n99. next")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.rendered, "one two\nthree\nitem\nnext\n"));
+    assert(f.state.block_count == 3);
+    assert(!strcmp(f.blocks[1].marker_text, "12.") && !strcmp(f.blocks[2].marker_text, "13."));
+    cui_text_view_range r = f.blocks[1].list_marker;
+    assert(r.end - r.begin == 3 && !memcmp(f.source + r.begin, "12.", 3));
+    assert(cui_text_view_range_for_source(&f.state, (cui_text_view_range){3, 4}, &r));
+    assert(r.end - r.begin == 1 && f.rendered[r.begin] == ' ');
+    assert(cui_text_view_layout(
+               &f.state,
+               (cui_text_view_layout_options){
+                   .width = 160, .font_size = 14, .line_height = 20, .paragraph_gap = 16},
+               measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[1].text_inset == 29 && f.blocks[2].text_inset == 29);
+    char output[256];
+    size_t length;
+    assert(cui_text_view_select(&f.state, 0, f.blocks[0].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "one two  \nthree"));
+    assert(cui_text_view_select(&f.state, f.blocks[1].text.begin, f.blocks[2].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "12. item\n13. next"));
+}
+static void test_source_copy(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "# title\n\nhello **bold** [link](https://x.test) `a`";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    char output[256];
+    size_t length;
+    size_t a = (size_t)(strstr(f.rendered, "bold") - f.rendered);
+    assert(cui_text_view_select(&f.state, a + 1, a + 3));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "**ol**") && length == 6);
+    memcpy(output, "unchanged", 10);
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, 3, &length) ==
+           CUI_TEXT_VIEW_CAPACITY);
+    assert(!strcmp(output, "unchanged") && length == 6);
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, NULL, 0, &length) ==
+               CUI_TEXT_VIEW_CAPACITY &&
+           length == 6);
+    a = (size_t)(strstr(f.rendered, "link") - f.rendered);
+    assert(cui_text_view_select(&f.state, a, a + 4));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "[link](https://x.test)"));
+    assert(cui_text_view_select(&f.state, 0, f.state.text_length));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(length == strlen(source) && !strcmp(output, source));
+    assert(cui_text_view_set_text(&f.state, text("before &amp;amp; \\` end")) == CUI_TEXT_VIEW_OK);
+    a = (size_t)(strstr(f.rendered, "&amp;") - f.rendered);
+    assert(cui_text_view_select(&f.state, a, a + 7));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "\\&amp; \\`"));
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(cui_text_view_set_text(&f.state, text("<b>hello</b>")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_select(&f.state, 0, 5));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "hello"));
+}
+static void test_table_copy_alignment(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state,
+                                  text("| A | B | C |\n| :-- | :-: | --: |\n| x | y | z |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].alignment == CUI_TEXT_VIEW_ALIGN_LEFT &&
+           f.blocks[1].alignment == CUI_TEXT_VIEW_ALIGN_CENTER &&
+           f.blocks[2].alignment == CUI_TEXT_VIEW_ALIGN_RIGHT);
+    assert(cui_text_view_layout(
+               &f.state,
+               (cui_text_view_layout_options){
+                   .width = 300, .font_size = 14, .line_height = 20, .paragraph_gap = 16},
+               measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[0].bounds.x == 12);
+    assert(f.glyphs[1].bounds.x > 140 && f.glyphs[1].bounds.x < 160);
+    assert(f.glyphs[2].bounds.x > 280);
+    size_t a = (size_t)(strstr(f.rendered, "y") - f.rendered);
+    assert(cui_text_view_select(&f.state, a, a + 1));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "|  |  |  |\n| :-- | :-: | --: |\n|  | y |  |"));
+}
 static void test_html(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_HTML);
@@ -169,6 +264,8 @@ static void test_html(void) {
 static void test_bounded_parser(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    cui_text_view_state invalid;
+    assert(!cui_text_view_init(&invalid, f.state.workspace, (cui_text_view_format)-1));
     unsigned seed = 123;
     char input[257];
     const char alphabet[] = "abc _*~`[]()<>!|#&;\\\n0123";
@@ -298,6 +395,13 @@ static void test_theme_scroll_and_reveal(void) {
     assert(!f.state.selecting);
     cui_destroy(ui);
 }
+static char clipboard_text[512];
+static bool clipboard_write(void *user, cui_str value) {
+    assert(user == clipboard_text && value.length < sizeof clipboard_text);
+    memcpy(clipboard_text, value.data, value.length);
+    clipboard_text[value.length] = 0;
+    return true;
+}
 static void test_styled_selection(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -340,6 +444,23 @@ static void test_styled_selection(void) {
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_A, .modifiers = CUI_MOD_CTRL}));
     frame(ui, &f, o);
     assert(f.state.anchor == 0 && f.state.cursor == f.state.text_length);
+    char copy_buffer[512];
+    cui_platform platform = {.user = clipboard_text,
+                             .capabilities = CUI_PLATFORM_CLIPBOARD,
+                             .clipboard_set = clipboard_write};
+    o.clipboard = &platform;
+    o.copy_format = CUI_TEXT_VIEW_COPY_SOURCE;
+    o.copy_buffer = copy_buffer;
+    o.copy_capacity = sizeof copy_buffer;
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, f.source));
+    assert(cui_text_view_select(&f.state, 1, 3));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+    frame(ui, &f, o);
+    assert(!strcmp(clipboard_text, "**ol**"));
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
     frame(ui, &f, o);
     assert(f.state.anchor == f.state.cursor);
@@ -359,6 +480,9 @@ int main(void) {
     test_markdown();
     test_unicode_ranges_and_stream();
     test_html();
+    test_source_copy();
+    test_table_copy_alignment();
+    test_paragraphs_and_numbered_markers();
     test_bounded_parser();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();

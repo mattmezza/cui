@@ -44,8 +44,9 @@ static bool cui_text_view_range_valid(cui_str s, cui_text_view_range r) {
            cui_text_view_boundary(s, r.end);
 }
 bool cui_text_view_init(cui_text_view_state *s, cui_text_view_workspace w, cui_text_view_format f) {
-    if (!s || f > CUI_TEXT_VIEW_PLAIN || !w.source || !w.rendered || !w.source_capacity ||
-        !w.rendered_capacity || w.source_capacity > CUI_TEXT_VIEW_BYTE_LIMIT ||
+    if (!s || f < CUI_TEXT_VIEW_MARKDOWN || f > CUI_TEXT_VIEW_PLAIN || !w.source || !w.rendered ||
+        !w.source_capacity || !w.rendered_capacity ||
+        w.source_capacity > CUI_TEXT_VIEW_BYTE_LIMIT ||
         w.rendered_capacity > CUI_TEXT_VIEW_BYTE_LIMIT || !w.mapping ||
         w.mapping_capacity < w.rendered_capacity || !w.spans || !w.span_capacity ||
         w.span_capacity > CUI_TEXT_VIEW_NODE_LIMIT || !w.blocks || !w.block_capacity ||
@@ -308,9 +309,33 @@ static bool cui_text_view_table_separator(cui_str s, size_t a, size_t b) {
     }
     return dash;
 }
+static cui_text_view_alignment cui_text_view_table_alignment(cui_str s, size_t a, size_t b,
+                                                             unsigned col) {
+    while (a < b && s.data[a] == ' ')
+        ++a;
+    if (a < b && s.data[a] == '|')
+        ++a;
+    for (unsigned c = 0; a < b; ++c) {
+        size_t end = cui_text_view_find(s, a, b, "|", 1);
+        if (end == SIZE_MAX)
+            end = b;
+        if (c == col) {
+            while (a < end && s.data[a] == ' ')
+                ++a;
+            while (end > a && s.data[end - 1] == ' ')
+                --end;
+            bool first = a < end && s.data[a] == ':', last = end > a && s.data[end - 1] == ':';
+            return last ? first ? CUI_TEXT_VIEW_ALIGN_CENTER : CUI_TEXT_VIEW_ALIGN_RIGHT
+                        : CUI_TEXT_VIEW_ALIGN_LEFT;
+        }
+        a = end < b ? end + 1 : b;
+    }
+    return CUI_TEXT_VIEW_ALIGN_LEFT;
+}
 static void cui_text_view_markdown(cui_text_view_parser *p) {
     size_t a = 0;
-    unsigned table = 0;
+    unsigned table = 0, list_number = 0;
+    bool prior_ordered = false;
     while (a < p->input.length && !p->error) {
         size_t b = cui_text_view_line_end(p->input, a), next = cui_text_view_next_line(p->input, b),
                start = a;
@@ -322,6 +347,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         if (b - a >= 3 &&
             (!memcmp(p->input.data + a, "```", 3) || !memcmp(p->input.data + a, "~~~", 3))) {
+            prior_ordered = false;
             char fence = p->input.data[a];
             size_t lang = a + 3, lang_end = b;
             while (lang < lang_end && p->input.data[lang] == ' ')
@@ -361,6 +387,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         size_t next_end = cui_text_view_line_end(p->input, next);
         if (cui_text_view_find(p->input, a, b, "|", 1) != SIZE_MAX && next < p->input.length &&
             cui_text_view_table_separator(p->input, next, next_end)) {
+            prior_ordered = false;
             ++table;
             unsigned row = 0;
             size_t line = start, line_end = b;
@@ -388,6 +415,8 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                         block->row = row;
                         block->column = col;
                         block->table_header = row == 0;
+                        block->alignment =
+                            cui_text_view_table_alignment(p->input, next, next_end, col);
                     }
                     cui_text_view_inline(p, l, r, 0, (cui_text_view_range){0}, 0);
                     cui_text_view_block_end(p, end, false);
@@ -407,6 +436,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
             a = line;
             continue;
         }
+        cui_text_view_range marker = {0};
         unsigned level = 0;
         while (a + level < b && p->input.data[a + level] == '#' && level < 6)
             ++level;
@@ -432,10 +462,11 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                 size_t digit = a;
                 while (digit < b && p->input.data[digit] >= '0' && p->input.data[digit] <= '9')
                     ++digit;
-                if (digit > a && digit + 1 < b && p->input.data[digit] == '.' &&
+                if (digit > a && digit - a <= 9 && digit + 1 < b && p->input.data[digit] == '.' &&
                     p->input.data[digit + 1] == ' ') {
                     kind = CUI_TEXT_VIEW_LIST_ITEM;
                     level = 1;
+                    marker = (cui_text_view_range){a, digit + 1};
                     a = digit + 2;
                 }
             }
@@ -449,6 +480,7 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
                    last = close == SIZE_MAX ? SIZE_MAX
                                             : cui_text_view_find(p->input, close + 2, b, ")", 1);
             if (last != SIZE_MAX) {
+                prior_ordered = false;
                 if (!cui_text_view_block_begin(p, CUI_TEXT_VIEW_IMAGE, start, 0))
                     return;
                 if (p->write)
@@ -462,8 +494,79 @@ static void cui_text_view_markdown(cui_text_view_parser *p) {
         }
         if (!cui_text_view_block_begin(p, kind, start, level))
             return;
-        if (kind != CUI_TEXT_VIEW_RULE)
-            cui_text_view_inline(p, a, b, 0, (cui_text_view_range){0}, 0);
+        if (kind == CUI_TEXT_VIEW_LIST_ITEM && level) {
+            if (!prior_ordered) {
+                list_number = 0;
+                for (size_t i = marker.begin; i + 1 < marker.end; ++i)
+                    list_number = list_number * 10 + (unsigned)(p->input.data[i] - '0');
+            } else
+                ++list_number;
+            prior_ordered = true;
+        } else
+            prior_ordered = false;
+        if (p->write) {
+            cui_text_view_block *block = &p->state->workspace.blocks[p->block];
+            block->list_marker = marker;
+            block->list_number = list_number;
+            if (kind == CUI_TEXT_VIEW_LIST_ITEM && level) {
+                char digits[10];
+                unsigned number = list_number, count = 0;
+                do {
+                    digits[count++] = (char)('0' + number % 10);
+                    number /= 10;
+                } while (number);
+                for (unsigned i = 0; i < count; ++i)
+                    block->marker_text[i] = digits[count - i - 1];
+                block->marker_text[count] = '.';
+                block->marker_text[count + 1] = 0;
+            }
+        }
+        if (kind != CUI_TEXT_VIEW_RULE) {
+            size_t inline_end = b;
+            if (kind == CUI_TEXT_VIEW_PARAGRAPH && b >= a + 2 && p->input.data[b - 1] == ' ' &&
+                p->input.data[b - 2] == ' ')
+                inline_end -= 2;
+            cui_text_view_inline(p, a, inline_end, 0, (cui_text_view_range){0}, 0);
+        }
+        if (kind == CUI_TEXT_VIEW_PARAGRAPH) {
+            while (next < p->input.length) {
+                size_t end = cui_text_view_line_end(p->input, next), first = next;
+                while (first < end && (p->input.data[first] == ' ' || p->input.data[first] == '\t'))
+                    ++first;
+                if (first == end)
+                    break;
+                char lead = p->input.data[first];
+                size_t digits = first;
+                while (digits < end && p->input.data[digits] >= '0' && p->input.data[digits] <= '9')
+                    ++digits;
+                bool list = ((lead == '-' || lead == '+' || lead == '*') && first + 1 < end &&
+                             p->input.data[first + 1] == ' ') ||
+                            (digits > first && digits + 1 < end && p->input.data[digits] == '.' &&
+                             p->input.data[digits + 1] == ' ');
+                if (lead == '#' || lead == '>' || list ||
+                    (end >= first + 3 && (!memcmp(p->input.data + first, "```", 3) ||
+                                          !memcmp(p->input.data + first, "~~~", 3) ||
+                                          !memcmp(p->input.data + first, "***", 3))) ||
+                    (end >= first + 2 && !memcmp(p->input.data + first, "![", 2)))
+                    break;
+                size_t after = cui_text_view_next_line(p->input, end);
+                if (cui_text_view_find(p->input, first, end, "|", 1) != SIZE_MAX &&
+                    after < p->input.length &&
+                    cui_text_view_table_separator(p->input, after,
+                                                  cui_text_view_line_end(p->input, after)))
+                    break;
+                bool hard = b >= 2 && p->input.data[b - 1] == ' ' && p->input.data[b - 2] == ' ';
+                cui_text_view_emit(p, (cui_str){hard ? "\n" : " ", 1},
+                                   (cui_text_view_range){b, next}, 0, (cui_text_view_range){0});
+                size_t inline_end = end;
+                if (end >= first + 2 && p->input.data[end - 1] == ' ' &&
+                    p->input.data[end - 2] == ' ')
+                    inline_end -= 2;
+                cui_text_view_inline(p, first, inline_end, 0, (cui_text_view_range){0}, 0);
+                b = end;
+                next = after;
+            }
+        }
         cui_text_view_block_end(p, next, true);
         a = next;
     }
@@ -915,8 +1018,16 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                  : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
                  : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 12
                                                        : padding;
+    if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level) {
+        cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
+        if (!isfinite(marker.width) || marker.width < 0)
+            return false;
+        left = fmaxf(left, marker.width + 8);
+    }
+    b->text_inset = left;
     float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 12 : padding));
     float cursor_x = 0, cursor_y = 0;
+    size_t first_glyph = s->glyph_count;
     if (b->kind == CUI_TEXT_VIEW_RULE) {
         b->bounds = (cui_rect){x, y, width, 1};
         return true;
@@ -994,6 +1105,20 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
             cursor_x += advance;
             measured = m.width;
             i += n;
+        }
+    }
+    if (b->kind == CUI_TEXT_VIEW_TABLE_CELL && b->alignment != CUI_TEXT_VIEW_ALIGN_LEFT) {
+        for (size_t first = first_glyph; first < s->glyph_count;) {
+            size_t last = first + 1;
+            while (last < s->glyph_count &&
+                   s->workspace.glyphs[last].bounds.y == s->workspace.glyphs[first].bounds.y)
+                ++last;
+            cui_rect tail = s->workspace.glyphs[last - 1].bounds;
+            float extra = fmaxf(0, available - (tail.x + tail.w - x - left));
+            float shift = b->alignment == CUI_TEXT_VIEW_ALIGN_CENTER ? extra * .5f : extra;
+            for (size_t j = first; j < last; ++j)
+                s->workspace.glyphs[j].bounds.x += shift;
+            first = last;
         }
     }
     b->actions_height = b->kind == CUI_TEXT_VIEW_CODE_BLOCK ? o.code_actions_height : 0;
@@ -1091,4 +1216,258 @@ size_t cui_text_view_hit(const cui_text_view_state *s, float x, float y) {
         }
     }
     return offset;
+}
+
+/* Two-pass writer keeps copy capacity failures transactional. */
+typedef struct {
+    char *output;
+    size_t length;
+    bool flatten;
+} cui_text_view_copy_writer;
+static void cui_text_view_copy_write(cui_text_view_copy_writer *w, cui_str t) {
+    if (w->output && t.length) {
+        memcpy(w->output + w->length, t.data, t.length);
+        if (w->flatten)
+            for (size_t i = 0; i < t.length; ++i)
+                if (w->output[w->length + i] == '\n')
+                    w->output[w->length + i] = ' ';
+    }
+    w->length += t.length;
+}
+static void cui_text_view_copy_literal(cui_text_view_copy_writer *w, const char *t) {
+    cui_text_view_copy_write(w, (cui_str){t, strlen(t)});
+}
+static void cui_text_view_copy_escape(cui_text_view_copy_writer *w, cui_str t, bool destination) {
+    for (size_t i = 0; i < t.length; ++i) {
+        char c = t.data[i];
+        if (!destination && c == '\n' && !w->flatten) {
+            cui_text_view_copy_literal(w, "  \n");
+            continue;
+        }
+        if (c == '\\' ||
+            (destination ? c == '(' || c == ')'
+                         : c == '*' || c == '_' || c == '[' || c == ']' || c == '~' || c == '#' ||
+                               c == '>' || c == '|' || c == '&' || c == '<' || c == '`'))
+            cui_text_view_copy_literal(w, "\\");
+        cui_text_view_copy_write(w, (cui_str){t.data + i, 1});
+    }
+}
+static unsigned cui_text_view_copy_ticks(cui_str t) {
+    unsigned longest = 0, run = 0;
+    for (size_t i = 0; i < t.length; ++i) {
+        run = t.data[i] == '`' ? run + 1 : 0;
+        if (run > longest)
+            longest = run;
+    }
+    return longest + 1;
+}
+static void cui_text_view_copy_repeat(cui_text_view_copy_writer *w, const char *t, unsigned n) {
+    for (unsigned i = 0; i < n; ++i)
+        cui_text_view_copy_literal(w, t);
+}
+static void cui_text_view_copy_inline(const cui_text_view_state *s, cui_text_view_copy_writer *w,
+                                      cui_text_view_range r, size_t block) {
+    for (size_t i = 0; i < s->span_count; ++i) {
+        const cui_text_view_span *span = &s->workspace.spans[i];
+        if (span->block != block || span->text.end <= r.begin || span->text.begin >= r.end)
+            continue;
+        size_t a = span->text.begin > r.begin ? span->text.begin : r.begin;
+        size_t b = span->text.end < r.end ? span->text.end : r.end;
+        cui_str t = {s->workspace.rendered + a, b - a};
+        bool link = span->link.end > span->link.begin;
+        unsigned flags = span->flags, ticks = 0;
+        if (link)
+            cui_text_view_copy_literal(w, "[");
+        if (flags & CUI_TEXT_VIEW_BOLD)
+            cui_text_view_copy_literal(w, "**");
+        if (flags & CUI_TEXT_VIEW_ITALIC)
+            cui_text_view_copy_literal(w, "*");
+        if (flags & CUI_TEXT_VIEW_STRIKE)
+            cui_text_view_copy_literal(w, "~~");
+        if (flags & CUI_TEXT_VIEW_CODE) {
+            ticks = cui_text_view_copy_ticks(t);
+            cui_text_view_copy_repeat(w, "`", ticks);
+            if (t.length && (t.data[0] == '`' || t.data[t.length - 1] == '`'))
+                cui_text_view_copy_literal(w, " ");
+            cui_text_view_copy_write(w, t);
+            if (t.length && (t.data[0] == '`' || t.data[t.length - 1] == '`'))
+                cui_text_view_copy_literal(w, " ");
+            cui_text_view_copy_repeat(w, "`", ticks);
+        } else
+            cui_text_view_copy_escape(w, t, false);
+        if (flags & CUI_TEXT_VIEW_STRIKE)
+            cui_text_view_copy_literal(w, "~~");
+        if (flags & CUI_TEXT_VIEW_ITALIC)
+            cui_text_view_copy_literal(w, "*");
+        if (flags & CUI_TEXT_VIEW_BOLD)
+            cui_text_view_copy_literal(w, "**");
+        if (link) {
+            cui_text_view_copy_literal(w, "](");
+            cui_text_view_copy_escape(w,
+                                      (cui_str){s->workspace.source + span->link.begin,
+                                                span->link.end - span->link.begin},
+                                      true);
+            cui_text_view_copy_literal(w, ")");
+        }
+    }
+}
+static void cui_text_view_copy_table(const cui_text_view_state *s, cui_text_view_copy_writer *w,
+                                     size_t start, size_t end, size_t a, size_t b) {
+    unsigned row = s->workspace.blocks[start].row;
+    unsigned columns = 0;
+    cui_text_view_copy_literal(w, "| ");
+    w->flatten = true;
+    for (size_t i = start; i < end; ++i) {
+        const cui_text_view_block *cell = &s->workspace.blocks[i];
+        if (cell->row != row) {
+            w->flatten = false;
+            cui_text_view_copy_literal(w, " |\n");
+            if (row == 0) {
+                cui_text_view_copy_literal(w, "| ");
+                for (unsigned col = 0; col < columns; ++col) {
+                    if (col)
+                        cui_text_view_copy_literal(w, " | ");
+                    cui_text_view_alignment align = s->workspace.blocks[start + col].alignment;
+                    cui_text_view_copy_literal(w, align == CUI_TEXT_VIEW_ALIGN_CENTER  ? ":-:"
+                                                  : align == CUI_TEXT_VIEW_ALIGN_RIGHT ? "--:"
+                                                                                       : ":--");
+                }
+                cui_text_view_copy_literal(w, " |\n");
+            }
+            row = cell->row;
+            columns = 0;
+            cui_text_view_copy_literal(w, "| ");
+            w->flatten = true;
+        }
+        if (columns)
+            cui_text_view_copy_literal(w, " | ");
+        ++columns;
+        size_t begin = cell->text.begin > a ? cell->text.begin : a,
+               finish = cell->text.end < b ? cell->text.end : b;
+        while (begin < finish && s->workspace.rendered[begin] == ' ')
+            ++begin;
+        while (finish > begin && s->workspace.rendered[finish - 1] == ' ')
+            --finish;
+        if (begin < finish)
+            cui_text_view_copy_inline(s, w, (cui_text_view_range){begin, finish}, i);
+    }
+    w->flatten = false;
+    cui_text_view_copy_literal(w, " |");
+    if (row == 0) {
+        cui_text_view_copy_literal(w, "\n| ");
+        for (unsigned col = 0; col < columns; ++col) {
+            if (col)
+                cui_text_view_copy_literal(w, " | ");
+            cui_text_view_alignment align = s->workspace.blocks[start + col].alignment;
+            cui_text_view_copy_literal(w, align == CUI_TEXT_VIEW_ALIGN_CENTER  ? ":-:"
+                                          : align == CUI_TEXT_VIEW_ALIGN_RIGHT ? "--:"
+                                                                               : ":--");
+        }
+        cui_text_view_copy_literal(w, " |");
+    }
+}
+static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *s,
+                                                     cui_text_view_copy_writer *w, size_t a,
+                                                     size_t b) {
+    bool prior = false, prior_list = false;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        const cui_text_view_block *block = &s->workspace.blocks[i];
+        if (block->text.end <= a || block->text.begin >= b)
+            continue;
+        if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
+            size_t start = i, end = i + 1;
+            while (start && s->workspace.blocks[start - 1].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                   s->workspace.blocks[start - 1].table == block->table)
+                --start;
+            while (end < s->block_count &&
+                   s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                   s->workspace.blocks[end].table == block->table)
+                ++end;
+            if (prior)
+                cui_text_view_copy_literal(w, "\n\n");
+            cui_text_view_copy_table(s, w, start, end, a, b);
+            prior = true;
+            prior_list = false;
+            i = end - 1;
+            continue;
+        }
+        size_t begin = block->text.begin > a ? block->text.begin : a;
+        size_t end = block->text.end < b ? block->text.end : b;
+        if (prior)
+            cui_text_view_copy_literal(
+                w, prior_list && block->kind == CUI_TEXT_VIEW_LIST_ITEM ? "\n" : "\n\n");
+        prior = true;
+        prior_list = block->kind == CUI_TEXT_VIEW_LIST_ITEM;
+        if (block->kind == CUI_TEXT_VIEW_HEADING) {
+            cui_text_view_copy_repeat(w, "#", block->level);
+            cui_text_view_copy_literal(w, " ");
+        } else if (block->kind == CUI_TEXT_VIEW_QUOTE)
+            cui_text_view_copy_literal(w, "> ");
+        else if (block->kind == CUI_TEXT_VIEW_LIST_ITEM) {
+            if (block->level)
+                cui_text_view_copy_literal(w, block->marker_text);
+            else
+                cui_text_view_copy_literal(w, "-");
+            cui_text_view_copy_literal(w, " ");
+        }
+        if (block->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
+            cui_str t = {s->workspace.rendered + begin, end - begin};
+            unsigned ticks = cui_text_view_copy_ticks(t);
+            if (ticks < 3)
+                ticks = 3;
+            cui_text_view_copy_repeat(w, "`", ticks);
+            cui_text_view_copy_write(w, (cui_str){s->workspace.source + block->resource.begin,
+                                                  block->resource.end - block->resource.begin});
+            cui_text_view_copy_literal(w, "\n");
+            cui_text_view_copy_write(w, t);
+            if (!t.length || t.data[t.length - 1] != '\n')
+                cui_text_view_copy_literal(w, "\n");
+            cui_text_view_copy_repeat(w, "`", ticks);
+        } else if (block->kind == CUI_TEXT_VIEW_IMAGE) {
+            cui_text_view_copy_literal(w, "![");
+            cui_text_view_copy_escape(w, (cui_str){s->workspace.rendered + begin, end - begin},
+                                      false);
+            cui_text_view_copy_literal(w, "](");
+            cui_text_view_copy_escape(w,
+                                      (cui_str){s->workspace.source + block->resource.begin,
+                                                block->resource.end - block->resource.begin},
+                                      true);
+            cui_text_view_copy_literal(w, ")");
+        } else
+            cui_text_view_copy_inline(s, w, (cui_text_view_range){begin, end}, i);
+    }
+    return CUI_TEXT_VIEW_OK;
+}
+cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
+                                                 cui_text_view_copy_format f, char *output,
+                                                 size_t capacity, size_t *length) {
+    if (!s || f < CUI_TEXT_VIEW_COPY_PLAIN || f > CUI_TEXT_VIEW_COPY_SOURCE ||
+        (!output && capacity))
+        return CUI_TEXT_VIEW_INVALID;
+    size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
+           b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    cui_str direct = {0};
+    if (f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN)
+        direct = (cui_str){s->workspace.rendered + a, b - a};
+    else if (a == 0 && b == s->text_length && a != b)
+        direct = cui_text_view_source(s);
+    cui_text_view_copy_writer w = {0};
+    cui_text_view_error error = CUI_TEXT_VIEW_OK;
+    if (direct.data)
+        cui_text_view_copy_write(&w, direct);
+    else
+        error = cui_text_view_copy_source(s, &w, a, b);
+    if (error != CUI_TEXT_VIEW_OK)
+        return error;
+    if (length)
+        *length = w.length;
+    if (capacity <= w.length)
+        return CUI_TEXT_VIEW_CAPACITY;
+    w = (cui_text_view_copy_writer){.output = output};
+    if (direct.data)
+        cui_text_view_copy_write(&w, direct);
+    else
+        (void)cui_text_view_copy_source(s, &w, a, b);
+    output[w.length] = 0;
+    return CUI_TEXT_VIEW_OK;
 }

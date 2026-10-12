@@ -53,14 +53,23 @@ typedef struct {
     size_t block;
     unsigned flags;
 } cui_text_view_span;
+typedef enum {
+    CUI_TEXT_VIEW_ALIGN_LEFT,
+    CUI_TEXT_VIEW_ALIGN_CENTER,
+    CUI_TEXT_VIEW_ALIGN_RIGHT
+} cui_text_view_alignment;
 typedef struct {
     cui_text_view_block_kind kind;
     cui_text_view_range text, source, resource;
     unsigned level, table, row, column;
+    cui_text_view_range list_marker;
+    unsigned list_number;
+    char marker_text[12];
     bool table_header, image_ready;
+    cui_text_view_alignment alignment;
     cui_bitmap image;
     cui_rect bounds;
-    float actions_height;
+    float actions_height, text_inset;
 } cui_text_view_block;
 typedef struct {
     cui_text_view_range text;
@@ -110,6 +119,14 @@ cui_str cui_text_view_source(const cui_text_view_state *);
 cui_str cui_text_view_rendered_text(const cui_text_view_state *);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
 cui_str cui_text_view_selected_text(const cui_text_view_state *);
+typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_view_copy_format;
+/* Writes a zero-terminated copy. On capacity failure, *length reports required
+ * bytes excluding zero and output is untouched. HTML Source falls back to Plain.
+ * Output must be separate from document workspace.
+ * Source select-all is verbatim; partial unsupported blocks return UNSUPPORTED. */
+cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *,
+                                                 cui_text_view_copy_format, char *output,
+                                                 size_t capacity, size_t *length);
 bool cui_text_view_selected_source_range(const cui_text_view_state *, cui_text_view_range *);
 bool cui_text_view_range_for_source(const cui_text_view_state *, cui_text_view_range,
                                     cui_text_view_range *);
@@ -142,6 +159,9 @@ typedef struct {
     bool custom_style;
     cui_text_view_style style;
     const cui_platform *clipboard;
+    cui_text_view_copy_format copy_format;
+    char *copy_buffer;
+    size_t copy_capacity;
     void (*on_link)(cui_str url, const cui_event *, void *);
     bool (*open_url)(cui_str url, void *);
     void *link_user;

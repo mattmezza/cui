@@ -130,9 +130,19 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
             } else if ((e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) && e->key == CUI_KEY_C &&
                        s->anchor != s->cursor) {
                 if (o.clipboard && (o.clipboard->capabilities & CUI_PLATFORM_CLIPBOARD) &&
-                    o.clipboard->clipboard_set)
-                    (void)o.clipboard->clipboard_set(o.clipboard->user,
-                                                     cui_text_view_selected_text(s));
+                    o.clipboard->clipboard_set) {
+                    if (o.copy_format == CUI_TEXT_VIEW_COPY_SOURCE && !o.scrollable &&
+                        s->format == CUI_TEXT_VIEW_MARKDOWN) {
+                        size_t length;
+                        if (cui_text_view_copy_selection(s, o.copy_format, o.copy_buffer,
+                                                         o.copy_capacity,
+                                                         &length) == CUI_TEXT_VIEW_OK)
+                            (void)o.clipboard->clipboard_set(o.clipboard->user,
+                                                             (cui_str){o.copy_buffer, length});
+                    } else
+                        (void)o.clipboard->clipboard_set(o.clipboard->user,
+                                                         cui_text_view_selected_text(s));
+                }
                 handled = true;
             } else if (!(e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META | CUI_MOD_ALT)) &&
                        (e->key == CUI_KEY_LEFT || e->key == CUI_KEY_RIGHT ||
@@ -256,9 +266,12 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         else if (b->kind == CUI_TEXT_VIEW_RULE)
             cui_text_view_quad(ui, part, r, style.border);
         else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM) {
-            cui_begin_absolute_box(ui, part, (cui_box){0},
-                                   (cui_rect){r.x, r.y, 16, style.line_height});
-            cui_text_ex(ui, b->level ? (cui_str){"1.", 2} : (cui_str){"\xe2\x80\xa2", 3},
+            cui_begin_absolute_box(
+                ui, part, (cui_box){0},
+                (cui_rect){r.x, r.y, fmaxf(16, b->text_inset - 8), style.line_height});
+            cui_text_ex(ui,
+                        b->level ? (cui_str){b->marker_text, strlen(b->marker_text)}
+                                 : (cui_str){"\xe2\x80\xa2", 3},
                         style.font_size, style.foreground, style.line_height, (cui_text_style){0});
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {

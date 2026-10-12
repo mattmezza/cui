@@ -16,9 +16,11 @@
 #include "cui/cui_plot.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_scroll.h"
+#include "cui/cui_sidebar.h"
 #include "cui/cui_status.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
+#include "cui/cui_textarea.h"
 #include "cui/cui_toolbar.h"
 #include "cui/cui_virtual.h"
 #include <stdio.h>
@@ -54,6 +56,96 @@ static unsigned toolbar_activations[4];
 static char toolbar_query_buffer[64] = "find";
 static cui_edit *toolbar_query;
 static cui_input_state toolbar_query_state;
+static int sidebar_mode, sidebar_side, sidebar_collapsed;
+static int sidebar_selected;
+static unsigned sidebar_actions;
+static cui_sidebar_state sidebar_state;
+static cui_sidebar_cache sidebar_cache[2];
+static cui_sidebar_item_state sidebar_items[12];
+static int sidebar_item_values[12];
+static int sidebar_group_values[2] = {0, 1};
+static char textarea_buffer[4096] = "First line of a project note.\nSecond line with enough words "
+                                    "to wrap when the field narrows.\nThird line.";
+static cui_edit *textarea_edit;
+static cui_textarea_state textarea_state;
+static cui_textarea_line textarea_lines[256];
+static cui_textarea_result textarea_result;
+static int textarea_rows = 4, textarea_auto_grow, textarea_readonly, textarea_no_wrap;
+static void sidebar_toggle(bool collapsed, void *user) {
+    (void)user;
+    sidebar_collapsed = collapsed;
+    redraw = true;
+}
+static void sidebar_activate(void *user) {
+    sidebar_selected = *(int *)user;
+    sidebar_actions++;
+    redraw = true;
+}
+static void sidebar_header_inner(cui_context *context, const cui_theme *theme, bool collapsed,
+                                 void *user) {
+    (void)user;
+    cui_sidebar_toggle_button(
+        context, cui_id_from(context, "sidebar-toggle"), theme,
+        (cui_sidebar_toggle_options){.side = (cui_sidebar_side)sidebar_side,
+                                     .collapsed = sidebar_collapsed != 0,
+                                     .accessibility_label = cui_string("Toggle sidebar"),
+                                     .on_change = sidebar_toggle});
+    if (!collapsed)
+        cui_label(context, theme, cui_string("Workspace"));
+}
+static void sidebar_header_content(cui_context *context, const cui_theme *theme, bool collapsed,
+                                   void *user) {
+    (void)user;
+    cui_sidebar_header(
+        context, cui_id_from(context, "sidebar-header"), theme,
+        (cui_sidebar_section_options){.collapsed = collapsed, .content = sidebar_header_inner});
+}
+static void sidebar_footer_inner(cui_context *context, const cui_theme *theme, bool collapsed,
+                                 void *user) {
+    (void)user;
+    cui_icon_named(context, cui_id_from(context, "sidebar-footer-icon"), theme,
+                   cui_string("settings"), (cui_icon_options){.size = CUI_ICON_SMALL});
+    if (!collapsed)
+        cui_label(context, theme, cui_string("Settings"));
+}
+static void sidebar_footer_content(cui_context *context, const cui_theme *theme, bool collapsed,
+                                   void *user) {
+    (void)user;
+    cui_sidebar_footer(
+        context, cui_id_from(context, "sidebar-footer"), theme,
+        (cui_sidebar_section_options){.collapsed = collapsed, .content = sidebar_footer_inner});
+}
+static void sidebar_menu_content(cui_context *context, const cui_theme *theme, bool collapsed,
+                                 void *user) {
+    int group = *(int *)user;
+    static const char *labels[12] = {"Overview", "Files",   "Activity", "Reviews",
+                                     "Alerts",   "Search",  "Projects", "Deployments",
+                                     "Usage",    "Billing", "Team",     "Help"};
+    static const char *icons[6] = {"house", "folder", "file-text", "settings", "bell", "search"};
+    cui_sidebar_menu_item items[6];
+    for (int index = 0; index < 6; index++) {
+        int position = group * 6 + index;
+        sidebar_item_values[position] = position;
+        items[index] = (cui_sidebar_menu_item){
+            .id = cui_id_from(context, labels[position]),
+            .label = cui_string(labels[position]),
+            .icon = cui_string(icons[index]),
+            .active = sidebar_selected == position,
+            .state = &sidebar_items[position],
+            .on_activate = sidebar_activate,
+            .user = &sidebar_item_values[position],
+            .tooltip_options = {.viewport = {0, 0, 900, 500}, .dt = host_dt, .open_delay = .5f}};
+    }
+    cui_sidebar_menu(context, cui_id_from(context, group ? "sidebar-menu-2" : "sidebar-menu-1"),
+                     theme, items, 6, collapsed);
+}
+static void sidebar_group_content(cui_context *context, const cui_theme *theme, bool collapsed,
+                                  void *user) {
+    int group = *(int *)user;
+    cui_sidebar_group(context, cui_id_from(context, group ? "sidebar-group-2" : "sidebar-group-1"),
+                      theme, cui_string(group ? "Projects" : "Workspace"), sidebar_menu_content,
+                      user, collapsed);
+}
 static int title_decoration, title_override, title_fullscreen;
 static bool title_maximized;
 static unsigned title_actions[7], title_closed;
@@ -589,6 +681,16 @@ int gallery_init(void) {
         return 0;
     if (!cui_resizable_state_init(&resizable_state, resizable_slots, 2))
         return 0;
+    if (!cui_sidebar_state_init(&sidebar_state, sidebar_cache, 2) ||
+        !cui_textarea_state_init(&textarea_state, textarea_lines, 256))
+        return 0;
+    textarea_edit = cui_edit_create((cui_edit_config){.buffer = textarea_buffer,
+                                                      .capacity = sizeof(textarea_buffer),
+                                                      .multiline = true,
+                                                      .history_bytes = 8192,
+                                                      .max_history_steps = 64});
+    if (!textarea_edit)
+        return 0;
     ui = cui_create((cui_config){.width = 720,
                                  .height = 300,
                                  .max_elements = 512,
@@ -905,6 +1007,63 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                               .name = cui_string("Window title bar"),
                                               .host = &title_host,
                                               .on_close = title_override ? title_close : NULL});
+        break;
+    }
+    case 70: {
+        cui_sidebar_entry entries[2] = {{.id = cui_id_from(ui, "sidebar-entry-1"),
+                                         .render = sidebar_group_content,
+                                         .user = &sidebar_group_values[0],
+                                         .estimated_height = 300},
+                                        {.id = cui_id_from(ui, "sidebar-entry-2"),
+                                         .render = sidebar_group_content,
+                                         .user = &sidebar_group_values[1],
+                                         .estimated_height = 300}};
+        cui_sidebar_options options = cui_sidebar_default();
+        options.width = 250;
+        options.height = height - 48;
+        options.collapse = (cui_sidebar_collapse)sidebar_mode;
+        options.side = (cui_sidebar_side)sidebar_side;
+        options.collapsed = sidebar_collapsed != 0;
+        options.reduced_motion = reduced_motion;
+        options.now_seconds = host_seconds;
+        options.header = sidebar_header_content;
+        options.footer = sidebar_footer_content;
+        options.label = cui_string("Workspace sidebar");
+        cui_begin_box(ui, cui_id_from(ui, "sidebar-layout"),
+                      (cui_box){.width = -1, .height = height - 48, .row = true});
+        if (sidebar_side == CUI_SIDEBAR_RIGHT) {
+            cui_begin_box(ui, cui_id_from(ui, "sidebar-main-right"),
+                          (cui_box){.width = -1, .height = -1, .padding = 20});
+            if (width >= 500)
+                cui_label(ui, &t, cui_string("Project workspace"));
+            cui_end_box(ui);
+        }
+        cui_sidebar(ui, cui_id_from(ui, "sidebar-preview"), &t, &sidebar_state, entries, 2,
+                    options);
+        if (sidebar_side == CUI_SIDEBAR_LEFT) {
+            cui_begin_box(ui, cui_id_from(ui, "sidebar-main-left"),
+                          (cui_box){.width = -1, .height = -1, .padding = 20});
+            if (width >= 500)
+                cui_label(ui, &t, cui_string("Project workspace"));
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+        break;
+    }
+    case 71: {
+        cui_label(ui, &t, cui_string("Project notes"));
+        textarea_result = cui_textarea(
+            ui, cui_id_from(ui, "textarea-preview"), &t, cui_string("Project notes"), textarea_edit,
+            &textarea_state,
+            (cui_textarea_options){.size = (cui_textarea_size)gallery_xsmall_second_size(),
+                                   .width = width > 430 ? 380 : width - 48,
+                                   .rows = (size_t)textarea_rows,
+                                   .auto_grow = textarea_auto_grow != 0,
+                                   .max_rows = 8,
+                                   .no_wrap = textarea_no_wrap != 0,
+                                   .readonly = textarea_readonly != 0,
+                                   .disabled = disabled != 0,
+                                   .placeholder = cui_string("Write project notes")});
         break;
     }
     case 0: {
@@ -2144,6 +2303,59 @@ int gallery_error(void) {
 }
 int gallery_cursor(void) {
     return (int)cui_pointer_cursor(ui);
+}
+void gallery_sidebar_options(int mode, int side, int collapsed) {
+    sidebar_mode = mode >= CUI_SIDEBAR_ICON && mode <= CUI_SIDEBAR_NONE ? mode : CUI_SIDEBAR_ICON;
+    sidebar_side = side == CUI_SIDEBAR_RIGHT ? CUI_SIDEBAR_RIGHT : CUI_SIDEBAR_LEFT;
+    sidebar_collapsed = collapsed != 0;
+}
+float gallery_sidebar_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return sidebar_collapsed;
+    case 1:
+        return sidebar_state.width;
+    case 2:
+        return sidebar_state.scroll.y;
+    case 3:
+        return sidebar_actions;
+    case 4:
+        return sidebar_selected;
+    case 5:
+        return sidebar_state.render_child;
+    default:
+        return 0;
+    }
+}
+void gallery_textarea_options(int rows, int auto_grow, int readonly, int no_wrap) {
+    textarea_rows = rows >= 1 && rows <= 8 ? rows : 4;
+    textarea_auto_grow = auto_grow != 0;
+    textarea_readonly = readonly != 0;
+    textarea_no_wrap = no_wrap != 0;
+}
+float gallery_textarea_stats(unsigned field) {
+    cui_edit_state state = cui_edit_get_state(textarea_edit);
+    switch (field) {
+    case 0:
+        return (float)cui_edit_get_text(textarea_edit).length;
+    case 1:
+        return (float)textarea_state.count;
+    case 2:
+        return (float)state.cursor;
+    case 3:
+        return (float)state.anchor;
+    case 4:
+        return textarea_state.scroll_y;
+    case 5:
+        return textarea_state.viewport.h;
+    case 6:
+        return (float)textarea_result.error;
+    default:
+        return 0;
+    }
+}
+const char *gallery_textarea_text(void) {
+    return cui_edit_get_text(textarea_edit).data;
 }
 void gallery_description_options(int columns, int vertical, int plain, int size) {
     description_columns = columns >= 1 && columns <= 3 ? columns : 3;

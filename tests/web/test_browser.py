@@ -40,6 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 70
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -206,6 +207,61 @@ def main():
                     page.wait_for_function('(role)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Export options")', arg=role)
             def dropdown_check(control):
                 control_change('dropdown-'+control, True)
+            page.evaluate('location.hash="Sidebar"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
+            assert semantic_index('Workspace sidebar', 9) is not None
+            assert semantic_index('Overview', 23) is not None
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===5)')
+            page.screenshot(path='/tmp/cui-web-sidebar-expanded.png')
+            click_semantic('Files', 23)
+            page.wait_for_function('cuiGallery.exports.gallery_sidebar_stats(3)===1&&cuiGallery.exports.gallery_sidebar_stats(4)===1')
+            click_semantic('Toggle sidebar', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_sidebar_stats(0)===1&&Math.abs(cuiGallery.exports.gallery_sidebar_stats(1)-48)<.2')
+            assert page.locator('#sidebar-collapsed').is_checked()
+            page.screenshot(path='/tmp/cui-web-sidebar-collapsed.png')
+            control_change('sidebar-mode', '1')
+            page.wait_for_function('cuiGallery.exports.gallery_sidebar_stats(1)===0&&cuiGallery.exports.gallery_sidebar_stats(5)===0')
+            control_change('sidebar-mode', '2')
+            page.wait_for_function('cuiGallery.exports.gallery_sidebar_stats(1)===250&&cuiGallery.exports.gallery_sidebar_stats(5)===1')
+            control_change('sidebar-collapsed', False)
+            control_change('sidebar-mode', '0')
+            control_change('sidebar-side', '1')
+            right_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('Workspace sidebar', 9))
+            assert right_x > 300, right_x
+            control_change('sidebar-side', '0')
+            viewport = semantic_index('Scrollable content', 9)
+            bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', viewport)
+            rect = canvas.bounding_box()
+            page.mouse.move(rect['x']+bounds[0]+bounds[2]/2,rect['y']+bounds[1]+bounds[3]/2)
+            page.mouse.wheel(0,240)
+            page.wait_for_function('cuiGallery.exports.gallery_sidebar_stats(2)>0')
+            page.evaluate('location.hash="Textarea"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Textarea"')
+            assert page.locator('#accessible [role=textbox][aria-label="Project notes"][aria-multiline=true]').count() == 1
+            page.screenshot(path='/tmp/cui-web-textarea.png')
+            length = page.evaluate('cuiGallery.exports.gallery_textarea_stats(0)')
+            click_semantic('Project notes', 6)
+            page.keyboard.press('Control+End')
+            page.keyboard.press('Enter')
+            page.keyboard.type('more')
+            page.wait_for_function('(length)=>cuiGallery.exports.gallery_textarea_stats(0)===length+5', arg=length)
+            assert page.evaluate('()=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_textarea_text(),cuiGallery.exports.gallery_textarea_stats(0))).endsWith(String.fromCharCode(10)+"more")')
+            control_change('textarea-readonly', True)
+            page.keyboard.type('X')
+            assert page.evaluate('cuiGallery.exports.gallery_textarea_stats(0)') == length+5
+            control_change('textarea-readonly', False)
+            control_change('textarea-rows', '1')
+            normal_height = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Project notes', 6))
+            control_change('textarea-grow', True)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Project notes', 6)) > normal_height
+            wrapped = page.evaluate('cuiGallery.exports.gallery_textarea_stats(1)')
+            control_change('textarea-nowrap', True)
+            assert page.evaluate('cuiGallery.exports.gallery_textarea_stats(1)') < wrapped
+            heights = []
+            for size in (3,1,0,2):
+                control_change('control-size', size)
+                heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Project notes', 6)))
+            assert heights[-1] > heights[0], heights
             for name in ('Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment'):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
@@ -1734,7 +1790,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 68 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 70 real WASM stories, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

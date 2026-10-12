@@ -1,0 +1,3 @@
+Source: 9741448
+Scope: controlled stepper rendering follows selected index.
+test_numeric: /tmp/cui-gallery-controls/tests/unit/test_numeric.c:508: stepper_visible_selection: Assertion `command->bounds.x >= active.x && command->bounds.x < active.x + active.w' failed.

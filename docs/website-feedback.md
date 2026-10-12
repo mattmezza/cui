@@ -13,7 +13,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] Progress: demonstrate animated progress and reduced motion.
 - [x] Radio: one click clears the previous selection visually and semantically. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Rating: proper empty, filled and partially filled star graphics. — first polish batch; native/browser geometry and interaction evidence below.
-- [ ] Stepper: make navigation and its current status visibly work.
+- [x] Stepper: make navigation and its current status visibly work. — 9741448 passes native75, sanitizers75, WASI67 and Chromium78; rendered-selection regression fails old code. Publication pending.
 - [x] Tooltip: center text in the panel. — first polish batch; native/browser geometry and interaction evidence below.
 - [ ] Calendar and DatePicker: use SVG navigation icons; center popup content.
 - [ ] ColorPicker: screen eyedropper through an explicit host capability.

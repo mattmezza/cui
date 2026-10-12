@@ -1,0 +1,4 @@
+Source: 9741448
+Scope: controlled stepper rendering follows selected index.
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting

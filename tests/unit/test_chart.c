@@ -33,6 +33,18 @@ static size_t format_q(double value, char *buffer, size_t capacity, void *user) 
         buffer[0] = 'Q';
     return capacity ? 1 : 0;
 }
+static void custom_tooltip(cui_context *ui, cui_id id, size_t index, const cui_chart_datum *datum,
+                           void *user) {
+    size_t *calls = user;
+    assert(ui && id == 91 && index == 0 && datum->label.length == 1);
+    (*calls)++;
+    cui_begin_absolute_box(
+        ui, id ^ UINT64_C(0xabcdef),
+        (cui_box){.width = 72, .height = 16, .fixed_width = true, .fixed_height = true},
+        (cui_rect){0, 0, 72, 16});
+    cui_text(ui, (cui_str){"Custom", 6}, 11, (cui_color){10, 20, 30, 255});
+    cui_end_box(ui);
+}
 #endif
 int main(void) {
     cui_chart_datum points[] = {
@@ -452,6 +464,24 @@ int main(void) {
                     ohlc[row] = true;
         }
     assert(ohlc[0] && ohlc[1] && ohlc[2] && ohlc[3]);
+    size_t tooltip_calls = 0;
+    options.tooltip_content = custom_tooltip;
+    options.tooltip_user = &tooltip_calls;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    draw = cui_end_frame(ui);
+    bool custom = false, default_ohlc = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str label = draw.commands[i].text;
+            if (label.length == 6 && memcmp(label.data, "Custom", 6) == 0)
+                custom = true;
+            if (label.length >= 3 && label.data[0] == 'O' && label.data[1] == ':')
+                default_ohlc = true;
+        }
+    assert(tooltip_calls == 1 && custom && !default_ohlc);
     cui_destroy(ui);
 #endif
     points[0].value = -DBL_MAX;

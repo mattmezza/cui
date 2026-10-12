@@ -231,64 +231,68 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_end_box(ui);
         }
     if (!o->noninteractive && state->hovered < o->count) {
-        cui_str title = o->data[state->hovered].label;
-        if (title.length && title.data) {
-            cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
-                                   (cui_box){.width = 72,
-                                             .height = 14,
-                                             .fixed_width = true,
-                                             .fixed_height = true,
-                                             .background = o->background},
-                                   (cui_rect){w > 74 ? w - 74 : 0, 2, 72, 14});
-            cui_text(ui, title, 11, o->foreground);
-            cui_end_box(ui);
-        }
-        size_t rows = o->kind == CUI_CHART_CANDLESTICK ? 4 : o->extra_series_count + 1;
-        for (size_t series = 0; series < rows; series++) {
-            double number = state->hovered_value;
-            if (o->kind != CUI_CHART_CANDLESTICK && series)
-                number = o->extra_series[series - 1].values[state->hovered];
-            if (o->kind == CUI_CHART_CANDLESTICK) {
-                const cui_chart_datum *d = &o->data[state->hovered];
-                number = series == 0   ? d->open
-                         : series == 1 ? d->high
-                         : series == 2 ? d->low
-                                       : d->close;
+        if (o->tooltip_content) {
+            o->tooltip_content(ui, id, state->hovered, &o->data[state->hovered], o->tooltip_user);
+        } else {
+            cui_str title = o->data[state->hovered].label;
+            if (title.length && title.data) {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
+                                       (cui_box){.width = 72,
+                                                 .height = 14,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = o->background},
+                                       (cui_rect){w > 74 ? w - 74 : 0, 2, 72, 14});
+                cui_text(ui, title, 11, o->foreground);
+                cui_end_box(ui);
             }
-            char value[48];
-            cui_str formatted =
-                cui_chart_number(value, sizeof value, number, o->tooltip_format, o->format_user);
-            if (!formatted.length)
-                continue;
-            char row[52];
-            cui_str label = formatted;
-            if (o->kind == CUI_CHART_CANDLESTICK) {
-                static const char prefix[] = "OHLC";
-                row[0] = prefix[series];
-                row[1] = ':';
-                row[2] = ' ';
-                size_t length =
-                    formatted.length < sizeof row - 3 ? formatted.length : sizeof row - 3;
-                memcpy(row + 3, formatted.data, length);
-                label = (cui_str){row, length + 3};
+            size_t rows = o->kind == CUI_CHART_CANDLESTICK ? 4 : o->extra_series_count + 1;
+            for (size_t series = 0; series < rows; series++) {
+                double number = state->hovered_value;
+                if (o->kind != CUI_CHART_CANDLESTICK && series)
+                    number = o->extra_series[series - 1].values[state->hovered];
+                if (o->kind == CUI_CHART_CANDLESTICK) {
+                    const cui_chart_datum *d = &o->data[state->hovered];
+                    number = series == 0   ? d->open
+                             : series == 1 ? d->high
+                             : series == 2 ? d->low
+                                           : d->close;
+                }
+                char value[48];
+                cui_str formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
+                                                     o->format_user);
+                if (!formatted.length)
+                    continue;
+                char row[52];
+                cui_str label = formatted;
+                if (o->kind == CUI_CHART_CANDLESTICK) {
+                    static const char prefix[] = "OHLC";
+                    row[0] = prefix[series];
+                    row[1] = ':';
+                    row[2] = ' ';
+                    size_t length =
+                        formatted.length < sizeof row - 3 ? formatted.length : sizeof row - 3;
+                    memcpy(row + 3, formatted.data, length);
+                    label = (cui_str){row, length + 3};
+                }
+                cui_begin_absolute_box(
+                    ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
+                    (cui_box){.width = 72,
+                              .height = 16,
+                              .fixed_width = true,
+                              .fixed_height = true,
+                              .background = o->background},
+                    (cui_rect){w > 74 ? w - 74 : 0, 16 + 16 * (float)series, 72, 16});
+                cui_color text_color = o->foreground;
+                if (o->kind == CUI_CHART_CANDLESTICK) {
+                    const cui_chart_datum *d = &o->data[state->hovered];
+                    cui_color direction = d->close > d->open ? o->bullish : o->bearish;
+                    if (direction.a)
+                        text_color = direction;
+                }
+                cui_text(ui, label, 11, text_color);
+                cui_end_box(ui);
             }
-            cui_begin_absolute_box(
-                ui, id ^ (UINT64_C(0xb48d186a501e6b77) + series),
-                (cui_box){.width = 72,
-                          .height = 16,
-                          .fixed_width = true,
-                          .fixed_height = true,
-                          .background = o->background},
-                (cui_rect){w > 74 ? w - 74 : 0, 16 + 16 * (float)series, 72, 16});
-            cui_color text_color = o->foreground;
-            if (o->kind == CUI_CHART_CANDLESTICK) {
-                const cui_chart_datum *d = &o->data[state->hovered];
-                cui_color direction = d->close > d->open ? o->bullish : o->bearish;
-                if (direction.a)
-                    text_color = direction;
-            }
-            cui_text(ui, label, 11, text_color);
-            cui_end_box(ui);
         }
     }
     cui_end_box(ui);

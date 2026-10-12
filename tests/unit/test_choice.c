@@ -1893,6 +1893,93 @@ static void test_tab_overflow_menu(void) {
     assert(!overflow.visible);
     cui_destroy(ui);
 }
+static bool tab_drag_scene(cui_context *ui, cui_choice_item *entries, size_t count, cui_id *value,
+                           cui_tab_drag_state *drag, bool vertical, bool disabled) {
+    cui_theme theme = cui_theme_light();
+    visible = 99;
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    bool changed = cui_tabs(
+        ui, 1, &theme, entries, count, value,
+        (cui_tabs_options){.vertical = vertical, .disabled = disabled, .drag = drag}, panel, NULL);
+    dropdown_draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return changed;
+}
+static void test_tab_drag_reorder(void) {
+    for (int vertical = 0; vertical < 2; vertical++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_choice_item entries[] = {
+            {10, {"First", 5}, false}, {20, {"Second", 6}, false}, {30, {"Third", 5}, false}};
+        cui_id value = 20;
+        cui_tab_drag_state drag = {0};
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        cui_rect first = cui_bounds(ui, 10), last = cui_bounds(ui, 30);
+        float x = vertical ? last.x + 2 : last.x + last.w - 2;
+        float y = vertical ? last.y + last.h - 2 : last.y + 2;
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = first.x + 2, .y = first.y + 2}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(drag.candidate == 10 && !drag.active);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x, .y = y}));
+        assert(!tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false));
+        assert(drag.active && drag.before == 0 && !drag.requested && value == 20);
+        bool marker = false;
+        for (size_t i = 0; i < dropdown_draw.count; i++) {
+            cui_draw_command command = dropdown_draw.commands[i];
+            marker |= command.type == CUI_DRAW_RECT &&
+                      (vertical ? command.bounds.h == 2 : command.bounds.w == 2) &&
+                      same_color(command.color, cui_theme_light().primary);
+        }
+        assert(marker);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y}));
+        assert(!tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false));
+        assert(!drag.active && drag.requested && drag.moved == 10 && drag.before == 0 &&
+               value == 20);
+        cui_choice_item moved = entries[0];
+        entries[0] = entries[1];
+        entries[1] = entries[2];
+        entries[2] = moved;
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(value == 20 && visible == 0 && !drag.requested);
+        first = cui_bounds(ui, 20);
+        last = cui_bounds(ui, 10);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = first.x + 2, .y = first.y + 2}));
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = last.x + 2, .y = last.y + 2}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(drag.active && drag.before == 10);
+        key(ui, CUI_KEY_ESCAPE);
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(!drag.active && !drag.candidate && !drag.requested);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = last.x + 2, .y = last.y + 2}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(!drag.requested && value == 20);
+        entries[2].disabled = true;
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        click(ui, 10);
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(!drag.candidate && !drag.requested && value == 20);
+        entries[2].disabled = false;
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        click(ui, 10);
+        assert(tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false));
+        assert(value == 10 && !drag.requested);
+        first = cui_bounds(ui, 10);
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = first.x + 2, .y = first.y + 2}));
+        assert(
+            cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 600, .y = 450}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(drag.active && !drag.drop_valid);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 600, .y = 450}));
+        tab_drag_scene(ui, entries, 3, &value, &drag, vertical, false);
+        assert(!drag.requested && !drag.active);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -1920,6 +2007,7 @@ int main(void) {
     test_tab_max_width();
     test_tab_scrolling();
     test_tab_overflow_menu();
+    test_tab_drag_reorder();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

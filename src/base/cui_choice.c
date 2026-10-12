@@ -31,6 +31,83 @@ void cui_tab_overflow_init(cui_tab_overflow *state, cui_id popup, cui_id trigger
     *state = (cui_tab_overflow){.entries = entries, .capacity = capacity, .trigger = trigger};
     cui_menu_tree_init(&state->menu, popup);
 }
+static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, size_t count,
+                               cui_tabs_options options, cui_event event, cui_id target) {
+    cui_tab_drag_state *drag = options.drag;
+    if (!drag ||
+        (event.type == CUI_EVENT_POINTER_UP && event.pointer_button != CUI_POINTER_PRIMARY))
+        return false;
+    if (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE) {
+        drag->candidate = 0;
+        drag->active = false;
+        return false;
+    }
+    if (event.type == CUI_EVENT_POINTER_DOWN && event.pointer_button == CUI_POINTER_PRIMARY) {
+        drag->candidate = 0;
+        drag->active = false;
+        for (size_t i = 0; i < count; i++)
+            if (items[i].id == target && !items[i].disabled) {
+                drag->candidate = target;
+                drag->start_x = event.x;
+                drag->start_y = event.y;
+                break;
+            }
+        return false;
+    }
+    if (!drag->candidate ||
+        (event.type != CUI_EVENT_POINTER_MOVE && event.type != CUI_EVENT_POINTER_UP))
+        return false;
+    if (target != drag->candidate || !isfinite(event.x) || !isfinite(event.y)) {
+        drag->candidate = 0;
+        drag->active = false;
+        return false;
+    }
+    if (fabsf(event.x - drag->start_x) >= 4 || fabsf(event.y - drag->start_y) >= 4)
+        drag->active = true;
+    if (!drag->active) {
+        if (event.type == CUI_EVENT_POINTER_UP)
+            drag->candidate = 0;
+        return false;
+    }
+    bool inside = true;
+    if (options.scroll) {
+        cui_rect bounds = options.scroll->viewport;
+        inside = event.x >= bounds.x && event.x < bounds.x + bounds.w && event.y >= bounds.y &&
+                 event.y < bounds.y + bounds.h;
+    }
+    bool found = false;
+    drag->before = 0;
+    for (size_t i = 0; i < count && inside; i++) {
+        cui_rect bounds = cui_bounds(ui, items[i].id);
+        if (event.x < bounds.x || event.x >= bounds.x + bounds.w || event.y < bounds.y ||
+            event.y >= bounds.y + bounds.h)
+            continue;
+        found = true;
+        bool after = options.vertical ? event.y >= bounds.y + bounds.h * .5f
+                                      : event.x >= bounds.x + bounds.w * .5f;
+        size_t insertion = i + (after ? 1 : 0);
+        if (insertion < count && items[insertion].id == drag->candidate)
+            insertion++;
+        drag->before = insertion < count ? items[insertion].id : 0;
+        break;
+    }
+    drag->drop_valid = found;
+    if (event.type == CUI_EVENT_POINTER_UP) {
+        size_t source = count;
+        for (size_t i = 0; i < count; i++)
+            if (items[i].id == drag->candidate)
+                source = i;
+        cui_id next = source + 1 < count ? items[source + 1].id : 0;
+        if (found && drag->before != drag->candidate && drag->before != next) {
+            drag->moved = drag->candidate;
+            drag->requested = true;
+        }
+        drag->candidate = 0;
+        drag->active = false;
+    }
+    cui_invalidate(ui);
+    return true;
+}
 bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_tabs_options options) {
     if (!count && options.overflow) {
@@ -38,6 +115,16 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         if (options.overflow->menu.overlay.open)
             cui_overlay_close(ui, &options.overflow->menu.overlay);
         options.overflow->menu.depth = 0;
+    }
+    if (options.drag) {
+        options.drag->requested = false;
+        bool present = false;
+        for (size_t i = 0; items && i < count; i++)
+            present |= items[i].id == options.drag->candidate && !items[i].disabled;
+        if (options.disabled || !present) {
+            options.drag->candidate = 0;
+            options.drag->active = false;
+        }
     }
     if (!items || !selected || !count)
         return false;
@@ -76,6 +163,11 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         if (scroll->changed)
             cui_invalidate(ui);
     }
+    if (options.scroll && options.scroll->changed && options.drag) {
+        options.drag->candidate = 0;
+        options.drag->active = false;
+        options.drag->drop_valid = false;
+    }
     cui_id old = *selected;
     if (options.overflow) {
         cui_tab_overflow *overflow = options.overflow;
@@ -113,7 +205,14 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
         if (options.scroll && options.scroll->changed &&
-            (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_POINTER_UP))
+            (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_POINTER_UP)) {
+            if (options.drag) {
+                options.drag->candidate = 0;
+                options.drag->active = false;
+            }
+            continue;
+        }
+        if (cui_tab_drag_event(ui, items, count, options, events[e], cui_event_target(ui, e)))
             continue;
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
             cursor = count;

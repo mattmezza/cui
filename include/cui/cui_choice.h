@@ -27,6 +27,11 @@ typedef enum {
     CUI_TAB_OUTLINE,
     CUI_TAB_SEGMENTED
 } cui_tab_variant;
+typedef struct {
+    cui_id candidate, before, moved;
+    float start_x, start_y;
+    bool active, requested, drop_valid;
+} cui_tab_drag_state;
 typedef struct cui_tab_overflow cui_tab_overflow;
 typedef struct {
     float offset, maximum;
@@ -45,6 +50,7 @@ typedef struct {
     cui_tab_scroll_state *scroll; /* optional application-owned bounded viewport */
     float bar_extent;             /* scroll viewport width, or height for vertical tabs */
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */
+    cui_tab_drag_state *drag; /* optional stable-ID reorder request; caller applies after frame */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;

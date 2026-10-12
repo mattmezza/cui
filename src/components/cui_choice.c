@@ -167,6 +167,31 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         if (items[i].id == *selected && !items[i].disabled)
             active = i;
     }
+    if (options.drag && options.drag->active && options.drag->drop_valid) {
+        cui_rect bounds = {0};
+        if (options.drag->before)
+            bounds = cui_bounds(ui, options.drag->before);
+        else if (count) {
+            bounds = cui_bounds(ui, items[count - 1].id);
+            if (options.vertical)
+                bounds.y += bounds.h;
+            else
+                bounds.x += bounds.w;
+        }
+        bool visible = bounds.w > 0 && bounds.h > 0;
+        if (scrollable) {
+            cui_rect viewport = options.scroll->viewport;
+            visible &= bounds.x >= viewport.x && bounds.x <= viewport.x + viewport.w &&
+                       bounds.y >= viewport.y && bounds.y <= viewport.y + viewport.h;
+        }
+        if (visible) {
+            cui_rect marker = options.vertical ? (cui_rect){bounds.x, bounds.y, bounds.w, 2}
+                                               : (cui_rect){bounds.x, bounds.y, 2, bounds.h};
+            cui_begin_portal(ui, container ^ UINT64_C(0x5df27b10b325643e),
+                             (cui_box){.background = theme->primary}, marker, 90);
+            cui_end_box(ui);
+        }
+    }
     if (scrollable)
         cui_end_box(ui);
     if (options.suffix)

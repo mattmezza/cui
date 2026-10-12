@@ -105,12 +105,29 @@ def main():
             dialog_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Notification preferences'))
             footer_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Save changes'))
             assert footer_bounds[1] + footer_bounds[3] <= dialog_bounds[1] + dialog_bounds[3]
+            body = semantic_index('Surface content')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,21)>0', arg=body)
+            body_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', body)
+            rectangle = canvas.bounding_box()
+            page.mouse.move(rectangle['x']+body_bounds[0]+body_bounds[2]/2,rectangle['y']+body_bounds[1]+body_bounds[3]/2)
+            page.mouse.wheel(0,160)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,19)>0', arg=body)
+            assert page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Save changes')) == footer_bounds
+            page.wait_for_function('cuiGallery.exports.gallery_redraw()===0')
+            frame = page.evaluate('cuiGallery.frame')
+            page.wait_for_timeout(100)
+            assert page.evaluate('cuiGallery.frame') == frame
             click_semantic('Save changes')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
             index = semantic_index('Edit preferences')
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
             click_semantic('Edit preferences')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1')
+            body = semantic_index('Surface content')
+            rectangle = canvas.bounding_box()
+            page.mouse.move(rectangle['x']+body_bounds[0]+body_bounds[2]/2,rectangle['y']+body_bounds[1]+body_bounds[3]/2)
+            page.mouse.wheel(0,-1000)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,19)===0', arg=body)
             click_semantic('Advanced preferences')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(4)===1')
             assert page.locator('#accessible [role=dialog][aria-modal=true]').count() == 2

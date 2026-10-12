@@ -1225,7 +1225,7 @@ int gallery_clicks(void) {
 }
 
 int gallery_redraw(void) {
-    return redraw;
+    return redraw || cui_needs_redraw(ui);
 }
 float gallery_hover_state(unsigned field) {
     switch (field) {

@@ -1539,6 +1539,7 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     s->span_count = actual.spans;
     s->block_count = actual.blocks;
     s->glyph_count = 0;
+    s->selection_projected = false;
     s->workspace.rendered[s->text_length] = 0;
     s->highlight_count = 0;
     for (size_t i = 0; i < kept; ++i) {
@@ -1564,7 +1565,8 @@ bool cui_text_view_select(cui_text_view_state *s, size_t a, size_t c) {
     if (!s || !cui_text_view_boundary(cui_text_view_rendered_text(s), a) ||
         !cui_text_view_boundary(cui_text_view_rendered_text(s), c))
         return false;
-    bool changed = s->anchor != a || s->cursor != c;
+    bool changed = s->anchor != a || s->cursor != c || s->selection_projected;
+    s->selection_projected = false;
     s->anchor = a;
     s->cursor = c;
     return changed;
@@ -1593,6 +1595,18 @@ static void cui_text_view_source_selection(const cui_text_view_state *s, size_t 
             *b = r.end;
     }
 }
+static cui_text_view_range cui_text_view_block_selection(const cui_text_view_state *s, size_t index,
+                                                         size_t a, size_t b) {
+    const cui_text_view_block *block = &s->workspace.blocks[index];
+    if (s->selection_projected) {
+        a = block->projected_selection.begin;
+        b = block->projected_selection.end;
+        if (a != b)
+            cui_text_view_source_selection(s, &a, &b);
+    }
+    return (cui_text_view_range){a > block->text.begin ? a : block->text.begin,
+                                 b < block->text.end ? b : block->text.end};
+}
 bool cui_text_view_selected_source_range(const cui_text_view_state *s, cui_text_view_range *out) {
     if (!s || s->format == CUI_TEXT_VIEW_HTML)
         return false;
@@ -1601,6 +1615,16 @@ bool cui_text_view_selected_source_range(const cui_text_view_state *s, cui_text_
     cui_text_view_source_selection(s, &a, &b);
     size_t start = SIZE_MAX, end = 0;
     for (size_t i = a; i < b; ++i) {
+        if (s->selection_projected) {
+            bool selected = false;
+            for (size_t j = 0; j < s->block_count; ++j) {
+                cui_text_view_range r = cui_text_view_block_selection(s, j, a, b);
+                if (i >= r.begin && i < r.end)
+                    selected = true;
+            }
+            if (!selected)
+                continue;
+        }
         cui_text_view_range m = s->workspace.mapping[i].source;
         if (m.begin != SIZE_MAX) {
             if (m.begin < start)
@@ -2409,8 +2433,8 @@ static void cui_text_view_copy_table(const cui_text_view_state *s, cui_text_view
         if (columns)
             cui_text_view_copy_literal(w, " | ");
         ++columns;
-        size_t begin = cell->text.begin > a ? cell->text.begin : a,
-               finish = cell->text.end < b ? cell->text.end : b;
+        cui_text_view_range selected = cui_text_view_block_selection(s, i, a, b);
+        size_t begin = selected.begin, finish = selected.end;
         while (begin < finish && s->workspace.rendered[begin] == ' ' &&
                !(s->workspace.mapping[begin].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
             ++begin;
@@ -2481,8 +2505,10 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
         const cui_text_view_block *block = &s->workspace.blocks[i];
         if (block->text.end <= a || block->text.begin >= b)
             continue;
-        size_t begin = block->text.begin > a ? block->text.begin : a;
-        size_t end = block->text.end < b ? block->text.end : b;
+        cui_text_view_range selected = cui_text_view_block_selection(s, i, a, b);
+        size_t begin = selected.begin, end = selected.end;
+        if (begin >= end)
+            continue;
         if (block->list_continuation && block->list_parent >= i)
             return CUI_TEXT_VIEW_INVALID;
         bool first_continuation = block->list_continuation && !listed[block->list_parent];
@@ -2620,7 +2646,7 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     bool plain = f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN;
     if (!plain)
         cui_text_view_source_selection(s, &a, &b);
-    if (!plain && a == 0 && b == s->text_length && a != b)
+    if (!plain && !s->selection_projected && a == 0 && b == s->text_length && a != b)
         direct = cui_text_view_source(s);
     cui_text_view_copy_writer w = {0};
     cui_text_view_error error = CUI_TEXT_VIEW_OK;
@@ -2647,6 +2673,71 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     return CUI_TEXT_VIEW_OK;
 }
 
+static void cui_text_view_copy_plain_document(const cui_text_view_state *s,
+                                              cui_text_view_copy_writer *w) {
+    size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
+           b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        const cui_text_view_block *block = &s->workspace.blocks[i];
+        cui_text_view_range r = cui_text_view_block_selection(s, i, a, b);
+        if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
+            size_t end = i + 1;
+            bool selected = r.begin < r.end;
+            while (end < s->block_count &&
+                   s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                   s->workspace.blocks[end].table == block->table) {
+                cui_text_view_range cell = cui_text_view_block_selection(s, end, a, b);
+                selected |= cell.begin < cell.end;
+                ++end;
+            }
+            if (selected) {
+                unsigned row = block->row;
+                for (size_t j = i; j < end; ++j) {
+                    const cui_text_view_block *cell = &s->workspace.blocks[j];
+                    if (j != i)
+                        cui_text_view_copy_literal(w, cell->row == row ? " " : "\n");
+                    row = cell->row;
+                    r = cui_text_view_block_selection(s, j, a, b);
+                    if (r.begin < r.end)
+                        cui_text_view_copy_plain(s, w, r.begin, r.end);
+                }
+                cui_text_view_copy_literal(w, "\n\n");
+            }
+            i = end - 1;
+            continue;
+        }
+        if (r.begin >= r.end)
+            continue;
+        size_t before = w->length;
+        cui_text_view_copy_plain(s, w, r.begin, r.end);
+        if (w->length != before) {
+            cui_text_view_copy_literal(w, "\n");
+            if (block->kind == CUI_TEXT_VIEW_QUOTE &&
+                (i + 1 == s->block_count || s->workspace.blocks[i + 1].kind != CUI_TEXT_VIEW_QUOTE))
+                cui_text_view_copy_literal(w, "\n");
+        }
+    }
+}
+cui_text_view_error cui_text_view_copy_document_selection(const cui_text_view_state *s,
+                                                          cui_text_view_copy_format format,
+                                                          char *out, size_t capacity,
+                                                          size_t *length) {
+    if (!s || format < CUI_TEXT_VIEW_COPY_PLAIN || format > CUI_TEXT_VIEW_COPY_SOURCE ||
+        (!out && capacity))
+        return CUI_TEXT_VIEW_INVALID;
+    if (format == CUI_TEXT_VIEW_COPY_SOURCE && s->format == CUI_TEXT_VIEW_MARKDOWN)
+        return cui_text_view_copy_selection(s, format, out, capacity, length);
+    cui_text_view_copy_writer w = {0};
+    cui_text_view_copy_plain_document(s, &w);
+    if (length)
+        *length = w.length;
+    if (capacity <= w.length)
+        return CUI_TEXT_VIEW_CAPACITY;
+    w = (cui_text_view_copy_writer){.output = out};
+    cui_text_view_copy_plain_document(s, &w);
+    out[w.length] = 0;
+    return CUI_TEXT_VIEW_OK;
+}
 bool cui_text_view_selection_init(cui_text_view_selection *m,
                                   cui_text_view_selection_member *members, size_t capacity) {
     if (!m || !members || !capacity || capacity > CUI_TEXT_VIEW_NODE_LIMIT)
@@ -2675,13 +2766,15 @@ bool cui_text_view_selection_register(cui_text_view_selection *m,
         if (m->members[i].id == member.id) {
             if (m->members[i].state != member.state)
                 return false;
-            m->members[i] = member;
-            if (!member.enabled) {
+            bool reset = !member.enabled || m->members[i].scope != member.scope ||
+                         m->members[i].table_mode != member.table_mode;
+            if (reset) {
                 (void)cui_text_view_select(member.state, member.state->cursor,
                                            member.state->cursor);
                 if (m->owner == member.id)
                     cui_text_view_selection_clear(m);
             }
+            m->members[i] = member;
             return true;
         }
         if (m->members[i].state == member.state)
@@ -2740,6 +2833,8 @@ bool cui_text_view_selection_project(cui_text_view_selection *m, cui_id scope, f
         if (p->scope != scope)
             continue;
         size_t first = SIZE_MAX, last = 0;
+        for (size_t j = 0; j < s->block_count; ++j)
+            s->workspace.blocks[j].projected_next = (cui_text_view_range){0};
         if (p->enabled && p->scope == scope)
             for (size_t j = 0; j < s->glyph_count; ++j) {
                 cui_text_view_glyph *g = &s->workspace.glyphs[j];
@@ -2758,11 +2853,24 @@ bool cui_text_view_selection_project(cui_text_view_selection *m, cui_id scope, f
                     if (first == SIZE_MAX)
                         first = g->text.begin;
                     last = g->text.end;
+                    cui_text_view_range *range = &s->workspace.blocks[g->block].projected_next;
+                    if (range->begin == range->end)
+                        range->begin = g->text.begin;
+                    range->end = g->text.end;
                 }
             }
         size_t a = first == SIZE_MAX ? s->cursor : forward ? first : last;
         size_t b = first == SIZE_MAX ? s->cursor : forward ? last : first;
-        changed |= cui_text_view_select(s, a, b);
+        changed |= s->anchor != a || s->cursor != b || !s->selection_projected;
+        s->anchor = a;
+        s->cursor = b;
+        for (size_t j = 0; j < s->block_count; ++j) {
+            cui_text_view_block *block = &s->workspace.blocks[j];
+            changed |= block->projected_selection.begin != block->projected_next.begin ||
+                       block->projected_selection.end != block->projected_next.end;
+            block->projected_selection = block->projected_next;
+        }
+        s->selection_projected = true;
     }
     return changed;
 }
@@ -2770,12 +2878,15 @@ static bool cui_text_view_selection_has_copy(const cui_text_view_state *s,
                                              cui_text_view_copy_format format) {
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
-    for (size_t i = a; i < b; ++i) {
-        if (s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
-            if (format == CUI_TEXT_VIEW_COPY_SOURCE && s->format == CUI_TEXT_VIEW_MARKDOWN)
+    for (size_t block = 0; block < s->block_count; ++block) {
+        cui_text_view_range r = cui_text_view_block_selection(s, block, a, b);
+        for (size_t i = r.begin; i < r.end; ++i) {
+            if (s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE) {
+                if (format == CUI_TEXT_VIEW_COPY_SOURCE && s->format == CUI_TEXT_VIEW_MARKDOWN)
+                    return true;
+            } else if (!strchr(" \t\n\r\f\v", s->workspace.rendered[i]))
                 return true;
-        } else if (!strchr(" \t\n\r\f\v", s->workspace.rendered[i]))
-            return true;
+        }
     }
     return false;
 }
@@ -2792,7 +2903,8 @@ cui_text_view_error cui_text_view_selection_copy(const cui_text_view_selection *
             !cui_text_view_selection_has_copy(p->state, format))
             continue;
         size_t n = 0;
-        cui_text_view_error error = cui_text_view_copy_selection(p->state, format, NULL, 0, &n);
+        cui_text_view_error error =
+            cui_text_view_copy_document_selection(p->state, format, NULL, 0, &n);
         if (error != CUI_TEXT_VIEW_CAPACITY)
             return error;
         if (n > SIZE_MAX - total - (selected != 0))
@@ -2821,8 +2933,8 @@ cui_text_view_error cui_text_view_selection_copy(const cui_text_view_selection *
         if (ordinal)
             out[written++] = '\n';
         size_t n;
-        (void)cui_text_view_copy_selection(m->members[next].state, format, out + written,
-                                           capacity - written, &n);
+        (void)cui_text_view_copy_document_selection(m->members[next].state, format, out + written,
+                                                    capacity - written, &n);
         written += n;
         previous = next;
     }

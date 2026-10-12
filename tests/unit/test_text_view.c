@@ -195,6 +195,55 @@ static void test_html_image_dimensions(void) {
            f.spans[1].image_bounds.x == f.glyphs[1].bounds.x &&
            f.glyphs[0].line_top == f.glyphs[1].line_top);
 }
+static void test_document_plain_copy(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *sources[] = {"paragraph", "# Heading", "```c\nabcdef\n```"};
+    const char *expected[] = {"rag\n", "ead\n", "bcd\n"};
+    const size_t starts[] = {2, 1, 1};
+    for (size_t i = 0; i < 3; ++i) {
+        assert(cui_text_view_set_text(&f.state, text(sources[i])) == CUI_TEXT_VIEW_OK);
+        assert(cui_text_view_select(&f.state, starts[i], starts[i] + 3));
+        char output[64];
+        size_t length;
+        assert(cui_text_view_copy_document_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output,
+                                                     sizeof output, &length) == CUI_TEXT_VIEW_OK &&
+               !strcmp(output, expected[i]));
+        assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output,
+                                            sizeof output, &length) == CUI_TEXT_VIEW_OK &&
+               length == 3);
+    }
+}
+static void test_shared_disjoint_cells(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("| abcdefghij | Z |\n| --- | --- |")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(
+        cui_text_view_layout(&f.state,
+                             (cui_text_view_layout_options){.width = 100,
+                                                            .font_size = 14,
+                                                            .line_height = 20,
+                                                            .table_mode = CUI_TEXT_VIEW_TABLE_WRAP},
+                             measure, NULL) == CUI_TEXT_VIEW_OK);
+    f.state.viewport = (cui_rect){0, 0, 100, 100};
+    cui_text_view_selection_member storage[1];
+    cui_text_view_selection manager;
+    assert(cui_text_view_selection_init(&manager, storage, 1));
+    assert(cui_text_view_selection_register(
+        &manager,
+        (cui_text_view_selection_member){&f.state, 77, 900, 0, CUI_TEXT_VIEW_TABLE_WRAP, true}));
+    float y = f.glyphs[0].bounds.y + 1;
+    assert(cui_text_view_selection_project(&manager, 900, 0, y, 100, y));
+    char output[128];
+    size_t length;
+    assert(cui_text_view_copy_document_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, output,
+                                                 sizeof output, &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "abcdef Z\n\n"));
+    assert(cui_text_view_copy_document_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output,
+                                                 sizeof output, &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "| abcdef | Z |\n| :-- | :-- |"));
+}
 static void test_shared_selection_model(void) {
     fixture a, b, isolated;
     setup(&a, CUI_TEXT_VIEW_MARKDOWN);
@@ -231,11 +280,11 @@ static void test_shared_selection_model(void) {
     size_t length;
     assert(cui_text_view_selection_copy(&manager, CUI_TEXT_VIEW_COPY_PLAIN, copy, sizeof copy,
                                         &length) == CUI_TEXT_VIEW_OK &&
-           !strcmp(copy, "first\nsecond"));
+           !strcmp(copy, "first\n\nsecond\n"));
     strcpy(copy, "unchanged");
     assert(cui_text_view_selection_copy(&manager, CUI_TEXT_VIEW_COPY_PLAIN, copy, 2, &length) ==
                CUI_TEXT_VIEW_CAPACITY &&
-           length == 12 && !strcmp(copy, "unchanged"));
+           length == 14 && !strcmp(copy, "unchanged"));
     assert(cui_text_view_selection_project(&manager, 99, 100, 41, 0, 1));
     assert(a.state.anchor == 5 && a.state.cursor == 0 && b.state.anchor == 6);
     b.state.scroll.y = 10;
@@ -257,8 +306,27 @@ static void test_shared_selection_model(void) {
     assert(cui_text_view_set_text(&b.state, text("![alt](asset)")) == CUI_TEXT_VIEW_OK);
     assert(cui_text_view_layout(&b.state, options, measure, NULL) == CUI_TEXT_VIEW_OK);
     b.state.viewport = (cui_rect){0, 40, 100, 20};
-    assert(!cui_text_view_selection_project(&manager, 99, 0, 41, 100, 41));
+    (void)cui_text_view_selection_project(&manager, 99, 0, 41, 100, 41);
     assert(b.state.anchor == b.state.cursor);
+    assert(cui_text_view_select(&a.state, 0, 2));
+    manager.owner = 1;
+    manager.active = manager.dragging = true;
+    assert(cui_text_view_selection_register(
+        &manager,
+        (cui_text_view_selection_member){&a.state, 1, 66, 10, CUI_TEXT_VIEW_TABLE_WRAP, true}));
+    assert(!manager.active && !manager.dragging && a.state.anchor == a.state.cursor);
+    assert(cui_text_view_select(&b.state, 0, 1));
+    assert(cui_text_view_selection_register(
+        &manager,
+        (cui_text_view_selection_member){&b.state, 2, 66, 20, CUI_TEXT_VIEW_TABLE_WRAP, true}));
+    assert(b.state.anchor == b.state.cursor);
+    assert(cui_text_view_set_text(&a.state, text("x")) == CUI_TEXT_VIEW_OK);
+    assert(!a.state.glyph_count && !a.state.selection_projected);
+    (void)cui_text_view_selection_project(&manager, 66, 0, 0, 100, 20);
+    assert(a.state.anchor == a.state.cursor);
+    assert(cui_text_view_selection_copy(&manager, CUI_TEXT_VIEW_COPY_SOURCE, copy, sizeof copy,
+                                        &length) == CUI_TEXT_VIEW_OK &&
+           length == 0);
 }
 static void test_image_source_boundaries(void) {
     fixture f;
@@ -1761,12 +1829,73 @@ static void test_shared_selection_events(void) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
     shared_selection_frame(ui, &a, &b, &manager, options);
-    assert(!strcmp(clipboard_text, "first\nsecond"));
+    assert(!strcmp(clipboard_text, "first\n\nsecond\n"));
     assert(cui_text_view_selection_remove(&manager, 78));
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
     shared_selection_frame(ui, &a, &b, &manager, options);
-    assert(!strcmp(clipboard_text, "first"));
+    assert(!strcmp(clipboard_text, "first\n"));
+    cui_destroy(ui);
+}
+static void test_document_plain_clipboard(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_platform platform = {.user = clipboard_text,
+                             .capabilities = CUI_PLATFORM_CLIPBOARD,
+                             .clipboard_set = clipboard_write};
+    cui_text_view_options options = cui_text_view_default();
+    options.width = 200;
+    options.clipboard = &platform;
+    const char *sources[] = {"paragraph", "# Heading", "```c\nabcdef\n```"};
+    const char *expected[] = {"rag\n", "ead\n", "bcd\n"};
+    const size_t starts[] = {2, 1, 1};
+    for (size_t i = 0; i < 3; ++i) {
+        assert(cui_text_view_set_text(&f.state, text(sources[i])) == CUI_TEXT_VIEW_OK);
+        frame(ui, &f, options);
+        cui_focus(ui, 77);
+        assert(cui_text_view_select(&f.state, starts[i], starts[i] + 3));
+        assert(cui_queue_event(
+            ui,
+            (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
+        frame(ui, &f, options);
+        assert(!strcmp(clipboard_text, expected[i]));
+    }
+    cui_destroy(ui);
+}
+static void test_shared_disjoint_cells_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("| abcdefghij | Z |\n| --- | --- |")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_selection_member storage[1];
+    cui_text_view_selection manager;
+    assert(cui_text_view_selection_init(&manager, storage, 1));
+    assert(cui_text_view_selection_register(
+        &manager,
+        (cui_text_view_selection_member){&f.state, 77, 900, 0, CUI_TEXT_VIEW_TABLE_WRAP, true}));
+    cui_text_view_options options = cui_text_view_default();
+    options.width = 100;
+    options.shared_selection = &manager;
+    options.custom_style = true;
+    options.style = cui_text_view_style_default();
+    options.style.selection = (cui_color){1, 2, 3, 255};
+    frame(ui, &f, options);
+    float y = f.state.viewport.y + f.glyphs[0].bounds.y + 1;
+    assert(cui_text_view_selection_project(&manager, 900, f.state.viewport.x, y,
+                                           f.state.viewport.x + 100, y));
+    cui_draw_list draw = frame(ui, &f, options);
+    size_t selected = 0;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.r == 1 &&
+            draw.commands[i].color.g == 2 && draw.commands[i].color.b == 3) {
+            assert(draw.commands[i].bounds.y < f.state.viewport.y + 30);
+            ++selected;
+        }
+    assert(selected == 2);
     cui_destroy(ui);
 }
 static void test_image_plain_clipboard(void) {
@@ -1787,7 +1916,7 @@ static void test_image_plain_clipboard(void) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
     frame(ui, &f, o);
-    assert(!strcmp(clipboard_text, "ab"));
+    assert(!strcmp(clipboard_text, "ab\n"));
     assert(cui_text_view_select(&f.state, 1, 2));
     strcpy(clipboard_text, "preserved");
     assert(cui_queue_event(
@@ -1801,7 +1930,7 @@ static void test_image_plain_clipboard(void) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
     frame(ui, &f, o);
-    assert(!strcmp(clipboard_text, "ab"));
+    assert(!strcmp(clipboard_text, "ab\n"));
     char buffer[64];
     o.copy_format = CUI_TEXT_VIEW_COPY_SOURCE;
     o.copy_buffer = buffer;
@@ -1818,7 +1947,7 @@ static void test_image_plain_clipboard(void) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_C, .modifiers = CUI_MOD_CTRL}));
     frame(ui, &f, o);
-    assert(!strcmp(clipboard_text, "ab"));
+    assert(!strcmp(clipboard_text, "ab\n"));
     cui_destroy(ui);
 }
 static cui_id action_buttons[4];
@@ -2715,6 +2844,8 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_document_plain_copy();
+    test_shared_disjoint_cells();
     test_shared_selection_model();
     test_image_source_boundaries();
     test_image_plain_copy();
@@ -2752,6 +2883,8 @@ int main(void) {
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
+    test_document_plain_clipboard();
+    test_shared_disjoint_cells_paint();
     test_shared_selection_events();
     test_image_plain_clipboard();
     test_standalone_markdown_object();

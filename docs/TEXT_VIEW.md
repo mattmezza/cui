@@ -333,8 +333,31 @@ Standalone views retain their existing behavior when the manager is absent.
 
 Remaining shared-selection gaps include touch handles, multi-click granularity,
 content-key resolution across dynamic renderers, cross-view automatic scrolling,
-and individual text-run ranges when one participant contains spatially disjoint
-runs. Projection currently records one coordinate range per view and clips to its
-viewport, rather than maintaining the source window manager's full per-run state.
+and individual image-separated text-run ranges within a paragraph. Projection
+retains a range for each block/table cell and clips to its viewport, rather than
+maintaining the source window manager's full inline-run state.
 Applications must refresh registration enabled flags and call the update before
 painting; there is no implicit window registry or stale-participant eviction.
+
+
+Styled Ctrl+C and shared copy use `cui_text_view_copy_document_selection`, which
+serializes selected blocks. Partial Plain Paragraph, Heading and Code selections
+include the source block's trailing newline. Table cells join with spaces, rows
+with newlines, and the table adds a final newline. Shared selection joins these
+participant strings with another newline in document order, preserving the frozen
+output (two selected one-line paragraphs copy as `first\n\nsecond\n`). Source
+mode retains Markdown reconstruction without those Plain terminators.
+`copy_selection(PLAIN)` remains a low-level coordinate slice copy with image slots
+omitted; it does not serialize document structure. `selected_text` is a borrowed
+bounding coordinate view and may include unselected gaps in a shared projection.
+Use document selection copy for source-equivalent styled text output.
+
+Shared projection stores separate ranges for wrapped table cells. Selection of
+one visual row therefore does not pull later wrapped text from a different cell
+into its copy or highlight. Within one paragraph, separate image-delimited text
+runs still share one block range; exact per-inline-run state remains tracked.
+Re-registering an existing member under a different scope or table mode clears
+its old projection; if it owns the active drag, the manager clears that drag.
+Changing text discards glyph geometry and projected ranges. Such a member cannot
+start a shared gesture until it has submitted fresh geometry; retained viewport
+coordinates alone are insufficient.

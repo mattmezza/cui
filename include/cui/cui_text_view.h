@@ -85,6 +85,7 @@ typedef struct {
     float table_track_width;
     cui_scroll_state table_scroll;
     float actions_height, text_inset, list_prefix_width;
+    cui_text_view_range projected_selection, projected_next;
 } cui_text_view_block;
 typedef struct {
     cui_text_view_range text;
@@ -117,7 +118,7 @@ typedef struct {
     cui_text_view_format format;
     size_t source_length, text_length, span_count, block_count, glyph_count, highlight_count;
     size_t anchor, cursor;
-    bool selecting, dragged, clamped, stream_fade, reduced_motion;
+    bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected;
     float pointer_x, pointer_y, press_x, press_y;
     cui_id secondary_link;
     float time, fade_duration, width, height;
@@ -151,6 +152,11 @@ typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_vi
 cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *,
                                                  cui_text_view_copy_format, char *output,
                                                  size_t capacity, size_t *length);
+/* Source-equivalent selected block serialization, used by styled clipboard delivery.
+ * Plain includes paragraph/heading/code terminators and table row/cell structure. */
+cui_text_view_error cui_text_view_copy_document_selection(const cui_text_view_state *,
+                                                          cui_text_view_copy_format, char *, size_t,
+                                                          size_t *length);
 bool cui_text_view_selected_source_range(const cui_text_view_state *, cui_text_view_range *);
 bool cui_text_view_range_for_source(const cui_text_view_state *, cui_text_view_range,
                                     cui_text_view_range *);

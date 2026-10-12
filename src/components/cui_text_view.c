@@ -140,7 +140,8 @@ bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
         if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_PRIMARY) {
             for (size_t j = 0; j < m->count; ++j) {
                 cui_text_view_selection_member *p = &m->members[j];
-                if (!p->enabled || !cui_event_hit_within_scope(ui, i, p->scope) ||
+                if (!p->enabled || !p->state->glyph_count || p->state->viewport.w <= 0 ||
+                    p->state->viewport.h <= 0 || !cui_event_hit_within_scope(ui, i, p->scope) ||
                     !cui_text_view_selection_target(p->state, p->id, cui_event_target(ui, i)))
                     continue;
                 cui_text_view_selection_clear(m);
@@ -267,9 +268,9 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                     if (o.copy_format == CUI_TEXT_VIEW_COPY_SOURCE && !o.scrollable &&
                         s->format == CUI_TEXT_VIEW_MARKDOWN) {
                         size_t length;
-                        if (cui_text_view_copy_selection(s, o.copy_format, o.copy_buffer,
-                                                         o.copy_capacity,
-                                                         &length) == CUI_TEXT_VIEW_OK)
+                        if (cui_text_view_copy_document_selection(s, o.copy_format, o.copy_buffer,
+                                                                  o.copy_capacity,
+                                                                  &length) == CUI_TEXT_VIEW_OK)
                             (void)o.clipboard->clipboard_set(o.clipboard->user,
                                                              (cui_str){o.copy_buffer, length});
                     } else {
@@ -277,8 +278,9 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                         char *buffer = o.copy_buffer ? o.copy_buffer : scratch;
                         size_t capacity = o.copy_buffer ? o.copy_capacity : sizeof scratch;
                         size_t length;
-                        if (cui_text_view_copy_selection(s, CUI_TEXT_VIEW_COPY_PLAIN, buffer,
-                                                         capacity, &length) == CUI_TEXT_VIEW_OK &&
+                        if (cui_text_view_copy_document_selection(s, CUI_TEXT_VIEW_COPY_PLAIN,
+                                                                  buffer, capacity,
+                                                                  &length) == CUI_TEXT_VIEW_OK &&
                             length)
                             (void)o.clipboard->clipboard_set(o.clipboard->user,
                                                              (cui_str){buffer, length});
@@ -304,6 +306,14 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
             }
         }
     }
+}
+static bool cui_text_view_glyph_selected(const cui_text_view_state *s, const cui_text_view_glyph *g,
+                                         cui_text_view_range selection) {
+    if (!s->selection_projected)
+        return cui_text_view_overlap(g->text, selection);
+    if (g->flags & CUI_TEXT_VIEW_INLINE_IMAGE)
+        return false;
+    return cui_text_view_overlap(g->text, s->workspace.blocks[g->block].projected_selection);
 }
 static float cui_text_view_opacity(const cui_text_view_state *s, size_t at) {
     if (!s->stream_fade || s->reduced_motion || s->workspace.mapping[at].born < 0)
@@ -548,7 +558,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             continue;
         }
         cui_color color = cui_text_view_foreground(s, first, style, o);
-        bool selected = o.selectable && cui_text_view_overlap(first->text, selection);
+        bool selected = o.selectable && cui_text_view_glyph_selected(s, first, selection);
         float opacity = cui_text_view_opacity(s, first->text.begin);
         size_t end = i + 1;
         while (end < s->glyph_count) {
@@ -556,7 +566,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
                                 *previous = &s->workspace.glyphs[end - 1];
             if (g->span != first->span || g->bounds.y != first->bounds.y ||
                 g->text.begin != previous->text.end ||
-                cui_text_view_overlap(g->text, selection) != selected ||
+                cui_text_view_glyph_selected(s, g, selection) != selected ||
                 cui_text_view_opacity(s, g->text.begin) != opacity ||
                 !cui_text_view_color_equal(cui_text_view_foreground(s, g, style, o), color))
                 break;

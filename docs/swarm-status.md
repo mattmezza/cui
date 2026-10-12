@@ -1,12 +1,18 @@
 # Live development checkpoint
 
-## Current priorities (12 October, afternoon)
+## Current priorities (12 October, evening)
 
-The public site remains the verified `e49dc95` release with 62 live stories. Local `3dd64a5` adds the 68th story (Title Bar), whose worker browser tests pass; newer root changes are awaiting the combined browser/release gate. Button text centering and source XS/S/M/L metrics (`658c5a3`), theme SVG overrides (`200caf1`), and SVG-only dialog close controls (`5fb6c11`) each pass all 59 native tests and quality gates. Canvas baseline correction and four-size controls are being validated in the gallery worktree. Full parity is not complete.
+The public site is verified at `3aecd899bd4ce372c690b7a402617ef2a4ccf47a`, with 77 interactive WASM stories. Both CI and Pages succeeded, and the full Chromium suite passed against the published HTTPS site. The 78th story, Questionnaire, is integrated locally with required validation, delayed radio advancement, freeform submission, reset, disabled state and four sizes. Its worker browser suite passed; the root combined 78-story browser, sanitizer and WASI gates are running. Do not describe the 78-story gallery as published until deployment and HTTPS validation succeed.
 
-User-requested website scope now includes a homepage and getting-started example, browsable repository documentation, slash-key fuzzy component search, and one-button usage-code copying. Finish alignment/size validation first, then implement these on the existing GitHub Pages site. Active isolated workers own Sidebar, Textarea, and the browser gallery/site; root owns shared core/theme integration and release validation. No user dependency installation is needed.
+The homepage, getting-started example, browsable docs, slash-key fuzzy search, copyable usage snippets, graphical Checkbox/Radio, SVG icon customization and four-size controls are implemented. The top-right palette picker has all 38 requested themes, Follow System as the live default, persistence and an additional High Contrast option. Website and WASM examples share the selected palette. No user dependency installation is needed. Impeccable metadata has been removed.
 
-Repository https://github.com/mattmezza/cui, default branch `main`. Existing public visibility preserved; ordinary pushes only. The full 78-family parity objective is active, with isolated choice, table and browser-gallery workers; only the root integrator merges. Impeccable metadata was removed at the user's request.
+All 78 manifest entries have partial implementations: 0 not started, 5 implemented, 73 tested, 0 verified. Tests and stories do not prove full family parity. The current authoritative evidence is [latest-checkpoint.json](validation/latest-checkpoint.json); detailed remaining behavior is recorded in [gpui-parity.json](gpui-parity.json) and component documents.
+
+Recent integrations cover persistent precise-scroll ownership, unwrapped measured TextView lines, nested list continuations and Setext headings, Sankey link-slot relaxation/reordering, Chart hover motion and measured Bar labels, and full alphanumeric core/SDL key identities. The complete 78-entry parity objective remains active. Isolated workers own Chart, TextView and the web gallery; root owns shared core, Questionnaire, integration and release validation. Only root integrates into main, using ordinary pushes. Native accessibility, editing/IME, platform services and feature-specific source fidelity remain in scope.
+
+## Historical checkpoints
+
+The entries below preserve earlier evidence and failures. Their story counts, status totals and pending work describe those historical revisions, not the current repository.
 
 The first resumed published checkpoint `8d670694cb63d7074c1f59ec717bccf848d45ac1` passed all six framework CI jobs and the WebAssembly browser/build/deploy pipeline. [Framework CI](https://github.com/mattmezza/cui/actions/runs/38219053307); [GitHub Pages deployment](https://github.com/mattmezza/cui/actions/runs/38219053380). Ubuntu/macOS/Windows portable22/22 each; Linux GCC/Clang native sanitizer25/25 each plus Xvfb gallery and Sokol readback; style/manifest/license/distribution gates. Hosted Sokol uses llvmpipe software separately from the development-host Intel/Mesa GPU evidence.
 

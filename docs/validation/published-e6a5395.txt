@@ -1,0 +1,21 @@
+Published source: e6a5395d8c2d7a5940d0c344ce17a9c23182883b
+CI 38318335400: success
+Pages 38318335379: success
+Earlier local HTTPS attempts failed during screenshot capture while /tmp user quota was exhausted. The rerun uses TMPDIR on the main disk.
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+PASS gallery.wasm b5a78b95cedf9f7d7fbc0ec91b67bb937f64a27a89decb88e77c77169d57725e
+PASS gallery.js 2c53091871ef416762c515ef13dff5dcbb55a16628e7ce91d9d5cea5a8b43257
+PASS gallery.css f46c2ffe07b2dd8a6adcff079166a1fd03b5f0e991e96c8e816c73739ad66ade
+PASS index.html ddaf11775c83bccebf4c666e78eabccc0d466255cd39056a45818b3e7548c661
+PASS catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+PASS themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+PASS docs.json b6740f99a4a9efa3c3ba2b20217bbda68d5cbdaf5648841d4255b95907e50aa8
+PASS assets/alpine-lake.jpg 92a48f1cc90763ed83e23f6db9dc1b76fa05c72b82908f895f84b363d95a9be6
+PASS llms.txt 98f0c8613b7db29e7cc02b944c4b20ad51adcaaf027f58ddf97283704c17dc4a
+PASS llm.txt 98f0c8613b7db29e7cc02b944c4b20ad51adcaaf027f58ddf97283704c17dc4a
+PASS llms-full.txt 4944a1921e532c398d91da074edad3df1106425d79c2e73a977e4f4d46775cf4
+PASS llm-full.txt 4944a1921e532c398d91da074edad3df1106425d79c2e73a977e4f4d46775cf4
+PASS markdown/docs/START_HERE.md 9500b82d2baedc9b608792da0975a52d8bd0dec1dd1e27f0552316e244a3586a
+PASS markdown/docs/AI_AGENTS.md 232ddacfcc165cb0967cb2111c64de2440c67ca19e3e8ef734984813a4ba2f18
+PASS markdown/docs/IMMEDIATE_AND_STATE.md 695a750f7185d036fbc20ee97f27e0388e1add9be082e922c028c36a38094bc0

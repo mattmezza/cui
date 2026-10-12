@@ -303,7 +303,45 @@ static void input_groups(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+#ifndef CUI_FORM_BASE_ONLY
+static void loading_addon_artwork(void) {
+    char buffer[32] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 100});
+    cui_theme t = cui_theme_light();
+    cui_input_group_state state = {0};
+    cui_input_group_addon addon = {.id = 110,
+                                   .kind = CUI_INPUT_GROUP_BUTTON,
+                                   .alignment = CUI_INPUT_GROUP_INLINE_END,
+                                   .label = {"Save", 4},
+                                   .width = 40,
+                                   .loading = true};
+    cui_input_group_options options = {.width = 300, .size = CUI_FORM_SMALL, .name = {"Search", 6}};
+    assert(ui && edit);
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 500, 100, 0));
+    cui_input_group_result r = cui_input_group(ui, 100, 101, &t, edit, &state, &addon, 1, options);
+    cui_draw_list draw = cui_end_frame(ui);
+    unsigned images = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+            images++;
+            assert(draw.commands[i].bitmap.bitmap.width == 14 &&
+                   cui_bitmap_valid(draw.commands[i].bitmap.bitmap));
+            assert(draw.commands[i].bitmap.tint.r == t.muted.r);
+        }
+    assert(images == 1 && r.error == CUI_FORM_OK && !r.activated_addon);
+    click(ui, 110);
+    assert(!group_scene(ui, edit, &state, options, &addon, 1).activated_addon);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
+#endif
 int main(void) {
+#ifndef CUI_FORM_BASE_ONLY
+    loading_addon_artwork();
+#endif
     planning();
     base_semantics();
     input_groups();

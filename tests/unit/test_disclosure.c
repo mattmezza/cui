@@ -3,6 +3,7 @@
 #include "cui/cui_disclosure.h"
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 static cui_disclosure_item items[] = {
     {10, {"One", 3}, false}, {20, {"Two", 3}, true}, {30, {"Three", 5}, false}};
 static bool opened[3];
@@ -305,7 +306,41 @@ static void test_configured_disclosure_springs(void) {
     animated_spring = (cui_spring_settings){.18f, 1, .001f, true};
     cui_destroy(ui);
 }
+static void test_disclosure_chevron(void) {
+    cui_context *ui = cui_create((cui_config){.width = 300, .height = 100});
+    cui_theme t = cui_theme_light();
+    cui_disclosure_item item = {995, {"Details", 7}, false};
+    bool open = false;
+    unsigned char first[16 * 16 * 4];
+    size_t bytes = 0;
+    for (unsigned phase = 0; phase < 3; phase++) {
+        if (phase == 1)
+            click(ui, item.id);
+        assert(cui_begin_frame(ui, 300, 100, .016f));
+        cui_accordion(ui, 994, &t, &item, 1, &open, (cui_accordion_options){.disabled = phase == 2},
+                      NULL, NULL);
+        cui_draw_list draw = cui_end_frame(ui);
+        unsigned images = 0;
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+                cui_bitmap bitmap = draw.commands[i].bitmap.bitmap;
+                images++;
+                assert(draw.commands[i].bitmap.tint.r == t.muted.r);
+                size_t length = bitmap.height * bitmap.stride;
+                assert(length <= sizeof(first));
+                if (!phase) {
+                    bytes = length;
+                    memcpy(first, bitmap.pixels, bytes);
+                } else
+                    assert(open && (length != bytes || memcmp(first, bitmap.pixels, bytes)));
+            }
+        assert(images == (phase == 2 ? 0u : 1u));
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    test_disclosure_chevron();
     test_measured_reveal();
     test_configured_disclosure_springs();
     test_accordion_reveal_storage();

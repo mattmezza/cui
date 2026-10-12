@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_form.h"
+#include "cui/cui_icon.h"
 #include <math.h>
 static float cui_form_private_form_gap(cui_form_options o) {
     return o.size == CUI_FORM_LARGE                                ? 12
@@ -107,7 +108,7 @@ cui_form_error cui_form(cui_context *ui, cui_id id, const cui_theme *t, const cu
 #include "cui/cui_components.h"
 static void cui_form_private_addon(cui_context *ui, const cui_theme *t,
                                    const cui_input_group_addon *a, cui_input_group_options o,
-                                   float height) {
+                                   float height, float rem_size) {
     bool disabled = o.input.disabled || a->disabled || a->loading;
     cui_box box = {.width = a->width,
                    .height = height,
@@ -138,18 +139,28 @@ static void cui_form_private_addon(cui_context *ui, const cui_theme *t,
     cui_begin_box(ui, a->id, box);
     if (a->render)
         a->render(ui, t, a->user, disabled, o.input.readonly, a->width);
+    else if (a->loading)
+        (void)cui_icon_spinner(
+            ui, a->id ^ UINT64_C(0x9cd0876164b3fe2a), t,
+            (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                               .custom_size = (o.size == CUI_FORM_XSMALL  ? 12
+                                               : o.size == CUI_FORM_SMALL ? 14
+                                               : o.size == CUI_FORM_LARGE ? 24
+                                                                          : 16) *
+                                              rem_size / 16,
+                               .custom_color = true,
+                               .color = a->kind == CUI_INPUT_GROUP_TEXT ? t->muted : ink});
     else
-        cui_text(ui, a->loading ? cui_string("...") : a->label, t->font_size,
-                 a->kind == CUI_INPUT_GROUP_TEXT ? t->muted : ink);
+        cui_text(ui, a->label, t->font_size, a->kind == CUI_INPUT_GROUP_TEXT ? t->muted : ink);
     cui_end_box(ui);
 }
 static void cui_form_private_addons(cui_context *ui, const cui_theme *t,
                                     const cui_input_group_addon *a, size_t count,
                                     cui_input_group_options o, cui_input_group_alignment alignment,
-                                    float height) {
+                                    float height, float rem_size) {
     for (size_t i = 0; i < count; i++)
         if (a[i].alignment == alignment)
-            cui_form_private_addon(ui, t, &a[i], o, height);
+            cui_form_private_addon(ui, t, &a[i], o, height, rem_size);
 }
 cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id input,
                                        const cui_theme *theme, cui_edit *edit,
@@ -200,7 +211,8 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
                                     .row = true,
                                     .align_y = CUI_ALIGN_CENTER,
                                     .height = cui_edit_get_state(edit).multiline ? 0 : h});
-            cui_form_private_addons(ui, &t, a, count, o, CUI_INPUT_GROUP_INLINE_START, h);
+            cui_form_private_addons(ui, &t, a, count, o, CUI_INPUT_GROUP_INLINE_START, h,
+                                    theme->font_size);
             cui_theme frameless = t;
             frameless.border = frameless.focus = frameless.surface = frameless.background =
                 (cui_color){0};
@@ -214,7 +226,8 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
                                                 .placeholder = o.placeholder});
             state->scroll_x = paint_state.scroll_x;
             (void)cui_track_bounds(ui, cui_input_viewport_id(input), &state->viewport);
-            cui_form_private_addons(ui, &t, a, count, o, CUI_INPUT_GROUP_INLINE_END, h);
+            cui_form_private_addons(ui, &t, a, count, o, CUI_INPUT_GROUP_INLINE_END, h,
+                                    theme->font_size);
             cui_end_box(ui);
         }
         bool any = false;
@@ -223,7 +236,7 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
         if (any) {
             cui_begin_box(ui, group ^ (UINT64_C(0x4871b368093d6ade) + side),
                           (cui_box){.width = -1, .row = true, .align_y = CUI_ALIGN_CENTER});
-            cui_form_private_addons(ui, &t, a, count, o, align, h);
+            cui_form_private_addons(ui, &t, a, count, o, align, h, theme->font_size);
             cui_end_box(ui);
         }
     }

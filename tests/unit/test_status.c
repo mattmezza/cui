@@ -697,7 +697,54 @@ static void notification_models(void) {
     heights[0] = NAN;
     assert(!cui_notification_stack_geometry(heights, 2, 0, false, &g));
 }
+#ifndef CUI_STATUS_BASE_ONLY
+static void notification_intent_artwork(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
+    cui_theme t = cui_theme_light();
+    t.info = (cui_color){11, 21, 31, 255};
+    t.success = (cui_color){12, 22, 32, 255};
+    t.warning = (cui_color){13, 23, 33, 255};
+    t.danger = (cui_color){14, 24, 34, 255};
+    cui_notification_entry entries[4];
+    cui_notification_state state;
+    cui_notification_settings settings = cui_notification_settings_default();
+    settings.reduced_motion = true;
+    assert(ui && cui_notification_init(&state, entries, 4, settings, (cui_notification_host){0}));
+    unsigned seen = 0;
+    for (int kind = CUI_NOTIFICATION_INFO; kind <= CUI_NOTIFICATION_ERROR; kind++) {
+        assert(cui_notification_init(&state, entries, 4, settings, (cui_notification_host){0}));
+        cui_notification n = cui_notification_default();
+        n.id = (cui_notification_id){1, (uint64_t)kind};
+        n.kind = (cui_notification_kind)kind;
+        n.message = cui_string("Message");
+        n.height = 80;
+        n.autohide = false;
+        assert(cui_notification_push(&state, n, 0));
+        assert(cui_begin_frame(ui, 600, 600, 0));
+        cui_notifications(ui, 910, &t, &state, (cui_rect){0, 0, 600, 600}, .4);
+        cui_draw_list draw = cui_end_frame(ui);
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+                cui_draw_command c = draw.commands[i];
+                assert(c.bitmap.tint.r >= 11 && c.bitmap.tint.r <= 14);
+                seen |= 1u << (c.bitmap.tint.r - 11);
+                assert(cui_bitmap_valid(c.bitmap.bitmap) && c.bounds.w == t.font_size);
+                unsigned coverage = 0;
+                for (unsigned y = 0; y < c.bitmap.bitmap.height; y++)
+                    for (unsigned x = 0; x < c.bitmap.bitmap.width; x++)
+                        coverage +=
+                            c.bitmap.bitmap.pixels[y * c.bitmap.bitmap.stride + x * 4 + 3] > 0;
+                assert(coverage > 20);
+            }
+    }
+    assert(seen == 15 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifndef CUI_STATUS_BASE_ONLY
+    notification_intent_artwork();
+#endif
     marker_models();
     shimmer_models();
     notification_models();

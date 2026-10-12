@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
+#include "cui/cui_icon.h"
 #include <math.h>
 static cui_box cui_components_control(const cui_theme *t, bool disabled, bool selected) {
     return (cui_box){.height = t->control_height,
@@ -84,7 +85,14 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     cui_begin_box(ui, id, b);
     foreground = disabled ? t->muted : foreground;
     if (options.loading)
-        cui_text(ui, cui_string("..."), t->font_size * scale, foreground);
+        (void)cui_icon_spinner(
+            ui, id ^ UINT64_C(0x7185e28e9fb974db), t,
+            (cui_icon_options){.size = options.size == CUI_CONTROL_XSMALL  ? CUI_ICON_XSMALL
+                                       : options.size == CUI_CONTROL_SMALL ? CUI_ICON_SMALL
+                                       : options.size == CUI_CONTROL_LARGE ? CUI_ICON_LARGE
+                                                                           : CUI_ICON_MEDIUM,
+                               .custom_color = true,
+                               .color = foreground});
     else if (options.leading.length)
         cui_text(ui, options.leading, t->font_size * scale, foreground);
     if (options.content)

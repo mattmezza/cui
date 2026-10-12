@@ -282,6 +282,8 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
     cui_id source = 0;
     bool reveal = false;
     for (size_t e = 0; e < count && !o.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_id activation = cui_event_activation(ui, e), target = cui_event_target(ui, e);
         size_t hit = SIZE_MAX;
         if (!cui_tree_hit(m, id, target, &hit))
@@ -306,6 +308,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
         if (!cui_tree_node_index(m, s->cursor, &cursor))
             continue;
         size_t position = m->banks[m->active].position[cursor], next = SIZE_MAX;
+        bool was_expanded = m->expanded[cursor];
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             cui_key key = events[e].key;
             if (key == CUI_KEY_UP || key == CUI_KEY_DOWN)
@@ -370,6 +373,10 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                     }
                 }
         }
+        if (events[e].type == CUI_EVENT_KEY_DOWN &&
+            (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT) &&
+            (m->expanded[cursor] != was_expanded || (next != SIZE_MAX && next != position)))
+            cui_consume_event(ui, e);
         if (next != SIZE_MAX && next < m->visible_count) {
             reveal = true;
             cursor = m->banks[m->active].visible[next];

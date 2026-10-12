@@ -170,6 +170,8 @@ static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) 
     thumb = fminf(track, fmaxf(16, thumb));
     float travel = track - thumb;
     for (size_t e = 0; e < count; e++) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_event event = events[e];
         if (event.type == CUI_EVENT_CANCEL ||
             (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE))
@@ -208,6 +210,9 @@ static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) 
                 scroll->offset += 32;
             scroll->offset = fminf(scroll->maximum, fmaxf(0, scroll->offset));
         }
+        if (before != scroll->offset && event.type == CUI_EVENT_KEY_DOWN &&
+            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT))
+            cui_consume_event(ui, e);
         scroll->changed |= before != scroll->offset;
     }
     cui_update_semantic(ui, scroll->scrollbar_id, false, scroll->offset);
@@ -322,6 +327,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         size_t n = 0;
         const cui_event *events = cui_frame_events(ui, &n);
         for (size_t e = 0; e < n && !options.disabled; e++) {
+            if (cui_event_consumed(ui, e))
+                continue;
             cui_event event = events[e];
             cui_id target = cui_event_target(ui, e);
             bool eligible = (scroll->receiving_id && target == scroll->receiving_id) ||
@@ -390,6 +397,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (options.scroll && options.scroll->changed &&
             (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_POINTER_UP)) {
             if (options.drag) {
@@ -421,6 +430,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
                 ? cui_choice_navigate(items, count, cursor, events[e].key, options.vertical)
                 : count;
         if (next != count) {
+            if (next != cursor && (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT))
+                cui_consume_event(ui, e);
             cursor = next;
             cui_focus(ui, items[next].id);
             if (!options.manual_activation)
@@ -463,6 +474,8 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
             cursor = count;
         size_t from = count;
@@ -494,6 +507,8 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
                 ? cui_choice_navigate(items, count, cursor, events[e].key, options.vertical)
                 : count;
         if (next != count) {
+            if (next != cursor && (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT))
+                cui_consume_event(ui, e);
             cursor = next;
             cui_focus(ui, items[next].id);
         }
@@ -605,6 +620,8 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
         window_begin = count - window_length;
     bool scrolled = options.window_changed;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_event event = events[e];
         scrolled |= cui_choice_scroll_event(
             ui, items, count, state, options.visible_count, &window_begin, options.scroll_bounds,
@@ -715,6 +732,8 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
     state->first_visible = begin;
     bool pointer_moved = false, keyboard_used = false;
     for (size_t e = 0; e < event_count; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (events[e].type == CUI_EVENT_POINTER_MOVE)
             pointer_moved = true;
         if (events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP)
@@ -860,6 +879,8 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
     bool dismiss = false;
     if (!disabled)
         for (size_t e = 0; e < event_count; e++) {
+            if (cui_event_consumed(ui, e))
+                continue;
             if (cui_event_target(ui, e) != input)
                 continue;
             if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE)
@@ -895,6 +916,8 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
         state->list.active = filtered[active].id;
     bool commit = false, edit_after_commit = false;
     for (size_t e = 0; e < event_count && !disabled; e++) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (cui_choice_scroll_event(ui, filtered, matched, &state->list, state->visible_rows,
                                     &state->list.first_visible, state->overlay.bounds,
                                     state->overlay.id,
@@ -1274,6 +1297,8 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
     bool redirected = false, activated_any = false, pointer_window_changed = false;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count; e++) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_id target = cui_event_target(ui, e);
         cui_event event = events[e];
         if (!state->drag_scroll || event.type == CUI_EVENT_CANCEL ||
@@ -1426,6 +1451,9 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
             (activation || events[e].type == CUI_EVENT_POINTER_MOVE ||
              (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_RIGHT));
         if (open_child) {
+            if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_RIGHT &&
+                (same_child || level + 1 < CUI_MENU_DEPTH_MAX))
+                cui_consume_event(ui, e);
             if (same_child) {
                 cui_focus(ui, state->levels[level + 1].active);
                 logical_level = level + 1;
@@ -1471,6 +1499,7 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         }
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             if (events[e].key == CUI_KEY_LEFT && level) {
+                cui_consume_event(ui, e);
                 state->depth = level;
                 logical_level = level - 1;
                 redirected = true;
@@ -1544,6 +1573,8 @@ bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry 
     const cui_event *events = cui_frame_events(ui, &event_count);
     if (!disabled && cui_pointer_scope_allowed(ui, state->overlay.id))
         for (size_t e = 0; e < event_count; e++) {
+            if (cui_event_consumed(ui, e))
+                continue;
             cui_event event = events[e];
             if (event.type == CUI_EVENT_POINTER_DOWN &&
                 event.pointer_button == CUI_POINTER_SECONDARY && event.x >= area.x &&

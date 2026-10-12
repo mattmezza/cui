@@ -2,6 +2,7 @@
 #include "cui/cui_choice.h"
 #include "cui/cui_base.h"
 #include "cui/cui_components.h"
+#include "cui/cui_icon.h"
 #include <math.h>
 static void cui_choice_menu_level(cui_context *, const cui_theme *, const cui_menu_entry *, size_t,
                                   cui_menu_tree_state *, size_t, cui_rect, cui_menu_tree_options,
@@ -355,6 +356,26 @@ static float cui_tab_extent(cui_context *ui, const cui_theme *theme, const cui_c
         extent = options.max_width;
     return extent;
 }
+typedef struct {
+    const cui_theme *theme;
+    bool selected;
+    float size;
+} cui_tab_overflow_icon;
+static void cui_tab_overflow_artwork(cui_context *ui, const cui_choice_item *item, size_t index,
+                                     void *user) {
+    (void)index;
+    const cui_tab_overflow_icon *icon = user;
+    cui_color color = item->disabled   ? icon->theme->muted
+                      : icon->selected ? icon->theme->on_primary
+                                       : icon->theme->text;
+    color.a = (uint8_t)lroundf(color.a * .75f);
+    (void)cui_icon_named(ui, item->id ^ UINT64_C(0x23f0b6d57ae48c19), icon->theme,
+                         cui_string("chevron-down"),
+                         (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                            .custom_size = icon->size,
+                                            .custom_color = true,
+                                            .color = color});
+}
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
               cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
@@ -617,9 +638,11 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         options.suffix(ui, options.content_user);
     if (options.overflow && options.overflow->visible) {
         cui_tab_overflow *overflow = options.overflow;
-        cui_choice_item trigger = {.id = overflow->trigger, .label = {"v", 1}};
-        cui_choice_draw(ui, &trigger, theme, overflow->menu.overlay.open,
-                        options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT);
+        cui_choice_item trigger = {.id = overflow->trigger, .label = {"All tabs", 8}};
+        cui_tab_overflow_icon icon = {theme, overflow->menu.overlay.open, 12 * density};
+        cui_choice_draw_ex(ui, &trigger, theme, overflow->menu.overlay.open,
+                           options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT,
+                           cui_tab_overflow_artwork, 0, &icon, 0, NULL, NULL, NULL);
         cui_set_semantic_details(ui, overflow->trigger, (cui_semantic_details){.parent = list_id});
         overflow->menu.row_height = theme->control_height;
         overflow->menu.padding = theme->padding;
@@ -1530,7 +1553,11 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                 cui_text_with_line_height(ui, entry->shortcut, metrics.font_size, foreground,
                                           metrics.font_size * 1.618034f);
             if (entry->kind == CUI_MENU_SUBMENU)
-                cui_text(ui, cui_string(">"), metrics.icon_size, theme->muted);
+                (void)cui_icon_named(ui, entry->id ^ UINT64_C(0x9e3f5d2a91bca002), theme,
+                                     cui_string("chevron-right"),
+                                     (cui_icon_options){.size = CUI_ICON_XSMALL,
+                                                        .custom_color = true,
+                                                        .color = theme->muted});
             cui_begin_box(ui, 0, (cui_box){.width = metrics.padding_x - 4 * density});
             cui_end_box(ui);
         }
@@ -1800,7 +1827,16 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                       .clip = true,
                       .align_y = CUI_ALIGN_CENTER});
         {
-            if (options.leading.length)
+            if (options.action_loading && options.leading.length)
+                (void)cui_icon_spinner(
+                    ui, action_id ^ UINT64_C(0x4aef702b79ab3181), theme,
+                    (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                       .custom_size = options.size == CUI_DROPDOWN_BUTTON_LARGE
+                                                          ? 24 * theme->font_size / 16
+                                                          : metrics.caret_size,
+                                       .custom_color = true,
+                                       .color = action_foreground});
+            else if (options.leading.length)
                 cui_dropdown_label(ui, action_id ^ UINT64_C(0x4aef702b79ab3180), options.leading,
                                    metrics.font_size, action_foreground, false);
             if (options.content)
@@ -1829,7 +1865,14 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                 .height = metrics.caret_size,
                                 .align_x = CUI_ALIGN_CENTER,
                                 .align_y = CUI_ALIGN_CENTER});
-        cui_text(ui, cui_string("v"), metrics.caret_size, trigger_foreground);
+        cui_color caret = trigger_foreground;
+        caret.a = (uint8_t)lroundf(caret.a * .75f);
+        (void)cui_icon_named(ui, trigger_id ^ UINT64_C(0x4aef702b79ab3171), theme,
+                             cui_string("chevron-down"),
+                             (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                                .custom_size = metrics.caret_size,
+                                                .custom_color = true,
+                                                .color = caret});
         cui_end_box(ui);
         cui_end_box(ui);
     }

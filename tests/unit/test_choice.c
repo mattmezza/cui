@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
 #include "cui/cui_components.h"
+#include "cui/cui_toolbar.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -481,7 +482,21 @@ static bool tree_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *acti
                                                         .width = 220,
                                                         .dt = .016f},
                                               .keep_open_checks = true});
-    cui_end_frame(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    if (state->overlay.open && !disabled) {
+        bool chevron = false;
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type == CUI_DRAW_IMAGE &&
+                draw.commands[i].bitmap.bitmap.width == 12) {
+                cui_bitmap bitmap = draw.commands[i].bitmap.bitmap;
+                unsigned coverage = 0;
+                for (unsigned y = 0; y < bitmap.height; y++)
+                    for (unsigned x = 0; x < bitmap.width; x++)
+                        coverage += bitmap.pixels[y * bitmap.stride + x * 4 + 3] > 0;
+                chevron |= coverage > 10;
+            }
+        assert(chevron);
+    }
     assert(cui_last_error(ui) == CUI_OK);
     return activated;
 }
@@ -511,7 +526,7 @@ static void test_menu_tree(void) {
     key(ui, CUI_KEY_DOWN);
     key(ui, CUI_KEY_RIGHT);
     assert(!tree_scene(ui, &state, &action, false));
-    assert(state.depth == 2 && cui_focused(ui) == 62);
+    assert(state.depth == 2 && cui_focused(ui) == 62 && cui_event_consumed(ui, 1));
     cui_rect parent = cui_bounds(ui, 48), child = cui_bounds(ui, 62);
     assert(child.x > parent.x && child.w > 0);
     key(ui, CUI_KEY_END);
@@ -523,7 +538,7 @@ static void test_menu_tree(void) {
     assert(state.depth == 2 && cui_focused(ui) == 63);
     key(ui, CUI_KEY_LEFT);
     tree_scene(ui, &state, &action, false);
-    assert(state.depth == 1 && cui_focused(ui) == 48);
+    assert(state.depth == 1 && cui_focused(ui) == 48 && cui_event_consumed(ui, 0));
     key(ui, CUI_KEY_RIGHT);
     key(ui, CUI_KEY_ENTER);
     assert(tree_scene(ui, &state, &action, false));
@@ -1913,6 +1928,11 @@ static void test_tab_overflow_menu(void) {
     cui_id value = 10;
     tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
     assert(overflow.visible && !overflow.menu.overlay.open);
+    bool caret = false;
+    for (size_t i = 0; i < dropdown_draw.count; i++)
+        caret |= dropdown_draw.commands[i].type == CUI_DRAW_IMAGE &&
+                 dropdown_draw.commands[i].bitmap.bitmap.width == 12;
+    assert(caret);
     click(ui, 3101);
     tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
     assert(overflow.menu.overlay.open);
@@ -2176,10 +2196,13 @@ static void test_dropdown_inner_button_presentation(void) {
     bool action_color = false, trigger_color = false;
     for (size_t i = 0; i < dropdown_draw.count; i++) {
         cui_draw_command command = dropdown_draw.commands[i];
-        if (command.type != CUI_DRAW_TEXT)
-            continue;
-        action_color |= command.text.length == 4 && same_color(command.color, theme.danger);
-        trigger_color |= command.text.length == 1 && same_color(command.color, theme.on_danger);
+        if (command.type == CUI_DRAW_TEXT)
+            action_color |= command.text.length == 4 && same_color(command.color, theme.danger);
+        if (command.type == CUI_DRAW_IMAGE) {
+            cui_color expected = theme.on_danger;
+            expected.a = (uint8_t)lroundf(expected.a * .75f);
+            trigger_color |= same_color(command.bitmap.tint, expected);
+        }
     }
     assert(action_color && trigger_color);
     options.outline = true;
@@ -3289,7 +3312,8 @@ static void test_dropdown_loading_subtree_opacity(void) {
                     assert(command.color.r == 44 && command.color.g == 55 &&
                            command.color.b == 66 && command.color.a == (uint8_t)(211 * opacity));
                 }
-                if (command.type == CUI_DRAW_IMAGE) {
+                if (command.type == CUI_DRAW_IMAGE && command.bitmap.custom_tint &&
+                    command.bitmap.tint.r == 77) {
                     image = true;
                     assert(fabsf(command.bitmap.opacity - .5f * opacity) < .0001f);
                 }
@@ -4021,7 +4045,61 @@ static void test_tab_current_frame_baseline(void) {
         cui_destroy(ui);
     }
 }
+static void test_tabs_toolbar_consumption(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    cui_theme t = cui_theme_light();
+    cui_id selection = 10;
+    for (unsigned phase = 0; phase < 3; phase++) {
+        if (phase) {
+            cui_focus(ui, 10);
+            key(ui, CUI_KEY_RIGHT);
+        }
+        assert(cui_begin_frame(ui, 400, 200, .016f));
+        if (phase == 2)
+            assert(cui_consume_event(ui, 0));
+        assert(cui_base_toolbar_begin(ui, 9900, cui_string("Commands"), (cui_box){.row = true}));
+        cui_tabs(ui, 9901, &t, items, 3, &selection, (cui_tabs_options){0}, NULL, NULL);
+        cui_button(ui, 9902, &t, cui_string("Other"), false);
+        cui_base_toolbar_end(ui, 9900, false);
+        cui_end_frame(ui);
+        if (phase)
+            assert(cui_event_consumed(ui, 0));
+        if (phase == 1)
+            assert(selection == 30 && cui_focused(ui) == 30);
+        if (phase == 2)
+            assert(selection == 30 && cui_focused(ui) == 10);
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
+static void test_dropdown_real_artwork(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_theme t = cui_theme_light();
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 2200);
+    cui_id action = 0;
+    cui_set_reduced_motion(ui, true);
+    cui_dropdown_button_options options = {
+        .leading = {"*", 1}, .action_loading = true, .size = CUI_DROPDOWN_BUTTON_SMALL};
+    dropdown_scene(ui, &state, &action, &t, options);
+    unsigned images = 0;
+    for (size_t i = 0; i < dropdown_draw.count; i++) {
+        cui_draw_command c = dropdown_draw.commands[i];
+        if (c.type == CUI_DRAW_IMAGE) {
+            images++;
+            assert(c.bitmap.bitmap.width == 14 && cui_bitmap_valid(c.bitmap.bitmap));
+        }
+        assert(c.type != CUI_DRAW_TEXT || c.text.length != 1 ||
+               (c.text.data[0] != '*' && c.text.data[0] != 'v'));
+    }
+    assert(images == 2);
+    click(ui, 2001);
+    assert(!dropdown_scene(ui, &state, &action, &t, options).action_activated);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_dropdown_real_artwork();
+    test_tabs_toolbar_consumption();
     test_searchable_popup_height_cap();
     test_searchable_reference_metrics();
     test_list_reference_metrics();

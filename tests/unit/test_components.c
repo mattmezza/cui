@@ -645,7 +645,34 @@ static void test_toggle(void) {
     assert(count == 0);
     cui_destroy(ui);
 }
+static void test_button_loading_artwork(void) {
+    cui_context *ui = cui_create((cui_config){.width = 300, .height = 100});
+    cui_theme t = cui_theme_light();
+    assert(ui);
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 300, 100, .016f));
+    assert(!cui_button_ex(ui, 990, &t, cui_string("Save"),
+                          (cui_button_options){.loading = true, .size = CUI_CONTROL_SMALL}));
+    cui_draw_list draw = cui_end_frame(ui);
+    unsigned images = 0;
+    for (size_t i = 0; i < draw.count; i++) {
+        cui_draw_command c = draw.commands[i];
+        if (c.type == CUI_DRAW_IMAGE) {
+            images++;
+            assert(c.bounds.w == 14 && c.bounds.h == 14 && cui_bitmap_valid(c.bitmap.bitmap));
+            unsigned coverage = 0;
+            for (unsigned y = 0; y < c.bitmap.bitmap.height; y++)
+                for (unsigned x = 0; x < c.bitmap.bitmap.width; x++)
+                    coverage += c.bitmap.bitmap.pixels[y * c.bitmap.bitmap.stride + x * 4 + 3] > 0;
+            assert(coverage > 20);
+        }
+        assert(c.type != CUI_DRAW_TEXT || c.text.length != 3 || memcmp(c.text.data, "...", 3));
+    }
+    assert(images == 1 && !cui_needs_redraw(ui) && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_button_loading_artwork();
     test_theme_list_tokens();
     test_toggle();
     test_switch();

@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_tree.h"
+#ifndef CUI_TREE_BASE_ONLY
+#include "cui/cui_components.h"
+#include "cui/cui_toolbar.h"
+#endif
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
@@ -301,7 +305,62 @@ static void virtualization(void) {
     free(nodes);
     free(expanded);
 }
+#ifndef CUI_TREE_BASE_ONLY
+static void tree_toolbar_artwork(void) {
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 200});
+    cui_tree_model *model = cui_tree_create(4);
+    cui_tree_node nodes[] = {{1, {"Root", 4}, 0, false}, {2, {"Child", 5}, 1, false}};
+    bool expanded[] = {false, false};
+    cui_id selected = 1;
+    cui_tree_state state = {0};
+    cui_theme t = cui_theme_light();
+    unsigned char previous[20 * 20 * 4];
+    size_t length = 0;
+    assert(ui && model && cui_tree_rebuild(model, nodes, expanded, 2) == CUI_TREE_OK);
+    for (unsigned phase = 0; phase < 3; phase++) {
+        if (phase) {
+            cui_focus(ui, cui_tree_row_id(10, 1));
+            key(ui, CUI_KEY_RIGHT);
+        }
+        assert(cui_begin_frame(ui, 500, 200, .016f));
+        if (phase == 2)
+            assert(cui_consume_event(ui, 0));
+        assert(cui_base_toolbar_begin(ui, 9000, cui_string("Commands"), (cui_box){.row = true}));
+        cui_tree(ui, 10, &t, model, &state, &selected,
+                 (cui_tree_options){.width = 240, .height = 120, .row_height = 32});
+        cui_button(ui, 9001, &t, cui_string("Other"), false);
+        cui_base_toolbar_end(ui, 9000, false);
+        cui_draw_list draw = cui_end_frame(ui);
+        unsigned images = 0;
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+                cui_bitmap b = draw.commands[i].bitmap.bitmap;
+                images++;
+                size_t bytes = b.height * b.stride;
+                assert(bytes <= sizeof(previous));
+                if (!phase) {
+                    length = bytes;
+                    memcpy(previous, b.pixels, bytes);
+                }
+                if (phase == 1)
+                    assert(bytes != length || memcmp(previous, b.pixels, length));
+            }
+        assert(images == 1 && cui_last_error(ui) == CUI_OK);
+        if (phase)
+            assert(cui_event_consumed(ui, 0) && cui_focused(ui) == cui_tree_row_id(10, 1));
+        if (phase == 1)
+            assert(expanded[0]);
+        if (phase == 2)
+            assert(selected == 1);
+    }
+    cui_destroy(ui);
+    cui_tree_destroy(model);
+}
+#endif
 int main(void) {
+#ifndef CUI_TREE_BASE_ONLY
+    tree_toolbar_artwork();
+#endif
     models();
     random_models();
     events();

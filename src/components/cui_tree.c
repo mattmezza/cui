@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_tree.h"
+#include "cui/cui_icon.h"
 #include <math.h>
 static cui_id cui_tree_style_id(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x18d9f87aab972b61) + UINT64_C(0x9e3779b97f4a7c15) * index);
@@ -49,10 +50,18 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
         if (cui_tree_is_branch(model, index)) {
             cui_begin_box(ui, cui_tree_toggle_id(id, node.key),
                           (cui_box){.width = 20, .height = fmaxf(1, row - 8)});
-            cui_text(ui, cui_string(cui_tree_expanded(model, index) ? "-" : "+"), t->font_size,
-                     disabled ? t->muted
-                     : active ? t->on_primary
-                              : t->text);
+            (void)cui_icon_named(
+                ui, cui_tree_toggle_id(id, node.key) ^ UINT64_C(0xd17a83c481e860f2), t,
+                cui_string("chevron-right"),
+                (cui_icon_options){.size = CUI_ICON_MEDIUM,
+                                   .custom_color = true,
+                                   .color = disabled ? t->muted
+                                            : active ? t->on_primary
+                                                     : t->text,
+                                   .custom_transform = true,
+                                   .transform = cui_icon_rotation(cui_tree_expanded(model, index)
+                                                                      ? 1.57079632679489661923f
+                                                                      : 0)});
             cui_end_box(ui);
         } else {
             cui_begin_box(ui, cui_tree_style_id(id, 200000 + (unsigned)index),

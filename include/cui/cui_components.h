@@ -60,6 +60,32 @@ typedef struct {
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
 bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+typedef void (*cui_boolean_change_fn)(void *user, bool requested);
+typedef struct {
+    double position, velocity, target, updated_at, next_wake_seconds;
+    bool initialized;
+    cui_hover_state tooltip;
+} cui_switch_state;
+typedef struct {
+    cui_control_size size;
+    bool disabled, skip_tab, hide_focus_ring, reduced_motion, label_left, custom_color;
+    float width;
+    cui_color color;
+    cui_str accessibility_label, tooltip;
+    cui_button_content_fn content;
+    void *content_user;
+    cui_boolean_change_fn on_change;
+    void *change_user;
+    double now_seconds;
+    cui_hover_options tooltip_options;
+} cui_switch_options;
+cui_switch_options cui_switch_options_default(void);
+cui_id cui_switch_track_id(cui_id);
+cui_id cui_switch_thumb_id(cui_id);
+/* Callback is a controlled request; without it, activation writes *value.
+ * State is optional for static painting, retained for interruptible spring motion. */
+bool cui_switch_ex(cui_context *, cui_id, const cui_theme *, cui_str label, bool *value,
+                   cui_switch_state *, cui_switch_options);
 bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 bool cui_toggle(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 typedef cui_checkbox_options cui_radio_options;

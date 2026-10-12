@@ -273,8 +273,174 @@ bool cui_checkbox(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, 
     *value = state == CUI_CHECK_CHECKED;
     return changed;
 }
-bool cui_switch(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v, bool d) {
-    return cui_components_binary_control(u, i, t, n, v, d, 1);
+static cui_id cui_components_child_id(cui_id parent, uint64_t child) {
+    uint64_t x = parent + child * UINT64_C(0x9e3779b97f4a7c15);
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    x ^= x >> 31;
+    return x ? x : 1;
+}
+cui_switch_options cui_switch_options_default(void) {
+    return (cui_switch_options){0};
+}
+cui_id cui_switch_track_id(cui_id id) {
+    return cui_components_child_id(id, 5001);
+}
+cui_id cui_switch_thumb_id(cui_id id) {
+    return cui_components_child_id(id, 5002);
+}
+static void cui_components_spring_step(cui_switch_state *s, double target,
+                                       cui_spring_settings policy, double now, bool reduced) {
+    s->next_wake_seconds = 0;
+    if (!s->initialized || reduced || !policy.travel || policy.response == 0) {
+        s->position = s->target = target;
+        s->velocity = 0;
+        s->updated_at = now;
+        s->initialized = true;
+        return;
+    }
+    if (s->position == target && s->velocity == 0) {
+        s->target = target;
+        return;
+    }
+    double dt = fmax(0, now - s->updated_at), w = 6.283185307179586 / policy.response,
+           z = policy.damping;
+    double y = s->position - s->target, v = s->velocity, position = y, velocity = v;
+    if (z <= 1 && z * w * dt > 700) {
+        position = velocity = 0;
+    } else if (z < 1) {
+        double wd = w * sqrt(1 - z * z), phase = fmod(dt, 6.283185307179586 / wd) * wd;
+        double decay = exp(-z * w * dt), c = cos(phase), sn = sin(phase);
+        position = decay * (y * c + (v + z * w * y) / wd * sn);
+        velocity = decay * (v * c - (z * w * v + w * w * y) / wd * sn);
+    } else if (z == 1) {
+        double decay = exp(-w * dt), b = v + w * y;
+        position = decay * (y + b * dt);
+        velocity = decay * (v - w * b * dt);
+    } else {
+        double root = sqrt(z * z - 1), r1 = -w / (z + root), r2 = -w * (z + root);
+        double a = (v - r2 * y) / (r1 - r2), b = y - a, e1 = exp(r1 * dt), e2 = exp(r2 * dt);
+        position = a * e1 + b * e2;
+        velocity = r1 * a * e1 + r2 * b * e2;
+    }
+    s->position = s->target + position;
+    s->velocity = velocity;
+    s->target = target;
+    s->updated_at = fmax(s->updated_at, now);
+    if (!isfinite(s->position) || !isfinite(s->velocity) ||
+        (fabs(s->position - target) <= policy.epsilon && fabs(s->velocity) <= policy.epsilon)) {
+        s->position = target;
+        s->velocity = 0;
+    } else
+        s->next_wake_seconds = now + 1. / 60;
+}
+static void cui_components_switch_label(cui_context *ui, const cui_theme *t, cui_str label,
+                                        cui_switch_options o, float font) {
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = o.width ? -1 : 0,
+                            .height = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL
+                                          ? 16
+                                      : o.size == CUI_CONTROL_LARGE ? 24
+                                                                    : 20,
+                            .align_y = CUI_ALIGN_CENTER});
+    if (o.content)
+        o.content(ui, o.content_user);
+    else if (label.length)
+        cui_text(ui, label, font, o.disabled ? t->muted : t->text);
+    cui_end_box(ui);
+}
+bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
+                   cui_switch_state *state, cui_switch_options o) {
+    if (!ui || !id || !t || !value || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
+        !isfinite(o.width) || !isfinite(o.now_seconds) || o.now_seconds < 0 ||
+        !isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0 ||
+        !isfinite(t->spring_move.response) || t->spring_move.response < 0 ||
+        !isfinite(t->spring_move.damping) || t->spring_move.damping < 0 ||
+        !isfinite(t->spring_move.epsilon) || t->spring_move.epsilon <= 0 ||
+        (label.length && !label.data) ||
+        (o.accessibility_label.length && !o.accessibility_label.data) ||
+        (o.tooltip.length && !o.tooltip.data))
+        return false;
+    cui_str name = o.accessibility_label.length ? o.accessibility_label : label;
+    bool requested = *value;
+    bool changed = cui_base_switch(ui, id, name, &requested, o.disabled);
+    if (changed) {
+        if (o.on_change)
+            o.on_change(o.change_user, requested);
+        else
+            *value = requested;
+    }
+    cui_update_semantic(ui, id, *value, *value ? 1 : 0);
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    bool small = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL;
+    float width = small ? 28 : o.size == CUI_CONTROL_LARGE ? 44 : 36;
+    float height = small ? 16 : o.size == CUI_CONTROL_LARGE ? 24 : 20;
+    float thumb = height - 4, target = *value ? width - thumb - 4 : 0;
+    float font = (o.size == CUI_CONTROL_XSMALL  ? 12
+                  : o.size == CUI_CONTROL_LARGE ? 16
+                                                : 14) *
+                 t->font_size / 16;
+    float radius = t->radius >= 4 ? height : t->radius;
+    if (state)
+        cui_components_spring_step(state, target, t->spring_move, o.now_seconds, o.reduced_motion);
+    float position = state ? (float)state->position : target;
+    bool label_present = label.length || o.content;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = o.width,
+                            .row = true,
+                            .gap = label_present ? 8 : 0,
+                            .align_y = CUI_ALIGN_START});
+    if (o.label_left && label_present)
+        cui_components_switch_label(ui, t, label, o, font);
+    cui_color background = *value ? (o.custom_color ? o.color : t->primary) : t->switch_background;
+    if (o.disabled)
+        background.a /= 2;
+    bool focused = !o.disabled && !o.hide_focus_ring && cui_focused(ui) == id;
+    cui_id track = cui_switch_track_id(id);
+    cui_begin_box(ui, track,
+                  (cui_box){.width = width,
+                            .height = height,
+                            .padding = 2,
+                            .radius = radius,
+                            .background = background,
+                            .border = focused ? t->focus : (cui_color){0},
+                            .border_width = 1,
+                            .clip = true,
+                            .offset_x = position,
+                            .align_y = CUI_ALIGN_CENTER});
+    cui_begin_box(
+        ui, cui_switch_thumb_id(id),
+        (cui_box){
+            .width = thumb, .height = thumb, .radius = radius, .background = t->switch_thumb});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    if (!o.label_left && label_present)
+        cui_components_switch_label(ui, t, label, o, font);
+    cui_end_box(ui);
+    if (focused) {
+        cui_rect bounds = cui_bounds(ui, track);
+        cui_color color = t->focus;
+        color.a /= 2;
+        if (bounds.w > 0) {
+            cui_begin_portal(ui, cui_components_child_id(id, 5003),
+                             (cui_box){.radius = radius + 3, .border = color, .border_width = 3},
+                             (cui_rect){bounds.x - 3, bounds.y - 3, bounds.w + 6, bounds.h + 6}, 1);
+            cui_end_box(ui);
+        }
+    }
+    if (state && o.tooltip.length) {
+        cui_hover_options tooltip = o.tooltip_options;
+        tooltip.trigger = id;
+        tooltip.disabled |= o.disabled;
+        cui_tooltip(ui, cui_components_child_id(id, 5004), t, &state->tooltip, o.tooltip, tooltip);
+    }
+    if (state && state->next_wake_seconds)
+        cui_invalidate(ui);
+    return changed;
+}
+bool cui_switch(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool *value,
+                bool disabled) {
+    return cui_switch_ex(ui, id, t, name, value, NULL, (cui_switch_options){.disabled = disabled});
 }
 bool cui_toggle(cui_context *u, cui_id i, const cui_theme *t, cui_str n, bool *v, bool d) {
     return cui_components_binary_control(u, i, t, n, v, d, 2);

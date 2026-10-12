@@ -300,7 +300,130 @@ static void test_radio_geometry(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+
+static cui_draw_list switch_frame(cui_context *ui, cui_theme *t, bool *value,
+                                  cui_switch_state *state, cui_switch_options o) {
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    cui_switch_ex(ui, 900, t, cui_string("Automatic sync"), value, state, o);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return list;
+}
+static unsigned switch_requests;
+static bool switch_requested;
+static void switch_request(void *user, bool requested) {
+    assert(user == &switch_requests);
+    switch_requests++;
+    switch_requested = requested;
+}
+static void test_switch(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    assert(ui);
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t ti = 0; ti < 4; ti++)
+        for (int size = CUI_CONTROL_MEDIUM; size <= CUI_CONTROL_XSMALL; size++)
+            for (int enabled = 0; enabled < 2; enabled++)
+                for (int on = 0; on < 2; on++) {
+                    bool value = on;
+                    cui_switch_options o = {.size = (cui_control_size)size, .disabled = !enabled};
+                    cui_draw_list list = switch_frame(ui, &themes[ti], &value, NULL, o);
+                    bool small = size == CUI_CONTROL_SMALL || size == CUI_CONTROL_XSMALL;
+                    float w = small ? 28 : size == CUI_CONTROL_LARGE ? 44 : 36;
+                    float h = small ? 16 : size == CUI_CONTROL_LARGE ? 24 : 20;
+                    cui_rect track = cui_bounds(ui, cui_switch_track_id(900));
+                    cui_rect thumb = cui_bounds(ui, cui_switch_thumb_id(900));
+                    assert(track.w == w && track.h == h && thumb.w == h - 4 && thumb.h == h - 4);
+                    assert(fabsf(thumb.x - track.x - (on ? w - h + 2 : 2)) < .01f);
+                    assert(thumb.y == track.y + 2);
+                    bool track_found = false, thumb_found = false;
+                    unsigned texts = 0;
+                    for (size_t i = 0; i < list.count; i++) {
+                        const cui_draw_command *c = &list.commands[i];
+                        if (c->type == CUI_DRAW_RECT && c->bounds.w == w && c->bounds.h == h) {
+                            cui_color expected =
+                                on ? themes[ti].primary : themes[ti].switch_background;
+                            if (!enabled)
+                                expected.a /= 2;
+                            assert(memcmp(&expected, &c->color, sizeof(expected)) == 0);
+                            assert(c->radius == (themes[ti].radius >= 4 ? h : themes[ti].radius));
+                            track_found = true;
+                        }
+                        if (c->type == CUI_DRAW_RECT && c->bounds.w == h - 4) {
+                            assert(memcmp(&c->color, &themes[ti].switch_thumb, sizeof(cui_color)) ==
+                                   0);
+                            thumb_found = true;
+                        }
+                        if (c->type == CUI_DRAW_TEXT) {
+                            texts++;
+                            assert(c->text.length == 14); /* No ON/OFF marker. */
+                        }
+                    }
+                    assert(track_found && thumb_found && texts == 1);
+                    size_t count;
+                    const cui_semantic *nodes = cui_semantics(ui, &count);
+                    assert(count == 1 && nodes[0].role == CUI_ROLE_SWITCH &&
+                           nodes[0].checked == value);
+                    assert(nodes[0].disabled == !enabled);
+                }
+    cui_theme t = themes[0];
+    bool value = false;
+    cui_switch_options o = {0};
+    switch_frame(ui, &t, &value, NULL, o);
+    cui_rect b = cui_bounds(ui, 900);
+    /* Visible label belongs to the same control and receives pointer focus. */
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = b.x + b.w - 2, .y = b.y + 5}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = b.x + b.w - 2, .y = b.y + 5}));
+    switch_frame(ui, &t, &value, NULL, o);
+    assert(value && cui_focused(ui) == 900);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_SPACE}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+    switch_frame(ui, &t, &value, NULL, o);
+    assert(!value);
+    o.on_change = switch_request;
+    o.change_user = &switch_requests;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    switch_frame(ui, &t, &value, NULL, o);
+    assert(switch_requests == 1 && switch_requested && !value);
+    o.disabled = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_SPACE}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+    switch_frame(ui, &t, &value, NULL, o);
+    assert(switch_requests == 1 && !value);
+    o = (cui_switch_options){0};
+    cui_switch_state state = {0};
+    switch_frame(ui, &t, &value, &state, o);
+    assert(state.position == 0 && state.next_wake_seconds == 0);
+    value = true;
+    switch_frame(ui, &t, &value, &state, o);
+    assert(state.position == 0 && state.target == 16 && state.next_wake_seconds > 0);
+    o.now_seconds = .07;
+    switch_frame(ui, &t, &value, &state, o);
+    assert(state.position > 0 && state.position < 16 && state.velocity > 0);
+    double position = state.position, velocity = state.velocity;
+    value = false;
+    switch_frame(ui, &t, &value, &state, o);
+    assert(state.position == position && state.velocity == velocity && state.target == 0);
+    o.now_seconds = 3;
+    switch_frame(ui, &t, &value, &state, o);
+    assert(state.position == 0 && state.velocity == 0 && state.next_wake_seconds == 0);
+    value = true;
+    o.reduced_motion = true;
+    switch_frame(ui, &t, &value, &state, o);
+    assert(state.position == 16 && state.next_wake_seconds == 0);
+    o.now_seconds = NAN;
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    assert(!cui_switch_ex(ui, 900, &t, cui_string("Sync"), &value, &state, o));
+    cui_end_frame(ui);
+    size_t count;
+    cui_semantics(ui, &count);
+    assert(count == 0);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_switch();
     test_checkbox_geometry();
     test_radio_geometry();
     test_semantic_theme_contrast();

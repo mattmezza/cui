@@ -149,9 +149,25 @@ typedef enum {
     CUI_QUESTIONNAIRE_XSMALL
 } cui_questionnaire_size;
 typedef struct {
+    size_t item, choice;
+    cui_questionnaire_size size;
+    bool multiple, selected, disabled, invalid, focused;
+    char shortcut; /* Zero when no default shortcut is available. */
+} cui_questionnaire_choice_view;
+/* Render balanced child elements inside the slot. The snapshot is borrowed for
+ * this call; do not mutate questionnaire state or end the enclosing slot.
+ * The supplied ID is a stable namespace for the slot's custom content. */
+typedef void (*cui_questionnaire_choice_render_fn)(cui_context *, cui_id,
+                                                   const cui_questionnaire_choice_view *,
+                                                   void *user);
+typedef struct {
     cui_questionnaire_size size;
     float width;
     bool disabled, numeric_shortcuts;
+    /* Choice-only overrides. NULL keeps the corresponding default content.
+     * Card interaction, semantic label and inherited disabled opacity remain. */
+    cui_questionnaire_choice_render_fn render_indicator, render_content, render_shortcut;
+    void *render_user;
 } cui_questionnaire_options;
 typedef struct {
     bool dragging;

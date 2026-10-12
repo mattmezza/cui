@@ -85,6 +85,16 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
                              (cui_semantic_details){.invalid = invalid,
                                                     .required = d->required,
                                                     .pointer_activatable = true});
+    char key = cui_questionnaire_shortcut(s, item, choice, o.numeric_shortcuts);
+    cui_questionnaire_choice_view view = {.item = item,
+                                          .choice = choice,
+                                          .size = o.size,
+                                          .multiple = d->multiple,
+                                          .selected = selected,
+                                          .disabled = disabled,
+                                          .invalid = invalid,
+                                          .focused = cui_focused(ui) == id,
+                                          .shortcut = key};
     float card_radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius
                         : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius * 2
                                                             : t->radius_lg;
@@ -112,38 +122,55 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
         ui, 0, (cui_box){.width = m.px - m.py, .fixed_width = true, .height = m.height - 2 * m.py});
     cui_end_box(ui);
     cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = m.gap});
-    cui_begin_box(ui, 0, (cui_box){.height = m.line, .align_y = CUI_ALIGN_CENTER});
-    cui_begin_box(ui, 0,
-                  (cui_box){.width = m.indicator,
-                            .height = m.indicator,
-                            .radius = d->multiple ? t->radius / 2 : m.indicator / 2,
-                            .border_width = 1,
-                            .border = selected ? t->primary : t->input,
-                            .background = selected ? t->primary : t->input_background,
-                            .align_x = CUI_ALIGN_CENTER,
-                            .align_y = CUI_ALIGN_CENTER});
-    if (selected) {
-        if (d->multiple)
-            cui_checkmark(ui, m.indicator - 2, t->on_primary);
-        else {
-            cui_begin_box(ui, 0,
-                          (cui_box){.width = m.mark,
-                                    .height = m.mark,
-                                    .radius = m.mark / 2,
-                                    .background = t->on_primary});
-            cui_end_box(ui);
+    if (o.render_indicator) {
+        cui_begin_box(ui, 0, (cui_box){0});
+        cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.indicator) / 2)});
+        cui_end_box(ui);
+        o.render_indicator(ui, id ^ UINT64_C(0x751ec681a5920310), &view, o.render_user);
+        cui_end_box(ui);
+    } else {
+        cui_begin_box(ui, 0, (cui_box){.height = m.line, .align_y = CUI_ALIGN_CENTER});
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = m.indicator,
+                                .height = m.indicator,
+                                .radius = d->multiple ? t->radius / 2 : m.indicator / 2,
+                                .border_width = 1,
+                                .border = selected ? t->primary : t->input,
+                                .background = selected ? t->primary : t->input_background,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
+        if (selected) {
+            if (d->multiple)
+                cui_checkmark(ui, m.indicator - 2, t->on_primary);
+            else {
+                cui_begin_box(ui, 0,
+                              (cui_box){.width = m.mark,
+                                        .height = m.mark,
+                                        .radius = m.mark / 2,
+                                        .background = t->on_primary});
+                cui_end_box(ui);
+            }
         }
+        cui_end_box(ui);
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, 0, (cui_box){.width = -1, .gap = m.content_gap});
+    if (o.render_content)
+        o.render_content(ui, id ^ UINT64_C(0x1f0e69b892345708), &view, o.render_user);
+    else {
+        cui_text_with_line_height(ui, label, m.font, t->text, m.line);
+        if (c->description.length)
+            cui_text_with_line_height(ui, c->description, m.font > 14 ? m.font - 2 : 12, t->muted,
+                                      m.line);
     }
     cui_end_box(ui);
-    cui_end_box(ui);
-    cui_begin_box(ui, 0, (cui_box){.width = -1, .gap = m.content_gap});
-    cui_text_with_line_height(ui, label, m.font, t->text, m.line);
-    if (c->description.length)
-        cui_text_with_line_height(ui, c->description, m.font > 14 ? m.font - 2 : 12, t->muted,
-                                  m.line);
-    cui_end_box(ui);
-    char key = cui_questionnaire_shortcut(s, item, choice, o.numeric_shortcuts);
-    if (key) {
+    if (o.render_shortcut) {
+        cui_begin_box(ui, 0, (cui_box){0});
+        cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.shortcut) / 2)});
+        cui_end_box(ui);
+        o.render_shortcut(ui, id ^ UINT64_C(0x931ac84625c0a917), &view, o.render_user);
+        cui_end_box(ui);
+    } else if (key) {
         cui_begin_box(
             ui, 0, (cui_box){.width = m.shortcut, .height = m.line, .align_y = CUI_ALIGN_CENTER});
         cui_begin_box(ui, 0,

@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_questionnaire.h"
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
+#include <string.h>
 static cui_questionnaire_input_state input_view;
 static void frame(cui_context *ui, cui_questionnaire_state *s, cui_questionnaire_options o) {
     assert(cui_begin_frame(ui, 400, 300, .016f));
@@ -242,6 +244,138 @@ static void source_card_styles(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+typedef struct {
+    unsigned calls[3];
+    cui_id ids[3];
+    cui_questionnaire_choice_view views[3];
+} slot_probe;
+static void custom_slot(cui_context *ui, cui_id id, const cui_questionnaire_choice_view *view,
+                        slot_probe *probe, unsigned slot) {
+    probe->calls[slot]++;
+    probe->ids[slot] = id;
+    probe->views[slot] = *view;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = slot == 1 ? -1 : 13,
+                            .height = slot == 0   ? 30
+                                      : slot == 1 ? 40
+                                                  : 7,
+                            .background = {(uint8_t)(61 + slot), 73, 91, 255}});
+    if (slot == 1)
+        cui_text(ui, cui_string("custom choice"), 10, (cui_color){1, 2, 3, 255});
+    cui_end_box(ui);
+}
+static void indicator_slot(cui_context *ui, cui_id id, const cui_questionnaire_choice_view *view,
+                           void *user) {
+    custom_slot(ui, id, view, user, 0);
+}
+static void content_slot(cui_context *ui, cui_id id, const cui_questionnaire_choice_view *view,
+                         void *user) {
+    custom_slot(ui, id, view, user, 1);
+}
+static void shortcut_slot(cui_context *ui, cui_id id, const cui_questionnaire_choice_view *view,
+                          void *user) {
+    custom_slot(ui, id, view, user, 2);
+}
+static void custom_choice_slots(void) {
+    const float padding[] = {10, 8, 12, 4};
+    const float indicator_offset[] = {4, 3, 5, 2};
+    const float shortcut_offset[] = {2, 1, 2, 0};
+    for (unsigned multiple = 0; multiple < 2; multiple++) {
+        cui_context *ui = cui_create((cui_config){.max_elements = 256});
+        cui_questionnaire_choice choice = {.value = cui_string("yes"),
+                                           .label = cui_string("Default label"),
+                                           .description = cui_string("Default description")};
+        cui_questionnaire_item item = {.name = cui_string("question"),
+                                       .multiple = multiple != 0,
+                                       .choices = &choice,
+                                       .choice_count = 1};
+        cui_questionnaire_item_runtime runtime;
+        cui_questionnaire_choice_runtime selected;
+        cui_questionnaire_state state = {0};
+        assert(cui_questionnaire_init(&state, &item, 1,
+                                      (cui_questionnaire_workspace){.items = &runtime,
+                                                                    .item_capacity = 1,
+                                                                    .choices = &selected,
+                                                                    .choice_capacity = 1},
+                                      NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+        cui_theme theme = cui_theme_light();
+        for (unsigned size = 0; size < 4; size++) {
+            assert(cui_questionnaire_reset(&state));
+            assert(cui_questionnaire_disable_choice(&state, 0, 0, false) == CUI_QUESTIONNAIRE_OK);
+            assert(cui_questionnaire_external_error(&state, 0, NULL) == CUI_QUESTIONNAIRE_OK);
+            slot_probe probe = {0};
+            cui_questionnaire_options options = {.width = 300,
+                                                 .size = (cui_questionnaire_size)size,
+                                                 .render_indicator = indicator_slot,
+                                                 .render_content = content_slot,
+                                                 .render_shortcut = shortcut_slot,
+                                                 .render_user = &probe};
+            cui_draw_list draw = card_frame(ui, &state, &theme, options);
+            cui_rect card = cui_bounds(ui, 12);
+            for (unsigned slot = 0; slot < 3; slot++) {
+                assert(probe.calls[slot] == 1 && probe.views[slot].item == 0 &&
+                       probe.views[slot].choice == 0 &&
+                       probe.views[slot].size == (cui_questionnaire_size)size &&
+                       probe.views[slot].multiple == (multiple != 0) &&
+                       !probe.views[slot].selected && !probe.views[slot].disabled &&
+                       probe.views[slot].shortcut == 'A');
+                cui_rect bounds = cui_bounds(ui, probe.ids[slot]);
+                float offset = slot == 0   ? indicator_offset[size]
+                               : slot == 2 ? shortcut_offset[size]
+                                           : 0;
+                assert(fabsf(bounds.y - card.y - padding[size] - offset) < .01f);
+                assert(bounds.x >= card.x && bounds.x + bounds.w <= card.x + card.w);
+            }
+            assert(probe.ids[0] != probe.ids[1] && probe.ids[1] != probe.ids[2]);
+            unsigned custom_text = 0;
+            for (size_t i = 0; i < draw.count; i++) {
+                if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                    assert(draw.commands[i].text.length == 13 &&
+                           !memcmp(draw.commands[i].text.data, "custom choice", 13));
+                    custom_text++;
+                }
+            }
+            assert(custom_text == 1);
+            /* Custom content preserves parent hit testing and native semantics. */
+            cui_focus(ui, 12);
+            assert(cui_queue_event(
+                ui,
+                (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = card.x + 20, .y = card.y + 20}));
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = card.x + 20, .y = card.y + 20}));
+            card_frame(ui, &state, &theme, options);
+            assert(cui_questionnaire_choice_selected(&state, 0, 0));
+            assert(probe.views[0].selected && probe.views[0].focused);
+            size_t count;
+            const cui_semantic *semantics = cui_semantics(ui, &count);
+            bool found = false;
+            for (size_t i = 0; i < count; i++)
+                if (semantics[i].id == 12) {
+                    assert(semantics[i].role == (multiple ? CUI_ROLE_CHECKBOX : CUI_ROLE_RADIO));
+                    assert(semantics[i].checked && semantics[i].name.length == 13);
+                    found = true;
+                }
+            assert(found);
+            cui_str error = cui_string("Try again");
+            assert(cui_questionnaire_external_error(&state, 0, &error) == CUI_QUESTIONNAIRE_OK);
+            assert(cui_questionnaire_disable_choice(&state, 0, 0, true) == CUI_QUESTIONNAIRE_OK);
+            draw = card_frame(ui, &state, &theme, options);
+            assert(probe.views[0].invalid && probe.views[0].disabled &&
+                   probe.views[2].shortcut == 0);
+            assert(probe.calls[2] ==
+                   3); /* Custom shortcut remains available without a default key. */
+            unsigned colored = 0;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.g == 73 &&
+                    draw.commands[i].color.b == 91) {
+                    assert(draw.commands[i].color.a == 127);
+                    colored++;
+                }
+            assert(colored == 3 && cui_last_error(ui) == CUI_OK);
+        }
+        cui_destroy(ui);
+    }
+}
 static void progress_semantics(void) {
     cui_context *ui = cui_create((cui_config){0});
     assert(ui);
@@ -267,6 +401,7 @@ static void progress_semantics(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    custom_choice_slots();
     source_card_styles();
     progress_semantics();
     radio_keyboard();

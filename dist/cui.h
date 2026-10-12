@@ -137,6 +137,8 @@ typedef struct {
     bool scroll_axis_lock;
     /* Opt a normally passive semantic container into keyboard/pointer focus. */
     bool focusable;
+    /* Primary pointer activation without opting into focus or keyboard activation. */
+    bool pointer_activatable;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -5679,8 +5681,10 @@ static cui_id cui_core_hit(cui_context *ui, float x, float y) {
     cui_id hit = 0;
     int16_t layer = INT16_MIN;
     for (size_t i = 0; i < ui->previous_count; i++)
-        if (cui_core_pointer_focus_target(ui, i) && cui_core_previous_allowed(ui, i) &&
-            cui_core_inside(ui->previous_hits[i], x, y) && ui->previous_layers[i] >= layer) {
+        if ((cui_core_pointer_focus_target(ui, i) ||
+             (!ui->previous[i].disabled && ui->previous[i].details.pointer_activatable)) &&
+            cui_core_previous_allowed(ui, i) && cui_core_inside(ui->previous_hits[i], x, y) &&
+            ui->previous_layers[i] >= layer) {
             hit = ui->previous[i].id;
             layer = ui->previous_layers[i];
         }
@@ -5694,7 +5698,8 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event) {
         if (!cui_core_previous_allowed(ui, i) ||
             !cui_core_inside(ui->previous_hits[i], event.x, event.y))
             continue;
-        if (cui_core_focusable(node) && ui->previous_layers[i] > blocking_layer)
+        if ((cui_core_focusable(node) || (!node->disabled && node->details.pointer_activatable)) &&
+            ui->previous_layers[i] > blocking_layer)
             blocking_layer = ui->previous_layers[i];
         cui_semantic_details d = node->details;
         bool can_x =
@@ -5825,15 +5830,19 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
+            bool pointer_only = false;
             for (size_t n = 0; n < ui->previous_count; n++)
                 if (ui->previous[n].id == hit) {
                     target = cui_core_pointer_focus_target(ui, n);
+                    pointer_only = !target && ui->previous[n].details.pointer_activatable;
                     break;
                 }
-            ui->capture = target == hit ? hit : 0;
-            if (hit || ui->previous_top_modal == SIZE_MAX)
-                ui->focus = target;
-            ui->focus_visible = false;
+            ui->capture = pointer_only || target == hit ? hit : 0;
+            if (!pointer_only) {
+                if (hit || ui->previous_top_modal == SIZE_MAX)
+                    ui->focus = target;
+                ui->focus_visible = false;
+            }
         } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
             if (ui->capture == cui_core_hit(ui, e.x, e.y))
                 cui_core_activate(ui, ui->capture);

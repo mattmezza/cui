@@ -780,6 +780,54 @@ static void test_focusable_container(void) {
     cui_destroy(ui);
 }
 
+static bool pointer_card(cui_context *ui, bool disabled) {
+    cui_begin_box(ui, 70, (cui_box){.width = 200, .height = 150});
+    bool activated =
+        cui_interact(ui, 70, CUI_ROLE_GROUP, cui_string("Card"), disabled, false, 0).activated;
+    cui_set_semantic_details(ui, 70, (cui_semantic_details){.pointer_activatable = true});
+    control(ui, 71, false);
+    cui_end_box(ui);
+    return activated;
+}
+static void test_pointer_only_container(void) {
+    cui_context *ui = make();
+    begin(ui);
+    assert(!pointer_card(ui, false));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_TAB, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 71);
+    pointer_card(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 150, 100, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 150, 100, 0, 0);
+    begin(ui);
+    assert(cui_focused(ui) == 71 && cui_event_target(ui, 0) == 70);
+    assert(pointer_card(ui, false));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    assert(!pointer_card(ui, false));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 71 && !pointer_card(ui, false));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 150, 100, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 250, 200, 0, 0);
+    begin(ui);
+    assert(!pointer_card(ui, false));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 150, 100, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_UP, 150, 100, 0, 0);
+    begin(ui);
+    assert(!pointer_card(ui, true));
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 71 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 static void test_perceptual_color_mix(void) {
     cui_color black = {0, 0, 0, 255}, white = {255, 255, 255, 255};
     cui_color middle = cui_color_mix_oklab(black, white, .5f);
@@ -1289,6 +1337,7 @@ int main(void) {
     test_dominant_axis_scroll();
     test_perceptual_color_mix();
     test_focusable_container();
+    test_pointer_only_container();
     test_table_semantic_roles();
     test_input();
     test_strings_and_draw();

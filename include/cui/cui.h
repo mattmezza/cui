@@ -136,6 +136,8 @@ typedef struct {
     bool scroll_axis_lock;
     /* Opt a normally passive semantic container into keyboard/pointer focus. */
     bool focusable;
+    /* Primary pointer activation without opting into focus or keyboard activation. */
+    bool pointer_activatable;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

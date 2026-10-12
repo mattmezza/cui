@@ -55,12 +55,14 @@ typedef enum {
     CUI_KEY_A
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
+typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
 typedef struct {
     cui_event_type type;
     float x, y, dx, dy;
     cui_key key;
     unsigned modifiers;
     bool repeat;
+    cui_pointer_button pointer_button; /* Zero preserves primary-button initializers. */
     char text[64];
 } cui_event;
 typedef enum {
@@ -5583,7 +5585,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         ui->event_targets[i] = ui->focus;
         if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_UP)
             ui->event_targets[i] = ui->capture;
-        if (e.type == CUI_EVENT_POINTER_DOWN) {
+        if (e.type == CUI_EVENT_POINTER_DOWN ||
+            (e.type == CUI_EVENT_POINTER_UP && e.pointer_button != CUI_POINTER_PRIMARY)) {
             ui->event_targets[i] = cui_core_hit(ui, e.x, e.y);
             if (!ui->event_targets[i] && ui->previous_top_modal != SIZE_MAX)
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
@@ -5609,12 +5612,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
         }
-        if (e.type == CUI_EVENT_POINTER_DOWN) {
+        if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             ui->capture = cui_core_hit(ui, e.x, e.y);
             if (ui->capture || ui->previous_top_modal == SIZE_MAX)
                 ui->focus = ui->capture;
             ui->focus_visible = false;
-        } else if (e.type == CUI_EVENT_POINTER_UP) {
+        } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
             if (ui->capture == cui_core_hit(ui, e.x, e.y))
                 cui_core_activate(ui, ui->capture);
             ui->capture = 0;

@@ -318,7 +318,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         ui->event_targets[i] = ui->focus;
         if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_UP)
             ui->event_targets[i] = ui->capture;
-        if (e.type == CUI_EVENT_POINTER_DOWN) {
+        if (e.type == CUI_EVENT_POINTER_DOWN ||
+            (e.type == CUI_EVENT_POINTER_UP && e.pointer_button != CUI_POINTER_PRIMARY)) {
             ui->event_targets[i] = cui_core_hit(ui, e.x, e.y);
             if (!ui->event_targets[i] && ui->previous_top_modal != SIZE_MAX)
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
@@ -344,12 +345,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
         }
-        if (e.type == CUI_EVENT_POINTER_DOWN) {
+        if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             ui->capture = cui_core_hit(ui, e.x, e.y);
             if (ui->capture || ui->previous_top_modal == SIZE_MAX)
                 ui->focus = ui->capture;
             ui->focus_visible = false;
-        } else if (e.type == CUI_EVENT_POINTER_UP) {
+        } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
             if (ui->capture == cui_core_hit(ui, e.x, e.y))
                 cui_core_activate(ui, ui->capture);
             ui->capture = 0;

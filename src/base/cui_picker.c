@@ -365,7 +365,8 @@ bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_stat
             state->digit_count = 0;
         }
         source = target;
-        if (events[e].type == CUI_EVENT_POINTER_DOWN) {
+        if (events[e].type == CUI_EVENT_POINTER_DOWN &&
+            events[e].pointer_button == CUI_POINTER_PRIMARY) {
             state->segment = segment;
             state->digit_count = 0;
         }
@@ -599,6 +600,9 @@ bool cui_base_color_picker(cui_context *ui, cui_id id, cui_color_state *s, cui_c
                 continue;
             cui_event event = events[e];
             cui_rect bounds = cui_bounds(ui, target);
+            if ((event.type == CUI_EVENT_POINTER_DOWN || event.type == CUI_EVENT_POINTER_UP) &&
+                event.pointer_button != CUI_POINTER_PRIMARY)
+                continue;
             if (event.type == CUI_EVENT_POINTER_DOWN)
                 pressed[i] = true;
             bool pointer = pressed[i] && (event.type == CUI_EVENT_POINTER_DOWN ||

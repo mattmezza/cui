@@ -54,12 +54,14 @@ typedef enum {
     CUI_KEY_A
 } cui_key;
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
+typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
 typedef struct {
     cui_event_type type;
     float x, y, dx, dy;
     cui_key key;
     unsigned modifiers;
     bool repeat;
+    cui_pointer_button pointer_button; /* Zero preserves primary-button initializers. */
     char text[64];
 } cui_event;
 typedef enum {

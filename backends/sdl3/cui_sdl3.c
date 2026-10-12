@@ -107,12 +107,16 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         case SDL_EVENT_MOUSE_BUTTON_UP:
-            if (e.button.button != SDL_BUTTON_LEFT) {
+            if (e.button.button != SDL_BUTTON_LEFT && e.button.button != SDL_BUTTON_RIGHT &&
+                e.button.button != SDL_BUTTON_MIDDLE) {
                 send = false;
                 break;
             }
             v.type = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? CUI_EVENT_POINTER_DOWN
                                                            : CUI_EVENT_POINTER_UP;
+            v.pointer_button = e.button.button == SDL_BUTTON_RIGHT    ? CUI_POINTER_SECONDARY
+                               : e.button.button == SDL_BUTTON_MIDDLE ? CUI_POINTER_MIDDLE
+                                                                      : CUI_POINTER_PRIMARY;
             v.x = e.button.x;
             v.y = e.button.y;
             break;

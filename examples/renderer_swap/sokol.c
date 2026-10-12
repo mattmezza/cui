@@ -153,12 +153,16 @@ int main(int argc, char **argv) {
                 break;
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
             case SDL_EVENT_MOUSE_BUTTON_UP:
-                if (e.button.button != SDL_BUTTON_LEFT) {
+                if (e.button.button != SDL_BUTTON_LEFT && e.button.button != SDL_BUTTON_RIGHT &&
+                    e.button.button != SDL_BUTTON_MIDDLE) {
                     send = false;
                     break;
                 }
                 event.type = e.type == SDL_EVENT_MOUSE_BUTTON_DOWN ? CUI_EVENT_POINTER_DOWN
                                                                    : CUI_EVENT_POINTER_UP;
+                event.pointer_button = e.button.button == SDL_BUTTON_RIGHT ? CUI_POINTER_SECONDARY
+                                       : e.button.button == SDL_BUTTON_MIDDLE ? CUI_POINTER_MIDDLE
+                                                                              : CUI_POINTER_PRIMARY;
                 event.x = e.button.x;
                 event.y = e.button.y;
                 break;

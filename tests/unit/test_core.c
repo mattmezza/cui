@@ -564,8 +564,55 @@ static void test_menu_check_radio_roles(void) {
     cui_destroy(ui);
 }
 
+static void test_secondary_pointer(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 2);
+    for (unsigned button = CUI_POINTER_SECONDARY; button <= CUI_POINTER_MIDDLE; ++button) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                               .x = 10,
+                                               .y = 10,
+                                               .pointer_button = (cui_pointer_button)button}));
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                               .x = 10,
+                                               .y = 10,
+                                               .pointer_button = (cui_pointer_button)button}));
+        begin(ui);
+        assert(cui_focused(ui) == 2);
+        assert(cui_event_target(ui, 0) == 1 && cui_event_target(ui, 1) == 1);
+        assert(!cui_event_activation(ui, 0) && !cui_event_activation(ui, 1));
+        cui_interaction first = control(ui, 1, false);
+        assert(!first.activated && !first.pressed);
+        control(ui, 2, false);
+        cui_end_frame(ui);
+    }
+    cui_rect second_bounds = cui_bounds(ui, 2);
+    /* Secondary release cannot terminate an in-progress primary drag. */
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = second_bounds.x + 10,
+                                           .y = second_bounds.y + 10,
+                                           .pointer_button = CUI_POINTER_SECONDARY}));
+    queue(ui, CUI_EVENT_POINTER_MOVE, 20, 10, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 1) == 2 && cui_event_target(ui, 2) == 1);
+    assert(control(ui, 1, false).pressed);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_UP, 20, 10, 0, 0);
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_menu_check_radio_roles();
+    test_secondary_pointer();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

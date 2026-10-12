@@ -133,6 +133,9 @@ bool cui_base_slider(cui_context *ui, cui_id id, cui_str name, float *value, flo
     bool dragging = s.pressed;
     for (size_t i = 0; i < count; i++) {
         cui_event e = events[i];
+        if ((e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_UP) &&
+            e.pointer_button != CUI_POINTER_PRIMARY)
+            continue;
         if (cui_event_target(ui, i) != id)
             continue;
         if (e.type == CUI_EVENT_POINTER_DOWN)

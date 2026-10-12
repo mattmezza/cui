@@ -72,6 +72,26 @@ int main(int argc, char **argv) {
             found = true;
     assert(found);
     cui_end_frame(ui);
+    const Uint8 buttons[] = {SDL_BUTTON_LEFT, SDL_BUTTON_RIGHT, SDL_BUTTON_MIDDLE};
+    for (unsigned i = 0; i < 3; ++i) {
+        event = (SDL_Event){0};
+        event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+        event.button.button = buttons[i];
+        event.button.x = 11;
+        event.button.y = 12;
+        assert(SDL_PushEvent(&event));
+    }
+    assert(cui_sdl3_poll(s, ui));
+    assert(cui_begin_frame(ui, 320, 160, 0));
+    events = cui_frame_events(ui, &count);
+    unsigned observed = 0;
+    for (size_t i = 0; i < count; ++i)
+        if (events[i].type == CUI_EVENT_POINTER_DOWN && events[i].x == 11 && events[i].y == 12) {
+            assert(events[i].pointer_button == (cui_pointer_button)observed);
+            observed++;
+        }
+    assert(observed == 3);
+    cui_end_frame(ui);
     cui_destroy(ui);
     printf("SDL driver=%s; glyph misses=%llu then %llu; persistent cache and "
            "clipboard/event roundtrips passed\n",

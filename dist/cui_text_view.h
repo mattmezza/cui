@@ -62,7 +62,7 @@ typedef enum {
 typedef struct {
     cui_text_view_block_kind kind;
     cui_text_view_range text, source, resource;
-    unsigned level, table, row, column;
+    unsigned level, table, row, column, table_columns;
     cui_text_view_range list_marker;
     unsigned list_number;
     char marker_text[12];
@@ -147,7 +147,7 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *, cui_text_view_la
                                          cui_text_view_measure_fn, void *);
 size_t cui_text_view_hit(const cui_text_view_state *, float x, float y);
 typedef struct {
-    cui_color foreground, muted, link, selection, code_background, border, mark;
+    cui_color foreground, muted, link, selection, code_background, border, mark, table_background;
     float font_size, line_height, paragraph_gap;
 } cui_text_view_style;
 cui_text_view_style cui_text_view_style_default(void);
@@ -1290,7 +1290,6 @@ static unsigned cui_text_view_block_flags(const cui_text_view_block *b) {
                                                     : b->level == 6 ? CUI_TEXT_VIEW_MEDIUM
                                                                     : CUI_TEXT_VIEW_SEMIBOLD)
            : b->kind == CUI_TEXT_VIEW_CODE_BLOCK ? CUI_TEXT_VIEW_CODE
-           : b->table_header                     ? CUI_TEXT_VIEW_SEMIBOLD
                                                  : 0;
 }
 static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, float x, float y,
@@ -1305,11 +1304,11 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
                                                    : 1;
     float font = o.font_size * scale, line = o.line_height * scale,
           padding = b->kind == CUI_TEXT_VIEW_CODE_BLOCK   ? 12
-                    : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
+                    : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 4
                                                           : 0;
     float left = b->kind == CUI_TEXT_VIEW_QUOTE        ? 12
                  : b->kind == CUI_TEXT_VIEW_LIST_ITEM  ? 20
-                 : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 12
+                 : b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8
                                                        : padding;
     if (b->kind == CUI_TEXT_VIEW_LIST_ITEM && b->level) {
         cui_size marker = measure(user, (cui_str){b->marker_text, strlen(b->marker_text)}, font, 0);
@@ -1318,7 +1317,7 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
         left = fmaxf(left, marker.width + 8);
     }
     b->text_inset = left;
-    float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 12 : padding));
+    float available = fmaxf(1, width - left - (b->kind == CUI_TEXT_VIEW_TABLE_CELL ? 8 : padding));
     float cursor_x = 0, cursor_y = 0;
     size_t first_glyph = s->glyph_count;
     if (b->kind == CUI_TEXT_VIEW_RULE) {
@@ -1418,6 +1417,53 @@ static bool cui_text_view_layout_block(cui_text_view_state *s, size_t index, flo
     b->bounds = (cui_rect){x, y, width, cursor_y + line + padding * 2};
     return true;
 }
+static void cui_text_view_table_widths(cui_text_view_state *s, size_t first, size_t end,
+                                       float width) {
+    float weights[CUI_TEXT_VIEW_NODE_LIMIT], widths[CUI_TEXT_VIEW_NODE_LIMIT];
+    unsigned columns = 0;
+    for (size_t i = first; i < end; ++i)
+        if (s->workspace.blocks[i].column + 1 > columns)
+            columns = s->workspace.blocks[i].column + 1;
+    for (unsigned c = 0; c < columns; ++c) {
+        weights[c] = 5;
+        widths[c] = 0;
+    }
+    for (size_t i = first; i < end; ++i) {
+        const cui_text_view_block *cell = &s->workspace.blocks[i];
+        unsigned count = 0;
+        for (size_t j = cell->text.begin; j < cell->text.end && count < 150; ++j)
+            if (((unsigned char)s->workspace.rendered[j] & 0xc0) != 0x80)
+                ++count;
+        if ((float)count > weights[cell->column])
+            weights[cell->column] = (float)count;
+    }
+    float remaining = fmaxf(width, (float)columns * 64), total = 0;
+    for (unsigned c = 0; c < columns; ++c)
+        total += weights[c];
+    bool changed;
+    do {
+        changed = false;
+        for (unsigned c = 0; c < columns; ++c)
+            if (widths[c] == 0 && remaining * weights[c] / total < 64) {
+                widths[c] = 64;
+                remaining -= 64;
+                total -= weights[c];
+                changed = true;
+            }
+    } while (changed && total > 0);
+    float x = 0;
+    for (unsigned c = 0; c < columns; ++c) {
+        if (widths[c] == 0)
+            widths[c] = remaining * weights[c] / total;
+        for (size_t i = first; i < end; ++i)
+            if (s->workspace.blocks[i].column == c) {
+                s->workspace.blocks[i].bounds.x = x;
+                s->workspace.blocks[i].bounds.w = widths[c];
+                s->workspace.blocks[i].table_columns = columns;
+            }
+        x += widths[c];
+    }
+}
 cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_layout_options o,
                                          cui_text_view_measure_fn measure, void *user) {
     if (!s || !measure || !isfinite(o.width) || o.width <= 0 || !isfinite(o.font_size) ||
@@ -1433,19 +1479,22 @@ cui_text_view_error cui_text_view_layout(cui_text_view_state *s, cui_text_view_l
     for (size_t b = 0; b < s->block_count;) {
         cui_text_view_block *block = &s->workspace.blocks[b];
         if (block->kind == CUI_TEXT_VIEW_TABLE_CELL) {
-            unsigned table = block->table, row = block->row, columns = 0;
-            for (size_t i = b;
-                 i < s->block_count && s->workspace.blocks[i].kind == CUI_TEXT_VIEW_TABLE_CELL &&
-                 s->workspace.blocks[i].table == table;
-                 ++i)
-                if (s->workspace.blocks[i].column + 1 > columns)
-                    columns = s->workspace.blocks[i].column + 1;
-            float cell_width = o.width / fmaxf(1, (float)columns), height = 0;
+            unsigned table = block->table, row = block->row;
+            if (b == 0 || s->workspace.blocks[b - 1].kind != CUI_TEXT_VIEW_TABLE_CELL ||
+                s->workspace.blocks[b - 1].table != table) {
+                size_t end = b + 1;
+                while (end < s->block_count &&
+                       s->workspace.blocks[end].kind == CUI_TEXT_VIEW_TABLE_CELL &&
+                       s->workspace.blocks[end].table == table)
+                    ++end;
+                cui_text_view_table_widths(s, b, end, o.width);
+            }
+            float height = 0;
             size_t first = b;
             while (b < s->block_count && s->workspace.blocks[b].kind == CUI_TEXT_VIEW_TABLE_CELL &&
                    s->workspace.blocks[b].table == table && s->workspace.blocks[b].row == row) {
-                if (!cui_text_view_layout_block(s, b, cell_width * s->workspace.blocks[b].column, y,
-                                                cell_width, o, measure, user))
+                float x = s->workspace.blocks[b].bounds.x, w = s->workspace.blocks[b].bounds.w;
+                if (!cui_text_view_layout_block(s, b, x, y, w, o, measure, user))
                     return CUI_TEXT_VIEW_INVALID;
                 if (s->workspace.blocks[b].bounds.h > height)
                     height = s->workspace.blocks[b].bounds.h;
@@ -1776,6 +1825,7 @@ cui_text_view_style cui_text_view_style_default(void) {
                                  .code_background = {244, 244, 245, 255},
                                  .border = {228, 228, 231, 255},
                                  .mark = {255, 220, 0, 100},
+                                 .table_background = {255, 255, 255, 255},
                                  .font_size = 14,
                                  .line_height = 20,
                                  .paragraph_gap = 16};
@@ -1785,11 +1835,12 @@ cui_text_view_style cui_text_view_style_from_theme(const cui_theme *t) {
         return cui_text_view_style_default();
     return (cui_text_view_style){.foreground = t->text,
                                  .muted = t->muted,
-                                 .link = t->link,
+                                 .link = t->primary,
                                  .selection = t->selection,
                                  .code_background = t->accent,
                                  .border = t->border,
                                  .mark = t->warning,
+                                 .table_background = t->surface,
                                  .font_size = t->font_size * .875f,
                                  .line_height = t->font_size * 1.25f,
                                  .paragraph_gap = t->font_size};
@@ -2040,15 +2091,19 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
             cui_text_view_quad(ui, part, r, style.code_background);
         } else if (b->kind == CUI_TEXT_VIEW_TABLE_CELL) {
-            if (s->clamped && r.y + 8 + style.line_height > s->height &&
+            if (s->clamped && r.y + 4 + style.line_height > s->height &&
                 style.line_height <= s->height)
                 continue;
-            cui_begin_absolute_box(
-                ui, part,
-                (cui_box){.background = b->table_header ? style.code_background : (cui_color){0},
-                          .border = style.border,
-                          .border_width = 1},
-                r);
+            cui_begin_absolute_box(ui, part,
+                                   (cui_box){.background = b->table_header ? style.code_background
+                                                                           : style.table_background,
+                                             .border = style.border,
+                                             .custom_border_edges = true,
+                                             .border_edges = {.left = b->column == 0 ? 1 : 0,
+                                                              .right = 1,
+                                                              .top = b->row == 0 ? 1 : 0,
+                                                              .bottom = 1}},
+                                   r);
             cui_end_box(ui);
         } else if (b->kind == CUI_TEXT_VIEW_QUOTE)
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
@@ -2095,6 +2150,14 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         r.w = last->bounds.x + last->bounds.w - r.x;
         cui_id link_id = id ^ UINT64_C(0x951f5d7100000000) ^ (uint64_t)span->link.begin ^
                          ((uint64_t)first->text.begin << 24);
+        cui_text_view_block *block = &s->workspace.blocks[first->block];
+        bool cell = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        if (cell) {
+            cui_begin_absolute_box(ui, link_id ^ UINT64_C(0x63a471cf00000000),
+                                   (cui_box){.clip = true}, block->bounds);
+            r.x -= block->bounds.x;
+            r.y -= block->bounds.y;
+        }
         cui_interaction interaction = cui_interact(
             ui, link_id, CUI_ROLE_LINK,
             cui_text_view_slice(cui_text_view_rendered_text(s),
@@ -2104,6 +2167,8 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         cui_begin_absolute_box(ui, link_id, (cui_box){0}, r);
         cui_end_box(ui);
         cui_text_view_link(ui, link_id, s, span->link, interaction.activated, o);
+        if (cell)
+            cui_end_box(ui);
         i = end;
     }
     cui_text_view_range selection = {s->anchor < s->cursor ? s->anchor : s->cursor,
@@ -2144,6 +2209,14 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         cui_id leaf = id ^ UINT64_C(0x164b82d900000000) ^ (uint64_t)first->text.begin;
         cui_text_view_span *span = &s->workspace.spans[first->span];
         bool is_link = span->link.end > span->link.begin;
+        cui_text_view_block *block = &s->workspace.blocks[first->block];
+        bool cell = block->kind == CUI_TEXT_VIEW_TABLE_CELL;
+        if (cell) {
+            cui_begin_absolute_box(ui, leaf ^ UINT64_C(0x63a471cf00000000), (cui_box){.clip = true},
+                                   block->bounds);
+            r.x -= block->bounds.x;
+            r.y -= block->bounds.y;
+        }
         if (first->flags & CUI_TEXT_VIEW_CODE)
             cui_text_view_quad(ui, leaf ^ UINT64_C(0x719ccbbb), r, style.code_background);
         for (size_t h = 0; h < s->highlight_count; ++h)
@@ -2165,6 +2238,8 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
         if (first->flags & CUI_TEXT_VIEW_STRIKE)
             cui_text_view_quad(ui, leaf ^ 2, (cui_rect){0, r.h * .5f, r.w, 1}, color);
         cui_end_box(ui);
+        if (cell)
+            cui_end_box(ui);
 
         i = end;
     }

@@ -1,0 +1,1 @@
+SDL driver=software; glyph misses=8 then 8; persistent cache and clipboard/event roundtrips passed

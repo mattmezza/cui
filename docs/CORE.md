@@ -108,20 +108,20 @@ Set `semantic_details.focusable` to opt a passive container (for example a Log v
 
 `cui_set_underlay` paints one rounded rectangle below the children of the current box and above its background. Relative bounds resolve after current-frame layout. The paint is clipped to that box and all enclosing clips, contributes no layout/input/semantics, and respects layout-only suppression. Repeated calls replace the same underlay. Invalid geometry leaves the prior paint unchanged; normal draw-command capacity applies atomically.
 
-`cui_paint_bitmap` emits a leaf `CUI_DRAW_IMAGE` from borrowed straight-alpha RGBA8 pixels. The source view supports padded rows, an explicit cache revision, a pixel crop, opacity, and grayscale. Zero source bounds select the entire image; FIT sizing defaults to the crop dimensions. Pixels must remain valid until renderer completion. Dimensions are bounded to 16384 per axis and invalid views/crops are rejected without opening a layout element. Rounded corners and ancestor clips apply normally. Software, SDL3, SDL_GPU/Vulkan, and Sokol render bitmap pixels with crop, grayscale, optional RGBA tint, opacity, and rounded clipping. Native adapters keep bounded 64-entry/64-MiB texture caches keyed by source pointer, revision, crop, raster size, corners, grayscale, and tint. Placement and opacity reuse the cached texture. Canvas support is being integrated. Rasterized rounded edges currently use pixel-center coverage; source alpha is preserved. This API does not decode files or fetch URLs.
+`cui_paint_bitmap` emits a leaf `CUI_DRAW_IMAGE` from borrowed straight-alpha RGBA8 pixels. The source view supports padded rows, an explicit cache revision, a pixel crop, opacity, and grayscale. Zero source bounds select the entire image; FIT sizing defaults to the crop dimensions. Pixels must remain valid until renderer completion. Dimensions are bounded to 16384 per axis and invalid views/crops are rejected without opening a layout element. Rounded corners and ancestor clips apply normally. Software, SDL3, SDL_GPU/Vulkan, and Sokol render bitmap pixels with crop, grayscale, optional RGBA tint, opacity, and rounded clipping. Native adapters keep bounded 64-entry/64-MiB texture caches keyed by source pointer, revision, crop, raster size, corners, grayscale, and tint. Placement and opacity reuse the cached texture. Canvas renders the same RGBA draw commands with a bounded 64-entry/16-MiB raster cache. Rasterized rounded edges currently use pixel-center coverage; source alpha is preserved. This API does not decode files or fetch URLs.
 
 `cui_set_underlay_ex` adds current-frame START/CENTER/END alignment and optional growth relative to the owning box. For a full-width bottom baseline, use bounds `{0,0,0,1}`, `grow_width=true`, and vertical END. Resizing resolves in the same layout pass without retained-size lag; offsets apply after alignment.
 
 `cui_begin_absolute_box` opens a zero-flow child using a fixed rectangle relative
- to its parent. It inherits ancestor clipping, inert/layout-only state and the
- parent's layer, so overlapping resize handles stay beneath higher portals.
- It requires an open parent and is balanced with `cui_end_box` even on invalid
- bounds. `CUI_ROLE_SEPARATOR` is passive unless semantic details opt into focus.
+to its parent. It inherits ancestor clipping, inert/layout-only state and the
+parent's layer, so overlapping resize handles stay beneath higher portals.
+It requires an open parent and is balanced with `cui_end_box` even on invalid
+bounds. `CUI_ROLE_SEPARATOR` is passive unless semantic details opt into focus.
 
 Semantic `details.cursor` is a portable pointer hint. `cui_pointer_cursor` returns
- the captured control's hint while dragging, otherwise the topmost enabled hit
- in the completed frame, respecting ancestor clips and modal ownership. Hosts
- apply it after `cui_end_frame`; unsupported hosts may retain their default.
- The SDL3 host exposes `cui_sdl3_set_cursor` and also applies the last completed
- frame's hint during polling. System cursors are cached and released with the
- adapter; headless drivers report unsupported without failing event dispatch.
+the captured control's hint while dragging, otherwise the topmost enabled hit
+in the completed frame, respecting ancestor clips and modal ownership. Hosts
+apply it after `cui_end_frame`; unsupported hosts may retain their default.
+The SDL3 host exposes `cui_sdl3_set_cursor` and also applies the last completed
+frame's hint during polling. System cursors are cached and released with the
+adapter; headless drivers report unsupported without failing event dispatch.

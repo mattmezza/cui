@@ -1,36 +1,36 @@
 {
-  "source": "996e356",
+  "source": "f01c6f9",
   "published_source": "59a0988ecf432f371378e1398193587de6806fb3",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Recovery source 996e356 passes native51/51, sanitizers49/49, WASI42/42 and Chromium60 stories. Includes graphical Checkbox/Radio/Switch and Choice checks, automatic system theme, and deterministic Dropdown browser frame readiness. Public59a0988 verified: all six CI jobs and Pages passed, HTTPS Chromium verified system-theme changes and graphical controls. All78 entries retained; full parity unfinished.",
+  "summary": "Source f01c6f9 passes native51/51, sanitizers49/49 and WASI42/42. Browser88511a4 passes62 stories with actual Image/Attachment rendering and lifecycle actions. Later ToggleGroup/core cursor changes await next browser release gate. Public59a0988 is confirmed60 stories with graphical controls and system theme. All78 entries retained;16 not started and62 partial; full parity unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "af972d7",
+      "source": "f01c6f9",
       "passed": 51,
       "total": 51,
-      "log": "native-recovery.txt"
+      "log": "native-62.txt"
     },
     {
       "name": "sanitizers",
-      "source": "af972d7",
+      "source": "f01c6f9",
       "passed": 49,
       "total": 49,
-      "log": "asan-recovery.txt"
+      "log": "asan-62.txt"
     },
     {
       "name": "WASI",
-      "source": "af972d7",
+      "source": "f01c6f9",
       "passed": 42,
       "total": 42,
-      "log": "wasi-recovery.txt"
+      "log": "wasi-62.txt"
     },
     {
       "name": "browser",
-      "source": "996e356",
-      "stories": 60,
+      "source": "88511a4",
+      "stories": 62,
       "catalog_entries": 78,
-      "log": "browser-recovery.txt"
+      "log": "browser-62.txt"
     }
   ],
   "previous_deployment": {

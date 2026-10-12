@@ -254,34 +254,45 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_media.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_media.c"
+        "tests/unit/test_media.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "web_wasm": "tested_partial"
       },
       "limitations": [
-        "Host-provided RGBA image loading and fits, animation timing, and Attachment lifecycle/composition tested. Built-in file/network decoding, shared image cache, full text styling and exact effects remain pending. Browser story pending; not full parity."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "file/media metadata",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "preview/remove actions",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "loading/error states",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/web/test_browser.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -309,9 +320,10 @@
           "Related types"
         ]
       },
-      "last_tested_commit": "2ef4f51",
+      "last_tested_commit": "88511a4",
       "evidence": [
         "tests/unit/test_media.c",
+        "tests/web/test_browser.py",
         "docs/MEDIA.md"
       ]
     },
@@ -1192,34 +1204,45 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_media.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_media.c"
+        "tests/unit/test_media.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "web_wasm": "tested_partial"
       },
       "limitations": [
-        "Host-provided RGBA image loading and fits, animation timing, and Attachment lifecycle/composition tested. Built-in file/network decoding, shared image cache, full text styling and exact effects remain pending. Browser story pending; not full parity."
+        "Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "host resource lifecycle",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "scaling/clipping/fallback",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "loading/error/accessibility",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_media.c",
+            "tests/web/test_browser.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1233,9 +1256,10 @@
           "Learn more"
         ]
       },
-      "last_tested_commit": "2ef4f51",
+      "last_tested_commit": "88511a4",
       "evidence": [
         "tests/unit/test_media.c",
+        "tests/web/test_browser.py",
         "docs/MEDIA.md"
       ]
     },
@@ -2412,7 +2436,8 @@
       "public_header": "include/cui/cui_components.h",
       "sample": "gallery/main.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_choice.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2420,7 +2445,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Controlled press state tested; toggle groups and full visual states pending."
+        "Ghost/Outline variants, four sizes, controlled requests, disabled input, custom content, tooltip composition and segmented multi-select groups have headless coverage. Convenience groups retain exclusive/allow-empty/keyboard policies through the shared painter. Full inherited text/icon styling and source-level visual acceptance remain pending; not full parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2429,18 +2454,25 @@
           "name": "controlled pressed state",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_components.c"
+            "tests/unit/test_components.c",
+            "tests/unit/test_choice.c"
           ]
         },
         {
           "name": "keyboard/pointer/disabled behavior",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c",
+            "tests/unit/test_choice.c"
+          ]
         },
         {
           "name": "pressed semantics/theme variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c",
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2471,9 +2503,12 @@
           "Best Practices"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "45d84c3",
       "evidence": [
-        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+        "tests/unit/test_components.c",
+        "tests/unit/test_choice.c",
+        "docs/CONTROLS.md",
+        "docs/CHOICE.md"
       ]
     },
     {

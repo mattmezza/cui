@@ -1,12 +1,18 @@
 # Live development checkpoint
 
+## Current priorities (12 October, afternoon)
+
+The public site remains the verified `e49dc95` release with 62 live stories. Local `3dd64a5` adds the 68th story (Title Bar), whose worker browser tests pass; newer root changes are awaiting the combined browser/release gate. Button text centering and source XS/S/M/L metrics (`658c5a3`), theme SVG overrides (`200caf1`), and SVG-only dialog close controls (`5fb6c11`) each pass all 59 native tests and quality gates. Canvas baseline correction and four-size controls are being validated in the gallery worktree. Full parity is not complete.
+
+User-requested website scope now includes a homepage and getting-started example, browsable repository documentation, slash-key fuzzy component search, and one-button usage-code copying. Finish alignment/size validation first, then implement these on the existing GitHub Pages site. Active isolated workers own Sidebar, Textarea, and the browser gallery/site; root owns shared core/theme integration and release validation. No user dependency installation is needed.
+
 Repository https://github.com/mattmezza/cui, default branch `main`. Existing public visibility preserved; ordinary pushes only. The full 78-family parity objective is active, with isolated choice, table and browser-gallery workers; only the root integrator merges. Impeccable metadata was removed at the user's request.
 
 The first resumed published checkpoint `8d670694cb63d7074c1f59ec717bccf848d45ac1` passed all six framework CI jobs and the WebAssembly browser/build/deploy pipeline. [Framework CI](https://github.com/mattmezza/cui/actions/runs/38219053307); [GitHub Pages deployment](https://github.com/mattmezza/cui/actions/runs/38219053380). Ubuntu/macOS/Windows portable22/22 each; Linux GCC/Clang native sanitizer25/25 each plus Xvfb gallery and Sokol readback; style/manifest/license/distribution gates. Hosted Sokol uses llvmpipe software separately from the development-host Intel/Mesa GPU evidence.
 
 The live gallery is https://matteo.merola.co/cui/ (existing account domain inherited by GitHub Pages). HTTPS is enforced. All78 entries appear in navigation; only actual implementations/models have live stories. Newer local stories and component changes are integrated and validated before the next ordinary push, with exact source evidence in validation/ and NIGHTLY_REPORT.md.
 
-Current catalog:27 not_started,0 scaffolded,4 implemented,47 tested,0 verified. Tested means a documented subset, including partial base models. Full family parity remains unfinished and every gap stays in gpui-parity.json. Do not infer completion from rendered previews or tested API subsets.
+Current catalog:10 not_started,0 scaffolded,4 implemented,64 tested,0 verified. Tested means a documented subset, including partial base models. Full family parity remains unfinished and every gap stays in gpui-parity.json. Do not infer completion from rendered previews or tested API subsets.
 
 Resumed work adds viewport portals, semantic relationships and roving focus, same-frame modal dismissal, per-event validated activation, content/hover surfaces, disclosure/tabs, flat menus/lists/selects, editable comboboxes and independently linked numeric/sequence behavior. Multiple selection, calendar/date/time and HSV/RGBA color controls are now integrated. Ongoing batches extend nested/context menus, tree virtualization and gallery stories.
 

@@ -1,0 +1,87 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["markdown-it-py==4.0.0", "mdurl==0.1.2"]
+# ///
+"""Exercise safe Markdown, links, assets, and complete repository doc discovery."""
+import importlib.util
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location('build_docs', ROOT / 'scripts/build_docs.py')
+DOCS = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(DOCS)
+
+
+class DocumentationTests(unittest.TestCase):
+    def test_render_links_and_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repo'
+            output = Path(directory) / 'site'
+            (root / 'docs/screenshots').mkdir(parents=True)
+            (root / 'README.md').write_text('# Start\n\n[Guide](docs/API.md#ownership)\n')
+            (root / 'docs/screenshots/test.png').write_bytes(b'PNG fixture')
+            (root / 'docs/API.md').write_text('''# API
+
+## Ownership
+
+## Ownership
+
+[Start](../README.md) [Here](#ownership) [Code](../include/cui/cui.h#L12)
+
+![Preview](screenshots/test.png)
+
+| Name | Meaning |
+| --- | --- |
+| CUI | C UI |
+
+```c
+if (x < 2) puts("<script>");
+```
+
+<script>alert(1)</script>
+
+[Unsafe](javascript:alert(1))
+''')
+            pages = DOCS.build(root, output)
+            self.assertEqual({p['slug'] for p in pages}, {'getting-started', 'api'})
+            start, api = pages
+            self.assertIn('href="#docs/api/ownership"', start['html'])
+            self.assertIn('href="#docs/getting-started"', api['html'])
+            self.assertIn('href="#docs/api/ownership"', api['html'])
+            self.assertIn('id="doc-ownership"', api['html'])
+            self.assertIn('id="doc-ownership-1"', api['html'])
+            self.assertIn('https://github.com/mattmezza/cui/blob/main/include/cui/cui.h#L12', api['html'])
+            self.assertIn('<table>', api['html'])
+            self.assertIn('class="language-c"', api['html'])
+            self.assertIn('&lt;script&gt;', api['html'])
+            self.assertNotIn('<script>', api['html'])
+            self.assertNotIn('href="javascript:', api['html'])
+            self.assertEqual((output / 'docs-assets/docs/screenshots/test.png').read_bytes(), b'PNG fixture')
+            self.assertEqual(json.loads((output / 'docs.json').read_text()), pages)
+
+    def test_complete_repository_docs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pages = DOCS.build(ROOT, Path(directory))
+            sources = {p['source'] for p in pages}
+            for path in (ROOT / 'docs').rglob('*.md'):
+                self.assertIn(DOCS.REPOSITORY + path.relative_to(ROOT).as_posix(), sources)
+            self.assertIn('getting-started', {p['slug'] for p in pages})
+            self.assertEqual(len(pages), len({p['slug'] for p in pages}))
+            self.assertTrue(all(p['title'] and p['html'] for p in pages))
+
+    def test_collisions_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'docs').mkdir()
+            (root / 'docs/A B.md').write_text('# One')
+            (root / 'docs/A-B.md').write_text('# Two')
+            with self.assertRaises(ValueError):
+                DOCS.build(root, root / 'out')
+
+
+if __name__ == '__main__':
+    unittest.main()

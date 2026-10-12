@@ -568,3 +568,10 @@ held active, selected, outlined and disabled states use the configured values
 without deriving their RGB colors from another state. Custom outline border
 currently changes alpha without reproducing upstream Oklab white mixing; rich
 backgrounds and custom shadow painting remain explicit gaps.
+
+Tab `max_width` now caps custom-rendered bodies as well as built-in labels.
+The core natural-width constraint leaves short bodies untouched on the first
+frame and clips long bodies without a measurement flash. Custom callbacks still
+own text ellipsis/decoration inside their body. Scroll range/reveal calculations
+use the capped tab width. Headless tests cover short/long custom content from the
+first frame across all variants, retained scroll geometry and actual selection.

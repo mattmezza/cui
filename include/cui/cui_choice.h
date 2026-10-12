@@ -51,7 +51,7 @@ typedef struct {
     void *render_user;
     cui_choice_content_fn prefix, suffix;
     void *content_user;
-    float max_width;              /* zero unconstrained; built-in labels ellipsize to fit */
+    float max_width; /* zero unconstrained; caps all bodies, built-in labels ellipsize */
     cui_tab_scroll_state *scroll; /* optional application-owned bounded viewport */
     float bar_extent;             /* scroll viewport width, or height for vertical tabs */
     cui_tab_overflow *overflow;   /* optional all-tabs menu when scroll maximum > 0 */

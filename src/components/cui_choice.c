@@ -70,10 +70,12 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
     bool ellipsized =
         !render && isfinite(max_width) && max_width > 0 &&
         cui_measure_text(ui, item->label, theme->font_size).width + 2 * theme->padding > max_width;
-    if (ellipsized) {
-        box.width = max_width;
+    if (isfinite(max_width) && max_width > 0) {
+        box.max_width = max_width;
         box.clip = true;
     }
+    if (ellipsized)
+        box.width = max_width;
     cui_begin_box(ui, item->id, box);
     if (variant == CUI_TAB_UNDERLINE)
         cui_begin_box(ui, 0,
@@ -123,8 +125,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                ? cui_bounds(ui, items[i].id).w
                                : cui_measure_text(ui, items[i].label, theme->font_size).width +
                                      2 * theme->padding;
-            if (!options.vertical && !options.render && options.max_width > 0 &&
-                extent > options.max_width)
+            if (!options.vertical && options.max_width > 0 && extent > options.max_width)
                 extent = options.max_width;
             if (isfinite(extent) && extent > 0)
                 content += extent;
@@ -152,8 +153,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                    ? cui_bounds(ui, items[i].id).w
                                    : cui_measure_text(ui, items[i].label, theme->font_size).width +
                                          2 * theme->padding;
-                if (!options.vertical && !options.render && options.max_width > 0 &&
-                    extent > options.max_width)
+                if (!options.vertical && options.max_width > 0 && extent > options.max_width)
                     extent = options.max_width;
                 if (items[i].id == scroll->reveal_id) {
                     found = true;

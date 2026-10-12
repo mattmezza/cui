@@ -2639,7 +2639,45 @@ static void test_dropdown_configurable_palettes(void) {
         cui_destroy(ui);
     }
 }
+static void capped_custom_tab(cui_context *ui, const cui_choice_item *item, size_t index,
+                              void *user) {
+    (void)item;
+    (void)user;
+    cui_begin_box(ui, 9000 + index,
+                  (cui_box){.width = index ? 300 : 20, .height = 20, .background = {5, 6, 7, 255}});
+    cui_end_box(ui);
+}
+static void test_custom_tab_width_caps(void) {
+    const cui_choice_item entries[] = {{10, {"Short", 5}, false}, {20, {"Long", 4}, false}};
+    cui_theme theme = cui_theme_light();
+    for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_id selected = 10;
+        cui_tab_scroll_state scroll = {0};
+        cui_tabs_options options = {.variant = (cui_tab_variant)variant,
+                                    .render = capped_custom_tab,
+                                    .max_width = 100,
+                                    .scroll = &scroll,
+                                    .bar_extent = 110};
+        for (int frame = 0; frame < 2; frame++) {
+            assert(cui_begin_frame(ui, 640, 480, .016f));
+            cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            assert(cui_bounds(ui, 10).w < 100 && cui_bounds(ui, 20).w == 100);
+        }
+        assert(scroll.maximum == cui_bounds(ui, 10).w + 100 + theme.gap - 110);
+        click(ui, 20);
+        assert(cui_begin_frame(ui, 640, 480, .016f));
+        assert(cui_tabs(ui, 1, &theme, entries, 2, &selected, options, NULL, NULL));
+        cui_end_frame(ui);
+        assert(selected == 20);
+        cui_destroy(ui);
+    }
+}
 int main(void) {
+    test_custom_tab_width_caps();
     test_dropdown_configurable_palettes();
     test_hierarchical_menu_scroll();
     test_menu_pointer_drag_scroll();

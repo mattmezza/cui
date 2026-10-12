@@ -898,6 +898,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         float tooltip_height =
             o->tooltip_content ? 64
                                : 16 + (title.length && title.data ? 18 : 0) + 16 * (float)row_count;
+        if (o->tooltip_content && o->tooltip_measure) {
+            cui_size content = o->tooltip_measure(ui, tooltip_index, datum, o->tooltip_user);
+            if (isfinite(content.width) && isfinite(content.height) && content.width >= 0 &&
+                content.height >= 0 && content.width <= 16368 && content.height <= 16368) {
+                tooltip_width = fmaxf(150, content.width + 16);
+                tooltip_height = content.height + 16;
+            }
+        }
         float cursor_x = state->tooltip_cursor_valid ? state->tooltip_cursor_x : 0;
         float cursor_y = state->tooltip_cursor_valid ? state->tooltip_cursor_y : 0;
         float tooltip_x = cursor_x < w / 2 ? cursor_x + 8 : cursor_x - 8 - tooltip_width;

@@ -146,6 +146,12 @@ static void custom_tooltip(cui_context *ui, cui_id id, size_t index, const cui_c
     cui_text(ui, (cui_str){"Custom", 6}, 11, (cui_color){10, 20, 30, 255});
     cui_end_box(ui);
 }
+static cui_size custom_tooltip_measure(cui_context *ui, size_t index, const cui_chart_datum *datum,
+                                       void *user) {
+    (void)user;
+    assert(ui && index == 0 && datum->label.length == 1);
+    return (cui_size){220, 90};
+}
 #endif
 int main(void) {
     cui_chart_datum points[] = {
@@ -1073,6 +1079,18 @@ int main(void) {
                 default_ohlc = true;
         }
     assert(tooltip_calls == 1 && custom && !default_ohlc);
+    options.tooltip_measure = custom_tooltip_measure;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Price", 5}));
+    draw = cui_end_frame(ui);
+    bool measured_custom = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT &&
+            fabsf(draw.commands[i].bounds.w - 236) < .01f &&
+            fabsf(draw.commands[i].bounds.h - 106) < .01f)
+            measured_custom = true;
+    assert(measured_custom && tooltip_calls == 2);
+    options.tooltip_measure = NULL;
     options.tooltip_content = NULL;
     options.tooltip_title = tooltip_title_override;
     options.tooltip_value = tooltip_value_override;

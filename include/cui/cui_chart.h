@@ -99,6 +99,10 @@ typedef cui_color (*cui_chart_region_fill_fn)(size_t series, float x, float y, c
                                               void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
+/* Content size excludes the tooltip's 8px padding on each side. Return a finite, nonnegative size.
+ */
+typedef cui_size (*cui_chart_tooltip_measure_fn)(cui_context *, size_t index,
+                                                 const cui_chart_datum *, void *user);
 typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef size_t (*cui_chart_tooltip_value_fn)(const cui_chart_datum *, size_t index, size_t series,
                                              double value, char *buffer, size_t capacity,
@@ -129,7 +133,8 @@ typedef struct {
     size_t reference_count; /* at most 16 */
     cui_chart_format_fn y_tick_format, tooltip_format, bar_label_format;
     void *format_user;
-    cui_chart_tooltip_fn tooltip_content; /* replaces default hover title and rows */
+    cui_chart_tooltip_fn tooltip_content;         /* replaces default hover title and rows */
+    cui_chart_tooltip_measure_fn tooltip_measure; /* optional intrinsic custom content size */
     void *tooltip_user;
     cui_chart_tooltip_title_fn tooltip_title;
     cui_chart_tooltip_value_fn tooltip_value;

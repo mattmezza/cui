@@ -91,6 +91,8 @@ typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef cui_color (*cui_chart_bar_label_color_fn)(const cui_chart_datum *, size_t index,
                                                   void *user);
+typedef cui_color (*cui_chart_region_fill_fn)(size_t series, float x, float y, cui_color fallback,
+                                              void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
 typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
@@ -182,7 +184,9 @@ typedef struct {
     cui_chart_format_fn sankey_value_format;
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
-    cui_color primary_fill; /* area/radar fill for the first series */
+    cui_color primary_fill;                         /* area/radar fill for the first series */
+    cui_chart_region_fill_fn area_radar_fill_pixel; /* chart-space gradients/patterns */
+    void *area_radar_fill_user;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */
@@ -197,6 +201,9 @@ typedef struct {
     double mark_clip_left, mark_clip_x; /* private reveal mask bounds */
     bool mark_clip_active;
     float rendered_reveal_progress;
+    const cui_chart_datum *rendered_data; /* private hover identity */
+    size_t rendered_count;
+    cui_chart_kind rendered_kind;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {
@@ -219,6 +226,9 @@ float cui_chart_measure_value_axis_gutter(cui_context *, const cui_chart_options
 cui_plot_result cui_chart_measure_sankey_margins(cui_context *, const cui_chart_options *,
                                                  cui_chart_sankey_margins *);
 bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *maximum);
+/* Pixel-space point location shared by line/area raster and hover decoration. */
+cui_plot_result cui_chart_point_coordinates(const cui_chart_options *, size_t index, size_t series,
+                                            float *x, float *y);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,
                                         cui_chart_candle_geometry *);
@@ -413,6 +423,22 @@ static void cui_chart_rect(cui_chart_state *s, const cui_chart_options *o, int x
         for (int x = x0; x < x1; x++)
             cui_chart_pixel(s, o, x, y, c);
 }
+static void cui_chart_area_rect(cui_chart_state *s, const cui_chart_options *o, int x0, int y0,
+                                int x1, int y1, cui_color fallback, size_t series) {
+    if (!o->area_radar_fill_pixel) {
+        cui_chart_rect(s, o, x0, y0, x1, y1, fallback);
+        return;
+    }
+    x0 = x0 < 0 ? 0 : x0;
+    y0 = y0 < 0 ? 0 : y0;
+    x1 = x1 > (int)o->width ? (int)o->width : x1;
+    y1 = y1 > (int)o->height ? (int)o->height : y1;
+    for (int y = y0; y < y1; y++)
+        for (int x = x0; x < x1; x++)
+            cui_chart_pixel(s, o, x, y,
+                            o->area_radar_fill_pixel(series, x + .5f, y + .5f, fallback,
+                                                     o->area_radar_fill_user));
+}
 static void cui_chart_rounded_rect(cui_chart_state *s, const cui_chart_options *o,
                                    cui_plot_rect bounds, double requested_radius, cui_color color) {
     double radius = fmin(requested_radius, fmin((bounds.x_max - bounds.x_min) / 2,
@@ -461,9 +487,27 @@ static void cui_chart_guide(cui_chart_state *s, const cui_chart_options *o, doub
     }
 }
 static double cui_chart_plot_left(const cui_chart_options *o) {
+    if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)
+        return o->show_y_axis && !o->y_axis_inside
+                   ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 32)
+                   : 0;
+    if (o->kind == CUI_CHART_BAR &&
+        (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT))
+        return 24;
     return o->show_y_axis && !o->y_axis_inside
                ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
                : 24;
+}
+static double cui_chart_plot_right(const cui_chart_options *o, double left) {
+    return o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA
+               ? o->width - left
+               : (o->width > 36 ? o->width - 12 : left);
+}
+static double cui_chart_plot_bottom(const cui_chart_options *o) {
+    bool horizontal_bar = o->kind == CUI_CHART_BAR && (o->bar_alignment == CUI_CHART_BAR_LEFT ||
+                                                       o->bar_alignment == CUI_CHART_BAR_RIGHT);
+    double gap = horizontal_bar && o->show_y_axis && !o->y_axis_inside ? 32 : 20;
+    return o->height > gap + 12 ? o->height - gap : 12;
 }
 static double cui_chart_x_at(const cui_chart_options *o, size_t i, double left, double right) {
     size_t n = o->point_count ? o->point_count : o->count;
@@ -532,8 +576,8 @@ bool cui_chart_value_domain(const cui_chart_options *o, double *minimum, double 
 }
 static cui_plot_result cui_chart_bar_bounds_domain(const cui_chart_options *o, size_t index,
                                                    double lo, double hi, cui_plot_rect *output) {
-    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
-    double top = 12, bottom = o->height > 32 ? o->height - 20 : 12;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
+    double top = 12, bottom = cui_chart_plot_bottom(o);
     if (right <= left || bottom <= top)
         return CUI_PLOT_EMPTY;
     bool horizontal =
@@ -618,7 +662,7 @@ cui_plot_result cui_chart_candle_bounds(const cui_chart_options *o, size_t index
     cui_chart_domain(o, &lo, &hi);
     if (!isfinite(lo) || !isfinite(hi) || lo >= hi)
         return CUI_PLOT_OVERFLOW;
-    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
     double top = 12, bottom = o->height > 32 ? o->height - 20 : 12;
     if (right <= left || bottom <= top)
         return CUI_PLOT_EMPTY;
@@ -655,6 +699,32 @@ static void cui_chart_series_point(const cui_chart_options *o, size_t series, si
     if (*y > bottom)
         *y = bottom;
 }
+cui_plot_result cui_chart_point_coordinates(const cui_chart_options *o, size_t index, size_t series,
+                                            float *x, float *y) {
+    if (!o || !x || !y || !o->data || (o->kind != CUI_CHART_LINE && o->kind != CUI_CHART_AREA) ||
+        !o->count || o->count > CUI_CHART_MAX_ITEMS || index >= o->count ||
+        series > o->extra_series_count || !o->width || !o->height || o->width > 4096 ||
+        o->height > 4096 || !isfinite(o->value_axis_gutter) || o->value_axis_gutter < 0 ||
+        o->value_axis_gutter >= o->width || !isfinite(o->y_padding_top) ||
+        !isfinite(o->y_padding_bottom) || o->y_padding_top < 0 || o->y_padding_bottom < 0 ||
+        (o->point_count && (o->point_count < o->count || o->point_count > 1000000)))
+        return CUI_PLOT_INVALID;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
+    double top = o->custom_y_padding ? o->y_padding_top : 10;
+    double bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
+    if (right <= left || bottom <= top)
+        return CUI_PLOT_EMPTY;
+    double lo, hi;
+    if (!cui_chart_value_domain(o, &lo, &hi))
+        return CUI_PLOT_INVALID;
+    double px, py;
+    cui_chart_series_point(o, series, index, left, right, lo, hi, top, bottom, &px, &py);
+    if (!isfinite(px) || !isfinite(py))
+        return CUI_PLOT_OVERFLOW;
+    *x = (float)px;
+    *y = (float)py;
+    return CUI_PLOT_OK;
+}
 static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o, size_t series,
                                   double left, double right, double top, double bottom, double lo,
                                   double hi, double baseline) {
@@ -672,8 +742,9 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
     double first_x, first_y;
     cui_chart_series_point(o, series, 0, left, right, lo, hi, top, bottom, &first_x, &first_y);
     if (o->kind == CUI_CHART_AREA)
-        cui_chart_rect(s, o, (int)floor(first_x), (int)floor(fmin(first_y, baseline)),
-                       (int)ceil(first_x + 1), (int)ceil(fmax(first_y, baseline)), fill);
+        cui_chart_area_rect(s, o, (int)floor(first_x), (int)floor(fmin(first_y, baseline)),
+                            (int)ceil(first_x + 1), (int)ceil(fmax(first_y, baseline)), fill,
+                            series);
     for (size_t i = 1; i < o->count; i++) {
         double x0, y0, x1, y1;
         cui_chart_series_point(o, series, i - 1, left, right, lo, hi, top, bottom, &x0, &y0);
@@ -683,15 +754,15 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
             if (i + 1 < o->count)
                 cui_chart_line(s, o, x1, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
-                cui_chart_rect(s, o, (int)ceil(x0), (int)floor(fmin(y0, baseline)), (int)ceil(x1),
-                               (int)ceil(fmax(y0, baseline)), fill);
+                cui_chart_area_rect(s, o, (int)ceil(x0), (int)floor(fmin(y0, baseline)),
+                                    (int)ceil(x1), (int)ceil(fmax(y0, baseline)), fill, series);
         } else if (curve == CUI_CHART_CURVE_LINEAR) {
             cui_chart_line(s, o, x0, y0, x1, y1, color);
             if (o->kind == CUI_CHART_AREA)
                 for (int x = (int)ceil(x0); x <= (int)floor(x1); x++) {
                     double y = y0 + (y1 - y0) * (x - x0) / (x1 - x0);
-                    cui_chart_rect(s, o, x, (int)floor(fmin(y, baseline)), x + 1,
-                                   (int)ceil(fmax(y, baseline)), fill);
+                    cui_chart_area_rect(s, o, x, (int)floor(fmin(y, baseline)), x + 1,
+                                        (int)ceil(fmax(y, baseline)), fill, series);
                 }
         } else {
             double prev_y = y0, prev_x = x0, p0y = y0, p3y = y1;
@@ -718,8 +789,9 @@ static void cui_chart_draw_series(cui_chart_state *s, const cui_chart_options *o
                     y = bottom;
                 cui_chart_line(s, o, prev_x, prev_y, x, y, color);
                 if (o->kind == CUI_CHART_AREA)
-                    cui_chart_rect(s, o, (int)floor(x), (int)floor(fmin(y, baseline)),
-                                   (int)ceil(x + 1), (int)ceil(fmax(y, baseline)), fill);
+                    cui_chart_area_rect(s, o, (int)floor(x), (int)floor(fmin(y, baseline)),
+                                        (int)ceil(x + 1), (int)ceil(fmax(y, baseline)), fill,
+                                        series);
                 prev_x = x;
                 prev_y = y;
             }
@@ -791,8 +863,8 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
         }
 }
 static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) {
-    double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left, top = 12,
-           bottom = o->height > 32 ? o->height - 20 : 12;
+    double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left), top = 12,
+           bottom = cui_chart_plot_bottom(o);
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
         top = o->custom_y_padding ? o->y_padding_top : 10;
         bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
@@ -1022,7 +1094,8 @@ static void cui_chart_pie(cui_chart_state *s, const cui_chart_options *o) {
     }
 }
 static void cui_chart_triangle(cui_chart_state *s, const cui_chart_options *o, double ax, double ay,
-                               double bx, double by, double cx, double cy, cui_color color) {
+                               double bx, double by, double cx, double cy, cui_color color,
+                               size_t series) {
     double left = fmax(0, floor(fmin(ax, fmin(bx, cx))));
     double right = fmin(o->width, ceil(fmax(ax, fmax(bx, cx))));
     double top = fmax(0, floor(fmin(ay, fmin(by, cy))));
@@ -1037,8 +1110,13 @@ static void cui_chart_triangle(cui_chart_state *s, const cui_chart_options *o, d
             double b = (cx - bx) * (py - by) - (cy - by) * (px - bx);
             double c = (ax - cx) * (py - cy) - (ay - cy) * (px - cx);
             if ((area > 0 && a >= 0 && b >= 0 && c >= 0) ||
-                (area < 0 && a <= 0 && b <= 0 && c <= 0))
-                cui_chart_pixel(s, o, x, y, color);
+                (area < 0 && a <= 0 && b <= 0 && c <= 0)) {
+                cui_color fill = o->area_radar_fill_pixel
+                                     ? o->area_radar_fill_pixel(series, x + .5f, y + .5f, color,
+                                                                o->area_radar_fill_user)
+                                     : color;
+                cui_chart_pixel(s, o, x, y, fill);
+            }
         }
 }
 static double cui_chart_radar_radius(const cui_chart_options *o) {
@@ -1097,7 +1175,7 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
         }
         for (size_t i = 0; i < o->count; i++) {
             size_t j = (i + 1) % o->count;
-            cui_chart_triangle(s, o, cx, cy, xs[i], ys[i], xs[j], ys[j], fill);
+            cui_chart_triangle(s, o, cx, cy, xs[i], ys[i], xs[j], ys[j], fill, series);
         }
         for (size_t i = 0; i < o->count; i++) {
             size_t j = (i + 1) % o->count;
@@ -1110,6 +1188,8 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
 }
 static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_node *nodes,
                                    size_t layers, double padding);
+static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
+                                                cui_chart_sankey_node *nodes, size_t layers);
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sankey_node *out,
                                         size_t capacity) {
     if (!o || o->kind != CUI_CHART_SANKEY || !o->data || !o->count || o->count > 256 ||
@@ -1240,8 +1320,51 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
             }
     }
     cui_chart_sankey_relax(o, nodes, layers, padding);
+    cui_chart_sankey_center_and_stagger(o, nodes, layers);
     memcpy(out, nodes, o->count * sizeof(*out));
     return CUI_PLOT_OK;
+}
+static void cui_chart_sankey_center_and_stagger(const cui_chart_options *o,
+                                                cui_chart_sankey_node *nodes, size_t layers) {
+    double top = 8 + o->sankey_margins.top;
+    double bottom = o->height - 8 - o->sankey_margins.bottom;
+    double lo[256], hi[256], height[256] = {0};
+    size_t count[256] = {0}, single[256] = {0};
+    for (size_t layer = 0; layer < layers; layer++) {
+        lo[layer] = DBL_MAX;
+        hi[layer] = -DBL_MAX;
+    }
+    for (size_t i = 0; i < o->count; i++) {
+        size_t layer = nodes[i].layer;
+        lo[layer] = fmin(lo[layer], nodes[i].y0);
+        hi[layer] = fmax(hi[layer], nodes[i].y1);
+        count[layer]++;
+        single[layer] = i;
+    }
+    for (size_t layer = 0; layer < layers; layer++) {
+        double shift = hi[layer] > lo[layer] ? (top + bottom - lo[layer] - hi[layer]) / 2 : 0;
+        for (size_t i = 0; i < o->count; i++)
+            if (nodes[i].layer == layer) {
+                nodes[i].y0 += (float)shift;
+                nodes[i].y1 += (float)shift;
+            }
+        if (count[layer] == 1)
+            height[layer] = nodes[single[layer]].y1 - nodes[single[layer]].y0;
+    }
+    size_t run = 0;
+    for (size_t layer = 1; layer < layers; layer++) {
+        if (count[layer] == 1 && count[layer - 1] == 1 &&
+            fabs(height[layer] - height[layer - 1]) < 1e-3) {
+            run++;
+            if (run % 2) {
+                double slack = fmax(0, bottom - top - height[layer]);
+                double shift = fmin(height[layer] * .15, slack / 2);
+                nodes[single[layer]].y0 += (float)shift;
+                nodes[single[layer]].y1 += (float)shift;
+            }
+        } else
+            run = 0;
+    }
 }
 static void cui_chart_sankey_resolve(cui_chart_sankey_node *nodes, size_t count, size_t layer,
                                      double padding, double top, double bottom) {
@@ -1530,6 +1653,10 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     const unsigned char *primary_fill = (const unsigned char *)&o->primary_fill;
     for (size_t i = 0; i < sizeof(o->primary_fill); i++)
         h = cui_chart_mix(h, primary_fill[i]);
+    const unsigned char *region_fill = (const unsigned char *)&o->area_radar_fill_pixel;
+    for (size_t i = 0; i < sizeof(o->area_radar_fill_pixel); i++)
+        h = cui_chart_mix(h, region_fill[i]);
+    h = cui_chart_mix(h, (uintptr_t)o->area_radar_fill_user);
     return h ? h : 1;
 }
 cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o) {
@@ -1568,8 +1695,14 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         cui_chart_sankey(s, o, nodes, link_geometry);
         s->mark_clip_active = false;
     }
-    s->hovered = SIZE_MAX;
-    s->hovered_value = 0;
+    if (s->rendered_data != o->data || s->rendered_count != o->count ||
+        s->rendered_kind != o->kind) {
+        s->hovered = SIZE_MAX;
+        s->hovered_value = 0;
+    }
+    s->rendered_data = o->data;
+    s->rendered_count = o->count;
+    s->rendered_kind = o->kind;
     s->revision++;
     s->cache_key = key;
     s->rendered_reveal_progress = o->reveal_enabled && !o->reduced_motion ? o->reveal_progress : 1;
@@ -1659,8 +1792,8 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
         hit.value = nodes[index].throughput;
         return hit;
     } else {
-        double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left;
-        double top = 12, bottom = o->height > 32 ? o->height - 20 : 12;
+        double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
+        double top = 12, bottom = cui_chart_plot_bottom(o);
         if (x < left || x > right || y < top || y > bottom || right <= left)
             return hit;
         size_t n = o->point_count ? o->point_count : o->count;
@@ -1735,6 +1868,8 @@ static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
 }
 float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_options *o) {
     if (!ui || !o || !o->show_y_axis || o->y_axis_inside || !o->data || !o->count ||
+        (o->kind == CUI_CHART_BAR &&
+         (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT)) ||
         o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_RADAR || o->kind == CUI_CHART_SANKEY)
         return 0;
     double lo, hi;
@@ -1924,6 +2059,53 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     bool ok = cui_paint_bitmap(
         ui, id ^ UINT64_C(0x381c6b293497e8a1), paint,
         (cui_box){.width = w, .height = h, .fixed_width = true, .fixed_height = true});
+    if (!o->noninteractive && state->hovered < o->count &&
+        (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)) {
+        float pixel_x, pixel_y;
+        if (cui_chart_point_coordinates(o, state->hovered, 0, &pixel_x, &pixel_y) == CUI_PLOT_OK) {
+            float x = pixel_x * w / o->width;
+            float top = (o->custom_y_padding ? o->y_padding_top : 10) * h / o->height;
+            float bottom =
+                (o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)) * h / o->height;
+            cui_color crosshair = o->grid.a ? o->grid : (cui_color){120, 120, 120, 150};
+            cui_begin_absolute_box(ui, id ^ UINT64_C(0x9f39c738cd235001),
+                                   (cui_box){.width = 1,
+                                             .height = bottom - top,
+                                             .fixed_width = true,
+                                             .fixed_height = true,
+                                             .background = crosshair},
+                                   (cui_rect){x, top, 1, bottom - top});
+            cui_end_box(ui);
+            for (size_t series = 0; series <= o->extra_series_count; series++) {
+                if (cui_chart_point_coordinates(o, state->hovered, series, &pixel_x, &pixel_y) !=
+                    CUI_PLOT_OK)
+                    continue;
+                float dot_x = pixel_x * w / o->width;
+                float dot_y = pixel_y * h / o->height;
+                cui_color dot = series ? o->extra_series[series - 1].color : o->series[0];
+                if (!dot.a)
+                    dot = o->series[series].a ? o->series[series] : o->foreground;
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x8e4ad6f381012000) + series),
+                                       (cui_box){.width = 10,
+                                                 .height = 10,
+                                                 .radius = 5,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = o->background},
+                                       (cui_rect){dot_x - 5, dot_y - 5, 10, 10});
+                cui_end_box(ui);
+                cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9e4ad6f381012000) + series),
+                                       (cui_box){.width = 6,
+                                                 .height = 6,
+                                                 .radius = 3,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = dot},
+                                       (cui_rect){dot_x - 3, dot_y - 3, 6, 6});
+                cui_end_box(ui);
+            }
+        }
+    }
     if (!o->hide_axes && !o->hide_x_axis && o->kind != CUI_CHART_PIE &&
         o->kind != CUI_CHART_RADAR && o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40) {
         size_t slots = o->point_count ? o->point_count : o->count;
@@ -1933,12 +2115,17 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_str label = o->data[i].label;
             if (!label.length || !label.data)
                 continue;
-            float left = o->show_y_axis && !o->y_axis_inside
-                             ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
-                             : 24;
-            float x = slots > 1 ? (left + (o->width - 12 - left) * (float)i / (float)(slots - 1)) *
-                                      w / o->width
-                                : w / 2;
+            bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+            float left = point_chart ? (o->show_y_axis && !o->y_axis_inside
+                                            ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 32)
+                                            : 0)
+                                     : (o->show_y_axis && !o->y_axis_inside
+                                            ? (o->value_axis_gutter > 0 ? o->value_axis_gutter : 50)
+                                            : 24);
+            float right = point_chart ? o->width - left : o->width - 12;
+            float x = slots > 1
+                          ? (left + (right - left) * (float)i / (float)(slots - 1)) * w / o->width
+                          : w / 2;
             float y = h - 14;
             if (o->kind == CUI_CHART_CANDLESTICK) {
                 cui_chart_candle_geometry candle;
@@ -1970,6 +2157,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
             unsigned visible = count < 32 ? count : 32;
+            bool horizontal_bar =
+                o->kind == CUI_CHART_BAR &&
+                (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT);
             bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
             double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 12;
             double bottom = point_chart
@@ -1981,13 +2171,30 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
                 double pixel_y = top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
-                (void)cui_plot_inverse(&scale, pixel_y, &value);
+                if (horizontal_bar)
+                    value = lo + (hi - lo) * tick / (count - 1);
+                else
+                    (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label =
                     cui_chart_number(text, sizeof text, value, o->y_tick_format, o->format_user);
                 float y = (float)(pixel_y * h / o->height);
-                float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 50;
+                float gutter =
+                    o->value_axis_gutter > 0
+                        ? o->value_axis_gutter
+                        : (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA ? 32 : 50);
                 float x = o->y_axis_inside ? 26 * w / o->width : 0;
                 float label_width = o->y_axis_inside ? 48 : gutter - 4;
+                if (horizontal_bar) {
+                    float left = 24 * w / o->width;
+                    float right = (o->width - 12) * w / o->width;
+                    float fraction = (float)tick / (count - 1);
+                    x = (o->bar_alignment == CUI_CHART_BAR_LEFT
+                             ? left + (right - left) * fraction
+                             : right - (right - left) * fraction) -
+                        24;
+                    y = o->y_axis_inside ? h - 14 : h - 28;
+                    label_width = 48;
+                }
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
                                        (cui_box){.width = label_width,
                                                  .height = 12,

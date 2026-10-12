@@ -1166,6 +1166,22 @@ int main(void) {
     options.tooltip_title = NULL;
     options.tooltip_value = NULL;
     options.tooltip_value_color = NULL;
+    options.kind = CUI_CHART_BAR;
+    options.bar_gradient_start = (cui_color){211, 22, 33, 255};
+    options.bar_gradient_end = (cui_color){4, 155, 6, 255};
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    bool gradient_swatch = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && fabsf(draw.commands[i].bounds.w - 8) < .01f &&
+            draw.commands[i].color.r == options.bar_gradient_start.r &&
+            draw.commands[i].color.g == options.bar_gradient_start.g)
+            gradient_swatch = true;
+    assert(gradient_swatch);
+    options.bar_gradient_start = options.bar_gradient_end = (cui_color){0};
     options.pie_show_labels = true;
     options.pie_outer_radius = 20;
     options.pie_label_gap = 5;

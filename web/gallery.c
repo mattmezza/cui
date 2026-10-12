@@ -1,16 +1,20 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "cui/cui_chrome.h"
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
+#include "cui/cui_description.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
 #include "cui/cui_form.h"
+#include "cui/cui_icon.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_numeric.h"
 #include "cui/cui_otp.h"
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
+#include "cui/cui_resizable.h"
 #include "cui/cui_scroll.h"
 #include "cui/cui_status.h"
 #include "cui/cui_surface.h"
@@ -36,6 +40,16 @@ static cui_draw_list draw;
 static const cui_semantic *semantics;
 static size_t semantic_count;
 static bool checked, enabled = true, toggled;
+static int description_columns = 3, description_vertical, description_plain, description_size;
+static int status_right = 1, status_custom;
+static int resizable_vertical, resizable_disabled;
+static cui_resizable_slot resizable_slots[2];
+static cui_resizable_state resizable_state;
+static int icon_choice, icon_size = CUI_ICON_MEDIUM, icon_rotate, icon_color, icon_loaded = -1;
+static cui_icon_state icon_state;
+static void resizable_content(cui_context *context, void *user) {
+    cui_label(context, &current_theme, cui_string((uintptr_t)user == 0 ? "Explorer" : "Editor"));
+}
 static cui_check_state check_state;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
 static int switch_label_left, switch_custom_color, toggle_variant, toggle_segmented,
@@ -499,6 +513,9 @@ static cui_size measure(void *user, cui_str text, float size) {
 int gallery_init(void) {
     if (ui)
         return 1;
+    cui_icon_state_init(&icon_state);
+    if (!cui_resizable_state_init(&resizable_state, resizable_slots, 2))
+        return 0;
     ui = cui_create((cui_config){.width = 720,
                                  .height = 300,
                                  .max_elements = 512,
@@ -661,8 +678,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     redraw = false;
     next_wake = 0;
+    /* The host has synchronously painted the preceding draw list by this call. */
+    cui_icon_state_collect(&icon_state);
     current_theme = t;
     cui_begin_frame(ui, width, height, host_dt);
+    cui_set_reduced_motion(ui, reduced_motion);
     cui_begin_box(ui, cui_id_from(ui, "preview"),
                   (cui_box){.width = width,
                             .height = height,
@@ -670,6 +690,101 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                             .gap = 16,
                             .background = t.background});
     switch (story) {
+    case 64: {
+        cui_description_item items[] = {
+            {.id = cui_id_from(ui, "description-owner"),
+             .label = cui_string("Owner"),
+             .value = cui_string("Ada Lovelace")},
+            {.id = cui_id_from(ui, "description-team"),
+             .label = cui_string("Team"),
+             .value = cui_string("Core UI")},
+            {.id = cui_id_from(ui, "description-separator"), .separator = true},
+            {.id = cui_id_from(ui, "description-status"),
+             .label = cui_string("Status"),
+             .value = cui_string("In progress")},
+            {.id = cui_id_from(ui, "description-created"),
+             .label = cui_string("Created"),
+             .value = cui_string("12 October 2026")}};
+        cui_description_options options = cui_description_options_default();
+        options.columns = (unsigned)description_columns;
+        options.vertical = description_vertical != 0;
+        options.unbordered = description_plain != 0;
+        options.size = (cui_description_size)description_size;
+        options.width = width - 48;
+        options.name = cui_string("Project details");
+        cui_description_list(ui, cui_id_from(ui, "description-list"), &t, items, 5, options);
+        break;
+    }
+    case 65: {
+        cui_chrome_item left[] = {
+            {.id = cui_id_from(ui, "status-branch"), .text = cui_string("main")}};
+        cui_chrome_item center[] = {
+            {.id = cui_id_from(ui, "status-file"), .text = cui_string("gallery.c")}};
+        cui_chrome_item right[] = {
+            {.id = cui_id_from(ui, "status-position"), .text = cui_string("Ln 42, Col 8")}};
+        cui_box custom = {.width = width - 48,
+                          .background = t.status_bar,
+                          .border = t.status_bar_border,
+                          .border_width = 1,
+                          .radius = 8};
+        cui_status_bar(ui, cui_id_from(ui, "status-bar"), &t, (cui_chrome_region){left, 1},
+                       (cui_chrome_region){center, 1},
+                       (cui_chrome_region){right, status_right ? 1u : 0u},
+                       (cui_status_bar_options){.width = width - 48,
+                                                .name = cui_string("Editor status"),
+                                                .style = status_custom ? &custom : NULL});
+        break;
+    }
+    case 66: {
+        cui_resizable_panel panels[2];
+        panels[0] = cui_resizable_panel_default(cui_id_from(ui, "resizable-explorer"));
+        panels[1] = cui_resizable_panel_default(cui_id_from(ui, "resizable-editor"));
+        panels[0].accessibility_label = cui_string("Explorer panel");
+        panels[1].accessibility_label = cui_string("Editor panel");
+        panels[0].initial_size = 140;
+        panels[0].has_initial_size = true;
+        panels[0].minimum = 80;
+        panels[0].maximum = 300;
+        panels[0].custom_range = true;
+        panels[1].minimum = 80;
+        panels[1].maximum = 600;
+        panels[1].custom_range = true;
+        panels[0].content = resizable_content;
+        panels[1].content = resizable_content;
+        panels[0].content_user = (void *)(uintptr_t)0;
+        panels[1].content_user = (void *)(uintptr_t)1;
+        panels[0].box.background = t.surface;
+        panels[1].box.background = t.surface;
+        cui_resizable_options options = cui_resizable_options_default();
+        options.axis = resizable_vertical ? CUI_RESIZABLE_VERTICAL : CUI_RESIZABLE_HORIZONTAL;
+        options.extent = resizable_vertical ? 210 : width - 48;
+        options.cross_size = resizable_vertical ? width - 48 : 160;
+        options.disabled = disabled || resizable_disabled;
+        options.reduced_motion = reduced_motion;
+        options.now_seconds = host_seconds;
+        cui_resizable(ui, cui_id_from(ui, "resizable-group"), &t, &resizable_state, panels, 2,
+                      options);
+        break;
+    }
+    case 67: {
+        const char *names[] = {"check", "bell", "arrow-right"};
+        if (icon_loaded != icon_choice) {
+            cui_icon_set_name(&icon_state, cui_string(names[icon_choice]), NULL, NULL);
+            icon_loaded = icon_choice;
+        }
+        cui_icon_options options = {.size = (cui_icon_size)icon_size};
+        if (icon_rotate) {
+            options.custom_transform = true;
+            options.transform = cui_icon_rotation(.785398163f);
+        }
+        if (icon_color) {
+            options.custom_color = true;
+            options.color = t.primary;
+        }
+        cui_icon(ui, cui_id_from(ui, "icon-preview"), &t, &icon_state, options);
+        cui_label(ui, &t, cui_string(names[icon_choice]));
+        break;
+    }
     case 0: {
         char label[64];
         if (cui_button(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"), disabled))
@@ -1902,6 +2017,43 @@ int gallery_error(void) {
 }
 int gallery_cursor(void) {
     return (int)cui_pointer_cursor(ui);
+}
+void gallery_description_options(int columns, int vertical, int plain, int size) {
+    description_columns = columns >= 1 && columns <= 3 ? columns : 3;
+    description_vertical = vertical != 0;
+    description_plain = plain != 0;
+    description_size = size >= 0 && size <= 3 ? size : 0;
+}
+void gallery_status_options(int right, int custom) {
+    status_right = right != 0;
+    status_custom = custom != 0;
+}
+void gallery_resizable_options(int vertical, int disabled) {
+    resizable_vertical = vertical != 0;
+    resizable_disabled = disabled != 0;
+}
+float gallery_resizable_size(unsigned index) {
+    return index < resizable_state.count ? resizable_state.slots[index].size : 0;
+}
+void gallery_icon_options(int choice, int size, int rotate, int color) {
+    icon_choice = choice >= 0 && choice < 3 ? choice : 0;
+    icon_size = size >= CUI_ICON_INHERITED && size <= CUI_ICON_LARGE ? size : CUI_ICON_MEDIUM;
+    icon_rotate = rotate != 0;
+    icon_color = color != 0;
+}
+float gallery_icon_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return (float)icon_state.parse_count;
+    case 1:
+        return (float)icon_state.raster_count;
+    case 2:
+        return (float)icon_state.cache_bytes;
+    case 3:
+        return (float)icon_state.error;
+    default:
+        return 0;
+    }
 }
 unsigned gallery_count(void) {
     return (unsigned)draw.count;

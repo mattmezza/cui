@@ -8,7 +8,11 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = ['src/base/cui_media.c', 'src/components/cui_media.c', 'src/base/cui_message.c', 'src/components/cui_message.c', 'src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
+SOURCES = ['src/base/cui_description.c', 'src/components/cui_description.c',
+           'src/base/cui_chrome.c', 'src/components/cui_chrome.c',
+           'src/base/cui_resizable.c', 'src/components/cui_resizable.c',
+           'src/base/cui_icon.c', 'src/components/cui_icon.c',
+           'src/base/cui_media.c', 'src/components/cui_media.c', 'src/base/cui_message.c', 'src/components/cui_message.c', 'src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
            'src/base/cui_overlay.c', 'src/base/cui_virtual.c', 'src/base/cui_dock.c', 'src/base/cui_plot.c', 'src/base/cui_edit.c',
            'src/base/cui_scroll.c', 'src/components/cui_scroll.c',
            'src/base/cui_status.c', 'src/components/cui_status.c',
@@ -23,7 +27,7 @@ SOURCES = ['src/base/cui_media.c', 'src/components/cui_media.c', 'src/base/cui_m
            'src/base/cui_disclosure.c', 'src/components/cui_disclosure.c',
            'src/base/cui_choice.c', 'src/components/cui_choice.c',
            'src/theme/cui_theme.c', 'src/components/cui_components.c', 'web/gallery.c']
-EXPORTS = ['gallery_cursor', 'gallery_control_options', 'gallery_control_stats', 'gallery_image_options', 'gallery_image_stats', 'gallery_attachment_options', 'gallery_attachment_stats', 'gallery_checkbox_state', 'gallery_message_options', 'gallery_message_actions', 'gallery_conversation', 'gallery_dropdown_options', 'gallery_tabs_options', 'gallery_tabs_scroll', 'gallery_shimmer_mode', 'gallery_shimmer_phase', 'gallery_init', 'gallery_error', 'gallery_scroll', 'gallery_table_pin', 'gallery_table_mode', 'gallery_table_selection_mode', 'gallery_disclosure_options', 'gallery_disclosure_progress', 'gallery_disclosure_actions', 'gallery_notification_options', 'gallery_notification_stats', 'gallery_notification_entry', 'gallery_tag_options', 'gallery_marker_options', 'gallery_otp_options', 'gallery_otp_completions', 'gallery_otp_cursor', 'gallery_next_wake', 'gallery_group_mode', 'gallery_group_actions', 'gallery_form_mode', 'gallery_form_submissions', 'gallery_surface_variant', 'gallery_surface_open', 'gallery_alert_attempts', 'gallery_input_mode', 'gallery_input_selection', 'gallery_event', 'gallery_text', 'gallery_focus', 'gallery_frame',
+EXPORTS = ['gallery_description_options', 'gallery_status_options', 'gallery_resizable_options', 'gallery_resizable_size', 'gallery_icon_options', 'gallery_icon_stats', 'gallery_cursor', 'gallery_control_options', 'gallery_control_stats', 'gallery_image_options', 'gallery_image_stats', 'gallery_attachment_options', 'gallery_attachment_stats', 'gallery_checkbox_state', 'gallery_message_options', 'gallery_message_actions', 'gallery_conversation', 'gallery_dropdown_options', 'gallery_tabs_options', 'gallery_tabs_scroll', 'gallery_shimmer_mode', 'gallery_shimmer_phase', 'gallery_init', 'gallery_error', 'gallery_scroll', 'gallery_table_pin', 'gallery_table_mode', 'gallery_table_selection_mode', 'gallery_disclosure_options', 'gallery_disclosure_progress', 'gallery_disclosure_actions', 'gallery_notification_options', 'gallery_notification_stats', 'gallery_notification_entry', 'gallery_tag_options', 'gallery_marker_options', 'gallery_otp_options', 'gallery_otp_completions', 'gallery_otp_cursor', 'gallery_next_wake', 'gallery_group_mode', 'gallery_group_actions', 'gallery_form_mode', 'gallery_form_submissions', 'gallery_surface_variant', 'gallery_surface_open', 'gallery_alert_attempts', 'gallery_input_mode', 'gallery_input_selection', 'gallery_event', 'gallery_text', 'gallery_focus', 'gallery_frame',
            'gallery_clipboard_request', 'gallery_clipboard_result', 'gallery_selection_mode', 'gallery_density', 'gallery_modal', 'gallery_time', 'gallery_redraw', 'gallery_hover_state', 'gallery_count', 'gallery_command', 'gallery_command_text', 'gallery_command_length', 'gallery_bitmap_pixels', 'gallery_bitmap_revision', 'gallery_bitmap',
            'gallery_semantic_id', 'gallery_semantic_parent', 'gallery_semantic_controls', 'gallery_semantic_labelled_by',
            'gallery_semantic_count', 'gallery_semantic', 'gallery_semantic_name', 'gallery_semantic_description', 'gallery_semantic_description_length',
@@ -51,7 +55,7 @@ def main():
     (out / 'gallery.js').write_text(javascript, encoding='utf-8', newline='\n')
     manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8'))
     (out / 'catalog.json').write_text(json.dumps(manifest, indent=2)+'\n')
-    notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
+    notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\nNanoSVG\n=======\n' + (ROOT / 'third_party/nanosvg/LICENSE').read_text(encoding='utf-8') + '\n\nGPUI Kit icons\n==============\n' + (ROOT / 'third_party/gpui_icons/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
     (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
     (out / '.nojekyll').touch()
     print(f'Gallery built at {out}; serve over HTTP, e.g. python -m http.server -d {out}')

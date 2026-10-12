@@ -139,6 +139,80 @@ def main():
                     page.wait_for_function('(role)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_semantic_name(i),cuiGallery.exports.gallery_semantic_length(i)))==="Export options")', arg=role)
             def dropdown_check(control):
                 control_change('dropdown-'+control, True)
+            page.evaluate('location.hash="DescriptionList"')
+            page.wait_for_function('cuiGallery.renderedComponent==="DescriptionList"')
+            owner = semantic_index('Owner', 7)
+            team = semantic_index('Team', 7)
+            assert owner is not None and team is not None
+            owner_y = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,2)', owner)
+            assert abs(owner_y-page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,2)', team)) < 1
+            control_change('description-columns', '1')
+            page.wait_for_function('()=>{const e=cuiGallery.exports,items=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).filter(i=>e.gallery_semantic(i,0)===7);return items.length===8&&e.gallery_semantic(items[2],2)>e.gallery_semantic(items[0],2);}')
+            control_change('description-vertical', True)
+            page.wait_for_function('()=>{const e=cuiGallery.exports,items=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).filter(i=>e.gallery_semantic(i,0)===7);return e.gallery_semantic(items[1],2)>e.gallery_semantic(items[0],2);}')
+            base_height = page.evaluate('cuiGallery.exports.gallery_semantic(0,4)')
+            control_change('description-size', '2')
+            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,4)') > base_height
+            control_change('description-plain', True)
+            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,4)') > 0
+            page.evaluate('location.hash="StatusBar"')
+            page.wait_for_function('cuiGallery.renderedComponent==="StatusBar"')
+            assert all(semantic_index(name, 7) is not None for name in ('main', 'gallery.c', 'Ln 42, Col 8'))
+            center = semantic_index('gallery.c', 7)
+            middle_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', center)
+            control_change('status-right', False)
+            assert semantic_index('Ln 42, Col 8', 7) is None
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('gallery.c', 7)) > middle_x
+            control_change('status-custom', True)
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,9)===8)')
+            page.evaluate('location.hash="Resizable"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Resizable"')
+            separator = page.locator('#accessible [role=separator][aria-label="Resize panels"]')
+            assert separator.get_attribute('aria-orientation') == 'vertical'
+            assert float(separator.get_attribute('aria-valuenow')) >= 80
+            initial_panel = page.evaluate('cuiGallery.exports.gallery_resizable_size(0)')
+            click_semantic('Resize panels', 40)
+            page.keyboard.press('ArrowRight')
+            page.wait_for_function('(size)=>cuiGallery.exports.gallery_resizable_size(0)>size', arg=initial_panel)
+            keyboard_panel = page.evaluate('cuiGallery.exports.gallery_resizable_size(0)')
+            handle = semantic_index('Resize panels', 40)
+            handle_bounds = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', handle)
+            canvas_bounds = canvas.bounding_box()
+            handle_x = canvas_bounds['x']+handle_bounds[0]+handle_bounds[2]/2
+            handle_y = canvas_bounds['y']+handle_bounds[1]+handle_bounds[3]/2
+            page.mouse.move(handle_x, handle_y)
+            page.mouse.down()
+            page.mouse.move(handle_x+24, handle_y, steps=4)
+            page.mouse.up()
+            page.wait_for_function('(size)=>cuiGallery.exports.gallery_resizable_size(0)>size+15', arg=keyboard_panel)
+            control_change('resizable-disabled', True)
+            locked_panel = page.evaluate('cuiGallery.exports.gallery_resizable_size(0)')
+            page.keyboard.press('ArrowRight')
+            assert page.evaluate('cuiGallery.exports.gallery_resizable_size(0)') == locked_panel
+            control_change('resizable-disabled', False)
+            control_change('resizable-vertical', True)
+            assert separator.get_attribute('aria-orientation') == 'horizontal'
+            assert abs(sum(page.evaluate('[0,1].map(i=>cuiGallery.exports.gallery_resizable_size(i))'))-210) < 1
+            page.evaluate('location.hash="Icon"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Icon"')
+            def icon_bitmap():
+                return page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_command(i,0)===5)')
+            bitmap = icon_bitmap()
+            assert bitmap is not None
+            assert page.evaluate('cuiGallery.exports.gallery_icon_stats(3)') == 0
+            first_parse = page.evaluate('cuiGallery.exports.gallery_icon_stats(0)')
+            control_change('icon-choice', '1')
+            assert page.evaluate('cuiGallery.exports.gallery_icon_stats(0)') == first_parse+1
+            assert icon_bitmap() is not None
+            control_change('icon-size', '4')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) >= 24
+            control_change('icon-color', True)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap(i,9)', icon_bitmap()) == 1
+            tinted = page.evaluate('(i)=>[10,11,12,13].map(f=>cuiGallery.exports.gallery_bitmap(i,f))', icon_bitmap())
+            assert tinted[3] == 255 and tinted[:3] != [0, 0, 0]
+            control_change('icon-rotate', True)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) > 24
+            assert page.locator('#accessible [role=img]').count() == 0
             page.evaluate('location.hash="Notification"')
             page.wait_for_function('cuiGallery.renderedComponent==="Notification"')
             control_change('notification-autohide', False)
@@ -1478,7 +1552,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 62 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 66 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

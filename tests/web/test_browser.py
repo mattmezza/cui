@@ -1346,9 +1346,28 @@ def main():
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===0', arg=index)
             page.evaluate('location.hash="Input Group"')
             page.wait_for_function('cuiGallery.renderedComponent==="Input Group"')
-            assert page.evaluate('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Open address")}')
+            assert page.evaluate('()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Open")}')
             group_input = page.locator('#accessible [role=textbox][aria-label="Workspace address"]')
             assert group_input.count() == 1
+            def inline_group_bounds():
+                return page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+                    return [['https://',7],['Workspace address',6],['.example.com',7],['Open address',1]]
+                    .map(([name,role])=>{const i=Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
+                        .find(i=>e.gallery_semantic(i,0)===role&&d.decode(new Uint8Array(
+                            e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
+                        return [1,2,3,4].map(f=>e.gallery_semantic(i,f));});}''')
+            for viewport in [{'width':390,'height':900}, {'width':1280,'height':900}]:
+                page.set_viewport_size(viewport)
+                page.wait_for_timeout(100)
+                inline = inline_group_bounds()
+                assert inline[1][2] > 0
+                assert all(abs(b[1]+b[3]/2-inline[1][1]-inline[1][3]/2) < 1 for b in inline), inline
+                assert all(inline[i][0]+inline[i][2] <= inline[i+1][0]+1 for i in range(3)), inline
+            control_change('group-mode', '4')
+            page.wait_for_function('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+                return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&
+                    d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Workspace address');}''')
+            control_change('group-mode', '0')
             action_count = page.evaluate('cuiGallery.exports.gallery_group_actions()')
             # Hold one host frame so pointer focus and all keyboard events route together.
             # No intermediate native focus wait: the prefix must proxy focus during routing.

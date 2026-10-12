@@ -186,6 +186,49 @@ static void editing(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_FORM_BASE_ONLY
+static void inline_group_geometry(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    char buffer[64] = "abc";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_group_state state = {0};
+    cui_theme theme = cui_theme_light();
+    const cui_input_group_addon addons[] = {
+        {.id = 110, .label = {"http://", 7}, .width = 70},
+        {.id = 111, .alignment = CUI_INPUT_GROUP_INLINE_END, .label = {".com", 4}, .width = 100},
+        {.id = 112,
+         .alignment = CUI_INPUT_GROUP_INLINE_END,
+         .kind = CUI_INPUT_GROUP_BUTTON,
+         .label = {"Go", 2},
+         .width = 60}};
+    const float heights[] = {32, 20, 24, 44};
+    assert(ui && edit);
+    for (unsigned size = 0; size < 4; size++) {
+        assert(cui_begin_frame(ui, 400, 200, .016f));
+        assert(cui_input_group(ui, 100, 101, &theme, edit, &state, addons, 3,
+                               (cui_input_group_options){.width = 300, .size = (cui_form_size)size})
+                   .error == CUI_FORM_OK);
+        cui_draw_list draw = cui_end_frame(ui);
+        cui_rect group = cui_bounds(ui, 100), field = cui_bounds(ui, 101);
+        assert(fabsf(group.h - heights[size]) < .01f && fabsf(field.h - heights[size]) < .01f);
+        for (unsigned i = 0; i < 3; i++) {
+            cui_rect addon = cui_bounds(ui, addons[i].id);
+            assert(fabsf(addon.y + addon.h / 2 - field.y - field.h / 2) < .01f);
+            assert(addon.x >= group.x && addon.x + addon.w <= group.x + group.w);
+        }
+        assert(field.w > 0 && field.x + field.w <= cui_bounds(ui, 111).x);
+        for (size_t i = 0; i < draw.count; i++) {
+            const cui_draw_command *c = &draw.commands[i];
+            assert(c->type != CUI_DRAW_BORDER || c->bounds.x != field.x || c->bounds.w != field.w);
+        }
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+#endif
+
 static cui_input_group_result group_scene(cui_context *ui, cui_edit *edit,
                                           cui_input_group_state *state, cui_input_group_options o,
                                           const cui_input_group_addon *a, size_t count) {
@@ -341,6 +384,7 @@ static void loading_addon_artwork(void) {
 int main(void) {
 #ifndef CUI_FORM_BASE_ONLY
     loading_addon_artwork();
+    inline_group_geometry();
 #endif
     planning();
     base_semantics();

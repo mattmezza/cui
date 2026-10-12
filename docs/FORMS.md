@@ -74,7 +74,7 @@ frame; the application performs its action. Custom interactive content owns its
 callbacks and must respect the supplied disabled policy.
 
 The group paints one shared theme frame; the input's own frame is transparent.
-Medium is default, with extra-small/small/large density presets. Invalid edits
+The field and addons share Input metrics: extra small 20px, small 24px, medium 32px and large 44px at the default 16px theme scale. The medium preset is the default. Theme scaling and an explicit group font size scale these dimensions together. Inline addons remain in the same row; block addons intentionally occupy rows above or below it. The gallery defaults to inline prefix/field/suffix/action and exposes block addons through its mode selector. Invalid edits
 highlight the shared frame. Disabled input disables the group and built-in
 buttons. Read-only preserves focus, selection/copy behavior, and addon actions.
 Clicking an addon or empty group inset focuses the editor; clicking an action

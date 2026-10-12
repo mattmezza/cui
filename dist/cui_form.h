@@ -446,8 +446,7 @@ static void cui_form_private_addon(cui_context *ui, const cui_theme *t,
                    .height = height,
                    .row = true,
                    .align_y = CUI_ALIGN_CENTER,
-                   .align_x = CUI_ALIGN_CENTER,
-                   .padding = 4};
+                   .align_x = CUI_ALIGN_CENTER};
     cui_color ink = disabled ? t->muted : t->text;
     if (a->kind == CUI_INPUT_GROUP_BUTTON) {
         box.radius = t->radius * .5f;
@@ -501,22 +500,28 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
     if (!theme)
         return (cui_input_group_result){.error = CUI_FORM_INVALID,
                                         .input.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_input_size input_size = o.size == CUI_FORM_XSMALL  ? CUI_INPUT_XSMALL
+                                : o.size == CUI_FORM_SMALL ? CUI_INPUT_SMALL
+                                : o.size == CUI_FORM_LARGE ? CUI_INPUT_LARGE
+                                                           : CUI_INPUT_MEDIUM;
+    float nominal_font = o.size == CUI_FORM_XSMALL ? 12 : o.size == CUI_FORM_LARGE ? 16 : 14;
+    cui_input_options paint_options = {.width = -1,
+                                       .size = input_size,
+                                       .density = o.font_size > 0 ? o.font_size / nominal_font
+                                                                  : theme->font_size / 16,
+                                       .no_appearance = true,
+                                       .disabled = o.input.disabled,
+                                       .readonly = o.input.readonly,
+                                       .required = o.input.required,
+                                       .placeholder = o.placeholder};
+    cui_input_metrics metrics;
+    if (!cui_input_measure(paint_options, theme->font_size, &metrics))
+        return (cui_input_group_result){.error = CUI_FORM_INVALID,
+                                        .input.error = CUI_EDIT_INVALID_ARGUMENT};
     cui_theme t = *theme;
-    if (o.size == CUI_FORM_XSMALL) {
-        t.control_height = 24;
-        t.font_size = 12;
-        t.padding = 4;
-    } else if (o.size == CUI_FORM_SMALL) {
-        t.control_height = 28;
-        t.font_size = 14;
-        t.padding = 5;
-    } else if (o.size == CUI_FORM_LARGE) {
-        t.control_height = 44;
-        t.font_size = 16;
-        t.padding = 10;
-    }
-    if (o.font_size > 0)
-        t.font_size = o.font_size;
+    t.control_height = metrics.height;
+    t.font_size = metrics.font_size;
+    t.padding = metrics.padding_x;
     o.font_size = t.font_size;
     cui_input_group_result result =
         cui_base_input_group(ui, group, input, edit, state, a, count, o);
@@ -551,11 +556,7 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
             cui_input_state paint_state = {.behavior = state->behavior,
                                            .scroll_x = state->scroll_x};
             cui_input_paint(ui, input, &frameless, cui_string(""), edit, &paint_state,
-                            (cui_input_options){.width = -1,
-                                                .disabled = o.input.disabled,
-                                                .readonly = o.input.readonly,
-                                                .required = o.input.required,
-                                                .placeholder = o.placeholder});
+                            paint_options);
             state->scroll_x = paint_state.scroll_x;
             (void)cui_track_bounds(ui, cui_input_viewport_id(input), &state->viewport);
             cui_form_private_addons(ui, &t, a, count, o, CUI_INPUT_GROUP_INLINE_END, h,

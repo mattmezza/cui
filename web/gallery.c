@@ -957,6 +957,13 @@ static cui_input_state input_state;
 static int input_mode;
 static int form_mode, form_submissions;
 static int group_mode, group_actions;
+static void gallery_group_action_content(cui_context *ui, const cui_theme *theme, void *user,
+                                         bool disabled, bool readonly, float width) {
+    (void)user;
+    (void)readonly;
+    (void)width;
+    cui_text(ui, cui_string("Open"), theme->font_size, disabled ? theme->muted : theme->on_primary);
+}
 static cui_otp_state otp_state;
 static char otp_buffer[32];
 static int otp_completions, otp_groups = 2;
@@ -2493,28 +2500,34 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 54: {
         cui_id action = cui_id_from(ui, "group-open");
-        const cui_input_group_addon addons[] = {{.id = cui_id_from(ui, "group-prefix"),
-                                                 .alignment = CUI_INPUT_GROUP_INLINE_START,
-                                                 .label = cui_string("https://"),
-                                                 .width = 70},
-                                                {.id = action,
-                                                 .alignment = CUI_INPUT_GROUP_INLINE_END,
-                                                 .kind = CUI_INPUT_GROUP_BUTTON,
-                                                 .variant = CUI_INPUT_GROUP_PRIMARY,
-                                                 .label = cui_string("Open address"),
-                                                 .width = 124,
-                                                 .loading = group_mode == 3},
-                                                {.id = cui_id_from(ui, "group-title"),
-                                                 .alignment = CUI_INPUT_GROUP_BLOCK_START,
-                                                 .label = cui_string("Workspace address"),
-                                                 .width = 190},
-                                                {.id = cui_id_from(ui, "group-suffix"),
-                                                 .alignment = CUI_INPUT_GROUP_BLOCK_END,
-                                                 .label = cui_string(".example.com"),
-                                                 .width = 130}};
+        const cui_input_group_addon addons[] = {
+            {.id = cui_id_from(ui, "group-prefix"),
+             .alignment = CUI_INPUT_GROUP_INLINE_START,
+             .label = cui_string("https://"),
+             .width = 64},
+            {.id = cui_id_from(ui, "group-suffix"),
+             .alignment = CUI_INPUT_GROUP_INLINE_END,
+             .label = cui_string(".example.com"),
+             .width = 112},
+            {.id = action,
+             .alignment = CUI_INPUT_GROUP_INLINE_END,
+             .kind = CUI_INPUT_GROUP_BUTTON,
+             .variant = CUI_INPUT_GROUP_PRIMARY,
+             .label = cui_string("Open address"),
+             .width = 56,
+             .render = group_mode == 3 ? NULL : gallery_group_action_content,
+             .loading = group_mode == 3},
+            {.id = cui_id_from(ui, "group-title"),
+             .alignment = CUI_INPUT_GROUP_BLOCK_START,
+             .label = cui_string("Workspace address"),
+             .width = 190},
+            {.id = cui_id_from(ui, "group-help"),
+             .alignment = CUI_INPUT_GROUP_BLOCK_END,
+             .label = cui_string("Click Open to continue"),
+             .width = 260}};
         cui_input_group_result result = cui_input_group(
             ui, cui_id_from(ui, "address-group"), cui_id_from(ui, "address-input"), &t, group_edit,
-            &group_state, addons, 4,
+            &group_state, addons, group_mode == 4 ? 5 : 3,
             (cui_input_group_options){
                 .width = width > 460 ? 400 : width - 48,
                 .size = (cui_form_size)gallery_xsmall_second_size(),
@@ -3866,7 +3879,7 @@ double gallery_next_wake(void) {
     return next_wake;
 }
 void gallery_group_mode(int mode) {
-    if (mode >= 0 && mode <= 3)
+    if (mode >= 0 && mode <= 4)
         group_mode = mode;
 }
 int gallery_group_actions(void) {

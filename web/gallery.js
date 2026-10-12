@@ -333,15 +333,15 @@ function syncSemantics(){
   if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_keyboard_event(3,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(role==='textbox'&&plainCharacterInput(e)));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
   const description=stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
   if(description)el.setAttribute('aria-description',description);else el.removeAttribute('aria-description');
-  if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
-  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{e.stopPropagation();wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};}
+  if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};}
+  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{e.stopPropagation();wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};}
   else el.setAttribute('aria-label',name);
   if(['checkbox','switch','radio','menuitemcheckbox','menuitemradio'].includes(role))el.setAttribute('aria-checked',role==='checkbox'&&f(8)===2?'mixed':String(Boolean(f(6))));
   if(['checkbox','radio'].includes(role)){el.setAttribute('aria-required',String(Boolean(f(27))));el.setAttribute('aria-invalid',String(Boolean(f(28))));}
   if(role==='button'&&selected.name==='Toggle')el.setAttribute('aria-pressed',String(Boolean(f(6))));else el.removeAttribute('aria-pressed');
   el.setAttribute('aria-busy',String(Boolean(f(14))));
   if(['listbox','tree','grid'].includes(role))el.setAttribute('aria-multiselectable',String(Boolean(f(15))));
-  if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
+  if(role==='treeitem'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};el.setAttribute('aria-level',String(f(30)||f(8)+1));el.setAttribute('aria-disabled',String(Boolean(f(5))));}
   if(['treeitem','radio','checkbox'].includes(role)){if(f(31))el.setAttribute('aria-posinset',String(f(31)));else el.removeAttribute('aria-posinset');if(f(32))el.setAttribute('aria-setsize',String(f(32)));else el.removeAttribute('aria-setsize');}
   if(role==='tab'||role==='option'||role==='treeitem')el.setAttribute('aria-selected',String(Boolean(f(11))));
   if(f(16))el.setAttribute('aria-orientation',f(16)===2?'vertical':'horizontal');else el.removeAttribute('aria-orientation');
@@ -497,8 +497,19 @@ function keyIdentity(key){return keys[key]||(key.length===1?wasm.gallery_key_ide
 function plainCharacterInput(e){return e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.isComposing;}
 function prefersCharacterInput(e){return plainCharacterInput(e)&&Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>wasm.gallery_semantic(i,0)===6&&wasm.gallery_semantic(i,7));}
 function mods(e){return(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);}
+const pointerButton=e=>e.button===2?1:e.button===1?2:0;
+let suppressCompatibilityMouse=false;
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
- if(!wasm)return;const rect=canvas.getBoundingClientRect();if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);}wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,e.button===2?1:e.button===1?2:0);requestFrame();
+ if(!wasm)return;
+ const rect=canvas.getBoundingClientRect();
+ if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=e.pointerType!=='mouse';}
+ if(type!==0&&e.pointerType==='mouse')return; // MouseEvent.detail carries the click count; PointerEvent.detail is zero.
+ wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),type===0?0:1);requestFrame();
+});
+for(const [event,type] of [['mousedown',1],['mouseup',2]])canvas.addEventListener(event,e=>{
+ if(!wasm||suppressCompatibilityMouse)return;
+ const rect=canvas.getBoundingClientRect();
+ wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),Math.max(1,e.detail));requestFrame();
 });
 canvas.addEventListener('wheel',e=>{
  if(!wasm)return;const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
@@ -506,10 +517,11 @@ canvas.addEventListener('wheel',e=>{
  const consumes=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>{const f=n=>wasm.gallery_semantic(i,n);if(!f(17)||f(5)||x<f(1)||y<f(2)||x>=f(1)+f(3)||y>=f(2)+f(4))return false;return(dx>0&&f(18)<f(20))||(dx<0&&f(18)>0)||(dy>0&&f(19)<f(21))||(dy<0&&f(19)>0);});
  if(consumes){e.preventDefault();wasm.gallery_scroll(x,y,-dx/32,-dy/32);requestFrame();}
 },{passive:false});
-canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0);requestFrame();});
+canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0,0,0);requestFrame();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('pointercancel',()=>{wasm?.gallery_event(7,0,0,0,0,0);requestFrame();});
-canvas.addEventListener('blur',()=>{wasm?.gallery_event(7,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
+canvas.addEventListener('click',()=>{suppressCompatibilityMouse=false;});
+canvas.addEventListener('pointercancel',()=>{wasm?.gallery_event(7,0,0,0,0,0,0,0);requestFrame();});
+canvas.addEventListener('blur',()=>{wasm?.gallery_event(7,0,0,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
 for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const key=keyIdentity(e.key);
  if(e.key==='Tab'){

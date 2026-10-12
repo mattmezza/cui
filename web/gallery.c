@@ -1481,6 +1481,8 @@ int gallery_init(void) {
            number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
 static int gallery_last_key_down, gallery_last_key_up;
+static unsigned gallery_last_pointer_down_clicks, gallery_last_pointer_up_clicks;
+static unsigned gallery_pointer_down_count, gallery_pointer_up_count;
 static unsigned gallery_key_down_count, gallery_key_up_count;
 static int gallery_last_composing, gallery_last_prefer_character;
 void gallery_keyboard_event(int type, int key, unsigned mods, int repeat, int composing,
@@ -1516,13 +1518,26 @@ int gallery_key_stats(int field) {
            : field == 4 ? gallery_last_composing
                         : gallery_last_prefer_character;
 }
-void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
+int gallery_pointer_stats(int field) {
+    return field == 0   ? (int)gallery_last_pointer_down_clicks
+           : field == 1 ? (int)gallery_last_pointer_up_clicks
+           : field == 2 ? (int)gallery_pointer_down_count
+                        : (int)gallery_pointer_up_count;
+}
+void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button,
+                   unsigned click_count) {
     if (type == CUI_EVENT_KEY_DOWN) {
         gallery_last_key_down = key;
         gallery_key_down_count++;
     } else if (type == CUI_EVENT_KEY_UP) {
         gallery_last_key_up = key;
         gallery_key_up_count++;
+    } else if (type == CUI_EVENT_POINTER_DOWN) {
+        gallery_last_pointer_down_clicks = click_count;
+        gallery_pointer_down_count++;
+    } else if (type == CUI_EVENT_POINTER_UP) {
+        gallery_last_pointer_up_clicks = click_count;
+        gallery_pointer_up_count++;
     }
     if (ui)
         cui_queue_event(ui, (cui_event){.type = (cui_event_type)type,
@@ -1531,7 +1546,8 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
                                         .key = (cui_key)key,
                                         .modifiers = mods,
                                         .repeat = repeat != 0,
-                                        .pointer_button = (cui_pointer_button)button});
+                                        .pointer_button = (cui_pointer_button)button,
+                                        .click_count = click_count});
 }
 void gallery_scroll(float x, float y, float dx, float dy) {
     if (ui)

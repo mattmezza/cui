@@ -84,6 +84,20 @@ def main():
             page.keyboard.press('Enter')
             page.wait_for_function('cuiGallery.renderedComponent==="Button"&&cuiGallery.exports.gallery_count()>0')
             assert page.locator('#gallery-page').is_visible()
+            pointer_before = page.evaluate('[cuiGallery.exports.gallery_pointer_stats(2),cuiGallery.exports.gallery_pointer_stats(3)]')
+            canvas = page.locator('canvas')
+            canvas_box = canvas.bounding_box()
+            for clicks in (1, 2, 3):
+                page.mouse.click(canvas_box['x']+5, canvas_box['y']+5, click_count=clicks)
+                assert page.evaluate('[cuiGallery.exports.gallery_pointer_stats(0),cuiGallery.exports.gallery_pointer_stats(1)]') == [clicks, clicks]
+            assert page.evaluate('[cuiGallery.exports.gallery_pointer_stats(2),cuiGallery.exports.gallery_pointer_stats(3)]') == [pointer_before[0]+6, pointer_before[1]+6]
+            touch_context = browser.new_context(has_touch=True, viewport={'width':1280,'height':900})
+            touch_page = touch_context.new_page()
+            touch_page.goto(f'http://127.0.0.1:{server.server_port}/cui/#Button')
+            touch_page.wait_for_function('window.cuiGallery&&cuiGallery.renderedComponent==="Button"&&cuiGallery.exports.gallery_count()>0')
+            touch_page.locator('canvas').tap(position={'x':5,'y':5})
+            assert touch_page.evaluate('[cuiGallery.exports.gallery_pointer_stats(0),cuiGallery.exports.gallery_pointer_stats(1),cuiGallery.exports.gallery_pointer_stats(2),cuiGallery.exports.gallery_pointer_stats(3)]') == [1,1,1,1]
+            touch_context.close()
             key_delivery = page.evaluate('''() => {
                 const e=cuiGallery.exports, canvas=document.querySelector('canvas');
                 const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

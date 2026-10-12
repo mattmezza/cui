@@ -1439,6 +1439,18 @@ int main(void) {
     options.sankey_margins = (cui_chart_sankey_margins){0};
     options.sankey_show_labels = false;
     options.sankey_show_values = false;
+    state.hovered = 0;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Flow", 4}));
+    draw = cui_end_frame(ui);
+    bool tooltip_value_fallback = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
+            draw.commands[i].text.data[0] == 'Q')
+            tooltip_value_fallback = true;
+    assert(tooltip_value_fallback);
     options.sankey_value_format = NULL;
     options.logical_width = 64;
     options.logical_height = 48;

@@ -923,8 +923,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                          : (size_t)written < sizeof value ? (size_t)written
                                                                           : sizeof value - 1};
                 } else
-                    formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
-                                                 o->format_user);
+                    formatted =
+                        cui_chart_number(value, sizeof value, number,
+                                         o->tooltip_format             ? o->tooltip_format
+                                         : o->kind == CUI_CHART_SANKEY ? o->sankey_value_format
+                                                                       : NULL,
+                                         o->format_user);
                 if (!formatted.length)
                     continue;
                 memcpy(row_text[row_count], formatted.data, formatted.length);

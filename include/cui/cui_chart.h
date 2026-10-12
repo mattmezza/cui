@@ -218,6 +218,7 @@ typedef struct {
     bool hover_visual_started;
     float emphasis_focus, emphasis_center, emphasis_velocity;
     bool emphasis_started;
+    size_t emphasis_visual_index;                /* last hovered mark during exit fade */
     float pie_lift[256], pie_lift_velocity[256]; /* bounded source per-slice spring */
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;

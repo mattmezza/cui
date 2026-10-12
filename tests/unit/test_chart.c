@@ -266,6 +266,7 @@ int main(void) {
     memcpy(saved, pixels, sizeof pixels);
     uint64_t flow_revision = emphasis_state.revision;
     emphasis_state.hovered = 2;
+    emphasis_state.emphasis_visual_index = 2;
     emphasis_state.emphasis_focus = 1;
     assert(cui_chart_render(&emphasis_state, &flow_options) == CUI_PLOT_OK);
     assert(emphasis_state.revision == flow_revision + 1 &&
@@ -926,8 +927,14 @@ int main(void) {
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
-    (void)cui_end_frame(ui);
+    draw = cui_end_frame(ui);
     assert(state.hovered == 1 && state.emphasis_focus == 1);
+    bool hover_band = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.h == 32 &&
+            draw.commands[i].color.a > 0 && draw.commands[i].color.a <= 25)
+            hover_band = true;
+    assert(hover_band);
     options.reduced_motion = false;
     float old_band_center = state.emphasis_center;
     assert(cui_chart_bar_bounds(&options, 0, &hovered_bar) == CUI_PLOT_OK);

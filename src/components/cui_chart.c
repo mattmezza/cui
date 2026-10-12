@@ -240,6 +240,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     }
     if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) {
         bool active = !o->noninteractive && state->hovered < o->count;
+        if (active)
+            state->emphasis_visual_index = state->hovered;
         bool instant = o->reduced_motion || cui_reduced_motion(ui);
         float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
         float dt = cui_frame_delta(ui);
@@ -280,6 +282,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             }
         if (!active && state->emphasis_focus == 0)
             state->emphasis_started = false;
+        if (!active && state->emphasis_focus == 0)
+            state->emphasis_visual_index = SIZE_MAX;
         if (!instant && moving)
             cui_invalidate(ui);
         cui_chart_options frame = *o;
@@ -301,6 +305,34 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     bool ok = cui_paint_bitmap(
         ui, id ^ UINT64_C(0x381c6b293497e8a1), paint,
         (cui_box){.width = w, .height = h, .fixed_width = true, .fixed_height = true});
+    if (o->kind == CUI_CHART_BAR && !o->noninteractive && state->emphasis_focus > 0 &&
+        state->emphasis_visual_index < o->count) {
+        cui_plot_rect bar;
+        if (cui_chart_bar_bounds(o, state->emphasis_visual_index, &bar) == CUI_PLOT_OK) {
+            bool horizontal =
+                o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT;
+            float thickness = horizontal ? (bar.y_max - bar.y_min) * h / o->height
+                                         : (bar.x_max - bar.x_min) * w / o->width;
+            float band_x = horizontal ? 24 * w / o->width
+                                      : state->emphasis_center * w / o->width - thickness / 2;
+            float band_y = horizontal ? state->emphasis_center * h / o->height - thickness / 2
+                                      : 12 * h / o->height;
+            float band_w = horizontal ? (o->width - 36) * w / o->width : thickness;
+            float band_h = horizontal ? thickness : (o->height - 32) * h / o->height;
+            cui_color band = o->foreground.a ? o->foreground : (cui_color){32, 32, 32, 255};
+            band.a = (unsigned char)lroundf(band.a * .08f * state->emphasis_focus);
+            if (band.a && band_w > 0 && band_h > 0) {
+                cui_begin_absolute_box(ui, id ^ UINT64_C(0x9c97c1765a400001),
+                                       (cui_box){.width = band_w,
+                                                 .height = band_h,
+                                                 .fixed_width = true,
+                                                 .fixed_height = true,
+                                                 .background = band},
+                                       (cui_rect){band_x, band_y, band_w, band_h});
+                cui_end_box(ui);
+            }
+        }
+    }
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
         bool active = !o->noninteractive && state->hovered < o->count;
         float target_x = 0, target_y[8] = {0}, pixel_x, pixel_y;

@@ -1519,8 +1519,8 @@ static void cui_chart_sankey(cui_chart_state *s, const cui_chart_options *o,
         cui_color source_color = cui_chart_palette(o, source);
         cui_color target_color = cui_chart_palette(o, target);
         double opacity = o->custom_sankey_link_opacity ? o->sankey_link_opacity : .3;
-        if (!o->noninteractive && s->emphasis_focus > 0 && s->hovered < o->count &&
-            source != s->hovered && target != s->hovered)
+        if (!o->noninteractive && s->emphasis_focus > 0 && s->emphasis_visual_index < o->count &&
+            source != s->emphasis_visual_index && target != s->emphasis_visual_index)
             opacity *= 1 - .7 * fmin(1, s->emphasis_focus);
         for (int x = (int)ceil(x0); x < (int)x1; x++) {
             double t = (x - x0) / (x1 - x0), smooth = t * t * (3 - 2 * t),
@@ -1655,6 +1655,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     if (!o->noninteractive &&
         (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY)) {
         h = cui_chart_mix(h, s->hovered);
+        h = cui_chart_mix(h, s->emphasis_visual_index);
         h = cui_chart_mix(h, cui_chart_bits(s->emphasis_focus));
         h = cui_chart_mix(h, cui_chart_bits(s->emphasis_center));
         if (o->kind == CUI_CHART_PIE)
@@ -1687,6 +1688,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->emphasis_center = 0;
         s->emphasis_velocity = 0;
         s->emphasis_started = false;
+        s->emphasis_visual_index = SIZE_MAX;
         memset(s->pie_lift, 0, sizeof s->pie_lift);
         memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }

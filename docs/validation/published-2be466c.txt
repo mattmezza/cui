@@ -1,0 +1,12 @@
+Published source: 2be466c922bc396250781de5cc3e972256ec0357
+Pages run: 38298372417 success
+Framework CI run: 38298372212 success
+Installed 4 packages in 18ms
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+PASS gallery.wasm fc6bc44b9bfb58a3ecec064f113c4fbfb19fd54df709ce46b9f971a9a0a04fe8
+PASS gallery.js 9a3c9111dcceaf00c0dded21577dd879929046fd7e450165954cad60e880a66f
+PASS gallery.css fc7989381ed627cb5698655e006d8d4d5fd936bff667f60e0c2b4becba8179f2
+PASS index.html baf61fe34f0ef2000161727403b269350a51b57904082ae6304a0fcbe3a9fb64
+PASS catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+PASS themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+PASS docs.json cc83e89a208c08626fc47acfcfe32bf15a97a62449c5c92459e4915b3e6c4898

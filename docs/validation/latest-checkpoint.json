@@ -1,8 +1,8 @@
 {
   "source": "25b84dc",
-  "published_source": "ff475e69fea087ae1dcf95b55eac54c02e4216d1",
+  "published_source": "2be466c922bc396250781de5cc3e972256ec0357",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Portable source 25b84dc and gallery 94503eb pass native 77, sanitizers 75, WASI 67, all 78 browser stories, quality checks and strict web build. Adds acyclic semantic ancestry, Questionnaire groups and custom slots, Chart geometry and rendering fixes, and atomic image selection behavior. Published ff475e6 remains verified; this integration is awaiting publication. Full 78-entry feature parity remains incomplete.",
+  "summary": "Published 2be466c passed all 78 actual HTTPS gallery stories and seven deployed asset hashes match the Pages artifact. Portable source 25b84dc and gallery 94503eb passed native 77, sanitizers 75, WASI 67, quality and strict web build. A subsequent isolated animation/selection/focus-ring integration is undergoing full gates. Full 78-entry feature parity remains incomplete.",
   "checks": [
     {
       "name": "native",
@@ -42,12 +42,12 @@
     "reason": "Physical click helper failed elementFromPoint for first Start over after Skip completion. Investigating stale semantic index across awaited scrolling and viewport visibility. Public04e044e remains HTTPS78 verified.",
     "log": "pages-failure-1edb47d.txt"
   },
-  "published_evidence": "published-ff475e6.txt",
+  "published_evidence": "published-2be466c.txt",
   "deployment": {
-    "source": "ff475e69fea087ae1dcf95b55eac54c02e4216d1",
+    "source": "2be466c922bc396250781de5cc3e972256ec0357",
     "status": "success",
-    "pages_run": 38296393361,
-    "ci_run": 38296393398
+    "pages_run": 38298372417,
+    "ci_run": 38298372212
   },
   "targeted_checks": [
     {

@@ -87,6 +87,42 @@ static void rectangle(cui_software *r, const cui_draw_command *c) {
         }
     }
 }
+static bool bitmap(cui_software *r, const cui_draw_command *c) {
+    const cui_bitmap_paint *p = &c->bitmap;
+    cui_rect src = p->source;
+    if (!cui_bitmap_valid(p->bitmap) || !isfinite(p->opacity) || p->opacity < 0 || p->opacity > 1 ||
+        !isfinite(src.x) || !isfinite(src.y) || !isfinite(src.w) || !isfinite(src.h) || src.x < 0 ||
+        src.y < 0 || src.w <= 0 || src.h <= 0 || src.x + src.w > p->bitmap.width ||
+        src.y + src.h > p->bitmap.height)
+        return false;
+    cui_rect area = intersect(c->bounds, r->clip);
+    if (area.w <= 0 || area.h <= 0 || c->bounds.w <= 0 || c->bounds.h <= 0)
+        return true;
+    float radii[4], edges[4];
+    cui_shape_values(c, radii, edges);
+    for (int y = (int)floorf(area.y); y < (int)ceilf(area.y + area.h); y++) {
+        float left, right, yy = y + .5f - c->bounds.y;
+        if (!cui_shape_span(c, radii, edges, false, yy, &left, &right))
+            continue;
+        unsigned sy =
+            (unsigned)fminf(p->bitmap.height - 1, floorf(src.y + yy / c->bounds.h * src.h));
+        for (int x = (int)floorf(area.x); x < (int)ceilf(area.x + area.w); x++) {
+            float xx = x + .5f - c->bounds.x;
+            if (xx < left || xx >= right)
+                continue;
+            unsigned sx =
+                (unsigned)fminf(p->bitmap.width - 1, floorf(src.x + xx / c->bounds.w * src.w));
+            const unsigned char *pixel = p->bitmap.pixels + sy * p->bitmap.stride + sx * 4;
+            cui_color color = {pixel[0], pixel[1], pixel[2],
+                               (unsigned char)lroundf(pixel[3] * p->opacity)};
+            if (p->grayscale)
+                color.r = color.g = color.b =
+                    (unsigned char)lroundf(.2126f * color.r + .7152f * color.g + .0722f * color.b);
+            blend(r, x, y, color);
+        }
+    }
+    return true;
+}
 #ifdef CUI_HAS_TEXT
 static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsigned char *data) {
     cui_software *r = user;
@@ -119,6 +155,10 @@ bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color c
             !isfinite(c->stroke))
             return false;
         switch (c->type) {
+        case CUI_DRAW_IMAGE:
+            if (!bitmap(r, c))
+                return false;
+            break;
         case CUI_DRAW_RECT:
         case CUI_DRAW_BORDER:
             rectangle(r, c);
@@ -180,7 +220,7 @@ static void destroy(void *r) {
 }
 cui_renderer cui_software_interface(cui_software *r) {
     return (cui_renderer){r, "CUI deterministic software",
-                          CUI_RENDER_ROUNDED | CUI_RENDER_CLIP
+                          CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE
 #ifdef CUI_HAS_TEXT
                               | (r && r->font ? CUI_RENDER_TEXT : 0)
 #endif

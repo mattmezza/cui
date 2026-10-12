@@ -1376,7 +1376,35 @@ static void test_box_maximum_axes(void) {
     cui_destroy(ui);
 }
 
+static void test_bitmap_leaf(void) {
+    unsigned char pixels[24] = {255};
+    cui_context *ui = make();
+    cui_bitmap_paint paint = {.bitmap = {pixels, 2, 2, 12, 7}, .opacity = .5f};
+    assert(cui_bitmap_valid(paint.bitmap));
+    assert(!cui_bitmap_valid((cui_bitmap){pixels, 2, 2, 7, 0}));
+    begin(ui);
+    cui_bitmap_paint bad = paint;
+    bad.source = (cui_rect){1, 0, 2, 2};
+    assert(!cui_paint_bitmap(ui, 11, bad, (cui_box){0}));
+    assert(cui_paint_bitmap(ui, 11, paint, (cui_box){.radius = 1}));
+    cui_draw_list list = cui_end_frame(ui);
+    assert(list.count == 1 && list.commands[0].type == CUI_DRAW_IMAGE);
+    const cui_draw_command *d = &list.commands[0];
+    assert(d->bitmap.bitmap.pixels == pixels && d->bitmap.bitmap.revision == 7);
+    assert(d->bitmap.source.w == 2 && d->bitmap.source.h == 2);
+    assert(d->bounds.w == 2 && d->bounds.h == 2 && d->corner_radii.top_left == 1);
+    begin(ui);
+    assert(cui_paint_bitmap(ui, 11, paint, (cui_box){.layout_only = true}));
+    assert(cui_end_frame(ui).count == 0);
+    begin(ui);
+    paint.source = (cui_rect){1, 0, 1, 2};
+    assert(cui_paint_bitmap(ui, 11, paint, (cui_box){.width = 20, .height = 30}));
+    list = cui_end_frame(ui);
+    assert(list.count == 1 && list.commands[0].bounds.w == 20 && list.commands[0].bounds.h == 30);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_bitmap_leaf();
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
     test_semantic_role_refinement();

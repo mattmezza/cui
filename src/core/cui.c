@@ -31,6 +31,7 @@ typedef struct {
     size_t parent;
     bool clip, layout_only, inert;
     int16_t layer;
+    cui_bitmap_paint bitmap;
     cui_rect underlay_bounds;
     cui_color underlay_color;
     cui_corner_radii underlay_radii;
@@ -670,6 +671,35 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                  isfinite(b.offset_y) ? b.offset_y : 0}},
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
 }
+bool cui_bitmap_valid(cui_bitmap b) {
+    return b.pixels && b.width && b.height && b.width <= 16384 && b.height <= 16384 &&
+           b.stride >= (size_t)b.width * 4 && b.stride <= SIZE_MAX / b.height;
+}
+bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_box box) {
+    if (!ui || !ui->in_frame || !cui_bitmap_valid(paint.bitmap) || !isfinite(paint.opacity) ||
+        paint.opacity < 0 || paint.opacity > 1)
+        return false;
+    cui_rect *s = &paint.source;
+    if (!s->x && !s->y && !s->w && !s->h)
+        *s = (cui_rect){0, 0, (float)paint.bitmap.width, (float)paint.bitmap.height};
+    if (!isfinite(s->x) || !isfinite(s->y) || !isfinite(s->w) || !isfinite(s->h) || s->x < 0 ||
+        s->y < 0 || s->w <= 0 || s->h <= 0 || s->x + s->w > paint.bitmap.width ||
+        s->y + s->h > paint.bitmap.height)
+        return false;
+    if (!box.width && !box.fixed_width)
+        box.width = s->w;
+    if (!box.height && !box.fixed_height)
+        box.height = s->h;
+    cui_core_begin_box(ui, id, box, NULL, 0);
+    bool ok = !ui->overflow_depth && ui->depth && ui->opened[ui->depth - 1];
+    if (ok) {
+        cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+        node->bitmap = paint;
+        Clay__GetOpenLayoutElement()->config.image.imageData = &node->bitmap;
+    }
+    cui_end_box(ui);
+    return ok;
+}
 bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_corner_radii radii) {
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
         !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
@@ -899,6 +929,15 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                                 c->renderData.rectangle.cornerRadius.bottomRight};
             d.custom_corners = true;
             break;
+        case CLAY_RENDER_COMMAND_TYPE_IMAGE: {
+            d.type = CUI_DRAW_IMAGE;
+            d.bitmap = *(const cui_bitmap_paint *)c->renderData.image.imageData;
+            Clay_CornerRadius radius = c->renderData.image.cornerRadius;
+            d.corner_radii = (cui_corner_radii){radius.topLeft, radius.topRight, radius.bottomLeft,
+                                                radius.bottomRight};
+            d.custom_corners = true;
+            break;
+        }
         case CLAY_RENDER_COMMAND_TYPE_BORDER:
             d.type = CUI_DRAW_BORDER;
             d.color = cui_core_color(c->renderData.border.color);

@@ -182,12 +182,31 @@ typedef struct {
     /* Positive finite caps apply to FIT/GROW/fixed; zero means unbounded. */
     float max_width, max_height;
 } cui_box;
+/* Borrowed straight-alpha RGBA8 pixels, valid through renderer completion.
+ * Increment revision whenever pixels change; stride includes row padding. */
+typedef struct {
+    const unsigned char *pixels;
+    unsigned width, height;
+    size_t stride;
+    uint64_t revision;
+} cui_bitmap;
+typedef struct {
+    cui_bitmap bitmap;
+    cui_rect source;
+    float opacity;
+    bool grayscale;
+} cui_bitmap_paint;
+bool cui_bitmap_valid(cui_bitmap);
+/* A zero source rectangle selects the whole bitmap. Opacity is explicitly 0..1.
+ * FIT dimensions default to source pixel dimensions. */
+bool cui_paint_bitmap(cui_context *, cui_id, cui_bitmap_paint, cui_box);
 typedef enum {
     CUI_DRAW_RECT,
     CUI_DRAW_BORDER,
     CUI_DRAW_TEXT,
     CUI_DRAW_CLIP_PUSH,
-    CUI_DRAW_CLIP_POP
+    CUI_DRAW_CLIP_POP,
+    CUI_DRAW_IMAGE
 } cui_draw_type;
 typedef struct {
     cui_draw_type type;
@@ -198,6 +217,7 @@ typedef struct {
     cui_corner_radii corner_radii;
     cui_border_edges border_edges;
     bool custom_corners, custom_border_edges;
+    cui_bitmap_paint bitmap;
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;

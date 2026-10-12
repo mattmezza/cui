@@ -5,7 +5,8 @@ enum {
     CUI_RENDER_ACCELERATED = 1,
     CUI_RENDER_TEXT = 2,
     CUI_RENDER_ROUNDED = 4,
-    CUI_RENDER_CLIP = 8
+    CUI_RENDER_CLIP = 8,
+    CUI_RENDER_IMAGE = 16
 };
 typedef struct {
     void *user;

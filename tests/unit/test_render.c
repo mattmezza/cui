@@ -122,7 +122,34 @@ static void test_underlay_pixels(void) {
     cui_software_destroy(renderer);
 }
 
+static void test_bitmap_pixels(void) {
+    const unsigned char pixels[] = {255, 0, 0,   255, 0,   255, 0,   128, 99, 99, 99, 99,
+                                    0,   0, 255, 255, 255, 255, 255, 255, 99, 99, 99, 99};
+    cui_software *r = cui_software_create(8, 8, NULL);
+    assert(r);
+    cui_draw_command d = {
+        .type = CUI_DRAW_IMAGE,
+        .bounds = {0, 0, 8, 8},
+        .bitmap = {.bitmap = {pixels, 2, 2, 12, 1}, .source = {0, 0, 2, 2}, .opacity = 1}};
+    cui_draw_list list = {.commands = &d, .count = 1, .width = 8, .height = 8};
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    assert(pixel(r, 1, 1)[0] == 255 && pixel(r, 6, 1)[1] == 255);
+    assert(pixel(r, 6, 1)[3] == 128 && pixel(r, 1, 6)[2] == 255);
+    d.bitmap.source = (cui_rect){1, 0, 1, 1};
+    d.bitmap.opacity = .5f;
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    assert(pixel(r, 1, 6)[1] == 255 && pixel(r, 1, 6)[3] == 64);
+    d.bitmap.grayscale = true;
+    d.radius = 4;
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    assert(pixel(r, 0, 0)[3] == 0);
+    assert(pixel(r, 4, 4)[0] == 182 && pixel(r, 4, 4)[1] == 182);
+    d.bitmap.source.w = 2;
+    assert(!cui_software_render(r, &list, (cui_color){0}));
+    cui_software_destroy(r);
+}
 int main(void) {
+    test_bitmap_pixels();
     test_underlay_pixels();
     asymmetric_shapes();
     cui_software *r = cui_software_create(16, 16, NULL);

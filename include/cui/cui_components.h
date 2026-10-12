@@ -180,6 +180,7 @@ typedef struct {
     float padding_x, padding_y;
     bool no_appearance, no_border, hide_focus_ring;
     cui_align text_align;
+    bool delegate_up_down; /* Composite owns list navigation instead of caret movement. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

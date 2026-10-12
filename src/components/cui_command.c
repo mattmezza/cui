@@ -145,6 +145,7 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
                                 .disabled = o.disabled,
                                 .clipboard = o.clipboard,
                                 .no_appearance = true,
+                                .delegate_up_down = true,
                                 .custom_padding = true,
                                 .padding_x = 0,
                                 .padding_y = 0,

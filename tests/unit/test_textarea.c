@@ -99,6 +99,15 @@ static void test_editing_navigation_scroll(void) {
     frame(ui, edit, &state, options);
     assert(cui_edit_get_state(edit).cursor == 14 && cui_edit_get_state(edit).anchor == 8 &&
            state.scroll_y == 20);
+    key(ui, CUI_KEY_UP, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 0 && state.scroll_y == 0);
+    key(ui, CUI_KEY_DOWN, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == strlen(buffer) && state.scroll_y == 40);
+    key(ui, CUI_KEY_LEFT, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == (size_t)(strstr(buffer, "last") - buffer));
     key(ui, CUI_KEY_END, CUI_MOD_CTRL);
     frame(ui, edit, &state, options);
     assert(cui_edit_get_state(edit).cursor == strlen(buffer) && state.scroll_y == 40);

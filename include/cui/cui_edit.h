@@ -34,7 +34,11 @@ typedef enum {
     CUI_EDIT_LINE_START,
     CUI_EDIT_LINE_END,
     CUI_EDIT_START,
-    CUI_EDIT_END
+    CUI_EDIT_END,
+    CUI_EDIT_WORD_PREVIOUS,
+    CUI_EDIT_WORD_NEXT,
+    CUI_EDIT_LINE_PREVIOUS,
+    CUI_EDIT_LINE_NEXT
 } cui_edit_motion;
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
@@ -44,6 +48,10 @@ cui_edit_state cui_edit_get_state(const cui_edit *edit);
 cui_str cui_edit_get_text(const cui_edit *edit);
 bool cui_edit_valid_utf8(cui_str text);
 cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
+/* Word motions skip punctuation/space and move between word starts. Letters,
+ * digits, underscores and common Unicode letter/combining ranges form words.
+ * Vertical motions preserve a scalar column across logical LF-delimited lines;
+ * visual wrapping and pixel-column movement belong to the styled textarea. */
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
 cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
 /* Replace a UTF-8 byte range as one history step without first changing the

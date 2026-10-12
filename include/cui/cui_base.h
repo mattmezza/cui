@@ -38,6 +38,7 @@ typedef struct {
     const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */
     cui_input_hit_test_fn hit_test; /* UTF-8 byte offset in current text. */
     void *hit_test_user;
+    bool delegate_up_down;  /* Composite popup owns vertical navigation. */
     bool delegate_home_end; /* Composite popup owns these keys; editor leaves them untouched. */
 } cui_base_input_options;
 cui_input_result cui_base_input_ex(cui_context *, cui_id, cui_str, cui_edit *,

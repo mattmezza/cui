@@ -284,8 +284,92 @@ static void test_composition_keys(void) {
     assert(cui_edit_get_state(edit).cursor == 1);
     cui_edit_destroy(edit);
 }
+static void test_word_and_vertical_navigation(void) {
+    char buffer[128] = "one,  two café_42 😀 三个";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    assert(edit);
+    size_t two = (size_t)(strstr(buffer, "two") - buffer);
+    size_t cafe = (size_t)(strstr(buffer, "café") - buffer);
+    size_t chinese = (size_t)(strstr(buffer, "三个") - buffer);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_LEFT,
+                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == chinese);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == cafe);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == two);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 0);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_RIGHT,
+                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == two);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_RIGHT,
+                                                  .modifiers = CUI_MOD_ALT | CUI_MOD_SHIFT}) ==
+           CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == cafe && cui_edit_get_state(edit).anchor == two);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_NEXT, true) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == chinese && cui_edit_get_state(edit).anchor == two);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_UP}) ==
+           CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 0);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_DOWN,
+                                                  .modifiers = CUI_MOD_SHIFT}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == strlen(buffer) &&
+           cui_edit_get_state(edit).anchor == 0);
+    assert(cui_edit_get_state(edit).revision == revision);
+    cui_edit_destroy(edit);
+
+    strcpy(buffer, "abcde\nx\nABCDE");
+    edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    assert(edit && cui_edit_select(edit, 4, 4) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_NEXT, true) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 7 && cui_edit_get_state(edit).anchor == 4);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_NEXT, true) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 12 && cui_edit_get_state(edit).anchor == 4);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 7);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 4);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 0);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 7);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 9);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_DOWN,
+                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == strlen(buffer));
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_UP,
+                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 0);
+    cui_edit_destroy(edit);
+
+    strcpy(buffer, "é好z\nq\nÉ好Z");
+    edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    assert(edit && cui_edit_select(edit, 5, 5) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 8);
+    assert(cui_edit_move(edit, CUI_EDIT_LINE_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 14);
+    assert(cui_edit_move(edit, (cui_edit_motion)99, false) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_get_state(edit).cursor == 14);
+    cui_edit_destroy(edit);
+}
+
 int main(void) {
     test_composition_keys();
+    test_word_and_vertical_navigation();
     test_atomic_range();
     test_atomic_indent();
     test_unicode();

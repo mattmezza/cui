@@ -964,6 +964,7 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
                                  .required = options.required,
                                  .invalid = options.invalid,
                                  .clipboard = options.clipboard,
+                                 .delegate_up_down = options.delegate_up_down,
                                  .hit_test = multiline ? NULL : cui_base_input_hit_test,
                                  .hit_test_user = &hit});
     options.invalid = options.invalid || result.error != CUI_EDIT_OK;

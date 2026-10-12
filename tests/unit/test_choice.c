@@ -3942,6 +3942,26 @@ static cui_draw_list choice_indicator_scene(cui_context *ui, unsigned mode, cui_
     assert(cui_last_error(ui) == CUI_OK);
     return draw;
 }
+static void test_combobox_arrow_open(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_choice_popup popup;
+    cui_choice_popup_init(&popup, 9800);
+    char buffer[32] = "";
+    cui_edit *query =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_id selected = 0;
+    bool chosen[3] = {0};
+    assert(ui && query);
+    choice_indicator_scene(ui, 3, &popup, query, &selected, chosen);
+    assert(!popup.overlay.open);
+    cui_focus(ui, 2);
+    key(ui, CUI_KEY_DOWN);
+    choice_indicator_scene(ui, 3, &popup, query, &selected, chosen);
+    assert(popup.overlay.open && popup.list.active != 0);
+    assert(cui_edit_get_state(query).cursor == 0 && !buffer[0]);
+    cui_edit_destroy(query);
+    cui_destroy(ui);
+}
 static void test_choice_trailing_checks(void) {
     for (unsigned mode = 0; mode < 5; mode++) {
         cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
@@ -4175,6 +4195,7 @@ int main(void) {
     test_toggle_group_shared_renderer();
     test_tab_current_frame_baseline();
     test_choice_trailing_checks();
+    test_combobox_arrow_open();
     test_menu_check_glyphs();
     test_dropdown_reference_metrics();
     test_dropdown_loading_subtree_opacity();

@@ -83,6 +83,20 @@ static void clipboard_and_readonly(void) {
     const cui_semantic *semantics = cui_semantics(ui, &count);
     assert(count == 1 && semantics[0].details.readonly && semantics[0].details.required &&
            semantics[0].details.invalid);
+    key(ui, CUI_KEY_UP, 0);
+    result = base_frame(ui, edit, &state, options);
+    assert(!result.changed && cui_edit_get_state(edit).cursor == 0);
+    key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
+    result = base_frame(ui, edit, &state, options);
+    assert(!result.changed && cui_edit_get_state(edit).cursor == 5 &&
+           cui_edit_get_state(edit).anchor == 0);
+    key(ui, CUI_KEY_LEFT, CUI_MOD_CTRL);
+    result = base_frame(ui, edit, &state, options);
+    assert(!result.changed && cui_edit_get_state(edit).cursor == 0);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_CTRL);
+    result = base_frame(ui, edit, &state, options);
+    assert(!result.changed && cui_edit_get_state(edit).cursor == 5 &&
+           !strcmp(buffer, "caf\xc3\xa9"));
     options.disabled = true;
     key(ui, CUI_KEY_LEFT, 0);
     assert(!base_frame(ui, edit, &state, options).changed && cui_edit_get_state(edit).cursor == 5);

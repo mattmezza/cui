@@ -1291,6 +1291,7 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
         ui, input, name, query, &state->query_behavior,
         (cui_base_input_options){.disabled = disabled,
                                  .delegate_home_end = state->overlay.open,
+                                 .delegate_up_down = true,
                                  .hit_test =
                                      state->query_font_size > 0 ? cui_base_input_hit_test : NULL,
                                  .hit_test_user = &hit});

@@ -393,6 +393,13 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                    (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V)) {
             error = cui_textarea_clipboard(edit, event, options);
             handled = true;
+        } else if (event.type == CUI_EVENT_KEY_DOWN && command &&
+                   (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN)) {
+            error =
+                cui_edit_move(edit, event.key == CUI_KEY_UP ? CUI_EDIT_START : CUI_EDIT_END, shift);
+            state->upstream_affinity = false;
+            state->preferred_valid = false;
+            move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN &&
                    (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN ||
                     event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN)) {

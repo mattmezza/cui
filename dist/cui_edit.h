@@ -35,7 +35,11 @@ typedef enum {
     CUI_EDIT_LINE_START,
     CUI_EDIT_LINE_END,
     CUI_EDIT_START,
-    CUI_EDIT_END
+    CUI_EDIT_END,
+    CUI_EDIT_WORD_PREVIOUS,
+    CUI_EDIT_WORD_NEXT,
+    CUI_EDIT_LINE_PREVIOUS,
+    CUI_EDIT_LINE_NEXT
 } cui_edit_motion;
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
@@ -45,6 +49,10 @@ cui_edit_state cui_edit_get_state(const cui_edit *edit);
 cui_str cui_edit_get_text(const cui_edit *edit);
 bool cui_edit_valid_utf8(cui_str text);
 cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
+/* Word motions skip punctuation/space and move between word starts. Letters,
+ * digits, underscores and common Unicode letter/combining ranges form words.
+ * Vertical motions preserve a scalar column across logical LF-delimited lines;
+ * visual wrapping and pixel-column movement belong to the styled textarea. */
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
 cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
 /* Replace a UTF-8 byte range as one history step without first changing the
@@ -81,7 +89,8 @@ typedef struct {
 } cui_edit_private_snapshot;
 struct cui_edit {
     cui_edit_config config;
-    size_t length, cursor, anchor;
+    size_t length, cursor, anchor, preferred_column;
+    bool preferred_column_valid;
     char *history, *scratch;
     cui_edit_private_snapshot *states;
     size_t slots, count, index;
@@ -238,6 +247,7 @@ cui_edit_result cui_edit_select(cui_edit *e, size_t a, size_t p) {
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!cui_edit_private_boundary(e, a) || !cui_edit_private_boundary(e, p))
         return CUI_EDIT_BOUNDARY;
+    e->preferred_column_valid = false;
     e->anchor = a;
     e->cursor = p;
     cui_edit_private_save_state(e);
@@ -259,10 +269,42 @@ static size_t cui_edit_private_next(cui_edit *e, size_t p) {
     }
     return p;
 }
+static bool cui_edit_private_word(cui_edit *e, size_t p) {
+    if (p >= e->length)
+        return false;
+    const unsigned char *s = (const unsigned char *)e->config.buffer + p;
+    unsigned cp = s[0];
+    if (cp >= 0x80) {
+        size_t count = cp < 0xe0 ? 2 : cp < 0xf0 ? 3 : 4;
+        cp &= count == 2 ? 31u : count == 3 ? 15u : 7u;
+        for (size_t i = 1; i < count; i++)
+            cp = (cp << 6) | (s[i] & 63u);
+    }
+    if (cp < 128)
+        return (cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z') || (cp >= '0' && cp <= '9') ||
+               cp == '_';
+    /* Stable, locale-independent useful ranges; not Unicode UAX #29 segmentation. */
+    return (cp >= 0xc0 && cp <= 0x2af && cp != 0xd7 && cp != 0xf7) ||
+           (cp >= 0x300 && cp <= 0x1fff) || (cp >= 0x2c00 && cp <= 0x2dff) ||
+           (cp >= 0x3040 && cp <= 0x30ff) || (cp >= 0x3400 && cp <= 0x9fff) ||
+           (cp >= 0xac00 && cp <= 0xd7af) || (cp >= 0xf900 && cp <= 0xfaff) ||
+           (cp >= 0xff10 && cp <= 0xff19) || (cp >= 0xff21 && cp <= 0xff3a) ||
+           (cp >= 0xff41 && cp <= 0xff5a);
+}
+static size_t cui_edit_private_line_start(const cui_edit *e, size_t at);
+static size_t cui_edit_private_line_end(cui_edit *e, size_t p) {
+    while (p < e->length && e->config.buffer[p] != '\n')
+        p = cui_edit_private_next(e, p);
+    return p;
+}
 cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
-    if (!e)
+    if (!e || m < CUI_EDIT_PREVIOUS || m > CUI_EDIT_LINE_NEXT)
         return CUI_EDIT_INVALID_ARGUMENT;
     size_t p = e->cursor;
+    bool vertical = m == CUI_EDIT_LINE_PREVIOUS || m == CUI_EDIT_LINE_NEXT;
+    size_t column = e->preferred_column;
+    if (!vertical)
+        e->preferred_column_valid = false;
     if (!extend && e->anchor != e->cursor && (m == CUI_EDIT_PREVIOUS || m == CUI_EDIT_NEXT))
         p = m == CUI_EDIT_PREVIOUS ? (e->anchor < p ? e->anchor : p)
                                    : (e->anchor > p ? e->anchor : p);
@@ -274,6 +316,48 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
         case CUI_EDIT_NEXT:
             p = cui_edit_private_next(e, p);
             break;
+        case CUI_EDIT_WORD_PREVIOUS:
+            while (p && !cui_edit_private_word(e, cui_edit_private_previous(e, p)))
+                p = cui_edit_private_previous(e, p);
+            while (p && cui_edit_private_word(e, cui_edit_private_previous(e, p)))
+                p = cui_edit_private_previous(e, p);
+            break;
+        case CUI_EDIT_WORD_NEXT:
+            while (p < e->length && cui_edit_private_word(e, p))
+                p = cui_edit_private_next(e, p);
+            while (p < e->length && !cui_edit_private_word(e, p))
+                p = cui_edit_private_next(e, p);
+            break;
+        case CUI_EDIT_LINE_PREVIOUS:
+        case CUI_EDIT_LINE_NEXT: {
+            size_t start = cui_edit_private_line_start(e, p);
+            if (!e->preferred_column_valid) {
+                column = 0;
+                for (size_t at = start; at < p; at = cui_edit_private_next(e, at))
+                    column++;
+            }
+            size_t end;
+            if (m == CUI_EDIT_LINE_PREVIOUS) {
+                if (!start) {
+                    p = 0;
+                    break;
+                }
+                end = start - 1;
+                start = cui_edit_private_line_start(e, end);
+            } else {
+                end = cui_edit_private_line_end(e, p);
+                if (end == e->length) {
+                    p = e->length;
+                    break;
+                }
+                start = end + 1;
+                end = cui_edit_private_line_end(e, start);
+            }
+            p = start;
+            for (size_t i = 0; i < column && p < end; i++)
+                p = cui_edit_private_next(e, p);
+            break;
+        }
         case CUI_EDIT_START:
             p = 0;
             break;
@@ -291,7 +375,12 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
         default:
             return CUI_EDIT_INVALID_ARGUMENT;
         }
-    return cui_edit_select(e, extend ? e->anchor : p, p);
+    cui_edit_result result = cui_edit_select(e, extend ? e->anchor : p, p);
+    if (vertical && result == CUI_EDIT_OK) {
+        e->preferred_column = column;
+        e->preferred_column_valid = true;
+    }
+    return result;
 }
 static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_t start,
                                                 size_t end) {
@@ -304,6 +393,7 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
         return CUI_EDIT_CAPACITY;
     if (!text.length && start == end)
         return CUI_EDIT_OK;
+    e->preferred_column_valid = false;
     if (text.length == end - start &&
         (!text.length || !memcmp(e->config.buffer + start, text.data, text.length))) {
         e->cursor = e->anchor = start + text.length;
@@ -355,6 +445,7 @@ static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t an
     cui_edit_private_save_state(e);
     memcpy(e->config.buffer, e->scratch, length + 1);
     e->length = length;
+    e->preferred_column_valid = false;
     e->anchor = anchor;
     e->cursor = cursor;
     e->revision++;
@@ -445,6 +536,7 @@ cui_edit_result cui_edit_delete(cui_edit *e) {
 static void cui_edit_private_restore(cui_edit *e) {
     cui_edit_private_snapshot s = e->states[e->index];
     e->length = s.length;
+    e->preferred_column_valid = false;
     e->cursor = s.cursor;
     e->anchor = s.anchor;
     memcpy(e->config.buffer, e->history + e->index * e->config.capacity, e->length + 1);
@@ -487,10 +579,29 @@ cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
         bool shift = (v.modifiers & CUI_MOD_SHIFT) != 0;
         switch (v.key) {
         case CUI_KEY_LEFT:
-            r = cui_edit_move(e, CUI_EDIT_PREVIOUS, shift);
+            r = cui_edit_move(e,
+                              (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_ALT)) ? CUI_EDIT_WORD_PREVIOUS
+                                                                           : CUI_EDIT_PREVIOUS,
+                              shift);
             break;
         case CUI_KEY_RIGHT:
-            r = cui_edit_move(e, CUI_EDIT_NEXT, shift);
+            r = cui_edit_move(e,
+                              (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_ALT)) ? CUI_EDIT_WORD_NEXT
+                                                                           : CUI_EDIT_NEXT,
+                              shift);
+            break;
+        case CUI_KEY_UP:
+            r = cui_edit_move(e,
+                              (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_META))
+                                  ? CUI_EDIT_START
+                                  : CUI_EDIT_LINE_PREVIOUS,
+                              shift);
+            break;
+        case CUI_KEY_DOWN:
+            r = cui_edit_move(e,
+                              (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) ? CUI_EDIT_END
+                                                                            : CUI_EDIT_LINE_NEXT,
+                              shift);
             break;
         case CUI_KEY_HOME:
             r = cui_edit_move(
@@ -547,6 +658,7 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
             continue;
         if (events[i].type == CUI_EVENT_KEY_DOWN &&
             (events[i].key == CUI_KEY_LEFT || events[i].key == CUI_KEY_RIGHT ||
+             events[i].key == CUI_KEY_UP || events[i].key == CUI_KEY_DOWN ||
              events[i].key == CUI_KEY_HOME || events[i].key == CUI_KEY_END))
             cui_consume_event(ui, i);
         cui_edit_result r = cui_edit_apply_event(e, events[i]);

@@ -39,6 +39,7 @@ typedef struct {
     const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */
     cui_input_hit_test_fn hit_test; /* UTF-8 byte offset in current text. */
     void *hit_test_user;
+    bool delegate_up_down;  /* Composite popup owns vertical navigation. */
     bool delegate_home_end; /* Composite popup owns these keys; editor leaves them untouched. */
 } cui_base_input_options;
 cui_input_result cui_base_input_ex(cui_context *, cui_id, cui_str, cui_edit *,
@@ -191,8 +192,8 @@ bool cui_base_slider(cui_context *ui, cui_id id, cui_str name, float *value, flo
 static bool cui_input_readonly_event(cui_event event) {
     if (event.type != CUI_EVENT_KEY_DOWN)
         return false;
-    return event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_HOME ||
-           event.key == CUI_KEY_END ||
+    return event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_UP ||
+           event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END ||
            (event.key == CUI_KEY_A && (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)));
 }
 cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
@@ -221,12 +222,15 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
             (event.type == CUI_EVENT_KEY_DOWN &&
              (event.ime_composing || event.prefer_character_input)))
             continue;
+        if (options.delegate_up_down && event.type == CUI_EVENT_KEY_DOWN &&
+            (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN))
+            continue;
         if (options.delegate_home_end && event.type == CUI_EVENT_KEY_DOWN &&
             (event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
             continue;
         if (event.type == CUI_EVENT_KEY_DOWN &&
-            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_HOME ||
-             event.key == CUI_KEY_END))
+            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_UP ||
+             event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
             cui_consume_event(ui, i);
         cui_edit_result error = CUI_EDIT_OK;
         bool primary = event.pointer_button == CUI_POINTER_PRIMARY;

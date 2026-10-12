@@ -242,6 +242,8 @@ cui_rect cui_bounds(cui_context *ui, cui_id id);
 bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained);
 /* Previous-frame clipped region, excluding higher interactive layers/modal scopes. */
 bool cui_hovered(cui_context *ui, cui_id id);
+/* Current primary-pointer or Space capture; submit behavior before querying. */
+bool cui_pressed(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);
 void cui_focus(cui_context *ui, cui_id id);
 /* Is a coordinate-based opener permitted by current/previous modal scopes?
@@ -6384,6 +6386,10 @@ void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
             ui->semantics[i].tab_index = enabled ? 0 : -1;
             return;
         }
+}
+
+bool cui_pressed(cui_context *ui, cui_id id) {
+    return ui && id && !cui_core_inert(ui) && (ui->capture == id || ui->space_capture == id);
 }
 
 bool cui_hovered(cui_context *ui, cui_id id) {

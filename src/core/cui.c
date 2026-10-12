@@ -1060,6 +1060,10 @@ void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
         }
 }
 
+bool cui_pressed(cui_context *ui, cui_id id) {
+    return ui && id && !cui_core_inert(ui) && (ui->capture == id || ui->space_capture == id);
+}
+
 bool cui_hovered(cui_context *ui, cui_id id) {
     if (!ui || !id || cui_core_inert(ui))
         return false;

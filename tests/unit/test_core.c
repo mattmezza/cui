@@ -1011,10 +1011,49 @@ static void test_semantic_role_refinement(void) {
     cui_destroy(ui);
 }
 
+static void test_pressed_query(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, CUI_KEY_NONE, 0);
+    begin(ui);
+    assert(control(ui, 1, false).pressed && cui_pressed(ui, 1));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_MOVE, 250, 180, CUI_KEY_NONE, 0);
+    begin(ui);
+    assert(control(ui, 1, false).pressed && cui_pressed(ui, 1) && !cui_hovered(ui, 1));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_CANCEL, 0, 0, CUI_KEY_NONE, 0);
+    begin(ui);
+    control(ui, 1, false);
+    assert(!cui_pressed(ui, 1));
+    cui_end_frame(ui);
+    cui_focus(ui, 1);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_SPACE, 0);
+    begin(ui);
+    assert(control(ui, 1, false).pressed && cui_pressed(ui, 1));
+    cui_begin_box(ui, 2, (cui_box){.inert = true});
+    assert(!cui_pressed(ui, 1));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    begin(ui);
+    control(ui, 1, true);
+    assert(!cui_pressed(ui, 1));
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_UP, 0, 0, CUI_KEY_SPACE, 0);
+    begin(ui);
+    assert(!control(ui, 1, false).activated && !cui_pressed(ui, 1));
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_layout_only_and_zero_size();
     test_inert_painted_subtree();
     test_semantic_role_refinement();
+    test_pressed_query();
     test_custom_shape_commands();
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();

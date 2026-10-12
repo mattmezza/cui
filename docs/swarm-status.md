@@ -2,7 +2,7 @@
 
 ## Current priorities (12 October, evening)
 
-The public site is verified at `3aecd899bd4ce372c690b7a402617ef2a4ccf47a`, with 77 interactive WASM stories. Both CI and Pages succeeded, and the full Chromium suite passed against the published HTTPS site. The 78th story, Questionnaire, is integrated locally with required validation, delayed radio advancement, freeform submission, reset, disabled state and four sizes. Its worker browser suite passed; the root combined 78-story browser, sanitizer and WASI gates are running. Do not describe the 78-story gallery as published until deployment and HTTPS validation succeed.
+The public site is verified at `3aecd899bd4ce372c690b7a402617ef2a4ccf47a`, with 77 interactive WASM stories. Both CI and Pages succeeded, and the full Chromium suite passed against the published HTTPS site. The 78th story, Questionnaire, is integrated locally with required validation, delayed radio advancement, freeform submission, reset, disabled state and four sizes. The root combined 78-story Chromium suite, 77 native tests, 75 sanitizer tests and 67 WASI suites passed; publication is pending. Do not describe the 78-story gallery as published until deployment and HTTPS validation succeed.
 
 The homepage, getting-started example, browsable docs, slash-key fuzzy search, copyable usage snippets, graphical Checkbox/Radio, SVG icon customization and four-size controls are implemented. The top-right palette picker has all 38 requested themes, Follow System as the live default, persistence and an additional High Contrast option. Website and WASM examples share the selected palette. No user dependency installation is needed. Impeccable metadata has been removed.
 

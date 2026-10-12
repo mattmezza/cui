@@ -79,6 +79,12 @@ typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef void (*cui_chart_tooltip_fn)(cui_context *, cui_id, size_t index, const cui_chart_datum *,
                                      void *user);
+typedef cui_str (*cui_chart_tooltip_title_fn)(const cui_chart_datum *, size_t index, void *user);
+typedef size_t (*cui_chart_tooltip_value_fn)(const cui_chart_datum *, size_t index, size_t series,
+                                             double value, char *buffer, size_t capacity,
+                                             void *user);
+typedef cui_color (*cui_chart_tooltip_value_color_fn)(const cui_chart_datum *, size_t index,
+                                                      size_t series, double value, void *user);
 typedef struct {
     cui_chart_kind kind;
     const cui_chart_datum *data;
@@ -96,12 +102,17 @@ typedef struct {
     unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;
     bool hide_x_axis, show_y_axis, y_axis_inside, grid_solid;
+    bool custom_y_padding; /* line/area value scale; defaults source 10px top, 0 bottom */
+    float y_padding_top, y_padding_bottom;
     const double *reference_values;
     size_t reference_count; /* at most 16 */
     cui_chart_format_fn y_tick_format, tooltip_format, bar_label_format;
     void *format_user;
     cui_chart_tooltip_fn tooltip_content; /* replaces default hover title and rows */
     void *tooltip_user;
+    cui_chart_tooltip_title_fn tooltip_title;
+    cui_chart_tooltip_value_fn tooltip_value;
+    cui_chart_tooltip_value_color_fn tooltip_value_color;
     bool has_domain;
     double domain_min, domain_max;
     double inner_radius;     /* pie/donut pixels */
@@ -274,7 +285,10 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         (o->reference_count && !o->reference_values) ||
         (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
-        o->logical_height < 0 ||
+        o->logical_height < 0 || !isfinite(o->y_padding_top) || !isfinite(o->y_padding_bottom) ||
+        o->y_padding_top < 0 || o->y_padding_bottom < 0 ||
+        (o->custom_y_padding && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) &&
+         (double)o->y_padding_top + o->y_padding_bottom >= o->height - 20) ||
         (o->has_domain &&
          (!isfinite(o->domain_min) || !isfinite(o->domain_max) || o->domain_min >= o->domain_max)))
         return CUI_PLOT_INVALID;
@@ -736,6 +750,10 @@ static void cui_chart_draw_bar(cui_chart_state *s, const cui_chart_options *o, s
 static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) {
     double left = cui_chart_plot_left(o), right = o->width > 36 ? o->width - 12 : left, top = 12,
            bottom = o->height > 32 ? o->height - 20 : 12;
+    if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
+        top = o->custom_y_padding ? o->y_padding_top : 10;
+        bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
+    }
     if (right <= left || bottom <= top)
         return;
     double lo, hi;
@@ -1381,6 +1399,9 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->bar_alignment);
     h = cui_chart_mix(h, o->custom_bar_padding);
     h = cui_chart_mix(h, o->show_dots);
+    h = cui_chart_mix(h, o->custom_y_padding);
+    h = cui_chart_mix(h, cui_chart_bits(o->y_padding_top));
+    h = cui_chart_mix(h, cui_chart_bits(o->y_padding_bottom));
     h = cui_chart_mix(h, o->sankey_align);
     h = cui_chart_mix(h, o->sankey_value_scale);
     h = cui_chart_mix(h, o->sankey_iterations);
@@ -1779,12 +1800,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
             unsigned visible = count < 32 ? count : 32;
-            cui_plot_scale scale = {
-                CUI_PLOT_LINEAR, lo, hi, o->height > 32 ? o->height - 20 : 12, 12, true};
+            bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+            double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 12;
+            double bottom = point_chart
+                                ? o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)
+                                : (o->height > 32 ? o->height - 20 : 12);
+            cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
-                double pixel_y = 12 + (o->height - 32) * (double)tick / (count - 1);
+                double pixel_y = top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
                 (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label =
@@ -1956,7 +1981,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (o->tooltip_content) {
             o->tooltip_content(ui, id, state->hovered, &o->data[state->hovered], o->tooltip_user);
         } else {
-            cui_str title = o->data[state->hovered].label;
+            const cui_chart_datum *datum = &o->data[state->hovered];
+            cui_str title = o->tooltip_title
+                                ? o->tooltip_title(datum, state->hovered, o->tooltip_user)
+                                : datum->label;
             if (title.length && title.data) {
                 cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),
                                        (cui_box){.width = 72,
@@ -1981,8 +2009,15 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                            : d->close;
                 }
                 char value[48];
-                cui_str formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
-                                                     o->format_user);
+                cui_str formatted;
+                if (o->tooltip_value) {
+                    size_t written = o->tooltip_value(datum, state->hovered, series, number, value,
+                                                      sizeof value, o->tooltip_user);
+                    formatted =
+                        (cui_str){value, written < sizeof value ? written : sizeof value - 1};
+                } else
+                    formatted = cui_chart_number(value, sizeof value, number, o->tooltip_format,
+                                                 o->format_user);
                 if (!formatted.length)
                     continue;
                 char row[52];
@@ -2012,6 +2047,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     if (direction.a)
                         text_color = direction;
                 }
+                if (o->tooltip_value_color)
+                    text_color = o->tooltip_value_color(datum, state->hovered, series, number,
+                                                        o->tooltip_user);
                 cui_text(ui, label, 11, text_color);
                 cui_end_box(ui);
             }

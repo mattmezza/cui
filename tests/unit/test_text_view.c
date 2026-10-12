@@ -455,6 +455,38 @@ static void test_nested_list_model(void) {
     assert(cui_text_view_set_text(&f.state, text(nested)) == CUI_TEXT_VIEW_INVALID);
     assert(f.state.block_count == 4 && f.blocks[1].list_parent == 0);
 }
+static void test_list_nonparagraph_blocks(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(
+               &f.state, text("- ## heading\n  - child\n\n  > quote\n\n  after\n- next")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 5 && f.blocks[0].kind == CUI_TEXT_VIEW_HEADING &&
+           f.blocks[0].level == 2 && f.blocks[0].list_item && !f.blocks[0].list_ordered);
+    assert(f.blocks[1].list_parent == 0 && f.blocks[2].kind == CUI_TEXT_VIEW_QUOTE &&
+           f.blocks[2].list_continuation && f.blocks[2].list_parent == 0);
+    assert(f.blocks[3].list_continuation && !f.blocks[3].list_repeat_marker);
+    cui_text_view_layout_options o = {
+        .width = 400, .font_size = 14, .line_height = 20, .paragraph_gap = 16};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].bounds.x == 14 && f.blocks[0].bounds.h == 30 && f.blocks[2].bounds.x == 16 &&
+           f.blocks[2].text_inset == 12);
+    assert(cui_text_view_select(&f.state, f.blocks[0].text.begin, f.blocks[4].text.end));
+    char output[256];
+    size_t length;
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "- ## heading\n  > quote\n  after\n  - child\n- next"));
+    assert(cui_text_view_set_text(&f.state, text("10. > quote\n\n    # subheading\n11. next")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(f.blocks[0].kind == CUI_TEXT_VIEW_QUOTE && f.blocks[0].list_ordered &&
+           f.blocks[1].kind == CUI_TEXT_VIEW_HEADING && f.blocks[1].list_parent == 0 &&
+           f.blocks[2].list_number == 11);
+    assert(cui_text_view_select(&f.state, f.blocks[0].text.begin, f.blocks[2].text.end));
+    assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, output, sizeof output,
+                                        &length) == CUI_TEXT_VIEW_OK);
+    assert(!strcmp(output, "10. > quote\n    # subheading\n11. next"));
+}
 static void test_first_list_fence(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1162,6 +1194,40 @@ static void nested_code_controls(cui_context *ui, cui_id id, const cui_theme *th
                       (cui_button_options){.size = CUI_CONTROL_SMALL}))
         ++action_clicks;
 }
+static void test_list_nonparagraph_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("- ## heading\n  - child\n\n  > quote")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 400;
+    cui_draw_list d = frame(ui, &f, o);
+    bool heading = false, prefix = false, quote = false, quote_border = false;
+    unsigned prefix_count = 0;
+    for (size_t i = 0; i < d.count; ++i) {
+        const cui_draw_command *command = &d.commands[i];
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 7 &&
+            !memcmp(command->text.data, "heading", 7))
+            heading = command->font_size == 21 &&
+                      command->text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD &&
+                      command->bounds.x == f.blocks[0].list_prefix_width;
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 4 &&
+            !memcmp(command->text.data, "\xe2\x80\xa2 ", 4)) {
+            ++prefix_count;
+            prefix = command->font_size == 14 && command->bounds.x == 0 &&
+                     command->text_style.weight == CUI_TEXT_WEIGHT_NORMAL;
+        }
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 5 &&
+            !memcmp(command->text.data, "quote", 5))
+            quote = command->bounds.x == 28;
+        if (command->type == CUI_DRAW_RECT && command->bounds.x == 16 && command->bounds.w == 3)
+            quote_border = true;
+    }
+    assert(heading && prefix && quote && quote_border && prefix_count == 1);
+    cui_destroy(ui);
+}
 static void test_first_list_fence_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1455,6 +1521,7 @@ int main(void) {
     test_nested_list_continuations();
     test_nested_fenced_continuation();
     test_first_list_fence();
+    test_list_nonparagraph_blocks();
     test_fenced_code_content();
     test_table_copy_alignment();
     test_paragraphs_and_numbered_markers();
@@ -1474,6 +1541,7 @@ int main(void) {
     test_nested_continuation_paint();
     test_nested_fenced_paint();
     test_first_list_fence_paint();
+    test_list_nonparagraph_paint();
     test_horizontal_table_gesture();
 #endif
     return 0;

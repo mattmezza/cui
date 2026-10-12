@@ -339,13 +339,13 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         r.x -= origin_x;
         r.y -= origin_y;
         cui_id part = id ^ UINT64_C(0x451ddbcb00000000) ^ (uint64_t)i;
+        if (b->list_item && b->kind != CUI_TEXT_VIEW_LIST_ITEM) {
+            cui_rect prefix = r;
+            prefix.x -= b->list_prefix_width;
+            cui_text_view_paint_list_prefix(ui, part ^ UINT64_C(0x70666978), b, prefix,
+                                            b->list_prefix_width, style);
+        }
         if (b->kind == CUI_TEXT_VIEW_CODE_BLOCK) {
-            if (b->list_item) {
-                cui_rect prefix = r;
-                prefix.x -= b->list_prefix_width;
-                cui_text_view_paint_list_prefix(ui, part ^ UINT64_C(0x70666978), b, prefix,
-                                                b->list_prefix_width, style);
-            }
             cui_text_view_quad(ui, part, r, style.code_background);
         } else if (b->kind == CUI_TEXT_VIEW_TABLE_CELL) {
             if (s->clamped && r.y + 4 + style.line_height > s->height &&
@@ -374,7 +374,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             cui_text_view_quad(ui, part, (cui_rect){r.x, r.y, 3, r.h}, style.border);
         else if (b->kind == CUI_TEXT_VIEW_RULE)
             cui_text_view_quad(ui, part, r, style.border);
-        else if (b->list_item || b->list_repeat_marker) {
+        else if (b->kind == CUI_TEXT_VIEW_LIST_ITEM || b->list_repeat_marker) {
             cui_text_view_paint_list_prefix(ui, part, b, r, b->text_inset, style);
         } else if (b->kind == CUI_TEXT_VIEW_IMAGE && b->image_ready) {
             cui_begin_absolute_box(ui, part, (cui_box){0}, r);

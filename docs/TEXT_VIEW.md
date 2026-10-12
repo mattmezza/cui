@@ -163,7 +163,11 @@ Fences written directly after a list marker are real code blocks with independen
 list-item metadata: the marker or passive task indicator occupies a separate
 column, outside the code background. Such code blocks own nested-list ancestry and
 keep exact source mappings for literal backslashes and subsequent lines. Loose-list
-spacing and nested tables/images/quotes are not yet a complete list AST.
+spacing and nested tables/images or multi-paragraph quote containers are not yet a
+complete list AST. First-child headings and single-paragraph quotes use real block
+styles with a separate normal-size list marker column. Following indented headings
+and quotes remain children of the enclosing item. List ordering is independent of
+heading level, preserving bullet versus decimal prefixes and subsequent counters.
 
 Ordinary list paragraphs join lazy continuation lines with spaces and preserve
 two-space hard breaks. A following indented paragraph stays attached to its

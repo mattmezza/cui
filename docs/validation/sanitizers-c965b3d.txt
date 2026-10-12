@@ -1,0 +1,157 @@
+Source: c965b3d
+Scope: constrain clipped surface content width, wrap a changing alert description and keep both confirmation clicks hittable. Native regression fails the old content-width behavior.
+Test project /home/matteo/.cache/cui-validation/alert-width-asan
+      Start  1: bootstrap
+ 1/75 Test  #1: bootstrap ........................   Passed    0.03 sec
+      Start  2: core
+ 2/75 Test  #2: core .............................   Passed    0.12 sec
+      Start  3: base
+ 3/75 Test  #3: base .............................   Passed    0.06 sec
+      Start  4: components
+ 4/75 Test  #4: components .......................   Passed    0.20 sec
+      Start  5: render
+ 5/75 Test  #5: render ...........................   Passed    0.04 sec
+      Start  6: edit
+ 6/75 Test  #6: edit .............................   Passed    0.06 sec
+      Start  7: overlay
+ 7/75 Test  #7: overlay ..........................   Passed    0.03 sec
+      Start  8: virtual
+ 8/75 Test  #8: virtual ..........................   Passed    0.09 sec
+      Start  9: dock
+ 9/75 Test  #9: dock .............................   Passed    0.83 sec
+      Start 10: plot
+10/75 Test #10: plot .............................   Passed    0.03 sec
+      Start 11: content
+11/75 Test #11: content ..........................   Passed    0.05 sec
+      Start 12: disclosure
+12/75 Test #12: disclosure .......................   Passed    0.10 sec
+      Start 13: choice
+13/75 Test #13: choice ...........................   Passed    1.33 sec
+      Start 14: numeric
+14/75 Test #14: numeric ..........................   Passed    0.11 sec
+      Start 15: picker
+15/75 Test #15: picker ...........................   Passed    0.26 sec
+      Start 16: tree
+16/75 Test #16: tree .............................   Passed    0.13 sec
+      Start 17: input
+17/75 Test #17: input ............................   Passed    0.07 sec
+      Start 18: table
+18/75 Test #18: table ............................   Passed    0.09 sec
+      Start 19: scroll
+19/75 Test #19: scroll ...........................   Passed    0.06 sec
+      Start 20: surface
+20/75 Test #20: surface ..........................   Passed    0.33 sec
+      Start 21: form
+21/75 Test #21: form .............................   Passed    0.08 sec
+      Start 22: otp
+22/75 Test #22: otp ..............................   Passed    0.09 sec
+      Start 23: status
+23/75 Test #23: status ...........................   Passed    0.16 sec
+      Start 24: message
+24/75 Test #24: message ..........................   Passed    0.11 sec
+      Start 25: media
+25/75 Test #25: media ............................   Passed    0.18 sec
+      Start 26: description
+26/75 Test #26: description ......................   Passed    0.07 sec
+      Start 27: chrome
+27/75 Test #27: chrome ...........................   Passed    0.06 sec
+      Start 28: resizable
+28/75 Test #28: resizable ........................   Passed    0.05 sec
+      Start 29: icon
+29/75 Test #29: icon .............................   Passed    0.37 sec
+      Start 30: toolbar
+30/75 Test #30: toolbar ..........................   Passed    0.03 sec
+      Start 31: sidebar
+31/75 Test #31: sidebar ..........................   Passed    0.06 sec
+      Start 32: textarea
+32/75 Test #32: textarea .........................   Passed    0.05 sec
+      Start 33: settings
+33/75 Test #33: settings .........................   Passed    0.15 sec
+      Start 34: carousel
+34/75 Test #34: carousel .........................   Passed    0.10 sec
+      Start 35: command
+35/75 Test #35: command ..........................   Passed    0.08 sec
+      Start 36: root
+36/75 Test #36: root .............................   Passed    0.05 sec
+      Start 37: text_view
+37/75 Test #37: text_view ........................   Passed    0.15 sec
+      Start 38: chart
+38/75 Test #38: chart ............................   Passed    0.23 sec
+      Start 39: speech
+39/75 Test #39: speech ...........................   Passed    0.04 sec
+      Start 40: questionnaire
+40/75 Test #40: questionnaire ....................   Passed    0.02 sec
+      Start 41: questionnaire_styled
+41/75 Test #41: questionnaire_styled .............   Passed    0.14 sec
+      Start 42: icon_host_svg
+42/75 Test #42: icon_host_svg ....................   Passed    0.03 sec
+      Start 43: example_unstyled
+43/75 Test #43: example_unstyled .................   Passed    0.03 sec
+      Start 44: example_styled_settings
+44/75 Test #44: example_styled_settings ..........   Passed    0.03 sec
+      Start 45: manifest
+45/75 Test #45: manifest .........................   Passed    0.18 sec
+      Start 46: licenses
+46/75 Test #46: licenses .........................   Passed    0.16 sec
+      Start 47: distribution
+47/75 Test #47: distribution .....................   Passed    0.25 sec
+      Start 48: cpp_embedding
+48/75 Test #48: cpp_embedding ....................   Passed    0.03 sec
+      Start 49: distribution_single
+49/75 Test #49: distribution_single ..............   Passed    0.04 sec
+      Start 50: distribution_multi
+50/75 Test #50: distribution_multi ...............   Passed    0.05 sec
+      Start 51: sdl3_services
+51/75 Test #51: sdl3_services ....................   Passed    0.90 sec
+      Start 52: gallery_layout
+52/75 Test #52: gallery_layout ...................   Passed    0.05 sec
+      Start 53: gallery_capture
+53/75 Test #53: gallery_capture ..................   Passed    0.33 sec
+      Start 54: implementation_embedding
+54/75 Test #54: implementation_embedding .........   Passed    0.03 sec
+      Start 55: numeric_base_only
+55/75 Test #55: numeric_base_only ................   Passed    0.06 sec
+      Start 56: picker_base_only
+56/75 Test #56: picker_base_only .................   Passed    0.14 sec
+      Start 57: tree_base_only
+57/75 Test #57: tree_base_only ...................   Passed    0.09 sec
+      Start 58: input_base_only
+58/75 Test #58: input_base_only ..................   Passed    0.04 sec
+      Start 59: table_base_only
+59/75 Test #59: table_base_only ..................   Passed    0.05 sec
+      Start 60: scroll_base_only
+60/75 Test #60: scroll_base_only .................   Passed    0.06 sec
+      Start 61: surface_base_only
+61/75 Test #61: surface_base_only ................   Passed    0.15 sec
+      Start 62: form_base_only
+62/75 Test #62: form_base_only ...................   Passed    0.03 sec
+      Start 63: otp_base_only
+63/75 Test #63: otp_base_only ....................   Passed    0.03 sec
+      Start 64: status_base_only
+64/75 Test #64: status_base_only .................   Passed    0.02 sec
+      Start 65: message_base_only
+65/75 Test #65: message_base_only ................   Passed    0.03 sec
+      Start 66: media_base_only
+66/75 Test #66: media_base_only ..................   Passed    0.01 sec
+      Start 67: resizable_base_only
+67/75 Test #67: resizable_base_only ..............   Passed    0.04 sec
+      Start 68: toolbar_base_only
+68/75 Test #68: toolbar_base_only ................   Passed    0.03 sec
+      Start 69: sidebar_base_only
+69/75 Test #69: sidebar_base_only ................   Passed    0.03 sec
+      Start 70: carousel_base_only
+70/75 Test #70: carousel_base_only ...............   Passed    0.01 sec
+      Start 71: command_base_only
+71/75 Test #71: command_base_only ................   Passed    0.01 sec
+      Start 72: root_base_only
+72/75 Test #72: root_base_only ...................   Passed    0.02 sec
+      Start 73: text_view_base_only
+73/75 Test #73: text_view_base_only ..............   Passed    0.07 sec
+      Start 74: chart_base_only
+74/75 Test #74: chart_base_only ..................   Passed    0.11 sec
+      Start 75: speech_base_only
+75/75 Test #75: speech_base_only .................   Passed    0.02 sec
+
+100% tests passed out of 75
+
+Total Test time (real) =   9.49 sec

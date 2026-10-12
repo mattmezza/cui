@@ -1,0 +1,9 @@
+Source: c965b3d
+Scope: constrain clipped surface content width, wrap a changing alert description and keep both confirmation clicks hittable. Native regression fails the old content-width behavior.
+python scripts/check_manifest.py
+78 unique components: {'not_started': 0, 'scaffolded': 0, 'implemented': 5, 'tested': 73, 'verified': 0}
+python scripts/check_licenses.py
+Pinned dependency hashes and license files match
+python scripts/theme_presets.py --check
+python scripts/format.py --check
+python scripts/amalgamate.py --check

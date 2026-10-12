@@ -1,0 +1,3 @@
+Source: c965b3d
+Scope: constrain clipped surface content width, wrap a changing alert description and keep both confirmation clicks hittable. Native regression fails the old content-width behavior.
+test_surface: /home/matteo/.cache/cui-worktrees/alert-width/tests/unit/test_surface.c:675: alert_wrapped_confirmation: Assertion `content.w <= viewport.w + .1f' failed.

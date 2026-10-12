@@ -164,7 +164,7 @@ def main() -> int:
         targets += [("picker_base_only", ["tests/unit/test_picker.c", "src/core/cui.c", "src/base/cui_models.c", "src/base/cui_overlay.c", "src/base/cui_picker.c"], False, ["-DCUI_PICKER_BASE_ONLY=1"])]
         targets += [("tree_base_only", ["tests/unit/test_tree.c", "src/core/cui.c", "src/base/cui_tree.c"], False, ["-DCUI_TREE_BASE_ONLY=1"])]
         targets += [("input_base_only", ["tests/unit/test_input.c", "src/core/cui.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_INPUT_BASE_ONLY=1"])]
-        targets += [("table_base_only", ["tests/unit/test_table.c", "src/core/cui.c", "src/base/cui_table.c"], False, ["-DCUI_TABLE_BASE_ONLY=1"])]
+        targets += [("table_base_only", ["tests/unit/test_table.c", "src/core/cui.c", "src/base/cui_table.c", "src/base/cui_scroll.c"], False, ["-DCUI_TABLE_BASE_ONLY=1"])]
         targets += [("scroll_base_only", ["tests/unit/test_scroll.c", "src/core/cui.c", "src/base/cui_scroll.c"], False, ["-DCUI_SCROLL_BASE_ONLY=1"])]
         targets += [("surface_base_only", ["tests/unit/test_surface.c", "src/core/cui.c", "src/base/cui_models.c", "src/base/cui_overlay.c", "src/base/cui_surface.c"], False, ["-DCUI_SURFACE_BASE_ONLY=1"])]
         targets += [("implementation_embedding", ["tests/unit/test_core_embed.c"], False, [])]

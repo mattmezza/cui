@@ -287,7 +287,7 @@ cui_warnings(test_input_base)
 add_test(NAME input_base_only COMMAND test_input_base)
 set_tests_properties(input_base_only PROPERTIES TIMEOUT 60)
 
-add_executable(test_table_base tests/unit/test_table.c src/core/cui.c src/base/cui_table.c)
+add_executable(test_table_base tests/unit/test_table.c src/core/cui.c src/base/cui_table.c src/base/cui_scroll.c)
 target_include_directories(test_table_base PRIVATE include third_party/clay)
 target_compile_definitions(test_table_base PRIVATE CUI_TABLE_BASE_ONLY=1)
 if(NOT MSVC)

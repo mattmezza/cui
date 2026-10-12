@@ -201,6 +201,13 @@ bool cui_text_view_selection_update(cui_context *ui, cui_text_view_selection *m,
         cui_invalidate(ui);
     return changed;
 }
+static void cui_text_view_project_pointer(cui_id id, cui_text_view_state *s,
+                                          cui_text_view_table_mode mode, float x, float y) {
+    cui_text_view_selection_member member = {
+        .state = s, .id = id, .scope = id, .table_mode = mode, .enabled = true};
+    cui_text_view_selection manager = {.members = &member, .count = 1, .capacity = 1};
+    (void)cui_text_view_selection_project(&manager, id, s->selection_x, s->selection_y, x, y);
+}
 static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state *s,
                                  cui_text_view_options o) {
     if (!o.selectable || o.disabled) {
@@ -237,7 +244,21 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                 s->dragged = false;
                 s->pointer_x = s->press_x = e->x;
                 s->pointer_y = s->press_y = e->y;
+                s->selection_x = e->x;
+                s->selection_y = e->y;
+                if (e->modifiers & CUI_MOD_SHIFT)
+                    for (size_t j = 0; j < s->glyph_count; ++j) {
+                        const cui_text_view_glyph *g = &s->workspace.glyphs[j];
+                        if (!(g->flags & CUI_TEXT_VIEW_INLINE_IMAGE) &&
+                            s->anchor >= g->text.begin && s->anchor <= g->text.end) {
+                            s->selection_x = s->viewport.x + g->bounds.x +
+                                             (s->anchor == g->text.end ? g->bounds.w : 0);
+                            s->selection_y = s->viewport.y + g->bounds.y - s->scroll.y + 1;
+                            break;
+                        }
+                    }
                 (void)cui_text_view_select(s, e->modifiers & CUI_MOD_SHIFT ? s->anchor : at, at);
+                cui_text_view_project_pointer(id, s, o.table_mode, e->x, e->y);
             } else if (s->selecting && (e->type != CUI_EVENT_POINTER_UP ||
                                         e->pointer_button == CUI_POINTER_PRIMARY)) {
                 if (fabsf(e->x - s->press_x) > 2 || fabsf(e->y - s->press_y) > 2)
@@ -245,7 +266,7 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                 s->pointer_x = e->x;
                 s->pointer_y = e->y;
                 if (s->dragged) {
-                    (void)cui_text_view_select(s, s->anchor, at);
+                    cui_text_view_project_pointer(id, s, o.table_mode, e->x, e->y);
                     cui_focus(ui, id);
                     (void)cui_cancel_event_activation(ui, i);
                     (void)cui_consume_event(ui, i);
@@ -897,11 +918,7 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
         float before = s->scroll.y;
         s->scroll.y = fminf(fmaxf(0, s->scroll.y + speed * o.dt), fmaxf(0, s->height - viewport));
         if (before != s->scroll.y) {
-            size_t at =
-                cui_text_view_pointer_hit(s, s->pointer_x - s->viewport.x,
-                                          s->pointer_y - s->viewport.y + s->scroll.y, o.table_mode);
-            if (at != SIZE_MAX)
-                (void)cui_text_view_select(s, s->anchor, at);
+            cui_text_view_project_pointer(id, s, o.table_mode, s->pointer_x, s->pointer_y);
             cui_invalidate(ui);
         }
     }

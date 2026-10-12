@@ -119,7 +119,7 @@ typedef struct {
     size_t source_length, text_length, span_count, block_count, glyph_count, highlight_count;
     size_t anchor, cursor;
     bool selecting, dragged, clamped, stream_fade, reduced_motion, selection_projected;
-    float pointer_x, pointer_y, press_x, press_y;
+    float pointer_x, pointer_y, press_x, press_y, selection_x, selection_y;
     cui_id secondary_link;
     float time, fade_duration, width, height;
     cui_scroll_state scroll;

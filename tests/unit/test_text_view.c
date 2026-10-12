@@ -1367,7 +1367,7 @@ static void test_inline_image_paint(void) {
     size_t copied;
     assert(cui_text_view_copy_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, selected,
                                         sizeof selected, &copied) == CUI_TEXT_VIEW_OK &&
-           !strcmp(selected, "![alt](asset)"));
+           copied == 0 && !selected[0]);
     o.width = 32;
     frame(ui, &f, o);
     assert(f.spans[1].image_bounds.y == 22.5f && f.glyphs[2].bounds.y == 40);
@@ -1377,6 +1377,45 @@ static void test_inline_image_paint(void) {
         assert(d.commands[i].type != CUI_DRAW_IMAGE);
     assert(!f.spans[1].image_ready && f.spans[1].image_bounds.w == 15 &&
            f.glyphs[0].bounds.y == f.glyphs[2].bounds.y && !strcmp(f.rendered, "a b\n"));
+    cui_destroy(ui);
+}
+static void test_reverse_inline_image_selection(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    const char *source = "a![alt](asset)b";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    frame(ui, &f, o);
+    float right = f.state.viewport.x + f.glyphs[2].bounds.x + f.glyphs[2].bounds.w,
+          left = f.state.viewport.x + f.glyphs[0].bounds.x,
+          y = f.state.viewport.y + f.glyphs[0].bounds.y + 5;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = right,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = left, .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = left,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(!f.state.selecting && f.state.anchor == 3 && f.state.cursor == 0);
+    char copy[64];
+    size_t length;
+    assert(cui_text_view_copy_document_selection(&f.state, CUI_TEXT_VIEW_COPY_PLAIN, copy,
+                                                 sizeof copy, &length) == CUI_TEXT_VIEW_OK &&
+           !strcmp(copy, "ab\n"));
+    assert(cui_text_view_copy_document_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, copy,
+                                                 sizeof copy, &length) == CUI_TEXT_VIEW_OK &&
+           !strcmp(copy, source));
+    frame(ui, &f, o);
+    assert(!f.state.selecting && f.state.anchor == 3 && f.state.cursor == 0);
     cui_destroy(ui);
 }
 static unsigned standalone_image_calls;
@@ -1467,6 +1506,24 @@ static void test_linked_image_paint(void) {
                                            .y = y}));
     frame(ui, &f, o);
     assert(image_link_clicks == 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x + 10, .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x + 10,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(image_link_clicks == 1 && !f.state.selecting && f.state.anchor == f.state.cursor);
+    char copy[64];
+    size_t length;
+    assert(cui_text_view_copy_document_selection(&f.state, CUI_TEXT_VIEW_COPY_SOURCE, copy,
+                                                 sizeof copy, &length) == CUI_TEXT_VIEW_OK &&
+           length == 0);
     cui_destroy(ui);
 }
 static void test_markdown_html_image_paint(void) {
@@ -2894,6 +2951,7 @@ int main(void) {
     test_html_inline_image_paint();
     test_inline_image_heading_metrics();
     test_inline_image_paint();
+    test_reverse_inline_image_selection();
     test_image_metric_paint();
     test_links_and_images();
     test_theme_scroll_and_reveal();

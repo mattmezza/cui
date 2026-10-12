@@ -68,8 +68,8 @@ and drawing; register matching native faces for the desired typography. The regu
 face remains the renderer fallback. No Content rich-text parser existed to reuse.
 
 Remaining frozen-source gaps are tracked explicitly: complete CommonMark/HTML5
-and nested lists, inline/linked images, MDX/plugins/YAML front matter, image
-alignment/error UI, global selection spanning multiple views, touch selection menus
+and complete nested-list/quote structure, MDX/plugins/YAML front matter, image
+error UI, complete shared-window selection identity, touch selection menus
 and handles, grapheme/BiDi shaping, inherited parent foreground palettes, fully configurable table/action refinements,
 custom word/CJK stagger and easing, automatic enclosing-list reveal, background
 syntax styles, cached/asynchronous parsing and layout. Default wrap tables use
@@ -286,14 +286,15 @@ Plain copy and Ctrl+C omit image slots, matching source paragraph text output.
 Copying only an image in Plain mode produces no text and leaves the clipboard
 unchanged. The raw `selected_text` accessor remains a borrowed coordinate slice
 of `workspace.rendered`, including object slots, valid until the next text mutation;
-use `copy_selection(PLAIN)` for presentation or clipboard text. Default Plain
+use `copy_document_selection(PLAIN)` for styled presentation or clipboard text. Default Plain
 clipboard output uses bounded temporary storage when no caller buffer is supplied.
-Source-format Ctrl+C continues to require caller output storage.
+Ordinary Source-format Ctrl+C continues to require caller output storage.
 
 The frozen implementation selects shared text runs around images and includes
 images in Source copy when selection spans the adjacent run boundaries. CUI still
-uses a flat coordinate space with atomic image slots, so independent image selection
-and complete shared-window selection identity are not yet source-equivalent.
+retains atomic image slots in its low-level coordinate API. Styled pointer selection
+projects text glyphs instead of independently selecting those slots; full shared-window
+selection identity remains tracked.
 
 Markdown Source copy and selected source ranges include consecutive images at a
 paragraph boundary when selection begins at the first text byte after leading
@@ -361,3 +362,16 @@ its old projection; if it owns the active drag, the manager clears that drag.
 Changing text discards glyph geometry and projected ranges. Such a member cannot
 start a shared gesture until it has submitted fresh geometry; retained viewport
 coordinates alone are insufficient.
+
+
+Ordinary pointer drags now use the same window-point projection as shared selection.
+Dragging within an image selects no text and copies no Source syntax; a tap on a
+linked image still activates its link, while a drag cancels that release activation.
+Reverse text-image-text drags retain their direction and include image syntax in
+Source copy when adjacent text boundaries are selected. Programmatic
+`cui_text_view_select` remains the explicit low-level coordinate API and can select
+an image slot by itself; that does not describe the styled pointer behavior.
+
+HTML Source fallback to Plain and unavailable HTML source offsets match the frozen
+implementation's `effective_format` contract and html5ever's absent source spans;
+they are not missing HTML reconstruction features promised by that source.

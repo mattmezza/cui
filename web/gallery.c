@@ -37,6 +37,18 @@ static float host_measure(const char *s, size_t n, float size) {
 #endif
 static cui_context *ui;
 static cui_theme current_theme;
+static int gallery_preset_index = -1;
+
+void gallery_theme_preset(int index) {
+    gallery_preset_index = index >= 0 && (size_t)index < cui_theme_preset_count() ? index : -1;
+}
+
+int gallery_theme_channel(int field, int channel) {
+    cui_color color = field == 1   ? current_theme.text
+                      : field == 2 ? current_theme.primary
+                                   : current_theme.background;
+    return channel == 0 ? color.r : channel == 1 ? color.g : channel == 2 ? color.b : color.a;
+}
 static bool redraw, reduced_motion, compact_density;
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
@@ -828,6 +840,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     cui_theme t = theme == 1   ? cui_theme_dark()
                   : theme == 2 ? cui_theme_high_contrast()
                                : cui_theme_light();
+    if (gallery_preset_index >= 0)
+        cui_theme_preset_get((size_t)gallery_preset_index, &t);
     if (compact_density) {
         t.font_size *= .875f;
         t.control_height *= .8f;

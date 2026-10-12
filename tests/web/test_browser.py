@@ -96,6 +96,58 @@ def main():
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"')
             page.emulate_media(color_scheme='light')
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="light"')
+            page.locator('#palette-trigger').click()
+            page.locator('#palette-menu [data-palette="high-contrast"]').click()
+            assert page.evaluate('getComputedStyle(document.body).backgroundColor') == 'rgb(255, 255, 255)'
+            page.locator('#palette-trigger').click()
+            page.locator('#palette-menu [data-palette="system"]').click()
+            # The picker uses the same pinned palette data for CSS and the C draw theme.
+            presets = page.evaluate('cuiGallery.themes')
+            assert len(presets) == 38
+            assert page.locator('#palette-menu [role=group]').count() == 4
+            assert page.locator('#palette-menu [role=option]').count() == 40
+            for index, preset in enumerate(presets):
+                page.locator('#palette-trigger').click()
+                assert page.locator('#palette-menu .palette-check:visible').count() == 1
+                if index == 0:
+                    page.screenshot(path='/tmp/cui-web-palette-light.png')
+                before_palette_frame = page.evaluate('cuiGallery.frame')
+                page.locator(f'#palette-menu [data-palette="{preset["id"]}"]').click()
+                page.wait_for_function('(expected)=>cuiGallery.themeChoice===expected.id&&getComputedStyle(document.body).backgroundColor===expected.css', arg={'id':preset['id'],'css':f'rgb({int(preset["colors"]["background"][1:3],16)}, {int(preset["colors"]["background"][3:5],16)}, {int(preset["colors"]["background"][5:7],16)})'})
+                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before_palette_frame)
+                channels = page.evaluate('Array.from({length:4},(_,channel)=>cuiGallery.exports.gallery_theme_channel(0,channel))')
+                assert channels == [int(preset['colors']['background'][n:n+2],16) for n in (1,3,5,7)], (index,preset['name'],channels)
+                assert page.locator('#palette-trigger').get_attribute('aria-expanded') == 'false'
+                assert page.locator('#palette-trigger').evaluate('(node)=>document.activeElement===node')
+                if index == 12:
+                    page.locator('#palette-trigger').click()
+                    page.screenshot(path='/tmp/cui-web-palette-dark.png')
+                    page.keyboard.press('Escape')
+            page.reload()
+            page.wait_for_function('window.cuiGallery&&cuiGallery.themeChoice===localStorage.getItem("cui.theme")')
+            assert page.locator('#palette-label').inner_text() == presets[-1]['name']
+            page.emulate_media(color_scheme='dark')
+            page.emulate_media(color_scheme='light')
+            assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'dark'
+            page.locator('#palette-trigger').click()
+            page.keyboard.press('Home')
+            assert page.locator('#palette-menu [data-palette="system"]').evaluate('(node)=>document.activeElement===node')
+            page.keyboard.press('ArrowDown')
+            assert page.locator('#palette-menu [data-palette="default-light"]').evaluate('(node)=>document.activeElement===node')
+            assert page.locator('#palette-menu [tabindex="0"]').count() == 1
+            page.keyboard.press('Escape')
+            assert page.locator('#palette-trigger').evaluate('(node)=>document.activeElement===node')
+            page.locator('#palette-trigger').click()
+            page.keyboard.press('Home')
+            page.keyboard.press('Enter')
+            page.wait_for_function('cuiGallery.themeChoice==="system"')
+            page.locator('#palette-trigger').click()
+            page.mouse.click(700, 250)
+            assert page.locator('#palette-menu').is_hidden()
+            page.emulate_media(color_scheme='dark')
+            page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"')
+            page.emulate_media(color_scheme='light')
+            page.wait_for_function('getComputedStyle(document.body).colorScheme==="light"')
             assert page.request.get(f'http://127.0.0.1:{server.server_port}/cui/LICENSE.txt').ok
             assert page.locator('#catalog a').count() == 78
             assert page.locator('#name').inner_text() == 'Button'

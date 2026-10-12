@@ -29,6 +29,8 @@ SOURCES = (
     "src/components/cui_components.c",
     "src/base/cui_table.c",
     "src/components/cui_table.c",
+    "src/base/cui_surface.c",
+    "src/components/cui_surface.c",
     "src/base/cui_scroll.c",
     "src/components/cui_scroll.c",
     "src/base/cui_tree.c",
@@ -45,7 +47,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -164,6 +166,7 @@ def main() -> int:
         targets += [("input_base_only", ["tests/unit/test_input.c", "src/core/cui.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_INPUT_BASE_ONLY=1"])]
         targets += [("table_base_only", ["tests/unit/test_table.c", "src/core/cui.c", "src/base/cui_table.c"], False, ["-DCUI_TABLE_BASE_ONLY=1"])]
         targets += [("scroll_base_only", ["tests/unit/test_scroll.c", "src/core/cui.c", "src/base/cui_scroll.c"], False, ["-DCUI_SCROLL_BASE_ONLY=1"])]
+        targets += [("surface_base_only", ["tests/unit/test_surface.c", "src/core/cui.c", "src/base/cui_models.c", "src/base/cui_overlay.c", "src/base/cui_surface.c"], False, ["-DCUI_SURFACE_BASE_ONLY=1"])]
         targets += [("implementation_embedding", ["tests/unit/test_core_embed.c"], False, [])]
         targets += [(f"example_{name}", [f"examples/{name}/main.c"], True, [])
                     for name in ("unstyled", "styled_settings")]

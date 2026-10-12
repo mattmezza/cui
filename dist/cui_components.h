@@ -9,6 +9,7 @@
 #include "cui_numeric.h"
 #include "cui_picker.h"
 #include "cui_scroll.h"
+#include "cui_surface.h"
 #include "cui_table.h"
 #include "cui_theme.h"
 #include "cui_tree.h"
@@ -107,6 +108,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_SCROLL_IMPLEMENTATION
 #endif
 #include "cui_scroll.h"
+#ifndef CUI_SURFACE_IMPLEMENTATION
+#define CUI_SURFACE_IMPLEMENTATION
+#endif
+#include "cui_surface.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

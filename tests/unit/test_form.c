@@ -31,6 +31,10 @@ static void planning(void) {
     f[1].id = 1;
     assert(cui_form_plan(f, 5, o, c, 5, &rows) == CUI_FORM_DUPLICATE_ID);
     f[1].id = 2;
+    f[3].column_start = 1;
+    assert(cui_form_plan(f, 5, o, c, 5, &rows) == CUI_FORM_OK && c[3].row > c[2].row);
+    o.width = 1;
+    assert(cui_form_plan(f, 5, o, c, 5, &rows) == CUI_FORM_INVALID);
     o.width = NAN;
     assert(cui_form_plan(f, 5, o, c, 5, &rows) == CUI_FORM_INVALID);
 }
@@ -182,9 +186,128 @@ static void editing(void) {
     cui_destroy(ui);
 }
 #endif
+static cui_input_group_result group_scene(cui_context *ui, cui_edit *edit,
+                                          cui_input_group_state *state, cui_input_group_options o,
+                                          const cui_input_group_addon *a, size_t count) {
+    assert(cui_begin_frame(ui, 500, 500, .016f));
+    cui_input_group_result result;
+#ifdef CUI_FORM_BASE_ONLY
+    result = cui_base_input_group(ui, 100, 101, edit, state, a, count, o);
+    cui_begin_box(ui, 100, (cui_box){.width = 300});
+    for (size_t i = 0; i < count; i++) {
+        cui_begin_box(ui, a[i].id, (cui_box){.width = 60, .height = 30});
+        cui_end_box(ui);
+    }
+    cui_begin_box(ui, 101, (cui_box){.width = 180, .height = 30});
+    cui_end_box(ui);
+    cui_end_box(ui);
+#else
+    cui_theme t = cui_theme_dark();
+    result = cui_input_group(ui, 100, 101, &t, edit, state, a, count, o);
+#endif
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && result.error == CUI_FORM_OK);
+    return result;
+}
+static void click(cui_context *ui, cui_id id) {
+    cui_rect r = cui_bounds(ui, id);
+    assert(r.w > 0 && r.h > 0);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));
+}
+static void input_groups(void) {
+    char buffer[64] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+    assert(edit);
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 500});
+    assert(ui);
+    cui_input_group_state state = {0};
+    cui_input_group_options o = {.width = 300, .name = {"Search", 6}};
+    cui_input_group_addon a[] = {
+        {.id = 110, .label = {"https://", 8}, .width = 60},
+        {.id = 111,
+         .alignment = CUI_INPUT_GROUP_INLINE_END,
+         .kind = CUI_INPUT_GROUP_BUTTON,
+         .label = {"Clear", 5},
+         .width = 60},
+        {.id = 112, .alignment = CUI_INPUT_GROUP_BLOCK_START, .label = {"Heading", 7}},
+        {.id = 113, .alignment = CUI_INPUT_GROUP_BLOCK_END, .label = {"Counter", 7}}};
+    group_scene(ui, edit, &state, o, a, 4);
+#ifndef CUI_FORM_BASE_ONLY
+    cui_rect left = cui_bounds(ui, 110), input = cui_bounds(ui, 101), right = cui_bounds(ui, 111),
+             top = cui_bounds(ui, 112), bottom = cui_bounds(ui, 113);
+    assert(left.x + left.w <= input.x && input.x + input.w <= right.x && top.y + top.h <= input.y &&
+           bottom.y >= input.y + input.h);
+#endif
+    click(ui, 110);
+    group_scene(ui, edit, &state, o, a, 4);
+    assert(cui_focused(ui) == 101);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "abc"}));
+    assert(group_scene(ui, edit, &state, o, a, 4).input.changed &&
+           cui_edit_get_text(edit).length == 3);
+    click(ui, 111);
+    assert(group_scene(ui, edit, &state, o, a, 4).activated_addon == 111 && cui_focused(ui) == 111);
+    o.input.readonly = true;
+    click(ui, 110);
+    group_scene(ui, edit, &state, o, a, 4);
+    assert(cui_focused(ui) == 101);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "x"}));
+    assert(!group_scene(ui, edit, &state, o, a, 4).input.changed &&
+           cui_edit_get_text(edit).length == 3);
+    click(ui, 111);
+    assert(group_scene(ui, edit, &state, o, a, 4).activated_addon == 111);
+    o.input.disabled = true;
+    click(ui, 111);
+    assert(!group_scene(ui, edit, &state, o, a, 4).activated_addon);
+    o.input.disabled = false;
+    a[1].loading = true;
+    click(ui, 111);
+    assert(!group_scene(ui, edit, &state, o, a, 4).activated_addon);
+    o.input.invalid = true;
+    group_scene(ui, edit, &state, o, a, 4);
+    size_t n;
+    const cui_semantic *sem = cui_semantics(ui, &n);
+    assert(sem[0].details.invalid && sem[0].details.readonly);
+#ifndef CUI_FORM_BASE_ONLY
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme = 0; theme < 4; theme++)
+        for (unsigned size = 0; size < 4; size++) {
+            o.size = (cui_form_size)size;
+            assert(cui_begin_frame(ui, 500, 500, .016f));
+            assert(cui_input_group(ui, 100, 101, &themes[theme], edit, &state, a, 4, o).error ==
+                   CUI_FORM_OK);
+            cui_draw_list draw = cui_end_frame(ui);
+            bool danger = false;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_BORDER &&
+                    draw.commands[i].color.r == themes[theme].danger.r &&
+                    draw.commands[i].color.g == themes[theme].danger.g &&
+                    draw.commands[i].color.b == themes[theme].danger.b)
+                    danger = true;
+            assert(danger && cui_last_error(ui) == CUI_OK);
+        }
+#endif
+    assert(cui_begin_frame(ui, 500, 500, .016f));
+    o.width = INFINITY;
+    assert(cui_base_input_group(ui, 100, 101, edit, &state, a, 4, o).error == CUI_FORM_INVALID);
+    o.width = 300;
+    a[0].width = NAN;
+    assert(cui_base_input_group(ui, 100, 101, edit, &state, a, 4, o).error == CUI_FORM_INVALID);
+    a[0].width = 60;
+    a[1].id = a[0].id;
+    assert(cui_base_input_group(ui, 100, 101, edit, &state, a, 4, o).error == CUI_FORM_INVALID);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
     planning();
     base_semantics();
+    input_groups();
 #ifndef CUI_FORM_BASE_ONLY
     composition();
     editing();

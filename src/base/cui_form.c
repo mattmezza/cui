@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_form.h"
 #include <math.h>
-static size_t columns(cui_form_options o) {
+static size_t cui_form_private_columns(cui_form_options o) {
     return o.columns ? o.columns : 1;
 }
-static float width(cui_form_options o) {
+static float cui_form_private_width(cui_form_options o) {
     return o.width > 0 ? o.width : 480;
 }
-static float gap(cui_form_options o) {
+static float cui_form_private_gap(cui_form_options o) {
     return o.size == CUI_FORM_LARGE                                ? 12
            : o.size == CUI_FORM_SMALL || o.size == CUI_FORM_XSMALL ? 6
                                                                    : 8;
@@ -21,31 +21,34 @@ cui_id cui_form_label_id(cui_id id) {
 cui_id cui_form_description_id(cui_id id) {
     return id ^ UINT64_C(0xd29c8f326b970fea);
 }
-static int line(int value, size_t n) {
+static int cui_form_private_line(int value, size_t n) {
     return value < 0 ? (int)n + 2 + value : value;
 }
-static bool string_valid(cui_str s) {
+static bool cui_form_private_string_valid(cui_str s) {
     return !s.length || s.data;
 }
 cui_form_error cui_form_plan(const cui_form_field *f, size_t count, cui_form_options o,
                              cui_form_cell *cells, size_t capacity, size_t *rows) {
-    size_t n = columns(o);
+    size_t n = cui_form_private_columns(o);
     if ((count && (!f || !cells)) || !rows || n > 64 || count > 256 || !isfinite(o.width) ||
         !isfinite(o.label_width) || !isfinite(o.label_text_size) || !isfinite(o.gap_x) ||
         !isfinite(o.gap_y) || o.width < 0 || o.label_width < 0 || o.label_text_size < 0 ||
         o.gap_x < 0 || o.gap_y < 0 || o.size < CUI_FORM_MEDIUM || o.size > CUI_FORM_LARGE ||
-        !string_valid(o.name))
+        !cui_form_private_string_valid(o.name))
         return CUI_FORM_INVALID;
     if (capacity < count)
         return CUI_FORM_CAPACITY;
-    float gx = o.gap_x > 0 ? o.gap_x : gap(o) * 3;
-    if (width(o) <= gx * (n - 1))
+    float gx = o.gap_x > 0 ? o.gap_x : cui_form_private_gap(o) * 3;
+    if (cui_form_private_width(o) <= gx * (n - 1))
         return CUI_FORM_INVALID;
     for (size_t i = 0; i < count; i++) {
-        if (!f[i].id || !string_valid(f[i].label) || !string_valid(f[i].description) ||
-            !string_valid(f[i].error) || f[i].align < CUI_ALIGN_START || f[i].align > CUI_ALIGN_END)
+        if (!f[i].id || !cui_form_private_string_valid(f[i].label) ||
+            !cui_form_private_string_valid(f[i].description) ||
+            !cui_form_private_string_valid(f[i].error) || f[i].align < CUI_ALIGN_START ||
+            f[i].align > CUI_ALIGN_END)
             return CUI_FORM_INVALID;
-        int start = line(f[i].column_start, n), end = line(f[i].column_end, n);
+        int start = cui_form_private_line(f[i].column_start, n),
+            end = cui_form_private_line(f[i].column_end, n);
         size_t span = f[i].column_span ? f[i].column_span : 1;
         if (span > n || (start && (start < 1 || start > (int)n)) ||
             (end && (end < 2 || end > (int)n + 1)) || (start && end && end <= start) ||
@@ -57,12 +60,13 @@ cui_form_error cui_form_plan(const cui_form_field *f, size_t count, cui_form_opt
                 return CUI_FORM_DUPLICATE_ID;
     }
     size_t row = 0, cursor = 0, visible = 0;
-    float unit = (width(o) - gx * (n - 1)) / n;
+    float unit = (cui_form_private_width(o) - gx * (n - 1)) / n;
     for (size_t i = 0; i < count; i++) {
         cells[i] = (cui_form_cell){0};
         if (f[i].hidden)
             continue;
-        int start = line(f[i].column_start, n), end = line(f[i].column_end, n);
+        int start = cui_form_private_line(f[i].column_start, n),
+            end = cui_form_private_line(f[i].column_end, n);
         size_t span = f[i].column_span ? f[i].column_span : 1;
         if (start && end)
             span = (size_t)(end - start);
@@ -136,4 +140,91 @@ cui_form_error cui_base_form(cui_context *ui, cui_id id, const cui_form_field *f
             cui_form_associate_control(ui, &f[i]);
         }
     return CUI_FORM_OK;
+}
+static bool cui_form_private_group_valid(cui_id group, cui_id input, const cui_input_group_addon *a,
+                                         size_t count, cui_input_group_options o) {
+    if (!group || !input || group == input || count > 64 || (count && !a) ||
+        !cui_form_private_string_valid(o.name) || !cui_form_private_string_valid(o.placeholder) ||
+        !isfinite(o.width) || !isfinite(o.font_size) || o.width < 0 || o.font_size < 0 ||
+        o.size < CUI_FORM_MEDIUM || o.size > CUI_FORM_LARGE)
+        return false;
+    for (size_t i = 0; i < count; i++) {
+        if (!a[i].id || a[i].id == group || a[i].id == input ||
+            !cui_form_private_string_valid(a[i].label) || !isfinite(a[i].width) || a[i].width < 0 ||
+            a[i].alignment < CUI_INPUT_GROUP_INLINE_START ||
+            a[i].alignment > CUI_INPUT_GROUP_BLOCK_END || a[i].kind < CUI_INPUT_GROUP_TEXT ||
+            a[i].kind > CUI_INPUT_GROUP_CUSTOM || a[i].variant < CUI_INPUT_GROUP_GHOST ||
+            a[i].variant > CUI_INPUT_GROUP_DANGER)
+            return false;
+        for (size_t j = 0; j < i; j++)
+            if (a[j].id == a[i].id)
+                return false;
+    }
+    return true;
+}
+cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_id input,
+                                            cui_edit *edit, cui_input_group_state *state,
+                                            const cui_input_group_addon *a, size_t count,
+                                            cui_input_group_options o) {
+    cui_input_group_result result = {.input.error = CUI_EDIT_OK};
+    if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
+        result.error = CUI_FORM_INVALID;
+        result.input.error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    (void)cui_interact(ui, group, CUI_ROLE_GROUP, o.name, o.input.disabled, false, 0);
+    cui_set_semantic_details(ui, group,
+                             (cui_semantic_details){.readonly = o.input.readonly,
+                                                    .invalid = o.input.invalid,
+                                                    .controls = input});
+    for (size_t i = 0; i < count; i++) {
+        bool disabled = o.input.disabled || a[i].disabled || a[i].loading;
+        if (a[i].kind == CUI_INPUT_GROUP_BUTTON) {
+            cui_interaction button = cui_base_button(ui, a[i].id, a[i].label, disabled);
+            if (button.activated)
+                result.activated_addon = a[i].id;
+        } else
+            (void)cui_interact(ui, a[i].id, CUI_ROLE_GROUP, a[i].label, disabled, false, 0);
+        cui_set_semantic_details(ui, a[i].id,
+                                 (cui_semantic_details){.parent = group, .busy = a[i].loading});
+    }
+    size_t n;
+    const cui_event *events = cui_frame_events(ui, &n);
+    if (!o.input.disabled)
+        for (size_t i = 0; i < n; i++) {
+            if (events[i].type != CUI_EVENT_POINTER_DOWN ||
+                events[i].pointer_button != CUI_POINTER_PRIMARY)
+                continue;
+            cui_id target = cui_event_target(ui, i);
+            bool focus = target == group || (!target && cui_hovered(ui, group));
+            for (size_t j = 0; j < count; j++)
+                focus |= target == a[j].id && a[j].kind != CUI_INPUT_GROUP_BUTTON && !a[j].disabled;
+            for (size_t j = 0; j < count; j++) {
+                cui_rect bounds = cui_bounds(ui, a[j].id);
+                if (a[j].kind == CUI_INPUT_GROUP_BUTTON && events[i].x >= bounds.x &&
+                    events[i].x < bounds.x + bounds.w && events[i].y >= bounds.y &&
+                    events[i].y < bounds.y + bounds.h)
+                    focus = false;
+            }
+            if (focus)
+                cui_focus(ui, input);
+        }
+    cui_base_input_options behavior = o.input;
+    cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
+                                  state->scroll_x};
+    if (!behavior.hit_test && !cui_edit_get_state(edit).multiline) {
+        behavior.hit_test = cui_base_input_hit_test;
+        behavior.hit_test_user = &hit;
+    }
+    result.input = cui_base_input_ex(ui, input, o.name, edit, &state->behavior, behavior);
+    size_t sc;
+    const cui_semantic *sem = cui_semantics(ui, &sc);
+    for (size_t i = 0; i < sc; i++)
+        if (sem[i].id == input) {
+            cui_semantic_details d = sem[i].details;
+            d.parent = group;
+            cui_set_semantic_details(ui, input, d);
+            break;
+        }
+    return result;
 }

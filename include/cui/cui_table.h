@@ -2,6 +2,7 @@
 #ifndef CUI_TABLE_H
 #define CUI_TABLE_H
 #include "cui.h"
+#include "cui_scroll.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -75,6 +76,7 @@ typedef struct {
     cui_id dragging;
     float drag_x;
     bool drag_active;
+    cui_scroll_state scrollbar;
     cui_id resizing;
     float resize_x, resize_width;
     size_t visible_begin, visible_end, column_begin, column_end, previous_row_count;
@@ -87,13 +89,30 @@ typedef void (*cui_table_header_fn)(cui_context *, const cui_theme *, void *, cu
 typedef void (*cui_table_row_header_fn)(cui_context *, const cui_theme *, void *, size_t row);
 typedef void (*cui_table_placeholder_fn)(cui_context *, const cui_theme *, void *);
 typedef struct {
-    float width, height, row_height, header_height, row_header_width;
-    size_t overscan, column_overscan, load_more_threshold;
+    cui_str label;
+    size_t span;
+} cui_table_column_group;
+typedef struct {
+    const cui_table_column_group *groups;
+    size_t count;
+} cui_table_group_row;
+typedef void (*cui_table_group_header_fn)(cui_context *, const cui_theme *, void *, size_t level,
+                                          size_t group, cui_str label, size_t span, float width);
+typedef void (*cui_table_row_fn)(cui_context *, const cui_theme *, void *, size_t row);
+typedef void (*cui_table_trailing_fn)(cui_context *, const cui_theme *, void *, bool header,
+                                      size_t row);
+typedef struct {
+    float width, height, row_height, header_height, row_header_width, bar_thickness, trailing_width;
+    size_t overscan, column_overscan, load_more_threshold, group_header_count;
     bool disabled, striped, bordered, manual_selection, loop_selection, load_more,
-        multiple_selection, row_header, loading;
+        multiple_selection, row_header, loading, scrollbars;
     cui_table_header_fn render_header;
     cui_table_row_header_fn render_row_header;
+    cui_table_group_header_fn render_group_header;
+    cui_table_row_fn render_row;
+    cui_table_trailing_fn render_trailing;
     cui_table_placeholder_fn render_empty, render_loading;
+    const cui_table_group_row *group_headers;
     void *render_userdata;
     cui_table_selection_mode selection_mode;
 } cui_table_options;
@@ -107,6 +126,10 @@ typedef struct {
     cui_id activated_row, activated_column;
     cui_table_error error;
 } cui_table_result;
+cui_scroll_geometry cui_table_scroll_layout(const cui_table_model *, cui_table_options);
+bool cui_table_group_headers_valid(const cui_table_model *, cui_table_options);
+cui_id cui_table_group_header_id(cui_id table, size_t level, size_t group);
+cui_id cui_table_trailing_id(cui_id table, bool header, cui_id row);
 float cui_table_row_header_width(cui_table_options);
 cui_id cui_table_row_header_id(cui_id table, cui_id row);
 bool cui_table_is_selected(const cui_table_state *, cui_table_options, cui_id row, cui_id column);

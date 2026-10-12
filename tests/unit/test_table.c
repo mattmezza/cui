@@ -244,6 +244,26 @@ static void custom_placeholder(cui_context *ui, const cui_theme *t, void *data) 
     ((size_t *)data)[2]++;
     cui_text(ui, cui_string("Custom status"), t->font_size, t->muted);
 }
+static void custom_group(cui_context *ui, const cui_theme *t, void *data, size_t level,
+                         size_t group, cui_str label, size_t span, float width) {
+    size_t *counts = data;
+    assert(level < 2 && group < 3 && label.length && span && width > 0);
+    counts[0]++;
+    cui_text(ui, label, t->font_size, t->text);
+}
+static void custom_whole_row(cui_context *ui, const cui_theme *t, void *data, size_t row) {
+    size_t *counts = data;
+    assert(row < 4);
+    counts[1]++;
+    cui_text(ui, cui_string("row"), t->font_size, t->muted);
+}
+static void custom_trailing(cui_context *ui, const cui_theme *t, void *data, bool header,
+                            size_t row) {
+    size_t *counts = data;
+    assert(header || row < 4);
+    counts[2]++;
+    cui_text(ui, cui_string("+"), t->font_size, t->muted);
+}
 #endif
 static void placeholders(void) {
     cui_table_model *m = cui_table_create(2);
@@ -425,7 +445,106 @@ static void row_headers(void) {
     cui_destroy(ui);
     cui_table_destroy(m);
 }
+static void scrollbars(void) {
+    cui_table_model *m = cui_table_create(100);
+    cui_table_row rows[100];
+    for (size_t r = 0; r < 100; r++)
+        rows[r] = (cui_table_row){.key = r + 1};
+    cui_table_column cols[] = {
+        {.key = 10, .width = 100}, {.key = 20, .width = 100}, {.key = 30, .width = 100}};
+    assert(cui_table_bind(m, rows, 100, cols, 3) == CUI_TABLE_OK);
+    cui_table_state state = {0};
+    cui_table_options o = {.width = 200, .height = 100, .row_height = 32, .scrollbars = true};
+    cui_scroll_geometry geometry = cui_table_scroll_layout(m, o);
+    assert(geometry.viewport.width == 190 && geometry.viewport.height == 90 &&
+           geometry.maximum_x == 110 && geometry.maximum_y == 3110);
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    scene(ui, m, &state, o);
+    cui_focus(ui, cui_scrollbar_id(10, true));
+    key(ui, CUI_KEY_END, 0);
+    scene(ui, m, &state, o);
+    assert(state.scroll_y == 3110);
+    key(ui, CUI_KEY_HOME, 0);
+    scene(ui, m, &state, o);
+    assert(state.scroll_y == 0);
+    cui_focus(ui, cui_scrollbar_id(10, false));
+    key(ui, CUI_KEY_END, 0);
+    scene(ui, m, &state, o);
+    assert(state.scroll_x == 110);
+    size_t n;
+    const cui_semantic *sem = cui_semantics(ui, &n);
+    bool found = false;
+    for (size_t i = 0; i < n; i++)
+        if (sem[i].id == cui_scrollbar_id(10, true))
+            found = sem[i].role == CUI_ROLE_SCROLLBAR && sem[i].details.maximum == 3110 &&
+                    sem[i].details.controls == 10;
+    assert(found);
 #ifndef CUI_TABLE_BASE_ONLY
+    cui_rect track = cui_bounds(ui, cui_scrollbar_id(10, true));
+    assert(track.x == 190 && track.y == 32 && track.w == 10 && track.h == 90);
+    float x = track.x + 5, y = track.y + 3;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x, .y = y + 39}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y + 39}));
+    scene(ui, m, &state, o);
+    assert(fabsf(state.scroll_y - 1555) < .01f && !state.scrollbar.dragging_y);
+#endif
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
+#ifndef CUI_TABLE_BASE_ONLY
+static void composed_data_table(void) {
+    cui_table_model *m = cui_table_create(4);
+    cui_table_row rows[] = {{.key = 1}, {.key = 2}, {.key = 3}, {.key = 4}};
+    cui_table_column cols[] = {{.key = 10, .label = {"A", 1}, .width = 80},
+                               {.key = 20, .label = {"B", 1}, .width = 90},
+                               {.key = 30, .label = {"C", 1}, .width = 100}};
+    assert(cui_table_bind(m, rows, 4, cols, 3) == CUI_TABLE_OK);
+    const cui_table_column_group level0[] = {{{"Identity", 8}, 1}, {{"Metrics", 7}, 2}};
+    const cui_table_column_group level1[] = {
+        {{"First", 5}, 1}, {{"Second", 6}, 1}, {{"Third", 5}, 1}};
+    const cui_table_group_row groups[] = {{level0, 2}, {level1, 3}};
+    size_t counts[3] = {0};
+    cui_table_options o = {.width = 220,
+                           .height = 64,
+                           .row_height = 32,
+                           .header_height = 24,
+                           .group_headers = groups,
+                           .group_header_count = 2,
+                           .render_group_header = custom_group,
+                           .render_row = custom_whole_row,
+                           .render_trailing = custom_trailing,
+                           .trailing_width = 18,
+                           .render_userdata = counts};
+    assert(cui_table_group_headers_valid(m, o));
+    cui_table_state state = {.scroll_x = 68};
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    scene(ui, m, &state, o);
+    assert(counts[0] == 5 && counts[1] == 2 && counts[2] == 5);
+    assert(cui_bounds(ui, cui_table_group_header_id(10, 0, 1)).y == 0);
+    assert(cui_bounds(ui, cui_table_header_id(10, 10)).y == 48);
+    assert(cui_bounds(ui, cui_table_trailing_id(10, true, 0)).w == 18);
+    assert(cui_bounds(ui, cui_table_trailing_id(10, false, 1)).w == 18);
+    size_t n;
+    const cui_semantic *sem = cui_semantics(ui, &n);
+    bool group_seen = false;
+    for (size_t i = 0; i < n; i++)
+        if (sem[i].id == cui_table_group_header_id(10, 0, 1))
+            group_seen = sem[i].role == CUI_ROLE_COLUMNHEADER && sem[i].details.readonly &&
+                         sem[i].details.column_index == 2;
+    assert(group_seen);
+    cui_table_column_group crossing[] = {{{"All", 3}, 3}};
+    cui_table_group_row invalid[] = {{crossing, 1}};
+    cols[0].fixed_left = true;
+    assert(cui_table_bind(m, rows, 4, cols, 3) == CUI_TABLE_OK);
+    o.group_headers = invalid;
+    o.group_header_count = 1;
+    assert(!cui_table_group_headers_valid(m, o));
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
 static void static_tables(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
@@ -685,7 +804,9 @@ int main(void) {
     multiple_selection();
     placeholders();
     row_headers();
+    scrollbars();
 #ifndef CUI_TABLE_BASE_ONLY
+    composed_data_table();
     static_tables();
     virtual_scene();
     pointer_resize();

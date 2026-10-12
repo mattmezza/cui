@@ -32,6 +32,14 @@ cui_id cui_table_cell_id(cui_id id, cui_id row, cui_id col) {
 cui_id cui_table_body_id(cui_id id) {
     return id ^ UINT64_C(0x49c42a1399ffe201);
 }
+cui_id cui_table_group_header_id(cui_id id, size_t level, size_t group) {
+    return id ^ mix((uint64_t)level + UINT64_C(0x6a09e667f3bcc909)) ^
+           mix((uint64_t)group + UINT64_C(0xbb67ae8584caa73b));
+}
+cui_id cui_table_trailing_id(cui_id id, bool header, cui_id row) {
+    return id ^ mix(row + UINT64_C(0x3c6ef372fe94f82b)) ^
+           (header ? UINT64_C(0xa54ff53a5f1d36f1) : UINT64_C(0x510e527fade682d1));
+}
 cui_table_model *cui_table_create(size_t capacity) {
     if (!capacity || capacity > 1000000)
         return NULL;
@@ -206,6 +214,73 @@ static float row_height(cui_table_options o) {
 }
 static float height(cui_table_options o) {
     return isfinite(o.height) && o.height > 0 ? o.height : 240;
+}
+static float trailing_width(cui_table_options o) {
+    if (!o.render_trailing)
+        return 0;
+    return isfinite(o.trailing_width) && o.trailing_width > 0 ? fminf(o.trailing_width, 4096) : 12;
+}
+bool cui_table_group_headers_valid(const cui_table_model *m, cui_table_options o) {
+    if (!m || o.group_header_count > 16 || (!o.group_headers && o.group_header_count))
+        return false;
+    size_t fixed = cui_table_fixed_columns(m);
+    for (size_t level = 0; level < o.group_header_count; level++) {
+        const cui_table_group_row *row = o.group_headers + level;
+        if (!row->groups || !row->count || row->count > m->columns)
+            return false;
+        size_t column = 0;
+        for (size_t group = 0; group < row->count; group++) {
+            size_t span = row->groups[group].span;
+            if (!span || span > m->columns - column ||
+                (row->groups[group].label.length && !row->groups[group].label.data))
+                return false;
+            if (column < fixed && column + span > fixed)
+                return false;
+            column += span;
+        }
+        if (column != m->columns)
+            return false;
+    }
+    return true;
+}
+cui_scroll_geometry cui_table_scroll_layout(const cui_table_model *m, cui_table_options o) {
+    float width = isfinite(o.width) && o.width > 0 ? o.width : 480, h = height(o);
+    if (!m || !o.scrollbars)
+        return (cui_scroll_geometry){.viewport = {width, h}};
+    float bar = isfinite(o.bar_thickness) && o.bar_thickness > 0 ? o.bar_thickness : 10;
+    bar = fminf(bar, fminf(width, h) * .5f);
+    float columns = cui_table_row_header_width(o);
+    for (size_t c = 0; c < m->columns; c++)
+        columns += m->cols[c].width;
+    columns += trailing_width(o);
+    float rows = (float)m->count * row_height(o);
+    bool x = false, y = false;
+    for (unsigned i = 0; i < 3; i++) {
+        x = m->columns > cui_table_fixed_columns(m) && columns > width - (y ? bar : 0);
+        y = rows > h - (x ? bar : 0);
+    }
+    cui_scroll_geometry g = cui_scroll_layout((cui_scroll_options){.width = width,
+                                                                   .height = h,
+                                                                   .content_width = columns,
+                                                                   .content_height = rows,
+                                                                   .bar_thickness = bar,
+                                                                   .horizontal = x,
+                                                                   .vertical = y});
+    cui_table_view v =
+        cui_table_column_viewport(m, 0, g.viewport.width - cui_table_row_header_width(o), 0);
+    g.maximum_x = fmaxf(0, v.total + trailing_width(o) -
+                               fmaxf(1, g.viewport.width - cui_table_fixed_width(m) -
+                                            cui_table_row_header_width(o)));
+    return g;
+}
+static cui_table_options view_options(const cui_table_model *m, cui_table_options o) {
+    if (o.scrollbars) {
+        cui_scroll_geometry g = cui_table_scroll_layout(m, o);
+        o.width = g.viewport.width;
+        o.height = g.viewport.height;
+        o.scrollbars = false;
+    }
+    return o;
 }
 cui_table_view cui_table_viewport(const cui_table_model *m, float scroll, float h, float row,
                                   size_t over) {
@@ -506,6 +581,9 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         out.error = CUI_TABLE_INVALID;
         return out;
     }
+    cui_table_options original = o;
+    cui_scroll_geometry geometry = cui_table_scroll_layout(m, o);
+    o = view_options(m, o);
     if (o.multiple_selection &&
         ((!s->selection && s->selection_capacity) || s->selection_capacity > 4096 ||
          s->selection_count > s->selection_capacity)) {
@@ -757,6 +835,7 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
     size_t fixed = cui_table_fixed_columns(m);
     for (size_t p = fixed; p < m->columns; p++)
         total += m->cols[p].width;
+    total += trailing_width(o);
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
     float available = fmaxf(1, width - cui_table_fixed_width(m) - cui_table_row_header_width(o));
     s->scroll_x =
@@ -793,6 +872,22 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         }
     }
     s->scroll_y = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), o.overscan).scroll;
+    if (original.scrollbars) {
+        s->scrollbar.x = s->scroll_x;
+        s->scrollbar.y = s->scroll_y;
+        cui_scroll_options bars = {
+            .width = isfinite(original.width) && original.width > 0 ? original.width : 480,
+            .height = height(original),
+            .bar_thickness = original.bar_thickness,
+            .wheel_step = row_height(o),
+            .disabled = o.disabled || o.loading};
+        if (geometry.maximum_x > 0)
+            cui_base_scrollbar(ui, id, &s->scrollbar, geometry, bars, false);
+        if (geometry.maximum_y > 0)
+            cui_base_scrollbar(ui, id, &s->scrollbar, geometry, bars, true);
+        s->scroll_x = s->scrollbar.x;
+        s->scroll_y = s->scrollbar.y;
+    }
     out.rows = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), 0);
     out.columns =
         cui_table_column_viewport(m, s->scroll_x, width - cui_table_row_header_width(o), 0);
@@ -820,6 +915,7 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
 }
 void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                            cui_table_options o) {
+    o = view_options(m, o);
     if (!ui || !m || !s)
         return;
     cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, viewport_width(o), 0);
@@ -829,18 +925,20 @@ void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_t
     cui_set_tab_stop(ui, id, false);
     cui_set_semantic_details(
         ui, id,
-        (cui_semantic_details){
-            .row_count = (unsigned)m->count,
-            .column_count = (unsigned)m->columns,
-            .multiselectable = o.multiple_selection,
-            .busy = o.loading,
-            .scrollable = true,
-            .scroll_x = s->scroll_x,
-            .scroll_max_x = fmaxf(0, columns.total - fmaxf(1, width - cui_table_fixed_width(m) -
-                                                                  cui_table_row_header_width(o)))});
+        (cui_semantic_details){.row_count = (unsigned)m->count,
+                               .column_count = (unsigned)m->columns,
+                               .multiselectable = o.multiple_selection,
+                               .busy = o.loading,
+                               .scrollable = true,
+                               .scroll_x = s->scroll_x,
+                               .scroll_max_x =
+                                   fmaxf(0, columns.total + trailing_width(o) -
+                                                fmaxf(1, width - cui_table_fixed_width(m) -
+                                                             cui_table_row_header_width(o)))});
 }
 void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model *m,
                                     cui_table_state *s, cui_table_options o, size_t c) {
+    o = view_options(m, o);
     if (!ui || !m || !s || c >= m->columns)
         return;
     cui_table_view columns =
@@ -882,6 +980,7 @@ void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model 
 }
 void cui_table_submit_header(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                              cui_table_options o) {
+    o = view_options(m, o);
     if (!ui || !m || !s)
         return;
     cui_table_view columns =
@@ -893,6 +992,7 @@ void cui_table_submit_header(cui_context *ui, cui_id id, cui_table_model *m, cui
 }
 void cui_table_submit_body_root(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                                 cui_table_options o) {
+    o = view_options(m, o);
     if (!ui || !m || !s)
         return;
     cui_id body = cui_table_body_id(id);
@@ -904,17 +1004,19 @@ void cui_table_submit_body_root(cui_context *ui, cui_id id, cui_table_model *m, 
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
     cui_set_semantic_details(
         ui, body,
-        (cui_semantic_details){
-            .parent = id,
-            .scrollable = true,
-            .scroll_y = s->scroll_y,
-            .scroll_x = s->scroll_x,
-            .scroll_max_y = fmaxf(0, allrows.total - height(o)),
-            .scroll_max_x = fmaxf(0, allcols.total - fmaxf(1, width - cui_table_fixed_width(m) -
-                                                                  cui_table_row_header_width(o)))});
+        (cui_semantic_details){.parent = id,
+                               .scrollable = true,
+                               .scroll_y = s->scroll_y,
+                               .scroll_x = s->scroll_x,
+                               .scroll_max_y = fmaxf(0, allrows.total - height(o)),
+                               .scroll_max_x =
+                                   fmaxf(0, allcols.total + trailing_width(o) -
+                                                fmaxf(1, width - cui_table_fixed_width(m) -
+                                                             cui_table_row_header_width(o)))});
 }
 void cui_table_submit_row(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                           cui_table_options o, size_t r) {
+    o = view_options(m, o);
     if (!ui || !m || !s || r >= m->count)
         return;
     cui_id body = cui_table_body_id(id);
@@ -945,6 +1047,7 @@ void cui_table_submit_row(cui_context *ui, cui_id id, cui_table_model *m, cui_ta
 void cui_table_submit_cell(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                            cui_table_options o, size_t r, size_t c, cui_table_label_fn label,
                            void *data) {
+    o = view_options(m, o);
     if (!ui || !m || !s || r >= m->count || c >= m->columns)
         return;
     cui_id rid = cui_table_row_id(id, m->rows[r].key);
@@ -963,6 +1066,7 @@ void cui_table_submit_cell(cui_context *ui, cui_id id, cui_table_model *m, cui_t
 }
 void cui_table_submit_body(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                            cui_table_options o, cui_table_label_fn label, void *data) {
+    o = view_options(m, o);
     if (!ui || !m || !s)
         return;
     cui_table_submit_body_root(ui, id, m, s, o);

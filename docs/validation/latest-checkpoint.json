@@ -1,8 +1,8 @@
 {
-  "source": "cf513f5",
+  "source": "d85d2a5",
   "published_source": "04e044e3bef7084e1ea64b3f8a74061fdf3f950c",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Currentcf513f5 adds real native/Canvas font metrics, composition-owned editor guards, custom Questionnaire slots, source-aligned Sankey custom labels/layout and TextView image baselines. Native77, ASan/UBSan75, WASI67 and quality gates pass. Browser release gate is pending a host fix: Ctrl+Z was incorrectly marked preferred character input and then correctly ignored by the editor. Published04e044e remains full HTTPS78 verified. Full feature parity remains unfinished.",
+  "summary": "Release candidated85d2a5 fixes browser modifier classification on Canvas and semantic inputs. Full integrated Chromium78 passes, including actual Textarea Undo/Redo and Questionnaire completion/reset shortcuts. Portable C is unchanged fromcf513f5, whose native77, ASan/UBSan75, WASI67 and quality gates pass. Published04e044e remains full HTTPS78 verified until this candidate deploys and HTTPS validation passes. Full feature parity remains unfinished.",
   "checks": [
     {
       "name": "native",
@@ -27,9 +27,11 @@
     },
     {
       "name": "browser",
-      "source": "cf513f5",
-      "status": "pending",
-      "reason": "Awaiting host modifier classification fix and full integrated browser rerun. Prior failure preserved in browser-failure-30bde26.txt."
+      "source": "d85d2a5",
+      "passed": 78,
+      "total": 78,
+      "palettes": 38,
+      "log": "browser-d85d2a5.txt"
     }
   ],
   "previous_deployment": {

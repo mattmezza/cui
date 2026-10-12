@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
-static bool allow_accept;
+static bool allow_accept, consume_first;
 static unsigned decisions;
 static bool decide(void *user, cui_surface_result result) {
     (void)user;
@@ -62,6 +62,8 @@ static void end(cui_context *ui) {
 static cui_draw_list scene(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
                            cui_surface_options options, bool body_closes) {
     assert(cui_begin_frame(ui, 600, 400, .016f));
+    if (consume_first)
+        assert(cui_consume_event(ui, 0));
     cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400});
     button(ui, 1, theme, cui_string("Open"), false);
     button(ui, 2, theme, cui_string("Background"), false);
@@ -129,6 +131,11 @@ static void dialog_events(void) {
         scene(ui, &themes[theme], &s, options, false);
         assert(cui_focused(ui) == 20 || cui_focused(ui) == 22 ||
                cui_focused(ui) == cui_surface_part_id(100, 1));
+        consume_first = true;
+        key(ui, CUI_KEY_ESCAPE);
+        scene(ui, &themes[theme], &s, options, false);
+        assert(s.overlay.open && cui_surface_take_result(&s) == CUI_SURFACE_NONE);
+        consume_first = false;
         key(ui, CUI_KEY_ESCAPE);
         scene(ui, &themes[theme], &s, options, false);
         assert(!s.overlay.open && cui_focused(ui) == 1 &&
@@ -136,6 +143,11 @@ static void dialog_events(void) {
         assert(cui_surface_take_result(&s) == CUI_SURFACE_NONE);
         cui_surface_open(ui, &s, 1);
         scene(ui, &themes[theme], &s, options, false);
+        consume_first = true;
+        pointer(ui, 5, 5);
+        scene(ui, &themes[theme], &s, options, false);
+        assert(s.overlay.open);
+        consume_first = false;
         pointer(ui, 5, 5);
         scene(ui, &themes[theme], &s, options, false);
         assert(!s.overlay.open && cui_focused(ui) == 1);

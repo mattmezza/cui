@@ -276,6 +276,8 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count && s->overlay.open; ++i) {
+        if (cui_event_consumed(ui, i))
+            continue;
         cui_event e = events[i];
         cui_surface_resize_event(ui, s, o, e, i);
         if (e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&

@@ -59,7 +59,8 @@ struct cui_root {
     void *copy_user;
     bool initialized;
 };
-/* All arrays and plugin states are caller-owned and must outlive this root.
+/* Zero-initialize the root before its first init; dispose before reinitializing.
+ * All arrays and plugin states are caller-owned and must outlive this root.
  * Invalid capacity is rejected before any factory is called or state is changed. */
 bool cui_root_init(cui_root *, cui_root_plugin_instance *, size_t capacity,
                    const cui_root_registry *, void *window_user);

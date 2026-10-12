@@ -4552,30 +4552,49 @@
       "name": "Root View",
       "reference_url": "https://gpui-kit.com/component/root/",
       "category": "layout",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "base_behavior": [
+        "cui_root_register",
+        "cui_root_init",
+        "cui_base_root_render"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_root.h",
+      "sample": null,
+      "tests": [
+        "tests/unit/test_root.c"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Per-window plugin snapshots, ordered render stages, field-specific style overrides, factory rollback, automatic Sheet/Dialog/Notification layers and Sheet-aware notification placement are tested. Window creation, entity observations, global selection/copy service, tooltip/native-menu/touch-selection hosts and automatic chrome remain incomplete; see docs/ROOT.md."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "theme/overlay/notification providers",
-          "status": "not_started",
-          "evidence": []
+          "name": "per-window registry snapshots and plugin lifecycle",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root.c"
+          ]
         },
         {
-          "name": "window lifecycle and focus scopes",
-          "status": "not_started",
-          "evidence": []
+          "name": "ordered render stages, decorator nesting and style refinement",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root.c"
+          ]
         },
         {
-          "name": "safe area/scaling",
+          "name": "automatic modal facilities and Sheet-aware notifications",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_root.c"
+          ]
+        },
+        {
+          "name": "complete styled window services and host lifecycle parity",
           "status": "not_started",
           "evidence": []
         }

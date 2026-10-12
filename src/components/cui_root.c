@@ -33,9 +33,31 @@ static void cui_root_facilities(cui_context *ui, void *user) {
             cui_surface_end(ui);
         }
     }
+    cui_rect notification_viewport = frame->viewport;
+    if (root->sheet.surface && root->sheet.surface->overlay.open) {
+        cui_surface_options options = root->sheet.options;
+        options.viewport = frame->viewport;
+        cui_rect sheet = cui_surface_current_geometry(root->sheet.surface, options);
+        switch (options.edge) {
+        case CUI_SHEET_LEFT:
+            notification_viewport.x += sheet.w;
+            notification_viewport.w -= sheet.w;
+            break;
+        case CUI_SHEET_RIGHT:
+            notification_viewport.w -= sheet.w;
+            break;
+        case CUI_SHEET_TOP:
+            notification_viewport.y += sheet.h;
+            notification_viewport.h -= sheet.h;
+            break;
+        case CUI_SHEET_BOTTOM:
+            notification_viewport.h -= sheet.h;
+            break;
+        }
+    }
     if (root->notifications)
         (void)cui_notifications(ui, frame->id ^ UINT64_C(0x94fbd6a19873c20e), frame->theme,
-                                root->notifications, frame->viewport, frame->now_seconds);
+                                root->notifications, notification_viewport, frame->now_seconds);
 }
 bool cui_root_render(cui_context *ui, cui_id id, cui_root *root, const cui_theme *theme,
                      cui_rect viewport, const cui_root_style_override *instance_override,

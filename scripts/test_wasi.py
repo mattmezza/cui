@@ -37,6 +37,8 @@ SOURCES = (
     "src/components/cui_textarea.c",
     "src/base/cui_settings.c",
     "src/components/cui_settings.c",
+    "src/base/cui_root.c",
+    "src/components/cui_root.c",
     "src/base/cui_command.c",
     "src/components/cui_command.c",
     "src/base/cui_carousel.c",
@@ -77,7 +79,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -193,6 +195,7 @@ def main() -> int:
         virtual_clock = ["-D_WASI_EMULATED_PROCESS_CLOCKS", "-lwasi-emulated-process-clocks"]
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("root_base_only", ["tests/unit/test_root.c", "src/base/cui_root.c", "src/core/cui.c", "src/base/cui_surface.c", "src/base/cui_overlay.c", "src/base/cui_models.c", "src/base/cui_status.c"], False, ["-DCUI_ROOT_BASE_ONLY=1"])]
         targets += [("command_base_only", ["tests/unit/test_command.c", "src/base/cui_command.c"], False, ["-DCUI_COMMAND_BASE_ONLY=1"])]
         targets += [("carousel_base_only", ["tests/unit/test_carousel.c", "src/base/cui_carousel.c"], False, ["-DCUI_CAROUSEL_BASE_ONLY=1"])]
         targets += [("sidebar_base_only", ["tests/unit/test_sidebar.c", "src/core/cui.c", "src/base/cui_sidebar.c"], False, ["-DCUI_SIDEBAR_BASE_ONLY=1"])]

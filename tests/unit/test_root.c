@@ -252,6 +252,23 @@ static void test_styled_facilities(void) {
     assert(notes.count == 1 && note_entries[0].bounds.w > 0);
     assert(note_entries[0].bounds.x >= 0 &&
            note_entries[0].bounds.x + note_entries[0].bounds.w <= 400);
+    for (unsigned edge = CUI_SHEET_LEFT; edge <= CUI_SHEET_BOTTOM; edge++) {
+        root.sheet.options.edge = (cui_sheet_edge)edge;
+        root.sheet.options.width = 120;
+        root.sheet.options.height = 100;
+        styled_frame(ui, &root, &theme, .5 + edge * .1);
+        cui_rect panel = cui_bounds(ui, sheet.overlay.id);
+        cui_rect notification = note_entries[0].bounds;
+        assert(notification.w > 0 && notification.h > 0);
+        if (edge == CUI_SHEET_LEFT)
+            assert(notification.x >= panel.x + panel.w);
+        else if (edge == CUI_SHEET_RIGHT)
+            assert(notification.x + notification.w <= panel.x);
+        else if (edge == CUI_SHEET_TOP)
+            assert(notification.y >= panel.y + panel.h);
+        else
+            assert(notification.y + notification.h <= panel.y);
+    }
     cui_destroy(ui);
 }
 #endif

@@ -15,6 +15,7 @@
 #include "cui_otp.h"
 #include "cui_picker.h"
 #include "cui_resizable.h"
+#include "cui_root.h"
 #include "cui_scroll.h"
 #include "cui_status.h"
 #include "cui_surface.h"

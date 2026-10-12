@@ -575,7 +575,7 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
             if (r->kind == CUI_COMMAND_ROW_SEPARATOR) {
                 cui_begin_absolute_box(ui, row, (cui_box){.align_y = CUI_ALIGN_CENTER},
                                        (cui_rect){inset, r->offset, content, r->height});
-                cui_divider(ui, row ^ 1, t, content, false);
+                cui_divider(ui, row ^ UINT64_C(0x79d7a00c), t, content, false);
                 cui_end_box(ui);
                 continue;
             }
@@ -599,7 +599,7 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
                               : r->item && r->item->disabled ? t->muted
                                                              : t->popover_foreground;
             if (r->kind == CUI_COMMAND_ROW_SEPARATOR)
-                cui_divider(ui, row ^ 1, t, content, false);
+                cui_divider(ui, row ^ UINT64_C(0x79d7a00c), t, content, false);
             else if (r->kind == CUI_COMMAND_ROW_HEADING)
                 cui_text_with_line_height(ui, r->heading, 12 * density, t->muted, 16 * density);
             else if (r->item->content)

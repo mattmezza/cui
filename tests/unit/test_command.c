@@ -131,6 +131,37 @@ static cui_draw_list draw(cui_context *ui, cui_command_state *s, const cui_comma
     assert(cui_last_error(ui) == CUI_OK);
     return result;
 }
+static void test_separator_before_heading(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    char buffer[64] = "Save";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    assert(edit);
+    cui_command_state s;
+    cui_command_row rows[16];
+    assert(cui_command_init(&s, rows, 16, edit));
+    cui_command_item group[] = {{.label = cui_string("Settings")}};
+    cui_command_entry entries[] = {
+        {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Save")}},
+        {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Open")}},
+        {.kind = CUI_COMMAND_SEPARATOR},
+        {.kind = CUI_COMMAND_GROUP,
+         .heading = cui_string("Preferences"),
+         .items = group,
+         .item_count = 1}};
+    cui_command_options o = cui_command_default();
+    draw(ui, &s, entries, 4, o);
+    assert(s.matched_count == 1);
+    cui_command_focus(ui, 42, o);
+    draw(ui, &s, entries, 4, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+    draw(ui, &s, entries, 4, o);
+    assert(cui_edit_get_text(edit).length == 0 && s.matched_count == 3);
+    assert(cui_event_consumed(ui, 0));
+    draw(ui, &s, entries, 4, o);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 static void test_render(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);
@@ -451,6 +482,7 @@ static void test_dialog(void) {
 int main(void) {
     test_model();
 #ifndef CUI_COMMAND_BASE_ONLY
+    test_separator_before_heading();
     test_render();
     test_virtual_geometry();
     test_dialog();

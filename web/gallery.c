@@ -8,6 +8,7 @@
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_scroll.h"
+#include "cui/cui_surface.h"
 #include "cui/cui_table.h"
 #include "cui/cui_virtual.h"
 #include <stdio.h>
@@ -81,9 +82,23 @@ static int input_mode;
 static cui_scroll_state scroll_state;
 static cui_table_model *table;
 static cui_table_state table_state;
+static cui_table_selection table_selection[64];
+static bool table_pinned;
 static cui_table_row table_rows[1000];
 static cui_table_column table_columns[3];
 static char table_names[1000][24], table_sizes[1000][24];
+static cui_surface_state dialog_surface, alert_dialog_surface, sheet_surface, popover_surface,
+    nested_surface;
+static int surface_variant, alert_attempts;
+static bool dialog_updates = true, popover_updates;
+static bool alert_decision(void *user, cui_surface_result result) {
+    int *attempts = user;
+    if (result != CUI_SURFACE_ACCEPTED)
+        return true;
+    (*attempts)++;
+    redraw = true;
+    return *attempts > 1;
+}
 static cui_str table_label(void *user, size_t row, cui_id column) {
     (void)user;
     if (row >= 1000)
@@ -128,6 +143,8 @@ int gallery_init(void) {
         cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
     }
     table = cui_table_create(1000);
+    table_state.selection = table_selection;
+    table_state.selection_capacity = 64;
     for (size_t i = 0; i < 1000; i++) {
         snprintf(table_names[i], sizeof(table_names[i]), "File %04zu", i + 1);
         snprintf(table_sizes[i], sizeof(table_sizes[i]), "%zu KB", i + 1);
@@ -169,6 +186,12 @@ int gallery_init(void) {
     cui_choice_popup_init(&menu_popup, cui_id_from(ui, "menu-popup"));
     cui_menu_tree_init(&menu_tree, cui_id_from(ui, "nested-menu-popup"));
     cui_menu_tree_init(&context_menu, cui_id_from(ui, "context-menu-popup"));
+    cui_surface_init(&dialog_surface, cui_id_from(ui, "dialog-surface"), CUI_SURFACE_DIALOG);
+    cui_surface_init(&nested_surface, cui_id_from(ui, "nested-surface"), CUI_SURFACE_DIALOG);
+    cui_surface_init(&alert_dialog_surface, cui_id_from(ui, "alert-dialog-surface"),
+                     CUI_SURFACE_ALERT);
+    cui_surface_init(&sheet_surface, cui_id_from(ui, "sheet-surface"), CUI_SURFACE_SHEET);
+    cui_surface_init(&popover_surface, cui_id_from(ui, "popover-surface"), CUI_SURFACE_POPOVER);
     return ui && edit && dock && query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
 }
 void gallery_event(int type, float x, float y, int key, unsigned mods, int repeat, int button) {
@@ -196,6 +219,8 @@ void gallery_text(const char *text, size_t length) {
 void gallery_focus(unsigned index) {
     if (index < semantic_count)
         cui_focus(ui, semantics[index].id);
+    else
+        cui_focus(ui, 0);
 }
 int gallery_frame(int story, int theme, int disabled, float width, float height) {
     if (!ui || width < 1 || height < 1)
@@ -217,6 +242,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_overlay_close(ui, &combo_popup.overlay);
         cui_overlay_close(ui, &date_picker.overlay);
         cui_overlay_close(ui, &trap);
+        cui_overlay_close(ui, &dialog_surface.overlay);
+        cui_overlay_close(ui, &nested_surface.overlay);
+        cui_overlay_close(ui, &alert_dialog_surface.overlay);
+        cui_overlay_close(ui, &sheet_surface.overlay);
+        cui_overlay_close(ui, &popover_surface.overlay);
         previous_story = story;
     }
     redraw = false;
@@ -304,6 +334,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string("Semantic tokens and runtime themes"));
         cui_button(ui, cui_id_from(ui, "theme-button"), &t, cui_string("Primary action"), disabled);
         cui_badge(ui, cui_id_from(ui, "theme-badge"), &t, cui_string("Surface / primary"));
+        cui_begin_box(ui, cui_id_from(ui, "shape-sample"),
+                      (cui_box){.width = 120,
+                                .height = 64,
+                                .background = {29, 100, 220, 255},
+                                .border = {240, 150, 20, 255},
+                                .custom_corners = true,
+                                .corner_radii = {24, 0, 0, 18},
+                                .custom_border_edges = true,
+                                .border_edges = {0, 8, 4, 0}});
+        cui_end_box(ui);
         break;
     case 12:
         cui_alert(ui, cui_id_from(ui, "alert"), &t,
@@ -506,6 +546,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                .disabled = disabled,
                                                .striped = true,
                                                .bordered = true,
+                                               .multiple_selection = multiple_mode,
                                                .selection_mode = CUI_TABLE_SELECT_CELL},
                            table_label, NULL, NULL);
         char text[72];
@@ -540,6 +581,104 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_table_end(ui);
         break;
     }
+    case 48: {
+        cui_id trigger = cui_id_from(ui, "dialog-trigger");
+        if (cui_button(ui, trigger, &t, cui_string("Edit preferences"), disabled))
+            cui_surface_open(ui, &dialog_surface, trigger);
+        cui_surface_options options = {.viewport = {0, 0, width, height},
+                                       .width = width > 520 ? 420 : width - 32,
+                                       .height = 250,
+                                       .margin = 16};
+        if (cui_surface_begin(ui, &t, &dialog_surface, cui_string("Notification preferences"),
+                              cui_string("Choose how CUI should keep you informed."), options)) {
+            cui_checkbox(ui, cui_id_from(ui, "dialog-updates"), &t, cui_string("Product updates"),
+                         &dialog_updates, false);
+            cui_id nested_trigger = cui_id_from(ui, "nested-trigger");
+            if (cui_button(ui, nested_trigger, &t, cui_string("Advanced preferences"), false))
+                cui_surface_open(ui, &nested_surface, nested_trigger);
+            if (cui_button(ui, cui_id_from(ui, "dialog-save"), &t, cui_string("Save changes"),
+                           false))
+                cui_surface_close(ui, &dialog_surface, CUI_SURFACE_ACCEPTED);
+            if (cui_surface_begin(ui, &t, &nested_surface, cui_string("Advanced preferences"),
+                                  cui_string("Escape returns to the parent dialog."),
+                                  (cui_surface_options){.viewport = {0, 0, width, height},
+                                                        .width = options.width - 32,
+                                                        .height = 190,
+                                                        .margin = 16,
+                                                        .layer = 200})) {
+                cui_checkbox(ui, cui_id_from(ui, "nested-updates"), &t,
+                             cui_string("Preview releases"), &popover_updates, false);
+                cui_surface_end(ui);
+            }
+            cui_surface_end(ui);
+        }
+        break;
+    }
+    case 49: {
+        cui_id trigger = cui_id_from(ui, "alert-dialog-trigger");
+        if (cui_button(ui, trigger, &t, cui_string("Delete workspace"), disabled)) {
+            alert_attempts = 0;
+            cui_surface_open(ui, &alert_dialog_surface, trigger);
+        }
+        const char *description = alert_attempts == 1
+                                      ? "Deletion was rejected once. Confirm again to proceed."
+                                      : "The first confirmation is deliberately rejected.";
+        cui_alert_dialog(ui, &t, &alert_dialog_surface, cui_string("Delete workspace?"),
+                         cui_string(description), cui_string("Delete"),
+                         cui_string("Keep workspace"),
+                         (cui_surface_options){.viewport = {0, 0, width, height},
+                                               .width = width > 520 ? 420 : width - 32,
+                                               .height = 220,
+                                               .margin = 16,
+                                               .decide = alert_decision,
+                                               .decision_user = &alert_attempts});
+        break;
+    }
+    case 50: {
+        cui_id trigger = cui_id_from(ui, "sheet-trigger");
+        if (cui_button(ui, trigger, &t, cui_string("Open settings sheet"), disabled))
+            cui_surface_open(ui, &sheet_surface, trigger);
+        cui_sheet_edge edge =
+            surface_variant >= CUI_SHEET_LEFT && surface_variant <= CUI_SHEET_BOTTOM
+                ? (cui_sheet_edge)surface_variant
+                : CUI_SHEET_LEFT;
+        cui_surface_options options = {.viewport = {0, 0, width, height},
+                                       .width = width > 520 ? 320 : width * .72f,
+                                       .height = height * .62f,
+                                       .edge = edge};
+        if (cui_surface_begin(ui, &t, &sheet_surface, cui_string("Workspace settings"),
+                              cui_string("The same composed surface supports all four edges."),
+                              options)) {
+            cui_checkbox(ui, cui_id_from(ui, "sheet-updates"), &t, cui_string("Automatic updates"),
+                         &dialog_updates, false);
+            cui_label(ui, &t, cui_string("Escape or Close restores focus to the trigger."));
+            cui_surface_end(ui);
+        }
+        break;
+    }
+    case 51: {
+        cui_id trigger = cui_id_from(ui, "popover-trigger");
+        if (cui_button(ui, trigger, &t, cui_string("Open account card"), disabled))
+            cui_surface_open(ui, &popover_surface, trigger);
+        cui_rect anchor = cui_bounds(ui, trigger);
+        cui_surface_options options = {.viewport = {0, 0, width, height},
+                                       .anchor = anchor,
+                                       .width = width > 500 ? 340 : width - 48,
+                                       .height = 190,
+                                       .margin = 12,
+                                       .side = CUI_POPUP_BELOW};
+        if (cui_surface_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
+                              cui_string("Maintainer · Portable UI systems"), options)) {
+            cui_avatar(ui, cui_id_from(ui, "popover-avatar"), &t, cui_string("Alex Morgan"), 40);
+            cui_checkbox(ui, cui_id_from(ui, "popover-updates"), &t,
+                         cui_string("Notify me about releases"), &popover_updates, false);
+            if (cui_button(ui, cui_id_from(ui, "popover-profile"), &t, cui_string("View profile"),
+                           false))
+                cui_surface_close(ui, &popover_surface, CUI_SURFACE_ACCEPTED);
+            cui_surface_end(ui);
+        }
+        break;
+    }
     case 43: {
         cui_tree(ui, cui_id_from(ui, "tree"), &t, tree, &tree_state, &tree_selected,
                  (cui_tree_options){.disabled = disabled,
@@ -550,7 +689,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 32:
-    case 47: {
+    case 47:
+    case 52: {
         const cui_menu_entry children[] = {
             {.id = cui_id_from(ui, "export-json"),
              .label = cui_string("JSON"),
@@ -597,6 +737,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                           (cui_button_options){.disabled = disabled, .width = width - 48});
             invoked = cui_context_menu(ui, target, &t, cui_string("Context actions"), entries, 9,
                                        &menu_action, &context_menu, options);
+        } else if (story == 52) {
+            cui_dropdown_button_result result = cui_dropdown_button(
+                ui, cui_id_from(ui, "split-button"), cui_id_from(ui, "split-action"),
+                cui_id_from(ui, "split-trigger"), &t, cui_string("Export workspace"),
+                cui_string("Export options"), entries, 9, &menu_action, &menu_tree,
+                (cui_dropdown_button_options){
+                    .disabled = disabled, .leading = cui_string("↓"), .menu = options});
+            if (result.action_activated)
+                clicks++;
+            invoked = result.menu_activated;
         } else
             invoked = cui_menu_tree(ui, cui_id_from(ui, "menu"), &t, cui_string("Actions"), entries,
                                     9, &menu_action, &menu_tree, options);
@@ -605,6 +755,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         char text[64];
         snprintf(text, sizeof(text), "Actions invoked: %d", menu_invocations);
         cui_label(ui, &t, cui_string(text));
+        if (story == 52) {
+            snprintf(text, sizeof(text), "Primary exports: %d", clicks);
+            cui_label(ui, &t, cui_string(text));
+        }
         break;
     }
     case 30:
@@ -794,6 +948,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     semantics = cui_semantics(ui, &semantic_count);
     return cui_last_error(ui) == CUI_OK;
 }
+int gallery_error(void) {
+    return ui ? cui_last_error(ui) : CUI_ERROR_LIFECYCLE;
+}
 unsigned gallery_count(void) {
     return (unsigned)draw.count;
 }
@@ -826,6 +983,26 @@ float gallery_command(unsigned i, unsigned field) {
         return c->stroke;
     case 11:
         return c->font_size;
+    case 12:
+        return c->custom_corners;
+    case 13:
+        return c->corner_radii.top_left;
+    case 14:
+        return c->corner_radii.top_right;
+    case 15:
+        return c->corner_radii.bottom_left;
+    case 16:
+        return c->corner_radii.bottom_right;
+    case 17:
+        return c->custom_border_edges;
+    case 18:
+        return c->border_edges.left;
+    case 19:
+        return c->border_edges.right;
+    case 20:
+        return c->border_edges.top;
+    case 21:
+        return c->border_edges.bottom;
     default:
         return 0;
     }
@@ -920,6 +1097,33 @@ const char *gallery_semantic_name(unsigned i) {
 unsigned gallery_semantic_length(unsigned i) {
     return i < semantic_count ? (unsigned)semantics[i].name.length : 0;
 }
+const char *gallery_semantic_description(unsigned i) {
+    return i < semantic_count ? semantics[i].details.description.data : NULL;
+}
+unsigned gallery_semantic_description_length(unsigned i) {
+    return i < semantic_count ? (unsigned)semantics[i].details.description.length : 0;
+}
+void gallery_table_pin(int pinned) {
+    if (!table || table_pinned == (pinned != 0))
+        return;
+    if (pinned)
+        cui_table_move_column(table, 101, 0);
+    for (size_t c = 0; c < 3; c++)
+        table_columns[c].fixed_left = pinned && table_columns[c].key == 101;
+    if (cui_table_bind(table, table_rows, 1000, table_columns, 3) == CUI_TABLE_OK)
+        table_pinned = pinned != 0;
+}
+void gallery_surface_variant(int variant) {
+    surface_variant = variant;
+}
+int gallery_surface_open(int surface) {
+    const cui_surface_state *states[] = {&dialog_surface, &alert_dialog_surface, &sheet_surface,
+                                         &popover_surface, &nested_surface};
+    return surface >= 0 && surface < 5 && states[surface]->overlay.open;
+}
+int gallery_alert_attempts(void) {
+    return alert_attempts;
+}
 void gallery_input_mode(int mode) {
     input_mode = mode;
 }
@@ -934,6 +1138,24 @@ int gallery_clicks(void) {
 int gallery_redraw(void) {
     return redraw;
 }
+float gallery_hover_state(unsigned field) {
+    switch (field) {
+    case 0:
+        return cui_hovered(ui, cui_id_from(ui, "hover-trigger"));
+    case 1:
+        return cui_hovered(ui, cui_id_from(ui, "hover-card"));
+    case 2:
+        return card_state.open;
+    case 3:
+        return card_state.pending;
+    case 4:
+        return card_state.elapsed;
+    case 5:
+        return host_dt;
+    default:
+        return 0;
+    }
+}
 
 void gallery_time(float seconds, float dt, int reduced) {
     host_seconds = seconds;
@@ -942,6 +1164,9 @@ void gallery_time(float seconds, float dt, int reduced) {
 }
 
 int gallery_modal(void) {
+    if (dialog_surface.overlay.open || nested_surface.overlay.open ||
+        alert_dialog_surface.overlay.open || sheet_surface.overlay.open)
+        return 1;
     return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open ||
            trap.open || date_picker.overlay.open || menu_tree.overlay.open ||
            context_menu.overlay.open;

@@ -68,6 +68,19 @@ def main():
             assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
             page.locator('#theme').select_option('1')
             assert page.locator('body.dark').count() == 1
+            page.evaluate('location.hash="Theme"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Theme"')
+            shape = page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===0&&e.gallery_command(i,5)===29&&e.gallery_command(i,6)===100;})')
+            assert shape is not None
+            assert page.evaluate('(i)=>Array.from({length:5},(_,j)=>cuiGallery.exports.gallery_command(i,12+j))', shape) == [1,24,0,0,18]
+            pixels = page.evaluate('''(i)=>{
+                const e=cuiGallery.exports,c=document.querySelector('canvas'),ctx=c.getContext('2d');
+                const x=e.gallery_command(i,1),y=e.gallery_command(i,2),scale=c.width/c.clientWidth;
+                return [[60,32],[1,32],[116,32],[60,1],[60,62],[1,1]].map(([dx,dy])=>Array.from(ctx.getImageData(Math.floor((x+dx)*scale),Math.floor((y+dy)*scale),1,1).data));
+            }''', shape)
+            blue, orange = [29,100,220,255], [240,150,20,255]
+            assert pixels[:5] == [blue,blue,orange,orange,blue], pixels
+            assert pixels[5] not in [blue,orange], pixels
             for name in page.evaluate('Object.keys(cuiGallery.stories)'):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
@@ -83,6 +96,114 @@ def main():
                 bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', index)
                 rectangle = canvas.bounding_box()
                 page.mouse.click(rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2)
+            page.evaluate('location.hash="Dialog"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Dialog"')
+            click_semantic('Edit preferences')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1')
+            assert page.locator('#accessible [role=dialog][aria-modal=true]').count() == 1
+            assert page.locator('#accessible [role=dialog]').get_attribute('aria-labelledby')
+            click_semantic('Save changes')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
+            index = semantic_index('Edit preferences')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
+            click_semantic('Edit preferences')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1')
+            click_semantic('Advanced preferences')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(4)===1')
+            assert page.locator('#accessible [role=dialog][aria-modal=true]').count() == 2
+            for _ in range(5):
+                page.keyboard.press('Tab')
+                page.wait_for_timeout(20)
+                assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_semantic(i,7)).every(i=>{const e=cuiGallery.exports;const name=new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)));return ["Close","Preview releases"].includes(name);})')
+            page.keyboard.press('Escape')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(4)===0')
+            assert page.evaluate('cuiGallery.exports.gallery_surface_open(0)') == 1
+            index = semantic_index('Advanced preferences')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
+            page.keyboard.press('Escape')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
+            click_semantic('Edit preferences')
+            rectangle = canvas.bounding_box()
+            page.mouse.click(rectangle['x']+4, rectangle['y']+rectangle['height']-4)
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===0')
+            page.evaluate('location.hash="AlertDialog"')
+            page.wait_for_function('cuiGallery.renderedComponent==="AlertDialog"')
+            click_semantic('Delete workspace')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===1')
+            assert page.locator('#accessible [role=alertdialog][aria-modal=true]').count() == 1
+            click_semantic('Delete')
+            page.wait_for_function('cuiGallery.exports.gallery_alert_attempts()===1')
+            assert page.evaluate('cuiGallery.exports.gallery_surface_open(1)') == 1
+            page.wait_for_function('document.querySelector("#accessible [role=alertdialog]")?.getAttribute("aria-description")?.includes("rejected once")')
+            click_semantic('Delete')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===0')
+            index = semantic_index('Delete workspace')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
+            click_semantic('Delete workspace')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===1')
+            click_semantic('Keep workspace')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===0')
+            assert page.evaluate('cuiGallery.exports.gallery_alert_attempts()') == 0
+            page.evaluate('location.hash="Sheet"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Sheet"')
+            for edge in range(4):
+                page.locator('#surface-variant').select_option(str(edge))
+                click_semantic('Open settings sheet')
+                page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===1')
+                dialog = page.locator('#accessible [role=dialog]')
+                assert dialog.get_attribute('aria-modal') == 'true'
+                index = semantic_index('Workspace settings')
+                bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', index)
+                canvas_width = page.evaluate('document.querySelector("canvas").clientWidth')
+                canvas_height = page.evaluate('document.querySelector("canvas").clientHeight')
+                if edge == 0:
+                    assert abs(bounds[0]) < 1
+                elif edge == 1:
+                    assert abs(bounds[0] + bounds[2] - canvas_width) < 1
+                elif edge == 2:
+                    assert abs(bounds[1]) < 1 and abs(bounds[2] - canvas_width) < 1
+                else:
+                    assert abs(bounds[1] + bounds[3] - canvas_height) < 1
+                page.keyboard.press('Escape')
+                page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===0')
+                index = semantic_index('Open settings sheet')
+                assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
+            page.evaluate('location.hash="Popover"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Popover"')
+            click_semantic('Open account card')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===1')
+            assert page.locator('#accessible [role=dialog][aria-modal=false]').count() == 1
+            assert page.evaluate('cuiGallery.exports.gallery_modal()') == 0
+            click_semantic('Notify me about releases')
+            page.wait_for_function('document.querySelector("#accessible [role=checkbox]")?.getAttribute("aria-checked")==="true"')
+            rectangle = canvas.bounding_box()
+            page.mouse.click(rectangle['x']+rectangle['width']-4, rectangle['y']+rectangle['height']-4)
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===0')
+            click_semantic('Open account card')
+            page.keyboard.press('Escape')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)===0')
+            page.evaluate('location.hash="DropdownButton"')
+            page.wait_for_function('cuiGallery.renderedComponent==="DropdownButton"')
+            count = page.evaluate('cuiGallery.exports.gallery_clicks()')
+            click_semantic('Export workspace')
+            page.wait_for_function('(count)=>cuiGallery.exports.gallery_clicks()===count+1', arg=count)
+            assert page.evaluate('cuiGallery.exports.gallery_modal()') == 0
+            page.keyboard.press('Tab')
+            page.keyboard.press('Enter')
+            page.wait_for_function('cuiGallery.exports.gallery_modal()===1')
+            click_semantic('Priority')
+            page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
+            assert page.evaluate('cuiGallery.exports.gallery_clicks()') == count + 1
+            index = semantic_index('Export options')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
+            page.locator('#disabled').check()
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible button")).filter(e=>["Export workspace","Export options"].includes(e.textContent)).every(e=>e.disabled)')
+            click_semantic('Export workspace')
+            click_semantic('Export options')
+            page.wait_for_timeout(40)
+            assert page.evaluate('cuiGallery.exports.gallery_clicks()') == count + 1
+            assert page.evaluate('cuiGallery.exports.gallery_modal()') == 0
+            page.locator('#disabled').uncheck()
             page.evaluate('location.hash="Menu"')
             page.wait_for_function('cuiGallery.renderedComponent==="Menu"')
             click_semantic('Actions')
@@ -147,6 +268,31 @@ def main():
             page.keyboard.press('ArrowRight')
             page.keyboard.press('Enter')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).some(e=>e.getAttribute("aria-label")==="Status"&&e.getAttribute("aria-sort")==="ascending")')
+            # Native column movement preserves the key while changing visible order.
+            page.keyboard.press('Control+ArrowRight')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).map(e=>e.getAttribute("aria-label")).join(",")==="Name,Size,Status"')
+            page.keyboard.press('Control+ArrowLeft')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).map(e=>e.getAttribute("aria-label")).join(",")==="Name,Status,Size"')
+            index = semantic_index('Column width')
+            width_before = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', index)
+            bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', index)
+            rectangle = canvas.bounding_box()
+            x,y = rectangle['x']+bounds[0]+bounds[2]/2,rectangle['y']+bounds[1]+bounds[3]/2
+            page.mouse.move(x,y)
+            page.mouse.down()
+            page.mouse.move(x+24,y,steps=6)
+            page.mouse.up()
+            page.wait_for_function('(before)=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===5&&cuiGallery.exports.gallery_semantic(i,8)>before)', arg=width_before)
+            page.locator('#selection-mode').select_option('1')
+            page.wait_for_function('document.querySelector("#accessible [role=grid]")?.getAttribute("aria-multiselectable")==="true"')
+            click_semantic('File 0001')
+            page.keyboard.press('Shift+ArrowDown')
+            page.wait_for_function('document.querySelectorAll("#accessible [role=gridcell][aria-selected=true]").length===2')
+            page.keyboard.down('Control')
+            click_semantic('File 0004')
+            page.keyboard.up('Control')
+            page.wait_for_function('document.querySelectorAll("#accessible [role=gridcell][aria-selected=true]").length===3')
+            page.locator('#selection-mode').select_option('0')
             canvas.scroll_into_view_if_needed()
             rectangle = canvas.bounding_box()
             page.mouse.move(rectangle['x']+100,rectangle['y']+140)
@@ -334,6 +480,8 @@ def main():
             page.wait_for_function(texts + '.some(s=>s.includes("Alex Morgan"))')
             page.mouse.move(box['x'] + box['width'] - 8, box['y'] + box['height'] - 8)
             page.locator('#theme').focus()
+            page.wait_for_function('cuiGallery.exports.gallery_hover_state(0)===0 && cuiGallery.exports.gallery_hover_state(1)===0')
+            page.wait_for_function('cuiGallery.exports.gallery_hover_state(2)===0')
             page.wait_for_function(texts + '.every(s=>!s.includes("Alex Morgan"))')
             page.evaluate('location.hash="Checkbox"')
             page.wait_for_function('document.querySelector("#name").textContent==="Checkbox" && cuiGallery.renderedComponent==="Checkbox"')
@@ -419,8 +567,22 @@ def main():
                 }""")
                 if bad:
                     overflow.append((name, bad))
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), name
             assert not overflow, overflow
+            page.evaluate('location.hash="DataTable"')
+            page.wait_for_function('cuiGallery.renderedComponent==="DataTable"')
+            page.locator('#table-pin').select_option('1')
+            page.wait_for_timeout(50)
+            index = semantic_index('Name')
+            fixed_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', index)
+            canvas.scroll_into_view_if_needed()
+            rectangle = canvas.bounding_box()
+            page.mouse.move(rectangle['x']+200,rectangle['y']+120)
+            page.mouse.wheel(120,0)
+            page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,17)&&cuiGallery.exports.gallery_semantic(i,18)>0)')
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('Name')) == fixed_x
             page.evaluate('location.hash="Button"')
+            page.wait_for_timeout(100)
             page.wait_for_function('document.querySelector("#name").textContent==="Button" && cuiGallery.renderedComponent==="Button"')
             page.wait_for_timeout(50)
             page.screenshot(path=str(root / 'browser-mobile.png'))
@@ -429,7 +591,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 46 real WASM stories, pointer/keyboard/disabled controls, slider, input, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 51 real WASM stories, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

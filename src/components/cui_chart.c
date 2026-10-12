@@ -694,9 +694,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT);
             bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
             double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 12;
-            double bottom = point_chart
-                                ? o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0)
-                                : (o->height > 32 ? o->height - 20 : 12);
+            double bottom = point_chart ? o->height - (o->hide_x_axis ? 0 : 20) -
+                                              (o->custom_y_padding ? o->y_padding_bottom : 0)
+                                        : (o->height > 32 ? o->height - 20 : 12);
             cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];

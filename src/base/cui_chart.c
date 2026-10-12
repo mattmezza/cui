@@ -80,7 +80,7 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->value_axis_gutter >= o->width || !isfinite(o->y_padding_top) ||
         !isfinite(o->y_padding_bottom) || o->y_padding_top < 0 || o->y_padding_bottom < 0 ||
         (o->custom_y_padding && (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) &&
-         (double)o->y_padding_top + o->y_padding_bottom >= o->height - 20) ||
+         (double)o->y_padding_top + o->y_padding_bottom >= o->height - (o->hide_x_axis ? 0 : 20)) ||
         (o->has_domain &&
          (!isfinite(o->domain_min) || !isfinite(o->domain_max) || o->domain_min >= o->domain_max)))
         return CUI_PLOT_INVALID;
@@ -255,6 +255,9 @@ static double cui_chart_plot_right(const cui_chart_options *o, double left) {
 static double cui_chart_plot_bottom(const cui_chart_options *o) {
     if (o->kind == CUI_CHART_CANDLESTICK)
         return o->height - (o->hide_x_axis ? 0 : 20);
+    if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA)
+        return o->height - (o->hide_x_axis ? 0 : 20) -
+               (o->custom_y_padding ? o->y_padding_bottom : 0);
     bool horizontal_bar = o->kind == CUI_CHART_BAR && (o->bar_alignment == CUI_CHART_BAR_LEFT ||
                                                        o->bar_alignment == CUI_CHART_BAR_RIGHT);
     double gap = horizontal_bar && o->show_y_axis && !o->y_axis_inside ? 32 : 20;
@@ -500,7 +503,7 @@ cui_plot_result cui_chart_point_coordinates(const cui_chart_options *o, size_t i
         return CUI_PLOT_INVALID;
     double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
     double top = o->custom_y_padding ? o->y_padding_top : 10;
-    double bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
+    double bottom = cui_chart_plot_bottom(o);
     if (right <= left || bottom <= top)
         return CUI_PLOT_EMPTY;
     double lo, hi;
@@ -668,7 +671,7 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
            bottom = cui_chart_plot_bottom(o);
     if (o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA) {
         top = o->custom_y_padding ? o->y_padding_top : 10;
-        bottom = o->height - 20 - (o->custom_y_padding ? o->y_padding_bottom : 0);
+        bottom = cui_chart_plot_bottom(o);
     } else if (o->kind == CUI_CHART_CANDLESTICK)
         top = 10;
     if (right <= left || bottom <= top)

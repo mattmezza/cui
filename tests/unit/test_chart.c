@@ -513,6 +513,29 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_INVALID);
     assert(state.revision == old_revision && memcmp(saved, pixels, sizeof pixels) == 0);
     extra.count = 3;
+    float x_with_axis, y_with_axis, x_without_axis, y_without_axis;
+    assert(cui_chart_point_coordinates(&options, 1, 0, &x_with_axis, &y_with_axis) == CUI_PLOT_OK);
+    assert(!cui_chart_hit_test(&options, x_with_axis * options.logical_width / options.width,
+                               options.logical_height - 1)
+                .valid);
+    options.hide_x_axis = true;
+    assert(cui_chart_point_coordinates(&options, 1, 0, &x_without_axis, &y_without_axis) ==
+           CUI_PLOT_OK);
+    assert(fabsf(x_with_axis - x_without_axis) < .01f && y_without_axis > y_with_axis);
+    assert(cui_chart_hit_test(&options, x_without_axis * options.logical_width / options.width,
+                              options.logical_height - 1)
+               .valid);
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    memcpy(saved, pixels, sizeof pixels);
+    options.hide_x_axis = false;
+    assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    assert(memcmp(saved, pixels, sizeof pixels) != 0);
+    options.kind = CUI_CHART_AREA;
+    options.hide_x_axis = true;
+    assert(cui_chart_point_coordinates(&options, 1, 0, &x_without_axis, &y_without_axis) ==
+           CUI_PLOT_OK);
+    assert(y_without_axis > y_with_axis);
+    options.hide_x_axis = false;
     options.kind = CUI_CHART_RADAR;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     float radar_x = -1, radar_y = -1;

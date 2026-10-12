@@ -2763,7 +2763,78 @@ static void test_structured_tab_parts(void) {
         cui_destroy(ui);
     }
 }
+static unsigned list_confirms, list_secondary_confirms, list_cancels, list_legacy_confirms;
+static void list_confirm(cui_id item, bool secondary, void *user) {
+    assert(user == &list_confirms && item == 10);
+    list_confirms++;
+    list_secondary_confirms += secondary;
+    assert(list_legacy_confirms == list_confirms);
+}
+static void list_cancel(void *user) {
+    assert(user == &list_confirms);
+    list_cancels++;
+}
+static void list_legacy_confirm(cui_id item, void *user) {
+    assert(item == 10 && user == &list_confirms);
+    list_legacy_confirms++;
+}
+static void test_list_confirmation_contract(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    const cui_choice_item entries[] = {{10, {"Enabled", 7}, false}, {20, {"Disabled", 8}, true}};
+    cui_list_state state = {.active = 10};
+    cui_id selected = 0;
+    cui_list_options options = {.on_activate = list_legacy_confirm,
+                                .on_confirm = list_confirm,
+                                .on_cancel = list_cancel,
+                                .activation_user = &list_confirms,
+                                .track_secondary = true};
+    list_confirms = list_secondary_confirms = list_cancels = list_legacy_confirms = 0;
+    list_scene(ui, entries, 2, &selected, &state, options);
+    cui_rect row = cui_bounds(ui, 10);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_SECONDARY,
+                                           .x = row.x + 2,
+                                           .y = row.y + 2}));
+    assert(!list_scene(ui, entries, 2, &selected, &state, options));
+    assert(state.secondary_active == 10 && !selected && !list_confirms);
+    cui_focus(ui, 10);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .modifiers = CUI_MOD_CTRL}));
+    assert(list_scene(ui, entries, 2, &selected, &state, options));
+    assert(selected == 10 && list_confirms == 1 && list_secondary_confirms == 1 &&
+           !state.secondary_active);
+    key(ui, CUI_KEY_ENTER);
+    assert(list_scene(ui, entries, 2, &selected, &state, options));
+    assert(list_confirms == 2 && list_secondary_confirms == 1);
+    options.secondary_modifiers = CUI_MOD_ALT;
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = row.x + 2, .y = row.y + 2}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = row.x + 2,
+                                           .y = row.y + 2,
+                                           .modifiers = CUI_MOD_ALT}));
+    assert(list_scene(ui, entries, 2, &selected, &state, options));
+    assert(list_confirms == 3 && list_secondary_confirms == 2);
+    key(ui, CUI_KEY_ESCAPE);
+    assert(!list_scene(ui, entries, 2, &selected, &state, options));
+    assert(list_cancels == 1 && selected == 10);
+    options.disabled = true;
+    key(ui, CUI_KEY_ENTER);
+    key(ui, CUI_KEY_ESCAPE);
+    assert(!list_scene(ui, entries, 2, &selected, &state, options));
+    assert(list_confirms == 3 && list_cancels == 1);
+    options.disabled = false;
+    list_scene(ui, NULL, 0, &selected, &state, options);
+    cui_focus(ui, 91);
+    key(ui, CUI_KEY_ESCAPE);
+    assert(!list_scene(ui, NULL, 0, &selected, &state, options));
+    assert(list_cancels == 2);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_list_confirmation_contract();
     test_structured_tab_parts();
     test_custom_tab_width_caps();
     test_dropdown_configurable_palettes();

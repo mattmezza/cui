@@ -434,22 +434,27 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                        .padding = theme->padding,
                        .row = true,
                        .gap = theme->gap,
-                       .background = state->active == items[i].id ? theme->primary : theme->surface,
+                       .background =
+                           (state->active == items[i].id || state->secondary_active == items[i].id)
+                               ? theme->primary
+                               : theme->surface,
                        .border = cui_focused(ui) == items[i].id ? theme->focus : theme->surface,
                        .border_width = cui_focused(ui) == items[i].id ? 1 : 0};
         cui_begin_box(ui, items[i].id, box);
         if (multiple_selected)
             cui_text(ui, cui_string(multiple_selected[i] ? "[x]" : "[ ]"), theme->font_size,
                      options.disabled || items[i].disabled ? theme->muted
-                     : state->active == items[i].id        ? theme->on_primary
-                                                           : theme->text);
+                     : (state->active == items[i].id || state->secondary_active == items[i].id)
+                         ? theme->on_primary
+                         : theme->text);
         if (options.render)
             options.render(ui, &items[i], i, options.render_user);
         else
             cui_text(ui, items[i].label, theme->font_size,
                      options.disabled || items[i].disabled ? theme->muted
-                     : state->active == items[i].id        ? theme->on_primary
-                                                           : theme->text);
+                     : (state->active == items[i].id || state->secondary_active == items[i].id)
+                         ? theme->on_primary
+                         : theme->text);
         cui_end_box(ui);
         bool checked = multiple_selected ? multiple_selected[i] : *selected == items[i].id;
         cui_update_semantic(ui, items[i].id, checked, (float)i);
@@ -461,7 +466,7 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
 bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
               cui_list_options options) {
-    if (!theme || !items || !selected || !state)
+    if (!theme || (!items && count) || !selected || !state)
         return false;
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;

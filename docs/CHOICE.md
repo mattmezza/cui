@@ -592,3 +592,14 @@ geometry. Tests cover every variant, prefix width, suffix placement, ellipsis,
 custom body composition, slot clicks, effective disabled propagation, array bounds
 and icon exemption. Slot wrappers reserve tab IDs XOR `0xacf7823ab98e17d0`,
 `0xacf7823ab98e17e0`, `0xacf7823ab98e17f0`, `0xacf7823ab98e1710`.
+
+List offers `on_confirm(item, secondary, user)` after the existing activation
+callback, and `on_cancel(user)` for focused Escape without changing selection.
+Both use `activation_user` and preserve input order. `secondary_modifiers` selects
+the portable host policy (zero defaults to CTRL|META); modified Enter and primary
+click confirmation expose that flag. Optional `track_secondary` paints an
+independent context-click highlight without committing/confirming. A later
+confirmation, Escape, removed/hidden/disabled row or disabling the option clears
+that highlight. Empty lists retain focused cancellation. Tests cover callback
+order, modified/unmodified Enter, modified primary release, context highlighting,
+disabled behavior and empty cancellation.

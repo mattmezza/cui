@@ -94,9 +94,12 @@ typedef struct {
     size_t search_length;
     float search_time;
     size_t first_visible;
-    float scroll_remainder; /* fractional wheel rows carried across frames */
+    float scroll_remainder;  /* fractional wheel rows carried across frames */
+    cui_id secondary_active; /* independent optional context-click highlight */
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
+typedef void (*cui_choice_confirm_fn)(cui_id item, bool secondary, void *user);
+typedef void (*cui_choice_cancel_fn)(void *user);
 typedef struct {
     bool disabled, menu;
     float dt;
@@ -109,6 +112,10 @@ typedef struct {
     cui_id scroll_target;   /* eligible scrolling semantic ID */
     cui_id scroll_scope;    /* popup scope, or zero for a standalone list */
     bool window_changed;    /* discard pointer activation against pre-scroll layout */
+    cui_choice_confirm_fn on_confirm; /* same event order, after on_activate */
+    cui_choice_cancel_fn on_cancel;   /* Escape, independent of selection change */
+    unsigned secondary_modifiers;     /* zero uses CTRL|META; caller selects host policy */
+    bool track_secondary;             /* highlight secondary presses without confirming */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;

@@ -12,6 +12,16 @@ bool cui_number_parse(cui_str text, double *value);
 /* Reports required bytes excluding NUL; always emits ASCII '.' regardless of locale. */
 size_t cui_number_format(double value, char *output, size_t capacity);
 typedef double (*cui_number_step_fn)(void *user, double value, int direction);
+typedef enum {
+    CUI_NUMBER_MEDIUM,
+    CUI_NUMBER_SMALL,
+    CUI_NUMBER_LARGE,
+    CUI_NUMBER_XSMALL,
+    CUI_NUMBER_CUSTOM
+} cui_number_size;
+typedef struct {
+    float height, font_size, line_height, padding_x, padding_y, step_width, icon_size;
+} cui_number_metrics;
 typedef struct {
     double minimum, maximum, step;
     bool has_minimum, has_maximum, disabled, readonly, allow_exponent;
@@ -19,11 +29,17 @@ typedef struct {
     void *step_user;
     cui_str prefix, suffix;
     float width;
+    cui_number_size size;
+    float custom_size, density;
+    bool no_appearance, hide_focus_ring;
+    cui_str placeholder;
 } cui_number_options;
+bool cui_number_measure(cui_number_options, float root_font_size, cui_number_metrics *);
 typedef struct {
     cui_edit *edit; /* Borrowed single-line editor, draft limited to 127 UTF-8 bytes. */
     double last_value;
     bool initialized, was_focused, invalid;
+    float scroll_x;
 } cui_number_state;
 typedef struct {
     bool changed, submitted, invalid;
@@ -424,10 +440,20 @@ cui_number_result cui_base_number_input(cui_context *ui, cui_id id, cui_str name
             .invalid = s->invalid,
             .minimum = cui_numeric_semantic_value(o.has_minimum ? o.minimum : -FLT_MAX),
             .maximum = cui_numeric_semantic_value(o.has_maximum ? o.maximum : FLT_MAX)});
-    cui_interact(ui, cui_numeric_part_id(id, 1), CUI_ROLE_BUTTON, cui_string("-"),
-                 !editable || (o.has_minimum && *value <= o.minimum), false, 0);
-    cui_interact(ui, cui_numeric_part_id(id, 2), CUI_ROLE_BUTTON, cui_string("+"),
-                 !editable || (o.has_maximum && *value >= o.maximum), false, 0);
+    cui_interact(ui, cui_numeric_part_id(id, 1), CUI_ROLE_BUTTON, cui_string("Decrement"),
+                 !editable, false, 0);
+    cui_interact(ui, cui_numeric_part_id(id, 2), CUI_ROLE_BUTTON, cui_string("Increment"),
+                 !editable, false, 0);
+    for (unsigned part = 1; part <= 2; part++) {
+        cui_id button = cui_numeric_part_id(id, part);
+        cui_set_tab_stop(ui, button, false);
+        cui_set_semantic_details(ui, button,
+                                 (cui_semantic_details){.controls = id,
+                                                        .no_focus = true,
+                                                        .focus_target = id,
+                                                        .pointer_activatable = true,
+                                                        .cursor = CUI_CURSOR_POINTER});
+    }
     s->last_value = *value;
     s->was_focused = focused;
     result.invalid = s->invalid;
@@ -589,6 +615,8 @@ bool cui_base_stepper(cui_context *ui, cui_id id, const cui_step *steps, size_t 
 /* src/components/cui_numeric.c */
 /* SPDX-License-Identifier: MIT */
 
+
+
 #include <math.h>
 #include <stdio.h>
 static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str text,
@@ -603,37 +631,131 @@ static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme
     cui_text(ui, text, t->font_size, disabled ? t->muted : t->on_primary);
     cui_end_box(ui);
 }
+bool cui_number_measure(cui_number_options options, float root_font_size,
+                        cui_number_metrics *metrics) {
+    if (!metrics || options.size < CUI_NUMBER_MEDIUM || options.size > CUI_NUMBER_CUSTOM)
+        return false;
+    cui_input_metrics input;
+    if (!cui_input_measure((cui_input_options){.size = (cui_input_size)options.size,
+                                               .custom_size = options.custom_size,
+                                               .density = options.density},
+                           root_font_size, &input))
+        return false;
+    float d = options.density > 0 ? options.density : root_font_size / 16;
+    float width = options.size == CUI_NUMBER_XSMALL || options.size == CUI_NUMBER_SMALL ? 24 : 32;
+    float icon = options.size == CUI_NUMBER_XSMALL  ? 12
+                 : options.size == CUI_NUMBER_SMALL ? 14
+                 : options.size == CUI_NUMBER_LARGE ? 24
+                                                    : 16;
+    if (options.size == CUI_NUMBER_CUSTOM) {
+        width = options.custom_size / d;
+        icon = options.custom_size / d;
+    }
+    *metrics =
+        (cui_number_metrics){input.height,    input.font_size, input.line_height, input.padding_x,
+                             input.padding_y, width * d,       icon * d};
+    return true;
+}
+static void cui_number_step_paint(cui_context *ui, cui_id id, const cui_theme *theme,
+                                  cui_number_metrics metrics, bool increment, bool disabled,
+                                  float height, float radius) {
+    cui_color background = {0};
+    if (!disabled && (cui_hovered(ui, id) || cui_pressed(ui, id))) {
+        background = theme->input;
+        background.a = (uint8_t)lroundf(background.a * (cui_pressed(ui, id) ? .6f : .4f));
+    }
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = metrics.step_width,
+                  .height = height,
+                  .fixed_height = true,
+                  .align_x = CUI_ALIGN_CENTER,
+                  .align_y = CUI_ALIGN_CENTER,
+                  .background = background,
+                  .custom_corners = true,
+                  .corner_radii =
+                      increment ? (cui_corner_radii){.top_right = radius, .bottom_right = radius}
+                                : (cui_corner_radii){.top_left = radius, .bottom_left = radius}});
+    cui_color color = theme->secondary_foreground;
+    cui_icon_named(ui, id ^ UINT64_C(0xf753713882a65049), theme,
+                   increment ? cui_string("plus") : cui_string("minus"),
+                   (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                      .custom_size = metrics.icon_size,
+                                      .custom_color = true,
+                                      .color = color});
+    cui_end_box(ui);
+}
 cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_number_state *s, double *value, cui_number_options o) {
-    if (!t)
+    cui_number_metrics metrics;
+    if (!ui || !id || !t || !cui_number_measure(o, t->font_size, &metrics) || !isfinite(o.width) ||
+        (o.prefix.length && !o.prefix.data) || (o.suffix.length && !o.suffix.data) ||
+        (o.placeholder.length && !o.placeholder.data))
         return (cui_number_result){.invalid = true, .error = CUI_EDIT_INVALID_ARGUMENT};
     cui_number_result result = cui_base_number_input(ui, id, name, s, value, o);
-    if (!s || !s->edit || !value || (result.error == CUI_EDIT_INVALID_ARGUMENT && !s->initialized))
+    if (!s || !s->edit || !value || result.error == CUI_EDIT_INVALID_ARGUMENT)
         return result;
     bool editable = !o.disabled && !o.readonly;
-    float width = isfinite(o.width) && o.width > 0 ? o.width : 200;
-    cui_begin_box(ui, cui_numeric_part_id(id, 0), (cui_box){.gap = t->gap, .row = true});
-    if (o.prefix.length)
-        cui_text(ui, o.prefix, t->font_size, t->text);
-    cui_begin_box(ui, id,
+    float width = o.width ? o.width : 200, border = o.no_appearance ? 0 : 1;
+    float inner = fmaxf(0, metrics.height - 2 * border);
+    cui_color frame_border = t->input;
+    if (o.disabled)
+        frame_border.a = (uint8_t)lroundf(frame_border.a * .5f);
+    else if (s->invalid)
+        frame_border = t->danger;
+    else if (cui_focused(ui) == id && !o.hide_focus_ring)
+        frame_border = t->focus;
+    cui_color background = t->input_background;
+    if (o.disabled) {
+        background = t->input;
+        background.a = (uint8_t)lroundf(background.a * .2f);
+    }
+    cui_begin_box(ui, cui_numeric_part_id(id, 0),
                   (cui_box){.width = width,
-                            .padding = t->padding,
-                            .gap = t->gap * .5f,
+                            .height = metrics.height,
+                            .fixed_height = true,
+                            .row = true,
+                            .padding = border,
+                            .gap = 0,
+                            .align_y = CUI_ALIGN_CENTER,
                             .radius = t->radius,
-                            .background = t->surface,
-                            .border = s->invalid              ? t->danger
-                                      : cui_focused(ui) == id ? t->focus
-                                                              : t->border,
-                            .border_width = 1});
-    cui_text(ui, name, t->font_size * .8f, t->muted);
-    cui_text(ui, cui_edit_get_text(s->edit), t->font_size, o.disabled ? t->muted : t->text);
-    cui_end_box(ui);
-    cui_numeric_paint_button(ui, cui_numeric_part_id(id, 1), t, cui_string("-"),
-                             !editable || (o.has_minimum && *value <= o.minimum));
-    cui_numeric_paint_button(ui, cui_numeric_part_id(id, 2), t, cui_string("+"),
-                             !editable || (o.has_maximum && *value >= o.maximum));
+                            .clip = true,
+                            .background = o.no_appearance ? (cui_color){0} : background,
+                            .border = frame_border,
+                            .border_width = border,
+                            .custom_opacity = o.disabled,
+                            .opacity = .5f});
+    float radius = o.no_appearance ? t->radius : fmaxf(0, t->radius - 1);
+    cui_number_step_paint(ui, cui_numeric_part_id(id, 1), t, metrics, false, !editable, inner,
+                          radius);
+    if (o.prefix.length)
+        cui_text_with_line_height(ui, o.prefix, metrics.font_size, t->text, metrics.line_height);
+    float middle_width =
+        width > 0 ? fmaxf(1, width - 2 * border - 2 * metrics.step_width -
+                                 cui_measure_text(ui, o.prefix, metrics.font_size).width -
+                                 cui_measure_text(ui, o.suffix, metrics.font_size).width)
+                  : -1;
+    cui_input_state input = {.scroll_x = s->scroll_x};
+    cui_input_paint(ui, id, t, name, s->edit, &input,
+                    (cui_input_options){.size = (cui_input_size)o.size,
+                                        .custom_size = o.custom_size,
+                                        .density = o.density,
+                                        .height = inner,
+                                        .custom_height = true,
+                                        .width = middle_width,
+                                        .no_appearance = true,
+                                        .no_border = true,
+                                        .hide_focus_ring = true,
+                                        .disabled = o.disabled,
+                                        .readonly = o.readonly,
+                                        .invalid = s->invalid,
+                                        .placeholder = o.placeholder,
+                                        .text_align = CUI_ALIGN_CENTER});
+    s->scroll_x = input.scroll_x;
     if (o.suffix.length)
-        cui_text(ui, o.suffix, t->font_size, t->text);
+        cui_text_with_line_height(ui, o.suffix, metrics.font_size, t->text, metrics.line_height);
+    cui_number_step_paint(ui, cui_numeric_part_id(id, 2), t, metrics, true, !editable, inner,
+                          radius);
     cui_end_box(ui);
     return result;
 }

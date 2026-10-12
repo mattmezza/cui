@@ -3,6 +3,7 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
+#include "cui_carousel.h"
 #include "cui_choice.h"
 #include "cui_chrome.h"
 #include "cui_content.h"
@@ -149,12 +150,29 @@ typedef struct {
     cui_input_behavior_state behavior;
     float scroll_x;
 } cui_input_state;
+typedef enum {
+    CUI_INPUT_MEDIUM,
+    CUI_INPUT_SMALL,
+    CUI_INPUT_LARGE,
+    CUI_INPUT_XSMALL,
+    CUI_INPUT_CUSTOM
+} cui_input_size;
+typedef struct {
+    float height, font_size, line_height, padding_x, padding_y, gap;
+} cui_input_metrics;
 typedef struct {
     bool disabled, readonly, required, invalid;
     float width; /* Zero defaults to 280; negative grows. */
     cui_str placeholder;
     const cui_platform *clipboard;
+    cui_input_size size;
+    float custom_size, density; /* density 0 derives theme font_size/16. */
+    float height;               /* Optional frame-height refinement; line box remains 20*density. */
+    bool custom_height; /* Preserve explicit zero height. Positive height always overrides. */
+    bool no_appearance, no_border, hide_focus_ring;
+    cui_align text_align;
 } cui_input_options;
+bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
 /* Paint only: compose with a reducer without applying the event stream twice. */
 void cui_input_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_edit *,
@@ -267,6 +285,10 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_SETTINGS_IMPLEMENTATION
 #endif
 #include "cui_settings.h"
+#ifndef CUI_CAROUSEL_IMPLEMENTATION
+#define CUI_CAROUSEL_IMPLEMENTATION
+#endif
+#include "cui_carousel.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -1037,100 +1059,176 @@ void cui_separator(cui_context *ui, cui_id id, const cui_theme *t, float width) 
     cui_end_box(ui);
 }
 
-static void cui_components_input_span(cui_context *ui, cui_str text, const cui_theme *t,
-                                      bool selected, bool disabled) {
-    if (!text.length)
-        return;
-    cui_size extent = cui_measure_text(ui, text, t->font_size);
-    cui_begin_box(ui, 0,
-                  (cui_box){.width = extent.width,
-                            .height = extent.height,
-                            .background = selected ? t->primary : (cui_color){0}});
-    cui_text(ui, text, t->font_size, disabled ? t->muted : selected ? t->on_primary : t->text);
-    cui_end_box(ui);
-}
-static void cui_components_input_caret(cui_context *ui, const cui_theme *t, float height) {
-    cui_begin_box(ui, 0, (cui_box){.width = 1, .height = height, .background = t->text});
-    cui_end_box(ui);
+bool cui_input_measure(cui_input_options options, float root_font_size,
+                       cui_input_metrics *metrics) {
+    if (!metrics || options.size < CUI_INPUT_MEDIUM || options.size > CUI_INPUT_CUSTOM ||
+        !isfinite(root_font_size) || root_font_size <= 0 || root_font_size > 4096 ||
+        !isfinite(options.density) || options.density < 0 || options.density > 256 ||
+        !isfinite(options.height) || options.height < 0 || options.height > 1000000)
+        return false;
+    float d = options.density > 0 ? options.density : root_font_size / 16;
+    float h = 32, font = 14, px = 10, py = 8, gap = 6;
+    switch (options.size) {
+    case CUI_INPUT_XSMALL:
+        h = 20;
+        font = 12;
+        px = 4;
+        py = 0;
+        break;
+    case CUI_INPUT_SMALL:
+        h = 24;
+        px = 8;
+        py = 2;
+        gap = 4;
+        break;
+    case CUI_INPUT_LARGE:
+        h = 44;
+        font = 16;
+        px = 12;
+        py = 10;
+        gap = 8;
+        break;
+    case CUI_INPUT_CUSTOM:
+        if (!isfinite(options.custom_size) || options.custom_size <= 0 ||
+            options.custom_size > 4096)
+            return false;
+        h = options.custom_size / d;
+        font = options.custom_size * .875f / d;
+        px = 8;
+        py = 2;
+        break;
+    default:
+        break;
+    }
+    *metrics =
+        (cui_input_metrics){options.custom_height || options.height > 0 ? options.height : h * d,
+                            font * d,
+                            20 * d,
+                            px * d,
+                            py * d,
+                            gap * d};
+    return true;
 }
 cui_id cui_input_viewport_id(cui_id id) {
     return id ^ UINT64_C(0xb1642b97583fbd63);
 }
+static float cui_input_alignment(float available, float text, cui_align align) {
+    float extra = fmaxf(0, available - text);
+    return align == CUI_ALIGN_CENTER ? extra * .5f : align == CUI_ALIGN_END ? extra : 0;
+}
 void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_edit *edit,
                      cui_input_state *state, cui_input_options options) {
-    if (!ui || !id || !t || !edit || !state)
+    (void)name;
+    cui_input_metrics metrics;
+    if (!ui || !id || !t || !edit || !state ||
+        !cui_input_measure(options, t->font_size, &metrics) || !isfinite(options.width) ||
+        options.text_align < CUI_ALIGN_START || options.text_align > CUI_ALIGN_END)
         return;
-    cui_id viewport_id = cui_input_viewport_id(id);
-    cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), t->font_size, state->scroll_x};
     bool multiline = cui_edit_get_state(edit).multiline;
-    cui_box box = cui_components_control(t, options.disabled, false);
-    box.width = options.width ? options.width : 280;
-    box.height = 0;
-    box.row = false;
-    box.clip = true;
-    if (options.invalid)
-        box.border = t->danger;
-    else
-        cui_components_focus(ui, id, t, &box);
-    cui_begin_box(ui, id, box);
-    cui_text(ui, name, t->font_size * .8f, t->muted);
+    bool focused = cui_focused(ui) == id && !options.disabled;
+    float border = options.no_appearance || options.no_border ? 0 : 1;
+    cui_color background = t->input_background, foreground = options.disabled ? t->muted : t->text;
+    if (options.disabled) {
+        background = t->input;
+        background.a = (uint8_t)lroundf(background.a * .2f);
+        foreground.a = (uint8_t)lroundf(foreground.a * .5f);
+    }
+    cui_color frame_border = options.invalid                       ? t->danger
+                             : focused && !options.hide_focus_ring ? t->focus
+                                                                   : t->input;
+    float width = options.width ? options.width : 280;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = width,
+                            .height = multiline ? 0 : metrics.height,
+                            .fixed_height = !multiline,
+                            .row = !multiline,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .clip = true,
+                            .radius = options.no_appearance ? 0 : t->radius,
+                            .background = options.no_appearance ? (cui_color){0} : background,
+                            .border = frame_border,
+                            .border_width = border});
     cui_str text = cui_edit_get_text(edit);
     cui_edit_state selection = cui_edit_get_state(edit);
-    bool focused = cui_focused(ui) == id && !options.disabled;
     if (multiline) {
-        cui_text(ui, text.length ? text : cui_string(" "), t->font_size,
-                 options.disabled ? t->muted : t->text);
-    } else {
-        float height = cui_measure_text(ui, cui_string("M"), t->font_size).height;
-        float viewport_width = hit.viewport.w;
-        if (box.width > 0)
-            viewport_width = fmaxf(1, box.width - 2 * box.padding);
-        float caret =
-            cui_measure_text(ui, (cui_str){text.data, selection.cursor}, t->font_size).width;
-        float total = cui_measure_text(ui, text, t->font_size).width + (focused ? 1 : 0);
-        if (!isfinite(state->scroll_x) || state->scroll_x < 0)
-            state->scroll_x = 0;
-        if (focused && viewport_width > 0) {
-            if (caret < state->scroll_x)
-                state->scroll_x = caret;
-            if (caret + 1 > state->scroll_x + viewport_width)
-                state->scroll_x = caret + 1 - viewport_width;
-        }
-        state->scroll_x = fminf(state->scroll_x, fmaxf(0, total - viewport_width));
-        cui_begin_box(ui, viewport_id,
-                      (cui_box){.width = -1,
-                                .height = height,
-                                .row = true,
-                                .clip = true,
-                                .offset_x = -state->scroll_x});
-        if (!text.length && options.placeholder.length) {
-            if (focused)
-                cui_components_input_caret(ui, t, height);
-            cui_text(ui, options.placeholder, t->font_size, t->muted);
-        } else {
-            size_t first =
-                selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
-            size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
-            cui_components_input_span(ui, (cui_str){text.data, first}, t, false, options.disabled);
-            if (focused && selection.cursor == first)
-                cui_components_input_caret(ui, t, height);
-            cui_components_input_span(ui, (cui_str){text.data + first, last - first}, t, focused,
-                                      options.disabled);
-            if (focused && selection.cursor != first)
-                cui_components_input_caret(ui, t, height);
-            cui_components_input_span(ui, (cui_str){text.data + last, text.length - last}, t, false,
-                                      options.disabled);
-        }
+        cui_text_with_line_height(ui, text.length ? text : cui_string(" "), metrics.font_size,
+                                  foreground, metrics.line_height);
+        cui_end_box(ui);
+        return;
+    }
+    float inset = metrics.padding_x + border;
+    cui_id viewport_id = cui_input_viewport_id(id);
+    float viewport_width = width > 0 ? fmaxf(0, width - 2 * inset) : cui_bounds(ui, viewport_id).w;
+    float text_width = cui_measure_text(ui, text, metrics.font_size).width;
+    float align = cui_input_alignment(viewport_width, text_width, options.text_align);
+    float caret =
+        cui_measure_text(ui, (cui_str){text.data, selection.cursor}, metrics.font_size).width;
+    float total = text_width + (focused ? 1 : 0);
+    if (!isfinite(state->scroll_x) || state->scroll_x < 0)
+        state->scroll_x = 0;
+    if (focused && viewport_width > 0) {
+        if (caret < state->scroll_x)
+            state->scroll_x = caret;
+        if (caret + 1 > state->scroll_x + viewport_width)
+            state->scroll_x = caret + 1 - viewport_width;
+    }
+    state->scroll_x = fminf(state->scroll_x, fmaxf(0, total - viewport_width));
+    cui_begin_box(ui, 0, (cui_box){.width = inset});
+    cui_end_box(ui);
+    cui_begin_box(ui, viewport_id,
+                  (cui_box){.width = -1,
+                            .height = metrics.line_height,
+                            .fixed_height = true,
+                            .clip = true,
+                            .offset_x = align - state->scroll_x});
+    cui_begin_box(ui, id ^ UINT64_C(0xb1642b97583fbd64),
+                  (cui_box){.width = fmaxf(text_width + 1, viewport_width),
+                            .height = metrics.line_height,
+                            .fixed_height = true});
+    size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
+    size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    if (focused && first != last) {
+        float left = cui_measure_text(ui, (cui_str){text.data, first}, metrics.font_size).width;
+        float right = cui_measure_text(ui, (cui_str){text.data, last}, metrics.font_size).width;
+        cui_set_underlay(ui, (cui_rect){left, 0, right - left, metrics.line_height}, t->selection,
+                         (cui_corner_radii){0});
+    }
+    if (text.length)
+        cui_text_with_line_height(ui, text, metrics.font_size, foreground, metrics.line_height);
+    else if (options.placeholder.length) {
+        cui_color placeholder = t->muted;
+        if (options.disabled)
+            placeholder.a = (uint8_t)lroundf(placeholder.a * .5f);
+        cui_text_with_line_height(ui, options.placeholder, metrics.font_size, placeholder,
+                                  metrics.line_height);
+    }
+    if (focused) {
+        float height = metrics.line_height * .85f;
+        cui_begin_absolute_box(ui, id ^ UINT64_C(0xb1642b97583fbd65),
+                               (cui_box){.background = t->caret},
+                               (cui_rect){caret, (metrics.line_height - height) * .5f, 1, height});
         cui_end_box(ui);
     }
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_begin_box(ui, 0, (cui_box){.width = inset});
+    cui_end_box(ui);
     cui_end_box(ui);
 }
 cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                               cui_edit *edit, cui_input_state *state, cui_input_options options) {
-    if (!ui || !t || !edit || !state)
+    cui_input_metrics metrics;
+    if (!ui || !t || !edit || !state || !cui_input_measure(options, t->font_size, &metrics) ||
+        !isfinite(options.width) || options.text_align < CUI_ALIGN_START ||
+        options.text_align > CUI_ALIGN_END ||
+        (options.placeholder.length && !options.placeholder.data))
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
     cui_id viewport_id = cui_input_viewport_id(id);
-    cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), t->font_size, state->scroll_x};
+    cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), metrics.font_size,
+                                  state->scroll_x};
+    hit.viewport.x += cui_input_alignment(
+        hit.viewport.w, cui_measure_text(ui, cui_edit_get_text(edit), metrics.font_size).width,
+        options.text_align);
     bool multiline = cui_edit_get_state(edit).multiline;
     cui_input_result result = cui_base_input_ex(
         ui, id, name, edit, &state->behavior,

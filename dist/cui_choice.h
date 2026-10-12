@@ -3081,7 +3081,12 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
         return result;
     }
     state->query_viewport = cui_bounds(ui, cui_input_viewport_id(input));
-    state->query_font_size = theme->font_size;
+    cui_input_metrics input_metrics;
+    if (!cui_input_measure((cui_input_options){0}, theme->font_size, &input_metrics)) {
+        result.error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    state->query_font_size = input_metrics.font_size;
     result = cui_base_combobox(ui, input, name, query, items, count, filtered, capacity, selected,
                                state, options.disabled);
     cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error);
@@ -3306,7 +3311,12 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
         return result;
     }
     state->query_viewport = cui_bounds(ui, cui_input_viewport_id(input));
-    state->query_font_size = theme->font_size;
+    cui_input_metrics input_metrics;
+    if (!cui_input_measure((cui_input_options){0}, theme->font_size, &input_metrics)) {
+        result.error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    state->query_font_size = input_metrics.font_size;
     result =
         cui_base_combobox_multi(ui, input, name, query, items, count, filtered, filtered_selected,
                                 capacity, selected, state, options.disabled);

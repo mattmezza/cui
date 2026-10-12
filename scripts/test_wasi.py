@@ -37,6 +37,8 @@ SOURCES = (
     "src/components/cui_textarea.c",
     "src/base/cui_settings.c",
     "src/components/cui_settings.c",
+    "src/base/cui_carousel.c",
+    "src/components/cui_carousel.c",
     "src/base/cui_icon.c",
     "src/components/cui_icon.c",
     "src/base/cui_resizable.c",
@@ -73,7 +75,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings")
+SUITES = ("bootstrap", "core", "base", "components", "render", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -189,6 +191,7 @@ def main() -> int:
         virtual_clock = ["-D_WASI_EMULATED_PROCESS_CLOCKS", "-lwasi-emulated-process-clocks"]
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("carousel_base_only", ["tests/unit/test_carousel.c", "src/base/cui_carousel.c"], False, ["-DCUI_CAROUSEL_BASE_ONLY=1"])]
         targets += [("sidebar_base_only", ["tests/unit/test_sidebar.c", "src/core/cui.c", "src/base/cui_sidebar.c"], False, ["-DCUI_SIDEBAR_BASE_ONLY=1"])]
         targets += [("numeric_base_only", ["tests/unit/test_numeric.c", "src/core/cui.c", "src/base/cui_edit.c", "src/base/cui_numeric.c"], False, ["-DCUI_NUMERIC_BASE_ONLY=1"])]
         targets += [("picker_base_only", ["tests/unit/test_picker.c", "src/core/cui.c", "src/base/cui_models.c", "src/base/cui_overlay.c", "src/base/cui_picker.c"], False, ["-DCUI_PICKER_BASE_ONLY=1"])]

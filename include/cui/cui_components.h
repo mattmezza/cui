@@ -2,6 +2,7 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
+#include "cui_carousel.h"
 #include "cui_choice.h"
 #include "cui_chrome.h"
 #include "cui_content.h"

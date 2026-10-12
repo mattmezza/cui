@@ -354,6 +354,36 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             }
         }
     }
+    if (o->kind == CUI_CHART_RADAR && !o->noninteractive && state->hovered < o->count)
+        for (size_t series = 0; series <= o->extra_series_count; series++) {
+            float pixel_x, pixel_y;
+            if (cui_chart_radar_vertex(o, state->hovered, series, &pixel_x, &pixel_y) !=
+                CUI_PLOT_OK)
+                continue;
+            float dot_x = pixel_x * w / o->width;
+            float dot_y = pixel_y * h / o->height;
+            cui_color dot = series ? o->extra_series[series - 1].color : o->series[0];
+            if (!dot.a)
+                dot = o->series[series].a ? o->series[series] : o->foreground;
+            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x46a5c19a4f310000) + series),
+                                   (cui_box){.width = 10,
+                                             .height = 10,
+                                             .radius = 5,
+                                             .fixed_width = true,
+                                             .fixed_height = true,
+                                             .background = o->background},
+                                   (cui_rect){dot_x - 5, dot_y - 5, 10, 10});
+            cui_end_box(ui);
+            cui_begin_absolute_box(ui, id ^ (UINT64_C(0x56a5c19a4f310000) + series),
+                                   (cui_box){.width = 6,
+                                             .height = 6,
+                                             .radius = 3,
+                                             .fixed_width = true,
+                                             .fixed_height = true,
+                                             .background = dot},
+                                   (cui_rect){dot_x - 3, dot_y - 3, 6, 6});
+            cui_end_box(ui);
+        }
     if (!o->hide_axes && !o->hide_x_axis && o->kind != CUI_CHART_PIE &&
         o->kind != CUI_CHART_RADAR && o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40) {
         size_t slots = o->point_count ? o->point_count : o->count;

@@ -416,6 +416,14 @@ int main(void) {
     extra.count = 3;
     options.kind = CUI_CHART_RADAR;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    float radar_x = -1, radar_y = -1;
+    assert(cui_chart_radar_vertex(&options, 0, 0, &radar_x, &radar_y) == CUI_PLOT_OK);
+    assert(fabsf(radar_x - 64) < .01f && radar_y > 0 && radar_y < 48);
+    assert(cui_chart_radar_vertex(&options, 0, 1, &radar_x, &radar_y) == CUI_PLOT_OK);
+    assert(fabsf(radar_x - 64) < .01f && radar_y > 0 && radar_y < 48);
+    assert(cui_chart_radar_vertex(&options, 0, 9, &radar_x, &radar_y) == CUI_PLOT_INVALID);
+    assert(cui_chart_hit_test(&options, 32, 1).valid);
+    assert(!cui_chart_hit_test(&options, 1, 1).valid);
     assert(green_pixel(pixels, options.width * options.height));
     memcpy(saved, pixels, sizeof pixels);
     extra.fill = (cui_color){0, 0, 240, 255};
@@ -958,14 +966,21 @@ int main(void) {
     options.radar_label_color = (cui_color){220, 10, 20, 255};
     assert(cui_begin_frame(ui, 256, 256, 0));
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    state.hovered = 0;
     assert(cui_chart(ui, 91, &state, &options, (cui_str){"Radar", 5}));
     draw = cui_end_frame(ui);
-    bool radar_colored_label = false;
+    bool radar_colored_label = false, radar_hover_dot = false;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
             draw.commands[i].color.r == 220 && draw.commands[i].color.g == 10)
             radar_colored_label = true;
+        else if (draw.commands[i].type == CUI_DRAW_RECT &&
+                 fabsf(draw.commands[i].bounds.w - 6) < .01f &&
+                 fabsf(draw.commands[i].bounds.h - 6) < .01f &&
+                 draw.commands[i].color.r == options.series[0].r)
+            radar_hover_dot = true;
     assert(radar_colored_label);
+    assert(radar_hover_dot);
     options.radar_label_gap = 0;
     options.radar_label_color = (cui_color){0};
     options.kind = CUI_CHART_SANKEY;

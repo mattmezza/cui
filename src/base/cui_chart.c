@@ -905,6 +905,41 @@ static void cui_chart_triangle(cui_chart_state *s, const cui_chart_options *o, d
 static double cui_chart_radar_radius(const cui_chart_options *o) {
     return o->radar_outer_radius > 0 ? o->radar_outer_radius : o->height * .4;
 }
+cui_plot_result cui_chart_radar_vertex(const cui_chart_options *o, size_t dimension, size_t series,
+                                       float *x, float *y) {
+    if (!o || !x || !y || o->kind != CUI_CHART_RADAR || !o->data || !o->count || o->count > 256 ||
+        dimension >= o->count || series > o->extra_series_count || o->extra_series_count > 7 ||
+        (o->extra_series_count && !o->extra_series) || !o->width || !o->height || o->width > 4096 ||
+        o->height > 4096 || !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 ||
+        !isfinite(o->radar_max_value) || o->radar_max_value < 0)
+        return CUI_PLOT_INVALID;
+    double max = o->radar_max_value;
+    bool pinned_max = max > 0;
+    for (size_t s = 0; s < o->extra_series_count; s++)
+        if (!o->extra_series[s].values || o->extra_series[s].count < o->count)
+            return CUI_PLOT_INVALID;
+    for (size_t s = 0; s <= o->extra_series_count; s++)
+        for (size_t i = 0; i < o->count; i++) {
+            double value = cui_chart_series_value(o, s, i);
+            if (!isfinite(value))
+                return CUI_PLOT_INVALID;
+            if (!pinned_max && value > max)
+                max = value;
+        }
+    double radius = cui_chart_radar_radius(o);
+    if (max <= 0 || radius <= 0)
+        return CUI_PLOT_EMPTY;
+    double value = cui_chart_series_value(o, series, dimension);
+    double r = fmin(8192, radius * fmax(0, value) / max);
+    double angle = -CUI_CHART_PI / 2 + 2 * CUI_CHART_PI * dimension / o->count;
+    double px = o->width / 2.0 + r * cos(angle);
+    double py = o->height / 2.0 + r * sin(angle);
+    if (!isfinite(px) || !isfinite(py))
+        return CUI_PLOT_OVERFLOW;
+    *x = (float)px;
+    *y = (float)py;
+    return CUI_PLOT_OK;
+}
 static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
     if (o->count < 3)
         return;
@@ -1693,7 +1728,11 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
             return hit;
     } else if (o->kind == CUI_CHART_RADAR) {
         double dx = x - o->width / 2.0, dy = y - o->height / 2.0;
-        double radius = fmin(o->width / 2.0, o->height / 2.0) - 12;
+        if (!isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 ||
+            !isfinite(o->radar_label_gap) || o->radar_label_gap < 0)
+            return hit;
+        double radius =
+            cui_chart_radar_radius(o) + (o->radar_label_gap > 0 ? o->radar_label_gap : 10);
         if (dx * dx + dy * dy > radius * radius || radius <= 0)
             return hit;
         double angle = atan2(dy, dx) + CUI_CHART_PI / 2;

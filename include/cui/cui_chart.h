@@ -233,6 +233,9 @@ bool cui_chart_value_domain(const cui_chart_options *, double *minimum, double *
 /* Pixel-space point location shared by line/area raster and hover decoration. */
 cui_plot_result cui_chart_point_coordinates(const cui_chart_options *, size_t index, size_t series,
                                             float *x, float *y);
+/* Radar value vertex in physical pixels, shared with hovered series marks. */
+cui_plot_result cui_chart_radar_vertex(const cui_chart_options *, size_t dimension, size_t series,
+                                       float *x, float *y);
 cui_plot_result cui_chart_bar_bounds(const cui_chart_options *, size_t index, cui_plot_rect *);
 /* Band-axis center in pixels, including a zero-value bar with empty bounds. */
 cui_plot_result cui_chart_bar_band_center(const cui_chart_options *, size_t index, float *center);

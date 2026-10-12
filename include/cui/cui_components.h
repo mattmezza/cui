@@ -51,6 +51,10 @@ typedef struct {
     cui_str placeholder;
     const cui_platform *clipboard;
 } cui_input_options;
+cui_id cui_input_viewport_id(cui_id);
+/* Paint only: compose with a reducer without applying the event stream twice. */
+void cui_input_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_edit *,
+                     cui_input_state *, cui_input_options);
 cui_input_result cui_input_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                               cui_input_state *, cui_input_options);
 cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,

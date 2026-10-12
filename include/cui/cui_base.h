@@ -22,6 +22,13 @@ typedef struct {
     bool changed, submitted;
     cui_edit_result error;
 } cui_input_result;
+typedef struct {
+    cui_context *ui;
+    cui_rect viewport;
+    float font_size, scroll_x;
+} cui_input_hit_geometry;
+/* Reusable measured scalar hit test. Invalid input returns SIZE_MAX. */
+size_t cui_base_input_hit_test(void *geometry, cui_str, float x, float y);
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;

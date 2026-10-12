@@ -42,6 +42,11 @@ static void clipboard_and_readonly(void) {
     assert(ui && edit);
     cui_platform host = {
         .capabilities = CUI_PLATFORM_CLIPBOARD, .clipboard_set = copy, .clipboard_get = paste};
+    cui_input_hit_geometry hit = {.ui = ui, .viewport = {10, 0, 200, 40}, .font_size = 10};
+    assert(cui_base_input_hit_test(&hit, cui_string("ab"), 13, 0) == 1);
+    assert(cui_base_input_hit_test(&hit, cui_string("ab"), -10, 0) == 0);
+    assert(cui_base_input_hit_test(&hit, cui_string("ab"), 100, 0) == 2);
+    assert(cui_base_input_hit_test(&hit, cui_string("\xc3"), 20, 0) == SIZE_MAX);
     cui_input_behavior_state state = {0};
     cui_base_input_options options = {.clipboard = &host, .required = true};
     base_frame(ui, edit, &state, options);
@@ -118,6 +123,34 @@ static cui_rect text_bounds(cui_draw_list list, const char *text) {
 static void pointer(cui_context *ui, cui_event_type type, float x, float y, unsigned modifiers) {
     assert(cui_queue_event(ui, (cui_event){.type = type, .x = x, .y = y, .modifiers = modifiers}));
 }
+static void paint_only_reduction(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200, .measure = measure});
+    char buffer[32] = "ab";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_state state = {0};
+    cui_theme theme = cui_theme_light();
+    assert(ui && edit && cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    styled_frame(ui, edit, &theme, &state, (cui_input_options){0});
+    cui_focus(ui, 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "Q"}));
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    cui_input_result reduced = cui_base_input_ex(ui, 1, cui_string("Name"), edit, &state.behavior,
+                                                 (cui_base_input_options){0});
+    assert(reduced.changed);
+    cui_input_paint(ui, 1, &theme, cui_string("Name"), edit, &state, (cui_input_options){0});
+    cui_end_frame(ui);
+    assert(!strcmp(buffer, "aQb"));
+    size_t count;
+    assert(cui_semantics(ui, &count) && count == 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "R"}));
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    cui_input_paint(ui, 1, &theme, cui_string("Name"), edit, &state, (cui_input_options){0});
+    cui_end_frame(ui);
+    assert(!strcmp(buffer, "aQb") && cui_last_error(ui) == CUI_OK);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 static void styled_selection(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
@@ -178,6 +211,7 @@ static void styled_selection(void) {
 int main(void) {
     clipboard_and_readonly();
 #ifndef CUI_INPUT_BASE_ONLY
+    paint_only_reduction();
     styled_selection();
 #endif
     return 0;

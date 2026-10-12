@@ -195,40 +195,6 @@ void cui_separator(cui_context *ui, cui_id id, const cui_theme *t, float width) 
     cui_end_box(ui);
 }
 
-typedef struct {
-    cui_context *ui;
-    cui_rect viewport;
-    float font_size, scroll;
-} cui_components_input_hit;
-static size_t cui_components_input_offset(void *user, cui_str text, float x, float y) {
-    (void)y;
-    cui_components_input_hit *hit = user;
-    float target = x - hit->viewport.x + hit->scroll;
-    if (target <= 0 || !text.length)
-        return 0;
-    size_t low = 0, high = text.length;
-    while (low < high) {
-        size_t middle = low + (high - low) / 2;
-        while (middle > low && ((unsigned char)text.data[middle] & 0xc0) == 0x80)
-            middle--;
-        size_t next = middle + 1;
-        while (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)
-            next++;
-        float width = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
-        if (width <= target)
-            low = next;
-        else
-            high = middle;
-    }
-    if (low == text.length)
-        return low;
-    size_t next = low + 1;
-    while (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)
-        next++;
-    float left = cui_measure_text(hit->ui, (cui_str){text.data, low}, hit->font_size).width;
-    float right = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
-    return target < (left + right) * .5f ? low : next;
-}
 static void cui_components_input_span(cui_context *ui, cui_str text, const cui_theme *t,
                                       bool selected, bool disabled) {
     if (!text.length)
@@ -245,28 +211,22 @@ static void cui_components_input_caret(cui_context *ui, const cui_theme *t, floa
     cui_begin_box(ui, 0, (cui_box){.width = 1, .height = height, .background = t->text});
     cui_end_box(ui);
 }
-cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                              cui_edit *edit, cui_input_state *state, cui_input_options options) {
-    if (!ui || !t || !edit || !state)
-        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
-    cui_id viewport_id = id ^ UINT64_C(0xb1642b97583fbd63);
-    cui_components_input_hit hit = {ui, cui_bounds(ui, viewport_id), t->font_size, state->scroll_x};
+cui_id cui_input_viewport_id(cui_id id) {
+    return id ^ UINT64_C(0xb1642b97583fbd63);
+}
+void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_edit *edit,
+                     cui_input_state *state, cui_input_options options) {
+    if (!ui || !id || !t || !edit || !state)
+        return;
+    cui_id viewport_id = cui_input_viewport_id(id);
+    cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), t->font_size, state->scroll_x};
     bool multiline = cui_edit_get_state(edit).multiline;
-    cui_input_result result = cui_base_input_ex(
-        ui, id, name, edit, &state->behavior,
-        (cui_base_input_options){.disabled = options.disabled,
-                                 .readonly = options.readonly,
-                                 .required = options.required,
-                                 .invalid = options.invalid,
-                                 .clipboard = options.clipboard,
-                                 .hit_test = multiline ? NULL : cui_components_input_offset,
-                                 .hit_test_user = &hit});
     cui_box box = cui_components_control(t, options.disabled, false);
     box.width = options.width ? options.width : 280;
     box.height = 0;
     box.row = false;
     box.clip = true;
-    if (options.invalid || result.error != CUI_EDIT_OK)
+    if (options.invalid)
         box.border = t->danger;
     else
         cui_components_focus(ui, id, t, &box);
@@ -322,8 +282,28 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
         cui_end_box(ui);
     }
     cui_end_box(ui);
+}
+cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              cui_edit *edit, cui_input_state *state, cui_input_options options) {
+    if (!ui || !t || !edit || !state)
+        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_id viewport_id = cui_input_viewport_id(id);
+    cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), t->font_size, state->scroll_x};
+    bool multiline = cui_edit_get_state(edit).multiline;
+    cui_input_result result = cui_base_input_ex(
+        ui, id, name, edit, &state->behavior,
+        (cui_base_input_options){.disabled = options.disabled,
+                                 .readonly = options.readonly,
+                                 .required = options.required,
+                                 .invalid = options.invalid,
+                                 .clipboard = options.clipboard,
+                                 .hit_test = multiline ? NULL : cui_base_input_hit_test,
+                                 .hit_test_user = &hit});
+    options.invalid = options.invalid || result.error != CUI_EDIT_OK;
+    cui_input_paint(ui, id, t, name, edit, state, options);
     return result;
 }
+
 cui_input_result cui_input(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                            cui_edit *edit, bool disabled) {
     cui_input_state state = {0};

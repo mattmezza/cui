@@ -196,3 +196,36 @@ cui_input_result cui_base_input(cui_context *ui, cui_id id, cui_str name, cui_ed
     return cui_base_input_ex(ui, id, name, edit, &state,
                              (cui_base_input_options){.disabled = disabled});
 }
+
+size_t cui_base_input_hit_test(void *user, cui_str text, float x, float y) {
+    (void)y;
+    cui_input_hit_geometry *hit = user;
+    if (!hit || !hit->ui || !isfinite(x) || !isfinite(hit->font_size) || hit->font_size <= 0 ||
+        !cui_edit_valid_utf8(text))
+        return SIZE_MAX;
+    float target = x - hit->viewport.x + hit->scroll_x;
+    if (target <= 0 || !text.length)
+        return 0;
+    size_t low = 0, high = text.length;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        while (middle > low && ((unsigned char)text.data[middle] & 0xc0) == 0x80)
+            middle--;
+        size_t next = middle + 1;
+        while (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)
+            next++;
+        float width = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
+        if (width <= target)
+            low = next;
+        else
+            high = middle;
+    }
+    if (low == text.length)
+        return low;
+    size_t next = low + 1;
+    while (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)
+        next++;
+    float left = cui_measure_text(hit->ui, (cui_str){text.data, low}, hit->font_size).width;
+    float right = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
+    return target < (left + right) * .5f ? low : next;
+}

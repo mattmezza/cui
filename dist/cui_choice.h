@@ -49,6 +49,7 @@ typedef struct {
     size_t search_length;
     float search_time;
     size_t first_visible;
+    float scroll_remainder; /* fractional wheel rows carried across frames */
 } cui_list_state;
 typedef void (*cui_choice_activation_fn)(cui_id item, void *user);
 /* Styled row body; semantic name/disabled/selection remain supplied by item.
@@ -63,10 +64,14 @@ typedef struct {
     void *activation_user;
     cui_choice_render_fn render;
     void *render_user;
+    cui_rect scroll_bounds; /* base scrolling receiving bounds; styled fills automatically */
+    cui_id scroll_scope;    /* popup scope, or zero for a standalone list */
+    bool window_changed;    /* discard pointer activation against pre-scroll layout */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
     cui_list_state list;
+    size_t visible_rows; /* previous styled popup rows, used for ordered Combo scrolling */
 } cui_choice_popup;
 typedef struct {
     bool disabled;
@@ -105,7 +110,7 @@ bool cui_select_multi(cui_context *, cui_id trigger, const cui_theme *, cui_str 
                       cui_str placeholder, const cui_choice_item *, size_t count, bool *selected,
                       cui_choice_popup *, cui_choice_popup_options);
 typedef struct {
-    bool changed, query_changed;
+    bool changed, query_changed, scrolled;
     size_t matching_count;
     cui_edit_result error;
 } cui_combobox_result;
@@ -359,6 +364,54 @@ void cui_choice_popup_init(cui_choice_popup *state, cui_id popup_id) {
     *state = (cui_choice_popup){0};
     cui_overlay_init(&state->overlay, popup_id, true);
 }
+static bool cui_choice_scroll_event(cui_context *ui, const cui_choice_item *items, size_t count,
+                                    cui_list_state *state, size_t length, size_t *begin,
+                                    cui_rect bounds, cui_id scope, cui_event event) {
+    if (!count || !length || event.type != CUI_EVENT_SCROLL || !isfinite(event.dy) ||
+        !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
+        bounds.w <= 0 || bounds.h <= 0 || event.x < bounds.x || event.x >= bounds.x + bounds.w ||
+        event.y < bounds.y || event.y >= bounds.y + bounds.h ||
+        !cui_pointer_scope_allowed(ui, scope))
+        return false;
+    if (length > count)
+        length = count;
+    if (*begin > count - length)
+        *begin = count - length;
+    float amount = state->scroll_remainder - event.dy;
+    if (!isfinite(amount))
+        amount = event.dy > 0 ? -(float)count : (float)count;
+    float whole = truncf(amount);
+    state->scroll_remainder = amount - whole;
+    size_t before = *begin;
+    if (whole < 0) {
+        float steps = -whole;
+        *begin = steps >= (float)*begin ? 0 : *begin - (size_t)steps;
+    } else {
+        size_t remaining = count - length - *begin;
+        *begin += whole >= (float)remaining ? remaining : (size_t)whole;
+    }
+    if (before == *begin)
+        return false;
+    bool focused_option = false, active_visible = false;
+    for (size_t i = 0; i < count; i++) {
+        focused_option |= cui_focused(ui) == items[i].id;
+        if (i >= *begin && i < *begin + length && !items[i].disabled &&
+            items[i].id == state->active)
+            active_visible = true;
+    }
+    if (!active_visible) {
+        state->active = 0;
+        for (size_t i = *begin; i < *begin + length; i++)
+            if (!items[i].disabled) {
+                state->active = items[i].id;
+                break;
+            }
+        if (focused_option)
+            cui_focus(ui, state->active);
+    }
+    cui_invalidate(ui);
+    return true;
+}
 bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_list_state *state, cui_list_options options) {
     if (!items || !selected || !state || !count)
@@ -372,7 +425,20 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
         state->search_length = 0;
     size_t event_count = 0;
     const cui_event *events = cui_frame_events(ui, &event_count);
+    size_t window_length = options.visible_count ? options.visible_count : count;
+    if (window_length > count)
+        window_length = count;
+    size_t window_begin = options.visible_count ? options.visible_begin : 0;
+    if (window_begin > count - window_length)
+        window_begin = count - window_length;
+    bool scrolled = options.window_changed;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        cui_event event = events[e];
+        scrolled |=
+            cui_choice_scroll_event(ui, items, count, state, options.visible_count, &window_begin,
+                                    options.scroll_bounds, options.scroll_scope, event);
+        if (event.type == CUI_EVENT_SCROLL)
+            continue;
         size_t target = count, from = count;
         for (size_t i = 0; i < count; ++i) {
             if (items[i].id == cui_event_target(ui, e))
@@ -384,7 +450,7 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             continue;
         if (from == count || items[from].disabled)
             from = target;
-        if (cui_event_activation(ui, e) &&
+        if (cui_event_activation(ui, e) && !(scrolled && event.type == CUI_EVENT_POINTER_UP) &&
             (events[e].type != CUI_EVENT_KEY_UP || items[from].id == cui_event_activation(ui, e))) {
             size_t chosen = events[e].type == CUI_EVENT_POINTER_UP ? target : from;
             *selected = state->active = items[chosen].id;
@@ -428,7 +494,7 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             }
         }
     }
-    size_t begin = options.visible_count ? options.visible_begin : 0;
+    size_t begin = window_begin;
     if (begin >= count)
         begin = count - 1;
     size_t length = options.visible_count ? options.visible_count : count;
@@ -618,6 +684,15 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
         state->list.active = filtered[active].id;
     bool commit = false;
     for (size_t e = 0; e < event_count && !disabled; e++) {
+        if (cui_choice_scroll_event(ui, filtered, matched, &state->list, state->visible_rows,
+                                    &state->list.first_visible, state->overlay.bounds,
+                                    state->overlay.id, events[e])) {
+            result.scrolled = true;
+            active = matched;
+            for (size_t i = 0; i < matched; i++)
+                if (filtered[i].id == state->list.active && !filtered[i].disabled)
+                    active = i;
+        }
         if (cui_event_target(ui, e) != input || events[e].type != CUI_EVENT_KEY_DOWN)
             continue;
         size_t next = active == matched
@@ -1239,6 +1314,7 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
               cui_list_options options) {
     if (!theme || !items || !selected || !state)
         return false;
+    options.scroll_bounds = cui_bounds(ui, container);
     bool activated = cui_base_list(ui, items, count, selected, state, options);
     cui_choice_paint_list(ui, container, theme, items, count, selected, state, options, NULL);
     return activated;
@@ -1291,7 +1367,9 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
+                                     .scroll_scope = state->overlay.id};
     cui_id old = *selected;
     bool activated =
         count ? cui_base_list(ui, items, count, selected, &state->list, list_options) : false;
@@ -1381,6 +1459,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
     if (rows > 4096)
         rows = 4096;
+    state->visible_rows = rows;
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, input),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
@@ -1392,7 +1471,8 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .window_changed = result.scrolled};
     cui_id old = *selected;
     bool activated =
         matched ? cui_base_list(ui, filtered, matched, selected, &state->list, list_options)
@@ -1431,6 +1511,7 @@ bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
                     cui_list_state *state, cui_list_options options) {
     if (!theme || !items || !selected || !state)
         return false;
+    options.scroll_bounds = cui_bounds(ui, container);
     bool activated = cui_base_list_multi(ui, items, count, selected, state, options);
     cui_id action = 0;
     cui_choice_paint_list(ui, container, theme, items, count, &action, state, options, selected);
@@ -1507,7 +1588,9 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .scroll_bounds = cui_bounds(ui, state->overlay.id),
+                                     .scroll_scope = state->overlay.id};
     if (count)
         changed |= cui_base_list_multi(ui, items, count, selected, &state->list, list_options);
     cui_begin_portal(ui, state->overlay.id,
@@ -1579,6 +1662,7 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
         rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
     if (rows > 4096)
         rows = 4096;
+    state->visible_rows = rows;
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, input),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
@@ -1590,7 +1674,8 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
-                                     .render_user = options.render_user};
+                                     .render_user = options.render_user,
+                                     .window_changed = result.scrolled};
     bool activated = matched ? cui_base_list_multi(ui, filtered, matched, filtered_selected,
                                                    &state->list, list_options)
                              : false;

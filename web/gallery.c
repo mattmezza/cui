@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_carousel.h"
+#include "cui/cui_chart.h"
 #include "cui/cui_choice.h"
 #include "cui/cui_chrome.h"
 #include "cui/cui_command.h"
@@ -114,6 +115,32 @@ static int text_view_format, text_view_scrollable, text_view_fade;
 static int text_view_links;
 static cui_text_view_error text_view_error;
 static bool gallery_text_view_load(void);
+static unsigned char chart_pixels[1600 * 800 * 4];
+static cui_chart_state chart_state;
+static int chart_kind, chart_curve, chart_dots, chart_labels, chart_animate;
+static cui_plot_result chart_result;
+static unsigned chart_revision = 1;
+void gallery_chart_options(int kind, int curve, int dots, int labels, int animate) {
+    if (kind < CUI_CHART_LINE || kind > CUI_CHART_SANKEY)
+        kind = CUI_CHART_LINE;
+    if (chart_kind != kind || chart_curve != curve || chart_dots != dots ||
+        chart_labels != labels || chart_animate != animate) {
+        chart_revision++;
+        redraw = true;
+    }
+    chart_kind = kind;
+    chart_curve = curve;
+    chart_dots = dots;
+    chart_labels = labels;
+    chart_animate = animate;
+}
+float gallery_chart_stats(int field) {
+    return field == 0   ? (float)chart_result
+           : field == 1 ? (float)chart_state.hovered
+           : field == 2 ? chart_state.rendered_reveal_progress
+           : field == 3 ? (float)chart_state.revision
+                        : (float)chart_revision;
+}
 typedef struct {
     unsigned builds, prepares, styles, overlays, content, dialogs, sheets, notices;
 } gallery_root_counts;
@@ -1055,6 +1082,9 @@ static bool gallery_text_view_load(void) {
 int gallery_init(void) {
     if (ui)
         return 1;
+    chart_state.pixels = chart_pixels;
+    chart_state.byte_capacity = sizeof(chart_pixels);
+    chart_state.hovered = SIZE_MAX;
     cui_icon_state_init(&icon_state);
     toolbar_query = cui_edit_create((cui_edit_config){.buffer = toolbar_query_buffer,
                                                       .capacity = sizeof(toolbar_query_buffer)});
@@ -1683,6 +1713,44 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.on_link = gallery_text_view_link;
         (void)cui_text_view(ui, cui_id_from(ui, "text-view-preview"), &t, &text_view_state,
                             options);
+        break;
+    }
+    case 77: {
+        static const cui_chart_datum data[] = {
+            {.label = {"Jan", 3}, .value = 28, .open = 21, .high = 34, .low = 18, .close = 28},
+            {.label = {"Feb", 3}, .value = 36, .open = 28, .high = 40, .low = 24, .close = 36},
+            {.label = {"Mar", 3}, .value = 31, .open = 36, .high = 42, .low = 27, .close = 31},
+            {.label = {"Apr", 3}, .value = 46, .open = 31, .high = 50, .low = 29, .close = 46},
+            {.label = {"May", 3}, .value = 39, .open = 46, .high = 49, .low = 35, .close = 39},
+            {.label = {"Jun", 3}, .value = 53, .open = 39, .high = 57, .low = 37, .close = 53}};
+        static const cui_chart_link links[] = {{0, 2, 16, {0}}, {0, 3, 12, {0}}, {1, 3, 18, {0}},
+                                               {2, 4, 16, {0}}, {3, 5, 30, {0}}, {4, 5, 16, {0}}};
+        float logical_width = fminf(width - 48, 720);
+        cui_chart_options options = {.kind = (cui_chart_kind)chart_kind,
+                                     .data = data,
+                                     .count = sizeof(data) / sizeof(data[0]),
+                                     .links = links,
+                                     .link_count = sizeof(links) / sizeof(links[0]),
+                                     .width = (unsigned)(logical_width * 2),
+                                     .height = 560,
+                                     .logical_width = logical_width,
+                                     .logical_height = 280,
+                                     .data_revision = chart_revision,
+                                     .appear_key = chart_revision,
+                                     .disable_appear = !chart_animate,
+                                     .reduced_motion = reduced_motion,
+                                     .curve = (cui_chart_curve)chart_curve,
+                                     .show_dots = chart_dots != 0,
+                                     .show_bar_values = chart_labels != 0,
+                                     .pie_show_labels = chart_labels != 0,
+                                     .sankey_show_labels = chart_labels != 0,
+                                     .sankey_show_values = chart_labels != 0,
+                                     .inner_radius = chart_labels ? 42 : 0};
+        options = cui_chart_theme(options, &t);
+        chart_result = cui_chart_render_animated(ui, &chart_state, &options);
+        if (chart_result == CUI_PLOT_OK)
+            (void)cui_chart(ui, cui_id_from(ui, "chart-preview"), &chart_state, &options,
+                            cui_string("Project activity chart"));
         break;
     }
     case 0: {

@@ -40,7 +40,7 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 75
+            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 76
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -426,6 +426,29 @@ def main():
             page.wait_for_function('(before)=>cuiGallery.exports.gallery_text_view_stats(0)>before', arg=text_before)
             assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
             control_change('text-view-scroll', False)
+            page.evaluate('location.hash="Chart"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Chart"')
+            assert semantic_index('Project activity chart', 20) is not None
+            assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===5&&cuiGallery.exports.gallery_bitmap_pixels(i)>0)')
+            chart_signatures = []
+            for kind in range(7):
+                control_change('chart-kind', str(kind))
+                assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
+                chart_signatures.append(page.evaluate('()=>{const data=document.querySelector("canvas").getContext("2d").getImageData(24,24,Math.min(600,document.querySelector("canvas").clientWidth-48),280).data;let hash=2166136261;for(let i=0;i<data.length;i+=32){hash=Math.imul(hash^data[i],16777619);}return hash>>>0;}'))
+            assert len(set(chart_signatures)) == 7, chart_signatures
+            control_change('chart-kind', '2')
+            control_change('chart-labels', True)
+            assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
+            page.screenshot(path='/tmp/cui-web-chart-bar.png')
+            chart_bounds = page.evaluate('(index)=>Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(index,i+1))', semantic_index('Project activity chart', 20))
+            chart_canvas = canvas.bounding_box()
+            page.mouse.move(chart_canvas['x']+chart_bounds[0]+chart_bounds[2]/12, chart_canvas['y']+chart_bounds[1]+chart_bounds[3]*.8)
+            page.wait_for_function('cuiGallery.exports.gallery_chart_stats(1)<6')
+            control_change('chart-kind', '0')
+            control_change('chart-curve', '2')
+            control_change('chart-dots', True)
+            assert page.evaluate('cuiGallery.exports.gallery_chart_stats(0)') == 0
             page.evaluate('location.hash="Sidebar"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sidebar"')
             assert semantic_index('Workspace sidebar', 9) is not None
@@ -1988,8 +2011,8 @@ def main():
             page.wait_for_function('document.querySelector("#accessible [role=textbox]")?.getAttribute("aria-invalid")==="true"')
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-required') == 'true'
             assert page.locator('#accessible [role=textbox]').get_attribute('aria-readonly') == 'false'
-            page.evaluate('location.hash="Chart"')
-            page.wait_for_function('document.querySelector("#name").textContent==="Chart" && cuiGallery.renderedComponent==="Chart"')
+            page.evaluate('location.hash="Speech"')
+            page.wait_for_function('document.querySelector("#name").textContent==="Speech" && cuiGallery.renderedComponent==="Speech"')
             assert page.locator('#pending').is_visible()
             assert not page.locator('#preview-card').is_visible()
             page.locator('#search').fill('button')
@@ -2047,7 +2070,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 75 real WASM stories, TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 76 real WASM stories, Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

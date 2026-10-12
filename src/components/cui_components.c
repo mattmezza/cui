@@ -18,12 +18,11 @@ static void cui_components_focus(cui_context *ui, cui_id id, const cui_theme *t,
         b->border_width = 2;
     }
 }
-void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                      cui_button_options options) {
+static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                   cui_button_options options, cui_interaction state) {
     if (!ui || !t)
         return;
     bool disabled = options.disabled || options.loading;
-    cui_interaction state = {.hovered = cui_hovered(ui, id), .pressed = cui_pressed(ui, id)};
     cui_box b = cui_components_control(t, disabled, false);
     float density = isfinite(t->font_size) && t->font_size > 0 ? t->font_size / 16 : 1;
     float font = (options.size == CUI_CONTROL_XSMALL  ? 12
@@ -134,6 +133,16 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
     cui_end_box(ui);
     cui_end_box(ui);
 }
+void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                      cui_button_options options) {
+    bool disabled = options.disabled || options.loading;
+    cui_interaction state = {0};
+    if (!disabled) {
+        state.hovered = cui_hovered(ui, id);
+        state.pressed = cui_pressed(ui, id);
+    }
+    cui_button_paint_state(ui, id, t, name, options, state);
+}
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_button_options options) {
     if (!ui || !t)
@@ -146,7 +155,7 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     if (options.loading)
         cui_set_semantic_details(
             ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
-    cui_button_paint(ui, id, t, name, options);
+    cui_button_paint_state(ui, id, t, name, options, state);
     return state.activated;
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {

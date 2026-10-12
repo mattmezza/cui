@@ -140,6 +140,28 @@ static void test_linked_image_model(void) {
            CUI_TEXT_VIEW_OK);
     assert(f.spans[0].link.end - f.spans[0].link.begin == strlen("https://x.test/a(b)"));
 }
+static void test_html_inline_image_model(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    const char *source =
+        "<p>before <a href='https://x.test'><img src='asset' alt='image'></a> after</p>";
+    assert(cui_text_view_set_text(&f.state, text(source)) == CUI_TEXT_VIEW_OK);
+    assert(f.state.block_count == 1 && !strcmp(f.rendered, "before   after\n"));
+    assert(f.state.span_count == 3 && (f.spans[1].flags & CUI_TEXT_VIEW_INLINE_IMAGE));
+    assert(f.spans[1].text.end - f.spans[1].text.begin == 1 &&
+           f.spans[1].link.end > f.spans[1].link.begin);
+    assert(cui_text_view_select(&f.state, f.spans[1].text.begin, f.spans[1].text.end));
+    cui_text_view_range source_range = f.mapping[f.spans[1].text.begin].source;
+    assert(!cui_text_view_selected_source_range(&f.state, NULL));
+    assert(source[source_range.begin] == '<' && !memcmp(source + source_range.begin, "<img", 4) &&
+           source[source_range.end - 1] == '>');
+    cui_text_view_layout_options o = {.width = 400, .font_size = 14, .line_height = 20};
+    assert(cui_text_view_layout(&f.state, o, measure, NULL) == CUI_TEXT_VIEW_OK);
+    assert(f.glyphs[0].bounds.y == f.glyphs[f.state.glyph_count - 1].bounds.y);
+    assert(cui_text_view_set_text(&f.state, text("<p>a<img alt='missing'>b</p>")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(!strcmp(f.rendered, "ab\n") && f.state.span_count == 1);
+}
 static void test_image_only_table_copy(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1110,6 +1132,49 @@ static void test_linked_image_paint(void) {
                                            .y = y}));
     frame(ui, &f, o);
     assert(image_link_clicks == 1);
+    cui_destroy(ui);
+}
+static void test_html_inline_image_paint(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_HTML);
+    assert(
+        cui_text_view_set_text(
+            &f.state,
+            text("<p>a<a href='https://x.test'><img src='asset' alt='image'></a><em>b</em></p>")) ==
+        CUI_TEXT_VIEW_OK);
+    cui_font_metrics metrics = {8, 2, 10};
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 512, .font_metrics = image_metrics, .measure_user = &metrics});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.image = image_loaded;
+    o.on_link = image_link_clicked;
+    cui_draw_list d = frame(ui, &f, o);
+    bool bitmap = false, italic = false;
+    for (size_t i = 0; i < d.count; ++i) {
+        if (d.commands[i].type == CUI_DRAW_IMAGE)
+            bitmap = d.commands[i].bounds.h == 15 && d.commands[i].bounds.y == 2.5f;
+        if (d.commands[i].type == CUI_DRAW_TEXT && d.commands[i].text.length == 1 &&
+            d.commands[i].text.data[0] == 'b')
+            italic = d.commands[i].text_style.italic;
+    }
+    assert(bitmap && italic && f.state.block_count == 1);
+    frame(ui, &f, o);
+    float x = f.state.viewport.x + f.glyphs[1].bounds.x + 5;
+    float y = f.state.viewport.y + f.glyphs[1].bounds.y + 5;
+    unsigned before = image_link_clicks;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = x,
+                                           .y = y}));
+    frame(ui, &f, o);
+    assert(image_link_clicks == before + 1);
     cui_destroy(ui);
 }
 static unsigned heading_metric_calls;
@@ -2175,6 +2240,7 @@ static void test_styled_selection(void) {
 }
 #endif
 int main(void) {
+    test_html_inline_image_model();
     test_image_only_table_copy();
     test_linked_image_model();
     test_inline_image_objects();
@@ -2206,6 +2272,7 @@ int main(void) {
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
     test_styled_selection();
     test_linked_image_paint();
+    test_html_inline_image_paint();
     test_inline_image_heading_metrics();
     test_inline_image_paint();
     test_image_metric_paint();

@@ -1080,7 +1080,7 @@ static size_t cui_text_view_html_skip_raw(cui_str input, size_t start, cui_str t
 }
 static void cui_text_view_html(cui_text_view_parser *p) {
     size_t a = 0;
-    unsigned flags = 0, table = 0, row = 0, col = 0;
+    unsigned flags = 0, table = 0, row = 0, col = 0, inline_containers = 0;
     unsigned bold_depth = 0, italic_depth = 0, code_depth = 0, strike_depth = 0, mark_depth = 0;
     cui_text_view_range link = {0};
     bool active = false, pre = false;
@@ -1097,6 +1097,20 @@ static void cui_text_view_html(cui_text_view_parser *p) {
                        p->input.data[name_end] != '/' && p->input.data[name_end] != '\t')
                     ++name_end;
                 cui_str name = {p->input.data + begin, name_end - begin};
+                bool inline_container =
+                    cui_text_view_name(name, "p") || cui_text_view_name(name, "td") ||
+                    cui_text_view_name(name, "th") ||
+                    (name.length == 2 && (name.data[0] == 'h' || name.data[0] == 'H') &&
+                     name.data[1] >= '1' && name.data[1] <= '6');
+                if (inline_container) {
+                    if (closing) {
+                        if (inline_containers)
+                            --inline_containers;
+                    } else if (++inline_containers > 32) {
+                        p->error = CUI_TEXT_VIEW_INVALID;
+                        return;
+                    }
+                }
                 if (!closing &&
                     (cui_text_view_name(name, "script") || cui_text_view_name(name, "style"))) {
                     a = cui_text_view_html_skip_raw(p->input, end + 1, name);
@@ -1115,7 +1129,24 @@ static void cui_text_view_html(cui_text_view_parser *p) {
                 else if (cui_text_view_name(name, "a"))
                     link = closing ? (cui_text_view_range){0}
                                    : cui_text_view_attribute(p->input, name_end, end, "href");
-                else if (cui_text_view_name(name, "br")) {
+                else if (!closing && cui_text_view_name(name, "img") &&
+                         (inline_containers || link.end > link.begin)) {
+                    cui_text_view_range src =
+                        cui_text_view_attribute(p->input, name_end, end, "src");
+                    if (src.begin || src.end) {
+                        if (!active) {
+                            if (!cui_text_view_block_begin(p, CUI_TEXT_VIEW_PARAGRAPH, a, 0))
+                                return;
+                            active = true;
+                        }
+                        cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, end + 1},
+                                           flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
+                        p->last.resource = src;
+                        p->last.alt = cui_text_view_attribute(p->input, name_end, end, "alt");
+                        if (p->write && !p->error)
+                            p->state->workspace.spans[p->spans - 1] = p->last;
+                    }
+                } else if (cui_text_view_name(name, "br")) {
                     if (active)
                         cui_text_view_emit(p, (cui_str){"\n", 1}, (cui_text_view_range){a, end + 1},
                                            flags, link);

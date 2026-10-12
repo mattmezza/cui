@@ -565,7 +565,7 @@ def main():
             page.screenshot(path='/tmp/cui-web-speech-recording.png')
             speech_frame = page.evaluate('cuiGallery.frame')
             page.emulate_media(reduced_motion='reduce')
-            page.wait_for_function('(before)=>cuiGallery.frame>before', arg=speech_frame)
+            page.wait_for_function('(before)=>cuiGallery.frame>before&&cuiGallery.renderedReducedMotion===true', arg=speech_frame)
             waveform_bounds = page.evaluate('()=>Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===0).map(i=>Array.from({length:4},(_,field)=>cuiGallery.exports.gallery_command(i,field+1)))')
             speech_frame = page.evaluate('cuiGallery.frame')
             speech_canvas = canvas.bounding_box()

@@ -270,7 +270,8 @@ function render(){
  wasm.gallery_form_mode(Number($('form-mode').value));
  wasm.gallery_density(Number($('density').value));
  wasm.gallery_selection_mode(Number($('selection-mode').value));
- const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(reducedMotion.matches));lastTime=now;
+ const frameReducedMotion=reducedMotion.matches;
+ const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(frameReducedMotion));lastTime=now;
  wasm.gallery_theme_preset(themeChoice==='high-contrast'?-1:selectedPreset());
  if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
  let clips=0;
@@ -302,6 +303,7 @@ function render(){
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));
  if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
  $('table-selection').value=String(wasm.gallery_table_selection_mode(-1));
+ window.cuiGallery.renderedReducedMotion=frameReducedMotion;
  window.cuiGallery.renderedComponent=selected.name;window.cuiGallery.frame=(window.cuiGallery.frame||0)+1;
  const clipboard=wasm.gallery_clipboard_request();if(clipboard)void clipboardAction(clipboard);
  if(wasm.gallery_redraw())requestFrame();

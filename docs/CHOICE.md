@@ -105,10 +105,9 @@ labels follow the core's frame-copy lifetime. Initialize state once, not per fra
 The headless choice test verifies selection, repeated menu dispatch, clipping
 escape, synchronous focus restoration, outside/Escape dismissal, empty lists,
 ASCII typeahead and keyboard paging over forty items with disabled endpoints.
-This flat subset does not include nested submenus, separators or check/radio menu
-items, wheel/touch scrolling, arbitrary item delegates, searchable/multiple Select,
-Unicode normalization/case folding, Combobox text editing, or OS accessibility
-adapters. Tab currently stays in the open popup rather than dismissing and
+Hierarchical descriptors and multiple selection are documented below. Remaining
+list gaps include wheel/touch scrolling, arbitrary item delegates, searchable
+Select, Unicode normalization/case folding and OS accessibility adapters. Tab currently stays in the open popup rather than dismissing and
 advancing to the next background control. These are tracked parity gaps; rendering
 and keyboard selection of the implemented subset are real.
 
@@ -149,6 +148,8 @@ interleaving text edits and commits in a single batch is a remaining ordering ga
 `cui_base_combobox_multi` and `cui_combobox_multi` use a caller-owned boolean per
 source item. Multi Select and Combobox keep their popup open while toggling choices.
 Each visible option exposes its selected state and a checked visual indicator.
+Standalone and popup listbox roots expose `multiselectable`, vertical orientation
+and the popup's relationship to its labelled trigger/input.
 Escape/outside dismissal preserves the selected set. Selected values render as
 pill buttons; activating a pill removes that enabled choice and returns focus to
 the trigger/input. Disabled choices cannot be selected or removed by interaction.
@@ -231,6 +232,33 @@ The tests run check/radio mutations, repeated toggles, labels/separator/disabled
 skipping, three-level navigation and Escape restoration, batched child activation,
 real pointer hover, parent clicking with a child open, typeahead and the 16-level
 depth limit. Theme metrics supply menu density; text icons and shortcut hints are
-caller-provided and do not install key bindings. Context opening, URL dispatch,
-custom menu bodies, delayed hover/grace areas, wheel/touch scrolling, arbitrary
-item heights and a native OS accessibility bridge are still parity gaps.
+caller-provided and do not install key bindings. Entry `render` callbacks can paint
+custom row bodies synchronously while retaining the entry's accessible label and
+interaction. They must fit the fixed row height; they do not add independent
+menu actions. `checks_on_right` places check/radio indicators after the shortcut.
+Popup options choose the preferred anchor side; placement still flips and clamps.
+URL dispatch, delayed hover/grace areas, wheel/touch scrolling, arbitrary item
+heights and a native OS accessibility bridge are still parity gaps.
+
+## Context menus
+
+`cui_context_menu` attaches the same descriptor tree to an already submitted box
+ID, including a noninteractive receiving area. Call it after drawing that area.
+A secondary pointer press inside its previous-frame bounds opens the menu at the
+pointer without activating primary controls. Primary clicks keep their usual
+behavior. The modal scope guard prevents a receiving area behind an unrelated
+modal from opening; reanchoring its own open popup remains permitted. Opening
+inside the current parent modal is permitted.
+
+The menu root has the supplied accessible name. Check/radio, submenu navigation,
+Escape and action dismissal use the same reducers as the button menu. Dismissal
+restores the previously focused enabled control, including after reanchoring.
+`cui_context_menu_open` also provides explicit application-controlled opening with
+an anchor rectangle and a restore-focus ID. The application must draw the context
+menu each frame after opening it. Touch long-press and an automatic keyboard
+context-menu gesture are not implemented.
+
+Headless tests cover secondary press/release routing, primary activation,
+coordinate placement, reanchoring, nested action dispatch and focus restoration,
+as well as custom row drawing, right-side checks and preferred popup placement.
+

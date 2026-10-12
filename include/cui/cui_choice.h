@@ -65,6 +65,7 @@ typedef struct {
     bool disabled;
     cui_rect viewport;
     float width, dt;
+    cui_popup_side side; /* preferred anchor side; defaults below */
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */
@@ -130,6 +131,7 @@ typedef enum {
     CUI_MENU_LABEL,
     CUI_MENU_SUBMENU
 } cui_menu_kind;
+typedef void (*cui_menu_render_fn)(cui_context *, void *user);
 typedef struct cui_menu_entry {
     cui_id id;
     cui_str label, icon, shortcut;
@@ -140,6 +142,8 @@ typedef struct cui_menu_entry {
     int radio_option;
     const struct cui_menu_entry *children;
     size_t child_count;
+    cui_menu_render_fn render; /* optional custom row body; keep within control height */
+    void *render_user;
 } cui_menu_entry;
 typedef struct {
     cui_overlay overlay;
@@ -149,10 +153,12 @@ typedef struct {
     size_t depth;
     bool depth_limit;
     float row_height, padding; /* previous painted metrics for pointer hover */
+    bool contextual;
+    cui_rect anchor;
 } cui_menu_tree_state;
 typedef struct {
     cui_choice_popup_options popup;
-    bool keep_open_checks;
+    bool keep_open_checks, checks_on_right;
 } cui_menu_tree_options;
 void cui_menu_tree_init(cui_menu_tree_state *, cui_id popup);
 /* Ordered reducer before painting. Descriptors and pointed-to check/radio values
@@ -166,6 +172,17 @@ void cui_base_menu_entry(cui_context *, const cui_menu_entry *, bool disabled, b
 bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
                    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                    cui_menu_tree_options);
+/* Context-menu target is an existing visible box; this does not submit or paint
+ * that target again. Secondary press within its previous bounds opens at the
+ * pointer. Call once per state after rendering the receiving area. */
+void cui_context_menu_open(cui_context *, cui_menu_tree_state *, cui_id restore_focus,
+                           cui_rect anchor);
+bool cui_base_context_menu(cui_context *, cui_id target, const cui_menu_entry *, size_t count,
+                           cui_id *action, cui_menu_tree_state *, bool disabled, float dt,
+                           bool keep_open_checks);
+bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str name,
+                      const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
+                      cui_menu_tree_options);
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
 #include "cui/cui_base.h"
+#include <math.h>
 static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, size_t from,
                                   cui_key key, bool vertical) {
     int direction = 0;
@@ -604,9 +605,15 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
     if (!state || !state->overlay.id || !action || (!items && count))
         return false;
     bool was_open = state->overlay.open;
-    cui_choice_popup temporary = {.overlay = state->overlay, .list = state->levels[0]};
-    cui_base_choice_popup_trigger(ui, trigger, name, disabled, NULL, 0, 0, &temporary);
-    state->overlay = temporary.overlay;
+    if (state->contextual) {
+        cui_overlay_update(ui, &state->overlay);
+        if (disabled)
+            cui_overlay_close(ui, &state->overlay);
+    } else {
+        cui_choice_popup temporary = {.overlay = state->overlay, .list = state->levels[0]};
+        cui_base_choice_popup_trigger(ui, trigger, name, disabled, NULL, 0, 0, &temporary);
+        state->overlay = temporary.overlay;
+    }
     if (!state->overlay.open) {
         state->depth = 0;
         return false;
@@ -826,4 +833,41 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         }
     }
     return activated_any;
+}
+
+void cui_context_menu_open(cui_context *ui, cui_menu_tree_state *state, cui_id restore_focus,
+                           cui_rect anchor) {
+    if (!ui || !state || !state->overlay.id || !isfinite(anchor.x) || !isfinite(anchor.y) ||
+        !isfinite(anchor.w) || !isfinite(anchor.h) || anchor.w < 0 || anchor.h < 0)
+        return;
+    state->contextual = true;
+    state->anchor = anchor;
+    state->depth = 0;
+    cui_overlay_open(ui, &state->overlay, restore_focus);
+    if (restore_focus)
+        state->overlay.trigger = restore_focus;
+    state->overlay.has_bounds = false;
+    cui_invalidate(ui);
+}
+bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry *items,
+                           size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
+                           float dt, bool keep_open_checks) {
+    if (!state || !state->overlay.id || !target)
+        return false;
+    state->contextual = true;
+    cui_rect area = cui_bounds(ui, target);
+    size_t event_count = 0;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    if (!disabled && cui_pointer_scope_allowed(ui, state->overlay.id))
+        for (size_t e = 0; e < event_count; e++) {
+            cui_event event = events[e];
+            if (event.type == CUI_EVENT_POINTER_DOWN &&
+                event.pointer_button == CUI_POINTER_SECONDARY && event.x >= area.x &&
+                event.x < area.x + area.w && event.y >= area.y && event.y < area.y + area.h)
+                cui_context_menu_open(
+                    ui, state, state->overlay.open ? state->overlay.trigger : cui_focused(ui),
+                    (cui_rect){event.x, event.y, 0, 0});
+        }
+    return cui_base_menu_tree(ui, target, cui_string(""), items, count, action, state, disabled, dt,
+                              keep_open_checks);
 }

@@ -201,7 +201,7 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
         rows = 4096;
     float height = 2 * theme->padding + (rows ? rows : 1) * theme->control_height;
     cui_popup_result placement = cui_popup_place(cui_bounds(ui, trigger), (cui_size){width, height},
-                                                 options.viewport, CUI_POPUP_BELOW, 4);
+                                                 options.viewport, options.side, 4);
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return false;
@@ -302,7 +302,7 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, input),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
-        options.viewport, CUI_POPUP_BELOW, 4);
+        options.viewport, options.side, 4);
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return result;
@@ -413,7 +413,7 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, trigger),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
-        options.viewport, CUI_POPUP_BELOW, 4);
+        options.viewport, options.side, 4);
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return changed;
@@ -495,7 +495,7 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     cui_popup_result placement = cui_popup_place(
         cui_bounds(ui, input),
         (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
-        options.viewport, CUI_POPUP_BELOW, 4);
+        options.viewport, options.side, 4);
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return result;
@@ -541,7 +541,7 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
 static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                   const cui_menu_entry *entries, size_t count,
                                   cui_menu_tree_state *state, size_t level, cui_rect anchor,
-                                  cui_menu_tree_options options) {
+                                  cui_menu_tree_options options, cui_str name) {
     cui_list_state *cursor = &state->levels[level];
     float available = options.popup.viewport.h - 2 * theme->padding - 8;
     size_t rows = count;
@@ -566,9 +566,9 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     if (width > options.popup.viewport.w)
         width = options.popup.viewport.w;
     float height = 2 * theme->padding + (rows ? rows : 1) * theme->control_height;
-    cui_popup_result placement =
-        cui_popup_place(anchor, (cui_size){width, height}, options.popup.viewport,
-                        level ? CUI_POPUP_RIGHT : CUI_POPUP_BELOW, 4);
+    cui_popup_result placement = cui_popup_place(
+        anchor, (cui_size){width, height}, options.popup.viewport,
+        level ? CUI_POPUP_RIGHT : options.popup.side, !level && state->contextual ? 0 : 4);
     state->panels[level] = placement.bounds;
     if (!level)
         cui_overlay_set_bounds(&state->overlay, placement.bounds);
@@ -584,7 +584,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                .border_width = 1,
                                .radius = theme->radius},
                      placement.bounds, (int16_t)(100 + level));
-    cui_interact(ui, scope, CUI_ROLE_MENU, cui_string(""), false, false, 0);
+    cui_interact(ui, scope, CUI_ROLE_MENU, name, false, false, 0);
     cui_set_semantic_details(ui, scope,
                              (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
                                                     .labelled_by = level ? state->path[level - 1]
@@ -620,18 +620,23 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
             cui_begin_box(ui, 0, (cui_box){.height = 1, .width = -1, .background = theme->border});
             cui_end_box(ui);
         } else {
-            if (entry->kind == CUI_MENU_CHECK || entry->kind == CUI_MENU_RADIO)
-                cui_text(ui,
-                         cui_string(checked ? (entry->kind == CUI_MENU_RADIO ? "(*)" : "[x]")
-                                    : entry->kind == CUI_MENU_RADIO ? "( )"
-                                                                    : "[ ]"),
-                         theme->font_size, foreground);
+            bool checkable = entry->kind == CUI_MENU_CHECK || entry->kind == CUI_MENU_RADIO;
+            const char *marker = checked ? (entry->kind == CUI_MENU_RADIO ? "(*)" : "[x]")
+                                 : entry->kind == CUI_MENU_RADIO ? "( )"
+                                                                 : "[ ]";
+            if (checkable && !options.checks_on_right)
+                cui_text(ui, cui_string(marker), theme->font_size, foreground);
             else if (entry->icon.length)
                 cui_text(ui, entry->icon, theme->font_size, foreground);
             cui_begin_box(ui, 0, (cui_box){.width = -1});
-            cui_text(ui, entry->label, theme->font_size,
-                     entry->kind == CUI_MENU_LABEL ? theme->muted : foreground);
+            if (entry->render)
+                entry->render(ui, entry->render_user);
+            else
+                cui_text(ui, entry->label, theme->font_size,
+                         entry->kind == CUI_MENU_LABEL ? theme->muted : foreground);
             cui_end_box(ui);
+            if (checkable && options.checks_on_right)
+                cui_text(ui, cui_string(marker), theme->font_size, foreground);
             if (entry->shortcut.length)
                 cui_text(ui, entry->shortcut, theme->font_size * .8f, foreground);
             if (entry->kind == CUI_MENU_SUBMENU)
@@ -652,7 +657,7 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                          (float)(parent - begin) * theme->control_height,
                                      placement.bounds.w, theme->control_height};
             cui_choice_menu_level(ui, theme, entries[parent].children, entries[parent].child_count,
-                                  state, level + 1, child_anchor, options);
+                                  state, level + 1, child_anchor, options, entries[parent].label);
         }
     }
     cui_end_box(ui);
@@ -676,6 +681,27 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
     state->row_height = theme->control_height;
     state->padding = theme->padding;
     if (state->overlay.open)
-        cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger), options);
+        cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger), options,
+                              name);
+    return activated;
+}
+
+bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cui_str name,
+                      const cui_menu_entry *items, size_t count, cui_id *action,
+                      cui_menu_tree_state *state, cui_menu_tree_options options) {
+    if (!theme || !state || !state->overlay.id || !action || (!items && count) ||
+        !isfinite(theme->control_height) || theme->control_height <= 0 ||
+        !isfinite(theme->padding) || theme->padding < 0 || !isfinite(options.popup.viewport.x) ||
+        !isfinite(options.popup.viewport.y) || !isfinite(options.popup.viewport.w) ||
+        !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
+        options.popup.viewport.h <= 2 * theme->padding)
+        return false;
+    bool activated =
+        cui_base_context_menu(ui, target, items, count, action, state, options.popup.disabled,
+                              options.popup.dt, options.keep_open_checks);
+    state->row_height = theme->control_height;
+    state->padding = theme->padding;
+    if (state->overlay.open)
+        cui_choice_menu_level(ui, theme, items, count, state, 0, state->anchor, options, name);
     return activated;
 }

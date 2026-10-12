@@ -2,6 +2,7 @@
 #include "cui/cui_choice.h"
 #include "cui/cui_components.h"
 #include <assert.h>
+#include <string.h>
 static cui_choice_item items[] = {
     {10, {"First", 5}, false}, {20, {"Disabled", 8}, true}, {30, {"Last", 4}, false}};
 static cui_id selected = 10;
@@ -254,6 +255,20 @@ static bool multi_scene(cui_context *ui, bool *chosen, cui_choice_popup *popup, 
     assert(cui_last_error(ui) == CUI_OK);
     return changed;
 }
+static void assert_multi_group(cui_context *ui, cui_id id, cui_id labelled_by) {
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++) {
+        if (semantics[i].id != id)
+            continue;
+        assert(semantics[i].role == CUI_ROLE_LISTBOX);
+        assert(semantics[i].details.multiselectable);
+        assert(semantics[i].details.orientation == CUI_ORIENTATION_VERTICAL);
+        assert(semantics[i].details.labelled_by == labelled_by);
+        return;
+    }
+    assert(!"Multi selection group is missing");
+}
 static void test_multi_select(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
@@ -261,6 +276,7 @@ static void test_multi_select(void) {
     cui_choice_popup popup;
     cui_choice_popup_init(&popup, 800);
     multi_scene(ui, chosen, &popup, true);
+    assert_multi_group(ui, 90, 0);
     cui_focus(ui, 10);
     key(ui, CUI_KEY_ENTER);
     key(ui, CUI_KEY_ENTER);
@@ -275,6 +291,8 @@ static void test_multi_select(void) {
     click(ui, 2);
     multi_scene(ui, chosen, &popup, false);
     assert(popup.overlay.open && cui_focused(ui) == 10);
+    assert_multi_group(ui, 800, 2);
+    assert_multi_group(ui, 800 ^ UINT64_C(0xd1bc905ee4216f11), 0);
     key(ui, CUI_KEY_ENTER);
     assert(multi_scene(ui, chosen, &popup, false));
     assert(chosen[0] && popup.overlay.open);
@@ -329,6 +347,8 @@ static void test_multi_combobox(void) {
     click(ui, 2);
     combo_multi_scene(ui, query, &popup, chosen, scratch, scratch_selected);
     assert(popup.overlay.open && cui_focused(ui) == 2);
+    assert_multi_group(ui, 900, 2);
+    assert_multi_group(ui, 900 ^ UINT64_C(0xd1bc905ee4216f11), 0);
     key(ui, CUI_KEY_ENTER);
     key(ui, CUI_KEY_ENTER);
     cui_combobox_result result =
@@ -524,6 +544,184 @@ static void test_menu_depth_bound(void) {
     assert(state.depth == CUI_MENU_DEPTH_MAX && state.depth_limit && !action);
     cui_destroy(ui);
 }
+
+static bool context_button_clicked;
+static bool context_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *action) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    cui_begin_box(ui, 9000, (cui_box){.width = 360, .height = 300, .padding = 12, .clip = true});
+    context_button_clicked = cui_button(ui, 2, &theme, cui_string("Receiving area"), false);
+    cui_context_menu(
+        ui, 9000, &theme, cui_string("Context file menu"), tree_entries, 8, action, state,
+        (cui_menu_tree_options){.popup = {.viewport = {0, 0, 640, 540}, .width = 220}});
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return context_button_clicked;
+}
+static void secondary(cui_context *ui, cui_event_type type, float x, float y) {
+    assert(cui_queue_event(
+        ui, (cui_event){.type = type, .x = x, .y = y, .pointer_button = CUI_POINTER_SECONDARY}));
+}
+static void test_context_menu(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    assert(ui);
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 1200);
+    cui_id action = 0;
+    context_scene(ui, &state, &action);
+    click(ui, 2);
+    assert(context_scene(ui, &state, &action));
+    assert(!state.overlay.open && cui_focused(ui) == 2);
+    cui_rect receiver = cui_bounds(ui, 2);
+    float x = receiver.x + 4, y = receiver.y + 4;
+    secondary(ui, CUI_EVENT_POINTER_DOWN, x, y);
+    assert(!context_scene(ui, &state, &action));
+    assert(state.overlay.open && state.anchor.x == x && state.anchor.y == y &&
+           cui_focused(ui) == 42);
+    assert(state.panels[0].x == x && state.panels[0].y == y);
+    secondary(ui, CUI_EVENT_POINTER_UP, x, y);
+    assert(!context_scene(ui, &state, &action));
+    assert(!action);
+    size_t n = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &n);
+    bool named = false;
+    for (size_t i = 0; i < n; i++)
+        if (semantics[i].id == 1200)
+            named = semantics[i].role == CUI_ROLE_MENU && semantics[i].name.length == 17;
+    assert(named);
+    key(ui, CUI_KEY_END);
+    key(ui, CUI_KEY_RIGHT);
+    key(ui, CUI_KEY_ENTER);
+    context_scene(ui, &state, &action);
+    assert(action == 62 && !state.overlay.open && cui_focused(ui) == 2);
+    secondary(ui, CUI_EVENT_POINTER_DOWN, 300, 280);
+    context_scene(ui, &state, &action);
+    assert(state.overlay.open && state.panels[0].x == 300 && state.panels[0].y <= 280);
+    secondary(ui, CUI_EVENT_POINTER_DOWN, 40, 40);
+    context_scene(ui, &state, &action);
+    assert(state.overlay.open && state.anchor.x == 40 && state.panels[0].x == 40);
+    key(ui, CUI_KEY_ESCAPE);
+    context_scene(ui, &state, &action);
+    assert(!state.overlay.open && cui_focused(ui) == 2);
+    secondary(ui, CUI_EVENT_POINTER_DOWN, 600, 400);
+    context_scene(ui, &state, &action);
+    assert(!state.overlay.open);
+    cui_destroy(ui);
+}
+
+static void guarded_context_scene(cui_context *ui, cui_menu_tree_state *state, bool nested) {
+    cui_theme theme = cui_theme_light();
+    cui_id action = 0;
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    assert(cui_begin_focus_scope(ui, 5000, true));
+    cui_button(ui, 5001, &theme, cui_string("Modal focus"), false);
+    if (!nested)
+        cui_end_focus_scope(ui);
+    cui_begin_box(ui, 9000, (cui_box){.width = 360, .height = 300});
+    cui_context_menu(ui, 9000, &theme, cui_string("Scoped context"), tree_entries, 8, &action,
+                     state, (cui_menu_tree_options){.popup.viewport = {0, 0, 640, 540}});
+    cui_end_box(ui);
+    if (nested)
+        cui_end_focus_scope(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void test_context_modal_guard(void) {
+    for (unsigned nested = 0; nested < 2; nested++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        assert(ui);
+        cui_menu_tree_state state;
+        cui_menu_tree_init(&state, 1200);
+        guarded_context_scene(ui, &state, nested != 0);
+        cui_focus(ui, 5001);
+        cui_rect receiver = cui_bounds(ui, 9000);
+        secondary(ui, CUI_EVENT_POINTER_DOWN, receiver.x + 10, receiver.y + 10);
+        guarded_context_scene(ui, &state, nested != 0);
+        assert(state.overlay.open == (nested != 0));
+        if (!nested) {
+            assert(cui_focused(ui) == 5001);
+            size_t count = 0;
+            const cui_semantic *semantics = cui_semantics(ui, &count);
+            for (size_t i = 0; i < count; i++)
+                assert(semantics[i].id != 1200 && semantics[i].id != 42);
+        } else {
+            key(ui, CUI_KEY_ESCAPE);
+            guarded_context_scene(ui, &state, true);
+            assert(!state.overlay.open && cui_focused(ui) == 5001);
+        }
+        cui_destroy(ui);
+    }
+}
+
+static unsigned custom_rows;
+static void custom_menu_row(cui_context *ui, void *user) {
+    assert(user == &custom_rows);
+    custom_rows++;
+    cui_text(ui, cui_string("Custom body"), 14, (cui_color){20, 20, 20, 255});
+}
+static cui_draw_list menu_config_scene(cui_context *ui, cui_menu_tree_state *state,
+                                       cui_menu_entry *entries, cui_id *action, bool right) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 540, .016f));
+    cui_menu_tree(
+        ui, 2, &theme, cui_string("Configured"), entries, 2, action, state,
+        (cui_menu_tree_options){
+            .popup = {.viewport = {0, 0, 640, 540}, .width = 220, .side = CUI_POPUP_RIGHT},
+            .checks_on_right = right});
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return list;
+}
+static void marker_positions(cui_draw_list list, float *marker, float *label) {
+    *marker = *label = -1;
+    for (size_t i = 0; i < list.count; i++)
+        if (list.commands[i].type == CUI_DRAW_TEXT) {
+            cui_draw_command command = list.commands[i];
+            if (command.text.length == 3 && !memcmp(command.text.data, "[x]", 3))
+                *marker = command.bounds.x;
+            if (command.text.length == 6 && !memcmp(command.text.data, "Toggle", 6))
+                *label = command.bounds.x;
+        }
+    assert(*marker >= 0 && *label >= 0);
+}
+static void test_menu_configuration(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    assert(ui);
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 1300);
+    cui_id action = 0;
+    bool checked = true;
+    cui_menu_entry entries[] = {
+        {.id = 51, .label = {"Toggle", 6}, .kind = CUI_MENU_CHECK, .checked = &checked},
+        {.id = 52,
+         .label = {"Accessible item", 15},
+         .kind = CUI_MENU_ACTION,
+         .render = custom_menu_row,
+         .render_user = &custom_rows}};
+    menu_config_scene(ui, &state, entries, &action, false);
+    cui_rect trigger = cui_bounds(ui, 2);
+    click(ui, 2);
+    cui_draw_list list = menu_config_scene(ui, &state, entries, &action, false);
+    assert(state.overlay.open && state.panels[0].x >= trigger.x + trigger.w);
+    float marker, label;
+    marker_positions(list, &marker, &label);
+    assert(marker < label && custom_rows == 1);
+    list = menu_config_scene(ui, &state, entries, &action, true);
+    marker_positions(list, &marker, &label);
+    assert(marker > label && custom_rows == 2);
+    size_t n = 0;
+    const cui_semantic *s = cui_semantics(ui, &n);
+    bool named = false;
+    for (size_t i = 0; i < n; i++)
+        if (s[i].id == 52)
+            named = s[i].name.length == 15 && s[i].role == CUI_ROLE_MENUITEM;
+    assert(named);
+    click(ui, 52);
+    menu_config_scene(ui, &state, entries, &action, true);
+    assert(action == 52 && !state.overlay.open && cui_focused(ui) == 2);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
     test_combobox();
@@ -531,6 +729,9 @@ int main(void) {
     test_multi_combobox();
     test_menu_tree();
     test_menu_depth_bound();
+    test_context_menu();
+    test_context_modal_guard();
+    test_menu_configuration();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

@@ -805,6 +805,22 @@ static void test_pointer_only_container(void) {
     assert(cui_focused(ui) == 71 && cui_event_target(ui, 0) == 70);
     assert(pointer_card(ui, false));
     cui_end_frame(ui);
+    /* Passive pointer containers retain capture between event-loop frames. */
+    queue(ui, CUI_EVENT_POINTER_DOWN, 150, 100, 0, 0);
+    begin(ui);
+    assert(!pointer_card(ui, false));
+    cui_end_frame(ui);
+    assert(cui_pressed(ui, 70));
+    queue(ui, CUI_EVENT_POINTER_MOVE, 160, 100, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 70);
+    pointer_card(ui, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_UP, 160, 100, 0, 0);
+    begin(ui);
+    assert(pointer_card(ui, false));
+    cui_end_frame(ui);
+    assert(!cui_pressed(ui, 70));
     queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
     begin(ui);
     assert(!pointer_card(ui, false));

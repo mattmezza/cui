@@ -1286,10 +1286,12 @@ cui_core_commands_done:
         if (cui_core_focusable(s)) {
             retained |= s->id == ui->focus;
             if (cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
-                captured |= s->id == ui->capture;
                 space |= s->id == ui->space_capture;
             }
         }
+        if (!s->disabled && (cui_core_focusable(s) || s->details.pointer_activatable) &&
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal))
+            captured |= s->id == ui->capture;
         s->focused = s->id == ui->focus && !s->disabled;
     }
     if (!retained)

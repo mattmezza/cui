@@ -362,6 +362,8 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
     cui_id source = 0;
     bool reveal = false;
     for (size_t e = 0; e < count && !o.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_id activation = cui_event_activation(ui, e), target = cui_event_target(ui, e);
         size_t hit = SIZE_MAX;
         if (!cui_tree_hit(m, id, target, &hit))
@@ -386,6 +388,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
         if (!cui_tree_node_index(m, s->cursor, &cursor))
             continue;
         size_t position = m->banks[m->active].position[cursor], next = SIZE_MAX;
+        bool was_expanded = m->expanded[cursor];
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             cui_key key = events[e].key;
             if (key == CUI_KEY_UP || key == CUI_KEY_DOWN)
@@ -450,6 +453,10 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                     }
                 }
         }
+        if (events[e].type == CUI_EVENT_KEY_DOWN &&
+            (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT) &&
+            (m->expanded[cursor] != was_expanded || (next != SIZE_MAX && next != position)))
+            cui_consume_event(ui, e);
         if (next != SIZE_MAX && next < m->visible_count) {
             reveal = true;
             cursor = m->banks[m->active].visible[next];
@@ -537,6 +544,7 @@ cui_tree_result cui_base_tree(cui_context *ui, cui_id id, cui_tree_model *m, cui
 /* src/components/cui_tree.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
 static cui_id cui_tree_style_id(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x18d9f87aab972b61) + UINT64_C(0x9e3779b97f4a7c15) * index);
@@ -586,10 +594,18 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
         if (cui_tree_is_branch(model, index)) {
             cui_begin_box(ui, cui_tree_toggle_id(id, node.key),
                           (cui_box){.width = 20, .height = fmaxf(1, row - 8)});
-            cui_text(ui, cui_string(cui_tree_expanded(model, index) ? "-" : "+"), t->font_size,
-                     disabled ? t->muted
-                     : active ? t->on_primary
-                              : t->text);
+            (void)cui_icon_named(
+                ui, cui_tree_toggle_id(id, node.key) ^ UINT64_C(0xd17a83c481e860f2), t,
+                cui_string("chevron-right"),
+                (cui_icon_options){.size = CUI_ICON_MEDIUM,
+                                   .custom_color = true,
+                                   .color = disabled ? t->muted
+                                            : active ? t->on_primary
+                                                     : t->text,
+                                   .custom_transform = true,
+                                   .transform = cui_icon_rotation(cui_tree_expanded(model, index)
+                                                                      ? 1.57079632679489661923f
+                                                                      : 0)});
             cui_end_box(ui);
         } else {
             cui_begin_box(ui, cui_tree_style_id(id, 200000 + (unsigned)index),

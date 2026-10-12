@@ -609,6 +609,7 @@ bool cui_notification_system_click(cui_notification_state *s, cui_notification_i
 /* src/components/cui_status.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
 static cui_color cui_status_alpha(cui_color c, float opacity) {
     c.a = (uint8_t)(c.a * opacity);
@@ -1053,9 +1054,16 @@ bool cui_marker(cui_context *ui, cui_id id, const cui_theme *t, cui_marker_state
     return true;
 }
 
+typedef struct {
+    const cui_theme *theme;
+    cui_id id;
+} cui_status_close_icon;
 static void cui_status_notification_close_content(cui_context *ui, void *user) {
-    const cui_theme *t = user;
-    cui_text(ui, cui_string("x"), t->font_size * .65f, t->muted);
+    const cui_status_close_icon *icon = user;
+    (void)cui_icon_named(ui, icon->id, icon->theme, cui_string("close"),
+                         (cui_icon_options){.size = CUI_ICON_XSMALL,
+                                            .custom_color = true,
+                                            .color = icon->theme->muted});
 }
 static cui_id cui_status_notification_element(cui_id id, cui_notification_id n) {
     return cui_status_child_id(id, (size_t)(n.type ^ (n.key + UINT64_C(0x9e3779b97f4a7c15) +
@@ -1347,12 +1355,17 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                                   : n.kind == CUI_NOTIFICATION_ERROR   ? t->danger
                                   : n.kind == CUI_NOTIFICATION_INFO    ? t->info
                                                                        : t->muted;
-                const char *icon = n.kind == CUI_NOTIFICATION_SUCCESS   ? "+"
-                                   : n.kind == CUI_NOTIFICATION_WARNING ? "!"
-                                   : n.kind == CUI_NOTIFICATION_ERROR   ? "x"
-                                                                        : "i";
-                cui_text(ui, n.kind == CUI_NOTIFICATION_UNTYPED ? n.icon : cui_string(icon),
-                         t->font_size, cui_status_notification_color(color, alpha));
+                const char *icon = n.kind == CUI_NOTIFICATION_SUCCESS   ? "circle-check"
+                                   : n.kind == CUI_NOTIFICATION_WARNING ? "triangle-alert"
+                                   : n.kind == CUI_NOTIFICATION_ERROR   ? "circle-x"
+                                                                        : "info";
+                if (n.kind == CUI_NOTIFICATION_UNTYPED)
+                    cui_text(ui, n.icon, t->font_size, cui_status_notification_color(color, alpha));
+                else
+                    (void)cui_icon_named(
+                        ui, cui_status_child_id(card, 314), t, cui_string(icon),
+                        (cui_icon_options){.custom_color = true,
+                                           .color = cui_status_notification_color(color, alpha)});
             }
             float action_width =
                 n.action ? 80
@@ -1390,13 +1403,14 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                     (cui_rect){x + (width - e->motion_width) / 2 + e->motion_width - 24,
                                y + e->motion_y + slide + 4, 20, 20},
                     (int16_t)(21 + position));
+                cui_status_close_icon close_icon = {&theme, cui_status_child_id(card, 315)};
                 close = cui_button_ex(
                     ui, cui_status_child_id(card, 300), &theme, cui_string("Close"),
                     (cui_button_options){.variant = CUI_BUTTON_GHOST,
                                          .size = CUI_CONTROL_XSMALL,
                                          .width = 20,
                                          .content = cui_status_notification_close_content,
-                                         .content_user = &theme});
+                                         .content_user = &close_icon});
                 cui_end_box(ui);
             }
             cui_end_box(ui);

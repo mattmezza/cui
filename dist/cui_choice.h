@@ -591,6 +591,8 @@ static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) 
     thumb = fminf(track, fmaxf(16, thumb));
     float travel = track - thumb;
     for (size_t e = 0; e < count; e++) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_event event = events[e];
         if (event.type == CUI_EVENT_CANCEL ||
             (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE))
@@ -629,6 +631,9 @@ static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) 
                 scroll->offset += 32;
             scroll->offset = fminf(scroll->maximum, fmaxf(0, scroll->offset));
         }
+        if (before != scroll->offset && event.type == CUI_EVENT_KEY_DOWN &&
+            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT))
+            cui_consume_event(ui, e);
         scroll->changed |= before != scroll->offset;
     }
     cui_update_semantic(ui, scroll->scrollbar_id, false, scroll->offset);
@@ -743,6 +748,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         size_t n = 0;
         const cui_event *events = cui_frame_events(ui, &n);
         for (size_t e = 0; e < n && !options.disabled; e++) {
+            if (cui_event_consumed(ui, e))
+                continue;
             cui_event event = events[e];
             cui_id target = cui_event_target(ui, e);
             bool eligible = (scroll->receiving_id && target == scroll->receiving_id) ||
@@ -811,6 +818,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (options.scroll && options.scroll->changed &&
             (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_POINTER_UP)) {
             if (options.drag) {
@@ -842,6 +851,8 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
                 ? cui_choice_navigate(items, count, cursor, events[e].key, options.vertical)
                 : count;
         if (next != count) {
+            if (next != cursor && (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT))
+                cui_consume_event(ui, e);
             cursor = next;
             cui_focus(ui, items[next].id);
             if (!options.manual_activation)
@@ -884,6 +895,8 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
             cursor = count;
         size_t from = count;
@@ -915,6 +928,8 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
                 ? cui_choice_navigate(items, count, cursor, events[e].key, options.vertical)
                 : count;
         if (next != count) {
+            if (next != cursor && (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT))
+                cui_consume_event(ui, e);
             cursor = next;
             cui_focus(ui, items[next].id);
         }
@@ -1026,6 +1041,8 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
         window_begin = count - window_length;
     bool scrolled = options.window_changed;
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_event event = events[e];
         scrolled |= cui_choice_scroll_event(
             ui, items, count, state, options.visible_count, &window_begin, options.scroll_bounds,
@@ -1136,6 +1153,8 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
     state->first_visible = begin;
     bool pointer_moved = false, keyboard_used = false;
     for (size_t e = 0; e < event_count; ++e) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (events[e].type == CUI_EVENT_POINTER_MOVE)
             pointer_moved = true;
         if (events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP)
@@ -1281,6 +1300,8 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
     bool dismiss = false;
     if (!disabled)
         for (size_t e = 0; e < event_count; e++) {
+            if (cui_event_consumed(ui, e))
+                continue;
             if (cui_event_target(ui, e) != input)
                 continue;
             if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE)
@@ -1316,6 +1337,8 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
         state->list.active = filtered[active].id;
     bool commit = false, edit_after_commit = false;
     for (size_t e = 0; e < event_count && !disabled; e++) {
+        if (cui_event_consumed(ui, e))
+            continue;
         if (cui_choice_scroll_event(ui, filtered, matched, &state->list, state->visible_rows,
                                     &state->list.first_visible, state->overlay.bounds,
                                     state->overlay.id,
@@ -1695,6 +1718,8 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
     bool redirected = false, activated_any = false, pointer_window_changed = false;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count; e++) {
+        if (cui_event_consumed(ui, e))
+            continue;
         cui_id target = cui_event_target(ui, e);
         cui_event event = events[e];
         if (!state->drag_scroll || event.type == CUI_EVENT_CANCEL ||
@@ -1847,6 +1872,9 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
             (activation || events[e].type == CUI_EVENT_POINTER_MOVE ||
              (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_RIGHT));
         if (open_child) {
+            if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_RIGHT &&
+                (same_child || level + 1 < CUI_MENU_DEPTH_MAX))
+                cui_consume_event(ui, e);
             if (same_child) {
                 cui_focus(ui, state->levels[level + 1].active);
                 logical_level = level + 1;
@@ -1892,6 +1920,7 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         }
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             if (events[e].key == CUI_KEY_LEFT && level) {
+                cui_consume_event(ui, e);
                 state->depth = level;
                 logical_level = level - 1;
                 redirected = true;
@@ -1965,6 +1994,8 @@ bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry 
     const cui_event *events = cui_frame_events(ui, &event_count);
     if (!disabled && cui_pointer_scope_allowed(ui, state->overlay.id))
         for (size_t e = 0; e < event_count; e++) {
+            if (cui_event_consumed(ui, e))
+                continue;
             cui_event event = events[e];
             if (event.type == CUI_EVENT_POINTER_DOWN &&
                 event.pointer_button == CUI_POINTER_SECONDARY && event.x >= area.x &&
@@ -2008,6 +2039,7 @@ cui_dropdown_button_result cui_base_dropdown_button(
 
 /* src/components/cui_choice.c */
 /* SPDX-License-Identifier: MIT */
+
 
 
 
@@ -2364,6 +2396,26 @@ static float cui_tab_extent(cui_context *ui, const cui_theme *theme, const cui_c
         extent = options.max_width;
     return extent;
 }
+typedef struct {
+    const cui_theme *theme;
+    bool selected;
+    float size;
+} cui_tab_overflow_icon;
+static void cui_tab_overflow_artwork(cui_context *ui, const cui_choice_item *item, size_t index,
+                                     void *user) {
+    (void)index;
+    const cui_tab_overflow_icon *icon = user;
+    cui_color color = item->disabled   ? icon->theme->muted
+                      : icon->selected ? icon->theme->on_primary
+                                       : icon->theme->text;
+    color.a = (uint8_t)lroundf(color.a * .75f);
+    (void)cui_icon_named(ui, item->id ^ UINT64_C(0x23f0b6d57ae48c19), icon->theme,
+                         cui_string("chevron-down"),
+                         (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                            .custom_size = icon->size,
+                                            .custom_color = true,
+                                            .color = color});
+}
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
               cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
@@ -2626,9 +2678,11 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         options.suffix(ui, options.content_user);
     if (options.overflow && options.overflow->visible) {
         cui_tab_overflow *overflow = options.overflow;
-        cui_choice_item trigger = {.id = overflow->trigger, .label = {"v", 1}};
-        cui_choice_draw(ui, &trigger, theme, overflow->menu.overlay.open,
-                        options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT);
+        cui_choice_item trigger = {.id = overflow->trigger, .label = {"All tabs", 8}};
+        cui_tab_overflow_icon icon = {theme, overflow->menu.overlay.open, 12 * density};
+        cui_choice_draw_ex(ui, &trigger, theme, overflow->menu.overlay.open,
+                           options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT,
+                           cui_tab_overflow_artwork, 0, &icon, 0, NULL, NULL, NULL);
         cui_set_semantic_details(ui, overflow->trigger, (cui_semantic_details){.parent = list_id});
         overflow->menu.row_height = theme->control_height;
         overflow->menu.padding = theme->padding;
@@ -3539,7 +3593,11 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                 cui_text_with_line_height(ui, entry->shortcut, metrics.font_size, foreground,
                                           metrics.font_size * 1.618034f);
             if (entry->kind == CUI_MENU_SUBMENU)
-                cui_text(ui, cui_string(">"), metrics.icon_size, theme->muted);
+                (void)cui_icon_named(ui, entry->id ^ UINT64_C(0x9e3f5d2a91bca002), theme,
+                                     cui_string("chevron-right"),
+                                     (cui_icon_options){.size = CUI_ICON_XSMALL,
+                                                        .custom_color = true,
+                                                        .color = theme->muted});
             cui_begin_box(ui, 0, (cui_box){.width = metrics.padding_x - 4 * density});
             cui_end_box(ui);
         }
@@ -3809,7 +3867,16 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                       .clip = true,
                       .align_y = CUI_ALIGN_CENTER});
         {
-            if (options.leading.length)
+            if (options.action_loading && options.leading.length)
+                (void)cui_icon_spinner(
+                    ui, action_id ^ UINT64_C(0x4aef702b79ab3181), theme,
+                    (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                       .custom_size = options.size == CUI_DROPDOWN_BUTTON_LARGE
+                                                          ? 24 * theme->font_size / 16
+                                                          : metrics.caret_size,
+                                       .custom_color = true,
+                                       .color = action_foreground});
+            else if (options.leading.length)
                 cui_dropdown_label(ui, action_id ^ UINT64_C(0x4aef702b79ab3180), options.leading,
                                    metrics.font_size, action_foreground, false);
             if (options.content)
@@ -3838,7 +3905,14 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                 .height = metrics.caret_size,
                                 .align_x = CUI_ALIGN_CENTER,
                                 .align_y = CUI_ALIGN_CENTER});
-        cui_text(ui, cui_string("v"), metrics.caret_size, trigger_foreground);
+        cui_color caret = trigger_foreground;
+        caret.a = (uint8_t)lroundf(caret.a * .75f);
+        (void)cui_icon_named(ui, trigger_id ^ UINT64_C(0x4aef702b79ab3171), theme,
+                             cui_string("chevron-down"),
+                             (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                                .custom_size = metrics.caret_size,
+                                                .custom_color = true,
+                                                .color = caret});
         cui_end_box(ui);
         cui_end_box(ui);
     }

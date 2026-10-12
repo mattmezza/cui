@@ -229,6 +229,7 @@ bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_
 /* src/components/cui_disclosure.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
 static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *theme,
                                    cui_str label, bool open, bool disabled, bool bordered,
@@ -255,9 +256,19 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
         effective.disabled = disabled;
         render(ui, &effective, index, open, user);
     } else {
-        cui_text(ui, cui_string(open ? "-" : "+"), theme->font_size,
-                 disabled ? theme->muted : theme->primary);
         cui_text(ui, label, theme->font_size, disabled ? theme->muted : theme->text);
+        if (!disabled) {
+            cui_begin_box(ui, id ^ UINT64_C(0x52fc0dc74f3d9a21), (cui_box){.width = -1});
+            cui_end_box(ui);
+            (void)cui_icon_named(
+                ui, id ^ UINT64_C(0x52fc0dc74f3d9a22), theme, cui_string("chevron-down"),
+                (cui_icon_options){.size = CUI_ICON_XSMALL,
+                                   .custom_color = true,
+                                   .color = theme->muted,
+                                   .custom_transform = true,
+                                   .transform =
+                                       cui_icon_rotation(open ? 3.14159265358979323846f : 0)});
+        }
     }
     cui_end_box(ui);
 }

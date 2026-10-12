@@ -97,7 +97,10 @@ static void title_bar(void) {
     assert(window.actions[CUI_WINDOW_RESTORE] == 1 && !window.info.maximized);
     /* Empty title area owns drag; window controls do not bubble into it. */
     title_event(ui, CUI_EVENT_POINTER_DOWN, 200, 17, CUI_POINTER_PRIMARY);
+    title_frame(ui, &state, o, &theme);
+    assert(state.move_armed && cui_pressed(ui, 100));
     title_event(ui, CUI_EVENT_POINTER_MOVE, 210, 17, CUI_POINTER_PRIMARY);
+    title_frame(ui, &state, o, &theme);
     title_event(ui, CUI_EVENT_POINTER_MOVE, 220, 17, CUI_POINTER_PRIMARY);
     title_frame(ui, &state, o, &theme);
     assert(window.actions[CUI_WINDOW_MOVE] == 1 && !state.move_armed);

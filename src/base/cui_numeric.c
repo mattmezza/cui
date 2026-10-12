@@ -337,10 +337,20 @@ cui_number_result cui_base_number_input(cui_context *ui, cui_id id, cui_str name
             .invalid = s->invalid,
             .minimum = cui_numeric_semantic_value(o.has_minimum ? o.minimum : -FLT_MAX),
             .maximum = cui_numeric_semantic_value(o.has_maximum ? o.maximum : FLT_MAX)});
-    cui_interact(ui, cui_numeric_part_id(id, 1), CUI_ROLE_BUTTON, cui_string("-"),
-                 !editable || (o.has_minimum && *value <= o.minimum), false, 0);
-    cui_interact(ui, cui_numeric_part_id(id, 2), CUI_ROLE_BUTTON, cui_string("+"),
-                 !editable || (o.has_maximum && *value >= o.maximum), false, 0);
+    cui_interact(ui, cui_numeric_part_id(id, 1), CUI_ROLE_BUTTON, cui_string("Decrement"),
+                 !editable, false, 0);
+    cui_interact(ui, cui_numeric_part_id(id, 2), CUI_ROLE_BUTTON, cui_string("Increment"),
+                 !editable, false, 0);
+    for (unsigned part = 1; part <= 2; part++) {
+        cui_id button = cui_numeric_part_id(id, part);
+        cui_set_tab_stop(ui, button, false);
+        cui_set_semantic_details(ui, button,
+                                 (cui_semantic_details){.controls = id,
+                                                        .no_focus = true,
+                                                        .focus_target = id,
+                                                        .pointer_activatable = true,
+                                                        .cursor = CUI_CURSOR_POINTER});
+    }
     s->last_value = *value;
     s->was_focused = focused;
     result.invalid = s->invalid;

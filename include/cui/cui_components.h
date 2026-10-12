@@ -148,12 +148,29 @@ typedef struct {
     cui_input_behavior_state behavior;
     float scroll_x;
 } cui_input_state;
+typedef enum {
+    CUI_INPUT_MEDIUM,
+    CUI_INPUT_SMALL,
+    CUI_INPUT_LARGE,
+    CUI_INPUT_XSMALL,
+    CUI_INPUT_CUSTOM
+} cui_input_size;
+typedef struct {
+    float height, font_size, line_height, padding_x, padding_y, gap;
+} cui_input_metrics;
 typedef struct {
     bool disabled, readonly, required, invalid;
     float width; /* Zero defaults to 280; negative grows. */
     cui_str placeholder;
     const cui_platform *clipboard;
+    cui_input_size size;
+    float custom_size, density; /* density 0 derives theme font_size/16. */
+    float height;               /* Optional frame-height refinement; line box remains 20*density. */
+    bool custom_height; /* Preserve explicit zero height. Positive height always overrides. */
+    bool no_appearance, no_border, hide_focus_ring;
+    cui_align text_align;
 } cui_input_options;
+bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
 /* Paint only: compose with a reducer without applying the event stream twice. */
 void cui_input_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_edit *,

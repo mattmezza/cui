@@ -1175,7 +1175,7 @@ static void test_combo_editor_paint_and_hit(void) {
             bool caret = false;
             for (size_t i = 0; i < draw.count; i++)
                 caret |= draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 1 &&
-                         same_color(draw.commands[i].color, themes[t].text);
+                         same_color(draw.commands[i].color, themes[t].caret);
             assert(caret);
             assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
                                                    .key = CUI_KEY_A,
@@ -1183,17 +1183,26 @@ static void test_combo_editor_paint_and_hit(void) {
             draw = combo_edit_scene(ui, multi, query, &state, &themes[t]);
             cui_edit_state selection = cui_edit_get_state(query);
             assert(selection.anchor == 0 && selection.cursor == 6);
-            bool highlighted = false;
-            for (size_t i = 0; i < draw.count; i++)
-                highlighted |= draw.commands[i].type == CUI_DRAW_TEXT &&
-                               draw.commands[i].text.length == 6 &&
-                               same_color(draw.commands[i].color, themes[t].on_primary);
-            assert(highlighted);
+            cui_input_metrics metrics;
+            assert(cui_input_measure((cui_input_options){0}, themes[t].font_size, &metrics));
+            float selected_width =
+                cui_measure_text(ui, cui_string("abécd"), metrics.font_size).width;
+            bool highlighted = false, foreground = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                cui_draw_command command = draw.commands[i];
+                highlighted |= command.type == CUI_DRAW_RECT &&
+                               same_color(command.color, themes[t].selection) &&
+                               fabsf(command.bounds.w - selected_width) < .001f &&
+                               command.bounds.h == metrics.line_height;
+                foreground |= command.type == CUI_DRAW_TEXT && command.text.length == 6 &&
+                              same_color(command.color, themes[t].text);
+            }
+            assert(highlighted && foreground);
             cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(2));
             float start_x =
-                viewport.x + cui_measure_text(ui, cui_string("a"), themes[t].font_size).width;
+                viewport.x + cui_measure_text(ui, cui_string("a"), metrics.font_size).width;
             float end_x =
-                viewport.x + cui_measure_text(ui, cui_string("abé"), themes[t].font_size).width;
+                viewport.x + cui_measure_text(ui, cui_string("abé"), metrics.font_size).width;
             float y = viewport.y + viewport.h * .5f;
             assert(cui_queue_event(
                 ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = start_x, .y = y}));
@@ -1222,7 +1231,7 @@ static void test_combo_editor_paint_and_hit(void) {
             combo_edit_scene(ui, multi, query, &state, &themes[t]);
             assert(cui_edit_get_text(query).length == 52 && state.query_scroll_x > 0);
             viewport = cui_bounds(ui, cui_input_viewport_id(2));
-            cui_input_hit_geometry geometry = {ui, viewport, themes[t].font_size,
+            cui_input_hit_geometry geometry = {ui, viewport, metrics.font_size,
                                                state.query_scroll_x};
             size_t expected = cui_base_input_hit_test(&geometry, cui_edit_get_text(query),
                                                       viewport.x + 1, viewport.y + viewport.h / 2);

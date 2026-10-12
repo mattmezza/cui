@@ -318,7 +318,173 @@ static void other_events(void) {
         cui_destroy(ui);
     }
 }
+#ifndef CUI_NUMERIC_BASE_ONLY
+static unsigned provider_calls;
+static bool icon_provider(void *user, cui_str path, cui_str *svg) {
+    (void)user;
+    (void)svg;
+    if ((path.length >= 9 && memcmp(path.data + path.length - 9, "minus.svg", 9) == 0) ||
+        (path.length >= 8 && memcmp(path.data + path.length - 8, "plus.svg", 8) == 0))
+        provider_calls++;
+    return false;
+}
+static cui_draw_list sized_number_frame(cui_context *ui, cui_theme *theme, cui_number_state *state,
+                                        double *value, cui_number_options options) {
+    assert(cui_begin_frame(ui, 800, 600, .016f));
+    cui_number_result result =
+        cui_number_input(ui, 2, theme, cui_string("Quantity"), state, value, options);
+    assert(result.error == CUI_EDIT_OK);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void number_sizes_and_icons(void) {
+    cui_context *ui = cui_create((cui_config){.width = 800, .height = 600});
+    cui_theme theme = cui_theme_light();
+    theme.font_size = 16;
+    theme.icon_loader = icon_provider;
+    theme.secondary_foreground = (cui_color){13, 71, 191, 255};
+    char buffer[128] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+    assert(ui && edit);
+    cui_number_state state = {.edit = edit};
+    double value = 3;
+    const float heights[] = {32, 24, 44, 20}, fonts[] = {14, 14, 16, 12},
+                widths[] = {32, 24, 32, 24}, icons[] = {16, 14, 24, 12};
+    for (unsigned i = 0; i < 4; i++) {
+        cui_number_options options = {.width = 200,
+                                      .size = (cui_number_size)i,
+                                      .step = 1,
+                                      .has_minimum = true,
+                                      .minimum = 0,
+                                      .has_maximum = true,
+                                      .maximum = 10};
+        cui_number_metrics metrics;
+        assert(cui_number_measure(options, 16, &metrics));
+        assert(metrics.height == heights[i] && metrics.font_size == fonts[i] &&
+               metrics.step_width == widths[i] && metrics.icon_size == icons[i]);
+        cui_draw_list draw = sized_number_frame(ui, &theme, &state, &value, options);
+        cui_rect frame = cui_bounds(ui, cui_numeric_part_id(2, 0)),
+                 minus = cui_bounds(ui, cui_numeric_part_id(2, 1)),
+                 plus = cui_bounds(ui, cui_numeric_part_id(2, 2));
+        assert(frame.h == heights[i] && frame.w == 200 && minus.w == widths[i] &&
+               plus.w == widths[i]);
+        assert(minus.x == 1 && plus.x + plus.w == 199 && minus.h == heights[i] - 2);
+        unsigned images = 0;
+        bool centered = false;
+        for (size_t j = 0; j < draw.count; j++) {
+            cui_draw_command c = draw.commands[j];
+            if (c.type == CUI_DRAW_IMAGE) {
+                images++;
+                assert(c.bitmap.custom_tint && c.bitmap.tint.r == 13 && c.bitmap.tint.b == 191);
+                assert(c.bounds.w == icons[i] && c.bounds.h == icons[i]);
+            }
+            if (c.type == CUI_DRAW_TEXT) {
+                assert(c.text.length != 8 || memcmp(c.text.data, "Quantity", 8));
+                assert(c.text.length != 1 || (c.text.data[0] != '+' && c.text.data[0] != '-'));
+                if (c.text.length == 1 && c.text.data[0] == '3') {
+                    centered = fabsf(c.bounds.x + c.bounds.w * .5f - 100) < .001f &&
+                               fabsf(c.bounds.y +
+                                     cui_measure_text(ui, cui_string("3"), fonts[i]).height * .5f -
+                                     frame.h * .5f) < .001f;
+                    assert(c.font_size == fonts[i]);
+                }
+            }
+        }
+        assert(images == 2 && centered);
+        key(ui, CUI_KEY_UP, 0);
+        cui_focus(ui, 2);
+        sized_number_frame(ui, &theme, &state, &value, options);
+        assert(value == 4);
+        key(ui, CUI_KEY_DOWN, 0);
+        sized_number_frame(ui, &theme, &state, &value, options);
+        assert(value == 3);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                               .x = minus.x + minus.w / 2,
+                                               .y = minus.y + minus.h / 2}));
+        draw = sized_number_frame(ui, &theme, &state, &value, options);
+        bool hovered = false;
+        for (size_t j = 0; j < draw.count; j++) {
+            cui_draw_command c = draw.commands[j];
+            hovered |= c.type == CUI_DRAW_RECT && c.bounds.w == widths[i] &&
+                       c.bounds.h == heights[i] - 2 && c.color.r == theme.input.r &&
+                       c.color.a == (uint8_t)lroundf(theme.input.a * .4f);
+        }
+        assert(hovered);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                               .x = minus.x + minus.w / 2,
+                                               .y = minus.y + minus.h / 2}));
+        draw = sized_number_frame(ui, &theme, &state, &value, options);
+        bool held = false;
+        for (size_t j = 0; j < draw.count; j++) {
+            cui_draw_command c = draw.commands[j];
+            held |= c.type == CUI_DRAW_RECT && c.bounds.w == widths[i] &&
+                    c.bounds.h == heights[i] - 2 &&
+                    c.color.a == (uint8_t)lroundf(theme.input.a * .6f);
+        }
+        assert(held);
+        assert(cui_focused(ui) == 2);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                               .x = minus.x + minus.w / 2,
+                                               .y = minus.y + minus.h / 2}));
+        sized_number_frame(ui, &theme, &state, &value, options);
+        assert(value == 2 && cui_focused(ui) == 2);
+        cui_focus(ui, cui_numeric_part_id(2, 1));
+        assert(cui_focused(ui) == 2);
+        value = 3;
+        options.disabled = true;
+        key(ui, CUI_KEY_UP, 0);
+        sized_number_frame(ui, &theme, &state, &value, options);
+        assert(value == 3);
+        options.disabled = false;
+    }
+    assert(provider_calls >= 2);
+    cui_number_options bound = {.step = 1, .has_maximum = true, .maximum = 10};
+    value = 10;
+    sized_number_frame(ui, &theme, &state, &value, bound);
+    size_t semantic_count;
+    const cui_semantic *sem = cui_semantics(ui, &semantic_count);
+    assert(semantic_count == 3 && sem[1].details.no_focus && sem[2].details.no_focus &&
+           !sem[2].disabled);
+    assert(sem[1].name.length == 9 && memcmp(sem[1].name.data, "Decrement", 9) == 0);
+    assert(sem[2].name.length == 9 && memcmp(sem[2].name.data, "Increment", 9) == 0);
+    cui_rect plus = cui_bounds(ui, cui_numeric_part_id(2, 2));
+    cui_focus(ui, 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = plus.x + plus.w / 2,
+                                           .y = plus.y + plus.h / 2}));
+    sized_number_frame(ui, &theme, &state, &value, bound);
+    assert(cui_focused(ui) == 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = plus.x + plus.w / 2,
+                                           .y = plus.y + plus.h / 2}));
+    assert(cui_begin_frame(ui, 800, 600, .016f));
+    cui_number_result result =
+        cui_number_input(ui, 2, &theme, cui_string("Quantity"), &state, &value, bound);
+    cui_end_frame(ui);
+    assert(!result.changed && result.step_direction == 1 && value == 10 && cui_focused(ui) == 2);
+    key(ui, CUI_KEY_DOWN, 0);
+    sized_number_frame(ui, &theme, &state, &value, bound);
+    assert(value == 9);
+    key(ui, CUI_KEY_TAB, 0);
+    sized_number_frame(ui, &theme, &state, &value, bound);
+    assert(cui_focused(ui) == 2);
+
+    cui_number_metrics custom;
+    assert(cui_number_measure((cui_number_options){.size = CUI_NUMBER_CUSTOM, .custom_size = 30},
+                              16, &custom) &&
+           custom.height == 30 && custom.step_width == 30 && custom.icon_size == 30 &&
+           custom.font_size == 26.25f);
+    assert(!cui_number_measure((cui_number_options){.size = CUI_NUMBER_CUSTOM}, 16, &custom));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifndef CUI_NUMERIC_BASE_ONLY
+    number_sizes_and_icons();
+#endif
     decimal_locale();
     models();
     number_events();

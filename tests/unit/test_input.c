@@ -173,15 +173,17 @@ static void styled_selection(void) {
         pointer(ui, CUI_EVENT_POINTER_UP, bounds.x + 35, bounds.y + 5, CUI_MOD_SHIFT);
         list = styled_frame(ui, edit, &themes[theme_index], &state, options);
         assert(cui_edit_get_state(edit).cursor == 4 && cui_edit_get_state(edit).anchor == 1);
-        cui_rect selected = text_bounds(list, "i\xc3\xa9");
-        assert(selected.w == 16);
+        assert(text_bounds(list, buffer).w == 46);
+        cui_input_metrics metrics;
+        assert(cui_input_measure(options, themes[theme_index].font_size, &metrics));
         bool selection_paint = false, caret_paint = false;
         for (size_t i = 0; i < list.count; ++i) {
             cui_draw_command command = list.commands[i];
             if (command.type == CUI_DRAW_RECT && command.bounds.w == 16 &&
-                !memcmp(&command.color, &themes[theme_index].primary, sizeof command.color))
+                !memcmp(&command.color, &themes[theme_index].selection, sizeof command.color))
                 selection_paint = true;
-            if (command.type == CUI_DRAW_RECT && command.bounds.w == 1 && command.bounds.h == 20)
+            if (command.type == CUI_DRAW_RECT && command.bounds.w == 1 &&
+                command.bounds.h == metrics.line_height * .85f)
                 caret_paint = true;
         }
         assert(selection_paint && caret_paint);
@@ -262,7 +264,95 @@ static void consumed_release_ends_selection(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+#ifndef CUI_INPUT_BASE_ONLY
+static void size_metrics_and_centering(void) {
+    cui_theme theme = cui_theme_light();
+    theme.font_size = 16;
+    theme.caret = (cui_color){7, 31, 199, 255};
+    theme.selection = (cui_color){99, 18, 71, 255};
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    char buffer[64] = "abc";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+    assert(edit && ui);
+    cui_input_state state = {0};
+    const float heights[] = {32, 24, 44, 20}, fonts[] = {14, 14, 16, 12},
+                padding[] = {10, 8, 12, 4};
+    for (unsigned i = 0; i < 4; i++) {
+        cui_input_options options = {.size = (cui_input_size)i, .width = 180};
+        cui_input_metrics metrics;
+        assert(cui_input_measure(options, 16, &metrics));
+        assert(metrics.height == heights[i] && metrics.font_size == fonts[i] &&
+               metrics.padding_x == padding[i] && metrics.line_height == 20);
+        cui_draw_list list = styled_frame(ui, edit, &theme, &state, options);
+        cui_rect box = cui_bounds(ui, 1), text = text_bounds(list, buffer),
+                 viewport = cui_bounds(ui, cui_input_viewport_id(1));
+        assert(box.h == heights[i] &&
+               fabsf(text.y + cui_measure_text(ui, cui_string(buffer), fonts[i]).height * .5f -
+                     (box.y + box.h * .5f)) < .001f);
+        assert(viewport.x == box.x + padding[i] + 1 && viewport.h == 20);
+        assert(text.x == viewport.x && text.h == 20);
+        for (size_t j = 0; j < list.count; j++)
+            assert(list.commands[j].type != CUI_DRAW_TEXT || list.commands[j].text.length != 4 ||
+                   memcmp(list.commands[j].text.data, "Name", 4));
+        cui_focus(ui, 1);
+        cui_edit_select(edit, 1, 3);
+        list = styled_frame(ui, edit, &theme, &state, options);
+        bool caret = false, selection = false;
+        for (size_t j = 0; j < list.count; j++) {
+            cui_draw_command c = list.commands[j];
+            caret |=
+                c.type == CUI_DRAW_RECT && c.bounds.w == 1 && c.bounds.h == 17 && c.color.b == 199;
+            selection |= c.type == CUI_DRAW_RECT && c.color.r == 99 && c.bounds.h == 20;
+        }
+        assert(caret && selection);
+        cui_edit_select(edit, 0, 0);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "Q"}));
+        styled_frame(ui, edit, &theme, &state, options);
+        assert(buffer[0] == 'Q');
+        cui_edit_select(edit, 0, 1);
+        cui_edit_backspace(edit);
+        assert(strcmp(buffer, "abc") == 0);
+    }
+    cui_input_metrics metrics;
+    assert(cui_input_measure((cui_input_options){.size = CUI_INPUT_CUSTOM, .custom_size = 30}, 16,
+                             &metrics) &&
+           metrics.height == 30 && metrics.font_size == 26.25f);
+    assert(!cui_input_measure((cui_input_options){.size = CUI_INPUT_CUSTOM}, 16, &metrics));
+    assert(!cui_input_measure((cui_input_options){.density = NAN}, 16, &metrics));
+    cui_edit_select(edit, 0, 0);
+    cui_input_options center = {.width = 180, .text_align = CUI_ALIGN_CENTER};
+    cui_draw_list list = styled_frame(ui, edit, &theme, &state, center);
+    cui_rect bounds = text_bounds(list, buffer);
+    assert(fabsf(bounds.x + bounds.w / 2 - 90) < .001f);
+    pointer(ui, CUI_EVENT_POINTER_DOWN, bounds.x + bounds.w, bounds.y + 2, 0);
+    pointer(ui, CUI_EVENT_POINTER_UP, bounds.x + bounds.w, bounds.y + 2, 0);
+    styled_frame(ui, edit, &theme, &state, center);
+    assert(cui_edit_get_state(edit).cursor == 3);
+    theme.input = (cui_color){17, 71, 143, 200};
+    theme.input_background = (cui_color){1, 2, 3, 255};
+    theme.muted = (cui_color){132, 129, 113, 255};
+    list =
+        styled_frame(ui, edit, &theme, &state, (cui_input_options){.width = 180, .disabled = true});
+    bool disabled_background = false, disabled_foreground = false;
+    for (size_t j = 0; j < list.count; j++) {
+        cui_draw_command c = list.commands[j];
+        disabled_background |=
+            c.type == CUI_DRAW_RECT && c.bounds.w == 180 && c.color.r == 17 && c.color.a == 40;
+        disabled_foreground |= c.type == CUI_DRAW_TEXT && c.color.r == 132 && c.color.a == 128;
+    }
+    assert(disabled_background && disabled_foreground);
+    list = styled_frame(ui, edit, &theme, &state, (cui_input_options){.no_appearance = true});
+    for (size_t j = 0; j < list.count; j++)
+        assert(list.commands[j].type != CUI_DRAW_BORDER);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifndef CUI_INPUT_BASE_ONLY
+    size_metrics_and_centering();
+#endif
     consumed_release_ends_selection();
     input_consumes_caret_keys();
     clipboard_and_readonly();

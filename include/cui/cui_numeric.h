@@ -11,6 +11,16 @@ bool cui_number_parse(cui_str text, double *value);
 /* Reports required bytes excluding NUL; always emits ASCII '.' regardless of locale. */
 size_t cui_number_format(double value, char *output, size_t capacity);
 typedef double (*cui_number_step_fn)(void *user, double value, int direction);
+typedef enum {
+    CUI_NUMBER_MEDIUM,
+    CUI_NUMBER_SMALL,
+    CUI_NUMBER_LARGE,
+    CUI_NUMBER_XSMALL,
+    CUI_NUMBER_CUSTOM
+} cui_number_size;
+typedef struct {
+    float height, font_size, line_height, padding_x, padding_y, step_width, icon_size;
+} cui_number_metrics;
 typedef struct {
     double minimum, maximum, step;
     bool has_minimum, has_maximum, disabled, readonly, allow_exponent;
@@ -18,11 +28,17 @@ typedef struct {
     void *step_user;
     cui_str prefix, suffix;
     float width;
+    cui_number_size size;
+    float custom_size, density;
+    bool no_appearance, hide_focus_ring;
+    cui_str placeholder;
 } cui_number_options;
+bool cui_number_measure(cui_number_options, float root_font_size, cui_number_metrics *);
 typedef struct {
     cui_edit *edit; /* Borrowed single-line editor, draft limited to 127 UTF-8 bytes. */
     double last_value;
     bool initialized, was_focused, invalid;
+    float scroll_x;
 } cui_number_state;
 typedef struct {
     bool changed, submitted, invalid;

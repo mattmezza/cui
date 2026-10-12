@@ -132,3 +132,10 @@ Nested factors multiply; default boxes preserve full opacity. Values clamp to
 0..1, with nonfinite values treated as zero. This is per-draw alpha modulation,
 not isolated group compositing. Opacity alone preserves semantics and input;
 combine with `inert` when hidden content should stop receiving interaction.
+
+Fractional font sizes and explicit line heights are preserved through measurement,
+word wrapping and draw commands. A context-owned bounded style table supplies
+stable Clay measurement identities; old generations are reclaimed only between
+frames, avoiding stale metrics when a line height changes. Text stays vertically
+centered in an explicit line box. Native font rasterizers may still quantize glyph
+outlines independently of these float layout coordinates.

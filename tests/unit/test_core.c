@@ -1614,7 +1614,35 @@ static void test_inherited_opacity(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_fractional_text_metrics(void) {
+    cui_context *ui = make();
+    cui_size measured = cui_measure_text(ui, cui_string("one"), 10.5f);
+    assert(fabsf(measured.width - 18.9f) < .001f);
+    for (unsigned frame = 0; frame < 140; frame++) {
+        float height = frame % 3 == 0 ? 22.652476f : 20.25f + frame * .001f;
+        begin(ui);
+        cui_begin_box(ui, 930, (cui_box){.width = 100});
+        cui_text_with_line_height(ui, cui_string("one\ntwo"), 10.5f, (cui_color){1, 2, 3, 255},
+                                  height);
+        cui_end_box(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        assert(fabsf(cui_bounds(ui, 930).h - 2 * height) < .001f);
+        assert(list.count == 2 && list.commands[0].font_size == 10.5f);
+        assert(fabsf(list.commands[1].bounds.y - list.commands[0].bounds.y - height) < .001f);
+        assert(fabsf(list.commands[0].bounds.y - (height - measured.height) * .5f) < .001f);
+    }
+    begin(ui);
+    cui_begin_box(ui, 931, (cui_box){.width = 25});
+    cui_text_with_line_height(ui, cui_string("one two"), 10.5f, (cui_color){1, 2, 3, 255}, 21.75f);
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(list.count == 2 && fabsf(cui_bounds(ui, 931).h - 43.5f) < .001f);
+    assert(fabsf(list.commands[1].bounds.y - list.commands[0].bounds.y - 21.75f) < .001f);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_fractional_text_metrics();
     test_inherited_opacity();
     test_absolute_boxes();
     test_bitmap_leaf();

@@ -262,11 +262,22 @@ typedef struct {
     bool drag_scroll, scroll_pending, scroll_dragging;
     size_t scroll_level;
     float scroll_start_y, scroll_last_y;
+    float label_height, separator_height, row_gap,
+        available_height; /* previous nonuniform styled row metrics */
 } cui_menu_tree_state;
+typedef enum { CUI_MENU_MEDIUM, CUI_MENU_SMALL, CUI_MENU_LARGE, CUI_MENU_XSMALL } cui_menu_size;
+typedef struct {
+    float row_height, label_height, separator_height, gap;
+    float padding, padding_x, font_size, icon_size, radius;
+} cui_menu_metrics;
+cui_menu_metrics cui_menu_size_metrics(cui_menu_size, float density, float radius);
 typedef struct {
     cui_choice_popup_options popup;
     bool keep_open_checks, checks_on_right;
-    bool drag_scroll; /* opt-in primary-pointer drag, usable by touch adapters */
+    bool drag_scroll;   /* opt-in primary-pointer drag, usable by touch adapters */
+    cui_menu_size size; /* source Small20; other sizes26 logical px */
+    float density;      /* zero derives theme.font_size/16 */
+    float max_height;   /* positive override; default min(viewport.height/2,450*density) */
 } cui_menu_tree_options;
 struct cui_tab_overflow {
     cui_menu_tree_state menu;
@@ -1499,6 +1510,28 @@ void cui_base_menu_entry(cui_context *ui, const cui_menu_entry *entry, bool disa
                                                : 0,
                                .description = entry->shortcut});
 }
+static float cui_menu_retained_row_height(const cui_menu_tree_state *state,
+                                          const cui_menu_entry *entry) {
+    if (entry->kind == CUI_MENU_SEPARATOR && state->separator_height > 0)
+        return state->separator_height;
+    if (entry->kind == CUI_MENU_LABEL && state->label_height > 0)
+        return state->label_height;
+    return state->row_height - state->row_gap;
+}
+static size_t cui_menu_retained_fit(const cui_menu_tree_state *state, const cui_menu_entry *entries,
+                                    size_t count, size_t begin) {
+    size_t rows = 0;
+    float height = 0;
+    while (begin + rows < count && rows < 4096) {
+        float next = cui_menu_retained_row_height(state, &entries[begin + rows]) +
+                     (rows ? state->row_gap : 0);
+        if (rows && height + next > state->available_height)
+            break;
+        height += next;
+        rows++;
+    }
+    return rows;
+}
 static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries, size_t count,
                                   cui_menu_tree_state *state, size_t level, cui_id target,
                                   cui_event event) {
@@ -1513,6 +1546,18 @@ static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries
         return false;
     cui_list_state *cursor = &state->levels[level];
     size_t maximum = count - rows;
+    if (state->available_height > 0 && state->row_gap > 0) {
+        maximum = count - 1;
+        float height = cui_menu_retained_row_height(state, &entries[maximum]);
+        while (maximum && count - maximum < 4096) {
+            float next =
+                cui_menu_retained_row_height(state, &entries[maximum - 1]) + state->row_gap;
+            if (height + next > state->available_height)
+                break;
+            height += next;
+            maximum--;
+        }
+    }
     if (cursor->first_visible > maximum)
         cursor->first_visible = maximum;
     float amount = cursor->scroll_remainder - event.dy;
@@ -1529,6 +1574,8 @@ static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries
     }
     if (before == cursor->first_visible)
         return false;
+    if (state->available_height > 0 && state->row_gap > 0)
+        rows = cui_menu_retained_fit(state, entries, count, cursor->first_visible);
     bool focused = false, active_visible = false;
     for (size_t i = 0; i < count; i++) {
         focused |= cui_focused(ui) == entries[i].id;
@@ -1719,12 +1766,20 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
                 if (events[e].x >= panel.x && events[e].x < panel.x + panel.w &&
                     events[e].y >= panel.y + state->padding &&
                     events[e].y < panel.y + panel.h - state->padding) {
-                    float offset = (events[e].y - panel.y - state->padding) / state->row_height;
-                    if (offset >= (float)counts[level])
-                        break;
-                    size_t row = state->levels[level].first_visible + (size_t)offset;
-                    if (row < counts[level] && !cui_menu_entry_is_disabled(&menus[level][row]))
-                        target = menus[level][row].id;
+                    float offset = events[e].y - panel.y - state->padding;
+                    size_t row = state->levels[level].first_visible;
+                    while (row < counts[level]) {
+                        float height = cui_menu_retained_row_height(state, &menus[level][row]);
+                        if (offset < height) {
+                            if (!cui_menu_entry_is_disabled(&menus[level][row]))
+                                target = menus[level][row].id;
+                            break;
+                        }
+                        if (offset < height + state->row_gap)
+                            break;
+                        offset -= height + state->row_gap;
+                        row++;
+                    }
                     break;
                 }
             }
@@ -3168,36 +3223,100 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     return result;
 }
 
+cui_menu_metrics cui_menu_size_metrics(cui_menu_size size, float density, float radius) {
+    if (!isfinite(density) || density <= 0)
+        density = 1;
+    if (!isfinite(radius) || radius < 0)
+        radius = 0;
+    radius = fminf(radius, 8 * density);
+    return (cui_menu_metrics){.row_height = (size == CUI_MENU_SMALL ? 20 : 26) * density,
+                              .label_height = 14 * 1.618034f * density,
+                              .separator_height = 6 * density,
+                              .gap = 2 * density,
+                              .padding = 4 * density,
+                              .padding_x = 8 * density,
+                              .font_size = 14 * density,
+                              .icon_size = 12 * density,
+                              .radius = size == CUI_MENU_SMALL ? radius / 2 : radius};
+}
+static cui_menu_metrics cui_choice_menu_metrics(const cui_theme *theme,
+                                                cui_menu_tree_options options) {
+    float density =
+        options.density > 0 && isfinite(options.density) ? options.density : theme->font_size / 16;
+    return cui_menu_size_metrics(options.size, density, theme->radius);
+}
+static float cui_choice_menu_row_height(const cui_menu_entry *entry, cui_menu_metrics metrics) {
+    return entry->kind == CUI_MENU_SEPARATOR ? metrics.separator_height
+           : entry->kind == CUI_MENU_LABEL   ? metrics.label_height
+                                             : metrics.row_height;
+}
+static float cui_choice_menu_window_height(const cui_menu_entry *entries, size_t begin, size_t rows,
+                                           cui_menu_metrics metrics) {
+    float height = 0;
+    for (size_t i = 0; i < rows; i++)
+        height += cui_choice_menu_row_height(&entries[begin + i], metrics) + (i ? metrics.gap : 0);
+    return height;
+}
+static size_t cui_choice_menu_fit(const cui_menu_entry *entries, size_t count, size_t begin,
+                                  float available, cui_menu_metrics metrics) {
+    size_t rows = 0;
+    float height = 0;
+    while (begin + rows < count && rows < 4096) {
+        float next =
+            cui_choice_menu_row_height(&entries[begin + rows], metrics) + (rows ? metrics.gap : 0);
+        if (rows && height + next > available)
+            break;
+        height += next;
+        rows++;
+    }
+    return rows;
+}
+static void cui_choice_menu_retain_metrics(cui_menu_tree_state *state, cui_menu_metrics metrics) {
+    state->row_height = metrics.row_height + metrics.gap;
+    state->padding = metrics.padding;
+    state->label_height = metrics.label_height;
+    state->separator_height = metrics.separator_height;
+    state->row_gap = metrics.gap;
+}
 static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                   const cui_menu_entry *entries, size_t count,
                                   cui_menu_tree_state *state, size_t level, cui_rect anchor,
                                   cui_menu_tree_options options, cui_str name) {
+    cui_menu_metrics metrics = cui_choice_menu_metrics(theme, options);
     cui_list_state *cursor = &state->levels[level];
-    float available = options.popup.viewport.h - 2 * theme->padding - 8;
-    size_t rows = count;
-    if (available / theme->control_height < (float)rows)
-        rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
-    if (rows > 4096)
-        rows = 4096;
-    state->visible_rows[level] = rows;
-    size_t maximum = count > rows ? count - rows : 0;
-    if (cursor->first_visible > maximum)
-        cursor->first_visible = maximum;
+    float density = metrics.padding / 4;
+    float maximum_height = options.max_height > 0 && isfinite(options.max_height)
+                               ? options.max_height
+                               : fminf(options.popup.viewport.h / 2, 450 * density);
+    maximum_height = fminf(maximum_height, options.popup.viewport.h - 8);
+    float available = fmaxf(metrics.row_height, maximum_height - 2 * metrics.padding);
+    state->available_height = available;
+    if (cursor->first_visible >= count)
+        cursor->first_visible = count ? count - 1 : 0;
     size_t active = count;
     for (size_t i = 0; i < count; i++)
         if (entries[i].id == cursor->active)
             active = i;
-    if (active < count && rows) {
-        if (active < cursor->first_visible)
-            cursor->first_visible = active;
-        else if (active >= cursor->first_visible + rows)
-            cursor->first_visible = active + 1 - rows;
+    size_t rows = cui_choice_menu_fit(entries, count, cursor->first_visible, available, metrics);
+    if (active < count &&
+        (active < cursor->first_visible || active >= cursor->first_visible + rows)) {
+        cursor->first_visible = active;
+        while (cursor->first_visible && active - cursor->first_visible < 4095 &&
+               cui_choice_menu_window_height(entries, cursor->first_visible - 1,
+                                             active - cursor->first_visible + 2,
+                                             metrics) <= available)
+            cursor->first_visible--;
+        rows = cui_choice_menu_fit(entries, count, cursor->first_visible, available, metrics);
     }
+    state->visible_rows[level] = rows;
     float width =
         options.popup.width > 0 && isfinite(options.popup.width) ? options.popup.width : 240;
     if (width > options.popup.viewport.w)
         width = options.popup.viewport.w;
-    float height = 2 * theme->padding + (rows ? rows : 1) * theme->control_height;
+    float height =
+        2 * metrics.padding +
+        (rows ? cui_choice_menu_window_height(entries, cursor->first_visible, rows, metrics)
+              : metrics.row_height);
     cui_popup_result placement = cui_popup_place(
         anchor, (cui_size){width, height}, options.popup.viewport,
         level ? CUI_POPUP_RIGHT : options.popup.side, !level && state->contextual ? 0 : 4);
@@ -3219,7 +3338,8 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     if (!cui_begin_focus_scope(ui, scope, !level))
         return;
     cui_begin_portal(ui, scope,
-                     (cui_box){.padding = theme->padding,
+                     (cui_box){.padding = metrics.padding,
+                               .gap = metrics.gap,
                                .clip = true,
                                .background = theme->popover,
                                .border = theme->border,
@@ -3229,17 +3349,16 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     cui_interact(ui, scope, CUI_ROLE_MENU, name, false, false, 0);
     cui_set_semantic_details(
         ui, scope,
-        (cui_semantic_details){.orientation = CUI_ORIENTATION_VERTICAL,
-                               .labelled_by =
-                                   level ? state->path[level - 1] : state->overlay.trigger,
-                               .scrollable = count > rows,
-                               .scroll_y = cursor->first_visible * theme->control_height,
-                               .scroll_max_y = maximum * theme->control_height});
+        (cui_semantic_details){
+            .orientation = CUI_ORIENTATION_VERTICAL,
+            .labelled_by = level ? state->path[level - 1] : state->overlay.trigger,
+            .scrollable = count > rows,
+            .scroll_y = cui_choice_menu_window_height(entries, 0, cursor->first_visible, metrics) +
+                        (cursor->first_visible ? metrics.gap : 0),
+            .scroll_max_y = fmaxf(0, cui_choice_menu_window_height(entries, 0, count, metrics) -
+                                         (height - 2 * metrics.padding))});
     size_t begin = cursor->first_visible, end = rows > count - begin ? count : begin + rows;
-    float icon_density = theme->font_size / 16;
-    if (!isfinite(icon_density) || icon_density <= 0)
-        icon_density = 1;
-    float icon_size = 12 * icon_density;
+    float icon_size = metrics.icon_size;
     bool has_left_icon = false;
     for (size_t i = 0; i < count; i++) {
         const cui_menu_entry *entry = &entries[i];
@@ -3267,19 +3386,22 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                                              : theme->popover_foreground;
         cui_begin_box(
             ui, entry->id,
-            (cui_box){.height = theme->control_height,
+            (cui_box){.height = cui_choice_menu_row_height(entry, metrics),
                       .width = -1,
-                      .padding = theme->padding,
-                      .gap = theme->gap,
+                      .radius = entry->kind == CUI_MENU_SEPARATOR ? 0 : metrics.radius,
+                      .gap = 4 * density,
                       .row = true,
                       .align_y = CUI_ALIGN_CENTER,
                       .background = highlighted ? theme->accent : (cui_color){0},
                       .border = cui_focused(ui) == entry->id ? theme->focus : theme->surface,
                       .border_width = cui_focused(ui) == entry->id ? 1 : 0});
         if (entry->kind == CUI_MENU_SEPARATOR) {
-            cui_begin_box(ui, 0, (cui_box){.height = 1, .width = -1, .background = theme->border});
+            cui_begin_box(
+                ui, 0, (cui_box){.height = 2 * density, .width = -1, .background = theme->border});
             cui_end_box(ui);
         } else {
+            cui_begin_box(ui, 0, (cui_box){.width = metrics.padding_x - 4 * density});
+            cui_end_box(ui);
             if (has_left_icon) {
                 cui_begin_box(ui, entry->id ^ UINT64_C(0x9e3f5d2a91bca001),
                               (cui_box){.width = icon_size,
@@ -3297,15 +3419,19 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
             if (entry->render)
                 entry->render(ui, entry->render_user);
             else
-                cui_text(ui, entry->label, theme->font_size,
-                         entry->kind == CUI_MENU_LABEL ? theme->muted : foreground);
+                cui_text_with_line_height(ui, entry->label, metrics.font_size,
+                                          entry->kind == CUI_MENU_LABEL ? theme->muted : foreground,
+                                          metrics.font_size * 1.618034f);
             cui_end_box(ui);
             if (checked && options.checks_on_right)
                 cui_checkmark(ui, icon_size, foreground);
             if (entry->shortcut.length)
-                cui_text(ui, entry->shortcut, theme->font_size * .8f, foreground);
+                cui_text_with_line_height(ui, entry->shortcut, metrics.font_size, foreground,
+                                          metrics.font_size * 1.618034f);
             if (entry->kind == CUI_MENU_SUBMENU)
-                cui_text(ui, cui_string(">"), theme->font_size, foreground);
+                cui_text(ui, cui_string(">"), metrics.icon_size, theme->muted);
+            cui_begin_box(ui, 0, (cui_box){.width = metrics.padding_x - 4 * density});
+            cui_end_box(ui);
         }
         cui_end_box(ui);
     }
@@ -3317,10 +3443,12 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
             if (entries[i].id == state->path[level])
                 parent = i;
         if (parent >= begin && parent < end) {
-            cui_rect child_anchor = {placement.bounds.x,
-                                     placement.bounds.y + theme->padding +
-                                         (float)(parent - begin) * theme->control_height,
-                                     placement.bounds.w, theme->control_height};
+            cui_rect child_anchor = {
+                placement.bounds.x,
+                placement.bounds.y + metrics.padding +
+                    cui_choice_menu_window_height(entries, begin, parent - begin, metrics) +
+                    (parent > begin ? metrics.gap : 0),
+                placement.bounds.w, cui_choice_menu_row_height(&entries[parent], metrics)};
             cui_choice_menu_level(ui, theme, entries[parent].children, entries[parent].child_count,
                                   state, level + 1, child_anchor, options, entries[parent].label);
         }
@@ -3344,8 +3472,7 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
                            options.popup.dt, options.keep_open_checks);
     cui_choice_item trigger_item = {trigger, name, options.popup.disabled};
     cui_choice_draw(ui, &trigger_item, theme, false, options.popup.disabled, CUI_TAB_DEFAULT);
-    state->row_height = theme->control_height;
-    state->padding = theme->padding;
+    cui_choice_menu_retain_metrics(state, cui_choice_menu_metrics(theme, options));
     if (state->overlay.open)
         cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger), options,
                               name);
@@ -3366,8 +3493,7 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
     bool activated =
         cui_base_context_menu(ui, target, items, count, action, state, options.popup.disabled,
                               options.popup.dt, options.keep_open_checks);
-    state->row_height = theme->control_height;
-    state->padding = theme->padding;
+    cui_choice_menu_retain_metrics(state, cui_choice_menu_metrics(theme, options));
     if (state->overlay.open)
         cui_choice_menu_level(ui, theme, items, count, state, 0, state->anchor, options, name);
     return activated;
@@ -3608,8 +3734,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
         cui_end_box(ui);
     }
     cui_end_box(ui);
-    state->row_height = theme->control_height;
-    state->padding = theme->padding;
+    cui_choice_menu_retain_metrics(state, cui_choice_menu_metrics(theme, options.menu));
     if (options.tooltip_id && options.tooltip_state) {
         cui_hover_options tooltip = options.tooltip_options;
         tooltip.trigger = action_id;

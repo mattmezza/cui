@@ -5453,6 +5453,9 @@ typedef struct {
     cui_id id;
     cui_rect *retained;
 } cui_core_bounds_track;
+typedef struct {
+    float size, line_height;
+} cui_core_text_style;
 struct cui_context {
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
         previous_focus_scopes[CUI_CORE_STACK_MAX];
@@ -5463,6 +5466,8 @@ struct cui_context {
     void *arena;
     Clay__ScrollContainerDataInternal *clip_containers;
     cui_config config;
+    cui_core_text_style *text_styles;
+    size_t text_style_count, text_style_capacity;
     cui_draw_command *commands;
     size_t count;
     cui_core_box_node *nodes;
@@ -5518,7 +5523,7 @@ static bool cui_core_active(cui_context *ui) {
 cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
     if (!ui || (!text.data && text.length) || !isfinite(size) || size <= 0)
         return (cui_size){0};
-    size = size > 65535 ? 65535 : (float)(uint16_t)size;
+    size = fminf(size, 65535);
     cui_size result = ui->config.measure ? ui->config.measure(ui->config.measure_user, text, size)
                                          : (cui_size){text.length * size * .6f, size * 1.3f};
     if (!isfinite(result.width) || !isfinite(result.height) || result.width < 0 ||
@@ -5527,8 +5532,12 @@ cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
     return result;
 }
 static Clay_Dimensions cui_core_measure(Clay_StringSlice s, Clay_TextElementConfig *c, void *u) {
-    cui_size z = cui_measure_text(u, (cui_str){s.chars, (size_t)s.length}, c->fontSize);
-    return (Clay_Dimensions){z.width, z.height};
+    cui_context *ui = u;
+    cui_core_text_style style = c->fontId && c->fontId <= ui->text_style_count
+                                    ? ui->text_styles[c->fontId - 1]
+                                    : (cui_core_text_style){c->fontSize, 0};
+    cui_size z = cui_measure_text(ui, (cui_str){s.chars, (size_t)s.length}, style.size);
+    return (Clay_Dimensions){z.width, style.line_height > 0 ? style.line_height : z.height};
 }
 
 static void cui_core_clay_error(Clay_ErrorData e) {
@@ -5616,6 +5625,8 @@ cui_context *cui_create(cui_config config) {
     ui->config = config;
     ui->dirty = true;
     ui->top_modal = ui->previous_top_modal = SIZE_MAX;
+    ui->text_style_capacity = config.max_elements > 32767 ? 65535 : config.max_elements * 2;
+    ui->text_styles = calloc(ui->text_style_capacity, sizeof(*ui->text_styles));
     ui->commands = calloc(config.max_commands, sizeof(*ui->commands));
     ui->semantics = calloc(config.max_elements, sizeof(*ui->semantics));
     ui->previous = calloc(config.max_elements, sizeof(*ui->previous));
@@ -5638,10 +5649,10 @@ cui_context *cui_create(cui_config config) {
     Clay_SetMaxElementCount((int32_t)(config.max_elements * 2 + 32));
     size_t n = Clay_MinMemorySize();
     ui->arena = malloc(n);
-    if (!ui->commands || !ui->semantics || !ui->previous || !ui->ids || !ui->activations ||
-        !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings || !ui->nodes ||
-        !ui->semantic_nodes || !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers ||
-        !ui->clip_containers || !ui->arena) {
+    if (!ui->text_styles || !ui->commands || !ui->semantics || !ui->previous || !ui->ids ||
+        !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes || !ui->strings ||
+        !ui->nodes || !ui->semantic_nodes || !ui->previous_hits || !ui->bounds_tracks ||
+        !ui->previous_layers || !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -5671,6 +5682,7 @@ void cui_destroy(cui_context *ui) {
         Clay_SetCurrentContext(NULL);
     free(ui->semantic_scopes);
     free(ui->previous_semantic_scopes);
+    free(ui->text_styles);
     free(ui->nodes);
     free(ui->bounds_tracks);
     free(ui->semantic_nodes);
@@ -5965,6 +5977,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     /* CUI does not retain Clay scroll positions. Start registrations afresh so
      * changing every clipped ID cannot temporarily consume two frames' budget. */
     ui->clay->scrollContainerDatas.length = 0;
+    /* IDs are stable while cached. Reclaim old style generations only between
+     * frames, before Clay stores any references into its measurement cache. */
+    if (ui->text_style_count > ui->text_style_capacity / 2) {
+        Clay_ResetMeasureTextCache();
+        ui->text_style_count = 0;
+    }
     Clay_BeginLayout();
     ui->config.width = w;
     ui->config.height = h;
@@ -6216,6 +6234,17 @@ static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
     ui->string_used += s.length + 1;
     return (cui_str){p, s.length};
 }
+static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_height) {
+    for (size_t i = 0; i < ui->text_style_count; i++)
+        if (ui->text_styles[i].size == size && ui->text_styles[i].line_height == line_height)
+            return (uint16_t)(i + 1);
+    if (ui->text_style_count == ui->text_style_capacity) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return 0;
+    }
+    ui->text_styles[ui->text_style_count++] = (cui_core_text_style){size, line_height};
+    return (uint16_t)ui->text_style_count;
+}
 void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
                                float line_height) {
     if (!cui_core_active(ui))
@@ -6226,6 +6255,12 @@ void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
         return;
     }
+    size = isfinite(size) ? fminf(65535, fmaxf(0, size)) : 0;
+    line_height = isfinite(line_height) ? fminf(65535, fmaxf(0, line_height)) : 0;
+    bool fractional = size != floorf(size) || line_height != floorf(line_height);
+    uint16_t style = fractional ? cui_core_text_style_id(ui, size, line_height) : 0;
+    if (fractional && !style)
+        return;
     ui->element_count++;
     t = cui_core_copy_string(ui, t);
     Clay__OpenTextElement(
@@ -6234,7 +6269,8 @@ void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color
                                              : ui->depth ? &ui->nodes[ui->node_stack[ui->depth - 1]]
                                                          : NULL,
                                  .fontSize = cui_core_scalar(size),
-                                 .lineHeight = cui_core_scalar(line_height),
+                                 .fontId = style,
+                                 .lineHeight = style ? 0 : cui_core_scalar(line_height),
                                  .textColor = {c.r, c.g, c.b, c.a}});
 }
 void cui_text(cui_context *ui, cui_str text, float size, cui_color color) {
@@ -6467,6 +6503,14 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.text = (cui_str){c->renderData.text.stringContents.chars,
                                (size_t)c->renderData.text.stringContents.length};
             d.font_size = c->renderData.text.fontSize;
+            if (c->renderData.text.fontId && c->renderData.text.fontId <= ui->text_style_count) {
+                cui_core_text_style style = ui->text_styles[c->renderData.text.fontId - 1];
+                d.font_size = style.size;
+                if (style.line_height > 0) {
+                    float natural = cui_measure_text(ui, d.text, style.size).height;
+                    d.bounds.y += (style.line_height - natural) * .5f;
+                }
+            }
             d.color = cui_core_color(c->renderData.text.textColor);
             break;
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START:

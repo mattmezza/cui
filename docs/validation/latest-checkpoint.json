@@ -1,8 +1,8 @@
 {
   "source": "a5d5f23",
-  "published_source": "d552763b35a9efd915a59834c70688d81d982bba",
+  "published_source": "0cbfcbbf3f5037a3869348b58362edd79f51d5ba",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local 75-story WASM gallery passes full Chromium interactions and quality checks, including the native-regression-backed Command separator ID fix and real TextView story. Published site remains d552763 with74 stories pending deployment. Full78-entry parity remains unfinished.",
+  "summary": "Public0cbfcbb deployed successfully and passed full HTTPS75-story browser suite, including real TextView and Command two-Escape regression. New Chart and TextView source fidelity updates remain local. Full78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -40,12 +40,12 @@
     "reason": "Carousel loop navigation failed in hosted Chromium. Arrow clicks erroneously started a slide drag; fixed in 18d3c6d with a failing-before/passing-after headless regression. Full browser revalidation now passes.",
     "run": 38273904793
   },
-  "published_evidence": "published-d552763.txt",
+  "published_evidence": "published-0cbfcbb.txt",
   "deployment": {
-    "source": "d552763b35a9efd915a59834c70688d81d982bba",
+    "source": "0cbfcbbf3f5037a3869348b58362edd79f51d5ba",
     "status": "success",
-    "pages_run": 38279129813,
-    "ci_run": 38279129759
+    "pages_run": 38281971609,
+    "ci_run": 38281971637
   },
   "targeted_checks": [
     {

@@ -289,7 +289,68 @@ static void test_invalid_and_limits(void) {
     assert(!cui_bitmap_valid(cui_icon_state_bitmap(&state)));
     cui_icon_state_destroy(&state);
 }
+static cui_bitmap first_image(cui_draw_list draw) {
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE)
+            return draw.commands[i].bitmap.bitmap;
+    return (cui_bitmap){0};
+}
+static void test_context_convenience(void) {
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
+    cui_theme theme = cui_theme_light();
+    assert(ui && cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_icon_named(ui, 1, &theme, cui_string("chevron-down"), (cui_icon_options){0}) ==
+           CUI_ICON_OK);
+    cui_bitmap first = first_image(cui_end_frame(ui));
+    assert(cui_bitmap_valid(first) && covered(first));
+    assert(cui_begin_frame(ui, 100, 100, .1f));
+    assert(cui_icon_named(ui, 1, &theme, cui_string("icons/chevron-down.svg"),
+                          (cui_icon_options){.custom_color = true, .color = {1, 2, 3, 4}}) ==
+           CUI_ICON_OK);
+    assert(first_image(cui_end_frame(ui)).pixels == first.pixels);
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_icon_named(ui, 1, &theme, cui_string("chevron-right"), (cui_icon_options){0}) ==
+           CUI_ICON_OK);
+    cui_bitmap changed = first_image(cui_end_frame(ui));
+    assert(cui_bitmap_valid(changed) && changed.pixels != first.pixels && covered(first));
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_icon_named(ui, 2, &theme, cui_string("missing"), (cui_icon_options){0}) ==
+           CUI_ICON_NOT_FOUND);
+    cui_end_frame(ui);
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_icon_spinner(ui, 3, &theme, (cui_icon_options){0}) == CUI_ICON_OK);
+    first = first_image(cui_end_frame(ui));
+    unsigned char original[16 * 16 * 4];
+    assert(first.width == 16 && first.height == 16);
+    memcpy(original, first.pixels, sizeof(original));
+    assert(cui_needs_redraw(ui));
+    assert(cui_begin_frame(ui, 100, 100, .2f));
+    assert(cui_icon_spinner(ui, 3, &theme, (cui_icon_options){0}) == CUI_ICON_OK);
+    changed = first_image(cui_end_frame(ui));
+    /* Quarter phase eases to one eighth turn; paint expands but layout is stable. */
+    assert(changed.width >= 22 && changed.height >= 22 && cui_bounds(ui, 3).w == 16);
+    cui_set_reduced_motion(ui, true);
+    assert(cui_begin_frame(ui, 100, 100, .2f));
+    assert(cui_icon_spinner(ui, 3, &theme, (cui_icon_options){0}) == CUI_ICON_OK);
+    first = first_image(cui_end_frame(ui));
+    assert(first.width == 16 && !memcmp(first.pixels, original, sizeof(original)));
+    assert(!cui_needs_redraw(ui));
+    assert(cui_begin_frame(ui, 100, 100, .2f));
+    assert(cui_icon_spinner(ui, 3, &theme, (cui_icon_options){0}) == CUI_ICON_OK);
+    assert(first_image(cui_end_frame(ui)).pixels == first.pixels && !cui_needs_redraw(ui));
+    cui_destroy(ui);
+    ui = cui_create((cui_config){.width = 100, .height = 100, .max_resources = 1});
+    assert(ui && cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_icon_named(ui, 1, &theme, cui_string("check"), (cui_icon_options){0}) ==
+           CUI_ICON_OK);
+    assert(cui_icon_named(ui, 2, &theme, cui_string("check"), (cui_icon_options){0}) !=
+           CUI_ICON_OK);
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_context_convenience();
     test_assets();
     test_source_and_raster();
     test_loader();

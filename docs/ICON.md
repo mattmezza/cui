@@ -107,3 +107,19 @@ size precedence, tint/opacity cache reuse, host reload/fallback, source replacem
 and borrowed draw lifetimes. Both default and full-catalog configurations parse and
 rasterize every embedded asset. Build-system, amalgamation and adapter wiring are
 maintained by the integrator.
+
+## Context-owned convenience icons
+
+`cui_icon_named(ui, id, theme, name_or_path, options)` uses a bounded context
+resource instead of caller-owned state. Equivalent name/path spellings retain the
+same source and raster. `cui_icon_spinner` renders Loader with a repeating
+0.8-second quadratic ease-in-out rotation; zero options use Medium size. Its clock
+starts on first appearance and resets after absence for a complete frame. The
+spinner overrides the paint transform, retains layout dimensions and requests
+redraw while active. Host reduced motion makes it static and stops those requests.
+
+Convenience resources use a 1 MiB/four-version raster cache budget per widget,
+subject to the context's resource count and payload budget. Finish rendering before
+`cui_begin_frame`: that call collects retired masks and eventually destroys omitted
+widgets. Context destruction releases all caches. Source/raster preparation errors
+are returned; context resource exhaustion also reports `CUI_ERROR_CAPACITY`.

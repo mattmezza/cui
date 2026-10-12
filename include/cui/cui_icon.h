@@ -80,6 +80,13 @@ typedef struct {
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
 cui_icon_error cui_icon(cui_context *, cui_id, const cui_theme *, cui_icon_state *,
                         cui_icon_options);
+/* Context-owned convenience cache; accepts catalog names or paths. Its masks
+ * expire at the next begin_frame, matching the core draw-list borrow lifetime. */
+cui_icon_error cui_icon_named(cui_context *, cui_id, const cui_theme *, cui_str name,
+                              cui_icon_options);
+/* Source Loader, .8-second quadratic rotation; zero options use Medium size.
+ * Reduced motion paints a static icon and does not request animation frames. */
+cui_icon_error cui_icon_spinner(cui_context *, cui_id, const cui_theme *, cui_icon_options);
 #ifdef __cplusplus
 }
 #endif

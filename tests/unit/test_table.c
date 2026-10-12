@@ -3,6 +3,19 @@
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
+static void defaults(void) {
+    cui_table_model *m = cui_table_create(1);
+    cui_table_row row = {.key = 1};
+    cui_table_column col = cui_table_column_default(10, cui_string("Value"));
+    cui_table_options options = cui_table_options_default();
+    assert(col.width == 100 && col.minimum == 20 && col.resizable && col.movable && !col.sortable &&
+           !col.disabled && col.align == CUI_TABLE_ALIGN_LEFT);
+    assert(options.bordered && options.scrollbars && !options.striped &&
+           options.selection_mode == CUI_TABLE_SELECT_ROW);
+    assert(cui_table_bind(m, &row, 1, &col, 1) == CUI_TABLE_OK);
+    assert(cui_table_resize(m, 10, 1) && col.width == 20);
+    cui_table_destroy(m);
+}
 static void models(void) {
     assert(!cui_table_create(SIZE_MAX));
     cui_table_model *m = cui_table_create(10000);
@@ -814,6 +827,7 @@ static void virtual_scene(void) {
 }
 #endif
 int main(void) {
+    defaults();
     models();
     spans();
     columns_and_loading();

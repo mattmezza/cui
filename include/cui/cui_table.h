@@ -24,6 +24,8 @@ typedef struct {
     bool sortable, resizable, movable, disabled, fixed_left;
     cui_table_align align;
 } cui_table_column;
+/* Reference defaults; zero-initialized structs remain supported. */
+cui_table_column cui_table_column_default(cui_id key, cui_str label);
 typedef enum {
     CUI_TABLE_SORT_DEFAULT,
     CUI_TABLE_SORT_ASCENDING,
@@ -116,6 +118,7 @@ typedef struct {
     void *render_userdata;
     cui_table_selection_mode selection_mode;
 } cui_table_options;
+cui_table_options cui_table_options_default(void);
 typedef struct {
     bool selection_changed, sort_changed, columns_changed;
     bool visible_rows_changed, visible_columns_changed, load_more, context_requested;

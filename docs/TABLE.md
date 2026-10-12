@@ -10,6 +10,8 @@ portable C11 public types and independent base behavior.
 begin requires a matching end. These register passive table, row and cell roles;
 callers can set semantic parent and descriptive details using core setters. Head-cell, header/body/footer section and caption helpers preserve that composition. Validated cell-span helpers sum explicit column widths; failed validation does not begin a box. Callers place captions after their sections and provide accessible head-cell names. There are no implicit data cell labels.
 
+`cui_table_column_default(key, label)` supplies a 100-pixel, resizable, movable column with a 20-pixel minimum and optional sorting disabled. `cui_table_options_default()` enables border and scrollbars with row selection and no stripes, matching the supported reference defaults. Zero initialization remains available for applications choosing their own configuration. Widths remain bounded by CUI's 65,536-pixel safety limit.
+
 Create `cui_table_model` with a bounded row capacity, then bind borrowed rows and
 mutable columns. Rows and columns need nonzero unique keys within each dimension.
 Binding rejects invalid labels, duplicate keys, excessive counts, invalid widths

@@ -10,6 +10,18 @@ struct cui_table_model {
     cui_id *keys[2];
     size_t *indices[2];
 };
+cui_table_column cui_table_column_default(cui_id key, cui_str label) {
+    return (cui_table_column){.key = key,
+                              .label = label,
+                              .width = 100,
+                              .minimum = 20,
+                              .resizable = true,
+                              .movable = true};
+}
+cui_table_options cui_table_options_default(void) {
+    return (cui_table_options){
+        .bordered = true, .scrollbars = true, .selection_mode = CUI_TABLE_SELECT_ROW};
+}
 static uint64_t mix(uint64_t x) {
     x ^= x >> 30;
     x *= UINT64_C(0xbf58476d1ce4e5b9);

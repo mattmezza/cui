@@ -466,7 +466,10 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                      .zIndex = layer,
                      .attachTo = portal ? CLAY_ATTACH_TO_ROOT : CLAY_ATTACH_TO_NONE,
                      .clipTo = CLAY_CLIP_TO_NONE},
-        .clip = {.horizontal = b.clip, .vertical = b.clip},
+        .clip = {.horizontal = b.clip,
+                 .vertical = b.clip,
+                 .childOffset = {isfinite(b.offset_x) ? b.offset_x : 0,
+                                 isfinite(b.offset_y) ? b.offset_y : 0}},
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a},
                    .width = {bw, bw, bw, bw, 0}}});
 }

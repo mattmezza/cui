@@ -610,9 +610,51 @@ static void test_secondary_pointer(void) {
     cui_destroy(ui);
 }
 
+static void offset_scene(cui_context *ui) {
+    cui_begin_box(
+        ui, 10,
+        (cui_box){.width = 80, .height = 50, .clip = true, .offset_x = -10, .offset_y = -15});
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_box(ui);
+}
+static void test_clipped_child_translation(void) {
+    cui_context *ui = make();
+    begin(ui);
+    offset_scene(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    cui_rect first = cui_bounds(ui, 1), second = cui_bounds(ui, 2);
+    assert(first.x == -10 && first.y == -15 && second.x == -10 && second.y == 15);
+    bool clip = false, painted = false;
+    for (size_t i = 0; i < list.count; ++i) {
+        if (list.commands[i].type == CUI_DRAW_CLIP_PUSH) {
+            clip = true;
+            assert(list.commands[i].bounds.w == 80 && list.commands[i].bounds.h == 50);
+        }
+        if (list.commands[i].type == CUI_DRAW_RECT && list.commands[i].bounds.y == -15)
+            painted = true;
+    }
+    assert(clip && painted);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 25, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 2);
+    offset_scene(ui);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_CANCEL, 0, 0, 0, 0);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 85, 25, 0, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 1) ==
+           0); /* Shifted child exists beyond viewport, hit is clipped. */
+    offset_scene(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
     test_menu_check_radio_roles();
     test_secondary_pointer();
+    test_clipped_child_translation();
     test_input();
     test_strings_and_draw();
     test_contexts_errors();

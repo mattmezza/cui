@@ -124,6 +124,7 @@ typedef struct {
     cui_color background, border;
     float border_width;
     cui_align align_x, align_y;
+    float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
 } cui_box;
 typedef enum {
     CUI_DRAW_RECT,

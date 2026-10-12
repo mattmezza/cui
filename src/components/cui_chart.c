@@ -122,6 +122,7 @@ cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_char
         if (nodes[i].layer > last_layer)
             last_layer = nodes[i].layer;
     float gap = o->sankey_label_gap > 0 ? o->sankey_label_gap : 6;
+    bool has_content = false;
     for (size_t i = 0; i < o->count; i++) {
         float width = 0, block_height = 0;
         if (o->sankey_label_measure) {
@@ -146,6 +147,7 @@ cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_char
         }
         if (width == 0 && block_height == 0)
             continue;
+        has_content = true;
         if (!isfinite(width) || width < 0)
             return CUI_PLOT_INVALID;
         if (nodes[i].layer == 0)
@@ -154,6 +156,10 @@ cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_char
             measured.right = fmaxf(measured.right, width + gap);
         else
             measured.top = fmaxf(measured.top, block_height + 2);
+    }
+    if (!has_content) {
+        *out = (cui_chart_sankey_margins){0};
+        return CUI_PLOT_OK;
     }
     measured.left = fminf(measured.left, o->width * .2f);
     measured.right = fminf(measured.right, o->width * .2f);

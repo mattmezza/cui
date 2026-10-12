@@ -169,14 +169,16 @@ static cui_size custom_tooltip_measure(cui_context *ui, size_t index, const cui_
 }
 typedef struct {
     size_t measured, painted;
-    bool invalid;
+    bool invalid, empty;
 } sankey_content_calls;
 static cui_size sankey_content_measure(cui_context *ui, const cui_chart_datum *datum, size_t index,
                                        double throughput, void *user) {
     sankey_content_calls *calls = user;
     assert(ui && datum && index < 3 && throughput >= 0);
     calls->measured++;
-    return calls->invalid ? (cui_size){NAN, 40} : (cui_size){40, 40};
+    return calls->invalid ? (cui_size){NAN, 40}
+           : calls->empty ? (cui_size){0, 0}
+                          : (cui_size){40, 40};
 }
 static void sankey_content_paint(cui_context *ui, cui_id id, const cui_chart_datum *datum,
                                  size_t index, double throughput, void *user) {
@@ -1430,6 +1432,11 @@ int main(void) {
     assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_INVALID);
     assert(memcmp(&unchanged, &custom_margins, sizeof unchanged) == 0);
     content_calls.invalid = false;
+    content_calls.empty = true;
+    assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_OK);
+    assert(custom_margins.left == 0 && custom_margins.right == 0 && custom_margins.top == 0 &&
+           custom_margins.bottom == 0);
+    content_calls.empty = false;
     options.sankey_label_paint = NULL;
     assert(cui_chart_measure_sankey_margins(ui, &options, &custom_margins) == CUI_PLOT_INVALID);
     options.sankey_label_measure = NULL;

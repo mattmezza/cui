@@ -40,6 +40,7 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
         !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
         o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
+        !isfinite(o->sankey_min_link_width) || o->sankey_min_link_width < 0 ||
         (o->reference_count && !o->reference_values) ||
         (o->point_count && (o->point_count < o->count || o->point_count > 1000000)) ||
         !isfinite(o->logical_width) || !isfinite(o->logical_height) || o->logical_width < 0 ||
@@ -658,7 +659,8 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         o->sankey_align < CUI_CHART_SANKEY_JUSTIFY || o->sankey_align > CUI_CHART_SANKEY_CENTER ||
         !o->width || !o->height || o->width > 4096 || o->height > 4096 ||
         !isfinite(o->node_width) || !isfinite(o->node_padding) || o->node_width < 0 ||
-        o->node_padding < 0 || o->sankey_iterations > 100)
+        o->node_padding < 0 || o->sankey_iterations > 100 || !isfinite(o->sankey_min_link_width) ||
+        o->sankey_min_link_width < 0)
         return CUI_PLOT_INVALID;
     if (capacity < o->count)
         return CUI_PLOT_CAPACITY;
@@ -842,31 +844,89 @@ static void cui_chart_sankey_relax(const cui_chart_options *o, cui_chart_sankey_
             }
     }
 }
+cui_plot_result cui_chart_sankey_link_bounds(const cui_chart_options *o,
+                                             const cui_chart_sankey_node *nodes,
+                                             cui_chart_sankey_link_geometry *out, size_t capacity) {
+    if (!o || o->kind != CUI_CHART_SANKEY || !o->data || !nodes || !out || !o->count ||
+        o->count > 256 || o->link_count > 1024 || (o->link_count && !o->links))
+        return CUI_PLOT_INVALID;
+    if (capacity < o->link_count)
+        return CUI_PLOT_CAPACITY;
+    long double outgoing[256] = {0}, incoming[256] = {0};
+    for (size_t i = 0; i < o->count; i++)
+        if (!isfinite(nodes[i].y0) || !isfinite(nodes[i].y1) || nodes[i].y0 > nodes[i].y1)
+            return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < o->link_count; i++) {
+        const cui_chart_link *link = &o->links[i];
+        if (link->source >= o->count || link->target >= o->count || !isfinite(link->value) ||
+            link->value < 0)
+            return CUI_PLOT_INVALID;
+        outgoing[link->source] += link->value;
+        incoming[link->target] += link->value;
+    }
+    size_t source_order[1024], target_order[1024];
+    cui_chart_sankey_link_geometry geometry[1024] = {{0}};
+    for (size_t i = 0; i < o->link_count; i++) {
+        size_t j = i;
+        while (j &&
+               (o->links[source_order[j - 1]].source > o->links[i].source ||
+                (o->links[source_order[j - 1]].source == o->links[i].source &&
+                 nodes[o->links[source_order[j - 1]].target].y0 > nodes[o->links[i].target].y0))) {
+            source_order[j] = source_order[j - 1];
+            j--;
+        }
+        source_order[j] = i;
+        j = i;
+        while (j &&
+               (o->links[target_order[j - 1]].target > o->links[i].target ||
+                (o->links[target_order[j - 1]].target == o->links[i].target &&
+                 nodes[o->links[target_order[j - 1]].source].y0 > nodes[o->links[i].source].y0))) {
+            target_order[j] = target_order[j - 1];
+            j--;
+        }
+        target_order[j] = i;
+    }
+    double used[256] = {0};
+    for (size_t order = 0; order < o->link_count; order++) {
+        size_t i = source_order[order], source = o->links[i].source;
+        double height = nodes[source].y1 - nodes[source].y0;
+        double width =
+            outgoing[source] > 0 ? (double)(o->links[i].value / outgoing[source]) * height : 0;
+        geometry[i].source_width = (float)width;
+        geometry[i].source_y = (float)(nodes[source].y0 + used[source] + width / 2);
+        used[source] += width;
+    }
+    memset(used, 0, sizeof used);
+    for (size_t order = 0; order < o->link_count; order++) {
+        size_t i = target_order[order], target = o->links[i].target;
+        double height = nodes[target].y1 - nodes[target].y0;
+        double width =
+            incoming[target] > 0 ? (double)(o->links[i].value / incoming[target]) * height : 0;
+        geometry[i].target_width = (float)width;
+        geometry[i].target_y = (float)(nodes[target].y0 + used[target] + width / 2);
+        used[target] += width;
+    }
+    memcpy(out, geometry, o->link_count * sizeof(*out));
+    return CUI_PLOT_OK;
+}
 static void cui_chart_sankey(cui_chart_state *s, const cui_chart_options *o,
-                             const cui_chart_sankey_node *nodes) {
-    double source_used[256] = {0}, target_used[256] = {0};
+                             const cui_chart_sankey_node *nodes,
+                             const cui_chart_sankey_link_geometry *geometry) {
     for (size_t i = 0; i < o->link_count; i++) {
         const cui_chart_link *link = &o->links[i];
         size_t source = link->source, target = link->target;
-        double source_scale = nodes[source].throughput > 0
-                                  ? (nodes[source].y1 - nodes[source].y0) / nodes[source].throughput
-                                  : 0;
-        double target_scale = nodes[target].throughput > 0
-                                  ? (nodes[target].y1 - nodes[target].y0) / nodes[target].throughput
-                                  : 0;
-        double start_y = nodes[source].y0 + source_used[source] * source_scale;
-        double end_y = nodes[target].y0 + target_used[target] * target_scale;
-        double start_w = link->value * source_scale, end_w = link->value * target_scale;
-        source_used[source] += link->value;
-        target_used[target] += link->value;
+        double start_y = geometry[i].source_y, end_y = geometry[i].target_y;
+        double min_width = o->sankey_min_link_width > 0 ? o->sankey_min_link_width : 1;
+        double start_w = fmax(geometry[i].source_width, min_width);
+        double end_w = fmax(geometry[i].target_width, min_width);
         double x0 = nodes[source].x1, x1 = nodes[target].x0;
         if (x1 <= x0)
             continue;
         cui_color color = link->color.a ? link->color : cui_chart_palette(o, source);
         color.a = (unsigned char)(color.a / 2);
         for (int x = (int)ceil(x0); x < (int)x1; x++) {
-            double t = (x - x0) / (x1 - x0),
-                   center = (1 - t) * (start_y + start_w / 2) + t * (end_y + end_w / 2);
+            double t = (x - x0) / (x1 - x0), smooth = t * t * (3 - 2 * t),
+                   center = (1 - smooth) * start_y + smooth * end_y;
             double half = ((1 - t) * start_w + t * end_w) / 2;
             cui_chart_rect(s, o, x, (int)floor(center - half), x + 1, (int)ceil(center + half),
                            color);
@@ -908,6 +968,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, o->show_dots);
     h = cui_chart_mix(h, o->sankey_align);
     h = cui_chart_mix(h, o->sankey_iterations);
+    h = cui_chart_mix(h, cui_chart_bits(o->sankey_min_link_width));
     h = cui_chart_mix(h, o->hide_grid);
     h = cui_chart_mix(h, o->hide_axes);
     h = cui_chart_mix(h, o->hide_x_axis);
@@ -950,8 +1011,12 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
     if (status != CUI_PLOT_OK)
         return status;
     cui_chart_sankey_node nodes[256];
+    cui_chart_sankey_link_geometry link_geometry[1024];
     if (o->kind == CUI_CHART_SANKEY) {
         status = cui_chart_sankey_layout(o, nodes, 256);
+        if (status != CUI_PLOT_OK)
+            return status;
+        status = cui_chart_sankey_link_bounds(o, nodes, link_geometry, 1024);
         if (status != CUI_PLOT_OK)
             return status;
     }
@@ -971,7 +1036,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
     else if (o->kind == CUI_CHART_RADAR)
         cui_chart_radar(s, o);
     else if (o->kind == CUI_CHART_SANKEY)
-        cui_chart_sankey(s, o, nodes);
+        cui_chart_sankey(s, o, nodes, link_geometry);
     s->hovered = SIZE_MAX;
     s->hovered_value = 0;
     s->revision++;

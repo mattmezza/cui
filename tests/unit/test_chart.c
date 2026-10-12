@@ -77,6 +77,19 @@ int main(void) {
            nodes[3].throughput == 10);
     assert(nodes[0].x1 < nodes[1].x0 && nodes[1].x1 < nodes[2].x0);
     assert(nodes[2].y1 <= nodes[3].y0);
+    cui_chart_link reversed_links[] = {{0, 1, 40, {0}}, {1, 3, 10, {0}}, {1, 2, 20, {0}}};
+    cui_chart_options reordered = flow_options;
+    reordered.links = reversed_links;
+    assert(cui_chart_sankey_layout(&reordered, nodes, 4) == CUI_PLOT_OK);
+    cui_chart_sankey_link_geometry ribbons[3] = {{0}};
+    assert(cui_chart_sankey_link_bounds(&reordered, nodes, ribbons, 2) == CUI_PLOT_CAPACITY);
+    assert(ribbons[0].source_width == 0);
+    assert(cui_chart_sankey_link_bounds(&reordered, nodes, ribbons, 3) == CUI_PLOT_OK);
+    assert(ribbons[2].source_y < ribbons[1].source_y);
+    assert(fabs((ribbons[1].source_width + ribbons[2].source_width) - (nodes[1].y1 - nodes[1].y0)) <
+           .01);
+    assert(fabs(ribbons[0].target_width - (nodes[1].y1 - nodes[1].y0)) < .01);
+    assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
     cui_chart_hit node_hit = cui_chart_hit_test(&flow_options, (nodes[1].x0 + nodes[1].x1) / 4,
                                                 (nodes[1].y0 + nodes[1].y1) / 4);
     assert(node_hit.valid && node_hit.hovered == 1 && node_hit.value == 30);

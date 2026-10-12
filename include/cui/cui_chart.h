@@ -38,6 +38,9 @@ typedef struct {
     float x0, y0, x1, y1;
 } cui_chart_sankey_node;
 typedef struct {
+    float source_y, target_y, source_width, target_width;
+} cui_chart_sankey_link_geometry;
+typedef struct {
     cui_plot_rect wick, body;
     bool bullish;
 } cui_chart_candle_geometry;
@@ -101,6 +104,7 @@ typedef struct {
     double radar_max_value, radar_outer_radius; /* zero selects source defaults */
     cui_chart_sankey_align sankey_align;
     unsigned sankey_iterations;     /* zero selects six relaxation passes; maximum 100 */
+    float sankey_min_link_width;    /* zero selects source 1px */
     float node_width, node_padding; /* zero means 10 and 16 */
     cui_color background, foreground, grid, series[8], bullish, bearish;
 } cui_chart_options;
@@ -128,6 +132,9 @@ cui_plot_result cui_chart_candle_bounds(const cui_chart_options *, size_t index,
 /* Caller-owned output; computes acyclic topology and proportional node bounds atomically. */
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *, cui_chart_sankey_node *,
                                         size_t capacity);
+cui_plot_result cui_chart_sankey_link_bounds(const cui_chart_options *,
+                                             const cui_chart_sankey_node *nodes,
+                                             cui_chart_sankey_link_geometry *, size_t capacity);
 /* Read-only hit geometry over a successfully rendered chart. */
 cui_chart_hit cui_chart_hit_test(const cui_chart_options *, float x, float y);
 /* Draws the caller-owned bitmap, labels and a named image semantic. Render first. */

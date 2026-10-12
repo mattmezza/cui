@@ -191,6 +191,36 @@ cui_table_view cui_table_viewport(const cui_table_model *m, float scroll, float 
     v.after = (float)(m->count - v.end) * row;
     return v;
 }
+cui_table_view cui_table_column_viewport(const cui_table_model *m, float scroll, float width,
+                                         size_t over) {
+    cui_table_view v = {0};
+    if (!m)
+        return v;
+    width = isfinite(width) && width > 0 ? width : 480;
+    for (size_t c = 0; c < m->columns; c++)
+        v.total += m->cols[c].width;
+    v.scroll = isfinite(scroll) ? fmaxf(0, fminf(scroll, fmaxf(0, v.total - width))) : 0;
+    size_t first = 0, last = 0;
+    float x = 0;
+    for (size_t c = 0; c < m->columns; c++) {
+        float end = x + m->cols[c].width;
+        if (end <= v.scroll)
+            first = c + 1;
+        if (x < v.scroll + width)
+            last = c + 1;
+        x = end;
+    }
+    v.begin = first > over ? first - over : 0;
+    v.end = over > m->columns - last ? m->columns : last + over;
+    x = 0;
+    for (size_t c = 0; c < m->columns; c++) {
+        if (c < v.begin)
+            v.before += m->cols[c].width;
+        if (c >= v.end)
+            v.after += m->cols[c].width;
+    }
+    return v;
+}
 static void select(cui_table_state *s, cui_table_options o, cui_id row, cui_id col) {
     s->row = o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : row;
     s->column = o.selection_mode == CUI_TABLE_SELECT_ROW ? 0 : col;
@@ -384,13 +414,16 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
             }
         }
         if (ev[e].type == CUI_EVENT_SCROLL && isfinite(ev[e].dy) &&
-            cui_hovered(ui, cui_table_body_id(id))) {
+            target == cui_table_body_id(id)) {
             s->scroll_y -= ev[e].dy;
             if (isfinite(ev[e].dx))
                 s->scroll_x -= ev[e].dx;
         }
     }
     float total = 0;
+    for (size_t e = 0; e < count && !o.disabled; e++)
+        if (ev[e].type == CUI_EVENT_SCROLL && cui_event_target(ui, e) == id && isfinite(ev[e].dx))
+            s->scroll_x -= ev[e].dx;
     for (size_t p = 0; p < m->columns; p++)
         total += m->cols[p].width;
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
@@ -414,28 +447,55 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         }
     }
     s->scroll_y = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), o.overscan).scroll;
+    out.rows = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), 0);
+    out.columns = cui_table_column_viewport(m, s->scroll_x, width, 0);
+    out.visible_rows_changed = !s->viewport_initialized || s->visible_begin != out.rows.begin ||
+                               s->visible_end != out.rows.end;
+    out.visible_columns_changed = !s->viewport_initialized ||
+                                  s->column_begin != out.columns.begin ||
+                                  s->column_end != out.columns.end;
+    bool near = m->count - out.rows.end <= o.load_more_threshold;
+    if (!near || s->previous_row_count != m->count || !o.load_more)
+        s->load_pending = false;
+    out.load_more = o.load_more && !o.disabled && near && !s->load_pending;
+    if (out.load_more)
+        s->load_pending = true;
+    s->viewport_initialized = true;
+    s->visible_begin = out.rows.begin;
+    s->visible_end = out.rows.end;
+    s->column_begin = out.columns.begin;
+    s->column_end = out.columns.end;
+    s->previous_row_count = m->count;
     out.selection_changed = oldrow != s->row || oldcol != s->column;
     return out;
 }
-void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_table_options o) {
-    if (!ui || !m)
+void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
+                           cui_table_options o) {
+    if (!ui || !m || !s)
         return;
+    cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, o.width, 0);
+    float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
     cui_interact(ui, id, CUI_ROLE_GRID, cui_string("Data table"), o.disabled, false, 0);
     cui_set_tab_stop(ui, id, false);
-    cui_set_semantic_details(ui, id,
-                             (cui_semantic_details){.row_count = (unsigned)m->count,
-                                                    .column_count = (unsigned)m->columns});
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.row_count = (unsigned)m->count,
+                               .column_count = (unsigned)m->columns,
+                               .scrollable = true,
+                               .scroll_x = s->scroll_x,
+                               .scroll_max_x = fmaxf(0, columns.total - width)});
 }
 void cui_table_submit_header(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                              cui_table_options o) {
     if (!ui || !m || !s)
         return;
-    for (size_t c = 0; c < m->columns; c++) {
+    cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, o.width, o.column_overscan);
+    for (size_t c = columns.begin; c < columns.end; c++) {
         cui_id cid = cui_table_header_id(id, m->cols[c].key);
         bool disabled = o.disabled || m->cols[c].disabled;
         cui_interact(ui, cid, CUI_ROLE_COLUMNHEADER, m->cols[c].label, disabled, false,
                      s->sort_column == m->cols[c].key ? (float)s->sort : 0);
-        cui_set_tab_stop(ui, cid, c == 0);
+        cui_set_tab_stop(ui, cid, c == columns.begin);
         cui_set_semantic_details(
             ui, cid,
             (cui_semantic_details){.parent = id,
@@ -462,8 +522,19 @@ void cui_table_submit_body(cui_context *ui, cui_id id, cui_table_model *m, cui_t
     cui_id body = cui_table_body_id(id);
     cui_interact(ui, body, CUI_ROLE_GROUP, cui_string("Rows"), o.disabled, false, 0);
     cui_set_tab_stop(ui, body, false);
-    cui_set_semantic_details(ui, body, (cui_semantic_details){.parent = id});
+    cui_table_view allrows = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), 0);
+    cui_table_view allcols = cui_table_column_viewport(m, s->scroll_x, o.width, 0);
+    float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
+    cui_set_semantic_details(
+        ui, body,
+        (cui_semantic_details){.parent = id,
+                               .scrollable = true,
+                               .scroll_y = s->scroll_y,
+                               .scroll_x = s->scroll_x,
+                               .scroll_max_y = fmaxf(0, allrows.total - height(o)),
+                               .scroll_max_x = fmaxf(0, allcols.total - width)});
     cui_table_view v = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), o.overscan);
+    cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, o.width, o.column_overscan);
     for (size_t r = v.begin; r < v.end; r++) {
         cui_id rid = cui_table_row_id(id, m->rows[r].key);
         cui_interact(ui, rid, CUI_ROLE_ROW, m->rows[r].label, o.disabled || m->rows[r].disabled,
@@ -475,7 +546,7 @@ void cui_table_submit_body(cui_context *ui, cui_id id, cui_table_model *m, cui_t
                                    .row_index = (unsigned)r + 1,
                                    .selected = o.selection_mode == CUI_TABLE_SELECT_ROW &&
                                                s->row == m->rows[r].key});
-        for (size_t c = 0; c < m->columns; c++) {
+        for (size_t c = columns.begin; c < columns.end; c++) {
             cui_id cid = cui_table_cell_id(id, m->rows[r].key, m->cols[c].key);
             bool selected = (o.selection_mode == CUI_TABLE_SELECT_ROW ? s->row == m->rows[r].key
                              : o.selection_mode == CUI_TABLE_SELECT_COLUMN
@@ -498,7 +569,7 @@ cui_table_result cui_base_data_table(cui_context *ui, cui_id id, cui_table_model
                                      cui_table_state *s, cui_table_options o) {
     cui_table_result result = cui_table_reduce(ui, id, m, s, o);
     if (result.error == CUI_TABLE_OK) {
-        cui_table_submit_root(ui, id, m, o);
+        cui_table_submit_root(ui, id, m, s, o);
         cui_table_submit_header(ui, id, m, s, o);
         cui_table_submit_body(ui, id, m, s, o, NULL, NULL);
     }

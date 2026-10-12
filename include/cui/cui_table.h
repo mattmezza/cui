@@ -59,6 +59,8 @@ typedef struct {
 } cui_table_view;
 cui_table_view cui_table_viewport(const cui_table_model *, float scroll, float height,
                                   float row_height, size_t overscan);
+cui_table_view cui_table_column_viewport(const cui_table_model *, float scroll, float width,
+                                         size_t overscan);
 typedef struct {
     cui_id row, column; /* Controlled selection; zero means none. */
     cui_id cursor_row, cursor_column;
@@ -67,15 +69,19 @@ typedef struct {
     float scroll_x, scroll_y;
     cui_id resizing;
     float resize_x, resize_width;
+    size_t visible_begin, visible_end, column_begin, column_end, previous_row_count;
+    bool viewport_initialized, load_pending;
 } cui_table_state;
 typedef struct {
     float width, height, row_height, header_height;
-    size_t overscan;
-    bool disabled, striped, bordered, manual_selection, loop_selection;
+    size_t overscan, column_overscan, load_more_threshold;
+    bool disabled, striped, bordered, manual_selection, loop_selection, load_more;
     cui_table_selection_mode selection_mode;
 } cui_table_options;
 typedef struct {
     bool selection_changed, sort_changed, columns_changed;
+    bool visible_rows_changed, visible_columns_changed, load_more;
+    cui_table_view rows, columns;
     cui_id activated_row, activated_column;
     cui_table_error error;
 } cui_table_result;
@@ -89,7 +95,8 @@ typedef void (*cui_table_cell_fn)(cui_context *, const cui_theme *, void *, size
                                   cui_id column);
 cui_table_result cui_table_reduce(cui_context *, cui_id, cui_table_model *, cui_table_state *,
                                   cui_table_options);
-void cui_table_submit_root(cui_context *, cui_id, cui_table_model *, cui_table_options);
+void cui_table_submit_root(cui_context *, cui_id, cui_table_model *, cui_table_state *,
+                           cui_table_options);
 void cui_table_submit_header(cui_context *, cui_id, cui_table_model *, cui_table_state *,
                              cui_table_options);
 void cui_table_submit_body(cui_context *, cui_id, cui_table_model *, cui_table_state *,

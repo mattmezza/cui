@@ -41,6 +41,48 @@ static void models(void) {
     cui_table_destroy(m);
     free(rows);
 }
+static void columns_and_loading(void) {
+    cui_table_model *m = cui_table_create(20);
+    cui_table_row rows[20];
+    cui_table_column cols[100];
+    for (size_t r = 0; r < 20; r++)
+        rows[r] = (cui_table_row){.key = r + 1};
+    for (size_t c = 0; c < 100; c++)
+        cols[c] = (cui_table_column){.key = c + 1, .width = 100};
+    assert(cui_table_bind(m, rows, 10, cols, 100) == CUI_TABLE_OK);
+    cui_table_view v = cui_table_column_viewport(m, 4505, 200, 1);
+    assert(v.begin == 44 && v.end == 49 && v.before == 4400 && v.after == 5100 &&
+           v.total == 10000 && v.scroll == 4505);
+    v = cui_table_column_viewport(m, INFINITY, NAN, SIZE_MAX);
+    assert(v.begin == 0 && v.end == 100);
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    cui_table_state state = {0};
+    cui_table_options o = {
+        .width = 200, .height = 64, .row_height = 32, .load_more = true, .load_more_threshold = 1};
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    cui_table_result result = cui_table_reduce(ui, 10, m, &state, o);
+    assert(result.visible_rows_changed && result.visible_columns_changed && !result.load_more &&
+           result.rows.end == 2);
+    cui_end_frame(ui);
+    state.scroll_y = 256;
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    result = cui_table_reduce(ui, 10, m, &state, o);
+    assert(result.load_more && result.visible_rows_changed && result.rows.begin == 8);
+    cui_end_frame(ui);
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    result = cui_table_reduce(ui, 10, m, &state, o);
+    assert(!result.load_more && !result.visible_rows_changed);
+    cui_end_frame(ui);
+    assert(cui_table_bind(m, rows, 12, cols, 100) == CUI_TABLE_OK);
+    state.scroll_y = 320;
+    assert(cui_begin_frame(ui, 700, 500, .016f));
+    result = cui_table_reduce(ui, 10, m, &state, o);
+    assert(result.load_more);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
 static size_t rendered;
 static cui_str label(void *data, size_t row, cui_id column) {
     (void)data;
@@ -186,6 +228,35 @@ static void pointer_resize(void) {
     cui_destroy(ui);
     cui_table_destroy(m);
 }
+static void horizontal_virtualization(void) {
+    cui_table_model *m = cui_table_create(3);
+    cui_table_row rows[] = {{.key = 1}, {.key = 2}, {.key = 3}};
+    cui_table_column cols[100];
+    for (size_t c = 0; c < 100; c++)
+        cols[c] = (cui_table_column){.key = c + 1, .width = 100, .label = {"Column", 6}};
+    assert(cui_table_bind(m, rows, 3, cols, 100) == CUI_TABLE_OK);
+    cui_table_state state = {.scroll_x = 4505};
+    cui_table_options o = {.width = 200, .height = 96, .row_height = 32, .column_overscan = 1};
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    rendered = 0;
+    scene(ui, m, &state, o);
+    assert(rendered == 15);
+    cui_rect rect = cui_bounds(ui, cui_table_cell_id(10, 1, 46));
+    assert(rect.x == -5);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    assert(count == 25);
+    assert(sem[0].details.scrollable && sem[0].details.column_count == 100 &&
+           sem[0].details.scroll_max_x == 9800);
+    cui_focus(ui, cui_table_cell_id(10, 1, 46));
+    key(ui, CUI_KEY_RIGHT, 0);
+    key(ui, CUI_KEY_RIGHT, 0);
+    scene(ui, m, &state, o);
+    assert(state.cursor_column == 48 && state.scroll_x == 4600);
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
 static void virtual_scene(void) {
     cui_table_model *m = cui_table_create(10000);
     cui_table_row *rows = calloc(10000, sizeof(*rows));
@@ -238,10 +309,12 @@ static void virtual_scene(void) {
 #endif
 int main(void) {
     models();
+    columns_and_loading();
     events();
 #ifndef CUI_TABLE_BASE_ONLY
     virtual_scene();
     pointer_resize();
+    horizontal_virtualization();
 #else
     (void)rendered;
     (void)label;

@@ -49,9 +49,9 @@ pixel increments. Widths clamp to configured bounds; secondary button gestures
 do not resize. Manual selection moves the cursor without changing selection.
 Disabled state prevents reducer mutation.
 
-The body uses fixed row heights, fractional scroll offsets, bounded overscan and
+The body uses fixed row heights, fractional scroll offsets, bounded row and column overscan and
 real ancestor clipping. The header remains fixed vertically and shares horizontal
-scroll with the body. Wheel scrolling can move the cursor offscreen without
+scroll with the body. Width-aware horizontal column virtualization includes partial edge columns. Result fields report actual visible row/column windows (without overscan), changes to those windows, and an opt-in load-more request near the end. Load requests fire once per threshold entry or changed row count; applications append rows and rebind. They are suppressed while disabled. Both grid and body expose scroll extents for core wheel routing and boundary bubbling. Wheel scrolling can move the cursor offscreen without
 forcing it back into view; keyboard navigation reveals the cursor again. Grid,
 row, column-header and grid-cell semantics include hierarchy, selection, row and
 column indices, and total grid counts. Indices are one based data indices and
@@ -60,15 +60,15 @@ collisions with other controls as required by the core.
 
 Tests cover transactional validation, keyed lookup in 10,000 rows, fractional
 viewport arithmetic, clipped overscan, callback count and accessible labels,
-fixed header geometry, ordered keyboard events, disabled skipping, manual
+fixed header geometry, horizontal clipping/virtualization, load request deduplication, ordered keyboard events, disabled skipping, manual
 selection, sorting, column reorder, keyboard/pointer resize, width clamps,
 secondary gestures, wheel/focus interaction and semantic hierarchy. The same
 behavior tests run with a base-only core link; sanitizer validation instruments
 both layout and reducer.
 
 This is not full GPUI family parity. Remaining features include pinned left
-columns, horizontal column virtualization, multi-selection/range selection,
-column drag reorder, context menus, infinite-load/visible-range events, scrollbar
+columns, multi-selection/range selection,
+column drag reorder, context menus, asynchronous loading indicators, scrollbar
 chrome, variable row heights, Table cell spans/sections/captions, and row-header
 styling. Selection is a single controlled keyed item in each dimension. Caller
 sorting/filtering is supported but this module does not provide a comparator or

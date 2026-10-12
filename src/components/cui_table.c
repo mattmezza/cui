@@ -59,29 +59,25 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
           height = isfinite(o.height) && o.height > 0 ? o.height : 240;
     float row = isfinite(o.row_height) && o.row_height > 0 ? fminf(o.row_height, 4096) : 32,
           header = isfinite(o.header_height) && o.header_height > 0 ? o.header_height : 32;
-    float total = 0;
-    size_t columns = cui_table_columns(m);
+    cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, width, o.column_overscan);
+    float total = columns.total - columns.before - columns.after;
     cui_table_column col;
-    for (size_t c = 0; c < columns; c++) {
-        cui_table_get_column(m, c, &col);
-        total += col.width;
-    }
     cui_begin_box(ui, id,
                   (cui_box){.width = width,
                             .background = t->surface,
                             .border = t->border,
                             .border_width = 1,
                             .radius = t->radius});
-    cui_table_submit_root(ui, id, m, o);
+    cui_table_submit_root(ui, id, m, s, o);
     cui_begin_box(ui, style_id(id, 1),
                   (cui_box){.width = width,
                             .height = header,
                             .clip = true,
-                            .offset_x = -s->scroll_x,
+                            .offset_x = columns.before - s->scroll_x,
                             .background = t->background});
     cui_table_submit_header(ui, id, m, s, o);
     cui_begin_box(ui, style_id(id, 2), (cui_box){.width = total, .height = header, .row = true});
-    for (size_t c = 0; c < columns; c++) {
+    for (size_t c = columns.begin; c < columns.end; c++) {
         cui_table_get_column(m, c, &col);
         cui_id cid = cui_table_header_id(id, col.key);
         cui_begin_box(ui, cid,
@@ -124,7 +120,7 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
                   (cui_box){.width = width,
                             .height = height,
                             .clip = true,
-                            .offset_x = -s->scroll_x,
+                            .offset_x = columns.before - s->scroll_x,
                             .offset_y = v.before - v.scroll,
                             .background = t->surface});
     cui_table_submit_body(ui, id, m, s, o, label, data);
@@ -133,7 +129,7 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
         cui_table_get_row(m, r, &rr);
         cui_id rid = cui_table_row_id(id, rr.key);
         cui_begin_box(ui, rid, (cui_box){.width = total, .height = row, .row = true});
-        for (size_t c = 0; c < columns; c++) {
+        for (size_t c = columns.begin; c < columns.end; c++) {
             cui_table_get_column(m, c, &col);
             cui_id cid = cui_table_cell_id(id, rr.key, col.key);
             bool selected = o.selection_mode == CUI_TABLE_SELECT_ROW ? s->row == rr.key

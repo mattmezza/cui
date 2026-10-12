@@ -493,6 +493,7 @@ cui_attachment_group_result cui_attachment_group(cui_context *ui, cui_id id,
                                   .content_width = s->content.w,
                                   .content_height = height,
                                   .horizontal = true,
+                                  .hide_scrollbars = true,
                                   .wheel_step = o.wheel_step};
     cui_scroll_geometry geometry = cui_scroll_layout(options);
     r.changed = cui_base_scrollable(ui, id, scroll, options);

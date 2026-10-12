@@ -427,8 +427,15 @@ static void group_children(cui_context *ui, cui_id id, void *user, float width, 
 static cui_attachment_group_result group_scene(cui_context *ui, cui_attachment_group_state *s,
                                                cui_attachment_group_options o) {
     assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_begin_box(ui, 9001, (cui_box){.width = 400});
     cui_attachment_group_result r = cui_attachment_group(ui, 30, s, o);
+    cui_end_box(ui);
     cui_end_frame(ui);
+    size_t semantic_count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    for (size_t i = 0; i < semantic_count; i++)
+        assert(semantics[i].role != CUI_ROLE_SCROLLBAR);
+    assert(!cui_semantic_parent(ui, 30));
     assert(cui_last_error(ui) == CUI_OK);
     assert(r.valid);
     return r;

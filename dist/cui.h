@@ -6951,7 +6951,8 @@ cui_core_commands_done:
             ancestor = ui->nodes[ancestor].parent;
         for (; ancestor != SIZE_MAX; ancestor = ui->nodes[ancestor].parent) {
             for (size_t j = 0; j < ui->semantic_count; ++j)
-                if (ui->semantic_nodes[j] == ancestor) {
+                if (ui->semantic_nodes[j] == ancestor &&
+                    cui_core_folded(ui->semantics[j].id) == ui->nodes[ancestor].clay_id) {
                     ui->previous_parents[i] = j;
                     break;
                 }

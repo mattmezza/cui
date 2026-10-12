@@ -2337,7 +2337,36 @@ static void test_semantic_parent_query(void) {
     }
     cui_destroy(ui);
 }
+static void test_unpainted_semantic_does_not_own_ancestor(void) {
+    cui_context *ui = make();
+    for (int painted = 0; painted < 2; painted++) {
+        begin(ui);
+        cui_begin_box(ui, 1000, (cui_box){.width = 200});
+        cui_interact(ui, 1000, CUI_ROLE_GROUP, cui_string("Root"), false, false, 0);
+        cui_begin_box(ui, 2000, (cui_box){.width = 200});
+        /* Behavior registers before its eventual layout. An unpainted control
+         * must not become the semantic owner of this surrounding box. */
+        cui_interact(ui, 3000, CUI_ROLE_SCROLLBAR, cui_string("Scroll"), false, false, 0);
+        cui_set_semantic_details(ui, 3000, (cui_semantic_details){.parent = 4000});
+        cui_interact(ui, 4000, CUI_ROLE_GROUP, cui_string("Content"), false, false, 0);
+        cui_begin_box(ui, 4000, (cui_box){.width = 100, .height = 30});
+        cui_end_box(ui);
+        if (painted) {
+            cui_begin_box(ui, 3000, (cui_box){.width = 100, .height = 10});
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        assert(cui_semantic_parent(ui, 4000) == 1000);
+        assert(cui_semantic_parent(ui, 3000) == 4000);
+        assert(!cui_semantic_parent(ui, 1000));
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    test_unpainted_semantic_does_not_own_ancestor();
     test_semantic_parent_query();
     test_font_metrics();
     test_styled_text_pipeline();

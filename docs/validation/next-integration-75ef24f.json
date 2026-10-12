@@ -1,0 +1,26 @@
+{
+  "source": "75ef24f",
+  "branch": "integration/next-parity",
+  "checkpoint": "40aa649",
+  "worktree": "/tmp/cui-next-integration",
+  "published": false,
+  "checks": {
+    "native": {
+      "passed": 77,
+      "total": 77
+    },
+    "sanitizers": {
+      "passed": 75,
+      "total": 75
+    },
+    "WASI": {
+      "passed": 67,
+      "total": 67
+    },
+    "quality": "passed",
+    "web_build": "passed",
+    "browser_runtime": "pending"
+  },
+  "scope": "Chart through c084c82, TextView through ff76139, Questionnaire containers 74c9347 and shortcut badge backgrounds 761fff8. Full feature parity remains incomplete.",
+  "release_note": "Main held for separate physical-click helper repair; no new publication claimed."
+}

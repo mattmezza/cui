@@ -29,6 +29,22 @@ static void cui_chart_hover_spring(float *position, float *velocity, float targe
         *velocity = 0;
     }
 }
+static float cui_chart_hover_ease(float progress, bool entering) {
+    progress = fmaxf(0, fminf(1, progress));
+    float x1 = entering ? .16f : .4f, y1 = entering ? 1.f : 0.f;
+    float x2 = entering ? .3f : 1.f, y2 = 1.f;
+    float lo = 0, hi = 1;
+    for (unsigned i = 0; i < 20; i++) {
+        float t = (lo + hi) / 2, inv = 1 - t;
+        float x = 3 * inv * inv * t * x1 + 3 * inv * t * t * x2 + t * t * t;
+        if (x < progress)
+            lo = t;
+        else
+            hi = t;
+    }
+    float t = (lo + hi) / 2, inv = 1 - t;
+    return 3 * inv * inv * t * y1 + 3 * inv * t * t * y2 + t * t * t;
+}
 static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
                                          const cui_chart_sankey_node *node, size_t index,
                                          cui_chart_sankey_label out[16], size_t *count,
@@ -242,6 +258,39 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 }
             }
         }
+    }
+    {
+        bool active = !o->noninteractive && state->hovered < o->count;
+        bool instant = o->reduced_motion || cui_reduced_motion(ui);
+        if (active) {
+            state->tooltip_visual_index = state->hovered;
+            state->tooltip_visual_value = state->hovered_value;
+        }
+        float dt = cui_frame_delta(ui);
+        if (!isfinite(dt) || dt < 0)
+            dt = 0;
+        if (dt == 0 && active && state->tooltip_phase == 0)
+            dt = 1.f / 60;
+        float duration = o->hover_duration > 0 ? o->hover_duration : .12f;
+        if (!state->tooltip_started || state->tooltip_active != active) {
+            state->tooltip_from = state->tooltip_focus;
+            state->tooltip_phase = 0;
+            state->tooltip_active = active;
+            state->tooltip_started = true;
+        }
+        if (instant) {
+            state->tooltip_phase = 1;
+            state->tooltip_focus = active ? 1 : 0;
+        } else {
+            state->tooltip_phase = fminf(1, state->tooltip_phase + dt / duration);
+            float eased = cui_chart_hover_ease(state->tooltip_phase, active);
+            state->tooltip_focus =
+                state->tooltip_from + ((active ? 1.f : 0.f) - state->tooltip_from) * eased;
+        }
+        if (!active && state->tooltip_focus <= 0)
+            state->tooltip_visual_index = SIZE_MAX;
+        if (!instant && state->tooltip_phase < 1)
+            cui_invalidate(ui);
     }
     if (o->kind == CUI_CHART_BAR || o->kind == CUI_CHART_PIE || o->kind == CUI_CHART_SANKEY) {
         bool active = !o->noninteractive && state->hovered < o->count;
@@ -777,15 +826,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_text(ui, label, 10, color);
             cui_end_box(ui);
         }
-    if (!o->noninteractive && state->hovered < o->count) {
-        const cui_chart_datum *datum = &o->data[state->hovered];
+    if (!o->noninteractive && state->tooltip_visual_index < o->count && state->tooltip_focus > 0) {
+        size_t tooltip_index = state->tooltip_visual_index;
+        const cui_chart_datum *datum = &o->data[tooltip_index];
         cui_str title = {0};
         char row_text[8][52] = {{0}};
         size_t row_length[8] = {0}, row_count = 0;
         cui_color row_color[8] = {{0}};
         float tooltip_width = 150;
         if (!o->tooltip_content) {
-            title = o->tooltip_title ? o->tooltip_title(datum, state->hovered, o->tooltip_user)
+            title = o->tooltip_title ? o->tooltip_title(datum, tooltip_index, o->tooltip_user)
                                      : datum->label;
             if (title.data && title.length)
                 tooltip_width =
@@ -796,9 +846,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                               16);
             size_t rows = o->kind == CUI_CHART_CANDLESTICK ? 4 : o->extra_series_count + 1;
             for (size_t series = 0; series < rows; series++) {
-                double number = state->hovered_value;
+                double number =
+                    o->kind == CUI_CHART_SANKEY ? state->tooltip_visual_value : datum->value;
                 if (o->kind != CUI_CHART_CANDLESTICK && series)
-                    number = o->extra_series[series - 1].values[state->hovered];
+                    number = o->extra_series[series - 1].values[tooltip_index];
                 if (o->kind == CUI_CHART_CANDLESTICK)
                     number = series == 0   ? datum->open
                              : series == 1 ? datum->high
@@ -807,7 +858,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 char value[48];
                 cui_str formatted;
                 if (o->tooltip_value) {
-                    size_t written = o->tooltip_value(datum, state->hovered, series, number, value,
+                    size_t written = o->tooltip_value(datum, tooltip_index, series, number, value,
                                                       sizeof value, o->tooltip_user);
                     formatted =
                         (cui_str){value, written < sizeof value ? written : sizeof value - 1};
@@ -837,7 +888,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                         row_color[row_count] = direction;
                 }
                 if (o->tooltip_value_color)
-                    row_color[row_count] = o->tooltip_value_color(datum, state->hovered, series,
+                    row_color[row_count] = o->tooltip_value_color(datum, tooltip_index, series,
                                                                   number, o->tooltip_user);
                 tooltip_width = fmaxf(
                     tooltip_width,
@@ -862,12 +913,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                    .radius = 4,
                                    .background = o->background,
                                    .border = o->grid,
-                                   .border_width = 1},
+                                   .border_width = 1,
+                                   .opacity = state->tooltip_focus,
+                                   .custom_opacity = true},
                          (cui_rect){state->bounds.x + tooltip_x, state->bounds.y + tooltip_y,
                                     tooltip_width, tooltip_height},
                          120);
         if (o->tooltip_content)
-            o->tooltip_content(ui, id, state->hovered, datum, o->tooltip_user);
+            o->tooltip_content(ui, id, tooltip_index, datum, o->tooltip_user);
         else {
             float row_y = 8;
             if (title.length && title.data) {

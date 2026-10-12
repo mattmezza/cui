@@ -1133,6 +1133,7 @@ int main(void) {
     (void)cui_end_frame(ui);
     assert(state.hovered == SIZE_MAX && state.emphasis_focus > 0 && state.emphasis_focus < 1 &&
            state.pie_lift[1] > 0 && state.pie_lift[1] < 1);
+    assert(state.tooltip_visual_index == 1 && state.tooltip_focus > .5f && state.tooltip_focus < 1);
     options.pie_show_labels = false;
     options.pie_outer_radius = 0;
     options.pie_label_gap = 0;
@@ -1314,6 +1315,34 @@ int main(void) {
             right_popup_x = draw.commands[i].bounds.x, bottom_popup_y = draw.commands[i].bounds.y;
     assert(state.hovered < options.count && right_popup_x < state.bounds.x + 180 &&
            bottom_popup_y < state.bounds.y + 70);
+    cui_set_reduced_motion(ui, false);
+    state.tooltip_phase = state.tooltip_focus = 0;
+    state.tooltip_active = state.tooltip_started = false;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 60,
+                                           .y = state.bounds.y + 25}));
+    assert(cui_begin_frame(ui, 256, 256, .06f));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    draw = cui_end_frame(ui);
+    assert(state.tooltip_phase > .49f && state.tooltip_phase < .51f &&
+           state.tooltip_focus > state.tooltip_phase && state.tooltip_focus < 1);
+    bool faded_tooltip = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w >= 150 &&
+            draw.commands[i].bounds.h >= 48 && draw.commands[i].color.a > 0 &&
+            draw.commands[i].color.a < options.background.a)
+            faded_tooltip = true;
+    assert(faded_tooltip);
+    float entering_focus = state.tooltip_focus;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 2,
+                                           .y = state.bounds.y + 2}));
+    assert(cui_begin_frame(ui, 256, 256, .01f));
+    assert(cui_chart(ui, 91, &state, &options, (cui_str){"Revenue", 7}));
+    (void)cui_end_frame(ui);
+    assert(state.hovered == SIZE_MAX && state.tooltip_visual_index < options.count &&
+           state.tooltip_focus > 0 && state.tooltip_focus < entering_focus &&
+           state.tooltip_focus > entering_focus * .8f);
     options.logical_width = 64;
     options.logical_height = 48;
     cui_destroy(ui);

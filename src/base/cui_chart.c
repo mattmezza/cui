@@ -1690,6 +1690,11 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->emphasis_started = false;
         s->emphasis_visual_index = SIZE_MAX;
         s->tooltip_cursor_valid = false;
+        s->tooltip_phase = s->tooltip_focus = 0;
+        s->tooltip_from = 0;
+        s->tooltip_active = s->tooltip_started = false;
+        s->tooltip_visual_index = SIZE_MAX;
+        s->tooltip_visual_value = 0;
         memset(s->pie_lift, 0, sizeof s->pie_lift);
         memset(s->pie_lift_velocity, 0, sizeof s->pie_lift_velocity);
     }

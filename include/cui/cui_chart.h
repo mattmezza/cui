@@ -222,6 +222,11 @@ typedef struct {
     float pie_lift[256], pie_lift_velocity[256]; /* bounded source per-slice spring */
     float tooltip_cursor_x, tooltip_cursor_y;    /* last valid plot-relative pointer */
     bool tooltip_cursor_valid;
+    float tooltip_phase, tooltip_focus; /* source 120ms enter/exit easing */
+    float tooltip_from;
+    bool tooltip_active, tooltip_started;
+    size_t tooltip_visual_index; /* retained while fading out */
+    double tooltip_visual_value;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
 } cui_chart_state;
 typedef struct {

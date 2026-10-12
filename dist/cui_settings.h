@@ -40,6 +40,15 @@ typedef void (*cui_setting_render_fn)(cui_context *, cui_id, const cui_theme *,
                                       cui_settings_render_options, void *);
 typedef bool (*cui_setting_dirty_fn)(void *);
 typedef void (*cui_setting_reset_fn)(void *);
+/* Borrowed workspace; capacity must cover every choice. No per-frame allocation. */
+typedef struct {
+    cui_menu_tree_state menu;
+    cui_menu_entry *entries;
+    bool *checked;
+    size_t capacity;
+} cui_settings_dropdown_state;
+bool cui_settings_dropdown_init(cui_settings_dropdown_state *, cui_id popup, cui_menu_entry *,
+                                bool *checked, size_t capacity);
 typedef struct {
     cui_str title, description;
     const cui_str *keywords;
@@ -69,6 +78,8 @@ typedef struct {
     cui_setting_dirty_fn dirty;
     cui_setting_reset_fn reset;
     void *user;
+    cui_settings_dropdown_state *dropdown_state; /* Source Menu; NULL keeps legacy Select. */
+    bool dropdown_scrollable;
 } cui_setting_item;
 typedef struct {
     cui_str title, description;
@@ -94,6 +105,7 @@ typedef struct {
     cui_scroll_state scroll_state;
     float scroll, maximum;
     cui_rect viewport, content;
+    cui_hover_state reset_tooltip;
 } cui_settings_page_state;
 typedef struct {
     cui_settings_page_state *pages;
@@ -263,9 +275,17 @@ cui_settings_result cui_settings_filter(const cui_setting_page *pages, size_t co
                                 !cui_edit_get_state(item->number_state->edit).multiline;
                         break;
                     case CUI_SETTING_DROPDOWN:
-                        valid = item->choice && item->popup && item->popup->overlay.id &&
-                                (!item->choice_count || item->choices) &&
+                        valid = item->choice && (!item->choice_count || item->choices) &&
                                 item->choice_count <= 4096;
+                        if (item->dropdown_state) {
+                            const cui_settings_dropdown_state *dropdown = item->dropdown_state;
+                            valid =
+                                valid && dropdown->menu.overlay.id &&
+                                dropdown->capacity >= item->choice_count &&
+                                (!item->choice_count || (dropdown->entries && dropdown->checked));
+                        } else {
+                            valid = valid && item->popup && item->popup->overlay.id;
+                        }
                         break;
                     default:
                         break;
@@ -456,6 +476,139 @@ static cui_control_size control_size(cui_settings_size size) {
         return CUI_CONTROL_MEDIUM;
     }
 }
+static cui_input_size input_size(cui_settings_size size) {
+    switch (size) {
+    case CUI_SETTINGS_XSMALL:
+        return CUI_INPUT_XSMALL;
+    case CUI_SETTINGS_SMALL:
+        return CUI_INPUT_SMALL;
+    case CUI_SETTINGS_LARGE:
+        return CUI_INPUT_LARGE;
+    default:
+        return CUI_INPUT_MEDIUM;
+    }
+}
+static cui_number_size number_size(cui_settings_size size) {
+    switch (size) {
+    case CUI_SETTINGS_XSMALL:
+        return CUI_NUMBER_XSMALL;
+    case CUI_SETTINGS_SMALL:
+        return CUI_NUMBER_SMALL;
+    case CUI_SETTINGS_LARGE:
+        return CUI_NUMBER_LARGE;
+    default:
+        return CUI_NUMBER_MEDIUM;
+    }
+}
+bool cui_settings_dropdown_init(cui_settings_dropdown_state *state, cui_id popup,
+                                cui_menu_entry *entries, bool *checked, size_t capacity) {
+    if (!state || !popup || (!entries && capacity) || (!checked && capacity))
+        return false;
+    *state =
+        (cui_settings_dropdown_state){.entries = entries, .checked = checked, .capacity = capacity};
+    cui_menu_tree_init(&state->menu, popup);
+    return true;
+}
+typedef struct {
+    settings_frame *frame;
+    cui_id id;
+    cui_str label;
+    cui_control_size size;
+    bool disabled;
+} dropdown_content;
+static void dropdown_label(cui_context *ui, void *user) {
+    dropdown_content *content = user;
+    const cui_theme *theme = content->frame->theme;
+    float d = density(content->frame);
+    float font = (content->size == CUI_CONTROL_XSMALL  ? 12
+                  : content->size == CUI_CONTROL_LARGE ? 16
+                                                       : 14) *
+                 d;
+    cui_theme_button_colors colors = theme->buttons[CUI_THEME_BUTTON_DEFAULT];
+    cui_color foreground = content->disabled ? theme->muted : colors.outline_foreground;
+    cui_color caret = foreground;
+    caret.a = (uint8_t)lroundf(caret.a * .75f);
+    cui_text_with_line_height(ui, content->label, font, foreground, font * 1.25f);
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = (content->size == CUI_CONTROL_XSMALL ||
+                                              content->size == CUI_CONTROL_SMALL
+                                          ? 4
+                                          : 8) *
+                                     d});
+    cui_end_box(ui);
+    cui_icon_named(
+        ui, content->id ^ UINT64_C(0xe6b789bf43ddf531), theme, cui_string("chevron-down"),
+        (cui_icon_options){.size = content->size == CUI_CONTROL_XSMALL  ? CUI_ICON_XSMALL
+                                   : content->size == CUI_CONTROL_SMALL ? CUI_ICON_SMALL
+                                                                        : CUI_ICON_MEDIUM,
+                           .custom_color = true,
+                           .color = caret});
+}
+static bool dropdown(settings_frame *f, const cui_setting_item *item, cui_id id,
+                     cui_settings_render_options render) {
+    cui_settings_dropdown_state *state = item->dropdown_state;
+    if (!item->choice || !state || !state->menu.overlay.id ||
+        state->capacity < item->choice_count ||
+        (item->choice_count && (!state->entries || !state->checked))) {
+        f->result->invalid = true;
+        return false;
+    }
+    cui_str selected = item->title;
+    float widest = 0;
+    float font = 14 * density(f);
+    for (size_t i = 0; i < item->choice_count; i++) {
+        state->checked[i] = item->choices[i].id == *item->choice;
+        state->entries[i] = (cui_menu_entry){.id = item->choices[i].id,
+                                             .label = item->choices[i].label,
+                                             .disabled = item->choices[i].disabled,
+                                             .kind = CUI_MENU_CHECK,
+                                             .checked = &state->checked[i]};
+        if (state->checked[i])
+            selected = item->choices[i].label;
+        widest = fmaxf(widest, cui_measure_text(f->ui, item->choices[i].label, font).width);
+    }
+    cui_id action = 0;
+    state->menu.drag_scroll = item->dropdown_scrollable;
+    bool activated =
+        cui_base_menu_tree(f->ui, id, item->title, state->entries, item->choice_count, &action,
+                           &state->menu, render.disabled, cui_frame_delta(f->ui), false);
+    bool changed = activated && *item->choice != action;
+    if (activated)
+        *item->choice = action;
+    for (size_t i = 0; i < item->choice_count; i++)
+        state->checked[i] = state->entries[i].id == *item->choice;
+    /* Source label is recomputed after the ordered reducer, including pointer actions. */
+    for (size_t i = 0; i < item->choice_count; i++)
+        if (state->checked[i])
+            selected = state->entries[i].label;
+    dropdown_content content = {f, id, selected, control_size(render.size), render.disabled};
+    cui_button_paint(f->ui, id, f->theme, item->title,
+                     (cui_button_options){.variant = CUI_BUTTON_OUTLINE,
+                                          .size = content.size,
+                                          .selected = state->menu.overlay.open,
+                                          .disabled = render.disabled,
+                                          .width = render.vertical ? -1 : 0,
+                                          .content = dropdown_label,
+                                          .content_user = &content});
+    cui_update_semantic(f->ui, id, false, 0);
+    cui_set_semantic_details(f->ui, id,
+                             (cui_semantic_details){.expanded = state->menu.overlay.open,
+                                                    .controls = state->menu.overlay.id});
+    cui_rect viewport = f->state->bounds;
+    if (viewport.w <= 0 || viewport.h <= 8)
+        viewport = (cui_rect){0, 0, f->content_width + f->state->sidebar_width, f->height};
+    cui_menu_popup_paint(f->ui, f->theme, item->title, state->entries, item->choice_count,
+                         &state->menu, cui_bounds(f->ui, id),
+                         (cui_menu_tree_options){
+                             .popup = {.disabled = render.disabled,
+                                       .viewport = viewport,
+                                       .side = CUI_POPUP_BELOW,
+                                       .align_end = true,
+                                       .width = fmaxf(128 * density(f), widest + 48 * density(f))},
+                             .max_height = item->dropdown_scrollable ? 0 : viewport.h - 8,
+                             .drag_scroll = item->dropdown_scrollable});
+    return changed;
+}
 static void label(settings_frame *f, cui_str text, float font, cui_color color) {
     if (text.length)
         cui_text_with_line_height(f->ui, text, font, color, 20 * density(f));
@@ -576,7 +729,8 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
             cui_input_result result =
                 cui_input_ex(f->ui, id, f->theme, item->title, item->edit, item->input_state,
                              (cui_input_options){.width = render.vertical ? -1 : 256 * density(f),
-                                                 .disabled = render.disabled});
+                                                 .disabled = render.disabled,
+                                                 .size = input_size(render.size)});
             changed = result.changed;
             error = result.error;
         } else
@@ -588,7 +742,8 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
             options.disabled = render.disabled;
             if (options.step == 0)
                 options.step = 1;
-            options.width = render.vertical ? -1 : 256 * density(f);
+            options.width = render.vertical ? -1 : 128 * density(f);
+            options.size = number_size(render.size);
             double before = *item->number;
             cui_number_result result = cui_number_input(f->ui, id, f->theme, item->title,
                                                         item->number_state, item->number, options);
@@ -602,7 +757,9 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
         }
         break;
     case CUI_SETTING_DROPDOWN:
-        if (item->choice && item->popup) {
+        if (item->dropdown_state) {
+            changed = dropdown(f, item, id, render);
+        } else if (item->choice && item->popup) {
             cui_list_size list_size = render.size == CUI_SETTINGS_XSMALL  ? CUI_LIST_XSMALL
                                       : render.size == CUI_SETTINGS_SMALL ? CUI_LIST_SMALL
                                       : render.size == CUI_SETTINGS_LARGE ? CUI_LIST_LARGE
@@ -754,6 +911,19 @@ static void content(cui_context *ui, void *user) {
                                                .icon_only = true})) {
             f->result->reset = cui_settings_reset_page(page, f->query);
         }
+        cui_rect viewport = f->state->bounds;
+        if (viewport.w <= 0 || viewport.h <= 8)
+            viewport = (cui_rect){0, 0, f->content_width + f->state->sidebar_width, f->height};
+        cui_tooltip(ui, part(f, p, 0, 0, 49), f->theme, &f->state->pages[p].reset_tooltip,
+                    f->options.reset_label,
+                    (cui_hover_options){.trigger = part(f, p, 0, 0, 34),
+                                        .viewport = viewport,
+                                        .side = CUI_POPUP_BELOW,
+                                        .dt = cui_frame_delta(ui),
+                                        .open_delay = .5f,
+                                        .close_delay = .1f});
+    } else {
+        f->state->pages[p].reset_tooltip = (cui_hover_state){0};
     }
     cui_end_box(ui);
     label(f, page->description, 14 * d, f->theme->muted);

@@ -321,6 +321,12 @@ void cui_base_menu_entry(cui_context *, const cui_menu_entry *, bool disabled, b
 bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
                    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                    cui_menu_tree_options);
+/* Paint an already reduced Menu popup anchored to a caller-painted trigger.
+ * Does not submit the trigger, reduce events or mutate action/check values.
+ * Registers visible popup/row semantics and retains measured window metrics. */
+bool cui_menu_popup_paint(cui_context *, const cui_theme *, cui_str name, const cui_menu_entry *,
+                          size_t count, cui_menu_tree_state *, cui_rect anchor,
+                          cui_menu_tree_options);
 /* Context-menu target is an existing visible box; this does not submit or paint
  * that target again. Secondary press within its previous bounds opens at the
  * pointer. Call once per state after rendering the receiving area. */
@@ -3657,6 +3663,27 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
         cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger), options,
                               name);
     return activated;
+}
+
+bool cui_menu_popup_paint(cui_context *ui, const cui_theme *theme, cui_str name,
+                          const cui_menu_entry *items, size_t count, cui_menu_tree_state *state,
+                          cui_rect anchor, cui_menu_tree_options options) {
+    if (!ui || !theme || !state || !state->overlay.id || (!items && count) ||
+        !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(theme->radius) ||
+        theme->radius < 0 || !isfinite(options.popup.viewport.x) ||
+        !isfinite(options.popup.viewport.y) || !isfinite(options.popup.viewport.w) ||
+        !isfinite(options.popup.viewport.h) || options.popup.viewport.w <= 0 ||
+        options.popup.viewport.h <= 8 || !isfinite(options.popup.width) ||
+        !isfinite(options.density) || options.density < 0 || !isfinite(options.max_height) ||
+        options.max_height < 0 || options.size < CUI_MENU_MEDIUM ||
+        options.size > CUI_MENU_XSMALL || !isfinite(anchor.x) || !isfinite(anchor.y) ||
+        !isfinite(anchor.w) || !isfinite(anchor.h) || anchor.w < 0 || anchor.h < 0)
+        return false;
+    cui_choice_menu_retain_metrics(state, cui_choice_menu_metrics(theme, options));
+    if (!state->overlay.open)
+        return false;
+    cui_choice_menu_level(ui, theme, items, count, state, 0, anchor, options, name);
+    return true;
 }
 
 bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cui_str name,

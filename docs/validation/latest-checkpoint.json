@@ -1,8 +1,8 @@
 {
   "source": "e96fa1a",
-  "published_source": "2bb4b6ee62e788a7c8247e81036abacf3f68fd38",
+  "published_source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Local release passes 65/65 native, 63/63 sanitizer and 70 real Chromium stories, including 38 exact CSS/C palette comparisons, keyboard selection, persistence, live system changes, and four source Input/NumberInput sizes. Carousel native registration is included; Settings/Carousel browser stories remain in progress. Public 2bb4b6e remains verified with 68 stories; picker deployment dc63e71 failed an asynchronous test wait, corrected in e96fa1a. All 78 entries retained: 6 not started, 4 implemented partial, 68 tested partial, 0 verified. Full parity unfinished.",
+  "summary": "Published 1b453ab passes 65/65 native, 63/63 sanitizer, 55/55 WASI and 70 real Chromium stories. All 38 named palettes verified over HTTPS, with system default, live OS appearance changes and persisted manual selection. Four source Input/NumberInput sizes are public. GitHub Pages and build CI both succeeded. All 78 entries retained: 6 not started, 4 implemented partial, 68 tested partial, 0 verified. Full parity unfinished; Settings adapter and Command/Carousel gallery followups continue locally.",
   "checks": [
     {
       "name": "WASI",
@@ -40,5 +40,11 @@
     "reason": "Palette test observed a prior natural frame before selected WASM palette rendered; fixed by waiting for exact expected C RGBA as well as frame advancement.",
     "run": 38269606486
   },
-  "published_evidence": "published-e49dc95.txt"
+  "published_evidence": "published-picker-1b453ab.txt",
+  "deployment": {
+    "source": "1b453ab1aa0da2678ee280b901debdb1723796d1",
+    "status": "success",
+    "pages_run": 38270795919,
+    "ci_run": 38270795856
+  }
 }

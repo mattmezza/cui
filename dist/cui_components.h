@@ -55,6 +55,8 @@ typedef struct {
     void *content_user;
     bool outline; /* Orthogonal colored outline; selected is presentation only. */
 } cui_button_options;
+/* Paint an independently registered button without reducing events or submitting semantics. */
+void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 /* Paint-only antialiased check glyph for composed selection indicators. */
@@ -168,7 +170,9 @@ typedef struct {
     cui_input_size size;
     float custom_size, density; /* density 0 derives theme font_size/16. */
     float height;               /* Optional frame-height refinement; line box remains 20*density. */
-    bool custom_height; /* Preserve explicit zero height. Positive height always overrides. */
+    bool custom_height;  /* Preserve explicit zero height. Positive height always overrides. */
+    bool custom_padding; /* Use padding_x/y in pixels, including explicit zero. */
+    float padding_x, padding_y;
     bool no_appearance, no_border, hide_focus_ring;
     cui_align text_align;
 } cui_input_options;
@@ -310,14 +314,11 @@ static void cui_components_focus(cui_context *ui, cui_id id, const cui_theme *t,
         b->border_width = 2;
     }
 }
-bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_button_options options) {
+static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                   cui_button_options options, cui_interaction state) {
     if (!ui || !t)
-        return false;
+        return;
     bool disabled = options.disabled || options.loading;
-    cui_interaction state = cui_base_button(ui, id, name, disabled);
-    if (options.variant == CUI_BUTTON_LINK)
-        (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
     cui_box b = cui_components_control(t, disabled, false);
     float density = isfinite(t->font_size) && t->font_size > 0 ? t->font_size / 16 : 1;
     float font = (options.size == CUI_CONTROL_XSMALL  ? 12
@@ -384,11 +385,6 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
             b.background.a = 0;
     }
     cui_components_focus(ui, id, t, &b);
-    /* Selected paint is distinct from an accessibility toggle state. */
-    cui_update_semantic(ui, id, false, 0);
-    if (options.loading)
-        cui_set_semantic_details(
-            ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
     cui_begin_box(ui, id, b);
     cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
     cui_end_box(ui);
@@ -432,6 +428,30 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
     cui_end_box(ui);
     cui_end_box(ui);
+}
+void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                      cui_button_options options) {
+    bool disabled = options.disabled || options.loading;
+    cui_interaction state = {0};
+    if (!disabled) {
+        state.hovered = cui_hovered(ui, id);
+        state.pressed = cui_pressed(ui, id);
+    }
+    cui_button_paint_state(ui, id, t, name, options, state);
+}
+bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_button_options options) {
+    if (!ui || !t)
+        return false;
+    cui_interaction state = cui_base_button(ui, id, name, options.disabled || options.loading);
+    if (options.variant == CUI_BUTTON_LINK)
+        (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
+    /* Selected paint is distinct from an accessibility toggle state. */
+    cui_update_semantic(ui, id, false, 0);
+    if (options.loading)
+        cui_set_semantic_details(
+            ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
+    cui_button_paint_state(ui, id, t, name, options, state);
     return state.activated;
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
@@ -1064,7 +1084,9 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
     if (!metrics || options.size < CUI_INPUT_MEDIUM || options.size > CUI_INPUT_CUSTOM ||
         !isfinite(root_font_size) || root_font_size <= 0 || root_font_size > 4096 ||
         !isfinite(options.density) || options.density < 0 || options.density > 256 ||
-        !isfinite(options.height) || options.height < 0 || options.height > 1000000)
+        !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
+        !isfinite(options.padding_x) || options.padding_x < 0 || options.padding_x > 1000000 ||
+        !isfinite(options.padding_y) || options.padding_y < 0 || options.padding_y > 1000000)
         return false;
     float d = options.density > 0 ? options.density : root_font_size / 16;
     float h = 32, font = 14, px = 10, py = 8, gap = 6;
@@ -1104,8 +1126,8 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
         (cui_input_metrics){options.custom_height || options.height > 0 ? options.height : h * d,
                             font * d,
                             20 * d,
-                            px * d,
-                            py * d,
+                            options.custom_padding ? options.padding_x : px * d,
+                            options.custom_padding ? options.padding_y : py * d,
                             gap * d};
     return true;
 }

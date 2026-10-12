@@ -3232,6 +3232,13 @@
           "evidence": [
             "tests/unit/test_input.c"
           ]
+        },
+        {
+          "name": "explicit zero/custom padding for composed controls",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4663,7 +4670,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Searchable pages/groups, filtered reset and actual field composition tested. Input/NumberInput sizes, exact Dropdown presentation, reset tooltip, Unicode search, virtualization and rich descriptions remain partial; see docs/SETTINGS.md."
+        "Searchable pages/groups, atomic filtered reset, source-size Input/NumberInput, checked Menu dropdown composition and reset tooltip are tested. Unicode search, virtualization, rich descriptions, unconstrained oversized Menu layout and complete host styling remain partial; see docs/SETTINGS.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4693,6 +4700,14 @@
           "name": "complete documented source behavior and visual parity",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "source field sizes, checked Menu dropdown and reset tooltip",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_settings.c",
+            "tests/unit/test_choice.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5072,18 +5087,21 @@
       "reference_url": "https://gpui-kit.com/component/theme/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": "include/cui/cui_components.h",
-      "sample": "gallery/main.c",
+      "public_header": "include/cui/cui_theme.h",
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_components.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Four runtime token structs tested; system integration, comprehensive tokens and reduced motion pending."
+        "38 pinned named palettes, token derivation, themed button surfaces and CSS/WASM palette equality are tested. Website system appearance, persistence and live OS changes are tested. Native OS preference adapters, complete upstream theme tokens, gradient brushes, font and syntax themes remain partial; Aurora gradients use their first stop. See docs/THEME_PRESETS.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5104,6 +5122,22 @@
           "name": "system preference/high contrast/reduced motion",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "38 pinned named palettes with shared website and WASM colors",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c",
+            "tests/web/test_browser.py"
+          ]
+        },
+        {
+          "name": "website system appearance, live preference changes and persisted theme picker",
+          "status": "tested",
+          "evidence": [
+            "tests/web/test_browser.py",
+            "docs/validation/published-picker-1b453ab.txt"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5114,7 +5148,7 @@
           "Theme Registry"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "1b453ab1aa0da2678ee280b901debdb1723796d1",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]

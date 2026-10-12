@@ -1,0 +1,9 @@
+{
+  "url": "https://matteo.merola.co/cui/?release=picker-recovery#Button",
+  "stories": 70,
+  "named_palettes": 38,
+  "system_default": true,
+  "persistence": true,
+  "live_system_change": true,
+  "page_errors": []
+}

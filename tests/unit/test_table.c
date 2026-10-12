@@ -93,6 +93,17 @@ static void columns_and_loading(void) {
     cui_destroy(ui);
     cui_table_destroy(m);
 }
+static void spans(void) {
+    float widths[] = {80, 120, 40}, out = 17;
+    assert(cui_table_span_width(widths, 3, 0, 2, &out) && out == 200);
+    out = 17;
+    assert(!cui_table_span_width(widths, 3, SIZE_MAX, 2, &out) && out == 17);
+    assert(!cui_table_span_width(widths, 3, 2, SIZE_MAX, &out) && out == 17);
+    widths[1] = NAN;
+    assert(!cui_table_span_width(widths, 3, 0, 2, &out) && out == 17);
+    widths[1] = INFINITY;
+    assert(!cui_table_span_width(widths, 3, 0, 2, &out));
+}
 static size_t rendered;
 static cui_str label(void *data, size_t row, cui_id column) {
     (void)data;
@@ -218,6 +229,72 @@ static void events(void) {
     cui_destroy(ui);
     cui_table_destroy(m);
 }
+#ifndef CUI_TABLE_BASE_ONLY
+static void custom_header(cui_context *ui, const cui_theme *t, void *data, cui_id column) {
+    (void)column;
+    ((size_t *)data)[0]++;
+    cui_text(ui, cui_string("Custom head"), t->font_size, t->text);
+}
+static void custom_row_header(cui_context *ui, const cui_theme *t, void *data, size_t row) {
+    (void)row;
+    ((size_t *)data)[1]++;
+    cui_text(ui, cui_string("R"), t->font_size, t->text);
+}
+static void custom_placeholder(cui_context *ui, const cui_theme *t, void *data) {
+    ((size_t *)data)[2]++;
+    cui_text(ui, cui_string("Custom status"), t->font_size, t->muted);
+}
+#endif
+static void placeholders(void) {
+    cui_table_model *m = cui_table_create(2);
+    cui_table_row row = {.key = 1};
+    cui_table_column cols[] = {{.key = 10, .label = {"First", 5}, .width = 100, .sortable = true},
+                               {.key = 20, .label = {"Second", 6}, .width = 100}};
+    assert(cui_table_bind(m, NULL, 0, cols, 2) == CUI_TABLE_OK);
+    cui_table_state state = {0};
+    cui_table_options o = {.width = 240, .height = 96, .row_header = true, .load_more = true};
+    size_t counters[3] = {0};
+#ifndef CUI_TABLE_BASE_ONLY
+    o.render_header = custom_header;
+    o.render_row_header = custom_row_header;
+    o.render_empty = custom_placeholder;
+    o.render_loading = custom_placeholder;
+    o.render_userdata = counters;
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    rendered = 0;
+    assert(scene(ui, m, &state, o).load_more);
+    size_t n;
+    const cui_semantic *sem = cui_semantics(ui, &n);
+    bool status = false;
+    for (size_t i = 0; i < n; i++)
+        if (sem[i].role == CUI_ROLE_STATUS)
+            status = !sem[i].details.busy;
+    assert(status);
+#ifndef CUI_TABLE_BASE_ONLY
+    assert(counters[0] == 2 && counters[2] == 1 && rendered == 0);
+#endif
+    assert(cui_table_bind(m, &row, 1, cols, 2) == CUI_TABLE_OK);
+    o.loading = true;
+    cui_focus(ui, cui_table_header_id(10, 10));
+    key(ui, CUI_KEY_ENTER, 0);
+    cui_table_result result = scene(ui, m, &state, o);
+    assert(!result.sort_changed && !result.load_more);
+    sem = cui_semantics(ui, &n);
+    assert(sem[0].details.busy);
+    for (size_t i = 0; i < n; i++)
+        assert(sem[i].role != CUI_ROLE_GRIDCELL && sem[i].role != CUI_ROLE_ROW);
+    o.loading = false;
+    scene(ui, m, &state, o);
+#ifndef CUI_TABLE_BASE_ONLY
+    assert(counters[0] == 6 && counters[1] == 1 && counters[2] == 2 && rendered == 2);
+#else
+    (void)counters;
+#endif
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
 static void multiple_selection(void) {
     cui_table_model *m = cui_table_create(4);
     cui_table_row rows[] = {{.key = 1}, {.key = 2, .disabled = true}, {.key = 3}, {.key = 4}};
@@ -306,7 +383,104 @@ static void multiple_selection(void) {
     cui_destroy(ui);
     cui_table_destroy(m);
 }
+static void row_headers(void) {
+    cui_table_model *m = cui_table_create(4);
+    cui_table_row rows[] = {{.key = 1}, {.key = 2, .disabled = true}, {.key = 3}, {.key = 4}};
+    cui_table_column cols[] = {{.key = 10, .width = 100, .disabled = true},
+                               {.key = 20, .width = 100, .disabled = true}};
+    assert(cui_table_bind(m, rows, 4, cols, 2) == CUI_TABLE_OK);
+    cui_table_state state = {0};
+    cui_table_options o = {.width = 240,
+                           .height = 160,
+                           .row_height = 32,
+                           .selection_mode = CUI_TABLE_SELECT_CELL,
+                           .row_header = true};
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    scene(ui, m, &state, o);
+    cui_focus(ui, cui_table_row_header_id(10, 1));
+    key(ui, CUI_KEY_ENTER, 0);
+    cui_table_result result = scene(ui, m, &state, o);
+    assert(result.selection_mode_requested &&
+           result.requested_selection_mode == CUI_TABLE_SELECT_ROW && state.row == 1 &&
+           state.column == 0);
+    o.selection_mode = result.requested_selection_mode;
+    key(ui, CUI_KEY_DOWN, 0);
+    key(ui, CUI_KEY_DOWN, 0);
+    result = scene(ui, m, &state, o);
+    assert(result.selection_changed && state.row == 4 &&
+           cui_focused(ui) == cui_table_row_header_id(10, 4));
 #ifndef CUI_TABLE_BASE_ONLY
+    assert(cui_bounds(ui, cui_table_row_header_id(10, 1)).x == 0 &&
+           cui_bounds(ui, cui_table_cell_id(10, 1, 10)).x == 40);
+#endif
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    bool disabled = false;
+    for (size_t i = 0; i < count; i++)
+        if (sem[i].id == cui_table_row_header_id(10, 2))
+            disabled = sem[i].disabled && sem[i].details.parent == cui_table_row_id(10, 2);
+    assert(disabled);
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
+#ifndef CUI_TABLE_BASE_ONLY
+static void static_tables(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t i = 0; i < 4; i++) {
+        cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+        assert(ui);
+        assert(cui_begin_frame(ui, 700, 500, .016f));
+        float widths[] = {80, 120};
+        cui_table_begin(ui, 1, &themes[i], 200);
+        cui_table_begin_section(ui, 2, &themes[i], CUI_TABLE_SECTION_HEADER);
+        cui_table_begin_row(ui, 3, &themes[i], 32, true);
+        cui_table_begin_head_cell(ui, 4, 80, 32, CUI_TABLE_ALIGN_LEFT, cui_string("First"));
+        cui_text(ui, cui_string("First"), themes[i].font_size, themes[i].text);
+        cui_table_end(ui);
+        cui_table_begin_head_cell(ui, 5, 120, 32, CUI_TABLE_ALIGN_RIGHT, cui_string("Second"));
+        cui_text(ui, cui_string("Second"), themes[i].font_size, themes[i].text);
+        cui_table_end(ui);
+        cui_table_end(ui);
+        cui_table_end(ui);
+        cui_table_begin_section(ui, 6, &themes[i], CUI_TABLE_SECTION_BODY);
+        cui_table_begin_row(ui, 7, &themes[i], 32, false);
+        assert(cui_table_begin_cell_span(ui, 8, widths, 2, 0, 2, 32, CUI_TABLE_ALIGN_CENTER));
+        cui_text(ui, cui_string("Spanning"), themes[i].font_size, themes[i].text);
+        cui_table_end(ui);
+        assert(!cui_table_begin_cell_span(ui, 9, widths, 2, 1, 2, 32, CUI_TABLE_ALIGN_LEFT));
+        cui_table_end(ui);
+        cui_table_end(ui);
+        cui_table_begin_section(ui, 10, &themes[i], CUI_TABLE_SECTION_FOOTER);
+        cui_table_begin_row(ui, 11, &themes[i], 32, false);
+        cui_table_begin_cell(ui, 12, 200, 32, CUI_TABLE_ALIGN_RIGHT);
+        cui_text(ui, cui_string("Total"), themes[i].font_size, themes[i].text);
+        cui_table_end(ui);
+        cui_table_end(ui);
+        cui_table_end(ui);
+        cui_table_caption(ui, 13, &themes[i], cui_string("Caption"));
+        cui_table_end(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(list.count && cui_last_error(ui) == CUI_OK);
+        assert(cui_bounds(ui, 8).w == 200 && cui_bounds(ui, 8).y == 32 &&
+               cui_bounds(ui, 13).y == 96);
+        size_t n;
+        const cui_semantic *sem = cui_semantics(ui, &n);
+        for (size_t j = 0; j < n; j++)
+            if (sem[j].id == 4)
+                assert(sem[j].role == CUI_ROLE_COLUMNHEADER && sem[j].details.readonly &&
+                       sem[j].tab_index == -1);
+        bool header = false;
+        for (size_t j = 0; j < list.count; j++)
+            if (list.commands[j].type == CUI_DRAW_RECT && list.commands[j].bounds.y == 0 &&
+                list.commands[j].color.r == themes[i].background.r &&
+                list.commands[j].color.g == themes[i].background.g)
+                header = true;
+        assert(header);
+        cui_destroy(ui);
+    }
+}
 static void pointer_resize(void) {
     cui_table_model *m = cui_table_create(1);
     cui_table_row row = {1, {"One", 3}, false};
@@ -343,6 +517,38 @@ static void pointer_resize(void) {
                                            .y = y,
                                            .pointer_button = CUI_POINTER_SECONDARY}));
     assert(!scene(ui, m, &state, o).columns_changed && col.width == 150);
+    cui_destroy(ui);
+    cui_table_destroy(m);
+}
+static void drag_columns(void) {
+    cui_table_model *m = cui_table_create(1);
+    cui_table_row row = {.key = 1};
+    cui_table_column cols[] = {
+        {.key = 10, .label = {"First", 5}, .width = 100, .movable = true, .sortable = true},
+        {.key = 20, .label = {"Middle", 6}, .width = 100, .movable = true},
+        {.key = 30, .label = {"Last", 4}, .width = 100, .movable = true}};
+    assert(cui_table_bind(m, &row, 1, cols, 3) == CUI_TABLE_OK);
+    cui_table_state state = {0};
+    cui_table_options o = {.width = 300, .height = 64};
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    assert(ui);
+    scene(ui, m, &state, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 16}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 280, .y = 16}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 280, .y = 16}));
+    cui_table_result result = scene(ui, m, &state, o);
+    assert(result.columns_changed && !result.sort_changed && cols[2].key == 10 && !state.dragging);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 16}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 280, .y = 16}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    assert(!scene(ui, m, &state, o).columns_changed && !state.dragging);
+    cols[0].fixed_left = true;
+    assert(cui_table_bind(m, &row, 1, cols, 3) == CUI_TABLE_OK);
+    scene(ui, m, &state, o);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 16}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 280, .y = 16}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 280, .y = 16}));
+    assert(!scene(ui, m, &state, o).columns_changed && cols[0].key == 20);
     cui_destroy(ui);
     cui_table_destroy(m);
 }
@@ -470,14 +676,19 @@ static void virtual_scene(void) {
 #endif
 int main(void) {
     models();
+    spans();
     columns_and_loading();
     events();
     multiple_selection();
+    placeholders();
+    row_headers();
 #ifndef CUI_TABLE_BASE_ONLY
+    static_tables();
     virtual_scene();
     pointer_resize();
     horizontal_virtualization();
     pinned_geometry();
+    drag_columns();
 #else
     (void)rendered;
     (void)label;

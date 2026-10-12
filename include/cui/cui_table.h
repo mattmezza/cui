@@ -72,6 +72,9 @@ typedef struct {
     cui_id sort_column;
     cui_table_sort sort;
     float scroll_x, scroll_y;
+    cui_id dragging;
+    float drag_x;
+    bool drag_active;
     cui_id resizing;
     float resize_x, resize_width;
     size_t visible_begin, visible_end, column_begin, column_end, previous_row_count;
@@ -80,21 +83,32 @@ typedef struct {
     size_t selection_count, selection_capacity;
     cui_id anchor_row, anchor_column;
 } cui_table_state;
+typedef void (*cui_table_header_fn)(cui_context *, const cui_theme *, void *, cui_id column);
+typedef void (*cui_table_row_header_fn)(cui_context *, const cui_theme *, void *, size_t row);
+typedef void (*cui_table_placeholder_fn)(cui_context *, const cui_theme *, void *);
 typedef struct {
-    float width, height, row_height, header_height;
+    float width, height, row_height, header_height, row_header_width;
     size_t overscan, column_overscan, load_more_threshold;
     bool disabled, striped, bordered, manual_selection, loop_selection, load_more,
-        multiple_selection;
+        multiple_selection, row_header, loading;
+    cui_table_header_fn render_header;
+    cui_table_row_header_fn render_row_header;
+    cui_table_placeholder_fn render_empty, render_loading;
+    void *render_userdata;
     cui_table_selection_mode selection_mode;
 } cui_table_options;
 typedef struct {
     bool selection_changed, sort_changed, columns_changed;
     bool visible_rows_changed, visible_columns_changed, load_more, context_requested;
     cui_id context_row, context_column;
+    bool selection_mode_requested;
+    cui_table_selection_mode requested_selection_mode;
     cui_table_view rows, columns;
     cui_id activated_row, activated_column;
     cui_table_error error;
 } cui_table_result;
+float cui_table_row_header_width(cui_table_options);
+cui_id cui_table_row_header_id(cui_id table, cui_id row);
 bool cui_table_is_selected(const cui_table_state *, cui_table_options, cui_id row, cui_id column);
 cui_id cui_table_row_id(cui_id table, cui_id row);
 cui_id cui_table_cell_id(cui_id table, cui_id row, cui_id column);
@@ -128,6 +142,19 @@ cui_table_result cui_base_data_table(cui_context *, cui_id, cui_table_model *, c
 cui_table_result cui_data_table(cui_context *, cui_id, const cui_theme *, cui_table_model *,
                                 cui_table_state *, cui_table_options, cui_table_label_fn,
                                 cui_table_cell_fn, void *userdata);
+bool cui_table_span_width(const float *widths, size_t count, size_t start, size_t span,
+                          float *width);
+typedef enum {
+    CUI_TABLE_SECTION_HEADER,
+    CUI_TABLE_SECTION_BODY,
+    CUI_TABLE_SECTION_FOOTER
+} cui_table_section;
+void cui_table_begin_section(cui_context *, cui_id, const cui_theme *, cui_table_section);
+void cui_table_begin_head_cell(cui_context *, cui_id, float width, float height, cui_table_align,
+                               cui_str name);
+bool cui_table_begin_cell_span(cui_context *, cui_id, const float *widths, size_t count,
+                               size_t start, size_t span, float height, cui_table_align);
+void cui_table_caption(cui_context *, cui_id, const cui_theme *, cui_str);
 /* Stateless composable Table: caller determines section/cell hierarchy and content. */
 void cui_table_begin(cui_context *, cui_id, const cui_theme *, float width);
 void cui_table_begin_row(cui_context *, cui_id, const cui_theme *, float height, bool header);

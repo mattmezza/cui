@@ -8,8 +8,7 @@ portable C11 public types and independent base behavior.
 `cui_table_begin`, `cui_table_begin_row`, `cui_table_begin_cell` and
 `cui_table_end` compose a themed table containing arbitrary caller content. Every
 begin requires a matching end. These register passive table, row and cell roles;
-callers can set semantic parent and descriptive details using core setters. There
-are no implicit cell labels, column spans, sections or caption positioning.
+callers can set semantic parent and descriptive details using core setters. Head-cell, header/body/footer section and caption helpers preserve that composition. Validated cell-span helpers sum explicit column widths; failed validation does not begin a box. Callers place captions after their sections and provide accessible head-cell names. There are no implicit data cell labels.
 
 Create `cui_table_model` with a bounded row capacity, then bind borrowed rows and
 mutable columns. Rows and columns need nonzero unique keys within each dimension.
@@ -44,21 +43,23 @@ the first/last enabled row. PageUp/PageDown move a viewport of physical rows and
 events in one frame operate in queue order. Roving cell Tab focus follows the
 cursor; the header cursor is a separate Tab stop, with Left/Right/Home/End navigation skipping disabled columns. Headers support Enter or pointer
 sort activation, and Ctrl+Left/Right moves movable columns without crossing an
-immovable column. Resize grips accept pointer dragging and Left/Right in eight
+immovable column. Primary pointer dragging past four pixels reorders at header midpoints on drop; it respects pinned regions and immovable columns, suppresses sort activation, and cancels on Escape/cancel or release outside the header. Resize grips accept pointer dragging and Left/Right in eight
 pixel increments. Secondary clicks return a contextual row/column request without changing selection; the application composes and controls the menu. Widths clamp to configured bounds; secondary button gestures
 do not resize. Manual selection moves the cursor without changing selection.
 Disabled state prevents reducer mutation.
 
 The body uses fixed row heights, fractional scroll offsets, bounded row and column overscan and
 real ancestor clipping. The header remains fixed vertically and shares horizontal
-scroll with the body. Width-aware horizontal column virtualization includes partial edge columns. Result fields report actual visible row/column windows (without overscan), changes to those windows, and an opt-in load-more request near the end. Load requests fire once per threshold entry or changed row count; applications append rows and rebind. They are suppressed while disabled. Both grid and body expose scroll extents for core wheel routing and boundary bubbling. Wheel scrolling can move the cursor offscreen without
+scroll with the body. Width-aware horizontal column virtualization includes partial edge columns. An optional pinned row-number header selects whole rows and navigates enabled rows. Its result requests ROW selection mode; the caller applies that request to the controlled options. Row headers continue working when all data columns are disabled. Result fields report actual visible row/column windows (without overscan), changes to those windows, and an opt-in load-more request near the end. Load requests fire once per threshold entry or changed row count; applications append rows and rebind. They are suppressed while disabled. Both grid and body expose scroll extents for core wheel routing and boundary bubbling. Wheel scrolling can move the cursor offscreen without
 forcing it back into view; keyboard navigation reveals the cursor again. Grid,
 row, column-header and grid-cell semantics include hierarchy, selection, row and
 column indices, and total grid counts. Indices are one based data indices and
 exclude the header. IDs are stable keyed hashes; applications must avoid hash/ID
 collisions with other controls as required by the core.
 
-Tests cover bounded row/column/cell ranges, toggles, capacity rejection, and transactional validation, keyed lookup in 10,000 rows, fractional
+Custom header and row-header render hooks use option userdata. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
+
+Tests cover four-theme static sections/spans/caption geometry, row-header selection mode requests, drag reorder/cancellation, empty/loading/custom hooks, bounded row/column/cell ranges, toggles, capacity rejection, and transactional validation, keyed lookup in 10,000 rows, fractional
 viewport arithmetic, clipped overscan, callback count and accessible labels,
 fixed header geometry, pinned header/cell geometry and clipping/hit behavior, horizontal clipping/virtualization, load request deduplication, ordered keyboard events, disabled skipping, manual
 selection, sorting, column reorder, keyboard/pointer resize, width clamps,
@@ -66,9 +67,6 @@ secondary gestures, wheel/focus interaction and semantic hierarchy. The same
 behavior tests run with a base-only core link; sanitizer validation instruments
 both layout and reducer.
 
-This is not full GPUI family parity. Remaining features include
-column drag reorder, menu composition, asynchronous loading indicators, scrollbar
-chrome, variable row heights, Table cell spans/sections/captions, and row-header
-styling. Selection defaults to a single controlled keyed item in each dimension. An opt-in multiple-selection mode uses a caller-provided buffer of at most 4096 keyed items, with Ctrl/Meta toggles and Shift row/column/rectangular ranges. Disabled rows and columns are excluded from ranges. Capacity failures preserve the prior selection and keep the table rendered; callers may enlarge the buffer and retry. The anchor and buffer are controlled state, and callers must retain unique normalized keys in the buffer. Caller
+This is not full GPUI family parity. Remaining features include hierarchical DataTable group headers, whole-row composition hooks, trailing blank-column customization, composed menus, scrollbar chrome and variable row heights. Selection defaults to a single controlled keyed item in each dimension. An opt-in multiple-selection mode uses a caller-provided buffer of at most 4096 keyed items, with Ctrl/Meta toggles and Shift row/column/rectangular ranges. Disabled rows and columns are excluded from ranges. Capacity failures preserve the prior selection and keep the table rendered; callers may enlarge the buffer and retry. The anchor and buffer are controlled state, and callers must retain unique normalized keys in the buffer. Caller
 sorting/filtering is supported but this module does not provide a comparator or
 filter engine. Native accessibility adapters must map the portable grid roles.

@@ -1,6 +1,6 @@
 # Numeric and sequence controls
 
-`cui_numeric.h` provides NumberInput, Pagination, Rating and Stepper. Values and changes belong to the application; a true result signals a controlled value/index change. Theme values define typography, surfaces and spacing. The implementation is portable C11 and uses semantic snapshots and common draw commands, without platform or Clay types.
+`cui_numeric.h` provides NumberInput, Pagination, Rating and Stepper. Values and changes belong to the application; a true result signals a controlled value/index change. Theme values define typography, surfaces and spacing. Each styled function calls its corresponding `cui_base_*` reducer exactly once, then paints without adding semantics or mutating state. Base reducers are independently usable with custom layouts and emit no draw commands. `cui_numeric_part_id` exposes stable child IDs for these layouts. Button/page/star/step activations are processed in input order, including multiple activations in one frame. The implementation is portable C11 and uses semantic snapshots and common draw commands, without platform or Clay types.
 
 ## NumberInput
 
@@ -29,3 +29,5 @@ Rating accepts a controlled floating value, clamps to the configured maximum and
 Stepper uses a controlled zero-based selected index, bounded to existing items. Each item has title, optional description, explicit pending/active/complete/error status and disabled state. Pointer or Enter/Space activation updates the index. Whole-group disabling suppresses all items. Horizontal and vertical layouts use the same model. Selected semantic details update in the activation frame; status text includes non-color meaning. Empty arrays are supported, and this convenience renderer bounds arrays to one hundred items. Custom icons, connector lines, centered typography and exact size variants remain pending.
 
 Headless tests cover real routed key/pointer events, controlled replacement, draft rejection and CJK normalization, blur/Enter clamping, disabled/readonly behavior, half-star selection and clearing, page navigation, disabled step activation, all four themes, strict finite parsing and extreme double round trips. Exhaustive small pagination windows and `SIZE_MAX` boundaries test overflow/ordering invariants. New sources compile with strict C11 warnings; existing CTest and instrumented ASan/UBSan tests run before submission. Source/test/distribution registration belongs to the integrator.
+
+Compile `tests/unit/test_numeric.c` with `-DCUI_NUMERIC_BASE_ONLY` to run the same routed-event assertions against base reducers, bare geometry, and no theme/components link. The worker validates this separate executable as well as the styled path, including a Last-then-Previous activation sequence in one frame.

@@ -108,9 +108,22 @@ static cui_number_result number_scene(cui_context *ui, const cui_theme *theme,
                                       cui_number_state *state, double *value,
                                       cui_number_options options) {
     assert(cui_begin_frame(ui, 800, 600, .016f));
+#ifdef CUI_NUMERIC_BASE_ONLY
+    (void)theme;
+    cui_number_result result =
+        cui_base_number_input(ui, 2, cui_string("Quantity"), state, value, options);
+    cui_begin_box(ui, 2, (cui_box){.width = 200, .height = 40});
+    cui_end_box(ui);
+    for (unsigned i = 1; i <= 2; ++i) {
+        cui_begin_box(ui, cui_numeric_part_id(2, i), (cui_box){.width = 40, .height = 40});
+        cui_end_box(ui);
+    }
+    assert(cui_end_frame(ui).count == 0);
+#else
     cui_number_result result =
         cui_number_input(ui, 2, theme, cui_string("Quantity"), state, value, options);
     cui_end_frame(ui);
+#endif
     assert(cui_last_error(ui) == CUI_OK);
     return result;
 }
@@ -124,7 +137,11 @@ static void number_events(void) {
                                                        .max_history_steps = 16});
     assert(edit);
     cui_number_state state = {.edit = edit};
+#ifdef CUI_NUMERIC_BASE_ONLY
+    cui_theme theme = {0};
+#else
     cui_theme theme = cui_theme_light();
+#endif
     double value = 5;
     cui_number_options options = {
         .has_minimum = true, .has_maximum = true, .minimum = 0, .maximum = 10, .step = 2};
@@ -192,6 +209,29 @@ static void other_scene(cui_context *ui, const cui_theme *t, size_t *page, float
                         size_t *step, bool disabled, bool readonly) {
     assert(cui_begin_frame(ui, 1400, 800, .016f));
     cui_begin_box(ui, 100, (cui_box){.width = 1400, .gap = 8});
+    cui_step steps[] = {
+        {.title = cui_string("Details"), .status = CUI_STEP_COMPLETE},
+        {.title = cui_string("Payment"),
+         .description = cui_string("Choose method"),
+         .status = CUI_STEP_ACTIVE},
+        {.title = cui_string("Finish"), .status = CUI_STEP_PENDING, .disabled = true}};
+#ifdef CUI_NUMERIC_BASE_ONLY
+    (void)t;
+    cui_base_pagination(ui, 101, page, 100, false, disabled);
+    cui_base_rating(ui, 102, cui_string("Quality"), rating,
+                    (cui_rating_options){.maximum = 5,
+                                         .half_steps = true,
+                                         .clearable = true,
+                                         .disabled = disabled,
+                                         .readonly = readonly});
+    cui_base_stepper(ui, 103, steps, 3, step, disabled);
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    for (size_t i = 0; i < semantic_count; ++i) {
+        cui_begin_box(ui, semantics[i].id, (cui_box){.width = 180, .height = 24});
+        cui_end_box(ui);
+    }
+#else
     cui_pagination(ui, 101, t, page, 100, false, disabled);
     cui_rating(ui, 102, t, cui_string("Quality"), rating,
                (cui_rating_options){.maximum = 5,
@@ -199,13 +239,8 @@ static void other_scene(cui_context *ui, const cui_theme *t, size_t *page, float
                                     .clearable = true,
                                     .disabled = disabled,
                                     .readonly = readonly});
-    cui_step steps[] = {
-        {.title = cui_string("Details"), .status = CUI_STEP_COMPLETE},
-        {.title = cui_string("Payment"),
-         .description = cui_string("Choose method"),
-         .status = CUI_STEP_ACTIVE},
-        {.title = cui_string("Finish"), .status = CUI_STEP_PENDING, .disabled = true}};
     cui_stepper(ui, 103, t, steps, 3, step, false, disabled);
+#endif
     cui_end_box(ui);
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
@@ -220,8 +255,12 @@ static cui_id named(cui_context *ui, const char *name) {
     return 0;
 }
 static void other_events(void) {
+#ifdef CUI_NUMERIC_BASE_ONLY
+    cui_theme themes[4] = {0};
+#else
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};
+#endif
     for (size_t i = 0; i < 4; ++i) {
         cui_context *ui = cui_create((cui_config){.width = 1400, .height = 800});
         assert(ui);
@@ -233,6 +272,10 @@ static void other_events(void) {
         key(ui, CUI_KEY_ENTER, 0);
         other_scene(ui, &themes[i], &page, &rating, &step, false, false);
         assert(page == 51);
+        click(ui, cui_bounds(ui, named(ui, "Last")), .5f);
+        click(ui, cui_bounds(ui, named(ui, "Previous")), .5f);
+        other_scene(ui, &themes[i], &page, &rating, &step, false, false);
+        assert(page == 99);
         click(ui, cui_bounds(ui, named(ui, "Last")), .5f);
         other_scene(ui, &themes[i], &page, &rating, &step, false, false);
         assert(page == 100);

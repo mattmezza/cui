@@ -29,6 +29,12 @@ typedef struct {
     int step_direction;
     cui_edit_result error;
 } cui_number_result;
+/* Stable part IDs for custom base-only layouts: Number +/- use 1/2; Pagination
+ * first/previous/next/last use 1..4 and numbered items 10+window index;
+ * Rating clear uses 1 and stars 10+zero-based index; Stepper items use 1+index. */
+cui_id cui_numeric_part_id(cui_id root, unsigned part);
+cui_number_result cui_base_number_input(cui_context *, cui_id, cui_str, cui_number_state *,
+                                        double *, cui_number_options);
 /* Draft updates numeric value when valid; clamps on Enter/blur. Invalid draft remains editable. */
 cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                    cui_number_state *state, double *value,
@@ -41,6 +47,8 @@ typedef struct {
 /* One-based pages. radius <= 3; max output count is 11. Out-of-range current is clamped. */
 size_t cui_pagination_items(size_t current, size_t total, unsigned radius,
                             cui_page_item output[11]);
+bool cui_base_pagination(cui_context *, cui_id, size_t *, size_t total, bool compact,
+                         bool disabled);
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,
                     bool compact, bool disabled);
 typedef struct {
@@ -48,6 +56,7 @@ typedef struct {
     bool half_steps, clearable, disabled, readonly;
     float width;
 } cui_rating_options;
+bool cui_base_rating(cui_context *, cui_id, cui_str, float *, cui_rating_options);
 bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
                 cui_rating_options options);
 typedef enum {
@@ -63,6 +72,8 @@ typedef struct {
 } cui_step;
 /* Controlled zero-based index. Activation changes the index; explicit statuses remain caller-owned.
  */
+bool cui_base_stepper(cui_context *, cui_id, const cui_step *, size_t count, size_t *current,
+                      bool disabled);
 bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_step *steps,
                  size_t count, size_t *current, bool vertical, bool disabled);
 #ifdef __cplusplus

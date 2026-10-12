@@ -188,10 +188,31 @@ int main(int argc, char **argv) {
         }
     assert(observed == 3);
     cui_end_frame(ui);
-    cui_destroy(ui);
     printf("SDL driver=%s; glyph misses=%llu then %llu; persistent cache and "
            "clipboard/event roundtrips passed\n",
            cui_sdl3_driver(s), (unsigned long long)first.misses, (unsigned long long)second.misses);
+    cui_window_host window = cui_sdl3_window_interface(s);
+    cui_window_info info = window.query(window.user);
+    assert(info.actions & (1u << CUI_WINDOW_CLOSE));
+    assert(!(info.actions & (1u << CUI_WINDOW_MOVE)));
+    assert(!window.perform(window.user, CUI_WINDOW_MOVE, 10, 10));
+    assert(!window.perform(window.user, CUI_WINDOW_MENU, 10, 10));
+    const char *driver = cui_sdl3_video_driver();
+    if (driver && (!strcmp(driver, "dummy") || !strcmp(driver, "offscreen")))
+        assert(info.actions == (1u << CUI_WINDOW_CLOSE));
+    bool decorated = cui_sdl3_set_decorated(s, false);
+    if (driver && strcmp(driver, "dummy") && strcmp(driver, "offscreen"))
+        assert(decorated);
+    if (decorated) {
+        info = window.query(window.user);
+#ifndef SDL_PLATFORM_MACOS
+        assert(info.decoration == CUI_WINDOW_CLIENT_DECORATED);
+#endif
+        assert(cui_sdl3_set_decorated(s, true));
+    }
+    assert(window.perform(window.user, CUI_WINDOW_CLOSE, 0, 0));
+    assert(!cui_sdl3_poll(s, ui));
+    cui_destroy(ui);
     cui_sdl3_destroy(s);
     cui_font_close(font);
     return 0;

@@ -72,7 +72,9 @@ static cui_theme cui_theme_control_defaults(cui_theme t) {
                                            (uint8_t)((4u * t.background.g + t.border.g) / 5u),
                                            (uint8_t)((4u * t.background.b + t.border.b) / 5u), 255};
     t.description_list_label_foreground = t.muted;
-    t.status_bar = t.background;
+    t.title_bar = t.background;
+    t.title_bar_border = t.border;
+    t.status_bar = t.title_bar;
     t.status_bar_border = t.border;
     t.sidebar = (cui_color){(uint8_t)((85u * t.background.r + 15u * t.border.r) / 100u),
                             (uint8_t)((85u * t.background.g + 15u * t.border.g) / 100u),

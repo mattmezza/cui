@@ -536,3 +536,61 @@ cui_renderer cui_sdl3_interface(cui_sdl3 *s) {
                               (s && strcmp(name, "software") ? CUI_RENDER_ACCELERATED : 0),
                           render, destroy};
 }
+
+static cui_window_info cui_sdl3_window_query(void *user) {
+    cui_sdl3 *s = user;
+    if (!s || !s->window)
+        return (cui_window_info){0};
+    SDL_WindowFlags flags = SDL_GetWindowFlags(s->window);
+    cui_window_info info = {.decoration = (flags & SDL_WINDOW_BORDERLESS)
+                                              ? CUI_WINDOW_CLIENT_DECORATED
+                                              : CUI_WINDOW_SERVER_DECORATED,
+                            .actions = 1u << CUI_WINDOW_CLOSE,
+                            .maximized = (flags & SDL_WINDOW_MAXIMIZED) != 0,
+                            .fullscreen = (flags & SDL_WINDOW_FULLSCREEN) != 0};
+#ifdef SDL_PLATFORM_MACOS
+    info.decoration = CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS;
+#endif
+    const char *driver = SDL_GetCurrentVideoDriver();
+    if (driver && strcmp(driver, "dummy") && strcmp(driver, "offscreen")) {
+        info.actions |= 1u << CUI_WINDOW_MINIMIZE;
+        if (flags & SDL_WINDOW_RESIZABLE) {
+            info.actions |= (1u << CUI_WINDOW_MAXIMIZE) | (1u << CUI_WINDOW_RESTORE);
+#ifndef SDL_PLATFORM_MACOS
+            info.actions |= 1u << CUI_WINDOW_TITLEBAR_DOUBLE_CLICK;
+#endif
+        }
+    }
+    return info;
+}
+static bool cui_sdl3_window_perform(void *user, cui_window_action action, float x, float y) {
+    (void)x;
+    (void)y;
+    cui_sdl3 *s = user;
+    if (!s || action < CUI_WINDOW_MOVE || action > CUI_WINDOW_TITLEBAR_DOUBLE_CLICK)
+        return false;
+    cui_window_info info = cui_sdl3_window_query(user);
+    if (!(info.actions & (1u << action)))
+        return false;
+    switch (action) {
+    case CUI_WINDOW_MINIMIZE:
+        return SDL_MinimizeWindow(s->window);
+    case CUI_WINDOW_MAXIMIZE:
+        return SDL_MaximizeWindow(s->window);
+    case CUI_WINDOW_RESTORE:
+        return SDL_RestoreWindow(s->window);
+    case CUI_WINDOW_TITLEBAR_DOUBLE_CLICK:
+        return info.maximized ? SDL_RestoreWindow(s->window) : SDL_MaximizeWindow(s->window);
+    case CUI_WINDOW_CLOSE:
+        s->quit = true;
+        return true;
+    default:
+        return false;
+    }
+}
+cui_window_host cui_sdl3_window_interface(cui_sdl3 *s) {
+    return (cui_window_host){s, cui_sdl3_window_query, cui_sdl3_window_perform};
+}
+bool cui_sdl3_set_decorated(cui_sdl3 *s, bool decorated) {
+    return s && s->window && SDL_SetWindowBordered(s->window, decorated);
+}

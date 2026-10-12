@@ -5021,31 +5021,46 @@
       "reference_url": "https://gpui-kit.com/component/title-bar/",
       "category": "layout",
       "base_behavior": [],
-      "public_header": null,
+      "public_header": "include/cui/cui_chrome.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Full documented behavior pending implementation and audit."
+      "tests": [
+        "tests/unit/test_chrome.c",
+        "tests/unit/test_sdl3.c"
       ],
-      "owner": "unassigned",
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial",
+        "linux_x11": "tested_partial"
+      },
+      "limitations": [
+        "Source geometry/gradient/window SVGs and mock-host pointer/keyboard routing tested. SDL decoration/query/close contracts tested on X11; minimize/maximize remain OS-asynchronous. Native drag/menu, macOS traffic-light placement/preferences and Windows control hit areas remain host integration gaps. Portable double-click thresholds substitute OS preferences; browser story pending."
+      ],
+      "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "window controls and host chrome",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chrome.c",
+            "tests/unit/test_sdl3.c"
+          ]
         },
         {
           "name": "drag/maximize integration",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chrome.c",
+            "tests/unit/test_sdl3.c"
+          ]
         },
         {
           "name": "platform semantics/theme",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chrome.c",
+            "tests/unit/test_sdl3.c"
+          ]
         }
       ],
       "upstream_doc": {

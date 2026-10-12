@@ -33,6 +33,10 @@ cui_sdl3_cache_stats cui_sdl3_glyph_cache_stats(cui_sdl3 *backend);
  * Native input dispatch remains cui_sdl3_poll(); no IME composition capability.
  */
 cui_platform cui_sdl3_clipboard_interface(cui_sdl3 *backend);
+/* Window actions are deferred by the OS; close requests stop the next poll.
+ * Native move/system-menu dispatch is not available through this interface. */
+cui_window_host cui_sdl3_window_interface(cui_sdl3 *backend);
+bool cui_sdl3_set_decorated(cui_sdl3 *backend, bool decorated);
 void cui_sdl3_wait(unsigned milliseconds);
 cui_renderer cui_sdl3_interface(cui_sdl3 *backend);
 #ifdef __cplusplus

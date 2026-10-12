@@ -12,6 +12,8 @@ def generate(name,sources):
     lines += [f'#if defined({macro}) && !defined({macro}_ONCE)',f'#define {macro}_ONCE']
     if name in {"cui_choice", "cui_surface", "cui_form", "cui_status", "cui_message"}:
         lines += ['#include "cui_components.h"']
+    if name=="cui_chrome":
+        lines += ['#ifndef CUI_ICON_IMPLEMENTATION','#define CUI_ICON_IMPLEMENTATION','#endif','#include "cui_icon.h"']
     if name=="cui_base":
         lines += ['#ifndef CUI_EDIT_IMPLEMENTATION','#define CUI_EDIT_IMPLEMENTATION','#endif','#include "cui_edit.h"']
     if name=="cui_components":

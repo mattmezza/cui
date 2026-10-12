@@ -6,6 +6,8 @@ The new website and library feedback is preserved in [website-feedback.md](websi
 
 Build and test with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. Build the real browser gallery with `python scripts/build_web.py`; see [WEB_GALLERY.md](WEB_GALLERY.md) for serving and browser checks. The public renderer is the browser canvas host consuming actual CUI WASM draw lists. This is not evidence of native GPU runtime validation or complete native accessibility integration.
 
+Navigation batch `a679582` passes native77, sanitizer75, WASI67 and Chromium78, including a regression that fails the old word-navigation code. Publication awaits the next website/docs integration. The remaining feedback audit stays open.
+
 ## Historical report (superseded status and counts)
 
 # Nightly report — live development checkpoint

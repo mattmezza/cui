@@ -10,6 +10,8 @@ The public website includes system-default themes, all 38 named palettes, slash 
 
 Only root integrates. Worker worktrees remain preserved; workers reached model usage limits, so root continues the implementation and validation independently. No full-parity completion is claimed.
 
+The next keyboard batch `a679582` adds word movement, logical-line scalar-column movement, single-line Up/Down start/end and explicit popup key delegation. Native77, sanitizer75, WASI67 and Chromium78 pass; it awaits publication. The new Start building/state/callback/agent guides and downloadable agent-doc exports are being validated in a separate website branch.
+
 ## Historical checkpoints
 
 The entries below preserve earlier evidence and failures. Their story counts, status totals and pending work describe those historical revisions, not the current repository.

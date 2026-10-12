@@ -100,6 +100,13 @@ typedef cui_color (*cui_chart_bar_fill_fn)(const cui_chart_datum *, size_t index
                                            cui_plot_rect chart, float x, float y, void *user);
 typedef double (*cui_chart_pie_radius_fn)(const cui_chart_datum *, size_t index,
                                           double default_radius, void *user);
+typedef struct {
+    const cui_chart_datum *datum;
+    size_t index;
+    double value, start_angle, end_angle, pad_angle; /* source arc angles, radians from zero */
+} cui_chart_pie_arc;
+typedef double (*cui_chart_pie_arc_radius_fn)(const cui_chart_pie_arc *, double default_radius,
+                                              void *user);
 typedef cui_color (*cui_chart_pie_line_color_fn)(const cui_chart_datum *, size_t index, void *user);
 typedef cui_color (*cui_chart_bar_label_color_fn)(const cui_chart_datum *, size_t index,
                                                   void *user);
@@ -134,7 +141,8 @@ typedef struct {
     float logical_width, logical_height; /* zero selects pixel dimensions */
     uint64_t data_revision;              /* nonzero enables a cache with stable input pointers */
     size_t point_count;                  /* zero means count */
-    unsigned tick_count;                 /* zero means 5 */
+    unsigned
+        tick_count; /* zero: 5 Cartesian ticks, 4 Radar rings; one clamps to two for Cartesian */
     unsigned x_tick_count, grid_columns; /* zero: source stride/all, no columns */
     unsigned x_tick_margin; /* zero selects source stride one; ignored when count is set */
     bool hide_grid, hide_axes, hide_legend, noninteractive;
@@ -161,7 +169,8 @@ typedef struct {
     double inner_radius;     /* pie/donut pixels */
     double pie_outer_radius; /* zero selects 40% of pixel height */
     cui_chart_pie_radius_fn pie_inner_radius_fn, pie_outer_radius_fn;
-    void *pie_radius_user; /* callbacks must be stable during a render */
+    cui_chart_pie_arc_radius_fn pie_inner_arc_radius_fn, pie_outer_arc_radius_fn;
+    void *pie_radius_user; /* arc callbacks take precedence; stable during a render */
     bool pie_show_labels;  /* outside labels and leader lines */
     float pie_label_gap;   /* zero selects source 15px */
     cui_color pie_label_color, pie_label_line_color;
@@ -302,7 +311,7 @@ cui_plot_result cui_chart_pie_labels(const cui_chart_options *, cui_chart_pie_la
                                      size_t capacity);
 /* Read-only hit geometry over a successfully rendered chart. */
 cui_chart_hit cui_chart_hit_test(const cui_chart_options *, float x, float y);
-/* Draws the caller-owned bitmap, labels and a named image semantic. Render first. */
+/* Renders and draws the caller-owned bitmap, labels and a named image semantic. */
 bool cui_chart(cui_context *, cui_id, cui_chart_state *, const cui_chart_options *, cui_str name);
 /* Colors from the active theme; caller options override individual fields. */
 cui_chart_options cui_chart_theme(cui_chart_options, const cui_theme *);
@@ -337,10 +346,38 @@ static double cui_chart_sankey_scaled(const cui_chart_options *o, double value) 
 static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *inner,
                                 double *outer) {
     double base_outer = o->pie_outer_radius > 0 ? o->pie_outer_radius : o->height * .4;
-    *inner = o->pie_inner_radius_fn
+    cui_chart_pie_arc arc = {0};
+    bool use_arc =
+        o->data[i].value > 0 && (o->pie_inner_arc_radius_fn || o->pie_outer_arc_radius_fn);
+    if (use_arc) {
+        long double total = 0, before = 0;
+        for (size_t j = 0; j < o->count; j++) {
+            double value = o->data[j].value;
+            if (!isfinite(value) || value < 0)
+                return false;
+            total += value;
+            if (j < i)
+                before += value;
+        }
+        if (total <= 0 || total > DBL_MAX)
+            return false;
+        arc.datum = &o->data[i];
+        arc.index = i;
+        arc.value = o->data[i].value;
+        arc.start_angle = (double)(2 * CUI_CHART_PI * before / total);
+        arc.end_angle = (double)(2 * CUI_CHART_PI * (before + arc.value) / total);
+        arc.pad_angle = o->pad_angle;
+    }
+    *inner = o->pie_inner_arc_radius_fn
+                 ? (use_arc ? o->pie_inner_arc_radius_fn(&arc, o->inner_radius, o->pie_radius_user)
+                            : o->inner_radius)
+             : o->pie_inner_radius_fn
                  ? o->pie_inner_radius_fn(&o->data[i], i, o->inner_radius, o->pie_radius_user)
                  : o->inner_radius;
-    *outer = o->pie_outer_radius_fn
+    *outer = o->pie_outer_arc_radius_fn
+                 ? (use_arc ? o->pie_outer_arc_radius_fn(&arc, base_outer, o->pie_radius_user)
+                            : base_outer)
+             : o->pie_outer_radius_fn
                  ? o->pie_outer_radius_fn(&o->data[i], i, base_outer, o->pie_radius_user)
                  : base_outer;
     return isfinite(*inner) && isfinite(*outer) && *inner >= 0 && *outer >= *inner &&
@@ -368,20 +405,19 @@ static cui_plot_result cui_chart_validate(const cui_chart_state *s, const cui_ch
         o->pie_outer_radius < 0 || !isfinite(o->pie_label_gap) || o->pie_label_gap < 0 ||
         !isfinite(o->candle_body_ratio) || o->candle_body_ratio < 0 || o->candle_body_ratio > 1 ||
         !isfinite(o->pad_angle) || o->pad_angle < 0 || o->pad_angle > 2 * CUI_CHART_PI ||
-        !isfinite(o->bar_ratio) || o->bar_ratio < 0 || o->bar_ratio > 1 || o->tick_count == 1 ||
-        o->tick_count > 1000 || o->bar_alignment < CUI_CHART_BAR_BOTTOM ||
-        o->bar_alignment > CUI_CHART_BAR_RIGHT || !isfinite(o->bar_padding_inner) ||
-        !isfinite(o->bar_padding_outer) || !isfinite(o->max_bar_width) ||
-        !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 || o->bar_padding_inner > 1 ||
-        o->bar_padding_outer < 0 || o->bar_padding_outer > 1 || o->max_bar_width < 0 ||
-        o->min_bar_length < 0 || !isfinite(o->radar_max_value) || !isfinite(o->bar_corner_radius) ||
-        o->bar_corner_radius < 0 || !isfinite(o->reveal_progress) || o->reveal_progress < 0 ||
-        o->reveal_progress > 1 || !isfinite(o->appear_duration) || o->appear_duration < 0 ||
-        !isfinite(o->hover_duration) || o->hover_duration < 0 ||
-        (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) || o->radar_max_value < 0 ||
-        !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 || o->x_tick_count > 1000 ||
-        o->grid_columns > 1000 || o->reference_count > 16 || o->sankey_iterations > 100 ||
-        o->sankey_value_scale < CUI_CHART_SANKEY_LINEAR ||
+        !isfinite(o->bar_ratio) || o->bar_ratio < 0 || o->bar_ratio > 1 || o->tick_count > 1000 ||
+        o->bar_alignment < CUI_CHART_BAR_BOTTOM || o->bar_alignment > CUI_CHART_BAR_RIGHT ||
+        !isfinite(o->bar_padding_inner) || !isfinite(o->bar_padding_outer) ||
+        !isfinite(o->max_bar_width) || !isfinite(o->min_bar_length) || o->bar_padding_inner < 0 ||
+        o->bar_padding_inner > 1 || o->bar_padding_outer < 0 || o->bar_padding_outer > 1 ||
+        o->max_bar_width < 0 || o->min_bar_length < 0 || !isfinite(o->radar_max_value) ||
+        !isfinite(o->bar_corner_radius) || o->bar_corner_radius < 0 ||
+        !isfinite(o->reveal_progress) || o->reveal_progress < 0 || o->reveal_progress > 1 ||
+        !isfinite(o->appear_duration) || o->appear_duration < 0 || !isfinite(o->hover_duration) ||
+        o->hover_duration < 0 || (o->bar_gradient_start.a == 0) != (o->bar_gradient_end.a == 0) ||
+        o->radar_max_value < 0 || !isfinite(o->radar_outer_radius) || o->radar_outer_radius < 0 ||
+        o->x_tick_count > 1000 || o->grid_columns > 1000 || o->reference_count > 16 ||
+        o->sankey_iterations > 100 || o->sankey_value_scale < CUI_CHART_SANKEY_LINEAR ||
         o->sankey_value_scale > CUI_CHART_SANKEY_SQRT || !isfinite(o->sankey_min_link_width) ||
         o->sankey_min_link_width < 0 || !isfinite(o->sankey_link_opacity) ||
         o->sankey_link_opacity < 0 || o->sankey_link_opacity > 1 ||
@@ -1038,6 +1074,9 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         top = 10;
     if (right <= left || bottom <= top)
         return;
+    bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+    double grid_top = point_chart ? 0 : top;
+    double grid_bottom = point_chart ? o->height - (o->hide_x_axis ? 0 : 20) : bottom;
     double lo, hi;
     cui_chart_domain(o, &lo, &hi);
     bool horizontal = o->kind == CUI_CHART_BAR && (o->bar_alignment == CUI_CHART_BAR_LEFT ||
@@ -1045,6 +1084,8 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
     cui_color grid = o->grid.a ? o->grid : (cui_color){120, 120, 120, 80};
     if (!o->hide_grid) {
         unsigned n = o->tick_count ? o->tick_count : 5;
+        if (n < 2)
+            n = 2;
         for (unsigned i = 0; i + 1 < n; i++) {
             if (horizontal) {
                 double x = o->bar_alignment == CUI_CHART_BAR_LEFT
@@ -1052,7 +1093,8 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                                : left + (right - left) * i / (n - 1);
                 cui_chart_guide(s, o, x, top, x, bottom, grid, o->grid_solid);
             } else {
-                double y = o->kind == CUI_CHART_CANDLESTICK && !o->tick_count ? bottom * i / 4
+                double y = point_chart ? grid_top + (grid_bottom - grid_top) * i / (n - 1)
+                           : o->kind == CUI_CHART_CANDLESTICK && !o->tick_count ? bottom * i / 4
                            : o->kind == CUI_CHART_BAR && o->bar_alignment == CUI_CHART_BAR_TOP
                                ? bottom - (bottom - top) * i / (n - 1)
                                : top + (bottom - top) * i / (n - 1);
@@ -1061,12 +1103,10 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
         }
         for (unsigned i = 0; i < o->grid_columns; i++) {
             double x = left + (right - left) * i / o->grid_columns;
-            cui_chart_guide(s, o, x, top, x, bottom, grid, o->grid_solid);
+            cui_chart_guide(s, o, x, grid_top, x, grid_bottom, grid, o->grid_solid);
         }
     }
     if (!o->hide_axes) {
-        if (o->kind != CUI_CHART_CANDLESTICK && o->kind != CUI_CHART_BAR)
-            cui_chart_line(s, o, left, top, left, bottom, grid);
         if (!o->hide_x_axis) {
             if (o->kind == CUI_CHART_BAR) {
                 cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, 0, 0, true};
@@ -1085,7 +1125,7 @@ static void cui_chart_cartesian(cui_chart_state *s, const cui_chart_options *o) 
                         cui_chart_line(s, o, left, zero, right, zero, grid);
                 }
             } else
-                cui_chart_line(s, o, left, bottom, right, bottom, grid);
+                cui_chart_line(s, o, left, grid_bottom, right, grid_bottom, grid);
         }
     }
     for (size_t i = 0; i < o->reference_count; i++) {
@@ -1386,7 +1426,7 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
     if (max <= 0 || radius <= 0)
         return;
     cui_color grid = o->grid.a ? o->grid : (cui_color){120, 120, 120, 80};
-    unsigned levels = o->tick_count ? o->tick_count : 5;
+    unsigned levels = o->tick_count ? o->tick_count : 4;
     if (!o->hide_grid) {
         for (unsigned level = 1; level <= levels; level++) {
             double r = radius * level / levels;
@@ -1997,6 +2037,12 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
         h = cui_chart_mix(h, inner_callback[i]);
     for (size_t i = 0; i < sizeof(o->pie_outer_radius_fn); i++)
         h = cui_chart_mix(h, outer_callback[i]);
+    const unsigned char *inner_arc_callback = (const unsigned char *)&o->pie_inner_arc_radius_fn;
+    const unsigned char *outer_arc_callback = (const unsigned char *)&o->pie_outer_arc_radius_fn;
+    for (size_t i = 0; i < sizeof(o->pie_inner_arc_radius_fn); i++)
+        h = cui_chart_mix(h, inner_arc_callback[i]);
+    for (size_t i = 0; i < sizeof(o->pie_outer_arc_radius_fn); i++)
+        h = cui_chart_mix(h, outer_arc_callback[i]);
     h = cui_chart_mix(h, (uintptr_t)o->pie_radius_user);
     h = cui_chart_mix(h, o->pie_show_labels);
     h = cui_chart_mix(h, cui_chart_bits(o->pie_label_gap));
@@ -2217,8 +2263,10 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
         return hit;
     } else {
         double left = cui_chart_plot_left(o), right = cui_chart_plot_right(o, left);
-        double top = o->kind == CUI_CHART_CANDLESTICK ? 0 : cui_chart_plot_top(o);
-        double bottom = cui_chart_plot_bottom(o);
+        bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+        double top = o->kind == CUI_CHART_CANDLESTICK || point_chart ? 0 : cui_chart_plot_top(o);
+        double bottom =
+            point_chart ? o->height - (o->hide_x_axis ? 0 : 20) : cui_chart_plot_bottom(o);
         if (x < left || x > right || y < top || y > bottom || right <= left)
             return hit;
         size_t n = o->point_count ? o->point_count : o->count;
@@ -2370,13 +2418,26 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
     if (!cui_chart_value_domain(o, &lo, &hi))
         return 0;
     unsigned count = o->tick_count ? o->tick_count : 5;
-    if (count < 2 || count > 1000)
+    if (count < 2)
+        count = 2;
+    if (count > 1000)
         return 0;
     unsigned visible = count < 32 ? count : 32;
     float gutter = 32;
+    bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
+    double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 0;
+    double bottom = point_chart ? o->height - (o->hide_x_axis ? 0 : 20) -
+                                      (o->custom_y_padding ? o->y_padding_bottom : 0)
+                                : 0;
+    cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
     for (unsigned i = 0; i < visible; i++) {
         unsigned tick = (count - 1) * i / (visible - 1);
         double value = hi - (hi - lo) * tick / (count - 1);
+        if (point_chart) {
+            double pixel_y = (o->height - (o->hide_x_axis ? 0 : 20)) * tick / (count - 1);
+            if (cui_plot_inverse(&scale, pixel_y, &value) != CUI_PLOT_OK)
+                return 0;
+        }
         char buffer[48];
         cui_str label =
             cui_chart_number(buffer, sizeof buffer, value, o->y_tick_format, o->format_user);
@@ -2747,16 +2808,13 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->emphasis_visual_index = SIZE_MAX;
         if (!instant && moving)
             cui_invalidate(ui);
-        if (o->kind != CUI_CHART_CANDLESTICK) {
-            cui_chart_options frame = *o;
-            if (!frame.reveal_enabled && state->appear_started &&
-                state->rendered_reveal_progress < 1) {
-                frame.reveal_enabled = true;
-                frame.reveal_progress = state->rendered_reveal_progress;
-            }
-            if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
-                return false;
+        cui_chart_options frame = *o;
+        if (!frame.reveal_enabled && state->appear_started && state->rendered_reveal_progress < 1) {
+            frame.reveal_enabled = true;
+            frame.reveal_progress = state->rendered_reveal_progress;
         }
+        if (cui_chart_render(state, &frame) != CUI_PLOT_OK)
+            return false;
     }
     cui_begin_box(
         ui, id,
@@ -3044,6 +3102,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         double lo, hi;
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
+            if (count < 2)
+                count = 2;
             unsigned visible = count < 32 ? count : 32;
             bool horizontal_bar =
                 o->kind == CUI_CHART_BAR &&
@@ -3068,7 +3128,9 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
                 unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
-                double pixel_y = top + (bottom - top) * (double)tick / (count - 1);
+                double pixel_y = point_chart ? (o->height - (o->hide_x_axis ? 0 : 20)) *
+                                                   (double)tick / (count - 1)
+                                             : top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
                 if (horizontal_bar)
                     value = lo + (hi - lo) * tick / (count - 1);

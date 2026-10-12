@@ -141,6 +141,8 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *,
                                                   cui_text_view_range source, char *output,
                                                   size_t capacity, size_t *length);
 bool cui_text_view_select(cui_text_view_state *, size_t anchor, size_t cursor);
+/* Borrowed coordinate slice from workspace.rendered, valid until the next text mutation.
+ * Includes one-byte image slots; use copy_selection(PLAIN) for image-free text output. */
 cui_str cui_text_view_selected_text(const cui_text_view_state *);
 typedef enum { CUI_TEXT_VIEW_COPY_PLAIN, CUI_TEXT_VIEW_COPY_SOURCE } cui_text_view_copy_format;
 /* Writes a zero-terminated copy. On capacity failure, *length reports required
@@ -522,6 +524,12 @@ cui_text_view_error cui_text_view_decode_resource(const cui_text_view_state *s,
     output[required] = 0;
     return CUI_TEXT_VIEW_OK;
 }
+static bool cui_text_view_name(cui_str, const char *);
+static bool cui_text_view_html_space(char);
+static size_t cui_text_view_html_tag_end(cui_str, size_t, size_t);
+static cui_text_view_range cui_text_view_attribute(cui_str, size_t, size_t, const char *);
+static cui_text_view_image_length cui_text_view_html_image_length(cui_str, size_t, size_t,
+                                                                  const char *);
 static bool cui_text_view_link_syntax(cui_str input, size_t opening, size_t end, size_t *label_end,
                                       size_t *destination_end) {
     if (opening >= end || input.data[opening] != '[')
@@ -612,6 +620,33 @@ static void cui_text_view_inline(cui_text_view_parser *p, size_t a, size_t b, un
         }
         if (c == '&' && cui_text_view_entity(p, &a, b, flags, link))
             continue;
+        if (c == '<') {
+            size_t end = cui_text_view_html_tag_end(p->input, a, b);
+            if (end != SIZE_MAX) {
+                size_t name_end = a + 1;
+                while (name_end < end && !cui_text_view_html_space(p->input.data[name_end]) &&
+                       p->input.data[name_end] != '/')
+                    ++name_end;
+                if (cui_text_view_name((cui_str){p->input.data + a + 1, name_end - a - 1}, "img")) {
+                    cui_text_view_range src =
+                        cui_text_view_attribute(p->input, name_end, end, "src");
+                    if (src.begin || src.end) {
+                        cui_text_view_emit(p, (cui_str){" ", 1}, (cui_text_view_range){a, end + 1},
+                                           flags | CUI_TEXT_VIEW_INLINE_IMAGE, link);
+                        p->last.resource = src;
+                        p->last.alt = cui_text_view_attribute(p->input, name_end, end, "alt");
+                        p->last.image_width =
+                            cui_text_view_html_image_length(p->input, name_end, end, "width");
+                        p->last.image_height =
+                            cui_text_view_html_image_length(p->input, name_end, end, "height");
+                        if (p->write && !p->error)
+                            p->state->workspace.spans[p->spans - 1] = p->last;
+                    }
+                    a = end + 1;
+                    continue;
+                }
+            }
+        }
         if (c == '`') {
             size_t close = cui_text_view_find(p->input, a + 1, b, "`", 1);
             if (close != SIZE_MAX) {
@@ -1775,11 +1810,29 @@ cui_str cui_text_view_selected_text(const cui_text_view_state *s) {
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
     return (cui_str){s->workspace.rendered + a, b - a};
 }
+/* Images at paragraph boundaries belong to the adjacent selected text run. */
+static void cui_text_view_source_selection(const cui_text_view_state *s, size_t *a, size_t *b) {
+    if (*a == *b)
+        return;
+    for (size_t i = 0; i < s->block_count; ++i) {
+        cui_text_view_range r = s->workspace.blocks[i].text;
+        size_t first = r.begin, last = r.end;
+        while (first < last && (s->workspace.mapping[first].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            ++first;
+        while (last > first && (s->workspace.mapping[last - 1].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            --last;
+        if (*a == first && first < last && *b > first)
+            *a = r.begin;
+        if (*b == last && first < last && *a < last)
+            *b = r.end;
+    }
+}
 bool cui_text_view_selected_source_range(const cui_text_view_state *s, cui_text_view_range *out) {
     if (!s || s->format == CUI_TEXT_VIEW_HTML)
         return false;
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
+    cui_text_view_source_selection(s, &a, &b);
     size_t start = SIZE_MAX, end = 0;
     for (size_t i = a; i < b; ++i) {
         cui_text_view_range m = s->workspace.mapping[i].source;
@@ -2778,6 +2831,17 @@ static cui_text_view_error cui_text_view_copy_source(const cui_text_view_state *
     }
     return CUI_TEXT_VIEW_OK;
 }
+static void cui_text_view_copy_plain(const cui_text_view_state *s, cui_text_view_copy_writer *w,
+                                     size_t a, size_t b) {
+    size_t start = a;
+    for (size_t i = a; i < b; ++i) {
+        if (!(s->workspace.mapping[i].flags & CUI_TEXT_VIEW_INLINE_IMAGE))
+            continue;
+        cui_text_view_copy_write(w, (cui_str){s->workspace.rendered + start, i - start});
+        start = i + 1;
+    }
+    cui_text_view_copy_write(w, (cui_str){s->workspace.rendered + start, b - start});
+}
 cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
                                                  cui_text_view_copy_format f, char *output,
                                                  size_t capacity, size_t *length) {
@@ -2787,13 +2851,16 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     size_t a = s->anchor < s->cursor ? s->anchor : s->cursor,
            b = s->anchor > s->cursor ? s->anchor : s->cursor;
     cui_str direct = {0};
-    if (f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN)
-        direct = (cui_str){s->workspace.rendered + a, b - a};
-    else if (a == 0 && b == s->text_length && a != b)
+    bool plain = f == CUI_TEXT_VIEW_COPY_PLAIN || s->format != CUI_TEXT_VIEW_MARKDOWN;
+    if (!plain)
+        cui_text_view_source_selection(s, &a, &b);
+    if (!plain && a == 0 && b == s->text_length && a != b)
         direct = cui_text_view_source(s);
     cui_text_view_copy_writer w = {0};
     cui_text_view_error error = CUI_TEXT_VIEW_OK;
-    if (direct.data)
+    if (plain)
+        cui_text_view_copy_plain(s, &w, a, b);
+    else if (direct.data)
         cui_text_view_copy_write(&w, direct);
     else
         error = cui_text_view_copy_source(s, &w, a, b);
@@ -2804,7 +2871,9 @@ cui_text_view_error cui_text_view_copy_selection(const cui_text_view_state *s,
     if (capacity <= w.length)
         return CUI_TEXT_VIEW_CAPACITY;
     w = (cui_text_view_copy_writer){.output = output};
-    if (direct.data)
+    if (plain)
+        cui_text_view_copy_plain(s, &w, a, b);
+    else if (direct.data)
         cui_text_view_copy_write(&w, direct);
     else
         (void)cui_text_view_copy_source(s, &w, a, b);
@@ -3005,9 +3074,17 @@ static void cui_text_view_reduce(cui_context *ui, cui_id id, cui_text_view_state
                                                          &length) == CUI_TEXT_VIEW_OK)
                             (void)o.clipboard->clipboard_set(o.clipboard->user,
                                                              (cui_str){o.copy_buffer, length});
-                    } else
-                        (void)o.clipboard->clipboard_set(o.clipboard->user,
-                                                         cui_text_view_selected_text(s));
+                    } else {
+                        char scratch[CUI_TEXT_VIEW_BYTE_LIMIT];
+                        char *buffer = o.copy_buffer ? o.copy_buffer : scratch;
+                        size_t capacity = o.copy_buffer ? o.copy_capacity : sizeof scratch;
+                        size_t length;
+                        if (cui_text_view_copy_selection(s, CUI_TEXT_VIEW_COPY_PLAIN, buffer,
+                                                         capacity, &length) == CUI_TEXT_VIEW_OK &&
+                            length)
+                            (void)o.clipboard->clipboard_set(o.clipboard->user,
+                                                             (cui_str){buffer, length});
+                    }
                 }
                 handled = true;
             } else if (!(e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META | CUI_MOD_ALT)) &&

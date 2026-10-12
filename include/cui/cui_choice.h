@@ -2,6 +2,8 @@
 #ifndef CUI_CHOICE_H
 #define CUI_CHOICE_H
 #include "cui.h"
+#include "cui_base.h"
+#include "cui_edit.h"
 #include "cui_overlay.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
@@ -78,6 +80,22 @@ bool cui_select(cui_context *, cui_id trigger, const cui_theme *, cui_str name, 
 bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
               const cui_choice_item *, size_t count, cui_id *action, cui_choice_popup *,
               cui_choice_popup_options);
+typedef struct {
+    bool changed, query_changed;
+    size_t matching_count;
+    cui_edit_result error;
+} cui_combobox_result;
+/* Caller supplies filtered scratch capacity for at least count items. Query is
+ * an independently owned single-line editor; committed IDs survive filtering.
+ * Search is ASCII case-insensitive substring matching, byte-exact otherwise. */
+cui_combobox_result cui_base_combobox(cui_context *, cui_id input, cui_str name, cui_edit *query,
+                                      const cui_choice_item *, size_t count,
+                                      cui_choice_item *filtered, size_t filtered_capacity,
+                                      cui_id *selected, cui_choice_popup *, bool disabled);
+cui_combobox_result cui_combobox(cui_context *, cui_id input, const cui_theme *, cui_str name,
+                                 cui_edit *query, const cui_choice_item *, size_t count,
+                                 cui_choice_item *filtered, size_t filtered_capacity,
+                                 cui_id *selected, cui_choice_popup *, cui_choice_popup_options);
 #ifdef __cplusplus
 }
 #endif

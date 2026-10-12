@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "cui/cui_base.h"
 static size_t cui_choice_navigate(const cui_choice_item *items, size_t count, size_t from,
                                   cui_key key, bool vertical) {
     int direction = 0;
@@ -28,17 +29,14 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
         return false;
     cui_id old = *selected;
     for (size_t i = 0; i < count; ++i) {
-        cui_interaction interaction =
-            cui_interact(ui, items[i].id, CUI_ROLE_TAB, items[i].label,
-                         options.disabled || items[i].disabled, *selected == items[i].id, (float)i);
-        if (interaction.activated && !options.disabled && !items[i].disabled)
-            *selected = items[i].id;
+        cui_interact(ui, items[i].id, CUI_ROLE_TAB, items[i].label,
+                     options.disabled || items[i].disabled, *selected == items[i].id, (float)i);
     }
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
-        if (events[e].type != CUI_EVENT_KEY_DOWN)
-            continue;
+        if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
+            cursor = count;
         size_t from = count;
         for (size_t i = 0; i < count; ++i)
             if (items[i].id == cui_event_target(ui, e))
@@ -47,7 +45,16 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
             continue;
         if (cursor == count)
             cursor = from;
-        size_t next = cui_choice_navigate(items, count, cursor, events[e].key, options.vertical);
+        if (cui_event_activation(ui, e) && (events[e].type != CUI_EVENT_KEY_UP ||
+                                            items[cursor].id == cui_event_activation(ui, e))) {
+            if (events[e].type == CUI_EVENT_POINTER_UP)
+                cursor = from;
+            *selected = items[cursor].id;
+        }
+        size_t next =
+            events[e].type == CUI_EVENT_KEY_DOWN
+                ? cui_choice_navigate(items, count, cursor, events[e].key, options.vertical)
+                : count;
         if (next != count) {
             cursor = next;
             cui_focus(ui, items[next].id);
@@ -85,30 +92,14 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
         return false;
     bool changed = false;
     for (size_t i = 0; i < count; ++i) {
-        cui_interaction interaction =
-            cui_interact(ui, items[i].id, CUI_ROLE_BUTTON, items[i].label,
-                         options.disabled || items[i].disabled, selected[i], selected[i]);
-        if (!interaction.activated || options.disabled || items[i].disabled)
-            continue;
-        bool next = !selected[i];
-        if (!next && !options.allow_empty) {
-            size_t active = 0;
-            for (size_t j = 0; j < count; ++j)
-                active += selected[j];
-            if (active == 1)
-                continue;
-        }
-        if (next && !options.multiple)
-            for (size_t j = 0; j < count; ++j)
-                selected[j] = false;
-        selected[i] = next;
-        changed = true;
+        cui_interact(ui, items[i].id, CUI_ROLE_BUTTON, items[i].label,
+                     options.disabled || items[i].disabled, selected[i], selected[i]);
     }
     size_t event_count = 0, cursor = count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count && !options.disabled; ++e) {
-        if (events[e].type != CUI_EVENT_KEY_DOWN)
-            continue;
+        if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_TAB)
+            cursor = count;
         size_t from = count;
         for (size_t i = 0; i < count; ++i)
             if (items[i].id == cui_event_target(ui, e))
@@ -117,7 +108,26 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
             continue;
         if (cursor == count)
             cursor = from;
-        size_t next = cui_choice_navigate(items, count, cursor, events[e].key, options.vertical);
+        if (cui_event_activation(ui, e) && (events[e].type != CUI_EVENT_KEY_UP ||
+                                            items[cursor].id == cui_event_activation(ui, e))) {
+            if (events[e].type == CUI_EVENT_POINTER_UP)
+                cursor = from;
+            bool next_selected = !selected[cursor];
+            size_t active_count = 0;
+            for (size_t j = 0; j < count; j++)
+                active_count += selected[j];
+            if (next_selected || options.allow_empty || active_count > 1) {
+                if (next_selected && !options.multiple)
+                    for (size_t j = 0; j < count; j++)
+                        selected[j] = false;
+                selected[cursor] = next_selected;
+                changed = true;
+            }
+        }
+        size_t next =
+            events[e].type == CUI_EVENT_KEY_DOWN
+                ? cui_choice_navigate(items, count, cursor, events[e].key, options.vertical)
+                : count;
         if (next != count) {
             cursor = next;
             cui_focus(ui, items[next].id);
@@ -171,6 +181,12 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             continue;
         if (from == count || items[from].disabled)
             from = target;
+        if (cui_event_activation(ui, e) &&
+            (events[e].type != CUI_EVENT_KEY_UP || items[from].id == cui_event_activation(ui, e))) {
+            size_t chosen = events[e].type == CUI_EVENT_POINTER_UP ? target : from;
+            *selected = state->active = items[chosen].id;
+            activated = true;
+        }
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
             size_t next = cui_choice_navigate(items, count, from, events[e].key, true);
             if (next != count) {
@@ -223,20 +239,20 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
             }
     }
     state->first_visible = begin;
-    bool pointer_moved = false;
-    for (size_t e = 0; e < event_count; ++e)
+    bool pointer_moved = false, keyboard_used = false;
+    for (size_t e = 0; e < event_count; ++e) {
         if (events[e].type == CUI_EVENT_POINTER_MOVE)
             pointer_moved = true;
+        if (events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP)
+            keyboard_used = true;
+    }
     for (size_t i = begin; i < begin + length; ++i) {
         cui_interaction interaction = cui_interact(
             ui, items[i].id, options.menu ? CUI_ROLE_MENUITEM : CUI_ROLE_OPTION, items[i].label,
             options.disabled || items[i].disabled, *selected == items[i].id, (float)i);
-        if (!options.disabled && !items[i].disabled && interaction.hovered && pointer_moved)
+        if (!options.disabled && !items[i].disabled && interaction.hovered && pointer_moved &&
+            !keyboard_used)
             state->active = items[i].id;
-        if (!options.disabled && !items[i].disabled && interaction.activated) {
-            *selected = state->active = items[i].id;
-            activated = true;
-        }
     }
     size_t stop = count;
     for (size_t i = begin; i < begin + length; ++i)
@@ -306,4 +322,113 @@ void cui_base_choice_popup_trigger(cui_context *ui, cui_id trigger, cui_str name
     cui_set_semantic_details(
         ui, trigger,
         (cui_semantic_details){.expanded = state->overlay.open, .controls = state->overlay.id});
+}
+
+static bool cui_choice_contains(cui_str label, cui_str query) {
+    if (!query.length)
+        return true;
+    if (!label.data || !query.data || query.length > label.length)
+        return false;
+    for (size_t start = 0; start <= label.length - query.length; start++) {
+        bool match = true;
+        for (size_t j = 0; j < query.length; j++) {
+            unsigned char a = (unsigned char)label.data[start + j],
+                          b = (unsigned char)query.data[j];
+            if (a >= 'A' && a <= 'Z')
+                a = (unsigned char)(a + 'a' - 'A');
+            if (b >= 'A' && b <= 'Z')
+                b = (unsigned char)(b + 'a' - 'A');
+            if (a != b) {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+            return true;
+    }
+    return false;
+}
+cui_combobox_result cui_base_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit *query,
+                                      const cui_choice_item *items, size_t count,
+                                      cui_choice_item *filtered, size_t capacity, cui_id *selected,
+                                      cui_choice_popup *state, bool disabled) {
+    cui_combobox_result result = {.error = CUI_EDIT_OK};
+    if (!query || !selected || !state || !state->overlay.id || (!items && count) ||
+        (!filtered && capacity) || capacity < count || cui_edit_get_state(query).multiline) {
+        result.error = capacity < count ? CUI_EDIT_CAPACITY : CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    state->overlay.modal = false;
+    cui_overlay_update(ui, &state->overlay);
+    if (disabled)
+        cui_overlay_close(ui, &state->overlay);
+    cui_input_result input_result = cui_base_input(ui, input, name, query, disabled);
+    result.query_changed = input_result.changed;
+    result.error = input_result.error;
+    cui_str text = cui_edit_get_text(query);
+    size_t matched = 0;
+    for (size_t i = 0; i < count; i++)
+        if (cui_choice_contains(items[i].label, text))
+            filtered[matched++] = items[i];
+    result.matching_count = matched;
+    size_t event_count = 0;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    bool dismiss = false;
+    if (!disabled)
+        for (size_t e = 0; e < event_count; e++) {
+            if (cui_event_target(ui, e) != input)
+                continue;
+            if (events[e].type == CUI_EVENT_KEY_DOWN && events[e].key == CUI_KEY_ESCAPE)
+                dismiss = true;
+            if (events[e].type == CUI_EVENT_POINTER_DOWN || events[e].type == CUI_EVENT_TEXT ||
+                (events[e].type == CUI_EVENT_KEY_DOWN &&
+                 (events[e].key == CUI_KEY_DOWN || events[e].key == CUI_KEY_UP))) {
+                if (!state->overlay.open)
+                    cui_overlay_open(ui, &state->overlay, input);
+            }
+        }
+    if (dismiss)
+        cui_overlay_close(ui, &state->overlay);
+    cui_set_semantic_details(ui, input,
+                             (cui_semantic_details){.expanded = state->overlay.open,
+                                                    .controls = state->overlay.id,
+                                                    .description = text});
+    if (!state->overlay.open)
+        return result;
+    size_t active = matched;
+    for (size_t i = 0; i < matched; i++)
+        if (filtered[i].id == state->list.active && !filtered[i].disabled)
+            active = i;
+    if (active == matched)
+        for (size_t i = 0; i < matched; i++)
+            if (!filtered[i].disabled) {
+                active = i;
+                break;
+            }
+    if (active != matched)
+        state->list.active = filtered[active].id;
+    bool commit = false;
+    for (size_t e = 0; e < event_count && !disabled; e++) {
+        if (cui_event_target(ui, e) != input || events[e].type != CUI_EVENT_KEY_DOWN)
+            continue;
+        size_t next = active == matched
+                          ? matched
+                          : cui_choice_navigate(filtered, matched, active, events[e].key, true);
+        if (next != matched) {
+            active = next;
+            state->list.active = filtered[active].id;
+        }
+        if (events[e].key == CUI_KEY_ENTER && !events[e].repeat && active != matched)
+            commit = true;
+    }
+    if (commit) {
+        cui_id old = *selected;
+        *selected = state->list.active;
+        cui_overlay_close(ui, &state->overlay);
+        cui_set_semantic_details(
+            ui, input, (cui_semantic_details){.controls = state->overlay.id, .description = text});
+        result.changed = old != *selected;
+        return result;
+    }
+    return result;
 }

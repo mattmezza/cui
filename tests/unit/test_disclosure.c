@@ -92,6 +92,21 @@ int main(void) {
     assert(cui_collapsible(ui, 200, &themes[0], cui_string("More"), &open, false, panel, NULL));
     cui_end_frame(ui);
     assert(open);
+    cui_focus(ui, 200);
+    key(ui, CUI_KEY_ENTER);
+    key(ui, CUI_KEY_ENTER);
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    assert(cui_collapsible(ui, 200, &themes[0], cui_string("More"), &open, false, panel, NULL));
+    cui_end_frame(ui);
+    assert(open); /* two activations survive aggregation */
+    opened[0] = true;
+    opened[2] = false;
+    scene(ui, options, &themes[0]);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(scene(ui, options, &themes[0]));
+    assert(opened[2] && cui_focused(ui) == 30);
     cui_destroy(ui);
     return 0;
 }

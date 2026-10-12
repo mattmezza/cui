@@ -104,6 +104,15 @@ static void test_lists_and_popups(void) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "a"}));
     list_scene(ui, many, 40, &value, &list, options);
     assert(list.active == 1002);
+    list = (cui_list_state){.active = 1000};
+    options = (cui_list_options){0};
+    list_scene(ui, items, 3, &value, &list, options);
+    cui_focus(ui, 10);
+    list.active = 10;
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    assert(list_scene(ui, items, 3, &value, &list, options));
+    assert(value == 30 && list.active == 30);
     cui_choice_popup popup;
     cui_choice_popup_init(&popup, 500);
     value = 10;
@@ -161,8 +170,71 @@ static void test_lists_and_popups(void) {
     assert(!popup.overlay.open && cui_focused(ui) == 2);
     cui_destroy(ui);
 }
+
+static cui_combobox_result combo_scene(cui_context *ui, cui_edit *query, cui_choice_popup *popup,
+                                       cui_id *value, cui_choice_item *scratch, size_t capacity,
+                                       bool disabled) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_combobox_result result = cui_combobox(
+        ui, 2, &theme, cui_string("Find"), query, items, 3, scratch, capacity, value, popup,
+        (cui_choice_popup_options){.disabled = disabled, .viewport = {0, 0, 640, 480}});
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_combobox(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    char text[64] = "";
+    cui_edit *query = cui_edit_create((cui_edit_config){
+        .buffer = text, .capacity = sizeof(text), .history_bytes = 1024, .max_history_steps = 16});
+    assert(query);
+    cui_choice_popup popup;
+    cui_choice_popup_init(&popup, 700);
+    cui_choice_item scratch[3];
+    cui_id value = 10;
+    cui_combobox_result result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(result.error == CUI_EDIT_OK && result.matching_count == 3 && !popup.overlay.open);
+    click(ui, 2);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(popup.overlay.open && cui_focused(ui) == 2);
+    key(ui, CUI_KEY_DOWN);
+    key(ui, CUI_KEY_ENTER);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(result.changed && value == 30 && !popup.overlay.open && cui_focused(ui) == 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "LA"}));
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(result.query_changed && result.matching_count == 1 && scratch[0].id == 30 &&
+           popup.overlay.open && cui_focused(ui) == 2);
+    key(ui, CUI_KEY_ESCAPE);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(!popup.overlay.open && value == 30 && cui_focused(ui) == 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "Z"}));
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(result.matching_count == 0 && popup.overlay.open && value == 30);
+    key(ui, CUI_KEY_ENTER);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(!result.changed && value == 30);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, true);
+    assert(!popup.overlay.open && !result.query_changed);
+    result = combo_scene(ui, query, &popup, &value, scratch, 2, false);
+    assert(result.error == CUI_EDIT_CAPACITY);
+    assert(cui_edit_select(query, 0, cui_edit_get_state(query).length) == CUI_EDIT_OK);
+    assert(cui_edit_insert(query, cui_string("Fir")) == CUI_EDIT_OK);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    click(ui, 2);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(result.matching_count == 1 && scratch[0].id == 10 && popup.overlay.open);
+    click(ui, 10);
+    result = combo_scene(ui, query, &popup, &value, scratch, 3, false);
+    assert(result.changed && value == 10 && !popup.overlay.open && cui_focused(ui) == 2);
+    cui_edit_destroy(query);
+    cui_destroy(ui);
+}
 int main(void) {
     test_lists_and_popups();
+    test_combobox();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
@@ -252,6 +324,23 @@ int main(void) {
     key(ui, CUI_KEY_RIGHT);
     assert(!toggles(ui, values, group));
     assert(cui_focused(ui) == 30);
+    selected = 10;
+    options = (cui_tabs_options){.manual_activation = true};
+    scene(ui, options, &themes[0]);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_RIGHT);
+    key(ui, CUI_KEY_ENTER);
+    assert(scene(ui, options, &themes[0]));
+    assert(selected == 30 && cui_focused(ui) == 30);
+    values[0] = true;
+    values[2] = false;
+    group = (cui_toggle_group_options){0};
+    toggles(ui, values, group);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_RIGHT);
+    key(ui, CUI_KEY_ENTER);
+    assert(toggles(ui, values, group));
+    assert(!values[0] && values[2]);
     cui_destroy(ui);
     return 0;
 }

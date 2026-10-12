@@ -111,3 +111,33 @@ Unicode normalization/case folding, Combobox text editing, or OS accessibility
 adapters. Tab currently stays in the open popup rather than dismissing and
 advancing to the next background control. These are tracked parity gaps; rendering
 and keyboard selection of the implemented subset are real.
+
+## Combobox
+
+`cui_combobox` combines a single-line `cui_edit`, an input with textbox semantics,
+and an anchored suggestion list. `cui_base_combobox` supplies the same editing,
+filtering and keyboard behavior without drawing. The query editor, choice array,
+filtered scratch array, committed selected ID and popup state all belong to the
+application. Allocate filtered scratch for at least the full item count; insufficient
+capacity returns `CUI_EDIT_CAPACITY` before changing query or selection.
+
+Typing opens suggestions and filters label substrings using ASCII case-insensitive
+matching (other bytes match exactly). The input keeps focus while Up/Down and
+Home/End move the suggestion cursor; Enter commits that cursor. Disabled options
+are skipped. Pointer activation commits a suggestion and restores input focus.
+Escape or outside clicks dismiss without committing, and an empty filtered result
+renders an explicit message. The query remains independent of the committed ID;
+selection does not overwrite the query or destroy its undo history. Callers may
+replace/select editor text using the editor API when their product needs that.
+
+The tests exercise actual text events, filtering, focus retention, committed versus
+query state, disabled/no-match cases, capacity errors, pointer selection and
+Up/Down plus Enter in one event batch. List, Tabs, ToggleGroup and Accordion also
+have batched navigation-plus-activation tests using the core's validated per-event
+activation reports. Two same-frame Collapsible activations both take effect.
+
+This initial Combobox is single selection. Chips, multiple selection, remote
+query delegates, query/label synchronization policies, Unicode collation, IME,
+painted caret and selection, and the OS accessibility bridge remain incomplete.
+The current suggestion reducer applies edits before filtering for the frame;
+interleaving text edits and commits in a single batch is a remaining ordering gap.

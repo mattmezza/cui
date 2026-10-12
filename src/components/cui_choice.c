@@ -235,3 +235,85 @@ bool cui_menu(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str n
     return cui_choice_popup_render(ui, trigger, theme, name, name, items, count, action, state,
                                    options, true);
 }
+
+cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme *theme,
+                                 cui_str name, cui_edit *query, const cui_choice_item *items,
+                                 size_t count, cui_choice_item *filtered, size_t capacity,
+                                 cui_id *selected, cui_choice_popup *state,
+                                 cui_choice_popup_options options) {
+    cui_combobox_result result = {.error = CUI_EDIT_OK};
+    if (!theme || !query || !selected || !state || !state->overlay.id || (!items && count) ||
+        (!filtered && capacity) || capacity < count || cui_edit_get_state(query).multiline ||
+        !isfinite(options.viewport.w) || !isfinite(options.viewport.h) || options.viewport.w <= 0 ||
+        options.viewport.h <= 0 || !isfinite(theme->control_height) || theme->control_height <= 0) {
+        result.error = capacity < count ? CUI_EDIT_CAPACITY : CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    result = cui_base_combobox(ui, input, name, query, items, count, filtered, capacity, selected,
+                               state, options.disabled);
+    cui_box input_box = {.width = 280,
+                         .padding = theme->padding,
+                         .gap = theme->gap,
+                         .radius = theme->radius,
+                         .background = theme->surface,
+                         .border = cui_focused(ui) == input ? theme->focus : theme->border,
+                         .border_width = cui_focused(ui) == input ? 2 : 1};
+    cui_begin_box(ui, input, input_box);
+    cui_text(ui, name, theme->font_size * .8f, theme->muted);
+    cui_str text = cui_edit_get_text(query);
+    cui_text(ui, text.length ? text : cui_string(" "), theme->font_size,
+             options.disabled ? theme->muted : theme->text);
+    cui_end_box(ui);
+    if (!state->overlay.open)
+        return result;
+    size_t matched = result.matching_count;
+    float width = options.width > 0 && isfinite(options.width) ? options.width : 280;
+    if (width > options.viewport.w)
+        width = options.viewport.w;
+    float available = options.viewport.h - 2 * theme->padding - 8;
+    size_t rows = matched;
+    if (available / theme->control_height < (float)rows)
+        rows = available > theme->control_height ? (size_t)(available / theme->control_height) : 1;
+    if (rows > 4096)
+        rows = 4096;
+    cui_popup_result placement = cui_popup_place(
+        cui_bounds(ui, input),
+        (cui_size){width, 2 * theme->padding + (rows ? rows : 1) * theme->control_height},
+        options.viewport, CUI_POPUP_BELOW, 4);
+    cui_overlay_set_bounds(&state->overlay, placement.bounds);
+    if (!cui_overlay_begin(ui, &state->overlay))
+        return result;
+    cui_list_options list_options = {
+        .dt = options.dt, .visible_begin = state->list.first_visible, .visible_count = rows};
+    cui_id old = *selected;
+    bool activated =
+        matched ? cui_base_list(ui, filtered, matched, selected, &state->list, list_options)
+                : false;
+    if (activated) {
+        cui_overlay_close(ui, &state->overlay);
+        cui_dismiss_focus_scope(ui, state->overlay.id, input);
+        cui_overlay_end(ui);
+        cui_set_semantic_details(
+            ui, input, (cui_semantic_details){.controls = state->overlay.id, .description = text});
+        result.changed = old != *selected;
+        return result;
+    }
+    cui_begin_portal(ui, state->overlay.id,
+                     (cui_box){.padding = theme->padding,
+                               .clip = true,
+                               .background = theme->surface,
+                               .border = theme->border,
+                               .border_width = 1,
+                               .radius = theme->radius},
+                     placement.bounds, 100);
+    cui_interact(ui, state->overlay.id, CUI_ROLE_LISTBOX, name, false, false, 0);
+    cui_set_semantic_details(ui, state->overlay.id, (cui_semantic_details){.labelled_by = input});
+    if (matched)
+        cui_choice_paint_list(ui, state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11), theme, filtered,
+                              matched, selected, &state->list, list_options);
+    else
+        cui_text(ui, cui_string("No matches"), theme->font_size, theme->muted);
+    cui_end_box(ui);
+    cui_overlay_end(ui);
+    return result;
+}

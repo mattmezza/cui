@@ -1,8 +1,8 @@
 {
-  "source": "6e023e8",
+  "source": "6061cc5",
   "published_source": "55a0b6a614f9398e281d8d2e2ef62a68cd55fbd1",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public55a0b6a deployed and passed full HTTPS76-story suite including all seven Chart families. Local Questionnaire registration passes native77, sanitizer75 and WASI67. Full78-entry parity remains unfinished.",
+  "summary": "Local77-story WASM gallery passed full Chromium suite, including explicitly scripted Speech provider lifecycle and waveform. Public55a0b6a remains verified76-story release pending deployment. All78 manifest entries retain partial implementation status; full parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -13,18 +13,18 @@
     },
     {
       "name": "native",
-      "source": "d5c0631",
-      "passed": 75,
-      "total": 75,
-      "log": "native-d5c0631.txt"
+      "source": "6061cc5",
+      "passed": 77,
+      "total": 77,
+      "log": "native-6061cc5.txt"
     },
     {
       "name": "browser",
-      "source": "6e023e8",
-      "passed": 76,
-      "total": 76,
+      "source": "0df7626",
+      "passed": 77,
+      "total": 77,
       "palettes": 38,
-      "log": "browser-6e023e8.txt"
+      "log": "browser-0df7626.txt"
     },
     {
       "name": "sanitizers",

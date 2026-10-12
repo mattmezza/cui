@@ -45,7 +45,8 @@ int main(void) {
     assert(opened[0] && panels == 1);
     size_t count = 0;
     const cui_semantic *s = cui_semantics(ui, &count);
-    assert(count == 4 && s[0].checked && s[0].role == CUI_ROLE_BUTTON && s[1].disabled);
+    assert(count == 6 && s[0].checked && s[0].role == CUI_ROLE_BUTTON && s[1].disabled &&
+           s[0].details.expanded);
     cui_focus(ui, 10);
     key(ui, CUI_KEY_DOWN);
     assert(!scene(ui, options, &themes[0]));

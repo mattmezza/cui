@@ -37,9 +37,11 @@ externally supplied multiple selections are not silently normalized.
 
 The base functions paint nothing. Styled functions call those base functions and
 submit theme-dependent boxes, which permits an independent design system without
-forking keyboard behavior. Tabs expose tab role and selection through checked;
-ToggleGroup exposes button role and pressed state through checked. Semantic group
-relationships and OS accessibility bridges require additional core integration.
+forking keyboard behavior. Tabs expose tab, tab-list and panel roles with selected state and bidirectional
+trigger/panel relationships. The focused (or selected, or first enabled) tab is
+the group's single Tab stop; arrow traversal updates it. ToggleGroup exposes a
+group and buttons with pressed state through checked. OS accessibility bridges
+remain unfinished.
 
 The tab list ID is the container ID XOR `0xcda0312561f50cab`; a panel ID is its
 tab ID XOR `0x691a17db80e22f45`. These IDs must not overlap application children.

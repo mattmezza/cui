@@ -28,6 +28,9 @@ bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str
     cui_begin_box(ui, id ^ UINT64_C(0xb7c1c9d453922783), (cui_box){.gap = theme->gap});
     cui_disclosure_trigger(ui, id, theme, label, *open, disabled, true);
     if (*open && panel) {
+        cui_id panel_id = id ^ UINT64_C(0x1d8f322539deca61);
+        cui_interact(ui, panel_id, CUI_ROLE_GROUP, label, false, false, 0);
+        cui_set_semantic_details(ui, panel_id, (cui_semantic_details){.labelled_by = id});
         cui_begin_box(ui, id ^ UINT64_C(0x1d8f322539deca61),
                       (cui_box){.padding = theme->padding, .gap = theme->gap});
         panel(ui, 0, user);
@@ -42,11 +45,22 @@ bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
     if (!theme || !items || !open)
         return false;
     bool changed = cui_base_accordion(ui, items, count, open, options);
+    cui_interact(ui, container, CUI_ROLE_GROUP, cui_string(""), options.disabled, false, 0);
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
     for (size_t i = 0; i < count; ++i) {
         cui_disclosure_trigger(ui, items[i].id, theme, items[i].label, open[i],
                                options.disabled || items[i].disabled, options.bordered);
+        cui_set_semantic_details(
+            ui, items[i].id,
+            (cui_semantic_details){.expanded = open[i],
+                                   .controls = items[i].id ^ UINT64_C(0x1d8f322539deca61),
+                                   .parent = container});
         if (open[i] && panel) {
+            cui_id panel_id = items[i].id ^ UINT64_C(0x1d8f322539deca61);
+            cui_interact(ui, panel_id, CUI_ROLE_GROUP, items[i].label, false, false, 0);
+            cui_set_semantic_details(
+                ui, panel_id,
+                (cui_semantic_details){.labelled_by = items[i].id, .parent = container});
             cui_begin_box(ui, items[i].id ^ UINT64_C(0x1d8f322539deca61),
                           (cui_box){.padding = theme->padding, .gap = theme->gap});
             panel(ui, i, user);

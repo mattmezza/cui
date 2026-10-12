@@ -58,7 +58,8 @@ int main(void) {
     assert(selected == 30 && cui_focused(ui) == 30 && visible == 2);
     size_t count = 0;
     const cui_semantic *s = cui_semantics(ui, &count);
-    assert(count == 4 && s[0].role == CUI_ROLE_TAB && !s[0].checked && s[2].checked);
+    assert(count == 6 && s[0].role == CUI_ROLE_TAB && !s[0].checked && s[2].checked &&
+           s[2].details.selected && s[0].tab_index < 0 && s[2].tab_index == 0);
     key(ui, CUI_KEY_RIGHT);
     assert(scene(ui, options, &themes[0]));
     assert(selected == 10);

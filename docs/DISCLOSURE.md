@@ -30,8 +30,9 @@ Applications can also change the booleans themselves between frames.
 The base functions submit trigger semantics without painting. Custom designs can
 call them and then submit boxes with matching trigger IDs. The styled functions
 use theme colors, padding, gap, radius and control height; themes provide density
-and high contrast without duplicating behavior. Trigger semantics currently expose
-expanded state through checked/value. Native accessibility bridges are separate
+and high contrast without duplicating behavior. Trigger semantics expose
+expanded state and the controlled panel ID. Mounted panels expose their trigger
+relationship; an Accordion group supplies a semantic parent. Native accessibility bridges are separate
 unfinished infrastructure.
 
 The implementation derives panel IDs by XORing the trigger ID with

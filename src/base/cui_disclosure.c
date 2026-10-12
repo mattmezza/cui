@@ -5,10 +5,16 @@ bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open,
         return false;
     cui_interaction interaction =
         cui_interact(ui, id, CUI_ROLE_BUTTON, label, disabled, *open, *open);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.expanded = *open, .controls = id ^ UINT64_C(0x1d8f322539deca61)});
     if (disabled || !interaction.activated)
         return false;
     *open = !*open;
     cui_update_semantic(ui, id, *open, *open);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.expanded = *open, .controls = id ^ UINT64_C(0x1d8f322539deca61)});
     return true;
 }
 bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_t count, bool *open,
@@ -62,7 +68,12 @@ bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_
             }
         }
     }
-    for (size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i) {
         cui_update_semantic(ui, items[i].id, open[i], open[i]);
+        cui_set_semantic_details(
+            ui, items[i].id,
+            (cui_semantic_details){.expanded = open[i],
+                                   .controls = items[i].id ^ UINT64_C(0x1d8f322539deca61)});
+    }
     return changed;
 }

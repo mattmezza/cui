@@ -55,8 +55,28 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
                 *selected = items[next].id;
         }
     }
+    size_t stop = count;
     for (size_t i = 0; i < count; ++i)
+        if (!items[i].disabled && items[i].id == cui_focused(ui))
+            stop = i;
+    if (stop == count)
+        for (size_t i = 0; i < count; ++i)
+            if (!items[i].disabled && items[i].id == *selected)
+                stop = i;
+    if (stop == count)
+        for (size_t i = 0; i < count; ++i)
+            if (!items[i].disabled) {
+                stop = i;
+                break;
+            }
+    for (size_t i = 0; i < count; ++i) {
         cui_update_semantic(ui, items[i].id, *selected == items[i].id, (float)i);
+        cui_set_semantic_details(
+            ui, items[i].id,
+            (cui_semantic_details){.selected = *selected == items[i].id,
+                                   .controls = items[i].id ^ UINT64_C(0x691a17db80e22f45)});
+        cui_set_tab_stop(ui, items[i].id, i == stop);
+    }
     return old != *selected;
 }
 bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t count,

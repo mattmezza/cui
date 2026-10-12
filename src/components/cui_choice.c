@@ -54,17 +54,29 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         return false;
     bool changed = cui_base_tabs(ui, items, count, selected, options);
     cui_begin_box(ui, container, (cui_box){.gap = theme->gap});
+    cui_id list_id = container ^ UINT64_C(0xcda0312561f50cab);
+    cui_interact(ui, list_id, CUI_ROLE_TABLIST, cui_string(""), options.disabled, false, 0);
     cui_begin_box(ui, container ^ UINT64_C(0xcda0312561f50cab),
                   (cui_box){.row = !options.vertical, .gap = theme->gap});
     size_t active = count;
     for (size_t i = 0; i < count; ++i) {
         cui_choice_draw(ui, &items[i], theme, items[i].id == *selected,
                         options.disabled || items[i].disabled, options.variant);
+        cui_set_semantic_details(
+            ui, items[i].id,
+            (cui_semantic_details){.selected = items[i].id == *selected,
+                                   .controls = items[i].id ^ UINT64_C(0x691a17db80e22f45),
+                                   .parent = list_id});
         if (items[i].id == *selected && !items[i].disabled)
             active = i;
     }
     cui_end_box(ui);
     if (active != count && panel) {
+        cui_id panel_id = items[active].id ^ UINT64_C(0x691a17db80e22f45);
+        cui_interact(ui, panel_id, CUI_ROLE_TABPANEL, items[active].label, false, false, 0);
+        cui_set_semantic_details(
+            ui, panel_id,
+            (cui_semantic_details){.labelled_by = items[active].id, .parent = container});
         cui_begin_box(ui, items[active].id ^ UINT64_C(0x691a17db80e22f45),
                       (cui_box){.padding = theme->padding, .gap = theme->gap});
         panel(ui, active, user);
@@ -79,6 +91,7 @@ bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
     if (!theme || !items || !selected)
         return false;
     bool changed = cui_base_toggle_group(ui, items, count, selected, options);
+    cui_interact(ui, container, CUI_ROLE_GROUP, cui_string(""), options.disabled, false, 0);
     cui_begin_box(ui, container, (cui_box){.row = !options.vertical, .gap = theme->gap});
     for (size_t i = 0; i < count; ++i)
         cui_choice_draw(ui, &items[i], theme, selected[i], options.disabled || items[i].disabled,

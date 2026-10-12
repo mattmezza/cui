@@ -1,8 +1,8 @@
 {
-  "source": "e5b414b",
+  "source": "d972c06",
   "published_source": "611631b70491e69614d3fc55eb9aa40e1ccf9776",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Public 611631b is verified over HTTPS with 73 real WASM stories and styled fonts. Local Speech provider lifecycle and controls plus Chart/TextView fidelity updates pass 75 native, 73 sanitizer and 65 WASI suites. RootView browser story integration is next. Full 78-entry parity remains unfinished.",
+  "summary": "74 real WASM stories pass Chromium, including Root plugin overlays, automatic Dialog/Sheet/notification mounting and actual interaction. Portable Speech and Chart/TextView fidelity changes passed native75/sanitizers73/WASI65. Public611631b remains verified until deployment succeeds. Full78-entry parity remains unfinished.",
   "checks": [
     {
       "name": "WASI",
@@ -20,11 +20,11 @@
     },
     {
       "name": "browser",
-      "source": "71f6695",
-      "passed": 73,
-      "total": 73,
+      "source": "d972c06",
+      "passed": 74,
+      "total": 74,
       "palettes": 38,
-      "log": "browser-71f6695.txt"
+      "log": "browser-d972c06.txt"
     },
     {
       "name": "sanitizers",

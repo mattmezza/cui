@@ -5,6 +5,7 @@
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
 #include "cui/cui_form.h"
+#include "cui/cui_message.h"
 #include "cui/cui_numeric.h"
 #include "cui/cui_otp.h"
 #include "cui/cui_picker.h"
@@ -31,6 +32,12 @@ static cui_draw_list draw;
 static const cui_semantic *semantics;
 static size_t semantic_count;
 static bool checked, enabled = true, toggled;
+static cui_check_state check_state;
+static const unsigned char image_story_pixels[80] = {
+    255,255,255,255, 255,255,255,255, 255,255,255,255, 255,255,255,255, 0,0,0,0,
+    255,255,255,255, 200,100,0,255, 200,100,0,255, 255,255,255,255, 0,0,0,0,
+    255,255,255,255, 200,100,0,255, 200,100,0,255, 255,255,255,255, 0,0,0,0,
+    255,255,255,255, 255,255,255,255, 255,255,255,255, 255,255,255,255, 0,0,0,0};
 static int radio, clicks;
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
@@ -56,6 +63,50 @@ static void disclosure_header(cui_context *context, const cui_disclosure_item *i
     cui_text(context, cui_string(" (custom)"), current_theme.font_size, current_theme.muted);
 }
 
+static int message_alignment, message_variant = CUI_BUBBLE_SECONDARY, message_inset;
+static bool message_avatar = true, message_acknowledged, message_scrollbar = true;
+static unsigned message_actions, conversation_serial = 80, conversation_count = 80;
+static unsigned conversation_ids[256], conversation_rendered;
+static char conversation_names[256][32], conversation_texts[256][64];
+static int conversation_mutation;
+static cui_message_scroller_state *conversation;
+static cui_message_scroller_result conversation_result;
+static void message_rich(cui_context *context, cui_id id, void *user, cui_message_style style) {
+    (void)user;
+    cui_text(context, cui_string("Workspace is ready."), style.font_size, style.color);
+    cui_checkbox(context, id ^ 1, &current_theme, cui_string("Acknowledge message"),
+                 &message_acknowledged, false);
+    if (cui_button(context, id ^ 2, &current_theme, cui_string("Like message"), false))
+        message_actions++;
+}
+static void conversation_labels(void) {
+    for (unsigned i = 0; i < conversation_count; i++) {
+        snprintf(conversation_names[i], sizeof(conversation_names[i]), "Message %u",
+                 conversation_ids[i]);
+        snprintf(conversation_texts[i], sizeof(conversation_texts[i]), "Workspace update %u",
+                 conversation_ids[i]);
+    }
+}
+static void conversation_row(cui_context *context, cui_id id, size_t index, void *user,
+                             float width) {
+    (void)user;
+    conversation_rendered++;
+    cui_message_body bodies[2] = {
+        {.slot = {.present = true, .text = cui_string(conversation_texts[index])},
+         .typed_bubble = true,
+         .bubble = conversation_ids[index] % 2 ? CUI_BUBBLE_TINTED : CUI_BUBBLE_SECONDARY},
+        {.slot = {.present = true, .text = cui_string("Additional application-owned detail")}}};
+    cui_message_options options = cui_message_options_default();
+    options.width = width;
+    options.role = CUI_ROLE_LISTITEM;
+    options.name = cui_string(conversation_names[index]);
+    options.alignment = conversation_ids[index] % 2 ? CUI_MESSAGE_END : CUI_MESSAGE_START;
+    options.header = (cui_message_slot){.present = true, .text = cui_string("Alex Morgan")};
+    options.body = bodies;
+    options.body_count = conversation_ids[index] % 3 ? 1 : 2;
+    options.footer = (cui_message_slot){.present = true, .text = cui_string("Delivered")};
+    cui_message(context, id, &current_theme, options);
+}
 static cui_hover_state tooltip_state, card_state;
 static cui_virtual_list *virtual_list;
 static float scroll_percent;
@@ -343,6 +394,12 @@ int gallery_init(void) {
     if (!cui_notification_init(&notification_state, notification_entries, 8, notification_settings,
                                (cui_notification_host){0}))
         return 0;
+    conversation = cui_message_scroller_create((cui_message_scroller_config){256, 80, 96});
+    if (!conversation)
+        return 0;
+    for (unsigned i = 0; i < conversation_count; i++)
+        conversation_ids[i] = i + 1;
+    conversation_labels();
     if (cui_otp_init(&otp_state, otp_buffer, sizeof(otp_buffer), 6) != CUI_EDIT_OK)
         return 0;
     group_edit = cui_edit_create((cui_edit_config){.buffer = group_buffer,
@@ -509,8 +566,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 1:
-        cui_checkbox(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"), &checked,
-                     disabled);
+        cui_checkbox_ex(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"),
+                        &check_state, (cui_checkbox_options){.disabled = disabled});
         break;
     case 2:
         cui_switch(ui, cui_id_from(ui, "switch"), &t, cui_string("Notifications"), &enabled,
@@ -537,6 +594,72 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .invalid = input_mode == 2,
                                          .width = width > 360 ? 280 : width - 48});
         break;
+    case 60: {
+        cui_message_body bodies[2] = {
+            {.slot = {.present = true, .render = message_rich},
+             .typed_bubble = true,
+             .bubble = (cui_bubble_variant)message_variant},
+            {.slot = {.present = true, .text = cui_string("A second message body")}}};
+        cui_message_options options = cui_message_options_default();
+        options.width = width - 48;
+        options.alignment = (cui_message_alignment)message_alignment;
+        options.role = CUI_ROLE_LISTITEM;
+        options.name = cui_string("Workspace conversation");
+        options.avatar =
+            (cui_message_slot){.present = message_avatar,
+                               .text = message_avatar ? cui_string("AM") : cui_string(""),
+                               .width = 32,
+                               .height = 32};
+        options.header = (cui_message_slot){.present = true,
+                                            .text = cui_string("Alex Morgan"),
+                                            .inset = (cui_message_inset)message_inset};
+        options.footer = (cui_message_slot){.present = true,
+                                            .text = cui_string("Delivered at 09:30"),
+                                            .inset = (cui_message_inset)message_inset};
+        options.body = bodies;
+        options.body_count = 2;
+        cui_begin_message_group(ui, cui_id_from(ui, "message-group"), width - 48, 24);
+        cui_message(ui, cui_id_from(ui, "message"), &t, options);
+        cui_end_message_group(ui);
+        cui_begin_box(ui, cui_id_from(ui, "image-clip"),
+                      (cui_box){.width = 32, .height = 32, .clip = true});
+        cui_paint_bitmap(ui, cui_id_from(ui, "image-example"),
+                         (cui_bitmap_paint){.bitmap = {image_story_pixels, 4, 4, 20, 1},
+                                            .source = {1, 1, 2, 2},
+                                            .opacity = .5f,
+                                            .grayscale = true,
+                                            .custom_tint = true,
+                                            .tint = {255, 128, 0, 128}},
+                         (cui_box){.width = 60, .height = 60, .radius = 12});
+        cui_end_box(ui);
+        break;
+    }
+    case 61: {
+        cui_begin_box(ui, cui_id_from(ui, "conversation-actions"), (cui_box){.gap = t.gap});
+        if (cui_button(ui, cui_id_from(ui, "conversation-append"), &t, cui_string("Add message"),
+                       conversation_count >= 256))
+            conversation_mutation = 1;
+        if (cui_button(ui, cui_id_from(ui, "conversation-prepend"), &t,
+                       cui_string("Prepend earlier"), conversation_count >= 256))
+            conversation_mutation = 2;
+        if (cui_button(ui, cui_id_from(ui, "conversation-remove"), &t, cui_string("Remove first"),
+                       conversation_count == 0))
+            conversation_mutation = 3;
+        cui_end_box(ui);
+        cui_message_scroller_options options = cui_message_scroller_options_default();
+        options.width = width - 48;
+        options.height = 300;
+        options.scrollbar = message_scrollbar;
+        options.bottom_fade = true;
+        options.fade_color = t.background;
+        options.now_seconds = host_seconds;
+        options.reduced_motion = reduced_motion;
+        conversation_rendered = 0;
+        conversation_result = cui_message_scroller(ui, cui_id_from(ui, "conversation"), &t,
+                                                   conversation, conversation_row, NULL, options);
+        next_wake = conversation_result.next_wake_seconds;
+        break;
+    }
     case 59: {
         cui_shimmer_options options = cui_shimmer_options_default();
         options.now_seconds = host_seconds - shimmer_started;
@@ -1546,6 +1669,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         notification_pushes--;
         redraw = true;
     }
+    if (conversation_mutation) {
+        if (conversation_mutation == 1 && conversation_count < 256) {
+            conversation_ids[conversation_count++] = ++conversation_serial;
+            cui_message_scroller_append(conversation, 1);
+        } else if (conversation_mutation == 2 && conversation_count < 256) {
+            memmove(conversation_ids + 1, conversation_ids,
+                    conversation_count * sizeof(*conversation_ids));
+            conversation_ids[0] = ++conversation_serial;
+            conversation_count++;
+            cui_message_scroller_prepend(conversation, 1);
+        } else if (conversation_mutation == 3 && conversation_count) {
+            memmove(conversation_ids, conversation_ids + 1,
+                    (--conversation_count) * sizeof(*conversation_ids));
+            cui_message_scroller_splice(conversation, 0, 1, 0);
+        }
+        conversation_labels();
+        conversation_mutation = 0;
+        redraw = true;
+    }
     semantics = cui_semantics(ui, &semantic_count);
     return cui_last_error(ui) == CUI_OK;
 }
@@ -1613,6 +1755,33 @@ const char *gallery_command_text(unsigned i) {
 }
 unsigned gallery_command_length(unsigned i) {
     return i < draw.count ? (unsigned)draw.commands[i].text.length : 0;
+}
+unsigned gallery_bitmap_pixels(unsigned i) {
+    return i < draw.count && draw.commands[i].type == CUI_DRAW_IMAGE
+               ? (unsigned)(uintptr_t)draw.commands[i].bitmap.bitmap.pixels
+               : 0;
+}
+double gallery_bitmap(unsigned i, unsigned field) {
+    if (i >= draw.count || draw.commands[i].type != CUI_DRAW_IMAGE)
+        return 0;
+    const cui_bitmap_paint *paint = &draw.commands[i].bitmap;
+    switch (field) {
+    case 0: return paint->bitmap.width;
+    case 1: return paint->bitmap.height;
+    case 2: return (double)paint->bitmap.stride;
+    case 3: return paint->source.x;
+    case 4: return paint->source.y;
+    case 5: return paint->source.w;
+    case 6: return paint->source.h;
+    case 7: return paint->opacity;
+    case 8: return paint->grayscale;
+    case 9: return paint->custom_tint;
+    case 10: return paint->tint.r;
+    case 11: return paint->tint.g;
+    case 12: return paint->tint.b;
+    case 13: return paint->tint.a;
+    default: return 0;
+    }
 }
 unsigned gallery_semantic_count(void) {
     return (unsigned)semantic_count;
@@ -1690,6 +1859,8 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.set_size;
     case 33:
         return s->details.focusable;
+    case 34:
+        return s->details.pointer_activatable;
     default:
         return 0;
     }
@@ -1997,4 +2168,42 @@ void gallery_dropdown_options(int variant, int size, int halves, int action, int
     dropdown_anchor = anchor;
     dropdown_outline = outline != 0;
     dropdown_selected = selected != 0;
+}
+
+void gallery_message_options(int alignment, int variant, int inset, int avatar, int scrollbar) {
+    message_alignment = alignment;
+    message_variant = variant;
+    message_inset = inset;
+    message_avatar = avatar != 0;
+    message_scrollbar = scrollbar != 0;
+}
+unsigned gallery_message_actions(void) {
+    return message_actions;
+}
+int gallery_checkbox_state(int state) {
+    if (state >= CUI_CHECK_UNCHECKED && state <= CUI_CHECK_MIXED)
+        check_state = (cui_check_state)state;
+    return check_state;
+}
+double gallery_conversation(unsigned field) {
+    switch (field) {
+    case 0:
+        return conversation_count;
+    case 1:
+        return conversation_result.view.scroll;
+    case 2:
+        return conversation_result.view.total;
+    case 3:
+        return conversation_result.view.following_tail;
+    case 4:
+        return conversation_result.view.scrolled_up;
+    case 5:
+        return conversation_result.jump_opacity;
+    case 6:
+        return conversation_result.fade_opacity;
+    case 7:
+        return conversation_rendered;
+    default:
+        return 0;
+    }
 }

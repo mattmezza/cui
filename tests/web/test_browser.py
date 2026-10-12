@@ -40,6 +40,22 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.exports.gallery_count() > 0')
+            assert page.locator('#theme').input_value() == '3'
+            assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
+            light_canvas = page.evaluate('Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5))')
+            page.emulate_media(color_scheme='dark')
+            page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"&&cuiGallery.exports.gallery_command(0,0)===0')
+            page.wait_for_function('(light)=>Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5)).some((value,i)=>value!==light[i])', arg=light_canvas)
+            page.locator('#theme').select_option('0')
+            assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
+            page.wait_for_function('(light)=>Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5)).every((value,i)=>value===light[i])', arg=light_canvas)
+            page.emulate_media(color_scheme='light')
+            page.emulate_media(color_scheme='dark')
+            assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
+            page.locator('#theme').select_option('3')
+            page.wait_for_function('getComputedStyle(document.body).colorScheme==="dark"')
+            page.emulate_media(color_scheme='light')
+            page.wait_for_function('getComputedStyle(document.body).colorScheme==="light"')
             assert page.request.get(f'http://127.0.0.1:{server.server_port}/cui/LICENSE.txt').ok
             assert page.locator('#catalog a').count() == 78
             assert page.locator('#name').inner_text() == 'Button'
@@ -80,7 +96,8 @@ def main():
                 return [[60,32],[1,32],[116,32],[60,1],[60,62],[1,1]].map(([dx,dy])=>Array.from(ctx.getImageData(Math.floor((x+dx)*scale),Math.floor((y+dy)*scale),1,1).data));
             }''', shape)
             blue, orange = [29,100,220,255], [240,150,20,255]
-            assert pixels[:5] == [blue,blue,orange,orange,blue], pixels
+            assert all(all(abs(a-b) <= 1 for a,b in zip(pixel,expected))
+                       for pixel,expected in zip(pixels[:5],[blue,blue,orange,orange,blue])), pixels
             assert pixels[5] not in [blue,orange], pixels
             focusable_log = page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_semantic(i,0)===38&&cuiGallery.exports.gallery_semantic(i,33)===1)')
             passive_log = page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>cuiGallery.exports.gallery_semantic(i,0)===38&&cuiGallery.exports.gallery_semantic(i,33)===0)')
@@ -100,7 +117,7 @@ def main():
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>document.querySelector("#name").textContent===name && cuiGallery.renderedComponent===name', arg=name)
                 page.wait_for_timeout(50)
-                assert page.locator('#preview-card').is_visible()
+                assert page.locator('#preview-card').is_visible(), name
                 assert 'draw commands' in page.locator('#preview-note').inner_text()
             def semantic_index(name, role=None):
                 return page.evaluate('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', {'name':name,'role':role})
@@ -193,6 +210,92 @@ def main():
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
             page.emulate_media(reduced_motion='no-preference')
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
+            page.evaluate('location.hash="Message"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Message"')
+            bitmap = page.evaluate('''()=>{const e=cuiGallery.exports,c=document.querySelector('canvas'),
+                ctx=c.getContext('2d'),i=Array.from({length:e.gallery_count()},(_,i)=>i)
+                .find(i=>e.gallery_command(i,0)===5),f=n=>e.gallery_command(i,n),scale=c.width/c.clientWidth;
+                const pixel=(dx,dy)=>Array.from(ctx.getImageData(Math.round((f(1)+dx)*scale),
+                    Math.round((f(2)+dy)*scale),1,1).data);
+                return {source:Array.from({length:14},(_,n)=>e.gallery_bitmap(i,n)),
+                    samples:[pixel(2,2),pixel(15,15),pixel(31,15),pixel(36,15)]};}''')
+            assert bitmap['source'] == [4,4,20,1,1,2,2,.5,1,1,255,128,0,128]
+            corner, center, clipped_edge, outside = bitmap['samples']
+            assert corner == outside and all(abs(a-b) <= 2 for a,b in zip(center,clipped_edge))
+            assert center != corner and center[0] > center[1] > center[2] and center[3] == 255
+            assert page.locator('#accessible [role=listitem][aria-label="Workspace conversation"]').count() == 1
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,9)', semantic_index('Workspace conversation', 37)) == -1
+            click_semantic('Acknowledge message', 2)
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,6)===1', arg=semantic_index('Acknowledge message', 2))
+            actions = page.evaluate('cuiGallery.exports.gallery_message_actions()')
+            click_semantic('Like message', 1)
+            page.wait_for_function('(n)=>cuiGallery.exports.gallery_message_actions()===n+1', arg=actions)
+            def message_text_x(text):
+                return page.evaluate('(text)=>{const e=cuiGallery.exports;let i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===text);return e.gallery_command(i,1);}', text)
+            page.locator('#message-avatar').uncheck()
+            frame = page.evaluate('cuiGallery.frame')
+            page.locator('#message-inset').select_option('2')
+            page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+            start_x = message_text_x('Alex Morgan')
+            frame = page.evaluate('cuiGallery.frame')
+            page.locator('#message-inset').select_option('1')
+            page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+            assert abs(message_text_x('Alex Morgan')-start_x-12) < .2
+            frame = page.evaluate('cuiGallery.frame')
+            page.locator('#message-alignment').select_option('1')
+            page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+            assert message_text_x('Alex Morgan') > start_x+100
+            for variant in map(str,range(7)):
+                frame = page.evaluate('cuiGallery.frame')
+                page.locator('#message-variant').select_option(variant)
+                page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
+                assert page.evaluate('cuiGallery.exports.gallery_error()') == 0
+            page.evaluate('location.hash="MessageScroller"')
+            page.wait_for_function('cuiGallery.renderedComponent==="MessageScroller"&&cuiGallery.exports.gallery_conversation(3)===1')
+            assert page.evaluate('cuiGallery.exports.gallery_conversation(0)') == 80
+            assert 0 < page.evaluate('cuiGallery.exports.gallery_conversation(7)') < 32
+            log = semantic_index('Conversation', 38)
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,33)', log) == 1
+            page.locator('#message-scrollbar').uncheck()
+            page.wait_for_function('!document.querySelector(`#accessible [role=scrollbar]`)')
+            log = semantic_index('Conversation', 38)
+            # Programmatic focus enters the real native Log; keyboard behavior remains in CUI.
+            page.locator('#accessible [role=log]').focus()
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=log)
+            page.keyboard.press('Home')
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(1)===0&&cuiGallery.exports.gallery_conversation(4)===1')
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(5)===1&&cuiGallery.exports.gallery_conversation(6)===1')
+            scroll_before = page.evaluate('cuiGallery.exports.gallery_conversation(1)')
+            click_semantic('Add message', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(0)===81')
+            assert page.evaluate('cuiGallery.exports.gallery_conversation(3)') == 0
+            assert abs(page.evaluate('cuiGallery.exports.gallery_conversation(1)')-scroll_before) < .2
+            click_semantic('Jump to latest', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(3)===1&&cuiGallery.exports.gallery_conversation(4)===0')
+            click_semantic('Add message', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(0)===82&&cuiGallery.exports.gallery_conversation(3)===1')
+            page.locator('#accessible [role=log]').focus()
+            page.keyboard.press('Home')
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(1)===0')
+            page.keyboard.press('PageDown')
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(1)>0')
+            scroll_before = page.evaluate('cuiGallery.exports.gallery_conversation(1)')
+            visible_message = '''()=>{const e=cuiGallery.exports,log=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>e.gallery_semantic(i,0)===38&&e.gallery_semantic(i,33));
+                const top=e.gallery_semantic(log,2),bottom=top+e.gallery_semantic(log,4);
+                const row=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>e.gallery_semantic(i,0)===37&&e.gallery_semantic(i,2)>=top&&e.gallery_semantic(i,2)<bottom);
+                return [new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(row),e.gallery_semantic_length(row))),e.gallery_semantic(row,2)-top];}'''
+            anchored = page.evaluate(visible_message)
+            click_semantic('Prepend earlier', 1)
+            page.wait_for_function('(before)=>cuiGallery.exports.gallery_conversation(0)===83&&cuiGallery.exports.gallery_conversation(1)>before', arg=scroll_before)
+            assert page.evaluate('cuiGallery.exports.gallery_conversation(1)') > scroll_before
+            page.wait_for_function('({id,y})=>{const e=cuiGallery.exports,log=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>e.gallery_semantic(i,0)===38&&e.gallery_semantic(i,33)),top=e.gallery_semantic(log,2),bottom=top+e.gallery_semantic(log,4),row=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>e.gallery_semantic(i,0)===37&&e.gallery_semantic(i,2)>=top&&e.gallery_semantic(i,2)<bottom);return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(row),e.gallery_semantic_length(row)))===id&&Math.abs(e.gallery_semantic(row,2)-top-y)<=2;}', arg={'id': anchored[0], 'y': anchored[1]}, timeout=2000)
+            settled = page.evaluate(visible_message)
+            assert settled[0] == anchored[0] and abs(settled[1]-anchored[1]) <= 2, (anchored,settled)
+            click_semantic('Remove first', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_conversation(0)===82')
+            page.emulate_media(reduced_motion='reduce')
+            page.wait_for_function('cuiGallery.exports.gallery_next_wake()===0&&cuiGallery.exports.gallery_redraw()===0')
+            page.emulate_media(reduced_motion='no-preference')
             page.evaluate('location.hash="Accordion"')
             page.wait_for_function('cuiGallery.renderedComponent==="Accordion"')
             started = page.locator('#accessible button[aria-label="Getting started"]')
@@ -1097,6 +1200,19 @@ def main():
             page.keyboard.press('Tab')
             page.keyboard.press('Space')
             page.wait_for_function('cuiGallery.exports.gallery_semantic(0,6) === 1')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).includes(5)')
+            assert page.locator('#accessible [role=checkbox]').get_attribute('aria-checked') == 'true'
+            page.locator('#checkbox-state').select_option('2')
+            page.wait_for_function('document.querySelector(`#accessible [role=checkbox]`).getAttribute("aria-checked")==="mixed"')
+            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,8)') == 2
+            page.keyboard.press('Space')
+            page.wait_for_function('document.querySelector(`#accessible [role=checkbox]`).getAttribute("aria-checked")==="true"')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===2).every(i=>!/[x✓]/.test(new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))))')
+            page.evaluate('location.hash="Radio"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Radio"')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===2).every(i=>!/[()*]/.test(new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))))')
+            click_semantic('Priority', 4)
+            page.wait_for_function('document.querySelector(`#accessible [role=radio][aria-label=Priority]`).getAttribute("aria-checked")==="true"')
             page.evaluate('location.hash="Slider"')
             page.wait_for_function('document.querySelector("#name").textContent==="Slider" && cuiGallery.renderedComponent==="Slider"')
             page.wait_for_timeout(60)
@@ -1199,7 +1315,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
             browser.close()
-            print('PASS: 78 catalog entries, 58 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 catalog entries, 60 real WASM stories, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, pending status, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

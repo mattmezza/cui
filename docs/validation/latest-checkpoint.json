@@ -1,43 +1,48 @@
 {
-  "source": "377ee9f",
-  "published_source": "3ef6c49e66cf6ce0fd89b084ed30f9628bfd96e9",
+  "source": "ed10ae5",
+  "published_source": "a6fc99b1b0641fae800ce71a3f9f3183cbc80ebb",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Native strict GCC39/39 at input-painter source377ee9f; instrumented ASan/UBSan37/37 and WASI30/30 at earlier table/scroll source2c2de4b; Chromium43 local stories at2c2de4b. Published source3ef6c49 passed all six framework CI jobs (portable34/34 Windows/macOS), browser42-story build/deploy, and a direct HTTPS Chromium visit. Subsequent table multi-selection, tree metadata and input-painter refactoring require their own expanded checks; native checks pass. Full78-family parity remains unfinished.",
+  "summary": "Integrated native GCC43/43, ASan/UBSan41/41, WASI34/34 and Chromium51 real WASM stories passed. Includes Form composition, measured Surface body scrolling, fixed footers, Sheet resizing, table composition and choice/disclosure improvements. Full78-family parity remains unfinished. Published site remains earlier46-story deployment pending this push.",
   "checks": [
     {
       "name": "native",
-      "source": "377ee9f",
-      "passed": 39,
-      "total": 39,
-      "log": "gcc-input-paint.txt"
+      "source": "ed10ae5",
+      "passed": 43,
+      "total": 43,
+      "log": "gcc-form.txt"
     },
     {
       "name": "sanitizers",
-      "source": "2c2de4b",
-      "passed": 37,
-      "total": 37,
-      "log": "sanitizers-scroll-table.txt"
+      "source": "ed10ae5",
+      "passed": 41,
+      "total": 41,
+      "log": "asan-form.txt"
     },
     {
       "name": "WASI",
-      "source": "2c2de4b",
-      "passed": 30,
-      "total": 30,
-      "log": "wasi-scroll-table.txt"
+      "source": "ed10ae5",
+      "passed": 34,
+      "total": 34,
+      "log": "wasi-form.txt"
     },
     {
       "name": "browser",
-      "source": "2c2de4b",
-      "stories": 43,
+      "source": "ed10ae5",
+      "stories": 51,
       "catalog_entries": 78,
-      "log": "browser-43.txt"
+      "log": "browser-51-integrated.txt"
     },
     {
-      "name": "deployed browser",
-      "source": "3ef6c49",
-      "stories": 42,
+      "name": "published CI",
+      "source": "a6fc99b",
+      "log": "ci-a6fc99b.json"
+    },
+    {
+      "name": "published gallery pipeline",
+      "source": "a6fc99b",
+      "stories": 46,
       "catalog_entries": 78,
-      "log": "deployed-42.txt"
+      "log": "pages-a6fc99b.json"
     }
   ]
 }

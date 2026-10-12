@@ -18,7 +18,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Single/multiple controlled expansion, disabled triggers, keyboard traversal and semantic panel relationships tested. Animated reveal, custom header slots and complete upstream audit pending."
+        "Controlled expansion, disabled triggers, keyboard traversal, semantic panels and custom title/icon rendering tested. Animated measured reveal and complete upstream styling audit remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -76,16 +76,17 @@
         "modal focus isolation and trigger restoration"
       ],
       "public_header": "include/cui/cui_surface.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_surface.c"
+        "tests/unit/test_surface.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending."
+        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -120,6 +121,14 @@
           "evidence": [
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surfaces.txt"
+          ]
+        },
+        {
+          "name": "deferred close notification, measured scrolling and fixed footer",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surface-tracking.txt"
           ]
         }
       ],
@@ -709,7 +718,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled keyboard/pointer disclosure and panel semantics tested. Animated reveal and custom trigger slots pending."
+        "Controlled keyboard/pointer disclosure, panel semantics and custom trigger composition tested. Animated measured reveal and full reference styling audit remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -752,39 +761,65 @@
       "name": "DropdownButton",
       "reference_url": "https://gpui-kit.com/component/dropdown_button/",
       "category": "fundamentals",
-      "base_behavior": [],
-      "public_header": null,
-      "sample": null,
-      "tests": [],
-      "status": "not_started",
-      "platforms": {},
-      "limitations": [
-        "Split button/menu functionality pending implementation and audit."
+      "base_behavior": [
+        "independent primary activation and menu trigger",
+        "controlled disabled/loading and hierarchical menu interaction"
       ],
-      "owner": "unassigned",
+      "public_header": "include/cui/cui_choice.h",
+      "sample": "web/gallery.c",
+      "tests": [
+        "tests/unit/test_choice.c",
+        "tests/web/test_browser.py"
+      ],
+      "status": "tested",
+      "platforms": {
+        "headless": "tested_partial"
+      },
+      "limitations": [
+        "Split actions, optional halves, delayed tooltip, inner style inheritance, ghost shared state, corner anchors and asymmetric joined geometry tested. Full inherited Button semantic color variants and styling surface remain under reference audit."
+      ],
+      "owner": "compound-controls",
       "last_verified_commit": null,
       "features": [
         {
           "name": "split primary and menu actions",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-table-dropdown.txt"
+          ]
         },
         {
           "name": "keyboard opening and focus restore",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-table-dropdown.txt"
+          ]
         },
         {
           "name": "disabled/loading state",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-table-dropdown.txt"
+          ]
+        },
+        {
+          "name": "optional halves, delayed tooltip, shared ghost state and joined corners",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-integrated-51.txt"
+          ]
         }
       ],
       "upstream_doc": {
         "path": "website/component/dropdown_button.md",
         "sha256": "8395bb36c1344dce73e4c13055d3c525c0929af3b2d507d2783b75efee6bb281",
         "headings": []
-      }
+      },
+      "last_tested_commit": "42cafb8"
     },
     {
       "name": "Empty",
@@ -2803,32 +2838,46 @@
       "name": "Form",
       "reference_url": "https://gpui-kit.com/component/form/",
       "category": "forms",
-      "base_behavior": [],
-      "public_header": null,
+      "base_behavior": [
+        "Validated allocation-free field grid planning",
+        "Passive field/control semantic association"
+      ],
+      "public_header": "include/cui/cui_form.h",
       "sample": null,
-      "tests": [],
-      "status": "not_started",
+      "tests": [
+        "tests/unit/test_form.c"
+      ],
+      "status": "tested",
       "platforms": {},
       "limitations": [
-        "Full documented behavior pending implementation and audit."
+        "Validation, submission and responsive column counts are application-owned as in the frozen reference.",
+        "Gallery integration and feature-level reference audit remain in progress; inherited Input text/IME/native accessibility limitations remain."
       ],
-      "owner": "unassigned",
+      "owner": "forms",
       "last_verified_commit": null,
       "features": [
         {
-          "name": "field registration and validation",
-          "status": "not_started",
-          "evidence": []
+          "name": "Validated field placement, spans, explicit grid lines and conditional visibility",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_form.c",
+            "docs/validation/gcc-form.txt"
+          ]
         },
         {
-          "name": "error/required labels",
-          "status": "not_started",
-          "evidence": []
+          "name": "Required/error labels, dynamic descriptions and accessible control associations",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_form.c"
+          ]
         },
         {
-          "name": "submit/reset and keyboard",
-          "status": "not_started",
-          "evidence": []
+          "name": "Application-owned control and trailing submit/footer composition",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_form.c",
+            "docs/FORMS.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -2866,7 +2915,8 @@
           "Settings Form with Sections",
           "Contact Form"
         ]
-      }
+      },
+      "last_tested_commit": "ed10ae5"
     },
     {
       "name": "Input",
@@ -3683,16 +3733,17 @@
         "modal focus isolation and trigger restoration"
       ],
       "public_header": "include/cui/cui_surface.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_surface.c"
+        "tests/unit/test_surface.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending."
+        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3724,6 +3775,14 @@
           "evidence": [
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surfaces.txt"
+          ]
+        },
+        {
+          "name": "deferred close notification, measured scrolling and fixed footer",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surface-tracking.txt"
           ]
         }
       ],
@@ -4018,12 +4077,13 @@
         "modal focus isolation and trigger restoration"
       ],
       "public_header": "include/cui/cui_surface.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_overlay.c",
         "tests/unit/test_core.c",
         "tests/unit/test_base.c",
-        "tests/unit/test_surface.c"
+        "tests/unit/test_surface.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
@@ -4348,17 +4408,17 @@
         "modal focus isolation and trigger restoration"
       ],
       "public_header": "include/cui/cui_surface.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_surface.c"
+        "tests/unit/test_surface.c",
+        "tests/web/test_browser.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.",
-        "Sheet edge resizing and animated/reduced-motion transitions are pending."
+        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4387,6 +4447,22 @@
           "evidence": [
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surfaces.txt"
+          ]
+        },
+        {
+          "name": "deferred close notification, measured scrolling and fixed footer",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-surface-tracking.txt"
+          ]
+        },
+        {
+          "name": "captured edge resize with keyboard and bounded semantic dimensions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/validation/gcc-sheet-resize.txt"
           ]
         }
       ],
@@ -4548,7 +4624,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled stable-ID selection, horizontal/vertical keyboard navigation, manual activation, five themed variants, roving Tab and panel relationships tested. Overflow menus, close buttons, drag reorder and custom tab slots pending."
+        "Controlled stable-ID selection, keyboard navigation, five variants, custom tab/strip slots, custom close composition, measured UTF-8 ellipsis, bounded wheel scrolling, overflow menu and application-applied drag reorder requests tested. Automatic selected-tab reveal, native scrollbar presentation and full custom-body width constraints remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4572,6 +4648,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "measured ellipsis, bounded scrolling, overflow selection and cancellable drag requests",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "docs/validation/gcc-integrated-51.txt"
           ]
         }
       ],
@@ -5095,7 +5179,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling and loading/empty composition tested. Group headers, row/trailing customization, remote adapters and complete upstream behavior remain pending."
+        "Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling, multi-level group headers, whole-row/trailing callbacks and actual scrollbars tested. Complete reference-default, remote adapter and behavior audit remains in progress."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5127,6 +5211,14 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_table.c"
+          ]
+        },
+        {
+          "name": "validated group headers, row and trailing composition, reusable scrollbars",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c",
+            "docs/validation/gcc-table-dropdown.txt"
           ]
         }
       ],

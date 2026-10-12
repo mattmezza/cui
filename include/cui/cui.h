@@ -278,6 +278,10 @@ typedef struct {
     bool grow_width, grow_height;
 } cui_underlay_layout;
 bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corner_radii);
+/* Borrowed bitmap below children and above the box background, with the same
+ * first-frame grow/alignment and lifetime rules as solid underlays. */
+bool cui_set_bitmap_underlay(cui_context *, cui_underlay_layout, cui_bitmap_paint,
+                             cui_corner_radii);
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Zero-flow child at parent-relative bounds, inheriting clipping and layer.
  * A width/height of -1 fills the corresponding parent extent; zero is fixed.

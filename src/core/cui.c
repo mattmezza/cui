@@ -34,6 +34,7 @@ typedef struct {
     float opacity;
     uint32_t paint_root;
     cui_bitmap_paint bitmap;
+    bool bitmap_underlay;
     cui_rect underlay_bounds;
     cui_underlay_layout underlay_layout;
     cui_color underlay_color;
@@ -778,17 +779,21 @@ bool cui_bitmap_valid(cui_bitmap b) {
     return b.pixels && b.width && b.height && b.width <= 16384 && b.height <= 16384 &&
            b.stride >= (size_t)b.width * 4 && b.stride <= SIZE_MAX / b.height;
 }
+static bool cui_core_bitmap_paint_valid(cui_bitmap_paint *paint) {
+    if (!cui_bitmap_valid(paint->bitmap) || !isfinite(paint->opacity) || paint->opacity < 0 ||
+        paint->opacity > 1)
+        return false;
+    cui_rect *s = &paint->source;
+    if (!s->x && !s->y && !s->w && !s->h)
+        *s = (cui_rect){0, 0, (float)paint->bitmap.width, (float)paint->bitmap.height};
+    return isfinite(s->x) && isfinite(s->y) && isfinite(s->w) && isfinite(s->h) && s->x >= 0 &&
+           s->y >= 0 && s->w > 0 && s->h > 0 && s->x + s->w <= paint->bitmap.width &&
+           s->y + s->h <= paint->bitmap.height;
+}
 bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_box box) {
-    if (!ui || !ui->in_frame || !cui_bitmap_valid(paint.bitmap) || !isfinite(paint.opacity) ||
-        paint.opacity < 0 || paint.opacity > 1)
+    if (!ui || !ui->in_frame || !cui_core_bitmap_paint_valid(&paint))
         return false;
     cui_rect *s = &paint.source;
-    if (!s->x && !s->y && !s->w && !s->h)
-        *s = (cui_rect){0, 0, (float)paint.bitmap.width, (float)paint.bitmap.height};
-    if (!isfinite(s->x) || !isfinite(s->y) || !isfinite(s->w) || !isfinite(s->h) || s->x < 0 ||
-        s->y < 0 || s->w <= 0 || s->h <= 0 || s->x + s->w > paint.bitmap.width ||
-        s->y + s->h > paint.bitmap.height)
-        return false;
     if (!box.width && !box.fixed_width)
         box.width = s->w;
     if (!box.height && !box.fixed_height)
@@ -816,6 +821,7 @@ bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color 
         radii.bottom_left < 0 || radii.bottom_right < 0)
         return false;
     cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    node->bitmap_underlay = false;
     node->underlay_bounds = bounds;
     node->underlay_layout = layout;
     node->underlay_color = color;
@@ -825,6 +831,16 @@ bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color 
 }
 bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_corner_radii radii) {
     return cui_set_underlay_ex(ui, (cui_underlay_layout){.bounds = bounds}, color, radii);
+}
+bool cui_set_bitmap_underlay(cui_context *ui, cui_underlay_layout layout, cui_bitmap_paint paint,
+                             cui_corner_radii radii) {
+    if (!cui_core_bitmap_paint_valid(&paint) ||
+        !cui_set_underlay_ex(ui, layout, (cui_color){0}, radii))
+        return false;
+    cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    node->bitmap = paint;
+    node->bitmap_underlay = true;
+    return true;
 }
 void cui_begin_box(cui_context *ui, cui_id id, cui_box b) {
     cui_core_begin_box(ui, id, b, NULL, 0, false);
@@ -1150,11 +1166,15 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             underlay.y += d.bounds.y + (d.bounds.h - underlay.h) * align_y;
             cui_color underlay_color = node->underlay_color;
             underlay_color.a = (uint8_t)(underlay_color.a * opacity);
-            ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_RECT,
-                                                           .bounds = underlay,
-                                                           .color = underlay_color,
-                                                           .corner_radii = node->underlay_radii,
-                                                           .custom_corners = true};
+            cui_bitmap_paint bitmap = node->bitmap;
+            bitmap.opacity *= opacity;
+            ui->commands[ui->count++] =
+                (cui_draw_command){.type = node->bitmap_underlay ? CUI_DRAW_IMAGE : CUI_DRAW_RECT,
+                                   .bitmap = bitmap,
+                                   .bounds = underlay,
+                                   .color = underlay_color,
+                                   .corner_radii = node->underlay_radii,
+                                   .custom_corners = true};
             ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
             continue;
         }

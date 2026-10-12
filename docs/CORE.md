@@ -181,3 +181,10 @@ current delta. Failed begins do not advance the clock or collect resources.
 Hosts set `cui_set_reduced_motion`; changes request redraw, and components query
 `cui_reduced_motion` to choose static presentation. Animated components still
 request their next frame explicitly through `cui_invalidate`.
+
+`cui_set_bitmap_underlay` paints a borrowed bitmap above the current box's
+background and below its children, with the solid-underlay alignment/grow rules.
+It supports source cropping, tint, opacity and corner radii through the normal
+image renderer path. Inherited alpha is applied once. Invalid bitmap geometry
+leaves an existing underlay intact; a later solid underlay replaces the bitmap.
+This permits image/gradient backgrounds without floating over interactive text.

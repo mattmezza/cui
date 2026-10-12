@@ -1818,7 +1818,63 @@ static void test_context_resources(void) {
     assert(resource_destroys == 3);
     assert(!cui_create((cui_config){.max_resources = SIZE_MAX}));
 }
+static void test_bitmap_underlay(void) {
+    cui_context *ui = make();
+    unsigned char pixels[] = {255, 0, 0, 255, 0, 0, 255, 128};
+    cui_bitmap_paint paint = {.bitmap = {pixels, 1, 2, 4, 7}, .opacity = .8f};
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        float width = pass ? 160 : 80;
+        begin(ui);
+        cui_begin_box(ui, 1200,
+                      (cui_box){.width = width,
+                                .height = 40,
+                                .background = {10, 20, 30, 255},
+                                .opacity = .5f,
+                                .custom_opacity = true});
+        assert(cui_set_bitmap_underlay(ui,
+                                       (cui_underlay_layout){.bounds = {2, 3, -4, -6},
+                                                             .grow_width = true,
+                                                             .grow_height = true},
+                                       paint, (cui_corner_radii){2, 3, 4, 5}));
+        cui_bitmap_paint invalid = paint;
+        invalid.source.w = 2;
+        invalid.source.h = 2;
+        assert(
+            !cui_set_bitmap_underlay(ui, (cui_underlay_layout){0}, invalid, (cui_corner_radii){0}));
+        cui_text(ui, cui_string("foreground"), 12, (cui_color){255, 255, 255, 255});
+        cui_end_box(ui);
+        cui_draw_list draw = cui_end_frame(ui);
+        size_t image = SIZE_MAX, text = SIZE_MAX;
+        for (size_t i = 0; i < draw.count; ++i) {
+            if (draw.commands[i].type == CUI_DRAW_IMAGE)
+                image = i;
+            if (draw.commands[i].type == CUI_DRAW_TEXT)
+                text = i;
+        }
+        assert(image != SIZE_MAX && image < text && image > 0);
+        assert(draw.commands[image - 1].type == CUI_DRAW_CLIP_PUSH &&
+               draw.commands[image + 1].type == CUI_DRAW_CLIP_POP);
+        const cui_draw_command *d = &draw.commands[image];
+        assert(d->bounds.x == 2 && d->bounds.y == 3 && d->bounds.w == width - 4 &&
+               d->bounds.h == 34);
+        assert(d->bitmap.bitmap.pixels == pixels && d->bitmap.source.h == 2 &&
+               d->bitmap.bitmap.revision == 7 && fabsf(d->bitmap.opacity - .4f) < .001f);
+        assert(d->custom_corners && d->corner_radii.bottom_right == 5);
+    }
+    begin(ui);
+    cui_begin_box(ui, 1200, (cui_box){.width = 80, .height = 40});
+    assert(cui_set_bitmap_underlay(ui, (cui_underlay_layout){.bounds = {0, 0, 20, 20}}, paint,
+                                   (cui_corner_radii){0}));
+    assert(cui_set_underlay(ui, (cui_rect){0, 0, 10, 10}, (cui_color){1, 2, 3, 255},
+                            (cui_corner_radii){0}));
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    for (size_t i = 0; i < draw.count; ++i)
+        assert(draw.commands[i].type != CUI_DRAW_IMAGE);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_bitmap_underlay();
     test_context_resources();
     test_scoped_focus_and_consumption();
     test_percentage_dimensions();

@@ -81,6 +81,13 @@ typedef struct {
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
 cui_icon_error cui_icon(cui_context *, cui_id, const cui_theme *, cui_icon_state *,
                         cui_icon_options);
+/* Context-owned convenience cache; accepts catalog names or paths. Its masks
+ * expire at the next begin_frame, matching the core draw-list borrow lifetime. */
+cui_icon_error cui_icon_named(cui_context *, cui_id, const cui_theme *, cui_str name,
+                              cui_icon_options);
+/* Source Loader, .8-second quadratic rotation; zero options use Medium size.
+ * Reduced motion paints a static icon and does not request animation frames. */
+cui_icon_error cui_icon_spinner(cui_context *, cui_id, const cui_theme *, cui_icon_options);
 #ifdef __cplusplus
 }
 #endif
@@ -16071,6 +16078,7 @@ cui_rect cui_icon_state_paint_bounds(const cui_icon_state *state) {
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
+#include <string.h>
 cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_icon_state *state,
                         cui_icon_options options) {
     if (!ui || !id || !theme || !state || options.size < CUI_ICON_INHERITED ||
@@ -16122,6 +16130,85 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     }
     cui_end_box(ui);
     return result;
+}
+
+typedef struct {
+    cui_icon_state state;
+    size_t catalog_index;
+    double started;
+    bool initialized;
+} cui_icon_resource;
+static void cui_icon_resource_collect(void *payload) {
+    cui_icon_state_collect(&((cui_icon_resource *)payload)->state);
+}
+static void cui_icon_resource_destroy(void *payload) {
+    cui_icon_state_destroy(&((cui_icon_resource *)payload)->state);
+}
+static cui_icon_resource *cui_icon_resource_get(cui_context *ui, cui_id id, cui_id namespace_id) {
+    cui_icon_resource *resource =
+        cui_resource_get(ui, id, namespace_id, sizeof(*resource), cui_icon_resource_collect,
+                         cui_icon_resource_destroy);
+    if (resource && !resource->initialized) {
+        cui_icon_state_init(&resource->state);
+        if (!cui_icon_set_limits(&resource->state, (cui_icon_limits){.max_cache_bytes = 1024 * 1024,
+                                                                     .max_versions = 4}))
+            return NULL;
+        resource->catalog_index = SIZE_MAX;
+        resource->started = cui_frame_time(ui);
+        resource->initialized = true;
+    }
+    return resource;
+}
+static bool cui_icon_name_equal(cui_str first, cui_str second) {
+    return first.length == second.length && first.data && second.data &&
+           !memcmp(first.data, second.data, first.length);
+}
+cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                              cui_icon_options options) {
+    if (!ui || !id || !theme || !name.data || !name.length)
+        return CUI_ICON_INVALID;
+    size_t index = SIZE_MAX;
+    for (size_t i = 0; i < cui_icon_catalog_count(); i++)
+        if (cui_icon_name_equal(name, cui_icon_catalog_name(i)) ||
+            cui_icon_name_equal(name, cui_icon_catalog_path(i))) {
+            index = i;
+            break;
+        }
+    if (index == SIZE_MAX)
+        return CUI_ICON_NOT_FOUND;
+    cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0xe8e2ea151d9d14b4));
+    if (!resource)
+        return CUI_ICON_ALLOCATION;
+    if (resource->catalog_index != index) {
+        if (!cui_icon_set_name(&resource->state, cui_icon_catalog_name(index), NULL, NULL))
+            return resource->state.error;
+        resource->catalog_index = index;
+    }
+    return cui_icon(ui, id, theme, &resource->state, options);
+}
+cui_icon_error cui_icon_spinner(cui_context *ui, cui_id id, const cui_theme *theme,
+                                cui_icon_options options) {
+    if (!ui || !id || !theme)
+        return CUI_ICON_INVALID;
+    cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0x81f69ad695af247d));
+    if (!resource)
+        return CUI_ICON_ALLOCATION;
+    if (resource->catalog_index == SIZE_MAX) {
+        if (!cui_icon_set_name(&resource->state, cui_string("loader"), NULL, NULL))
+            return resource->state.error;
+        resource->catalog_index = 0;
+    }
+    float phase =
+        cui_reduced_motion(ui) ? 0 : (float)fmod((cui_frame_time(ui) - resource->started) / .8, 1);
+    float eased = phase < .5f ? 2 * phase * phase : 1 - (-2 * phase + 2) * (-2 * phase + 2) / 2;
+    options.custom_transform = true;
+    options.transform = cui_icon_rotation(eased * 6.2831853071795864769f);
+    if (options.size == CUI_ICON_INHERITED)
+        options.size = CUI_ICON_MEDIUM;
+    cui_icon_error error = cui_icon(ui, id, theme, &resource->state, options);
+    if (error == CUI_ICON_OK && !cui_reduced_motion(ui))
+        cui_invalidate(ui);
+    return error;
 }
 
 #endif

@@ -993,6 +993,85 @@ static double number = 42;
 static size_t page_number = 3, current_step;
 static float rating = 3;
 static cui_id dock_serial = 3;
+static uint64_t dock_active_panel = 1;
+static void gallery_dock_reset(void) {
+    cui_dock *fresh = cui_dock_create((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
+    if (!fresh)
+        return;
+    if (cui_dock_insert(fresh, cui_dock_root(fresh), 1, 0) != CUI_DOCK_OK ||
+        cui_dock_insert(fresh, cui_dock_root(fresh), 2, 1) != CUI_DOCK_OK) {
+        cui_dock_destroy(fresh);
+        return;
+    }
+    cui_dock_destroy(dock);
+    dock = fresh;
+    dock_serial = 3;
+    dock_active_panel = 1;
+    redraw = true;
+}
+static void gallery_dock_paint(cui_context *context, const cui_theme *theme, cui_dock_node node,
+                               float width, float height, bool disabled) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(dock, node, &info))
+        return;
+    cui_id owner = UINT64_C(0x279f0d636ef10d3a) ^ node * UINT64_C(0x9e3779b97f4a7c15);
+    bool leaf = info.kind == CUI_DOCK_TABS;
+    cui_begin_box(context, owner,
+                  (cui_box){.width = width,
+                            .height = height,
+                            .fixed_width = true,
+                            .fixed_height = true,
+                            .row = info.kind == CUI_DOCK_SPLIT_HORIZONTAL,
+                            .gap = 4,
+                            .padding = leaf ? 6 : 0,
+                            .clip = leaf,
+                            .background = leaf ? theme->surface : (cui_color){0},
+                            .border = theme->border,
+                            .border_width = leaf ? 1 : 0,
+                            .radius = theme->radius});
+    if (!leaf) {
+        float extent = info.kind == CUI_DOCK_SPLIT_HORIZONTAL ? width : height;
+        float first = fmaxf(0, extent - 4) * (float)info.ratio;
+        float second = fmaxf(0, extent - 4 - first);
+        gallery_dock_paint(context, theme, info.first,
+                           info.kind == CUI_DOCK_SPLIT_HORIZONTAL ? first : width,
+                           info.kind == CUI_DOCK_SPLIT_HORIZONTAL ? height : first, disabled);
+        gallery_dock_paint(context, theme, info.second,
+                           info.kind == CUI_DOCK_SPLIT_HORIZONTAL ? second : width,
+                           info.kind == CUI_DOCK_SPLIT_HORIZONTAL ? height : second, disabled);
+    } else {
+        char region[64];
+        snprintf(region, sizeof(region), "Workspace panel %llu",
+                 (unsigned long long)info.active_panel);
+        cui_interact(context, owner, CUI_ROLE_REGION, cui_string(region), disabled, false, 0);
+        cui_begin_box(context, 0, (cui_box){.width = -1, .row = true, .gap = 4});
+        for (size_t i = 0; i < info.panel_count; ++i) {
+            uint64_t panel;
+            cui_dock_panel_at(dock, node, i, &panel);
+            char label[48];
+            snprintf(label, sizeof(label), "Panel %llu", (unsigned long long)panel);
+            if (cui_button_ex(
+                    context, UINT64_C(0x273febc116addfaf) ^ panel, theme, cui_string(label),
+                    (cui_button_options){.size = CUI_CONTROL_XSMALL,
+                                         .variant = panel == info.active_panel ? CUI_BUTTON_PRIMARY
+                                                                               : CUI_BUTTON_GHOST,
+                                         .disabled = disabled})) {
+                cui_dock_activate(dock, panel);
+                dock_active_panel = panel;
+                redraw = true;
+            }
+        }
+        cui_end_box(context);
+        cui_dock_node_get(dock, node, &info);
+        char content[64];
+        snprintf(content, sizeof(content), "Active panel: %llu",
+                 (unsigned long long)info.active_panel);
+        cui_text(context, cui_string(content), 14, theme->text);
+        cui_text(context, cui_string("Select a tab to change this pane."), 12, theme->muted);
+    }
+    cui_end_box(context);
+}
+
 static void panel(cui_context *context, size_t index, void *user) {
     (void)user;
     char text[64];
@@ -2964,17 +3043,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 27: {
-        cui_label(ui, &t, cui_string("Base model: dock serialization and geometry"));
-        if (cui_button(ui, cui_id_from(ui, "split"), &t, cui_string("Split panel"), disabled)) {
+        cui_label(ui, &t, cui_string("Select tabs; Split panel divides the active pane."));
+        cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "split"), &t, cui_string("Split panel"),
+                       disabled || dock_serial >= 10)) {
             cui_dock_node tab;
             size_t index;
-            if (cui_dock_panel_find(dock, 1, &tab, &index)) {
+            if (cui_dock_panel_find(dock, dock_active_panel, &tab, &index)) {
                 cui_dock_node fresh;
                 if (cui_dock_split(dock, tab, CUI_DOCK_SPLIT_HORIZONTAL, .5, dock_serial, false,
-                                   &fresh) == CUI_DOCK_OK)
-                    dock_serial++;
+                                   &fresh) == CUI_DOCK_OK) {
+                    dock_active_panel = dock_serial++;
+                    redraw = true;
+                }
             }
         }
+        if (cui_button(ui, cui_id_from(ui, "dock-reset"), &t, cui_string("Reset layout"), disabled))
+            gallery_dock_reset();
+        cui_end_box(ui);
+        gallery_dock_paint(ui, &t, cui_dock_root(dock), width - 48, 180, disabled);
         cui_dock_geometry regions[16];
         size_t count = 0;
         bool fits;

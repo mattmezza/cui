@@ -28,3 +28,9 @@ Serialization first measures required bytes, excluding the terminating NUL. A NU
 Tests cover nested geometry and minimum compression, tab order/active selection, move/remove collapse, stale IDs, stable keys including zero and UINT64_MAX, deterministic roundtrip, transactional parser rejection, huge/deep inputs, explicit capacity rejection, 7000 deterministic mutations with tree/panel invariants, and 2000 malformed random restore inputs under ASan/UBSan.
 
 This model does not implement styled Dock widgets, drag/drop targeting, resizing gestures, floating native windows, focus scopes, or panel rendering. It supplies the retained tree, operations, geometry, and persistence required for a later widget layer; it does not claim full Dock component parity.
+
+## Browser demonstration
+
+The Dock gallery paints visible panes from the retained tree. Select Panel 1 or Panel 2 to change the active tab, then use Split panel to divide that pane. The demo supports up to eight panes; Reset layout recreates the original two-tab pane. The region count and serialized size update with the same model.
+
+This is a composed demonstration of the existing docking model. It does not implement a public styled Dock widget, tab drag-and-drop, divider dragging, floating windows, or persistence across a browser reload. The gallery painter lives in `web/gallery.c`; the retained model's public API remains `cui/cui_dock.h`.

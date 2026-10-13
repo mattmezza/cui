@@ -463,6 +463,22 @@ def main():
             page.keyboard.press('Home')
             wait_semantic('Task 000001', 37)
             page.screenshot(path='/tmp/cui-web-virtual-list.png')
+            page.evaluate('location.hash="Dock"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Dock"')
+            wait_semantic('Panel 1', 1)
+            wait_semantic('Panel 2', 1)
+            click_semantic('Panel 2', 1)
+            wait_semantic('Workspace panel 2', 41)
+            click_semantic('Split panel', 1)
+            wait_semantic('Panel 3', 1)
+            wait_semantic('Workspace panel 3', 41)
+            dock_regions = page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
+                .filter(i=>e.gallery_semantic(i,0)===41).map(i=>[1,2,3,4].map(f=>e.gallery_semantic(i,f)));}''')
+            assert len(dock_regions) == 2 and dock_regions[0][0]+dock_regions[0][2]+3 <= dock_regions[1][0], dock_regions
+            page.screenshot(path='/tmp/cui-web-dock.png')
+            click_semantic('Reset layout', 1)
+            wait_semantic('Workspace panel 1', 41)
+            assert semantic_index('Panel 3', 1) is None
             page.evaluate('location.hash="Command"')
             page.wait_for_function('cuiGallery.renderedComponent==="Command"')
             assert semantic_index('Command palette', 6) is not None

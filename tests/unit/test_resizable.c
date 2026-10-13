@@ -333,6 +333,89 @@ static void test_edge_appearance(void) {
         }
     cui_destroy(ui);
 }
+static void responsive_content(cui_context *ui, void *user) {
+    cui_id id = *(cui_id *)user;
+    cui_begin_box(ui, id, (cui_box){.width = -1, .height = -1});
+    cui_text(ui, cui_string("Panel content"), 14, (cui_color){20, 20, 20, 255});
+    cui_end_box(ui);
+}
+static void responsive_frame(cui_context *ui, cui_resizable_state *state,
+                             cui_resizable_panel *panels, cui_resizable_options options) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 1400, 1400, .016f));
+    assert(cui_resizable(ui, 100, &theme, state, panels, 2, options) == CUI_RESIZABLE_OK);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void test_responsive_actual_panels(void) {
+    for (int axis = 0; axis < 2; axis++)
+        for (int wide = 0; wide < 2; wide++)
+            for (int touch = 0; touch < 2; touch++) {
+                cui_context *ui = cui_create((cui_config){.width = 1400, .height = 1400});
+                assert(ui);
+                cui_resizable_state state;
+                cui_resizable_slot slots[2];
+                assert(cui_resizable_state_init(&state, slots, 2));
+                float extent = wide ? 1100 : 320;
+                cui_id content[] = {30, 31};
+                cui_resizable_panel panels[] = {{.id = 10,
+                                                 .has_initial_size = true,
+                                                 .initial_size = 140,
+                                                 .custom_range = true,
+                                                 .minimum = 80,
+                                                 .maximum = 300,
+                                                 .content = responsive_content,
+                                                 .content_user = &content[0]},
+                                                {.id = 11,
+                                                 .custom_range = true,
+                                                 .minimum = 80,
+                                                 .maximum = extent,
+                                                 .content = responsive_content,
+                                                 .content_user = &content[1]}};
+                cui_resizable_options options = cui_resizable_options_default();
+                options.axis = (cui_resizable_axis)axis;
+                options.extent = extent;
+                options.cross_size = 200;
+                options.reduced_motion = true;
+                completed = 0;
+                state.on_resize = resize_completed;
+                state.resize_user = &completed;
+                responsive_frame(ui, &state, panels, options);
+                assert(state.fit_constraints);
+                cui_rect before = cui_bounds(ui, 10), content_before = cui_bounds(ui, 30);
+                cui_rect handle = cui_bounds(ui, cui_resizable_handle_id(100, 10));
+                float x = handle.x + handle.w / 2, y = handle.y + handle.h / 2;
+                cui_pointer_type type = touch ? CUI_POINTER_TOUCH : CUI_POINTER_MOUSE;
+                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                       .pointer_type = type,
+                                                       .pointer_id = 7,
+                                                       .x = x,
+                                                       .y = y}));
+                responsive_frame(ui, &state, panels, options);
+                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                                       .pointer_type = type,
+                                                       .pointer_id = 7,
+                                                       .x = x + (axis == 0 ? 24 : 0),
+                                                       .y = y + (axis == 1 ? 24 : 0)}));
+                responsive_frame(ui, &state, panels, options);
+                cui_rect after = cui_bounds(ui, 10), content_after = cui_bounds(ui, 30);
+                assert((axis == 0 ? after.w - before.w : after.h - before.h) > 23);
+                near(axis == 0 ? after.w : after.h, slots[0].size);
+                near(axis == 0 ? content_after.w - content_before.w
+                               : content_after.h - content_before.h,
+                     axis == 0 ? after.w - before.w : after.h - before.h);
+                near(slots[0].size + slots[1].size, extent);
+                assert(completed == 0);
+                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                                       .pointer_type = type,
+                                                       .pointer_id = 7,
+                                                       .x = x + (axis == 0 ? 24 : 0),
+                                                       .y = y + (axis == 1 ? 24 : 0)}));
+                responsive_frame(ui, &state, panels, options);
+                assert(completed == 1 && !state.dragging);
+                cui_destroy(ui);
+            }
+}
 static void test_styled(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
     assert(ui);
@@ -531,6 +614,7 @@ int main(void) {
     test_base_input();
 #ifndef CUI_RESIZABLE_BASE_ONLY
     test_edge_appearance();
+    test_responsive_actual_panels();
     test_styled();
 #endif
     return 0;

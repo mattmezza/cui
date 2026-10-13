@@ -421,6 +421,16 @@ cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *, cui_plot_re
 cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *, cui_plot_rect bounds,
                                         cui_plot_point live_global_position, bool appearing,
                                         cui_plot_point *relative, bool *resolved);
+/* Shape identity helper: extras then source-style f32 point/value bits, with
+ * original FNV-1a hashing. Keys are opaque process-local values, not compatible
+ * with Rust DefaultHasher or persistent cross-platform serialization. Include
+ * curve/stroke/dash/radii inputs; exclude origin and paint-only color. */
+typedef struct {
+    uint64_t value;
+} cui_plot_shape_key;
+cui_plot_shape_key cui_plot_shape_key_init(uint64_t extra);
+cui_plot_result cui_plot_shape_key_float(cui_plot_shape_key *, float value);
+cui_plot_result cui_plot_shape_key_point(cui_plot_shape_key *, cui_plot_point);
 /* Projected scalar transition clock used by Plot enter/exit policies. Seconds
  * are caller-supplied monotonic timestamps; backward time saturates elapsed to
  * zero. Zero-initialize each independently keyed channel. First target is

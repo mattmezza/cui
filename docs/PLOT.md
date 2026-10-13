@@ -468,3 +468,12 @@ advance toward the previous target before retargeting. Schedule while
 explicit host seam, not automatic scoped renderer state or theme projection.
 
 The gallery shape selector exposes linear, natural cubic, step-after, area, radial, rounded-bar and dot previews. All use the same projected samples, scale and native C geometry; bars/dots sample every eighth point to bound software preview work. Zoom/pan resamples the function through the current scale. These previews do not imply automatic shape hit testing, animation clocks or renderer path caching.
+
+The software path route can retain caller-owned `cui_plot_path_cache` storage
+across frames. `cui_plot_path_cache_get` rebuilds and flattens only on a changed
+shape key; `cui_plot_raster_cached` accepts its borrowed relative segments plus
+current origin and colors. Origin/color changes reuse tessellation, and empty
+paths are cached. Pixel rasterization still runs; this does not add a Core native
+mesh cache or implicit element cache lifetime. See
+[cached tessellation](PLOT_MODEL.md#shape-keys-and-cached-tessellation) for bounds,
+key composition and view lifetimes.

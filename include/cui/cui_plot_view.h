@@ -85,6 +85,47 @@ typedef struct {
     cui_color fill, stroke;
     float stroke_width;
 } cui_plot_shape;
+/* Portable cached tessellation, not renderer-native stroke triangles. */
+typedef struct {
+    cui_plot_line line;
+    bool closed;
+} cui_plot_path_segment;
+typedef struct {
+    cui_plot_path_segment *storage;
+    size_t count, capacity;
+    uint64_t key;
+    bool warm;
+} cui_plot_path_cache;
+typedef struct {
+    const cui_plot_path_segment *segments;
+    size_t count;
+    cui_plot_point origin;
+} cui_plot_cached_path;
+typedef cui_plot_result (*cui_plot_path_build_fn)(void *user, cui_plot_shape *relative_shape);
+/* Caller storage <=4096 segments. Build once on changed key, never on hit;
+ * callback returns relative commands (borrowed until get returns), or EMPTY.
+ * EMPTY is cached and warm, returning EMPTY with an empty output path.
+ * Colors/stroke width in built shape are ignored; key must include every
+ * geometry-affecting input. Callback must not mutate cache/storage. Invalid,
+ * capacity and overflow errors preserve cache/storage/output. Origin translates
+ * geometry at paint time; output borrows storage until next successful miss. */
+cui_plot_result cui_plot_path_cache_init(cui_plot_path_cache *, cui_plot_path_segment *,
+                                         size_t capacity);
+bool cui_plot_path_cache_is_warm(const cui_plot_path_cache *);
+cui_plot_result cui_plot_path_cache_get(cui_plot_path_cache *, uint64_t key, cui_plot_point origin,
+                                        cui_plot_path_build_fn, void *user, cui_plot_cached_path *);
+typedef struct {
+    cui_plot_cached_path path;
+    cui_color fill, stroke;
+    float stroke_width;
+} cui_plot_cached_shape;
+/* Same raster bounds/style/sampling as cui_plot_raster. Reuses cached segments
+ * without command rebuilding or cubic flattening; pixels are still rasterized.
+ * Cache/pixel storage must be disjoint and stable throughout the call. */
+cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, unsigned height,
+                                       size_t stride, size_t capacity_bytes,
+                                       const cui_plot_cached_shape *, size_t count,
+                                       cui_color clear);
 /* Caller RGBA8 storage, straight alpha. Rasterizer accepts Move/Line/Cubic/Close;
  * use arc_flatten for ARC commands. Cubics use 16 uniform parameter chords.
  * Each shape <=4096 flattened segments, <=64 shapes, dimensions1..1024,

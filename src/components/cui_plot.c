@@ -155,10 +155,7 @@ cui_plot_result cui_plot_axis_ticks(const cui_plot_scale *scale, size_t desired,
     return CUI_PLOT_OK;
 }
 
-typedef struct {
-    cui_plot_line line;
-    bool closed;
-} plot_segment;
+typedef cui_plot_path_segment plot_segment;
 static bool point_valid(cui_plot_point p) {
     return isfinite(p.x) && isfinite(p.y) && fabs(p.x) <= 16384 && fabs(p.y) <= 16384;
 }
@@ -229,6 +226,35 @@ static void blend(unsigned char *p, cui_color c) {
     p[2] = (unsigned char)lround((c.b * a + p[2] * old * (1 - a)) / alpha);
     p[3] = (unsigned char)lround(alpha * 255);
 }
+static void raster_segments(unsigned char *pixels, unsigned width, unsigned height, size_t stride,
+                            const plot_segment *lines, size_t used, cui_plot_point origin,
+                            cui_color fill, cui_color stroke, float stroke_width) {
+    for (unsigned y = 0; y < height; ++y)
+        for (unsigned x = 0; x < width; ++x) {
+            double px = x + .5, py = y + .5;
+            bool inside = false, stroked = false;
+            for (size_t j = 0; j < used; ++j) {
+                cui_plot_point a = {lines[j].line.start.x + origin.x,
+                                    lines[j].line.start.y + origin.y};
+                cui_plot_point b = {lines[j].line.end.x + origin.x, lines[j].line.end.y + origin.y};
+                if (lines[j].closed && ((a.y > py) != (b.y > py)) &&
+                    px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
+                    inside = !inside;
+                if (stroke.a && stroke_width > 0) {
+                    double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+                    double t =
+                        length ? fmax(0, fmin(1, ((px - a.x) * dx + (py - a.y) * dy) / length)) : 0;
+                    if (hypot(px - a.x - t * dx, py - a.y - t * dy) <= stroke_width / 2)
+                        stroked = true;
+                }
+            }
+            unsigned char *p = pixels + y * stride + x * 4;
+            if (inside && fill.a)
+                blend(p, fill);
+            if (stroked)
+                blend(p, stroke);
+        }
+}
 cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned height,
                                 size_t stride, size_t capacity_bytes, const cui_plot_shape *shapes,
                                 size_t count, cui_color clear) {
@@ -258,31 +284,8 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
         }
     for (size_t i = 0; i < count; ++i) {
         (void)segments(shapes + i, lines, &used);
-        for (unsigned y = 0; y < height; ++y)
-            for (unsigned x = 0; x < width; ++x) {
-                double px = x + .5, py = y + .5;
-                bool inside = false, stroke = false;
-                for (size_t j = 0; j < used; ++j) {
-                    cui_plot_point a = lines[j].line.start, b = lines[j].line.end;
-                    if (lines[j].closed && ((a.y > py) != (b.y > py)) &&
-                        px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
-                        inside = !inside;
-                    if (shapes[i].stroke.a && shapes[i].stroke_width > 0) {
-                        double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
-                        double t =
-                            length ? fmax(0, fmin(1, ((px - a.x) * dx + (py - a.y) * dy) / length))
-                                   : 0;
-                        if (hypot(px - a.x - t * dx, py - a.y - t * dy) <=
-                            shapes[i].stroke_width / 2)
-                            stroke = true;
-                    }
-                }
-                unsigned char *p = pixels + y * stride + x * 4;
-                if (inside && shapes[i].fill.a)
-                    blend(p, shapes[i].fill);
-                if (stroke)
-                    blend(p, shapes[i].stroke);
-            }
+        raster_segments(pixels, width, height, stride, lines, used, (cui_plot_point){0},
+                        shapes[i].fill, shapes[i].stroke, shapes[i].stroke_width);
     }
     return CUI_PLOT_OK;
 }
@@ -656,4 +659,100 @@ cui_plot_result cui_plot_truncate_text(cui_context *ui, cui_str text, float size
 cui_plot_result cui_plot_grid(cui_context *ui, cui_id id, const cui_theme *theme,
                               const cui_plot_grid_options *options, cui_color stroke) {
     return cui_plot_grid_ex(ui, id, theme, options, stroke, false);
+}
+
+static bool cached_path_valid(cui_plot_cached_path path) {
+    if (path.count > 4096 || (path.count && !path.segments) || !point_valid(path.origin))
+        return false;
+    for (size_t i = 0; i < path.count; ++i) {
+        cui_plot_line line = path.segments[i].line;
+        if (!point_valid(line.start) || !point_valid(line.end) ||
+            !point_valid(
+                (cui_plot_point){line.start.x + path.origin.x, line.start.y + path.origin.y}) ||
+            !point_valid((cui_plot_point){line.end.x + path.origin.x, line.end.y + path.origin.y}))
+            return false;
+    }
+    return true;
+}
+cui_plot_result cui_plot_path_cache_init(cui_plot_path_cache *cache, cui_plot_path_segment *storage,
+                                         size_t capacity) {
+    if (!cache || capacity > 4096 || (capacity && !storage))
+        return CUI_PLOT_INVALID;
+    *cache = (cui_plot_path_cache){.storage = storage, .capacity = capacity};
+    return CUI_PLOT_OK;
+}
+bool cui_plot_path_cache_is_warm(const cui_plot_path_cache *cache) {
+    return cache && cache->warm;
+}
+cui_plot_result cui_plot_path_cache_get(cui_plot_path_cache *cache, uint64_t key,
+                                        cui_plot_point origin, cui_plot_path_build_fn build,
+                                        void *user, cui_plot_cached_path *out) {
+    if (!cache || !out || cache->capacity > 4096 || cache->count > cache->capacity ||
+        (cache->capacity && !cache->storage) || !point_valid(origin))
+        return CUI_PLOT_INVALID;
+    if (cache->warm && cache->key == key) {
+        cui_plot_cached_path path = {cache->storage, cache->count, origin};
+        if (!cached_path_valid(path))
+            return CUI_PLOT_INVALID;
+        *out = path;
+        return cache->count ? CUI_PLOT_OK : CUI_PLOT_EMPTY;
+    }
+    if (!build)
+        return CUI_PLOT_INVALID;
+    cui_plot_shape shape = {0};
+    cui_plot_result result = build(user, &shape);
+    if (result != CUI_PLOT_OK && result != CUI_PLOT_EMPTY)
+        return result;
+    plot_segment temporary[4096];
+    size_t count = 0;
+    if (result == CUI_PLOT_OK) {
+        shape.stroke_width = 0;
+        result = segments(&shape, temporary, &count);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (count > cache->capacity)
+        return CUI_PLOT_CAPACITY;
+    if (!cached_path_valid((cui_plot_cached_path){temporary, count, origin}))
+        return CUI_PLOT_INVALID;
+    if (count)
+        memcpy(cache->storage, temporary, count * sizeof *temporary);
+    cache->count = count;
+    cache->key = key;
+    cache->warm = true;
+    *out = (cui_plot_cached_path){cache->storage, count, origin};
+    return count ? CUI_PLOT_OK : CUI_PLOT_EMPTY;
+}
+cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, unsigned height,
+                                       size_t stride, size_t capacity_bytes,
+                                       const cui_plot_cached_shape *shapes, size_t count,
+                                       cui_color clear) {
+    if (!pixels || !width || !height || width > 1024 || height > 1024 ||
+        stride < (size_t)width * 4 || stride > SIZE_MAX / height || count > 64 ||
+        (count && !shapes))
+        return CUI_PLOT_INVALID;
+    if (capacity_bytes < stride * height)
+        return CUI_PLOT_CAPACITY;
+    size_t total = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!cached_path_valid(shapes[i].path) || !isfinite(shapes[i].stroke_width) ||
+            shapes[i].stroke_width < 0 || shapes[i].stroke_width > 1024)
+            return CUI_PLOT_INVALID;
+        total += shapes[i].path.count;
+    }
+    if (total && (size_t)width * height > 64000000 / total)
+        return CUI_PLOT_CAPACITY;
+    for (unsigned y = 0; y < height; ++y)
+        for (unsigned x = 0; x < width; ++x) {
+            unsigned char *p = pixels + y * stride + x * 4;
+            p[0] = clear.r;
+            p[1] = clear.g;
+            p[2] = clear.b;
+            p[3] = clear.a;
+        }
+    for (size_t i = 0; i < count; ++i)
+        raster_segments(pixels, width, height, stride, shapes[i].path.segments,
+                        shapes[i].path.count, shapes[i].path.origin, shapes[i].fill,
+                        shapes[i].stroke, shapes[i].stroke_width);
+    return CUI_PLOT_OK;
 }

@@ -2318,3 +2318,29 @@ cui_plot_result cui_plot_spring_step(cui_plot_spring_clock *clock, double target
     *out = value;
     return CUI_PLOT_OK;
 }
+
+static void plot_shape_key_bytes(cui_plot_shape_key *key, const void *data, size_t count) {
+    const unsigned char *bytes = data;
+    for (size_t i = 0; i < count; ++i) {
+        key->value ^= bytes[i];
+        key->value *= UINT64_C(1099511628211);
+    }
+}
+cui_plot_shape_key cui_plot_shape_key_init(uint64_t extra) {
+    cui_plot_shape_key key = {UINT64_C(14695981039346656037)};
+    plot_shape_key_bytes(&key, &extra, sizeof extra);
+    return key;
+}
+cui_plot_result cui_plot_shape_key_float(cui_plot_shape_key *key, float value) {
+    if (!key)
+        return CUI_PLOT_INVALID;
+    plot_shape_key_bytes(key, &value, sizeof value);
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_shape_key_point(cui_plot_shape_key *key, cui_plot_point point) {
+    if (!key || !isfinite(point.x) || !isfinite(point.y) || fabs(point.x) > FLT_MAX ||
+        fabs(point.y) > FLT_MAX)
+        return CUI_PLOT_INVALID;
+    (void)cui_plot_shape_key_float(key, (float)point.x);
+    return cui_plot_shape_key_float(key, (float)point.y);
+}

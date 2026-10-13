@@ -606,7 +606,113 @@ static void test_rounded_bar_raster(void) {
     assert(pixels[(11 * 16 + 2) * 4 + 3] == 255);
     assert(pixels[(6 * 16 + 6) * 4] == 200);
 }
+typedef struct {
+    const cui_plot_path_command *commands;
+    size_t count, builds;
+    cui_plot_result result;
+} cache_builder;
+static cui_plot_result build_cache(void *user, cui_plot_shape *shape) {
+    cache_builder *builder = user;
+    ++builder->builds;
+    *shape = (cui_plot_shape){.commands = builder->commands, .count = builder->count};
+    return builder->result;
+}
+static void path_caches(void) {
+    cui_plot_path_command commands[] = {
+        {.kind = CUI_PLOT_PATH_MOVE, .point = {2, 2}},
+        {.kind = CUI_PLOT_PATH_CUBIC, .point = {12, 2}, .control1 = {4, 8}, .control2 = {10, 8}},
+        {.kind = CUI_PLOT_PATH_LINE, .point = {2, 2}},
+        {.kind = CUI_PLOT_PATH_CLOSE}};
+    cui_plot_path_segment storage[32], saved_storage[32];
+    memset(storage, 0x5a, sizeof storage);
+    cui_plot_path_cache cache;
+    assert(cui_plot_path_cache_init(&cache, storage, 32) == CUI_PLOT_OK);
+    assert(!cui_plot_path_cache_is_warm(&cache));
+    cache_builder builder = {commands, 4, 0, CUI_PLOT_OK};
+    cui_plot_cached_path path;
+    assert(cui_plot_path_cache_get(&cache, 1, (cui_plot_point){0}, build_cache, &builder, &path) ==
+           CUI_PLOT_OK);
+    assert(builder.builds == 1 && path.count == 18 && cui_plot_path_cache_is_warm(&cache));
+    for (size_t i = 0; i < path.count; ++i)
+        assert(path.segments[i].closed);
+    memcpy(saved_storage, storage, sizeof storage);
+    cui_plot_cached_shape shape = {path, green, red, 1};
+    unsigned char direct[32 * 32 * 4], cached[sizeof direct];
+    cui_plot_shape original = {commands, 4, green, red, 1};
+    assert(cui_plot_raster(direct, 32, 32, 128, sizeof direct, &original, 1, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(cui_plot_raster_cached(cached, 32, 32, 128, sizeof cached, &shape, 1, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(memcmp(direct, cached, sizeof direct) == 0);
+    /* Origin/color changes do not rebuild; translated cached raster equals translated commands. */
+    assert(cui_plot_path_cache_get(&cache, 1, (cui_plot_point){5, 3}, NULL, NULL, &path) ==
+           CUI_PLOT_OK);
+    assert(builder.builds == 1 && memcmp(storage, saved_storage, sizeof storage) == 0);
+    for (size_t i = 0; i < 3; ++i) {
+        commands[i].point.x += 5;
+        commands[i].point.y += 3;
+    }
+    commands[1].control1.x += 5;
+    commands[1].control1.y += 3;
+    commands[1].control2.x += 5;
+    commands[1].control2.y += 3;
+    shape = (cui_plot_cached_shape){path, blue, green, 2};
+    original = (cui_plot_shape){commands, 4, blue, green, 2};
+    assert(cui_plot_raster(direct, 32, 32, 128, sizeof direct, &original, 1, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(cui_plot_raster_cached(cached, 32, 32, 128, sizeof cached, &shape, 1, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(memcmp(direct, cached, sizeof direct) == 0);
+    bool painted = false;
+    for (size_t i = 3; i < sizeof cached; i += 4)
+        painted |= cached[i] != 0;
+    assert(painted);
+    cui_plot_path_cache before = cache;
+    cui_plot_cached_path saved_path = path;
+    assert(cui_plot_path_cache_get(&cache, 2, (cui_plot_point){0}, NULL, NULL, &path) ==
+           CUI_PLOT_INVALID);
+    builder.result = CUI_PLOT_INVALID;
+    assert(cui_plot_path_cache_get(&cache, 2, (cui_plot_point){0}, build_cache, &builder, &path) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&before, &cache, sizeof cache) == 0 &&
+           memcmp(&saved_path, &path, sizeof path) == 0);
+    assert(memcmp(storage, saved_storage, sizeof storage) == 0);
+    builder.result = CUI_PLOT_OK;
+    assert(cui_plot_path_cache_get(&cache, 2, (cui_plot_point){0}, build_cache, &builder, &path) ==
+           CUI_PLOT_OK);
+    assert(builder.builds == 3 && cache.key == 2);
+    before = cache;
+    saved_path = path;
+    assert(cui_plot_path_cache_get(&cache, 2, (cui_plot_point){16384, 0}, NULL, NULL, &path) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&before, &cache, sizeof cache) == 0 &&
+           memcmp(&saved_path, &path, sizeof path) == 0);
+    builder.result = CUI_PLOT_EMPTY;
+    assert(cui_plot_path_cache_get(&cache, 3, (cui_plot_point){0}, build_cache, &builder, &path) ==
+           CUI_PLOT_EMPTY);
+    assert(path.count == 0 && cui_plot_path_cache_is_warm(&cache));
+    assert(cui_plot_path_cache_get(&cache, 3, (cui_plot_point){1, 1}, NULL, NULL, &path) ==
+           CUI_PLOT_EMPTY);
+    assert(builder.builds == 4);
+    cui_plot_path_cache small;
+    assert(cui_plot_path_cache_init(&small, storage, 1) == CUI_PLOT_OK);
+    builder.result = CUI_PLOT_OK;
+    memcpy(saved_storage, storage, sizeof storage);
+    assert(cui_plot_path_cache_get(&small, 1, (cui_plot_point){0}, build_cache, &builder, &path) ==
+           CUI_PLOT_CAPACITY);
+    assert(!small.warm && small.count == 0);
+    assert(memcmp(storage, saved_storage, sizeof storage) == 0);
+    shape.path.origin.x = NAN;
+    memset(cached, 0x5a, sizeof cached);
+    memcpy(direct, cached, sizeof cached);
+    assert(cui_plot_raster_cached(cached, 32, 32, 128, sizeof cached, &shape, 1, (cui_color){0}) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(direct, cached, sizeof cached) == 0);
+    assert(cui_plot_path_cache_get(&cache, 3, (cui_plot_point){NAN, 0}, NULL, NULL, &path) ==
+           CUI_PLOT_INVALID);
+}
 int main(void) {
+    path_caches();
     test_sankey_raster();
     test_rounded_bar_raster();
 #ifdef CUI_HAS_TEXT

@@ -583,11 +583,11 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `ScalePoint` owned domain, duplicate-first map, tick-at, nearest | Point init/map/at/nearest | Uint64 keys, borrowed arrays, bounded finite validation rather than owned generic Vec |
 | `ScaleOrdinal` domain/range replacement, unknown, first duplicate, cycling cloned output | Ordinal init/map; reinitialize to replace arrays | Byte copies preserve C value representations but do not deep-clone arbitrary payloads; pointers remain caller-owned; finite capacity bounds |
 | `Curve::{Natural,Linear,StepAfter}` | Cartesian path and source Area builders | Source Catmull-Rom controls and omitted final StepAfter vertical reproduced; no additional upstream StepBefore/Step scale exists |
-| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | Dot geometry/themed drivers now available; no accessor callbacks, arbitrary Background/gradient, or source path cache; numeric bounds/precision differ |
+| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | Dot geometry/themed drivers now available; no accessor callbacks, arbitrary Background/gradient, or source renderer mesh cache; caller-owned software segment cache available; numeric bounds/precision differ |
 | `Area` data/X/Y1, optional Y0, fill plus separate 1px upper stroke, curves, paint/cache | `cui_plot_area_paths` separate contours; two raster shapes | Source accessor callbacks/cache/backgrounds absent; open/singleton GPUI tessellator result not reproduced; extended per-point closed areas remain separate |
 | `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; pure independently rounded-bar paths available; no generic label callback or arbitrary gradient renderer; negative width is rejected |
 | `Pie` positive-value arcs/index/padding and angular limits | `cui_plot_pie` | No accessor callback/borrowed arbitrary datum payload; stable normalized double summation replaces unchecked f32 sums; pad is metadata |
-| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; no cache/Background |
+| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; flattened output can use software segment cache, no native mesh cache/Background |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
 | `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Shared Base graph/path model and Chart adapter | Shared pure topology/layout/layout_from, adjacency queries, source defaults, scaled values and tapered ribbon path available; bounded capacities/strict finite nonnegative values and checked doubles differ; Chart adapter delegates while preserving its public contracts |
@@ -595,7 +595,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `AxisLabelPlacement::{Outside,Inside}` | Application places labels/reserves gutters; Chart has its own layer | No standalone Plot placement enum or automatic gutter allocation; source PlotAxis itself only records position/side |
 | `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults and explicit-color paint covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
 | `Text`, `PlotLabel`, text width/truncation helpers | Caller-owned PlotLabel collection/layout/paint and measured UTF-8 ellipsis helper | No automatic tooltip content/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
-| `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned commands/bitmap revision | No origin-translated tessellation cache, keyed state slots/pairs or source hash key contract; source `is_warm` means a key exists, including after an initial empty build |
+| `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned flattened-segment cache, translated raster and shape-key helper | Cache hits skip builder/cubic flattening; empty builds are warm; opaque FNV keys preserve f32 bit sensitivity, not Rust hash values; no renderer-native stroke triangles or implicit keyed slot bank |
 | `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clocks and scalar pointer glide available; no automatic theme projection, keyed renderer clock or appearance first-paint driver |
 | `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot/registry and linear stagger clock | Bounded multi-plot completed map with explicit consecutive-frame lifetime; no implicit frame/scope tree, first-paint clock or scheduler; easing/reduced motion remain explicit |
 | `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | Explicit caller-owned scalar pointer glide available; no implicit scope lookup, tooltip rendering or event-to-datum routing |
@@ -1004,5 +1004,42 @@ than source f32 renderer values. Invalid parameters/state preserve state/output;
 nonfinite propagation reports OVERFLOW without mutation. Very small responses,
 extreme magnitudes/damping or elapsed oscillation angles may exceed representable
 math. The host must schedule requested frames and project its theme policy.
-Renderer keyed clocks, automatic first-paint appearance timing, PathCaches and
-paint/prepaint tooltip overlay composition remain absent.
+Renderer keyed clocks, automatic first-paint appearance timing, implicit PathCaches
+slot lifetime and paint/prepaint tooltip overlay composition remain absent.
+
+### Shape keys and cached tessellation
+
+`cui_plot_shape_key_init(extra)` plus `_point` and `_float` hash the same kinds
+of origin-relative projected points and geometry extras used by frozen ShapeKey.
+CUI uses original FNV-1a over native representations, not Rust DefaultHasher;
+keys are opaque process-local values and must not be persisted or compared with
+upstream numeric hashes. Point coordinates are checked finite and float-range,
+then converted to f32 to follow source point key sensitivity. Float append keeps
+raw bits, including signed zero. Include curve style and other geometry inputs
+in extras; hashes can collide, as with the source's opaque 64-bit key.
+
+The styled `cui_plot_path_cache_get` caches flattened relative segments in caller
+storage. A key change invokes the build callback once, consumes its borrowed
+Move/Line/Cubic/Close commands synchronously, and tessellates each cubic into 16
+chords once. Hits skip both callback and tessellation. An empty build is cached
+and `is_warm` is true even on its first empty build, matching the actual source
+implementation rather than the misleading reuse wording in its doc comment.
+
+`cui_plot_raster_cached` consumes those cached segments and a separate origin,
+fill, stroke and stroke width. Scrolling/origin and paint-color changes reuse the
+same geometry. Origin translation affects pixels while retained relative segment
+storage remains unchanged. Pixel rasterization still happens on every call; this
+is a software polyline tessellation cache, not cached pixels or GPUI's native
+stroke/fill triangle mesh. Stroke width is evaluated at raster time here, unlike
+source PathBuilder's stroke tessellation, so this route can reuse geometry across
+width changes. ARC commands must first be flattened using the existing arc helper.
+
+Cache init accepts at most 4096 segments. Invalid commands/origins and capacity
+failures preserve cache/storage/output (a failed miss invokes its callback, but
+does not change the key). Successful EMPTY changes the key and returns an empty
+borrowed path. Relative and translated coordinates must stay within +/-16384.
+Borrowed views remain valid until a successful miss replaces storage. All arrays
+must be stable/disjoint from cache metadata, output and pixels. The host owns one
+cache per stable shape slot, or two independent caches for Area fill/stroke; no
+window/element keyed `PathCaches::for_paint` lifecycle or slot auto-growth exists.
+The Core renderer still has no native cached path command/triangle seam.

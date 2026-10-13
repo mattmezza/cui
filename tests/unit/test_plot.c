@@ -1337,7 +1337,24 @@ static void pointer_springs(void) {
     assert(cui_plot_spring_step(&clock, 0, 1, policy, false, false, &value) == CUI_PLOT_OVERFLOW);
     assert(memcmp(&clock, &old, sizeof clock) == 0);
 }
+static void shape_keys(void) {
+    cui_plot_shape_key a = cui_plot_shape_key_init(1), same = a, moved = a;
+    assert(cui_plot_shape_key_point(&a, (cui_plot_point){1, 2}) == CUI_PLOT_OK);
+    assert(cui_plot_shape_key_point(&same, (cui_plot_point){1, 2}) == CUI_PLOT_OK);
+    assert(cui_plot_shape_key_point(&moved, (cui_plot_point){1, 3}) == CUI_PLOT_OK);
+    assert(a.value == same.value && a.value != moved.value);
+    assert(cui_plot_shape_key_float(&same, 2) == CUI_PLOT_OK && same.value != a.value);
+    cui_plot_shape_key zero = cui_plot_shape_key_init(0), negative = zero;
+    assert(cui_plot_shape_key_float(&zero, 0) == CUI_PLOT_OK);
+    assert(cui_plot_shape_key_float(&negative, -0.0f) == CUI_PLOT_OK);
+    assert(zero.value != negative.value);
+    same = a;
+    assert(cui_plot_shape_key_point(&a, (cui_plot_point){NAN, 0}) == CUI_PLOT_INVALID);
+    assert(a.value == same.value);
+    assert(cui_plot_shape_key_float(NULL, 0) == CUI_PLOT_INVALID);
+}
 int main(void) {
+    shape_keys();
     pointer_springs();
     transition_clocks();
     test_sankey_large_chain();

@@ -396,7 +396,29 @@ static void test_two_model_transfer(void) {
     cui_dock_destroy(a);
     cui_dock_destroy(b);
 }
+static void test_bulk_remove(void) {
+    cui_dock *d = make();
+    cui_dock_node root = cui_dock_root(d);
+    for (unsigned i = 0; i < 3; ++i)
+        assert(cui_dock_insert(d, root, i, SIZE_MAX) == CUI_DOCK_OK);
+    char before[4096], after[4096];
+    serialize(d, before, sizeof before);
+    uint64_t duplicate[] = {0, 0};
+    assert(cui_dock_remove_many(d, duplicate, 2) == CUI_DOCK_NOT_FOUND);
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after));
+    uint64_t missing[] = {0, 99};
+    assert(cui_dock_remove_many(d, missing, 2) == CUI_DOCK_NOT_FOUND);
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after));
+    uint64_t keys[] = {0, 2};
+    assert(cui_dock_remove_many(d, keys, 2) == CUI_DOCK_OK);
+    assert(!cui_dock_panel_find(d, 0, NULL, NULL) && !cui_dock_panel_find(d, 2, NULL, NULL) &&
+           cui_dock_panel_find(d, 1, NULL, NULL));
+    cui_dock_destroy(d);
+}
 int main(void) {
+    test_bulk_remove();
     test_two_model_transfer();
     test_move_split_transaction();
     test_split_layout();

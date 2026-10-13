@@ -60,6 +60,8 @@ cui_dock_result cui_dock_transfer(cui_dock *source, uint64_t panel, cui_dock *de
                                   cui_dock_node target, size_t index, cui_dock_kind axis,
                                   double ratio, bool before, cui_dock_node *new_tab);
 cui_dock_result cui_dock_reorder(cui_dock *dock, uint64_t panel, size_t index);
+/* Atomic bulk removal; missing/duplicate keys reject the entire operation. */
+cui_dock_result cui_dock_remove_many(cui_dock *, const uint64_t *panels, size_t count);
 cui_dock_result cui_dock_remove(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_activate(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_set_ratio(cui_dock *dock, cui_dock_node split, double ratio);
@@ -86,6 +88,17 @@ cui_dock_result cui_dock_serialize(const cui_dock *dock, char *output, size_t ca
 cui_dock_result cui_dock_restore(cui_dock *dock, cui_str serialized);
 /* Styled adapter; the domain model above remains independently linkable. */
 typedef struct cui_dock_view cui_dock_view;
+struct cui_menu_entry;
+#define CUI_DOCK_CUSTOM_MENU_LIMIT 32
+typedef enum {
+    CUI_DOCK_MENU_CLOSE,
+    CUI_DOCK_MENU_CLOSE_OTHERS,
+    CUI_DOCK_MENU_CLOSE_ALL,
+    CUI_DOCK_MENU_ZOOM,
+    CUI_DOCK_MENU_SPLIT_HORIZONTAL,
+    CUI_DOCK_MENU_SPLIT_VERTICAL,
+    CUI_DOCK_MENU_BALANCE
+} cui_dock_menu_action;
 typedef struct {
     uint64_t key;
     cui_str title;
@@ -95,6 +108,9 @@ typedef struct {
     cui_id focus_target; /* Optional content control; used when focus_content is enabled. */
     bool zoomable;
     void (*toolbar)(cui_context *, uint64_t panel, void *user);
+    const struct cui_menu_entry *menu_items;
+    size_t menu_count;
+    void (*menu_action)(void *user, uint64_t panel, cui_id action);
 } cui_dock_panel;
 typedef enum {
     CUI_DOCK_SELECTED,
@@ -129,6 +145,7 @@ typedef struct {
     bool disable_preview, custom_palette;
     cui_dock_drag_palette drag_palette;
     float toolbar_height; /* Zero defaults to 32 when a toolbar/control is present. */
+    bool hide_menu;
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;
@@ -137,6 +154,7 @@ typedef struct {
     uint64_t moved_panel;
     uint64_t selected_panel, closed_panel, reordered_panel;
     bool zoomed, restored;
+    size_t closed_count;
 } cui_dock_view_result;
 /* Bounded retained interaction storage, no per-frame allocation. Defaults 128/256. */
 cui_dock_view *cui_dock_view_create(size_t node_capacity, size_t panel_capacity);
@@ -146,6 +164,8 @@ cui_dock_view_options cui_dock_view_options_default(void);
 /* View-only zoom leaves model serialization unchanged. Programmatic setters bypass policies. */
 bool cui_dock_view_set_zoom(cui_dock_view *, cui_dock *, uint64_t panel, bool zoomed);
 bool cui_dock_view_zoomed(const cui_dock_view *, uint64_t *panel);
+cui_id cui_dock_menu_id(cui_id view, uint64_t panel);
+cui_id cui_dock_menu_action_id(cui_id view, uint64_t panel, cui_dock_menu_action);
 cui_id cui_dock_zoom_id(cui_id view, uint64_t panel);
 cui_id cui_dock_tab_id(cui_id view, uint64_t panel);
 cui_id cui_dock_close_id(cui_id view, uint64_t panel);

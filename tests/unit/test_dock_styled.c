@@ -13,6 +13,7 @@ static cui_dock_panel panels[5];
 static unsigned rendered[5], selected_events, closed_events, reordered_events, resized_events;
 static unsigned moved_events, split_events;
 static cui_dock_view_result result;
+static cui_draw_list last_draw;
 static cui_dock_result expected_error;
 static unsigned preview_backgrounds, accepted_indicators, rejected_indicators;
 static cui_dock_event deny_operation;
@@ -55,6 +56,7 @@ static void frame(void) {
     assert(cui_begin_frame(ui, 640, 480, .016f));
     result = cui_dock_view_render(ui, workspace, &theme, model, view, panels, 5, options);
     cui_draw_list commands = cui_end_frame(ui);
+    last_draw = commands;
     assert(result.error == expected_error && cui_last_error(ui) == CUI_OK && commands.count > 0);
     preview_backgrounds = accepted_indicators = rejected_indicators = 0;
     for (size_t i = 0; i < commands.count; ++i) {
@@ -795,6 +797,141 @@ static void test_oversized_content(void) {
     frame();
     panels[0].render = panels[1].render = content;
 }
+static unsigned custom_menu_calls;
+static void custom_menu_action(void *user, uint64_t panel, cui_id action) {
+    assert(user == &custom_menu_calls && panel == 0 && action == 970);
+    ++custom_menu_calls;
+}
+static void menu_click(uint64_t panel, cui_dock_menu_action action) {
+    frame();
+    click(cui_dock_menu_id(workspace, panel));
+    frame();
+    click(cui_dock_menu_action_id(workspace, panel, action));
+}
+static bool close_last_veto(void *user, const cui_dock_request *request) {
+    assert(user == &policy_calls && request->operation == CUI_DOCK_CLOSED);
+    ++policy_calls;
+    return request->panel != UINT64_MAX;
+}
+static void test_panel_menus(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    cui_dock_node root = cui_dock_root(model);
+    for (unsigned i = 0; i < 4; ++i)
+        assert(cui_dock_insert(model, root, i, SIZE_MAX) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, root, UINT64_MAX, SIZE_MAX) == CUI_DOCK_OK);
+    panels[0].zoomable = true;
+    panels[2].closable = false;
+    cui_menu_entry custom = {.id = 970,
+                             .label = cui_string("Inspect panel"),
+                             .icon = cui_string("info"),
+                             .kind = CUI_MENU_ACTION};
+    panels[0].menu_items = &custom;
+    panels[0].menu_count = 1;
+    panels[0].menu_action = custom_menu_action;
+    panels[0].user = &custom_menu_calls;
+    frame();
+    cui_rect icon_bounds = cui_bounds(ui, cui_dock_menu_id(workspace, 0));
+    bool svg = false;
+    for (size_t i = 0; i < last_draw.count; ++i) {
+        const cui_draw_command *command = &last_draw.commands[i];
+        svg |= command->type == CUI_DRAW_IMAGE && command->bounds.x >= icon_bounds.x &&
+               command->bounds.y >= icon_bounds.y &&
+               command->bounds.x + command->bounds.w <= icon_bounds.x + icon_bounds.w &&
+               command->bounds.y + command->bounds.h <= icon_bounds.y + icon_bounds.h;
+    }
+    assert(svg);
+    frame();
+    click(cui_dock_menu_id(workspace, 0));
+    frame();
+    click(970);
+    assert(custom_menu_calls == 1);
+    custom.disabled = true;
+    frame();
+    click(cui_dock_menu_id(workspace, 0));
+    frame();
+    click(970);
+    assert(custom_menu_calls == 1);
+    key(CUI_KEY_ESCAPE, 0);
+    custom.disabled = false;
+    menu_click(0, CUI_DOCK_MENU_ZOOM);
+    assert(result.zoomed);
+    frame();
+    panels[0].zoomable = false;
+    options.disabled = true;
+    frame();
+    menu_click(0, CUI_DOCK_MENU_ZOOM);
+    assert(result.restored);
+    options.disabled = false;
+    /* Bulk close veto rejects all eligible removals. Protected/disabled tabs survive. */
+    options.allow_operation = close_last_veto;
+    options.policy_user = &policy_calls;
+    char before[4096], after[4096];
+    size_t size;
+    assert(cui_dock_serialize(model, before, sizeof before, &size) == CUI_DOCK_OK);
+    menu_click(0, CUI_DOCK_MENU_CLOSE_OTHERS);
+    assert(result.denied && !result.closed);
+    assert(cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    options.allow_operation = NULL;
+    menu_click(0, CUI_DOCK_MENU_CLOSE_OTHERS);
+    assert(result.closed_count == 2 && !cui_dock_panel_find(model, 1, NULL, NULL) &&
+           !cui_dock_panel_find(model, UINT64_MAX, NULL, NULL));
+    assert(cui_dock_panel_find(model, 0, NULL, NULL) && cui_dock_panel_find(model, 2, NULL, NULL) &&
+           cui_dock_panel_find(model, 3, NULL, NULL));
+    assert(cui_dock_insert(model, root, 1, SIZE_MAX) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, root, UINT64_MAX, SIZE_MAX) == CUI_DOCK_OK);
+    menu_click(0, CUI_DOCK_MENU_CLOSE_ALL);
+    assert(result.closed_count == 3);
+    assert(cui_dock_insert(model, root, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, root, 1, SIZE_MAX) == CUI_DOCK_OK);
+    assert(cui_dock_activate(model, 0) == CUI_DOCK_OK);
+    options.allow_operation = policy;
+    options.policy_user = &policy_calls;
+    deny_operation = CUI_DOCK_SPLIT;
+    assert(cui_dock_serialize(model, before, sizeof before, &size) == CUI_DOCK_OK);
+    menu_click(0, CUI_DOCK_MENU_SPLIT_HORIZONTAL);
+    assert(result.denied && !result.split);
+    assert(cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    options.allow_operation = NULL;
+    menu_click(0, CUI_DOCK_MENU_SPLIT_HORIZONTAL);
+    assert(result.split);
+    frame();
+    cui_dock_node split = cui_dock_root(model);
+    cui_dock_node_info info;
+    assert(cui_dock_node_get(model, split, &info) && info.kind == CUI_DOCK_SPLIT_HORIZONTAL);
+    assert(cui_dock_set_ratio(model, split, .3) == CUI_DOCK_OK);
+    frame();
+    options.allow_operation = policy;
+    deny_operation = CUI_DOCK_RESIZED;
+    menu_click(0, CUI_DOCK_MENU_BALANCE);
+    assert(result.denied && !result.resized);
+    assert(cui_dock_node_get(model, split, &info) && info.ratio == .3);
+    options.allow_operation = NULL;
+    menu_click(0, CUI_DOCK_MENU_BALANCE);
+    assert(result.resized && cui_dock_node_get(model, split, &info) && info.ratio == .5);
+    menu_click(0, CUI_DOCK_MENU_CLOSE_ALL);
+    assert(result.closed_count == 1 && !cui_dock_panel_find(model, 0, NULL, NULL));
+    frame();
+    assert(cui_dock_panel_find(model, 2, NULL, NULL) && cui_dock_panel_find(model, 3, NULL, NULL));
+    panels[0].menu_items = NULL;
+    panels[0].menu_count = 0;
+    panels[0].menu_action = NULL;
+    panels[0].user = NULL;
+    panels[2].closable = true;
+    /* Disabled workspace cannot open a panel menu. */
+    options.disabled = true;
+    frame();
+    click(cui_dock_menu_id(workspace, 2));
+    frame();
+    assert(cui_bounds(ui, cui_dock_menu_action_id(workspace, 2, CUI_DOCK_MENU_CLOSE)).w == 0);
+    options.disabled = false;
+    options.hide_menu = true;
+    frame();
+    assert(cui_bounds(ui, cui_dock_menu_id(workspace, 2)).w == 0);
+    options.hide_menu = false;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -922,6 +1059,7 @@ int main(void) {
     test_edge_regions();
     test_workspace_transfers();
     test_oversized_content();
+    test_panel_menus();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

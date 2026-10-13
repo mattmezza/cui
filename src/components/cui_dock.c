@@ -11,6 +11,10 @@ typedef struct {
     cui_resizable_slot slots[2];
     cui_tab_scroll_state scroll;
     cui_tab_drag_state drag;
+    cui_menu_tree_state menu;
+    bool menu_initialized;
+    uint64_t menu_key;
+    cui_menu_entry menu_entries[CUI_DOCK_CUSTOM_MENU_LIMIT + 10];
 } dock_cache;
 struct cui_dock_view {
     size_t node_capacity, panel_capacity, count;
@@ -38,6 +42,11 @@ struct dock_scene {
     cui_dock_view_result result;
     bool pending_close, pending_reorder, pending_zoom, zoom_in;
     uint64_t zoom_key;
+    bool pending_bulk, keep_active, pending_menu_split, pending_balance, pending_custom;
+    cui_dock_node menu_node;
+    uint64_t menu_key;
+    cui_dock_kind menu_axis;
+    cui_id custom_action;
     uint64_t close_key, reorder_key;
     size_t reorder_index;
     bool pending_drop, edge_before;
@@ -229,6 +238,13 @@ static cui_id dock_part(cui_id id, uint64_t key, uint64_t tag) {
     x ^= x >> 31;
     return x ? x : tag;
 }
+cui_id cui_dock_menu_id(cui_id view, uint64_t panel) {
+    return dock_part(view, panel, UINT64_C(0x734ca23d83928712));
+}
+cui_id cui_dock_menu_action_id(cui_id view, uint64_t panel, cui_dock_menu_action action) {
+    return dock_part(view, panel,
+                     UINT64_C(0x5129837a389cbe01) + (uint64_t)action * UINT64_C(0x178ca9376153));
+}
 cui_id cui_dock_zoom_id(cui_id view, uint64_t panel) {
     return dock_part(view, panel, UINT64_C(0x46ac8d37ab16317e));
 }
@@ -377,6 +393,115 @@ static void dock_close_suffix(cui_context *ui, const cui_choice_item *item, size
         s->close_key = key;
     }
 }
+static void dock_render_menu(dock_scene *s, dock_cache *cache, cui_dock_node_info info,
+                             const cui_dock_panel *active) {
+    if (!active || s->options.hide_menu)
+        return;
+    cui_id trigger = cui_dock_menu_id(s->id, active->key);
+    if (!cache->menu_initialized || cache->menu_key != active->key) {
+        cui_menu_tree_init(&cache->menu, dock_part(s->id, info.id, UINT64_C(0x896ec6237838192a)));
+        cache->menu_initialized = true;
+        cache->menu_key = active->key;
+    }
+    bool disabled = s->options.disabled || active->disabled;
+    size_t count = 0;
+    for (size_t i = 0; i < active->menu_count; ++i) {
+        cache->menu_entries[count] = active->menu_items[i];
+        cache->menu_entries[count++].disabled |= disabled;
+    }
+    if (count)
+        cache->menu_entries[count++] = (cui_menu_entry){.kind = CUI_MENU_SEPARATOR};
+    const char *labels[] = {
+        "Close panel",         "Close other panels",
+        "Close all panels",    s->view->zoomed ? "Restore workspace" : "Maximize panel",
+        "Split horizontally",  "Split vertically",
+        "Balance parent split"};
+    const char *icons[] = {
+        "close",      "copy",         "close",   s->view->zoomed ? "minimize" : "maximize",
+        "panel-left", "panel-bottom", "maximize"};
+    size_t closable = 0, others = 0;
+    for (size_t i = 0; i < info.panel_count; ++i) {
+        uint64_t key;
+        cui_dock_panel_at(s->dock, info.id, i, &key);
+        const cui_dock_panel *panel = dock_panel_get(s, key);
+        if (panel && panel->closable && !panel->disabled) {
+            ++closable;
+            if (key != active->key)
+                ++others;
+        }
+    }
+
+    for (unsigned i = 0; i < 7; ++i) {
+        bool unavailable = disabled;
+        if (i == 0)
+            unavailable |= !active->closable;
+        if (i == 1)
+            unavailable |= !others;
+        if (i == 2)
+            unavailable |= !closable;
+        if (i == 3)
+            unavailable = s->view->zoomed ? false : disabled || !active->zoomable;
+        if (i == 4 || i == 5)
+            unavailable |= info.panel_count < 2 || s->view->zoomed;
+        if (i == 6)
+            unavailable |= !info.parent || s->view->zoomed;
+        cache->menu_entries[count++] = (cui_menu_entry){
+            .id = cui_dock_menu_action_id(s->id, active->key, (cui_dock_menu_action)i),
+            .label = cui_string(labels[i]),
+            .icon = cui_string(icons[i]),
+            .disabled = unavailable,
+            .kind = CUI_MENU_ACTION};
+    }
+    cui_id action = 0;
+    bool activated = cui_base_menu_tree(
+        s->ui, trigger, cui_string("Panel actions"), cache->menu_entries, count, &action,
+        &cache->menu, disabled && !s->view->zoomed, cui_frame_delta(s->ui), false);
+    cui_button_paint(s->ui, trigger, s->theme, cui_string("Panel actions"),
+                     (cui_button_options){.variant = CUI_BUTTON_GHOST,
+                                          .size = CUI_CONTROL_SMALL,
+                                          .icon = cui_string("ellipsis"),
+                                          .icon_only = true,
+                                          .selected = cache->menu.overlay.open,
+                                          .disabled = disabled && !s->view->zoomed});
+    cui_rect viewport = cui_bounds(s->ui, s->id);
+    if (viewport.w <= 0 || viewport.h <= 8)
+        viewport = (cui_rect){0, 0, s->options.width, s->options.height};
+    cui_menu_popup_paint(
+        s->ui, s->theme, cui_string("Panel actions"), cache->menu_entries, count, &cache->menu,
+        cui_bounds(s->ui, trigger),
+        (cui_menu_tree_options){.popup = {.viewport = viewport, .width = 240, .align_end = true},
+                                .size = CUI_MENU_SMALL});
+    if (!activated)
+        return;
+    for (unsigned i = 0; i < 7; ++i)
+        if (action == cui_dock_menu_action_id(s->id, active->key, (cui_dock_menu_action)i)) {
+            s->menu_key = active->key;
+            s->menu_node = info.id;
+            if (i == 0) {
+                s->pending_close = true;
+                s->close_key = active->key;
+            }
+            if (i == 1 || i == 2) {
+                s->pending_bulk = true;
+                s->keep_active = i == 1;
+            }
+            if (i == 3) {
+                s->pending_zoom = true;
+                s->zoom_in = !s->view->zoomed;
+                s->zoom_key = active->key;
+            }
+            if (i == 4 || i == 5) {
+                s->pending_menu_split = true;
+                s->menu_axis = i == 4 ? CUI_DOCK_SPLIT_HORIZONTAL : CUI_DOCK_SPLIT_VERTICAL;
+            }
+            if (i == 6)
+                s->pending_balance = true;
+            return;
+        }
+    s->pending_custom = true;
+    s->menu_key = active->key;
+    s->custom_action = action;
+}
 static void dock_render_node(dock_scene *, cui_dock_node, float, float);
 static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cache, float w,
                              float h) {
@@ -481,12 +606,14 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
             cui_consume_event(s->ui, i);
         }
     }
-    bool controls = active && (active->toolbar || active->zoomable || s->view->zoomed);
+    bool controls =
+        active && (active->toolbar || active->zoomable || s->view->zoomed || !s->options.hide_menu);
     float toolbar_height =
         controls ? fminf(s->options.toolbar_height, fmaxf(0, h - s->options.tab_height)) : 0;
     if (controls) {
         cui_begin_box(s->ui, dock_part(s->id, info.id, UINT64_C(0x2e89ac418f65c15a)),
-                      (cui_box){.width = -1,
+                      (cui_box){.width = w,
+                                .max_width = w,
                                 .height = toolbar_height,
                                 .fixed_height = toolbar_height == 0,
                                 .row = true,
@@ -503,17 +630,21 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
         }
         if (active->zoomable || s->view->zoomed) {
             bool zoomed = s->view->zoomed;
-            if (cui_button_ex(s->ui, cui_dock_zoom_id(s->id, active->key), s->theme,
-                              cui_string(zoomed ? "Restore workspace" : "Maximize panel"),
-                              (cui_button_options){.variant = CUI_BUTTON_GHOST,
-                                                   .size = CUI_CONTROL_SMALL,
-                                                   .disabled = !zoomed && (s->options.disabled ||
-                                                                           active->disabled)})) {
+            if (cui_button_ex(
+                    s->ui, cui_dock_zoom_id(s->id, active->key), s->theme,
+                    cui_string(zoomed ? "Restore workspace" : "Maximize panel"),
+                    (cui_button_options){.variant = CUI_BUTTON_GHOST,
+                                         .size = CUI_CONTROL_SMALL,
+                                         .icon = cui_string(zoomed ? "minimize" : "maximize"),
+                                         .icon_only = true,
+                                         .disabled = !zoomed &&
+                                                     (s->options.disabled || active->disabled)})) {
                 s->pending_zoom = true;
                 s->zoom_in = !zoomed;
                 s->zoom_key = active->key;
             }
         }
+        dock_render_menu(s, cache, info, active);
         cui_end_box(s->ui);
     }
     float content_height = fmaxf(0, h - s->options.tab_height - toolbar_height);
@@ -626,6 +757,39 @@ static void dock_render_node(dock_scene *s, cui_dock_node node, float w, float h
         }
     }
 }
+static bool dock_custom_menu_valid(cui_id view, uint64_t key, const cui_menu_entry *entries,
+                                   size_t count, size_t depth,
+                                   cui_id ids[CUI_DOCK_CUSTOM_MENU_LIMIT], size_t *used,
+                                   size_t *total) {
+    if ((count && !entries) || depth >= CUI_MENU_DEPTH_MAX)
+        return false;
+    for (size_t i = 0; i < count; ++i) {
+        const cui_menu_entry *entry = &entries[i];
+        if (++*total > CUI_DOCK_CUSTOM_MENU_LIMIT || entry->kind < CUI_MENU_ACTION ||
+            entry->kind > CUI_MENU_SUBMENU)
+            return false;
+        if ((entry->label.length && !entry->label.data) ||
+            (entry->icon.length && !entry->icon.data) ||
+            (entry->shortcut.length && !entry->shortcut.data))
+            return false;
+        if (entry->kind != CUI_MENU_SEPARATOR && entry->kind != CUI_MENU_LABEL) {
+            if (!entry->id)
+                return false;
+            for (size_t j = 0; j < *used; ++j)
+                if (ids[j] == entry->id)
+                    return false;
+            for (unsigned j = 0; j < 7; ++j)
+                if (entry->id == cui_dock_menu_action_id(view, key, (cui_dock_menu_action)j))
+                    return false;
+            ids[(*used)++] = entry->id;
+        }
+        if (entry->child_count &&
+            !dock_custom_menu_valid(view, key, entry->children, entry->child_count, depth + 1, ids,
+                                    used, total))
+            return false;
+    }
+    return true;
+}
 cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_theme *theme,
                                           cui_dock *model, cui_dock_view *view,
                                           const cui_dock_panel *panels, size_t count,
@@ -645,6 +809,11 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
     if (!options.key_step)
         options.key_step = 8;
     for (size_t i = 0; i < count; ++i) {
+        cui_id custom_ids[CUI_DOCK_CUSTOM_MENU_LIMIT];
+        size_t used = 0, total = 0;
+        if (!dock_custom_menu_valid(id, panels[i].key, panels[i].menu_items, panels[i].menu_count,
+                                    0, custom_ids, &used, &total))
+            return invalid;
         if (panels[i].title.length && !panels[i].title.data)
             return invalid;
         for (size_t j = 0; j < i; ++j)
@@ -726,6 +895,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                  cui_dock_remove(model, scene.close_key) == CUI_DOCK_OK) {
             scene.result.closed = true;
             scene.result.closed_panel = scene.close_key;
+            scene.result.closed_count = 1;
             dock_emit(&scene, CUI_DOCK_CLOSED, scene.close_key, node);
             cui_dock_node_info info;
             uint64_t survivor;
@@ -735,6 +905,71 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                 cui_focus(ui, cui_dock_tab_id(id, survivor));
             cui_invalidate(ui);
         }
+    } else if (scene.pending_bulk) {
+        cui_dock_node_info info;
+        size_t count = 0;
+        if (cui_dock_node_get(model, scene.menu_node, &info))
+            for (size_t i = 0; i < info.panel_count; ++i) {
+                uint64_t key;
+                cui_dock_panel_at(model, scene.menu_node, i, &key);
+                const cui_dock_panel *panel = dock_panel_get(&scene, key);
+                if ((scene.keep_active && key == scene.menu_key) || !panel || !panel->closable ||
+                    panel->disabled)
+                    continue;
+                if (!dock_allowed(&scene, CUI_DOCK_CLOSED, key, 0, 0, CUI_DOCK_TABS, false)) {
+                    scene.result.denied = true;
+                    break;
+                }
+                view->keys[count++] = key;
+            }
+        if (!scene.result.denied && count) {
+            scene.result.error = cui_dock_remove_many(model, view->keys, count);
+            if (scene.result.error == CUI_DOCK_OK) {
+                scene.result.closed = true;
+                scene.result.closed_count = count;
+                scene.result.closed_panel = view->keys[count - 1];
+                for (size_t i = 0; i < count; ++i)
+                    dock_emit(&scene, CUI_DOCK_CLOSED, view->keys[i], scene.menu_node);
+                uint64_t survivor;
+                if (dock_first_active(model, cui_dock_root(model), &survivor))
+                    cui_focus(ui, cui_dock_tab_id(id, survivor));
+                cui_invalidate(ui);
+            }
+        }
+    } else if (scene.pending_menu_split) {
+        if (!dock_allowed(&scene, CUI_DOCK_SPLIT, scene.menu_key, scene.menu_node, SIZE_MAX,
+                          scene.menu_axis, false))
+            scene.result.denied = true;
+        else if (nodes + 2 > view->node_capacity)
+            scene.result.error = CUI_DOCK_CAPACITY;
+        else {
+            cui_dock_node destination;
+            scene.result.error = cui_dock_move_split(model, scene.menu_key, scene.menu_node,
+                                                     scene.menu_axis, .5, false, &destination);
+            if (scene.result.error == CUI_DOCK_OK) {
+                scene.result.moved = scene.result.split = true;
+                scene.result.moved_panel = scene.menu_key;
+                dock_emit(&scene, CUI_DOCK_SPLIT, scene.menu_key, destination);
+                cui_focus(ui, cui_dock_tab_id(id, scene.menu_key));
+                cui_invalidate(ui);
+            }
+        }
+    } else if (scene.pending_balance) {
+        cui_dock_node_info info;
+        if (cui_dock_node_get(model, scene.menu_node, &info) && info.parent) {
+            if (!dock_allowed(&scene, CUI_DOCK_RESIZED, scene.menu_key, info.parent, 0,
+                              CUI_DOCK_TABS, false))
+                scene.result.denied = true;
+            else if (cui_dock_set_ratio(model, info.parent, .5) == CUI_DOCK_OK) {
+                scene.result.resized = true;
+                dock_emit(&scene, CUI_DOCK_RESIZED, scene.menu_key, info.parent);
+                cui_invalidate(ui);
+            }
+        }
+    } else if (scene.pending_custom) {
+        const cui_dock_panel *panel = dock_panel_get(&scene, scene.menu_key);
+        if (panel && panel->menu_action)
+            panel->menu_action(panel->user, scene.menu_key, scene.custom_action);
     } else if (scene.pending_drop) {
         cui_dock_node destination = scene.destination;
         cui_dock_result drop;
@@ -1277,6 +1512,13 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
             return invalid;
         for (size_t p = 0; p < region->panel_count; ++p) {
             if (region->panels[p].title.length && !region->panels[p].title.data)
+                return invalid;
+            cui_id menu_ids[CUI_DOCK_CUSTOM_MENU_LIMIT];
+            size_t menu_used = 0, menu_total = 0;
+            if (!dock_custom_menu_valid(cui_dock_region_id(id, (cui_dock_region)i),
+                                        region->panels[p].key, region->panels[p].menu_items,
+                                        region->panels[p].menu_count, 0, menu_ids, &menu_used,
+                                        &menu_total))
                 return invalid;
             for (size_t q = 0; q < p; ++q)
                 if (region->panels[p].key == region->panels[q].key)

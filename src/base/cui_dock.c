@@ -407,6 +407,18 @@ cui_dock_result cui_dock_transfer(cui_dock *source, uint64_t key, cui_dock *dest
         *out = leaf;
     return CUI_DOCK_OK;
 }
+cui_dock_result cui_dock_remove_many(cui_dock *model, const uint64_t *keys, size_t count) {
+    if (!model || (count && !keys) || count > model->config.panel_capacity)
+        return CUI_DOCK_INVALID;
+    cui_dock trial = cui_dock_private_stage(model);
+    for (size_t i = 0; i < count; ++i) {
+        cui_dock_result result = cui_dock_remove(&trial, keys[i]);
+        if (result != CUI_DOCK_OK)
+            return result;
+    }
+    cui_dock_private_commit(model, &trial);
+    return CUI_DOCK_OK;
+}
 cui_dock_result cui_dock_reorder(cui_dock *d, uint64_t key, size_t index) {
     cui_dock_node n;
     if (!cui_dock_panel_find(d, key, &n, NULL))

@@ -688,6 +688,87 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_tooltip_cursor(void) {
+    cui_plot_rect bounds = {10, 20, 110, 120};
+    cui_plot_cursor_memory memory = {0};
+    cui_plot_cursor_update update;
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){40, 50}, true, &update) ==
+           CUI_PLOT_OK);
+    assert(memory.visible && memory.relative.x == 30 && update.changed && update.request_frame);
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){41, 50}, true, &update) ==
+           CUI_PLOT_OK);
+    assert(update.changed && !update.request_frame);
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){41, 50}, true, &update) ==
+           CUI_PLOT_OK);
+    assert(!update.changed && !update.request_frame);
+    cui_plot_point relative = {99, 99};
+    bool resolved;
+    bounds.x_min = 20;
+    assert(cui_plot_cursor_resolve(&memory, bounds, (cui_plot_point){41, 50}, false, &relative,
+                                   &resolved) == CUI_PLOT_OK);
+    assert(resolved && relative.x == 21 && relative.y == 30);
+    assert(cui_plot_cursor_resolve(&memory, bounds, (cui_plot_point){41, 50}, true, &relative,
+                                   &resolved) == CUI_PLOT_OK);
+    assert(!resolved && relative.x == 21);
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){41, 50}, false, &update) ==
+           CUI_PLOT_OK);
+    assert(!memory.visible && update.request_frame);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){41, 50},
+                                      CUI_PLOT_LONG_PRESS_MOVED, true, false,
+                                      &update) == CUI_PLOT_OK);
+    assert(!memory.visible && !update.changed);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){41, 50},
+                                      CUI_PLOT_LONG_PRESS_STARTED, true, true,
+                                      &update) == CUI_PLOT_OK);
+    assert(!memory.visible && !update.prevent_default);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){41, 50},
+                                      CUI_PLOT_LONG_PRESS_STARTED, true, false,
+                                      &update) == CUI_PLOT_OK);
+    assert(memory.visible && update.prevent_default && update.request_frame);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){200, 50},
+                                      CUI_PLOT_LONG_PRESS_MOVED, false, true,
+                                      &update) == CUI_PLOT_OK);
+    assert(memory.visible && memory.relative.x == 180 && update.changed);
+    assert(cui_plot_cursor_resolve(&memory, bounds, (cui_plot_point){200, 50}, false, &relative,
+                                   &resolved) == CUI_PLOT_OK &&
+           !resolved);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){200, 50},
+                                      CUI_PLOT_LONG_PRESS_ENDED, false, false,
+                                      &update) == CUI_PLOT_OK);
+    assert(!memory.visible && update.changed);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){41, 50},
+                                      CUI_PLOT_LONG_PRESS_STARTED, true, false,
+                                      &update) == CUI_PLOT_OK);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){41, 50},
+                                      CUI_PLOT_LONG_PRESS_CANCELLED, true, false,
+                                      &update) == CUI_PLOT_OK &&
+           !memory.visible);
+    cui_plot_cursor_memory old = memory;
+    cui_plot_cursor_update saved = update;
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){NAN, 50}, true, &update) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&old, &memory, sizeof old) == 0 && memcmp(&saved, &update, sizeof saved) == 0);
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){110, 50}, true, &update) ==
+               CUI_PLOT_OK &&
+           !memory.visible);
+    assert(cui_plot_cursor_mouse(&memory, bounds, (cui_plot_point){20, 20}, true, &update) ==
+               CUI_PLOT_OK &&
+           memory.visible);
+    old = memory;
+    saved = update;
+    cui_plot_rect extreme = {-DBL_MAX, 0, DBL_MAX, 100};
+    assert(cui_plot_cursor_mouse(&memory, extreme, (cui_plot_point){DBL_MAX / 2, 50}, true,
+                                 &update) == CUI_PLOT_OVERFLOW);
+    assert(memcmp(&old, &memory, sizeof old) == 0 && memcmp(&saved, &update, sizeof saved) == 0);
+    relative = (cui_plot_point){99, 99};
+    resolved = true;
+    assert(cui_plot_cursor_resolve(&memory, bounds, (cui_plot_point){NAN, 0}, false, &relative,
+                                   &resolved) == CUI_PLOT_INVALID);
+    assert(relative.x == 99 && resolved);
+    assert(cui_plot_cursor_long_press(&memory, bounds, (cui_plot_point){40, 50},
+                                      (cui_plot_long_press_phase)99, true, false,
+                                      &update) == CUI_PLOT_INVALID);
+}
 static void test_source_arc_padding(void) {
     const double pi = acos(-1.0);
     cui_plot_arc arc = {.start_angle = 0, .end_angle = 2 * pi, .pad_angle = .3};
@@ -856,6 +937,7 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
 int main(void) {
+    test_tooltip_cursor();
     test_source_arc_padding();
     test_rounded_bar_path();
     test_linear_extent();

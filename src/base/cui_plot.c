@@ -1291,3 +1291,86 @@ cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, doub
     return cui_plot_arc_flatten_ex(arc, inner, outer, segments, CUI_PLOT_ARC_SEAMLESS, out,
                                    capacity, required);
 }
+
+static bool cui_plot_cursor_valid(cui_plot_rect b, cui_plot_point p) {
+    return isfinite(b.x_min) && isfinite(b.x_max) && isfinite(b.y_min) && isfinite(b.y_max) &&
+           b.x_min < b.x_max && b.y_min < b.y_max && isfinite(p.x) && isfinite(p.y);
+}
+static bool cui_plot_cursor_inside(cui_plot_rect b, cui_plot_point p) {
+    return p.x >= b.x_min && p.x < b.x_max && p.y >= b.y_min && p.y < b.y_max;
+}
+static cui_plot_result cui_plot_cursor_relative(cui_plot_rect b, cui_plot_point p,
+                                                cui_plot_point *relative) {
+    cui_plot_point next;
+    cui_plot_result result = cui_plot_number((long double)p.x - b.x_min, &next.x);
+    if (result != CUI_PLOT_OK)
+        return result;
+    result = cui_plot_number((long double)p.y - b.y_min, &next.y);
+    if (result != CUI_PLOT_OK)
+        return result;
+    *relative = next;
+    return CUI_PLOT_OK;
+}
+static bool cui_plot_cursor_changed(cui_plot_cursor_memory a, cui_plot_cursor_memory b) {
+    return a.visible != b.visible ||
+           (b.visible && (a.relative.x != b.relative.x || a.relative.y != b.relative.y));
+}
+cui_plot_result cui_plot_cursor_mouse(cui_plot_cursor_memory *memory, cui_plot_rect bounds,
+                                      cui_plot_point global, bool hovered,
+                                      cui_plot_cursor_update *update) {
+    if (!memory || !update || !cui_plot_cursor_valid(bounds, global))
+        return CUI_PLOT_INVALID;
+    cui_plot_cursor_memory next = *memory;
+    next.visible = hovered && cui_plot_cursor_inside(bounds, global);
+    if (next.visible) {
+        cui_plot_result result = cui_plot_cursor_relative(bounds, global, &next.relative);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    *update = (cui_plot_cursor_update){.changed = cui_plot_cursor_changed(*memory, next),
+                                       .request_frame = memory->visible != next.visible};
+    *memory = next;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *memory, cui_plot_rect bounds,
+                                           cui_plot_point global, cui_plot_long_press_phase phase,
+                                           bool hovered, bool prevented,
+                                           cui_plot_cursor_update *update) {
+    if (!memory || !update || !cui_plot_cursor_valid(bounds, global) ||
+        phase < CUI_PLOT_LONG_PRESS_STARTED || phase > CUI_PLOT_LONG_PRESS_CANCELLED)
+        return CUI_PLOT_INVALID;
+    cui_plot_cursor_memory next = *memory;
+    bool accepted = false;
+    if (phase == CUI_PLOT_LONG_PRESS_STARTED) {
+        if (!prevented && hovered && cui_plot_cursor_inside(bounds, global)) {
+            next.visible = true;
+            accepted = true;
+        }
+    } else if (phase == CUI_PLOT_LONG_PRESS_ENDED || phase == CUI_PLOT_LONG_PRESS_CANCELLED)
+        next.visible = false;
+    if ((phase == CUI_PLOT_LONG_PRESS_MOVED && memory->visible) || accepted) {
+        cui_plot_result result = cui_plot_cursor_relative(bounds, global, &next.relative);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    bool changed = cui_plot_cursor_changed(*memory, next);
+    *update = (cui_plot_cursor_update){changed, changed, accepted};
+    *memory = next;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *memory, cui_plot_rect bounds,
+                                        cui_plot_point global, bool appearing,
+                                        cui_plot_point *relative, bool *resolved) {
+    if (!memory || !relative || !resolved || !cui_plot_cursor_valid(bounds, global))
+        return CUI_PLOT_INVALID;
+    bool visible = memory->visible && !appearing && cui_plot_cursor_inside(bounds, global);
+    if (visible) {
+        cui_plot_point next;
+        cui_plot_result result = cui_plot_cursor_relative(bounds, global, &next);
+        if (result != CUI_PLOT_OK)
+            return result;
+        *relative = next;
+    }
+    *resolved = visible;
+    return CUI_PLOT_OK;
+}

@@ -599,7 +599,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot and linear stagger clock | No implicit frame/scope tree, first-paint clock or scheduler; easing and reduced-motion policy remain explicit |
 | `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | No projected pointer spring, scope lookup, tooltip rendering or event-to-datum routing |
 | `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | `cui_plot_view` fixed bitmap+axes and activation | No generic prepaint children/tooltip overlay driver, identity-driven motion/cache contract or custom trait-equivalent lifecycle |
-| `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; no source touch long-press/drag tooltip rules or animation scheduling |
+| `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; explicit caller-owned desktop/long-press cursor gate now covers visibility/coordinate transitions; no automatic OS gesture routing, occlusion hitbox or animation scheduling |
 | `origin_point` translation utility | Caller adds relative offsets before raster; Core offsets styled children | No separate named pure translation helper; ordinary finite coordinate addition remains caller responsibility |
 
 Missing renderer/lifecycle rows are real remaining Plot scope. Similar Chart,
@@ -737,3 +737,39 @@ threshold, not identical source f32 rounding. Paths close explicitly; no cached
 GPUI renderer path or exact tessellation claim follows. Centroid and contains
 remain independent of either paint policy, and contains deliberately ignores
 padding as the source does. Capacity/invalid errors preserve command buffers.
+
+## Tooltip cursor gating from PlotElement
+
+The frozen PlotElement stores an optional cursor as a visibility gate, then
+resolves coordinates from the live pointer and current bounds during prepaint.
+`cui_plot_cursor_mouse` exposes its desktop per-frame refresh: supply the
+application's occlusion-aware hovered decision and live global position each
+frame. A visibility flip requests a corrective frame; movement changes the
+stored relative position without that per-frame request. For mouse-move event
+handling, notify/invalidate on `update.changed`, as the source event handler does.
+A stationary pointer therefore picks up the new local position after relayout.
+
+`cui_plot_cursor_long_press` exposes detected Started/Moved/Ended/Cancelled
+phases. Started opens only when hovered, inside bounds, and not default-prevented,
+and reports `prevent_default` for the application to consume. Moved does nothing
+before a start; once active it follows the gesture even outside the bounds and
+ignores subsequent hovered/default-prevented decisions. Ended and Cancelled
+close it. Changed long-press state requests a frame. The application detects
+long presses and owns gesture identity; these functions do not inspect OS input,
+steal capture, synthesize delays or resolve Core semantic targets. Use separate
+state for mouse and touch, or reset when switching modes.
+
+`cui_plot_cursor_resolve` uses stored state only as a visibility gate. It derives
+relative coordinates from the supplied live global pointer/current bounds,
+returns no cursor outside bounds or during appearance, and preserves relative
+output on no-hit. Bounds follow Core's half-open containment (left/top included,
+right/bottom excluded), rather than claiming exact GPUI edge policy. Accepted
+positions and positive bounds must be finite; unrepresentable subtraction
+returns OVERFLOW. Invalid/overflow inputs preserve memory and outputs.
+
+Feed a resolved cursor to the application's datum resolver, then pass that
+optional datum to `cui_plot_hover_track`. Exiting can retain the previous tooltip
+while its progress fades. This sequence represents actual source cursor/state
+behavior without adding generic Plot callbacks, a tooltip renderer, an implicit
+retained scope or the source's prepaint/paint child tree. Application hit testing,
+occlusion, overlay content and paint order remain explicit.

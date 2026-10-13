@@ -300,6 +300,38 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+/* PlotElement's cursor visibility gate, separated from platform event routing.
+ * Zero initialize. Global positions are finite; bounds are a positive finite
+ * rectangle. Application supplies occlusion-aware hovered/default-prevented
+ * decisions and detected long-press phases. Desktop refreshes each frame;
+ * touch tracking begins only on accepted long press and ends on lift/cancel. */
+typedef struct {
+    cui_plot_point relative;
+    bool visible;
+} cui_plot_cursor_memory;
+typedef struct {
+    bool changed, request_frame, prevent_default;
+} cui_plot_cursor_update;
+typedef enum {
+    CUI_PLOT_LONG_PRESS_STARTED,
+    CUI_PLOT_LONG_PRESS_MOVED,
+    CUI_PLOT_LONG_PRESS_ENDED,
+    CUI_PLOT_LONG_PRESS_CANCELLED
+} cui_plot_long_press_phase;
+cui_plot_result cui_plot_cursor_mouse(cui_plot_cursor_memory *, cui_plot_rect bounds,
+                                      cui_plot_point global_position, bool hovered,
+                                      cui_plot_cursor_update *);
+cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *, cui_plot_rect bounds,
+                                           cui_plot_point global_position,
+                                           cui_plot_long_press_phase, bool hovered,
+                                           bool default_prevented, cui_plot_cursor_update *);
+/* Resolve from LIVE global position and CURRENT bounds, using memory only as
+ * visibility gate, as source prepaint does. Suppress during appearance. On no
+ * cursor, resolved=false and relative output unchanged; invalid leaves all
+ * outputs untouched. Bounds contain left/top, exclude right/bottom (Core rule). */
+cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *, cui_plot_rect bounds,
+                                        cui_plot_point live_global_position, bool appearing,
+                                        cui_plot_point *relative, bool *resolved);
 /* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
  * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
  * Zero initialize. Invalid input leaves memory unchanged. */

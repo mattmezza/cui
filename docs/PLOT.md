@@ -396,3 +396,11 @@ int main(void) {
     return 0;
 }
 ```
+
+The pure [tooltip cursor gate](PLOT_MODEL.md#tooltip-cursor-gating-from-plotelement)
+handles current-bounds desktop coordinates and explicit long-press state before
+your datum resolver runs. Refresh desktop state each frame using the application's
+hit/occlusion decision; use `update.changed` to invalidate from mouse-move events.
+Long-press detection and capture stay in the adapter/application. Resolve the
+live cursor, suppress during appearance, then update hover memory; this does not
+automatically make the bitmap view interactive or render an overlay.

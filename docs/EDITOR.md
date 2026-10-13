@@ -396,3 +396,23 @@ text afterward. Closing the matcher suppresses all search highlights. Revision
 synchronization uses caller range capacity; capacity errors are surfaced rather
 than drawing stale ranges. Match arrays and public matcher fields must remain
 unchanged by callers while attached (except through matcher APIs).
+
+The edit model has an opt-in bounded multi-selection foundation:
+`cui_edit_attach_selections` borrows up to 64 live selections and one caller-owned
+selection snapshot per existing document-history slot. It neither allocates new
+storage nor changes document history sizing. `cui_edit_select_many` validates
+extended-grapheme endpoints, merges overlapping/adjacent ranges, and preserves the
+active selection's ID and orientation. `cui_edit_replace_selections` repeats one
+text at every range in one transaction; before/after cursor collections round-trip
+through Undo/Redo, including document-history eviction. Capacity/validation errors
+preserve document, selections, and paired history. Candidate cursor endpoints
+must remain grapheme boundaries. Inline-token annotations are excluded while this
+storage is attached. Reattaching clears cursor metadata for older document entries,
+which restore their legacy primary selection; detaching preserves text/history.
+Legacy single-selection APIs collapse extra cursors. This commit supplies the
+retained model/history foundation, not yet the Editor's multicursor keyboard,
+Alt-click, rectangular selection, per-cursor preferred columns, or rendering.
+The frozen cursor collection and range-edit helpers are private source structures;
+these portable APIs expose a bounded host-controlled equivalent without claiming
+those remaining interaction behaviors. Search mode buttons now show selected
+presentation as well as their semantic checked state.

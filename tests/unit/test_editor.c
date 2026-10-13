@@ -754,6 +754,8 @@ static void replacement_panel(void) {
     assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "bar FOO foo"));
     search_frame(ui, &editor, &search, false);
     cui_theme theme = cui_theme_light();
+    theme.buttons[CUI_THEME_BUTTON_PRIMARY].active = (cui_color){7, 8, 9, 255};
+    theme.buttons[CUI_THEME_BUTTON_PRIMARY].normal = (cui_color){17, 18, 19, 255};
     assert(cui_begin_frame(ui, 400, 400, .016f));
     assert(cui_editor_find_bar(ui, 20, 10, &theme, &editor, &search, 330, false).error ==
            CUI_EDIT_OK);
@@ -762,8 +764,21 @@ static void replacement_panel(void) {
     narrow.search = &matcher;
     assert(cui_editor(ui, 10, &theme, cui_string("Code"), &editor, narrow).error ==
            CUI_TEXTAREA_OK);
-    cui_end_frame(ui);
+    cui_draw_list narrow_commands = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
+    cui_rect mode = cui_bounds(ui, 20 ^ UINT64_C(0x43b926eab194d100));
+    cui_rect match_case = cui_bounds(ui, 20 ^ UINT64_C(0x51a814631c060f34));
+    bool mode_selected = false, case_unselected = false;
+    for (size_t i = 0; i < narrow_commands.count; ++i) {
+        cui_draw_command c = narrow_commands.commands[i];
+        if (c.type == CUI_DRAW_RECT && c.bounds.x == mode.x && c.bounds.y == mode.y &&
+            c.color.r == 7 && c.color.g == 8)
+            mode_selected = true;
+        if (c.type == CUI_DRAW_RECT && c.bounds.x == match_case.x && c.bounds.y == match_case.y &&
+            c.color.r == 17 && c.color.g == 18)
+            case_unselected = true;
+    }
+    assert(mode_selected && case_unselected);
     cui_rect panel = cui_bounds(ui, 20);
     uint64_t controls[] = {
         UINT64_C(0x790a4100f05b190d), UINT64_C(0x1b4a6c72d005ab81), UINT64_C(0x391cfd020af58d20),

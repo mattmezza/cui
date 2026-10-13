@@ -594,16 +594,18 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
     cui_end_box(ui);
     if (replace_enabled) {
         cui_begin_box(ui, id ^ UINT64_C(0x44a08126b4c71f12), (cui_box){.row = true, .gap = 4});
-        if (cui_button(ui, id ^ UINT64_C(0x51a814631c060f34), theme, cui_string("Match case"),
-                       disabled)) {
+        if (cui_button_ex(ui, id ^ UINT64_C(0x51a814631c060f34), theme, cui_string("Match case"),
+                          (cui_button_options){.disabled = disabled,
+                                               .selected = !state->matcher->case_insensitive})) {
             result.error = cui_editor_matcher_set_query(editor, state->matcher, query,
                                                         !state->matcher->case_insensitive);
             result.matches = result.error == CUI_EDIT_OK ? state->matcher->count : 0;
         }
         cui_update_semantic(ui, id ^ UINT64_C(0x51a814631c060f34),
                             !state->matcher->case_insensitive, 0);
-        if (cui_button(ui, id ^ UINT64_C(0x43b926eab194d100), theme, cui_string("Replace mode"),
-                       disabled || state->replace_disabled))
+        if (cui_button_ex(ui, id ^ UINT64_C(0x43b926eab194d100), theme, cui_string("Replace mode"),
+                          (cui_button_options){.disabled = disabled || state->replace_disabled,
+                                               .selected = state->replace_mode}))
             state->replace_mode = !state->replace_mode;
         cui_update_semantic(ui, id ^ UINT64_C(0x43b926eab194d100), state->replace_mode, 0);
         cui_end_box(ui);

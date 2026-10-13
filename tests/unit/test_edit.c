@@ -801,7 +801,114 @@ static void test_token_replacement(void) {
            cui_edit_get_state(edit).revision == 0);
     cui_edit_destroy(edit);
 }
+static void test_multiple_selections(void) {
+    char buffer[64] = "abc def ghi";
+    cui_edit *edit = make(buffer, sizeof buffer, true, 4);
+    assert(cui_edit_insert(edit, cui_string("!")) == CUI_EDIT_OK);
+    cui_edit_selection storage[8];
+    memset(storage, 0x55, sizeof storage);
+    cui_edit_selection_snapshot history[5];
+    memset(history, 0x55, sizeof history);
+    assert(cui_edit_selection_history_slots(edit) == 5);
+    assert(cui_edit_attach_selections(edit, storage, 8, history, 4) == CUI_EDIT_INVALID_ARGUMENT);
+    assert((unsigned char)storage[0].id == 0x55 && (unsigned char)history[0].count == 0x55);
+    assert(cui_edit_attach_selections(edit, (cui_edit_selection *)(void *)buffer, 1, history, 5) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_attach_selections(edit, storage, 8, history, 5) == CUI_EDIT_OK);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abc def ghi") &&
+           storage[0].id == 0 && storage[0].cursor == 11); /* pre-attachment history */
+    size_t count = 0;
+    assert(cui_edit_get_selections(edit, &count) == storage && count == 1);
+    cui_edit_selection merged[3] = {{9, 4, 2}, {2, 0, 2}, {5, 6, 7}};
+    assert(cui_edit_select_many(edit, merged, 3) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2 && storage[0].id == 9 && storage[0].anchor == 4 && storage[0].cursor == 0);
+    cui_edit_selection input[3] = {{9, 2, 1}, {7, 4, 5}, {3, 8, 8}};
+    assert(cui_edit_select_many(edit, input, 3) == CUI_EDIT_OK);
+    cui_edit_selection saved[8];
+    memcpy(saved, storage, sizeof storage);
+    cui_edit_selection_snapshot saved_history[5];
+    memcpy(saved_history, history, sizeof history);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    cui_edit_selection duplicate[2] = {{1, 0, 0}, {1, 2, 2}};
+    assert(cui_edit_select_many(edit, duplicate, 2) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_replace_selections(edit, cui_string("abcdefghijklmnopqrstuvwxyz")) ==
+           CUI_EDIT_CAPACITY);
+    assert(!memcmp(saved, storage, sizeof storage) &&
+           !memcmp(saved_history, history, sizeof history) && !strcmp(buffer, "abc def ghi") &&
+           cui_edit_get_state(edit).revision == revision);
+    assert(cui_edit_set_tokens(edit, NULL, 0) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_replace_selections(edit, cui_string("X")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "aXc Xef Xghi") && storage[0].id == 9 && storage[0].cursor == 2);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abc def ghi"));
+    assert(storage[0].id == 9 && storage[0].anchor == 2 && storage[0].cursor == 1 &&
+           storage[1].id == 7 && storage[2].id == 3);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK && !strcmp(buffer, "aXc Xef Xghi"));
+    assert(storage[0].anchor == 2 && storage[0].cursor == 2 && storage[2].cursor == 9);
+    for (unsigned i = 0; i < 6; ++i)
+        assert(cui_edit_replace_selections(edit, cui_string("x")) == CUI_EDIT_OK);
+    unsigned undos = 0;
+    while (cui_edit_undo(edit) == CUI_EDIT_OK) {
+        cui_edit_get_selections(edit, &count);
+        assert(count == 3 && storage[0].id == 9);
+        ++undos;
+    }
+    assert(undos == 4); /* paired selection snapshots survive document-history eviction */
+    while (cui_edit_redo(edit) == CUI_EDIT_OK) {
+        cui_edit_get_selections(edit, &count);
+        assert(count == 3);
+    }
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 1 && storage[0].id == 9);
+    assert(cui_edit_insert(edit, cui_string("!")) == CUI_EDIT_OK);
+    cui_edit_detach_selections(edit);
+    assert(!cui_edit_get_selections(edit, &count) && !count);
+    assert(cui_edit_set_tokens(edit, NULL, 0) == CUI_EDIT_OK);
+    cui_edit_destroy(edit);
+    strcpy(buffer, "a\xcc\x81 b");
+    edit = make(buffer, sizeof buffer, true, 4);
+    assert(cui_edit_attach_selections(edit, storage, 8, history, 5) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK); /* legacy scalar position remains legal */
+    assert(cui_edit_replace_selections(edit, cui_string("x")) == CUI_EDIT_BOUNDARY);
+    cui_edit_selection invalid = {1, 1, 1};
+    assert(cui_edit_select_many(edit, &invalid, 1) == CUI_EDIT_BOUNDARY);
+    cui_edit_selection unicode[2] = {{8, 3, 0}, {9, 4, 5}};
+    assert(cui_edit_select_many(edit, unicode, 2) == CUI_EDIT_OK);
+    assert(cui_edit_replace_selections(edit, cui_string("\xf0\x9f\x98\x80")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "\xf0\x9f\x98\x80 \xf0\x9f\x98\x80"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "a\xcc\x81 b") &&
+           storage[0].anchor == 3);
+    cui_edit_destroy(edit);
+    strcpy(buffer, "abc");
+    edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    assert(edit && !cui_edit_selection_history_slots(edit));
+    assert(cui_edit_attach_selections(edit, storage, 1, NULL, 0) == CUI_EDIT_OK);
+    cui_edit_selection two[2] = {{1, 0, 0}, {2, 2, 2}};
+    assert(cui_edit_select_many(edit, two, 2) == CUI_EDIT_CAPACITY);
+    assert(cui_edit_undo(edit) == CUI_EDIT_NO_HISTORY);
+    cui_edit_destroy(edit);
+    char large[256];
+    memset(large, 'a', 128);
+    large[128] = 0;
+    edit = cui_edit_create(
+        (cui_edit_config){.buffer = large, .capacity = sizeof large, .multiline = true});
+    cui_edit_selection all[64], many[64];
+    assert(edit && cui_edit_attach_selections(edit, all, 64, NULL, 0) == CUI_EDIT_OK);
+    for (size_t i = 0; i < 64; ++i)
+        many[i] = (cui_edit_selection){63 - i, (63 - i) * 2, (63 - i) * 2};
+    assert(cui_edit_select_many(edit, many, 64) == CUI_EDIT_OK);
+    assert(cui_edit_replace_selections(edit, cui_string("x")) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 64 && all[0].id == 63 && all[0].cursor == 190 &&
+           cui_edit_get_text(edit).length == 192);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_multiple_selections();
     test_token_replacement();
     test_inline_content();
     test_unicode_word_events();

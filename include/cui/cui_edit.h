@@ -28,6 +28,39 @@ typedef struct {
     uint64_t revision;
     bool multiline;
 } cui_edit_state;
+#define CUI_EDIT_MAX_SELECTIONS 64
+/* Active selection is index0. IDs are caller-defined and must be unique.
+ * Anchor/cursor preserve orientation; offsets remain UTF-8 bytes. */
+typedef struct {
+    uint64_t id;
+    size_t anchor, cursor;
+} cui_edit_selection;
+/* One caller-owned cursor snapshot per existing document-history slot. */
+typedef struct {
+    size_t count;
+    cui_edit_selection items[CUI_EDIT_MAX_SELECTIONS];
+} cui_edit_selection_snapshot;
+/* Existing document slot count; attach does not allocate or resize history. */
+size_t cui_edit_selection_history_slots(const cui_edit *);
+/* Opt-in multiline selection storage. Arrays must be disjoint from each other
+ * and model storage, alive and unchanged by callers until detach. History needs
+ * at least selection_history_slots entries (NULL is valid with no history).
+ * Attachment preserves document/history and initializes one primary cursor;
+ * older history entries restore their existing primary selection only. */
+cui_edit_result cui_edit_attach_selections(cui_edit *, cui_edit_selection *storage, size_t capacity,
+                                           cui_edit_selection_snapshot *history,
+                                           size_t history_slots);
+void cui_edit_detach_selections(cui_edit *);
+const cui_edit_selection *cui_edit_get_selections(const cui_edit *, size_t *count);
+/* Validates grapheme endpoints, merges overlapping/adjacent ranges, and preserves
+ * active ID/orientation. Failure preserves model and attached arrays. */
+cui_edit_result cui_edit_select_many(cui_edit *, const cui_edit_selection *, size_t count);
+/* Repeat the same UTF-8 text across normalized selections, atomically. One
+ * document/history step; resulting cursors preserve IDs and active-first order.
+ * Candidate cursor endpoints must remain grapheme boundaries. Undo/Redo restore
+ * all selections with attached history. Single-selection APIs collapse extras.
+ * Inline-token content is excluded while selection storage is attached. */
+cui_edit_result cui_edit_replace_selections(cui_edit *, cui_str text);
 typedef enum {
     CUI_EDIT_PREVIOUS,
     CUI_EDIT_NEXT,

@@ -979,6 +979,48 @@ void cui_separator(cui_context *ui, cui_id id, const cui_theme *t, float width) 
     cui_end_box(ui);
 }
 
+cui_separator_options cui_separator_defaults(void) {
+    return (cui_separator_options){.length = 160};
+}
+bool cui_separator_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_separator_options o) {
+    if (!ui || !id || !t || !isfinite(o.length) || o.length < 0 || o.length > 4096 ||
+        (o.label.length && !o.label.data) || !isfinite(t->font_size) || t->font_size <= 0 ||
+        t->font_size > 4096)
+        return false;
+    float length = o.length ? o.length : 160;
+    float font = t->font_size * .75f, line_height = t->font_size;
+    float label_width = o.has_label ? cui_measure_text(ui, o.label, font).width + 16 : 0;
+    float label_height = o.has_label ? line_height + 8 : 0;
+    if (!isfinite(label_width) || !isfinite(label_height))
+        return false;
+    float width = o.vertical ? fmaxf(1, label_width) : length;
+    float height = o.vertical ? length : fmaxf(1, label_height);
+    cui_color color = o.custom_color ? o.color : t->border;
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = width, .height = height, .fixed_width = true, .fixed_height = true});
+    float increment = o.dashed ? 6 : length;
+    for (float offset = 0; offset < length; offset += increment) {
+        float segment = o.dashed ? fminf(4, length - offset) : length;
+        cui_rect rect = o.vertical ? (cui_rect){(width - 1) / 2, offset, 1, segment}
+                                   : (cui_rect){offset, (height - 1) / 2, segment, 1};
+        cui_begin_absolute_box(ui, 0, (cui_box){.background = color}, rect);
+        cui_end_box(ui);
+    }
+    if (o.has_label) {
+        cui_begin_absolute_box(ui, 0, (cui_box){.background = t->background},
+                               (cui_rect){(width - label_width) / 2, (height - label_height) / 2,
+                                          label_width, label_height});
+        cui_begin_absolute_box(ui, 0, (cui_box){0},
+                               (cui_rect){8, 4, label_width - 16, line_height});
+        cui_text_line(ui, o.label, font, t->muted, line_height, (cui_text_style){0});
+        cui_end_box(ui);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return true;
+}
+
 bool cui_input_measure(cui_input_options options, float root_font_size,
                        cui_input_metrics *metrics) {
     if (!metrics || options.size < CUI_INPUT_MEDIUM || options.size > CUI_INPUT_CUSTOM ||

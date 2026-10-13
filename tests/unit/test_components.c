@@ -1247,7 +1247,86 @@ static void design_scale(void) {
         }
     }
 }
+static void test_source_separator(void) {
+    cui_context *ui = cui_create((cui_config){.width = 320, .height = 240});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_color color = {19, 37, 71, 211};
+    for (int vertical = 0; vertical < 2; vertical++) {
+        for (int dashed = 0; dashed < 2; dashed++) {
+            assert(cui_begin_frame(ui, 320, 240, .016f));
+            cui_separator_options o = cui_separator_defaults();
+            o.length = 17;
+            o.vertical = vertical;
+            o.dashed = dashed;
+            o.custom_color = true;
+            o.color = color;
+            assert(cui_separator_ex(ui, 1201, &theme, o));
+            cui_draw_list list = cui_end_frame(ui);
+            cui_rect bounds = cui_bounds(ui, 1201);
+            assert(bounds.w == (vertical ? 1 : 17));
+            assert(bounds.h == (vertical ? 17 : 1));
+            size_t lines = 0;
+            for (size_t i = 0; i < list.count; i++) {
+                const cui_draw_command *c = list.commands + i;
+                if (c->type != CUI_DRAW_RECT || memcmp(&c->color, &color, sizeof(color)))
+                    continue;
+                assert(c->bounds.w == (vertical ? 1 : dashed ? 4 : 17));
+                assert(c->bounds.h == (vertical ? dashed ? 4 : 17 : 1));
+                assert(fabsf((vertical ? c->bounds.y - bounds.y : c->bounds.x - bounds.x) -
+                             (dashed ? (float)lines * 6 : 0)) < .01f);
+                lines++;
+            }
+            assert(lines == (dashed ? 3u : 1u));
+        }
+    }
+    for (int vertical = 0; vertical < 2; vertical++) {
+        for (int empty = 0; empty < 2; empty++) {
+            assert(cui_begin_frame(ui, 320, 240, .016f));
+            cui_separator_options o = cui_separator_defaults();
+            o.length = 160;
+            o.vertical = vertical;
+            o.has_label = true;
+            o.label = empty ? cui_string("") : cui_string("Or");
+            assert(cui_separator_ex(ui, 1202, &theme, o));
+            cui_draw_list list = cui_end_frame(ui);
+            cui_rect bounds = cui_bounds(ui, 1202);
+            float label_width = cui_measure_text(ui, o.label, 12).width + 16;
+            assert(fabsf(bounds.w - (vertical ? label_width : 160)) < 1);
+            assert(bounds.h == (vertical ? 160 : 24));
+            bool background = false, text = empty;
+            for (size_t i = 0; i < list.count; i++) {
+                const cui_draw_command *c = list.commands + i;
+                if (c->type == CUI_DRAW_RECT &&
+                    !memcmp(&c->color, &theme.background, sizeof(cui_color))) {
+                    background = true;
+                    assert(fabsf(c->bounds.x + c->bounds.w / 2 - bounds.x - bounds.w / 2) < 1);
+                    assert(fabsf(c->bounds.y + c->bounds.h / 2 - bounds.y - bounds.h / 2) < 1);
+                    assert(c->bounds.h == 24);
+                }
+                if (c->type == CUI_DRAW_TEXT && c->text.length) {
+                    text = true;
+                    assert(c->font_size == 12);
+                    assert(!memcmp(&c->color, &theme.muted, sizeof(cui_color)));
+                    assert(fabsf(c->bounds.x + c->bounds.w / 2 - bounds.x - bounds.w / 2) < 1);
+                    assert(fabsf(c->bounds.y + c->bounds.h / 2 - bounds.y - bounds.h / 2) < 1);
+                }
+            }
+            assert(background && text);
+        }
+    }
+    assert(cui_begin_frame(ui, 320, 240, .016f));
+    cui_separator_options invalid[] = {
+        {.length = -1}, {.length = NAN}, {.length = 4097}, {.has_label = true, .label = {NULL, 1}}};
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++)
+        assert(!cui_separator_ex(ui, 1203, &theme, invalid[i]));
+    assert(!cui_separator_ex(ui, 0, &theme, cui_separator_defaults()));
+    cui_draw_list list = cui_end_frame(ui);
+    assert(!list.count && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_source_separator();
     design_scale();
     test_badge_variants();
     test_progress_source_style();

@@ -255,6 +255,19 @@ bool cui_progress_circle(cui_context *, cui_id, const cui_theme *, float fractio
                          cui_button_content_fn, void *user);
 void cui_progress(cui_context *, cui_id, const cui_theme *, float fraction, float width);
 void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
+typedef struct {
+    float length; /* Zero defaults to160; explicit positive pixels, at most4096. */
+    bool vertical, dashed, has_label, custom_color;
+    cui_str label;
+    cui_color color;
+} cui_separator_options;
+cui_separator_options cui_separator_defaults(void);
+/* One-pixel line; dashed uses4px on/2px off. Label, including an explicitly
+ * empty label, overlays the line with theme background and8px/4px padding.
+ * Text is borrowed through renderer completion. Invalid options submit nothing.
+ * Length is explicit; caller resolves parent fill extent. No keyboard behavior. */
+bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_options);
+
 #ifdef __cplusplus
 }
 #endif

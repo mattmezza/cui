@@ -5924,15 +5924,18 @@
         "tests/web/test_chart_typed_tooltip.py",
         "tests/web/test_chart_tooltip_gallery.py",
         "tests/unit/test_chart_radar_tooltip_title.c",
-        "tests/web/test_chart_radar_tooltip_title.py"
+        "tests/web/test_chart_radar_tooltip_title.py",
+        "tests/unit/test_chart_tooltip_appearance.c",
+        "tests/web/test_chart_tooltip_appearance.py",
+        "tests/web/test_chart_appearance_gallery.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Seven chart families, bounded geometry, Sankey topology, measured axes, theme colors and current-frame hover have scoped tests. Full source tooltips/styles/shadows, native mobile long-press and arbitrary current-frame child layout remain unfinished; see docs/CHART.md.",
-        "Copied typed title/rows, plain/mixed/transparent slots, value color and failure rollback pass both consumers; the gallery exposes custom rows and a copyable callback guide. Radar custom-label fallback omission and Line/Area point-axis geometry are opt-ins. Source popover style/shadows, arbitrary retained current-frame content and mobile long-press remain incomplete.",
+        "Seven chart families, bounded geometry, Sankey topology, measured axes, theme colors and current-frame hover have scoped tests. Full source layout, Gaussian shadows, arbitrary current-frame child layout and native mobile long-press remain unfinished; see docs/CHART.md.",
+        "Copied typed title/rows and opt-in appearance pass both consumers: rem typography, inherited line boxes, popover roles, mixed/transparent slots, boxed/bare placement and filled sigma-zero outside ring. The gallery exposes choices and copied callback usage. Gaussian shadow layers, arbitrary retained current-frame content, source wrapping and mobile long-press remain incomplete.",
         "Value-owned motion and independent pointer clocks pass headless and actual WASM tests. Existing zero/AUTO Chart options retain legacy manual-hover compatibility; explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks. Legacy composition remains available; this does not certify complete layout/tooltip parity."
       ],
       "owner": "integrator",
@@ -6024,6 +6027,16 @@
             "tests/web/test_chart_radar_tooltip_title.py",
             "docs/CHART_RADAR_TOOLTIP_TITLE.md"
           ]
+        },
+        {
+          "name": "opt-in copied tooltip appearance with inherited typography, popover roles, boxed/bare placement and filled outside ring geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart_tooltip_appearance.c",
+            "tests/web/test_chart_tooltip_appearance.py",
+            "tests/web/test_chart_appearance_gallery.py",
+            "docs/CHART_TOOLTIP_APPEARANCE.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -6069,7 +6082,7 @@
           "Real-time Updates"
         ]
       },
-      "last_tested_commit": "8e701b342945e1a3ff8d7cb9e3a1223a44ba4aad"
+      "last_tested_commit": "d0fd181922fa4d811756c699afbc7dea13ca95da"
     },
     {
       "name": "Command",

@@ -1,0 +1,256 @@
+{
+  "audit_base": "021d553c23d066473db0b8e2bc67ef9ab525efb0",
+  "reference_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "reference_version": "0.7.1",
+  "scope": "ButtonGroup public contract and separate Button callback multiplicity proposal",
+  "production_changes": false,
+  "new_runtime_tests": false,
+  "completion_claim": false,
+  "reference_files": [
+    "crates/component/src/button/button_group.rs",
+    "crates/component/src/button/button.rs",
+    "crates/component/src/sizing.rs",
+    "crates/base/src/button.rs"
+  ],
+  "public_surface": {
+    "inherent": [
+      "new",
+      "child",
+      "children",
+      "multiple",
+      "layout",
+      "compact",
+      "outline",
+      "on_click"
+    ],
+    "traits": [
+      "Disableable::disabled",
+      "Sizable::with_size",
+      "Styled::style",
+      "ButtonVariants::with_variant"
+    ],
+    "variant_conveniences": [
+      "primary",
+      "secondary",
+      "danger",
+      "warning",
+      "success",
+      "info",
+      "ghost",
+      "link",
+      "text",
+      "custom"
+    ],
+    "size_conveniences": [
+      "xsmall",
+      "small",
+      "large"
+    ],
+    "default": {
+      "orientation": "horizontal",
+      "multiple": false,
+      "disabled": false,
+      "compact": false,
+      "outline": false,
+      "size_override": null,
+      "variant_override": null,
+      "on_click": null
+    }
+  },
+  "contracts": [
+    {
+      "feature": "ordered Button children with stable element IDs",
+      "source": "button_group.rs:48-76",
+      "current": "no distinct ButtonGroup API"
+    },
+    {
+      "feature": "rendered selected state controls toggle metadata",
+      "source": "button_group.rs:158-162,178-181",
+      "current": "Button selected and toggled fields exist"
+    },
+    {
+      "feature": "single click always requests singleton clicked index",
+      "source": "button_group.rs:255-257",
+      "current": "absent"
+    },
+    {
+      "feature": "multiple selected removal or ordered append",
+      "source": "button_group.rs:249-253",
+      "current": "ToggleGroup booleans are not equivalent",
+      "example": {
+        "rendered": [
+          1
+        ],
+        "clicked": 0,
+        "requested": [
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "feature": "controlled callback without retained selection mutation",
+      "source": "button_group.rs:154-162,246-261",
+      "current": "controlled ToggleGroup exists but no ButtonGroup"
+    },
+    {
+      "feature": "horizontal outer corner masks and one shared border",
+      "source": "button_group.rs:182-229",
+      "current": "Button per-corner and per-edge overrides absent"
+    },
+    {
+      "feature": "vertical outer corner masks and shared border",
+      "source": "button_group.rs:182-229",
+      "current": "ToggleGroup horizontal-only"
+    },
+    {
+      "feature": "single child shape unchanged",
+      "source": "button_group.rs:182-183",
+      "current": "ordinary Button supported"
+    },
+    {
+      "feature": "optional group size overrides children",
+      "source": "button_group.rs:230",
+      "current": "Button 4 legacy and 14 design sizes available"
+    },
+    {
+      "feature": "optional group variant overrides children",
+      "source": "button_group.rs:231",
+      "current": "Button variant enum available"
+    },
+    {
+      "feature": "group compact and outline only enable child options",
+      "source": "button_group.rs:232-233",
+      "current": "Button flags available"
+    },
+    {
+      "feature": "group callback replaces child callbacks",
+      "source": "button_group.rs:234-238,346-350",
+      "current": "absent"
+    },
+    {
+      "feature": "without group callback child handlers survive",
+      "source": "button_group.rs:354-358",
+      "current": "ordinary Button handlers available"
+    },
+    {
+      "feature": "background root click requests unchanged selection",
+      "source": "button_group.rs:243-261",
+      "current": "absent",
+      "evidence": "render source; no focused upstream test identified"
+    },
+    {
+      "feature": "ordinary child focus and Tab; no roving group API",
+      "source": "button_group.rs:173-240",
+      "current": "Core/Button focus available"
+    },
+    {
+      "feature": "keyboard does not reach legacy group callback",
+      "source": "button_group.rs:373-377",
+      "current": "policy must be explicit for new API"
+    },
+    {
+      "feature": "disabled builder order changes child behavior",
+      "source": "button_group.rs:68-76,243-244,381-423",
+      "current": "propose consistent disabled OR child disabled/loading instead"
+    },
+    {
+      "feature": "child loading/icon/slots inherited, no group loading method",
+      "source": "button_group.rs:20-42,173-240;button.rs:435-468",
+      "current": "Button child inputs available"
+    },
+    {
+      "feature": "generic StyleRefinement",
+      "source": "button_group.rs:139-142,166-171",
+      "current": "not equivalent to unrestricted GPUI styling"
+    },
+    {
+      "feature": "theme density",
+      "source": "no group density builder",
+      "current": "CUI theme-owned density; user scale requirement separate"
+    },
+    {
+      "feature": "render-local last child index retained across callbacks until rerender",
+      "source": "button_group.rs:156,234-238,248",
+      "current": "proposal explicitly uses actual event identity; does not reproduce stale background child index",
+      "evidence": "implementation inspection; no focused upstream regression identified"
+    }
+  ],
+  "not_source_requirements": [
+    "RadioGroup roving arrow focus or one tab stop",
+    "group-level loading or error state",
+    "mandatory selection or selection limits",
+    "equal-width children or responsive wrapping by default",
+    "spring animation or URL navigation API",
+    "private Button border methods as public upstream group methods"
+  ],
+  "proposal": {
+    "status": "proposal only; API and intentional divergences require integrator approval",
+    "architecture": "Core-only Base header/reducer plus separate styled Button wrapper",
+    "selection": "caller-owned bool array; requests borrowed synchronous ordered index array; callback accepts by updating values or rejects by preserving them",
+    "max_items_proposed": 256,
+    "scratch": "caller-owned request and event scratch; bounded; nonoverlapping; no heap",
+    "stable_ids": "nonzero group/child IDs unique; reordered items keep ID but callback index reflects current collection",
+    "overrides": "explicit presence flags for size/design-size/variant; compact and outline enable only; density theme-owned",
+    "source_callback_policy_default": "SOURCE_POINTER_CALLBACKS",
+    "usable_callback_policy_opt_in": "ALL_VALIDATED_ACTIVATIONS",
+    "background_click": "group ID, SIZE_MAX child index, unchanged selection; no background Tab stop",
+    "callback_ownership": "group handler replaces child handlers when installed; otherwise child handlers survive",
+    "disabled_divergence": "group disabled OR child disabled/loading regardless of construction order",
+    "multi_event_policy": "input-order requests based on current model after prior callback accept/reject",
+    "paint_order": "register all behavior, deliver ordered accepted callbacks, paint final model; same-frame checked/value coherence",
+    "geometry": "reuse Button painter with source per-corner/per-edge composition; do not substitute Toggle paint",
+    "remaining_style_limit": "group wrapper cannot close underlying Button generic custom style/gradient gaps",
+    "background_click_divergence": "Always unchanged selection for an actual background event; do not reuse source render-local stale child index"
+  },
+  "separate_multiplicity_gap": {
+    "evidence": "prior button completion audit two queued clicks: 2 generated activations, 1 styled callback",
+    "cause": [
+      "src/core/cui.c cui_interact folds accepted slots into bool",
+      "src/components/cui_components.c cui_button_ex invokes on_click once for bool"
+    ],
+    "proposed_count_seam": "append accepted activation_count to cui_interaction; retain activated any-count Boolean",
+    "proposed_event_seam": "cui_event_accepted_activation during frame after registration, zero for pending/rejected/cancelled/unsubmitted targets",
+    "callback_semantics": "one callback per accepted activation, input order; no raw UP counting or child/group duplicates",
+    "snapshot_semantics": "callbacks do not retroactively invalidate other activations accepted against current submitted inputs",
+    "core_approval_required": true
+  },
+  "proof_required": [
+    "0/1/2/many items; both orientations; corner and separator pixels",
+    "4 legacy and 14 user design sizes, 2 densities; variants and selected states",
+    "mixed inherited sizes, overrides, icons, loading, content slots and custom cursors",
+    "controlled accept/reject; multiple remove/append ordering; immediate sibling semantics and paint",
+    "stable reorder/removal and focus cleanup; group and child disabled/loading",
+    "source keyboard policy and opt-in usable policy; ordinary Tab/Enter/Space",
+    "same-frame queued mouse/key/accessibility multiplicity and chronological cross-child events",
+    "pointer/touch cancellation and ghost suppression; clipping, modal and layered overlap",
+    "ancestor wheel and touch pan; explicit activation-only blocker scope separation",
+    "actual WASM browser input and visible pixels; native adapter evidence separately from physical OS/device claims"
+  ],
+  "proposed_ownership": {
+    "slice_1": [
+      "narrow Core accepted activation count/event evidence",
+      "Button callback dispatch only",
+      "new focused tests"
+    ],
+    "slice_2": [
+      "new Base group header/reducer",
+      "new styled group wrapper",
+      "narrow Button corner/edge painter seam",
+      "new tests and guide"
+    ],
+    "integrator": [
+      "CMake",
+      "umbrella headers",
+      "WASI",
+      "amalgamation",
+      "exports",
+      "manifest"
+    ]
+  },
+  "validation": {
+    "method": "read-only pinned source/current API and implementation inspection",
+    "new_runtime_result": null,
+    "existing_tests_limit": "existing Button and ToggleGroup tests cannot certify absent ButtonGroup"
+  }
+}

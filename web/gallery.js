@@ -351,6 +351,7 @@ function render(){
  wasm.gallery_text_view_options(Number($('text-view-format').value),Number($('text-view-scroll').checked),Number($('text-view-fade').checked));
  wasm.gallery_chart_options(Number($('chart-kind').value),Number($('chart-curve').value),Number($('chart-dots').checked),Number($('chart-labels').checked),Number($('chart-animate').checked));
  wasm.gallery_chart_content(Number($('chart-custom-rows').checked));
+ wasm.gallery_chart_appearance(Number($('chart-tooltip-appearance').value));
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));
  wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),Number($('questionnaire-numbers').checked),Number($('questionnaire-custom').checked));
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
@@ -592,8 +593,8 @@ function selectComponent(){
  for(const id of ['questionnaire-size','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
  $('questionnaire-size').value='0';$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
  $('speech-size').value='0';$('speech-unavailable').checked=false;
- for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control','chart-custom-rows-control'])$(id).hidden=selected.name!=='Chart';
- $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;$('chart-custom-rows').checked=false;
+ for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control','chart-custom-rows-control','chart-tooltip-appearance'])$(id).hidden=selected.name!=='Chart';
+ $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;$('chart-custom-rows').checked=false;$('chart-tooltip-appearance').value='0';
  for(const id of ['text-view-format','text-view-scroll-control','text-view-fade-control','motion-duration','motion-stagger','motion-easing'])$(id).hidden=selected.name!=='TextView';
  $('motion-duration').value='0.35';$('motion-stagger').value='0';$('motion-easing').value='0';$('text-view-format').value='0';$('text-view-scroll').checked=false;$('text-view-fade').checked=false;
  for(const id of ['command-modal-control','command-loading-control','command-filterable-control'])$(id).hidden=selected.name!=='Command';
@@ -844,7 +845,7 @@ for(const id of ['image-state','image-fit','image-grayscale','image-opacity','at
 for(const id of ['description-columns','description-size','description-vertical','description-plain','status-right','status-custom','resizable-vertical','resizable-disabled','icon-choice','icon-size','icon-rotate','icon-color'])$(id).addEventListener('change',requestFrame);
 for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEventListener('change',requestFrame);
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);
-for(const id of ['motion-duration','motion-stagger','motion-easing','questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','chart-custom-rows','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
+for(const id of ['motion-duration','motion-stagger','motion-easing','questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','chart-custom-rows','chart-tooltip-appearance','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
 for(const id of ['control-size','choice-required','choice-invalid','choice-skip-tab','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
 for(const id of ['design-size','design-radius','design-spacing'])$(id).addEventListener('change',requestFrame);
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});

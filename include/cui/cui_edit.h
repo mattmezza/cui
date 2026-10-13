@@ -14,7 +14,8 @@ typedef enum {
     CUI_EDIT_NO_HISTORY,
     CUI_EDIT_INVALID_ARGUMENT,
     CUI_EDIT_LINE_BREAK,
-    CUI_EDIT_CLIPBOARD_UNAVAILABLE
+    CUI_EDIT_CLIPBOARD_UNAVAILABLE,
+    CUI_EDIT_PRESENTATION
 } cui_edit_result;
 typedef struct {
     char *buffer;
@@ -56,6 +57,27 @@ typedef enum {
  * Success appends NUL and borrows destination in normalized; failure writes none. */
 cui_edit_result cui_edit_normalize_text(cui_str source, cui_edit_normalization policy,
                                         char *destination, size_t capacity, cui_str *normalized);
+/* Pure scalar U+2022 display; source UTF-8 byte endpoints map to display
+ * bytes (three per scalar). All outputs are atomic and disjoint from source. */
+cui_edit_result cui_edit_mask_text(cui_str source, char *destination, size_t capacity,
+                                   cui_str *display);
+cui_edit_result cui_edit_mask_offset(cui_str source, size_t source_byte, size_t *display_byte);
+cui_edit_result cui_edit_unmask_offset(cui_str source, size_t display_byte, size_t *source_byte);
+typedef struct {
+    void *data;
+    size_t bytes;
+} cui_edit_workspace;
+/* Hard resource gate before acceptance/commit; returns only OK, CAPACITY or
+ * PRESENTATION. Candidate is synchronous borrowed real text, not mask bytes. */
+typedef cui_edit_result (*cui_edit_prepare_fn)(void *user, cui_str candidate, bool provisional);
+typedef struct {
+    cui_edit_prepare_fn prepare;
+    void *user;
+    size_t user_bytes;
+    cui_edit_workspace caller_descriptor;
+    cui_edit_workspace caller_workspaces[3];
+    size_t caller_workspace_count;
+} cui_edit_presentation;
 typedef enum {
     CUI_EDIT_REQUEST_EVENT,
     CUI_EDIT_REQUEST_INSERT,
@@ -69,10 +91,12 @@ typedef struct {
     cui_edit_composition *composition;
     bool editable;
     cui_edit_normalization normalization;
+    cui_edit_presentation presentation;
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;
     bool rejected;
+    bool presentation_prepared, presentation_applied;
 } cui_edit_checked_result;
 /* No new preview allocation: uses bounded engine/session workspaces. Predicate
  * borrows text synchronously; never retain/write it. Same-model mutators are
@@ -83,6 +107,14 @@ typedef struct {
  * composition START/CANCEL bypass it; UPDATE/COMMIT validate provisional text.
  * Rejection preserves logical state and prior view's defined bytes; internal
  * scratch and unused buffer tails are unspecified. */
+/* Presentation is supported for single-line models only. Declared user,
+ * descriptor and up to three workspaces must be accurate disjoint extents,
+ * outside model/session/payload storage. Unused spans must be zero. Preparation
+ * runs once before predicates, including Undo/Redo resource preparation. Caller
+ * owns all staged resources: consume/discard before another request. Prepared
+ * says prepare returned OK (even if later guard/predicate fails); applied says
+ * the checked operation adopted that candidate. Completion is outside engine
+ * rollback; no callbacks/foreign pointers are retained after the request. */
 cui_edit_checked_result cui_edit_apply_checked(cui_edit *, cui_edit_request, cui_edit_acceptance);
 /* Disabled/read-only/unfocused callers pass editable=false to cancel. Update
  * never changes document/history. Commit is exactly one undo transaction. */

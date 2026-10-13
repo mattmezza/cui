@@ -134,6 +134,21 @@ typedef size_t (*cui_chart_pie_tooltip_value_fn)(const cui_chart_datum *, size_t
                                                  size_t capacity, void *user);
 typedef cui_color (*cui_chart_tooltip_value_color_fn)(const cui_chart_datum *, size_t index,
                                                       size_t series, double value, void *user);
+/* Opt-in tooltip appearance. NULL options style preserves legacy geometry.
+ * line_height is the host's resolved inherited line box, not glyph height. */
+typedef enum { CUI_CHART_TOOLTIP_BOXED = 0, CUI_CHART_TOOLTIP_BARE } cui_chart_tooltip_appearance;
+typedef struct {
+    cui_chart_tooltip_appearance appearance;
+    float font_size, line_height;
+    float padding, min_width, cursor_gap;
+    float row_gap, label_value_gap, swatch_gap, swatch_size;
+    float radius, swatch_radius;
+    cui_color background, foreground, muted_foreground, ring_color;
+} cui_chart_tooltip_style;
+/* Checked atomic source projection: rem-relative metrics, Theme popover roles,
+ * radius/half-radius; caller supplies resolved inherited line height. No Gaussian shadows. */
+bool cui_chart_tooltip_style_project(const cui_theme *, float rem_size, float inherited_line_height,
+                                     cui_chart_tooltip_style *out);
 /* Transient copying builder: at most 32 rows, 4096 aggregate bytes, and
  * 1024 bytes per string. Setter/add-row copy valid UTF-8 synchronously. */
 typedef struct cui_chart_tooltip_builder cui_chart_tooltip_builder;
@@ -283,6 +298,10 @@ typedef struct {
      * stages copied content before layout. Existing box styling is retained. */
     cui_chart_tooltip_build_fn tooltip_build;
     void *tooltip_build_user;
+    /* Borrowed during composition only; copied by value for current prepaint.
+     * Explicit metrics/colors; invalid style rejects before owner/UI mutation.
+     * Host legacy custom children must apply this typography themselves. */
+    const cui_chart_tooltip_style *tooltip_style;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

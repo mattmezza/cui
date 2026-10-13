@@ -1705,10 +1705,12 @@ def main():
             assert page.evaluate('cuiGallery.exports.gallery_alert_attempts()') == 0
             page.evaluate('location.hash="Sheet"')
             page.wait_for_function('cuiGallery.renderedComponent==="Sheet"')
+            page.evaluate('''()=>{window.__sheetSamples=[];window.__observeSheets=true;const sample=()=>{if(!window.__observeSheets)return;window.__sheetSamples.push([cuiGallery.exports.gallery_surface_open(2),cuiGallery.exports.gallery_sheet_motion(0),cuiGallery.exports.gallery_sheet_motion(1)]);requestAnimationFrame(sample)};requestAnimationFrame(sample)}''')
             for edge in range(4):
                 control_change('surface-variant', str(edge))
                 click_semantic('Open settings sheet')
                 page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===1')
+                page.wait_for_function('cuiGallery.exports.gallery_sheet_motion(0)===1')
                 dialog = page.locator('#accessible [role=dialog]')
                 assert dialog.get_attribute('aria-modal') == 'true'
                 index = semantic_index('Workspace settings')
@@ -1742,9 +1744,19 @@ def main():
                 page.mouse.up()
                 page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)>120', arg=handle)
                 page.keyboard.press('Escape')
+                page.wait_for_function('cuiGallery.exports.gallery_sheet_motion(1)===1 && cuiGallery.exports.gallery_surface_open(2)===1')
                 page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===0')
                 index = semantic_index('Open settings sheet')
                 assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
+            page.evaluate('window.__observeSheets=false')
+            assert page.evaluate('window.__sheetSamples.some(([open,progress,closing])=>open && progress>0 && progress<1 && !closing)')
+            assert page.evaluate('window.__sheetSamples.some(([open,progress,closing])=>open && progress>0 && progress<1 && closing)')
+            page.emulate_media(reduced_motion='reduce')
+            click_semantic('Open settings sheet')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===1 && cuiGallery.exports.gallery_sheet_motion(0)===1')
+            page.keyboard.press('Escape')
+            page.wait_for_function('cuiGallery.exports.gallery_surface_open(2)===0 && cuiGallery.exports.gallery_sheet_motion(1)===0')
+            page.emulate_media(reduced_motion='no-preference')
             page.evaluate('location.hash="Popover"')
             page.wait_for_function('cuiGallery.renderedComponent==="Popover"')
             click_semantic('Open account card')

@@ -1,0 +1,12 @@
+Optional host-time Sheet enter/exit motion
+Parent 5e48b83, fix/sheet-motion.
+Native75, ASan/UBSan75, WASI67, strict WASM build and full Chromium78 PASS.
+Lint/format/distribution checks PASS.
+Native tests cover offscreen geometry and progress for all four edges, complete entry,
+deferred exit/result/callback/focus, reversal during exit, reduced-motion entry/close,
+and enabling reduced motion during exit. Old base code fails the offscreen assertion.
+Browser samples actual intermediate entry/exit frames, checks all edge placement and
+resize interaction after settling, and opens/closes directly under reduced motion.
+Default duration zero preserves existing immediate surface behavior. Animated sheets
+hold the modal and block events until exit completion; no CSS overlay simulation.
+This fixes the requested animation; full Sheet/GPUI-family parity remains unfinished.

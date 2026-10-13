@@ -33,6 +33,11 @@ typedef struct {
     void *close_user;
     float body_scroll, body_maximum;
     cui_rect body_viewport, body_content;
+    /* Optional sheet motion; the modal remains mounted until its exit completes. */
+    float sheet_progress, sheet_motion_from, sheet_animation_seconds;
+    double sheet_motion_start;
+    bool sheet_motion_enabled, sheet_closing;
+    cui_surface_result sheet_close_result;
 } cui_surface_state;
 typedef struct {
     cui_rect viewport, anchor;
@@ -48,6 +53,9 @@ typedef struct {
     void *decision_user;
     cui_surface_closed_fn on_close; /* Runs after close and focus restoration. */
     void *close_user;
+    /* Zero preserves immediate opening/closing. Uses cui_frame_time(ui). */
+    float sheet_animation_seconds;
+    bool reduced_motion;
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
@@ -60,7 +68,7 @@ cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_opt
 cui_rect cui_surface_resize_bounds(const cui_surface_state *, cui_surface_options);
 /* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport, 7 body content. */
 cui_id cui_surface_part_id(cui_id, unsigned part);
-/* Reduction happens before submission, so closing leaves no current modal. */
+/* Reduction precedes submission. Animated sheets retain their modal through exit. */
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
 bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, cui_str description,
                             cui_surface_options);

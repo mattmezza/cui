@@ -34,6 +34,11 @@ typedef struct {
     void *close_user;
     float body_scroll, body_maximum;
     cui_rect body_viewport, body_content;
+    /* Optional sheet motion; the modal remains mounted until its exit completes. */
+    float sheet_progress, sheet_motion_from, sheet_animation_seconds;
+    double sheet_motion_start;
+    bool sheet_motion_enabled, sheet_closing;
+    cui_surface_result sheet_close_result;
 } cui_surface_state;
 typedef struct {
     cui_rect viewport, anchor;
@@ -49,6 +54,9 @@ typedef struct {
     void *decision_user;
     cui_surface_closed_fn on_close; /* Runs after close and focus restoration. */
     void *close_user;
+    /* Zero preserves immediate opening/closing. Uses cui_frame_time(ui). */
+    float sheet_animation_seconds;
+    bool reduced_motion;
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
@@ -61,7 +69,7 @@ cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_opt
 cui_rect cui_surface_resize_bounds(const cui_surface_state *, cui_surface_options);
 /* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport, 7 body content. */
 cui_id cui_surface_part_id(cui_id, unsigned part);
-/* Reduction happens before submission, so closing leaves no current modal. */
+/* Reduction precedes submission. Animated sheets retain their modal through exit. */
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
 bool cui_base_surface_begin(cui_context *, cui_surface_state *, cui_str title, cui_str description,
                             cui_surface_options);
@@ -104,22 +112,50 @@ void cui_surface_init(cui_surface_state *s, cui_id id, cui_surface_kind kind) {
 void cui_surface_open(cui_context *ui, cui_surface_state *s, cui_id trigger) {
     if (!s)
         return;
+    s->sheet_motion_from = s->sheet_closing ? s->sheet_progress : 0;
+    s->sheet_progress = s->sheet_motion_from;
+    s->sheet_motion_start = cui_frame_time(ui);
+    s->sheet_closing = false;
+    s->sheet_close_result = CUI_SURFACE_NONE;
     s->result = CUI_SURFACE_NONE;
     s->pending_close = CUI_SURFACE_NONE;
     cui_overlay_open(ui, &s->overlay, trigger);
 }
-void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
+static void cui_surface_finish_close(cui_context *ui, cui_surface_state *s,
+                                     cui_surface_result result) {
     if (!ui || !s || !s->overlay.open)
         return;
     s->result = result;
+    s->sheet_closing = false;
+    s->sheet_progress = 0;
     s->resizing = false;
     cui_dismiss_focus_scope(ui, s->overlay.id, s->overlay.trigger);
     cui_overlay_close(ui, &s->overlay);
     if (s->on_close)
         s->on_close(s->close_user, result);
 }
+static void cui_surface_block_input(cui_context *ui) {
+    size_t count;
+    cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        cui_consume_event(ui, i);
+}
+void cui_surface_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
+    if (!ui || !s || !s->overlay.open || s->sheet_closing)
+        return;
+    if (s->kind == CUI_SURFACE_SHEET && s->sheet_motion_enabled && s->sheet_progress > 0) {
+        s->sheet_closing = true;
+        s->sheet_close_result = result;
+        s->sheet_motion_from = s->sheet_progress;
+        s->sheet_motion_start = cui_frame_time(ui);
+        s->resizing = false;
+        cui_surface_block_input(ui);
+        cui_invalidate(ui);
+    } else
+        cui_surface_finish_close(ui, s, result);
+}
 void cui_surface_request_close(cui_context *ui, cui_surface_state *s, cui_surface_result result) {
-    if (!ui || !s || !s->overlay.open)
+    if (!ui || !s || !s->overlay.open || s->sheet_closing)
         return;
     s->pending_close = result >= CUI_SURFACE_ACCEPTED && result <= CUI_SURFACE_CLOSED
                            ? result
@@ -182,10 +218,23 @@ cui_rect cui_surface_current_geometry(const cui_surface_state *s, cui_surface_op
         else
             o.width = size;
     }
-    return cui_surface_geometry(s->kind, o);
+    cui_rect b = cui_surface_geometry(s->kind, o);
+    if (s->kind == CUI_SURFACE_SHEET && s->sheet_motion_enabled) {
+        float hidden = 1 - fminf(1, fmaxf(0, s->sheet_progress));
+        if (o.edge == CUI_SHEET_LEFT)
+            b.x -= (b.x + b.w - o.viewport.x) * hidden;
+        else if (o.edge == CUI_SHEET_RIGHT)
+            b.x += (o.viewport.x + o.viewport.w - b.x) * hidden;
+        else if (o.edge == CUI_SHEET_TOP)
+            b.y -= (b.y + b.h - o.viewport.y) * hidden;
+        else
+            b.y += (o.viewport.y + o.viewport.h - b.y) * hidden;
+    }
+    return b;
 }
 cui_rect cui_surface_resize_bounds(const cui_surface_state *s, cui_surface_options o) {
-    if (!s || s->kind != CUI_SURFACE_SHEET || o.no_sheet_resize)
+    if (!s || s->kind != CUI_SURFACE_SHEET || o.no_sheet_resize || s->sheet_closing ||
+        (s->sheet_motion_enabled && s->sheet_progress < 1))
         return (cui_rect){0};
     cui_rect b = cui_surface_current_geometry(s, o);
     if (cui_surface_vertical_sheet(o)) {
@@ -247,16 +296,47 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
     }
 }
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
-    if (!ui || !s || !s->overlay.open)
+    if (!ui || !s)
+        return false;
+    s->sheet_animation_seconds =
+        isfinite(o.sheet_animation_seconds) && o.sheet_animation_seconds > 0
+            ? fminf(o.sheet_animation_seconds, 10)
+            : 0;
+    s->sheet_motion_enabled =
+        s->kind == CUI_SURFACE_SHEET && s->sheet_animation_seconds > 0 && !o.reduced_motion;
+    if (!s->overlay.open)
         return false;
     s->on_close = o.on_close;
     s->close_user = o.close_user;
+    if (s->sheet_motion_enabled) {
+        double elapsed = fmax(0, cui_frame_time(ui) - s->sheet_motion_start);
+        float phase = (float)fmin(1, elapsed / s->sheet_animation_seconds);
+        float eased = phase * phase * (3 - 2 * phase);
+        float target = s->sheet_closing ? 0 : 1;
+        s->sheet_progress = s->sheet_motion_from + (target - s->sheet_motion_from) * eased;
+        if (phase < 1)
+            cui_invalidate(ui);
+        else if (s->sheet_closing) {
+            cui_surface_finish_close(ui, s, s->sheet_close_result);
+            return true;
+        }
+    } else {
+        s->sheet_progress = 1;
+        if (s->sheet_closing) {
+            cui_surface_finish_close(ui, s, s->sheet_close_result);
+            return true;
+        }
+    }
+    if (s->sheet_closing) {
+        cui_surface_block_input(ui);
+        return false;
+    }
     if (s->pending_close != CUI_SURFACE_NONE) {
         cui_surface_result reason = s->pending_close;
         s->pending_close = CUI_SURFACE_NONE;
         if (!o.decide || o.decide(o.decision_user, reason)) {
             cui_surface_close(ui, s, reason);
-            return true;
+            return !s->overlay.open;
         }
     }
     s->overlay.modal = s->kind != CUI_SURFACE_POPOVER || o.modal_popover;
@@ -275,11 +355,12 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
         cui_invalidate(ui);
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
-    for (size_t i = 0; i < count && s->overlay.open; ++i) {
+    for (size_t i = 0; i < count && s->overlay.open && !s->sheet_closing; ++i) {
         if (cui_event_consumed(ui, i))
             continue;
         cui_event e = events[i];
-        cui_surface_resize_event(ui, s, o, e, i);
+        if (!s->sheet_motion_enabled || s->sheet_progress >= 1)
+            cui_surface_resize_event(ui, s, o, e, i);
         if (e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&
             cui_event_target(ui, i) == cui_surface_part_id(s->overlay.id, 6)) {
             s->body_scroll = fminf(s->body_maximum, fmaxf(0, s->body_scroll - e.dy * 48));

@@ -474,6 +474,87 @@ static void closed(void *user, cui_surface_result reason) {
     observer->calls++;
     observer->reason = reason;
 }
+static void sheet_motion(void) {
+#ifdef CUI_SURFACE_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    for (unsigned edge = 0; edge < 4; edge++) {
+        cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+        assert(ui);
+        cui_surface_state s;
+        cui_surface_init(&s, 100, CUI_SURFACE_SHEET);
+        close_observer observer = {.ui = ui, .surface = &s};
+        cui_surface_options o = {.viewport = {0, 0, 600, 400},
+                                 .width = 200,
+                                 .height = 160,
+                                 .edge = (cui_sheet_edge)edge,
+                                 .sheet_animation_seconds = .064f,
+                                 .on_close = closed,
+                                 .close_user = &observer};
+        scene(ui, &theme, &s, o, false);
+        cui_surface_open(ui, &s, 1);
+        cui_rect hidden = cui_surface_current_geometry(&s, o);
+        assert(edge == CUI_SHEET_LEFT    ? hidden.x + hidden.w <= 0
+               : edge == CUI_SHEET_RIGHT ? hidden.x >= 600
+               : edge == CUI_SHEET_TOP   ? hidden.y + hidden.h <= 0
+                                         : hidden.y >= 400);
+        scene(ui, &theme, &s, o, false);
+        assert(s.sheet_progress > 0 && s.sheet_progress < 1);
+        float entering = s.sheet_progress;
+        for (unsigned frame = 0; frame < 5; frame++) {
+            scene(ui, &theme, &s, o, false);
+            assert(s.sheet_progress >= entering);
+            entering = s.sheet_progress;
+        }
+        assert(s.sheet_progress == 1 && s.overlay.open);
+        cui_rect settled = cui_surface_current_geometry(&s, o);
+        cui_rect expected = cui_surface_geometry(CUI_SURFACE_SHEET, o);
+        assert(settled.x == expected.x && settled.y == expected.y);
+        cui_surface_request_close(ui, &s, CUI_SURFACE_CLOSED);
+        scene(ui, &theme, &s, o, false);
+        assert(s.sheet_closing && s.overlay.open && observer.calls == 0);
+        scene(ui, &theme, &s, o, false);
+        assert(s.sheet_progress > 0 && s.sheet_progress < 1);
+        assert(cui_surface_take_result(&s) == CUI_SURFACE_NONE);
+        for (unsigned frame = 0; frame < 5; frame++)
+            scene(ui, &theme, &s, o, false);
+        assert(!s.overlay.open && !s.sheet_closing && observer.calls == 1);
+        assert(cui_surface_take_result(&s) == CUI_SURFACE_CLOSED);
+        o.reduced_motion = true;
+        scene(ui, &theme, &s, o, false);
+        cui_surface_open(ui, &s, 1);
+        scene(ui, &theme, &s, o, false);
+        assert(s.sheet_progress == 1 && !s.sheet_motion_enabled);
+        cui_surface_request_close(ui, &s, CUI_SURFACE_CANCELLED);
+        scene(ui, &theme, &s, o, false);
+        assert(!s.overlay.open && observer.calls == 2);
+        o.reduced_motion = false;
+        scene(ui, &theme, &s, o, false);
+        cui_surface_open(ui, &s, 1);
+        for (unsigned frame = 0; frame < 6; frame++)
+            scene(ui, &theme, &s, o, false);
+        cui_surface_request_close(ui, &s, CUI_SURFACE_CLOSED);
+        scene(ui, &theme, &s, o, false);
+        assert(s.sheet_closing);
+        scene(ui, &theme, &s, o, false);
+        float reversing = s.sheet_progress;
+        assert(reversing > 0 && reversing < 1);
+        cui_surface_open(ui, &s, 1);
+        assert(!s.sheet_closing && s.sheet_progress == reversing);
+        for (unsigned frame = 0; frame < 6; frame++)
+            scene(ui, &theme, &s, o, false);
+        assert(s.overlay.open && s.sheet_progress == 1 && observer.calls == 2);
+        cui_surface_request_close(ui, &s, CUI_SURFACE_CLOSED);
+        scene(ui, &theme, &s, o, false);
+        assert(s.sheet_closing);
+        o.reduced_motion = true;
+        scene(ui, &theme, &s, o, false);
+        assert(!s.overlay.open && observer.calls == 3);
+        cui_destroy(ui);
+    }
+}
 static void requested_close(void) {
 #ifdef CUI_SURFACE_BASE_ONLY
     cui_theme theme = {0};
@@ -695,6 +776,7 @@ int main(void) {
     resize_sheets();
     nested_surfaces();
     requested_close();
+    sheet_motion();
 #ifndef CUI_SURFACE_BASE_ONLY
     styled_confirmation();
     fixed_footer();

@@ -3364,6 +3364,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                        .height = height * .62f,
                                        .edge = edge,
                                        .sheet_minimum = 100,
+                                       .sheet_animation_seconds = .22f,
+                                       .reduced_motion = reduced_motion,
                                        .sheet_maximum =
                                            edge < CUI_SHEET_TOP ? width - 48 : height - 32};
         if (cui_surface_begin(ui, &t, &sheet_surface, cui_string("Workspace settings"),
@@ -4195,6 +4197,9 @@ void gallery_form_mode(int mode) {
 }
 int gallery_form_submissions(void) {
     return form_submissions;
+}
+double gallery_sheet_motion(unsigned field) {
+    return field == 0 ? sheet_surface.sheet_progress : sheet_surface.sheet_closing;
 }
 void gallery_surface_variant(int variant) {
     if (surface_variant != variant)

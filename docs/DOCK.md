@@ -160,7 +160,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | `Dock`, `DockSizing`, `DockPlacement` | Retained left/right/bottom open flags and preferred sizes, bounds/minima clamping and pointer/keyboard resizing. Frozen component deliberately does not re-export base `Dock`. Opt-in bottom collapse includes its strip/live-size snapping. Per-edge collapsibility is retained and guards closing and bottom drag snapping. |
 | `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
 | `AnyDrag`, `DragPanel`, `DropIndicator`, `DropPlaceholderBounds`, `DropTarget`, `DragPanelPreview` | Portable queued tab gestures, cross-group/region transfer, content-edge splits, accepted/rejected target indications and previews. No GPUI entity drag payload or opaque host drag union is needed for CUI events. |
-| Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; no dynamic visibility predicate, automatic added/removed/active lifecycle hook or panel-specific dump callback. |
+| Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; dynamic visibility predicate; no automatic added/removed/active lifecycle hook or panel-specific dump callback. |
 | `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. No named factory registry or automatic panel construction from payload JSON. |
 | `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
 | Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Per-title chrome colors remain a gap. |
@@ -245,6 +245,29 @@ static cui_dock_group_constraints constraints(void *user, const cui_dock *model,
 options.group_constraints = constraints;
 ```
 
-Callbacks and user data remain host-owned; evaluate deterministically and do not mutate model/view/registry data. Constraints are presentation policy, not serialized model data. Restore can invalidate node IDs, so derive them from stable keys or refresh host mappings. `preserve_last` currently counts model panels, because dynamic visibility is a separate remaining gap. The frozen lock originates at DockArea; CUI's per-node callback is a portable host seam rather than a claim about a second frozen pinned-group primitive. It protects panel rearrangement, not splitter geometry; hosts can separately veto `CUI_DOCK_RESIZED` through `allow_operation`.
+Callbacks and user data remain host-owned; evaluate deterministically and do not mutate model/view/registry data. Constraints are presentation policy, not serialized model data. Restore can invalidate node IDs, so derive them from stable keys or refresh host mappings. `preserve_last` counts visible panels through the optional visibility predicate. The frozen lock originates at DockArea; CUI's per-node callback is a portable host seam rather than a claim about a second frozen pinned-group primitive. It protects panel rearrangement, not splitter geometry; hosts can separately veto `CUI_DOCK_RESIZED` through `allow_operation`.
 
 Headless checks exercise constructors in model-only linkage, sealed-source selection/content, blocked close/shortcut/menu and drag, locked targets with byte-equal model serialization, unclosable-but-movable groups, sole-panel preservation, isolated collapse, preserved active key after bulk close, cross-model locked-source/target rejection, closed-edge non-opening, target permission revoked after preview and successful transfer after unlocking.
+
+
+### Dynamic panel visibility
+
+Set `view_options.panel_visible` and `visibility_user` to filter panels without removing them from the model. The callback receives the owning model and stable panel key; a null callback means every panel is visible. It must be deterministic during a frame and must not mutate model, view or registry data. Visibility is host state and is not serialized.
+
+```c
+static bool panel_visible(void *user, const cui_dock *model, uint64_t key) {
+    const bool *show_inspector = user;
+    (void)model;
+    return key != 42 || *show_inspector;
+}
+
+/* Keep show_inspector alive while these options are used. */
+options.panel_visible = panel_visible;
+options.visibility_user = &show_inspector;
+```
+
+`cui_dock_visible_count(model, node, predicate, user)` counts visible members of a tab group. `cui_dock_displayed_panel(model, node, predicate, user, &key)` returns the stored active panel when visible, otherwise the first visible member; it returns false without changing the output when no member is visible. Neither query changes the active key or layout. Invalid groups return zero/false.
+
+The styled adapter uses that same fallback, omits hidden tab/title/content callbacks and semantics, and moves focus from a hidden tab to the displayed panel. Showing the original active panel restores its presentation unless the user explicitly selected another panel. Auto mode uses the visible count; the optional inner-padding rule retains the frozen source's total group-member count. Filtered reordering maps visible anchors back to model indices, retaining hidden members. Close-all and close-others affect visible panels only, and preserve-last protects the displayed visible member. A group with no visible members displays an empty-state caption; an all-hidden zoomed group restores the normal layout.
+
+Workspace transfers evaluate visibility against each region's model. Hiding a dragged source cancels the gesture; hiding the incoming key at the destination rejects release with `CUI_DOCK_INVALID`. Both layouts remain unchanged on rejection. Hosts should update visibility between frames, including after a drop preview. Headless tests exercise fallback, focus, unchanged serialization, Auto mode, visible-count protection, filtered reorder, bulk close, zoom restoration and real queued cross-region gestures.

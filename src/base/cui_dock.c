@@ -870,3 +870,36 @@ cui_dock_group_constraints cui_dock_group_sealed(void) {
 cui_dock_group_constraints cui_dock_group_in_split(bool alone) {
     return (cui_dock_group_constraints){.preserve_last = alone};
 }
+
+size_t cui_dock_visible_count(const cui_dock *model, cui_dock_node node,
+                              cui_dock_visibility_fn visible, void *user) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(model, node, &info) || info.kind != CUI_DOCK_TABS)
+        return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < info.panel_count; ++i) {
+        uint64_t key;
+        if (cui_dock_panel_at(model, node, i, &key) && (!visible || visible(user, model, key)))
+            ++count;
+    }
+    return count;
+}
+bool cui_dock_displayed_panel(const cui_dock *model, cui_dock_node node,
+                              cui_dock_visibility_fn visible, void *user, uint64_t *panel) {
+    cui_dock_node_info info;
+    if (!panel || !cui_dock_node_get(model, node, &info) || info.kind != CUI_DOCK_TABS ||
+        !info.has_active)
+        return false;
+    if (!visible || visible(user, model, info.active_panel)) {
+        *panel = info.active_panel;
+        return true;
+    }
+    for (size_t i = 0; i < info.panel_count; ++i) {
+        uint64_t key;
+        if (cui_dock_panel_at(model, node, i, &key) && visible(user, model, key)) {
+            *panel = key;
+            return true;
+        }
+    }
+    return false;
+}

@@ -41,6 +41,11 @@ cui_dock *cui_dock_create(cui_dock_config config);
 void cui_dock_destroy(cui_dock *dock);
 cui_dock_node cui_dock_root(const cui_dock *dock);
 size_t cui_dock_memory_bytes(const cui_dock *dock);
+/* Pure host visibility; hidden members remain in the serialized model. */
+typedef bool (*cui_dock_visibility_fn)(void *, const cui_dock *, uint64_t panel);
+size_t cui_dock_visible_count(const cui_dock *, cui_dock_node, cui_dock_visibility_fn, void *);
+bool cui_dock_displayed_panel(const cui_dock *, cui_dock_node, cui_dock_visibility_fn, void *,
+                              uint64_t *panel);
 bool cui_dock_node_get(const cui_dock *dock, cui_dock_node node, cui_dock_node_info *info);
 bool cui_dock_panel_at(const cui_dock *dock, cui_dock_node tab, size_t index, uint64_t *panel);
 bool cui_dock_panel_find(const cui_dock *dock, uint64_t panel, cui_dock_node *tab, size_t *index);
@@ -172,6 +177,8 @@ typedef struct {
     /* Pure, borrowed host policy; no model/view mutation during evaluation. */
     cui_dock_group_constraints (*group_constraints)(void *, const cui_dock *, cui_dock_node);
     void *constraints_user;
+    cui_dock_visibility_fn panel_visible;
+    void *visibility_user;
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;

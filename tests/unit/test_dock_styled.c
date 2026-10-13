@@ -1468,6 +1468,188 @@ static void test_workspace_constraints(void) {
     cui_dock_workspace_destroy(edges);
     constrained_model = NULL;
 }
+static const cui_dock *visibility_model;
+static uint64_t hidden_bits;
+static bool hidden_max;
+static bool panel_visible(void *user, const cui_dock *m, uint64_t key) {
+    assert(user == &hidden_bits);
+    if (m != visibility_model)
+        return true;
+    return key == UINT64_MAX ? !hidden_max : key >= 64 || !(hidden_bits & (UINT64_C(1) << key));
+}
+static void test_dynamic_visibility(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    assert(model);
+    uint64_t keys[] = {0, 1, 2, UINT64_MAX};
+    for (size_t i = 0; i < 4; ++i)
+        assert(cui_dock_insert(model, cui_dock_root(model), keys[i], SIZE_MAX) == CUI_DOCK_OK);
+    options.panel_visible = panel_visible;
+    options.visibility_user = &hidden_bits;
+    visibility_model = model;
+    hidden_bits = 0;
+    hidden_max = false;
+    panels[0].title_render = panels[1].title_render = custom_title;
+    panels[0].title_suffix = panels[1].title_suffix = custom_suffix;
+    for (unsigned i = 0; i < 2; ++i) {
+        panels[i].title_width = 60;
+        panels[i].title_suffix_width = 64;
+        panels[i].user = &title_calls;
+    }
+    frame();
+    frame();
+    cui_focus(ui, cui_dock_tab_id(workspace, 0));
+    char before[4096], after[4096];
+    size_t size;
+    assert(cui_dock_serialize(model, before, sizeof before, &size) == CUI_DOCK_OK);
+    unsigned zero_calls = rendered[0], zero_titles = title_calls[0], one_calls = rendered[1];
+    hidden_bits = (UINT64_C(1) << 0) | (UINT64_C(1) << 2);
+    frame();
+    assert(!result.selected && rendered[0] == zero_calls && title_calls[0] == zero_titles &&
+           rendered[1] > one_calls);
+    assert(cui_bounds(ui, cui_dock_tab_id(workspace, 0)).w == 0 &&
+           cui_bounds(ui, cui_dock_tab_id(workspace, 2)).w == 0);
+    assert(cui_focused(ui) == cui_dock_tab_id(workspace, 1));
+    assert(cui_bounds(ui, 950).w == 0 && cui_bounds(ui, 951).w > 0);
+    assert(cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    constrained_model = model;
+    constrained_node = cui_dock_root(model);
+    constraint_flags = cui_dock_group_in_split(true);
+    options.group_constraints = group_constraints;
+    options.constraints_user = &constraint_calls;
+    hidden_max = true;
+    options.panel_style = CUI_DOCK_PANEL_AUTO;
+    frame();
+    assert(semantic_role(cui_dock_tab_id(workspace, 1)) == CUI_ROLE_LABEL);
+    assert(cui_bounds(ui, cui_dock_close_id(workspace, 1)).w == 0);
+    menu_click(1, CUI_DOCK_MENU_CLOSE_ALL);
+    assert(!result.closed);
+    assert(cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    hidden_bits |= UINT64_C(1) << 1;
+    assert(cui_dock_view_set_zoom(view, model, 0, true));
+    zero_calls = rendered[0];
+    one_calls = rendered[1];
+    frame();
+    assert(result.restored && !cui_dock_view_zoomed(view, NULL));
+    assert(rendered[0] == zero_calls && rendered[1] == one_calls);
+    assert(cui_bounds(ui, cui_dock_tab_id(workspace, 1)).w == 0);
+    assert(cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    hidden_bits &= ~(UINT64_C(1) << 0);
+    frame();
+    assert(rendered[0] > zero_calls &&
+           semantic_role(cui_dock_tab_id(workspace, 0)) == CUI_ROLE_LABEL);
+    /* Reorder through visible stable-key anchors; invisible membership remains untouched. */
+    options.panel_style = CUI_DOCK_PANEL_TAB_BAR;
+    options.group_constraints = NULL;
+    options.constraints_user = NULL;
+    hidden_bits = UINT64_C(1) << 1;
+    hidden_max = false;
+    frame();
+    frame();
+    cui_rect a = cui_bounds(ui, cui_dock_tab_id(workspace, UINT64_MAX));
+    cui_rect b = cui_bounds(ui, cui_dock_tab_id(workspace, 0));
+    pointer(CUI_EVENT_POINTER_DOWN, a.x + 8, a.y + a.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, b.x + 3, b.y + b.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_UP, b.x + 3, b.y + b.h / 2);
+    frame();
+    assert(result.reordered);
+    uint64_t key_value;
+    assert(cui_dock_panel_at(model, cui_dock_root(model), 0, &key_value) &&
+           key_value == UINT64_MAX);
+    assert(cui_dock_panel_at(model, cui_dock_root(model), 2, &key_value) && key_value == 1);
+    frame();
+    menu_click(active(cui_dock_root(model)), CUI_DOCK_MENU_CLOSE_ALL);
+    assert(result.closed_count == 3 && cui_dock_panel_find(model, 1, NULL, NULL));
+    for (unsigned i = 0; i < 2; ++i) {
+        panels[i].title_render = panels[i].title_suffix = NULL;
+        panels[i].title_width = panels[i].title_suffix_width = 0;
+        panels[i].user = NULL;
+    }
+    options.panel_visible = NULL;
+    options.visibility_user = NULL;
+    hidden_bits = 0;
+    hidden_max = false;
+    visibility_model = NULL;
+    frame();
+    assert(cui_bounds(ui, cui_dock_tab_id(workspace, 1)).w > 0);
+}
+static void test_workspace_visibility(void) {
+    edges = cui_dock_workspace_create();
+    assert(edges);
+    edge_options = (cui_dock_workspace_options){.view = cui_dock_view_options_default()};
+    edge_options.view.width = 640;
+    edge_options.view.height = 480;
+    edge_options.view.panel_visible = panel_visible;
+    edge_options.view.visibility_user = &hidden_bits;
+    for (unsigned r = 0; r < 4; ++r) {
+        regions[r] = (cui_dock_region_content){.model = cui_dock_create((cui_dock_config){0}),
+                                               .view = cui_dock_view_create(0, 0),
+                                               .panels = panels,
+                                               .panel_count = 5};
+        assert(regions[r].model && regions[r].view);
+    }
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(regions[1].model, cui_dock_root(regions[1].model), 2, 0) == CUI_DOCK_OK);
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_LEFT, true, 160));
+    hidden_bits = 0;
+    hidden_max = false;
+    visibility_model = regions[1].model;
+    edge_frame();
+    edge_frame();
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_CENTER), 0));
+    cui_rect left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    char source_before[4096], target_before[4096], after[4096];
+    region_serialize(0, source_before);
+    region_serialize(1, target_before);
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_MOVE, left.x + left.w / 2, left.y + left.h / 2);
+    edge_frame();
+    hidden_bits = UINT64_C(1) << 0; /* Destination hides the incoming key after preview. */
+    edge_expected_error = CUI_DOCK_INVALID;
+    pointer(CUI_EVENT_POINTER_UP, left.x + left.w / 2, left.y + left.h / 2);
+    edge_frame();
+    edge_expected_error = CUI_DOCK_OK;
+    assert(!edge_result.transferred);
+    region_serialize(0, after);
+    assert(!strcmp(source_before, after));
+    region_serialize(1, after);
+    assert(!strcmp(target_before, after));
+    hidden_bits = 0;
+    visibility_model = regions[0].model;
+    edge_frame();
+    edge_frame();
+    tab = cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_CENTER), 0));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_MOVE, left.x + left.w / 2, left.y + left.h / 2);
+    edge_frame();
+    hidden_bits = UINT64_C(1) << 0; /* Source becomes invisible during the gesture. */
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_UP, left.x + left.w / 2, left.y + left.h / 2);
+    edge_frame();
+    assert(!edge_result.transferred &&
+           cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_CENTER), 0)).w == 0);
+    region_serialize(0, after);
+    assert(!strcmp(source_before, after));
+    region_serialize(1, after);
+    assert(!strcmp(target_before, after));
+    hidden_bits = 0;
+    edge_frame();
+    transfer_gesture(0, 0, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && cui_dock_panel_find(regions[1].model, 0, NULL, NULL));
+    for (unsigned r = 0; r < 4; ++r) {
+        cui_dock_view_destroy(regions[r].view);
+        cui_dock_destroy(regions[r].model);
+    }
+    cui_dock_workspace_destroy(edges);
+    visibility_model = NULL;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -1600,6 +1782,8 @@ int main(void) {
     test_title_modes_padding();
     test_group_constraints();
     test_workspace_constraints();
+    test_dynamic_visibility();
+    test_workspace_visibility();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

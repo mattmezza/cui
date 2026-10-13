@@ -62,12 +62,16 @@ dock_group_constraints(cui_dock_view_options options, const cui_dock *model, cui
                ? options.group_constraints(options.constraints_user, model, node)
                : (cui_dock_group_constraints){0};
 }
+static bool dock_panel_visible(cui_dock_view_options options, const cui_dock *model, uint64_t key) {
+    return !options.panel_visible || options.panel_visible(options.visibility_user, model, key);
+}
 static bool dock_group_draggable(cui_dock_view_options options, const cui_dock *model,
                                  cui_dock_node node) {
     cui_dock_group_constraints constraints = dock_group_constraints(options, model, node);
     cui_dock_node_info info;
     return cui_dock_node_get(model, node, &info) && !constraints.locked && !constraints.collapsed &&
-           !(constraints.preserve_last && info.panel_count <= 1);
+           !(constraints.preserve_last && cui_dock_visible_count(model, node, options.panel_visible,
+                                                                 options.visibility_user) <= 1);
 }
 static bool dock_group_closable(cui_dock_view_options options, const cui_dock *model,
                                 cui_dock_node node) {
@@ -78,6 +82,10 @@ static bool dock_allowed(dock_scene *s, cui_dock_event operation, uint64_t panel
                          cui_dock_node destination, size_t index, cui_dock_kind axis, bool before) {
     cui_dock_node source = 0;
     cui_dock_panel_find(s->dock, panel, &source, NULL);
+    if ((operation == CUI_DOCK_CLOSED || operation == CUI_DOCK_REORDERED ||
+         operation == CUI_DOCK_MOVED || operation == CUI_DOCK_SPLIT) &&
+        !dock_panel_visible(s->options, s->dock, panel))
+        return false;
     if (operation == CUI_DOCK_CLOSED && !dock_group_closable(s->options, s->dock, source))
         return false;
     if ((operation == CUI_DOCK_REORDERED || operation == CUI_DOCK_MOVED ||
@@ -146,7 +154,8 @@ static void dock_drag_events(dock_scene *s) {
     if (v->dragging) {
         bool enabled = false;
         for (size_t i = 0; i < s->panel_count; ++i)
-            if (s->panels[i].key == v->drag_key && !s->panels[i].disabled)
+            if (s->panels[i].key == v->drag_key && !s->panels[i].disabled &&
+                dock_panel_visible(s->options, s->dock, v->drag_key))
                 enabled = true;
         cui_dock_node source;
         if (!enabled || !cui_dock_panel_find(s->dock, v->drag_key, &source, NULL) ||
@@ -175,7 +184,8 @@ static void dock_drag_events(dock_scene *s) {
             for (size_t i = 0; i < s->panel_count; ++i) {
                 const cui_dock_panel *panel = &s->panels[i];
                 cui_dock_node source;
-                if (!panel->disabled && cui_dock_panel_find(s->dock, panel->key, &source, NULL) &&
+                if (!panel->disabled && dock_panel_visible(s->options, s->dock, panel->key) &&
+                    cui_dock_panel_find(s->dock, panel->key, &source, NULL) &&
                     dock_group_draggable(s->options, s->dock, source) &&
                     dock_contains(cui_bounds(s->ui, cui_dock_tab_id(s->id, panel->key)), event.x,
                                   event.y) &&
@@ -254,17 +264,16 @@ static void dock_drag_preview(dock_scene *s) {
     cui_text(s->ui, panel ? panel->title : cui_string("Panel"), s->theme->font_size, palette.text);
     cui_end_box(s->ui);
 }
-static bool dock_first_active(const cui_dock *model, cui_dock_node node, uint64_t *key) {
+static bool dock_first_active(const cui_dock *model, cui_dock_node node, uint64_t *key,
+                              cui_dock_view_options options) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
         return false;
-    if (info.kind == CUI_DOCK_TABS) {
-        if (!info.has_active)
-            return false;
-        *key = info.active_panel;
-        return true;
-    }
-    return dock_first_active(model, info.first, key) || dock_first_active(model, info.second, key);
+    if (info.kind == CUI_DOCK_TABS)
+        return cui_dock_displayed_panel(model, node, options.panel_visible, options.visibility_user,
+                                        key);
+    return dock_first_active(model, info.first, key, options) ||
+           dock_first_active(model, info.second, key, options);
 }
 static cui_id dock_part(cui_id id, uint64_t key, uint64_t tag) {
     uint64_t x = id ^ (key + tag);
@@ -461,7 +470,8 @@ static void dock_render_menu(dock_scene *s, dock_cache *cache, cui_dock_node_inf
         uint64_t key;
         cui_dock_panel_at(s->dock, info.id, i, &key);
         const cui_dock_panel *panel = dock_panel_get(s, key);
-        if (panel && panel->closable && !panel->disabled) {
+        if (panel && panel->closable && !panel->disabled &&
+            dock_panel_visible(s->options, s->dock, key)) {
             ++closable;
             if (key != active->key)
                 ++others;
@@ -483,7 +493,9 @@ static void dock_render_menu(dock_scene *s, dock_cache *cache, cui_dock_node_inf
         if (i == 3)
             unavailable = s->view->zoomed ? false : disabled || !active->zoomable;
         if (i == 4 || i == 5)
-            unavailable |= info.panel_count < 2 || s->view->zoomed || !group_drag;
+            unavailable |= cui_dock_visible_count(s->dock, info.id, s->options.panel_visible,
+                                                  s->options.visibility_user) < 2 ||
+                           s->view->zoomed || !group_drag;
         if (i == 6)
             unavailable |= !info.parent || s->view->zoomed;
         cache->menu_entries[count++] = (cui_menu_entry){
@@ -669,33 +681,55 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
         cui_end_box(s->ui);
         return;
     }
+    uint64_t displayed;
+    if (!cui_dock_displayed_panel(s->dock, info.id, s->options.panel_visible,
+                                  s->options.visibility_user, &displayed)) {
+        cui_text(s->ui, cui_string("No visible panels"), s->theme->font_size, s->theme->muted);
+        cui_end_box(s->ui);
+        return;
+    }
+    info.active_panel = displayed;
+    info.has_active = true;
     cui_id selected = 0;
+    size_t visible_count = 0;
     bool custom_title = false;
     float suffix_width = 0;
     for (size_t i = 0; i < info.panel_count; ++i) {
         uint64_t key;
         cui_dock_panel_at(s->dock, info.id, i, &key);
+        if (!dock_panel_visible(s->options, s->dock, key)) {
+            cui_id focused = cui_focused(s->ui);
+            if (focused == cui_dock_tab_id(s->id, key) ||
+                focused == cui_dock_close_id(s->id, key)) {
+                const cui_dock_panel *fallback = dock_panel_get(s, displayed);
+                cui_focus(s->ui, s->options.focus_content && fallback && fallback->focus_target
+                                     ? fallback->focus_target
+                                     : cui_dock_tab_id(s->id, displayed));
+            }
+            continue;
+        }
+        size_t j = visible_count++;
         const cui_dock_panel *panel = dock_panel_get(s, key);
         if (panel) {
             custom_title |= panel->title_render != NULL;
             if (panel->title_suffix && !s->options.collapsed)
                 suffix_width = fmaxf(suffix_width, panel->title_suffix_width);
         }
-        s->view->keys[i] = key;
-        s->view->items[i] =
+        s->view->keys[j] = key;
+        s->view->items[j] =
             (cui_choice_item){.id = cui_dock_tab_id(s->id, key),
                               .label = panel ? panel->title : cui_string("Unavailable panel"),
                               .disabled = s->options.disabled || (panel && panel->disabled)};
-        s->view->parts[i] = (cui_tab_parts){0};
+        s->view->parts[j] = (cui_tab_parts){0};
         if (panel && panel->closable && !s->options.collapsed &&
             dock_group_closable(s->options, s->dock, info.id))
-            s->view->parts[i] =
+            s->view->parts[j] =
                 (cui_tab_parts){.suffix = dock_close_suffix, .suffix_width = 28, .user = s};
         if (!s->options.collapsed && info.has_active && info.active_panel == key)
-            selected = s->view->items[i].id;
+            selected = s->view->items[j].id;
     }
     const cui_dock_panel *initial = info.has_active ? dock_panel_get(s, info.active_panel) : NULL;
-    bool simple = s->options.panel_style == CUI_DOCK_PANEL_AUTO && info.panel_count == 1 &&
+    bool simple = s->options.panel_style == CUI_DOCK_PANEL_AUTO && visible_count == 1 &&
                   !s->options.collapsed;
     bool hidden_title = simple && initial && initial->hide_title_bar;
     float header_height = hidden_title ? 0 : fminf(simple ? 30 : s->options.tab_height, h);
@@ -711,7 +745,7 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
         if (!hidden_title)
             dock_simple_title(s, info, &title_context, w, header_height);
     } else
-        changed = cui_tabs(s->ui, strip, s->theme, s->view->items, info.panel_count, &selected,
+        changed = cui_tabs(s->ui, strip, s->theme, s->view->items, visible_count, &selected,
                            (cui_tabs_options){.disabled = s->options.disabled,
                                               .variant = CUI_TAB_DEFAULT,
                                               .height = s->options.tab_height,
@@ -724,14 +758,14 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
                                               .reveal_selected = true,
                                               .scrollbar = true,
                                               .parts = s->view->parts,
-                                              .parts_count = info.panel_count,
+                                              .parts_count = visible_count,
                                               .drag = s->options.allow_reorder &&
                                                               !s->options.collapsed && group_drag
                                                           ? &cache->drag
                                                           : NULL},
                            NULL, NULL);
     if (changed) {
-        for (size_t i = 0; i < info.panel_count; ++i)
+        for (size_t i = 0; i < visible_count; ++i)
             if (s->view->items[i].id == selected) {
                 uint64_t key = s->view->keys[i];
                 if (cui_dock_activate(s->dock, key) == CUI_DOCK_OK) {
@@ -748,18 +782,20 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
     }
     if (cache->drag.requested) {
         size_t source = SIZE_MAX, target = info.panel_count;
-        for (size_t i = 0; i < info.panel_count; ++i) {
+        for (size_t i = 0; i < visible_count; ++i) {
             if (s->view->items[i].id == cache->drag.moved)
-                source = i;
+                cui_dock_panel_find(s->dock, s->view->keys[i], NULL, &source);
             if (s->view->items[i].id == cache->drag.before)
-                target = i;
+                cui_dock_panel_find(s->dock, s->view->keys[i], NULL, &target);
         }
         if (source != SIZE_MAX) {
             if (target > source)
                 --target;
             if (target != source) {
                 s->pending_reorder = true;
-                s->reorder_key = s->view->keys[source];
+                for (size_t i = 0; i < visible_count; ++i)
+                    if (s->view->items[i].id == cache->drag.moved)
+                        s->reorder_key = s->view->keys[i];
                 s->reorder_index = target;
             }
         }
@@ -1054,7 +1090,9 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Dock workspace"), options.disabled, false, 0);
     cui_dock_node visible_root = cui_dock_root(model);
     if (view->zoomed) {
-        if (cui_dock_panel_find(model, view->zoom_key, &visible_root, NULL)) {
+        if (cui_dock_panel_find(model, view->zoom_key, &visible_root, NULL) &&
+            cui_dock_visible_count(model, visible_root, options.panel_visible,
+                                   options.visibility_user)) {
             cui_dock_node_info info;
             cui_dock_node_get(model, visible_root, &info);
             scene.result.fit_minimum =
@@ -1064,7 +1102,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
             scene.result.restored = true;
             dock_emit(&scene, CUI_DOCK_RESTORED, view->zoom_key, 0);
             uint64_t survivor;
-            if (dock_first_active(model, cui_dock_root(model), &survivor))
+            if (dock_first_active(model, cui_dock_root(model), &survivor, options))
                 cui_focus(ui, cui_dock_tab_id(id, survivor));
             visible_root = cui_dock_root(model);
         }
@@ -1096,11 +1134,11 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
             scene.result.closed_panel = scene.close_key;
             scene.result.closed_count = 1;
             dock_emit(&scene, CUI_DOCK_CLOSED, scene.close_key, node);
-            cui_dock_node_info info;
             uint64_t survivor;
-            if (cui_dock_node_get(model, node, &info) && info.has_active)
-                cui_focus(ui, cui_dock_tab_id(id, info.active_panel));
-            else if (dock_first_active(model, cui_dock_root(model), &survivor))
+            if (cui_dock_displayed_panel(model, node, options.panel_visible,
+                                         options.visibility_user, &survivor))
+                cui_focus(ui, cui_dock_tab_id(id, survivor));
+            else if (dock_first_active(model, cui_dock_root(model), &survivor, options))
                 cui_focus(ui, cui_dock_tab_id(id, survivor));
             cui_invalidate(ui);
         }
@@ -1113,7 +1151,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                 cui_dock_panel_at(model, scene.menu_node, i, &key);
                 const cui_dock_panel *panel = dock_panel_get(&scene, key);
                 if ((scene.keep_active && key == scene.menu_key) || !panel || !panel->closable ||
-                    panel->disabled)
+                    panel->disabled || !dock_panel_visible(scene.options, model, key))
                     continue;
                 if (!dock_allowed(&scene, CUI_DOCK_CLOSED, key, 0, 0, CUI_DOCK_TABS, false)) {
                     scene.result.denied = true;
@@ -1130,7 +1168,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                 for (size_t i = 0; i < count; ++i)
                     dock_emit(&scene, CUI_DOCK_CLOSED, view->keys[i], scene.menu_node);
                 uint64_t survivor;
-                if (dock_first_active(model, cui_dock_root(model), &survivor))
+                if (dock_first_active(model, cui_dock_root(model), &survivor, options))
                     cui_focus(ui, cui_dock_tab_id(id, survivor));
                 cui_invalidate(ui);
             }
@@ -1366,7 +1404,8 @@ static bool dock_workspace_target(dock_workspace_scene *s, cui_dock_transfer_req
     const cui_dock_region_content *source = &s->regions[state->source_region],
                                   *target = &s->regions[destination];
     const cui_dock_panel *panel = dock_region_panel(source, state->drag_key);
-    if (!panel || panel->disabled || !dock_region_ready(source))
+    if (!panel || panel->disabled || !dock_region_ready(source) ||
+        !dock_panel_visible(s->options.view, source->model, state->drag_key))
         return false;
     cui_dock_node source_node, target_node;
     if (!cui_dock_panel_find(source->model, state->drag_key, &source_node, NULL))
@@ -1447,7 +1486,8 @@ static void dock_workspace_events(dock_workspace_scene *s) {
     if (state->dragging) {
         cui_dock_node source;
         const cui_dock_region_content *region = &s->regions[state->source_region];
-        if (!cui_dock_panel_find(region->model, state->drag_key, &source, NULL) ||
+        if (!dock_panel_visible(s->options.view, region->model, state->drag_key) ||
+            !cui_dock_panel_find(region->model, state->drag_key, &source, NULL) ||
             !dock_group_draggable(s->options.view, region->model, source)) {
             if (state->crossed && state->cross_region)
                 dock_workspace_restore_active(s);
@@ -1482,6 +1522,7 @@ static void dock_workspace_events(dock_workspace_scene *s) {
                     const cui_dock_panel *panel = &s->regions[r].panels[p];
                     cui_dock_node source_node;
                     if (!panel->disabled &&
+                        dock_panel_visible(s->options.view, s->regions[r].model, panel->key) &&
                         cui_dock_panel_find(s->regions[r].model, panel->key, &source_node, NULL) &&
                         dock_group_draggable(s->options.view, s->regions[r].model, source_node) &&
                         dock_contains(cui_bounds(s->ui, cui_dock_tab_id(view_id, panel->key)),
@@ -1880,7 +1921,9 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
             for (size_t p = 0; p < regions[3].panel_count; ++p) {
                 const cui_dock_panel *panel = &regions[3].panels[p];
                 cui_id tab = cui_dock_tab_id(cui_dock_region_id(id, CUI_DOCK_BOTTOM), panel->key);
-                if (!panel->disabled && cui_event_target(ui, e) == tab &&
+                if (!panel->disabled &&
+                    dock_panel_visible(options.view, regions[3].model, panel->key) &&
+                    cui_event_target(ui, e) == tab &&
                     cui_dock_panel_find(regions[3].model, panel->key, NULL, NULL)) {
                     state->snapshot.open[2] = true;
                     cui_resizable_clear(&state->resize[2]);
@@ -1928,7 +1971,8 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
             dock_preflight(target->model, cui_dock_root(target->model), &nodes, &panels);
         if (!panel)
             error = CUI_DOCK_NOT_FOUND;
-        else if (panel->disabled || cui_dock_view_zoomed(target->view, NULL))
+        else if (panel->disabled || cui_dock_view_zoomed(target->view, NULL) ||
+                 !dock_panel_visible(options.view, target->model, request->panel))
             error = CUI_DOCK_INVALID;
         else if (nodes + (request->axis == CUI_DOCK_TABS ? 0 : 2) > target->view->node_capacity ||
                  panels + 1 > target->view->panel_capacity)

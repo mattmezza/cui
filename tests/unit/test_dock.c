@@ -417,7 +417,40 @@ static void test_bulk_remove(void) {
            cui_dock_panel_find(d, 1, NULL, NULL));
     cui_dock_destroy(d);
 }
+static bool show_key(void *user, const cui_dock *model, uint64_t key) {
+    assert(model);
+    return key != *(const uint64_t *)user;
+}
+static bool show_none(void *user, const cui_dock *model, uint64_t key) {
+    (void)user;
+    (void)model;
+    (void)key;
+    return false;
+}
+static void test_visibility_queries(void) {
+    cui_dock *model = make();
+    cui_dock_node node = cui_dock_root(model);
+    assert(cui_dock_insert(model, node, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, node, UINT64_MAX, 1) == CUI_DOCK_OK);
+    char before[4096], after[4096];
+    serialize(model, before, sizeof before);
+    uint64_t hidden = 0, displayed = 77;
+    assert(cui_dock_visible_count(model, node, NULL, NULL) == 2);
+    assert(cui_dock_visible_count(model, node, show_key, &hidden) == 1);
+    assert(cui_dock_displayed_panel(model, node, show_key, &hidden, &displayed) &&
+           displayed == UINT64_MAX);
+    assert(!cui_dock_displayed_panel(model, node, show_none, NULL, &displayed) &&
+           displayed == UINT64_MAX);
+    assert(cui_dock_visible_count(model, node, show_none, NULL) == 0);
+    serialize(model, after, sizeof after);
+    assert(!strcmp(before, after));
+    hidden = UINT64_MAX;
+    assert(cui_dock_displayed_panel(model, node, show_key, &hidden, &displayed) && displayed == 0);
+    assert(!cui_dock_displayed_panel(model, 0, show_key, &hidden, &displayed) && displayed == 0);
+    cui_dock_destroy(model);
+}
 int main(void) {
+    test_visibility_queries();
     cui_dock_group_constraints sealed = cui_dock_group_sealed();
     assert(sealed.locked && sealed.unclosable && sealed.preserve_last && !sealed.collapsed);
     cui_dock_group_constraints split = cui_dock_group_in_split(false);

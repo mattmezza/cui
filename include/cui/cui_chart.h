@@ -237,6 +237,10 @@ typedef struct {
     bool custom_x_tick_count;
     bool custom_motion;            /* false preserves legacy defaults; true uses value policy */
     cui_plot_motion_policy motion; /* positive legacy durations override policy durations */
+    /* AUTO/LEGACY preserve manual hover; CURRENT_FRAME uses Core geometry and
+     * immutable pointer visibility. Rejects layout tooltip callbacks. Pure
+     * formatter callbacks/user and state/data/pixels remain live through paint. */
+    cui_plot_interaction_mode interaction_mode;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

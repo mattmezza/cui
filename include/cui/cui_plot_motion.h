@@ -8,6 +8,11 @@
 extern "C" {
 #endif
 typedef enum {
+    CUI_PLOT_INTERACTION_AUTO,
+    CUI_PLOT_INTERACTION_CURRENT_FRAME,
+    CUI_PLOT_INTERACTION_LEGACY
+} cui_plot_interaction_mode;
+typedef enum {
     CUI_PLOT_MOTION_LINEAR,
     CUI_PLOT_MOTION_BEZIER,
     CUI_PLOT_MOTION_QUARTIC_OUT
@@ -47,6 +52,11 @@ typedef struct {
 cui_plot_result cui_plot_motion_follow(cui_context *, cui_id owner, cui_plot_motion_pointer_state *,
                                        cui_plot_spring_policy, double target, bool entering,
                                        cui_plot_spring_value *);
+/* Pure clock seam for paint callbacks. Caller requests a frame when out says so. */
+cui_plot_result cui_plot_motion_follow_at(cui_id, cui_plot_motion_pointer_state *,
+                                          cui_plot_spring_policy, double target, double now,
+                                          bool reduced_motion, bool entering,
+                                          cui_plot_spring_value *);
 #ifdef __cplusplus
 }
 #endif

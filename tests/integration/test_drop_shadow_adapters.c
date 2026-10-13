@@ -18,6 +18,70 @@ static SDL_AssertState SDLCALL stop_assert(const SDL_AssertData *data, void *use
     fprintf(stderr, "SDL assertion: %s\n", data->condition);
     return SDL_ASSERTION_ABORT;
 }
+/* GNU/LLVM native fixture wrappers: capture before the real presentation.
+ * Post-Present accelerated backbuffer pixels have no preservation contract. */
+static SDL_Renderer *capture_renderer;
+static SDL_Surface *completed_capture;
+static unsigned presents, clears, draws;
+bool __real_SDL_RenderPresent(SDL_Renderer *renderer);
+bool __real_SDL_RenderClear(SDL_Renderer *renderer);
+bool __real_SDL_RenderTexture(SDL_Renderer *renderer, SDL_Texture *texture, const SDL_FRect *source,
+                              const SDL_FRect *destination);
+bool __real_SDL_RenderFillRect(SDL_Renderer *renderer, const SDL_FRect *rect);
+bool __wrap_SDL_RenderClear(SDL_Renderer *renderer) {
+    if (renderer == capture_renderer)
+        clears++;
+    return __real_SDL_RenderClear(renderer);
+}
+bool __wrap_SDL_RenderTexture(SDL_Renderer *renderer, SDL_Texture *texture, const SDL_FRect *source,
+                              const SDL_FRect *destination) {
+    if (renderer == capture_renderer)
+        draws++;
+    return __real_SDL_RenderTexture(renderer, texture, source, destination);
+}
+bool __wrap_SDL_RenderFillRect(SDL_Renderer *renderer, const SDL_FRect *rect) {
+    if (renderer == capture_renderer)
+        draws++;
+    return __real_SDL_RenderFillRect(renderer, rect);
+}
+bool __wrap_SDL_RenderPresent(SDL_Renderer *renderer) {
+    if (renderer != capture_renderer)
+        return __real_SDL_RenderPresent(renderer);
+    SDL_Surface *surface = SDL_RenderReadPixels(renderer, NULL);
+    assert(surface);
+    SDL_Surface *rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+    SDL_DestroySurface(surface);
+    assert(rgba);
+    SDL_DestroySurface(completed_capture);
+    completed_capture = rgba;
+    presents++;
+    bool ok = __real_SDL_RenderPresent(renderer);
+    assert(ok);
+    /* Diagnostic only: intentionally do not assert post-Present pixel values. */
+    surface = SDL_RenderReadPixels(renderer, NULL);
+    SDL_Surface *after = surface ? SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32) : NULL;
+    float sx, sy;
+    assert(SDL_GetRenderScale(renderer, &sx, &sy));
+    unsigned x = (unsigned)(18 * sx), y = (unsigned)(28 * sy);
+    if (x < (unsigned)rgba->w && y < (unsigned)rgba->h) {
+        const unsigned char *before =
+            (unsigned char *)rgba->pixels + (size_t)y * rgba->pitch + x * 4;
+        if (after && x < (unsigned)after->w && y < (unsigned)after->h) {
+            const unsigned char *post =
+                (unsigned char *)after->pixels + (size_t)y * after->pitch + x * 4;
+            printf("SDL scale %.0f pre/post-Present RGBA: %u,%u,%u,%u / %u,%u,%u,%u\n", sx,
+                   before[0], before[1], before[2], before[3], post[0], post[1], post[2], post[3]);
+        } else
+            puts("SDL post-Present readback unavailable (diagnostic only)");
+    }
+    SDL_DestroySurface(after);
+    SDL_DestroySurface(surface);
+    return ok;
+}
+static SDL_Surface *last_completed(SDL_Renderer *renderer) {
+    assert(renderer == capture_renderer && completed_capture);
+    return SDL_DuplicateSurface(completed_capture);
+}
 static cui_draw_command commands[4];
 static cui_draw_list list = {commands, 4, 64, 64};
 static void setup(void) {
@@ -104,11 +168,13 @@ static void sdl_renderer(void) {
     assert(window);
     SDL_Renderer *renderer = SDL_GetRenderer(window);
     assert(renderer);
+    capture_renderer = renderer;
+    printf("SDL Renderer driver: %s\n", cui_sdl3_driver(r));
     for (unsigned scale = 1; scale <= 2; scale++) {
         printf("SDL scale%u\n", scale);
         assert(SDL_SetRenderScale(renderer, (float)scale, (float)scale));
         assert(cui_sdl3_render(r, &list, (cui_color){255, 255, 255, 255}));
-        SDL_Surface *surface = SDL_RenderReadPixels(renderer, NULL);
+        SDL_Surface *surface = last_completed(renderer);
         assert(surface);
         SDL_Surface *rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
         assert(rgba);
@@ -132,7 +198,7 @@ static void sdl_renderer(void) {
     cui_draw_command mask[6];
     cui_draw_list clipped = masked(mask, 64, 64);
     assert(cui_sdl3_render(r, &clipped, (cui_color){255, 255, 255, 255}));
-    SDL_Surface *capture = SDL_RenderReadPixels(renderer, NULL);
+    SDL_Surface *capture = last_completed(renderer);
     assert(capture);
     SDL_Surface *rgba = SDL_ConvertSurface(capture, SDL_PIXELFORMAT_RGBA32);
     assert(rgba);
@@ -146,8 +212,10 @@ static void sdl_renderer(void) {
     SDL_DestroySurface(rgba);
     SDL_DestroySurface(capture);
     assert(SDL_SetRenderScale(renderer, 1, 2));
+    unsigned old_presents = presents, old_clears = clears, old_draws = draws;
     assert(!cui_sdl3_render(r, &list, (cui_color){0}));
-    capture = SDL_RenderReadPixels(renderer, NULL);
+    assert(presents == old_presents && clears == old_clears && draws == old_draws);
+    capture = last_completed(renderer);
     assert(capture);
     rgba = SDL_ConvertSurface(capture, SDL_PIXELFORMAT_RGBA32);
     assert(rgba && (size_t)rgba->w * rgba->h * 4 == old_bytes);
@@ -175,7 +243,7 @@ static void sdl_renderer(void) {
     }
     cui_draw_list ordinary = {images, 65, 64, 64};
     assert(cui_sdl3_render(r, &ordinary, (cui_color){255, 255, 255, 255}));
-    capture = SDL_RenderReadPixels(renderer, NULL);
+    capture = last_completed(renderer);
     assert(capture);
     rgba = SDL_ConvertSurface(capture, SDL_PIXELFORMAT_RGBA32);
     assert(rgba);
@@ -183,6 +251,9 @@ static void sdl_renderer(void) {
     assert(last[0] == 64 && last[1] == 100 && last[2] == 200 && last[3] == 255);
     SDL_DestroySurface(rgba);
     SDL_DestroySurface(capture);
+    SDL_DestroySurface(completed_capture);
+    completed_capture = NULL;
+    capture_renderer = NULL;
     cui_sdl3_destroy(r);
     puts("actual SDL Renderer shadow readback scales1/2 passed");
 }

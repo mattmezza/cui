@@ -237,6 +237,22 @@ cui_progress_options cui_progress_defaults(void);
  * owns the fraction and clock; reduced motion shows a static centered segment. */
 bool cui_progress_ex(cui_context *, cui_id, const cui_theme *, float fraction, float width,
                      cui_progress_options);
+typedef struct {
+    unsigned char *pixels;
+    size_t capacity;
+    uint64_t revision;
+} cui_progress_circle_state;
+typedef struct {
+    cui_progress_options progress;
+    float diameter, raster_scale; /* Zero diameter uses8/12/16/20px by control size. */
+} cui_progress_circle_options;
+cui_progress_circle_options cui_progress_circle_defaults(void);
+/* Caller owns pixel storage; no resource allocation. Returns animation demand.
+ * Optional child callback composes centered content. Invalid arguments submit
+ * no UI, do not invoke children and preserve motion/buffer/state. */
+bool cui_progress_circle(cui_context *, cui_id, const cui_theme *, float fraction,
+                         cui_progress_circle_state *, cui_progress_circle_options,
+                         cui_button_content_fn, void *user);
 void cui_progress(cui_context *, cui_id, const cui_theme *, float fraction, float width);
 void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #ifdef __cplusplus

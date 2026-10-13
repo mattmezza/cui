@@ -28,6 +28,17 @@ typedef struct {
  * preserves the legacy1.6s fixed-width CUI cycle. */
 cui_progress_geometry cui_progress_measure(float fraction, bool indeterminate, bool source_motion,
                                            double now_seconds, bool reduced_motion);
+/* Circle canvas geometry in logical pixels, clockwise from12 o'clock. */
+typedef struct {
+    float diameter, stroke_width, inner_radius, outer_radius, start_angle, end_angle;
+} cui_progress_circle_geometry;
+bool cui_progress_circle_measure(cui_progress_geometry, float diameter,
+                                 cui_progress_circle_geometry *);
+/* Allocation-free4x4 antialiased RGBA raster into caller storage. Diameter1..256,
+ * scale(0,4], at most512px per side. Failure preserves pixels and output.
+ * Pixels must remain alive and unmodified through renderer completion. */
+bool cui_progress_circle_raster(cui_progress_circle_geometry, cui_color, float scale,
+                                unsigned char *pixels, size_t capacity, cui_bitmap *);
 /* Submit inside a box with this id; paints nothing. Controlled normalized
  * fraction, numeric0..1 semantics, indeterminate busy/unknown value and no focus. */
 float cui_base_progress(cui_context *, cui_id, cui_str name, float fraction, bool indeterminate);

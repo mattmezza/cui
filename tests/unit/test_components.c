@@ -953,6 +953,58 @@ static void test_badge_variants(void) {
     assert(calls == prior && list.count == 0);
     cui_destroy(ui);
 }
+static void circle_child(cui_context *ui, void *user) {
+    unsigned *calls = user;
+    ++*calls;
+    cui_text(ui, cui_string("50"), 10, (cui_color){255, 255, 255, 255});
+}
+static void test_progress_circle(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    cui_theme theme = cui_theme_light();
+    unsigned char pixels[80 * 80 * 4];
+    cui_progress_circle_state state = {pixels, sizeof pixels, 0};
+    cui_progress_circle_options options = cui_progress_circle_defaults();
+    const float sizes[] = {16, 12, 20, 8};
+    unsigned calls = 0;
+    for (unsigned i = 0; i < 4; i++) {
+        options.progress.size = (cui_control_size)i;
+        assert(cui_begin_frame(ui, 300, 200, 0));
+        assert(!cui_progress_circle(ui, 100, &theme, .5f, &state, options, NULL, NULL));
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_bounds(ui, 100).w == sizes[i] && cui_bounds(ui, 100).h == sizes[i]);
+        bool image = false;
+        for (size_t j = 0; j < draw.count; j++)
+            if (draw.commands[j].type == CUI_DRAW_IMAGE)
+                image = true;
+        assert(image && cui_last_error(ui) == CUI_OK);
+        size_t count = 0;
+        const cui_semantic *semantic = cui_semantics(ui, &count);
+        assert(count == 1 && semantic[0].role == CUI_ROLE_PROGRESSBAR && semantic[0].value == .5f);
+    }
+    options.diameter = 40;
+    options.progress.indeterminate = true;
+    options.progress.now_seconds = .25;
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    assert(cui_progress_circle(ui, 100, &theme, .5f, &state, options, circle_child, &calls));
+    cui_end_frame(ui);
+    assert(calls == 1);
+    options.progress.reduced_motion = true;
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    assert(!cui_progress_circle(ui, 100, &theme, .5f, &state, options, NULL, NULL));
+    cui_end_frame(ui);
+    cui_progress_motion motion = {0};
+    options.progress.indeterminate = false;
+    options.progress.motion = &motion;
+    options.progress.reduced_motion = false;
+    state.capacity = 1;
+    cui_progress_motion old = motion;
+    uint64_t revision = state.revision;
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    assert(!cui_progress_circle(ui, 100, &theme, 1, &state, options, circle_child, &calls));
+    assert(cui_end_frame(ui).count == 0 && calls == 1 && state.revision == revision &&
+           !memcmp(&motion, &old, sizeof old));
+    cui_destroy(ui);
+}
 static void test_progress_source_style(void) {
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 80});
     cui_theme theme = cui_theme_light();
@@ -1173,6 +1225,7 @@ int main(void) {
     design_scale();
     test_badge_variants();
     test_progress_source_style();
+    test_progress_circle();
     test_progress_motion();
     test_button_hover_and_disabled_paint();
     test_button_paint_composition();

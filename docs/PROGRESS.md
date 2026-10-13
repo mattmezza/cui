@@ -67,3 +67,34 @@ The quadratic easing was checked against its pinned `gpui-pre 0.3.8` dependency
 No engine or runtime dependency is added. Base and styled tests cover geometry,
 cycle boundaries, reduced motion, colors/sizes, reversal continuity, clock
 regression, invalid-state transactionality and controlled semantics.
+
+## ProgressCircle
+
+`cui_progress_circle` uses the same controlled fraction, semantic behavior,
+caller-owned value motion and source loading cycle. Start from
+`cui_progress_circle_defaults`. Its nested `progress` options supply size,
+name, clock, loading/reduced-motion flags and color; bar height/corner/style
+fields do not affect the ring. Extra-small/small/medium/large diameters are
+8/12/16/20px. A positive `diameter` overrides them up to256px.
+
+Keep a `cui_progress_circle_state` with writable RGBA storage, capacity and a
+zero initial revision. Defaults rasterize at twice logical size; required storage
+is `ceil(diameter*raster_scale)^2*4` bytes. Scale must be greater than zero and at
+most4; output is bounded to512px per side. Pixels are borrowed by the draw list:
+retain them unchanged until rendering completes. Use distinct state/storage for
+simultaneously displayed circles. Insufficient capacity submits no UI, invokes
+no child callback and preserves motion, pixels and revision.
+
+The optional content callback composes children at the ring's center. Use a
+larger custom diameter for a text label. It runs synchronously; its user data and
+borrowed strings follow normal Core frame/render lifetimes. The circle is a
+progress indicator, with no automatic interaction or Tab stop.
+
+`cui_progress_circle_measure` exposes pure annulus/start/end geometry;
+`cui_progress_circle_raster` produces a portable4x4 antialiased RGBA bitmap
+without allocating. Stroke width is `min(diameter*0.15,5)`, with clockwise arcs
+starting at12 o'clock and a20%-alpha track. Transparent/custom colors remain
+explicit. CUI uses its raster sampling rather than GPUI vector paths; the
+reference's0.0001-radian path-closing seam for spans at least half a turn is not
+reproduced. Arbitrary vector/style refinement and child clipping are application
+composition, not automatic source tree reproduction.

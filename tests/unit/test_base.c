@@ -210,7 +210,41 @@ static void editor_composition_routing(void) {
         cui_destroy(ctx);
     }
 }
+static void progress_circle_geometry_and_pixels(void) {
+    cui_progress_circle_geometry g;
+    assert(cui_progress_circle_measure(cui_progress_measure(.25f, false, true, 0, false), 40, &g));
+    assert(g.stroke_width == 5 && g.inner_radius == 15 && g.outer_radius == 20);
+    assert(fabsf(g.end_angle - 1.57079632679f) < .00001f);
+    unsigned char pixels[40 * 40 * 4];
+    memset(pixels, 77, sizeof pixels);
+    cui_bitmap bitmap = {0};
+    assert(cui_progress_circle_raster(g, (cui_color){10, 20, 30, 255}, 1, pixels, sizeof pixels,
+                                      &bitmap));
+    assert(bitmap.width == 40 && bitmap.height == 40 && bitmap.stride == 160);
+    assert(pixels[((19 * 40) + 37) * 4 + 3] > 150);
+    assert(pixels[((20 * 40) + 2) * 4 + 3] == 51);
+    assert(pixels[((20 * 40) + 20) * 4 + 3] == 0);
+    assert(pixels[3] == 0);
+    unsigned char before[sizeof pixels];
+    memcpy(before, pixels, sizeof pixels);
+    cui_bitmap old = bitmap;
+    assert(!cui_progress_circle_raster(g, (cui_color){0}, 1, pixels, 10, &bitmap));
+    assert(!memcmp(before, pixels, sizeof pixels) && !memcmp(&old, &bitmap, sizeof old));
+    g.start_angle = NAN;
+    assert(!cui_progress_circle_raster(g, (cui_color){0}, 1, pixels, sizeof pixels, &bitmap));
+    assert(!memcmp(before, pixels, sizeof pixels));
+    assert(cui_progress_circle_measure(cui_progress_measure(1, false, true, 0, false), 16, &g));
+    assert(cui_progress_circle_raster(g, (cui_color){10, 20, 30, 0}, 2, pixels, sizeof pixels,
+                                      &bitmap));
+    for (size_t j = 3; j < bitmap.stride * bitmap.height; j += 4)
+        assert(pixels[j] == 0);
+    cui_progress_circle_geometry saved = g;
+    assert(
+        !cui_progress_circle_measure((cui_progress_geometry){.start = .9f, .length = .2f}, 16, &g));
+    assert(!memcmp(&saved, &g, sizeof g));
+}
 int main(void) {
+    progress_circle_geometry_and_pixels();
     progress_geometry_and_motion();
     editor_composition_routing();
     editor_navigation_consumption();

@@ -21,6 +21,7 @@ typedef struct {
     uint64_t used;
 } bitmap_entry;
 struct cui_sdl3 {
+    cui_platform_appearance appearance;
     SDL_Window *window;
     SDL_Renderer *renderer;
     cui_font *font;
@@ -35,6 +36,22 @@ struct cui_sdl3 {
     char *clipboard;
     SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
 };
+static cui_system_appearance system_appearance(void) {
+    switch (SDL_GetSystemTheme()) {
+    case SDL_SYSTEM_THEME_LIGHT:
+        return CUI_SYSTEM_APPEARANCE_LIGHT;
+    case SDL_SYSTEM_THEME_DARK:
+        return CUI_SYSTEM_APPEARANCE_DARK;
+    default:
+        return CUI_SYSTEM_APPEARANCE_UNKNOWN;
+    }
+}
+bool cui_sdl3_appearance(cui_sdl3 *s, cui_platform_appearance *out) {
+    if (!s || !out)
+        return false;
+    *out = s->appearance;
+    return true;
+}
 cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
         return NULL;
@@ -53,6 +70,7 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     }
     SDL_SetRenderDrawBlendMode(s->renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderVSync(s->renderer, 1);
+    s->appearance = (cui_platform_appearance){system_appearance(), CUI_APPEARANCE_SYSTEM_THEME, 1};
     SDL_StartTextInput(s->window);
     return s;
 }
@@ -160,6 +178,13 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
         cui_event v = {0};
         bool send = true;
         switch (e.type) {
+        case SDL_EVENT_SYSTEM_THEME_CHANGED:
+            s->appearance.appearance = system_appearance();
+            if (s->appearance.revision != UINT64_MAX)
+                s->appearance.revision++;
+            cui_invalidate(ui);
+            send = false;
+            break;
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             s->quit = true;

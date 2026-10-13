@@ -77,19 +77,21 @@ def run(a, directory):
 
     def message():
         bitmaps=a.page.evaluate(BITMAPS)
-        assert len(bitmaps)==2 and all(all(c[3]==0 for c in b['corners']) for b in bitmaps)
-        assert 'Can you review the release notes?' in a.texts()
-        assert "Looks good. I'll ship the update." in a.texts()
-        assert 'Delivered · 09:30' in a.texts() and '09:32 · Read' in a.texts()
+        assert len(bitmaps)==2 and all(all(c[3]==0 for c in b['corners']) for b in bitmaps), f'Portraits: {bitmaps}'
+        assert 'Can you review the release notes?' in a.texts(), f'Incoming body: {a.texts()}'
+        assert "Looks good. I'll ship the update." in a.texts(), f'Outgoing body: {a.texts()}'
+        assert 'Delivered · 09:30' in a.texts() and '09:32 · Read' in a.texts(), f'Delivery: {a.texts()}'
         assert 'A second message body' not in a.texts() and 'Workspace is ready.' not in a.texts()
-        assert len([s for s in a.snapshot() if s['f'][0]==37])==2
+        assert len([s for s in a.snapshot() if s['f'][0]==37])==2, f'Message semantics: {a.snapshot()}'
         before=a.page.evaluate('cuiGallery.exports.gallery_message_actions()')
         a.tap(a.target('Like message',1))
-        assert a.page.evaluate('cuiGallery.exports.gallery_message_actions()')==before+1
-        assert 'Liked' in a.texts()
+        a.page.wait_for_function('(expected)=>cuiGallery.exports.gallery_message_actions()===expected',arg=before+1)
+        assert a.page.evaluate('cuiGallery.exports.gallery_message_actions()')==before+1, 'Like tap did not invoke exactly one action'
+        assert 'Liked' in a.texts(), f'Like result: {a.texts()}'
         checkbox=a.target('Acknowledge message',2)
         checked=checkbox['f'][6];a.tap(checkbox)
-        assert a.value(checkbox,6)!=checked
+        a.page.wait_for_function('''({id,checked})=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_semantic_count()},(_,i)=>i).some(i=>String(e.gallery_semantic_id(i))===id&&e.gallery_semantic(i,6)!==checked);}''',arg={'id':checkbox['id'],'checked':checked})
+        assert a.value(checkbox,6)!=checked, 'Acknowledge tap did not toggle checked state'
     a.case('Message','compact incoming/outgoing portraits, timestamp/delivery and actual reaction callbacks',message)
 
     def message_disabled():

@@ -32,6 +32,8 @@ jobs:
         run: uv run tests/web/test_touch.py
       - name: Verify native IME composition in built-in text consumers
         run: uv run tests/web/test_ime.py
+      - name: Verify live Input whole-value acceptance and guide links
+        run: uv run tests/web/test_input_acceptance_gallery.py
       - name: Verify numeric OTP and combobox native composition
         run: uv run tests/web/test_ime_additional.py
       - name: Audit representative touch behavior across the catalog
@@ -46,6 +48,8 @@ jobs:
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions
         run: uv run tests/web/test_visual_regressions.py
+      - name: Verify Tabs nested wheel and touch event ownership
+        run: uv run tests/web/test_tabs_scroll_chaining.py
       - name: Verify expanded design sizes and tab overflow
         run: uv run tests/web/test_design_sizes.py
       - name: Verify localized date and year selection

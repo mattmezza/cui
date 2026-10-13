@@ -250,6 +250,7 @@ typedef struct {
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
     cui_edit_accept_fn validate;
     void *validate_user; /* See cui_edit_apply_checked: synchronous, nonretaining. */
+    cui_edit_normalization normalization; /* Zero preserves legacy CR/LF rejection. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
@@ -2252,6 +2253,7 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
                                  .clipboard = options.clipboard,
                                  .validate = options.validate,
                                  .validate_user = options.validate_user,
+                                 .normalization = options.normalization,
                                  .delegate_up_down = options.delegate_up_down,
                                  .hit_test = multiline ? NULL : cui_input_cached_hit_test,
                                  .hit_test_user = &cached_hit});

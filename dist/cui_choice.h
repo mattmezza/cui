@@ -795,7 +795,11 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
             if (!isfinite(after))
                 after = delta < 0 ? scroll->maximum : 0;
             scroll->offset = fminf(scroll->maximum, fmaxf(0, after));
-            scroll->changed |= before != scroll->offset;
+            if (before != scroll->offset) {
+                scroll->changed = true;
+                cui_consume_event(ui, e);
+            } else
+                cui_defer_scroll_event(ui, e, target);
         }
         if (scroll->changed)
             cui_invalidate(ui);

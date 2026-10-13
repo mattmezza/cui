@@ -1537,6 +1537,14 @@ static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
 static cui_input_state input_state;
 static int input_mode;
+static bool input_rejected;
+static bool gallery_name_acceptance(void *user, cui_str value) {
+    (void)user;
+    for (size_t i = 0; i < value.length; i++)
+        if (value.data[i] >= '0' && value.data[i] <= '9')
+            return false;
+    return true;
+}
 static int form_mode, form_submissions;
 static int group_mode, group_actions;
 static void gallery_group_action_content(cui_context *ui, const cui_theme *theme, void *user,
@@ -3362,17 +3370,31 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_slider(ui, cui_id_from(ui, "slider"), &t, cui_string("Volume"), &slider, 0, 100, 1,
                    disabled);
         break;
-    case 6:
-        cui_input_ex(ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit,
-                     &input_state,
-                     (cui_input_options){.disabled = disabled,
-                                         .readonly = input_mode == 1,
-                                         .required = input_mode == 2,
-                                         .invalid = input_mode == 2,
-                                         .size = (cui_input_size)control_size,
-                                         .design_size = design_size,
-                                         .width = width > 360 ? 280 : width - 48});
+    case 6: {
+        cui_input_result result = cui_input_ex(
+            ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit, &input_state,
+            (cui_input_options){.disabled = disabled,
+                                .readonly = input_mode == 1,
+                                .validate = input_mode == 3 ? gallery_name_acceptance : NULL,
+                                .normalization = input_mode == 3
+                                                     ? CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF
+                                                     : CUI_EDIT_NORMALIZE_NONE,
+                                .required = input_mode == 2,
+                                .invalid = input_mode == 2,
+                                .size = (cui_input_size)control_size,
+                                .design_size = design_size,
+                                .width = width > 360 ? 280 : width - 48});
+        if (result.rejected)
+            input_rejected = true;
+        else if (result.changed)
+            input_rejected = false;
+        if (input_mode == 3)
+            cui_label(ui, &t,
+                      cui_string(input_rejected
+                                     ? "Number rejected; your name is unchanged."
+                                     : "Names can contain Unicode text, but no digits."));
         break;
+    }
     case 60: {
         message_demo_disabled = disabled != 0;
         cui_message_body body = {
@@ -5542,6 +5564,10 @@ int gallery_alert_attempts(void) {
     return alert_attempts;
 }
 void gallery_input_mode(int mode) {
+    if (mode < 0 || mode > 3)
+        mode = 0;
+    if (input_mode != mode)
+        input_rejected = false;
     input_mode = mode;
 }
 unsigned gallery_input_selection(unsigned field) {

@@ -12,6 +12,24 @@ def repository_key(path, root=ROOT):
     return path.relative_to(root).as_posix()
 
 
+def public_header_closure(headers, entry):
+    """Only declarations reachable through the documented public include."""
+    seen = set()
+    text = []
+    pending = [entry]
+    while pending:
+        path = pending.pop()
+        if path in seen or path not in headers:
+            continue
+        seen.add(path)
+        source = headers[path]
+        text.append(source)
+        for include in re.findall(r'^\s*#\s*include\s*"([^"]+)"', source, re.M):
+            local = str(pathlib.PurePosixPath(path).parent / include)
+            pending.append(local if local in headers else 'include/' + include)
+    return '\n'.join(text)
+
+
 class ComponentUsageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -20,6 +38,14 @@ class ComponentUsageTests(unittest.TestCase):
         cls.entries = cls.data['components']
         cls.headers = {repository_key(p): p.read_text(encoding='utf-8') for p in (ROOT / 'include/cui').glob('*.h')}
         cls.all_headers = '\n'.join(cls.headers.values())
+
+    def test_callback_visibility_follows_public_includes(self):
+        headers = {'include/cui/top.h': '#include "nested.h"',
+                   'include/cui/nested.h': '#include "cui/top.h"\ntypedef bool (*visible)(void);',
+                   'include/cui/unrelated.h': 'typedef bool (*hidden)(void);'}
+        closure = public_header_closure(headers, 'include/cui/top.h')
+        self.assertIn('(*visible)', closure)
+        self.assertNotIn('(*hidden)', closure)
 
     def test_repository_keys_are_portable(self):
         for kind, root in [(pathlib.PureWindowsPath, 'C:/work/cui'),
@@ -45,12 +71,13 @@ class ComponentUsageTests(unittest.TestCase):
                 for typename in entry['state_types']:
                     # A real typedef or named struct, not a guessed component name.
                     self.assertRegex(self.all_headers, r'(?:}\s*|\bstruct\s+)' + re.escape(typename) + r'\b')
+                callback_header = public_header_closure(self.headers, entry['public_header'])
                 for callback in entry['callback_symbols']:
-                    self.assertRegex(header, r'\b' + re.escape(callback) + r'\b')
+                    self.assertRegex(callback_header, r'\b' + re.escape(callback) + r'\b')
                     if callback.startswith('cui_'):
-                        self.assertRegex(header, r'\(\*' + re.escape(callback) + r'\)')
+                        self.assertRegex(callback_header, r'\(\*' + re.escape(callback) + r'\)')
                     else:
-                        self.assertRegex(header, r'\(\*' + re.escape(callback) + r'\)')
+                        self.assertRegex(callback_header, r'\(\*' + re.escape(callback) + r'\)')
                 for doc in entry['docs']:
                     self.assertTrue((ROOT / doc).is_file(), doc)
                 # Every C identifier cited in prose must exist in a public header.

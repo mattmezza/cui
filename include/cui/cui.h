@@ -583,6 +583,12 @@ typedef struct {
     int16_t deferred_layer; /* Zero inherits owner; other layers must not precede owner. */
 } cui_prepaint_options;
 bool cui_set_prepaint(cui_context *, cui_prepaint_options);
+/* Atomically copy payload followed by tail into one aligned frame allocation.
+ * Callback tail starts at copied + original payload_bytes. Both spans may be
+ * empty; nonempty spans require valid pointers. No contained pointer is copied
+ * recursively. Overflow/capacity failure publishes no registration or budget. */
+bool cui_set_prepaint_parts(cui_context *, cui_prepaint_options, const void *tail,
+                            size_t tail_bytes);
 /* Explicit passive barrier, including inert painted overlays; false clears it.
  * Layout-only nodes never participate. Does not alter input dispatch. */
 bool cui_set_hover_hitbox(cui_context *, bool enabled);

@@ -78,7 +78,33 @@ owner and scrollbar keyboard scrolling, disabled behavior, invalid-input state
 preservation, empty models, nested deferred scroll translation, large local row
 positions, and software clipping. The frozen GPUI Kit reference also supports
 intrinsic cross-axis measurement, sizing behaviors, deferred scroll strategies,
-and richer scroll-handle integration. CUI requires explicit cross extents and
-precomputed heights; it does not automatically measure a selected row, implement
-all upstream sizing modes, or guarantee focus restoration for virtualized children.
+and richer scroll-handle integration. CUI requires precomputed main extents;
+selected-row intrinsic measurement and Auto/Infer sizing are described below.
+It does not automatically measure render callbacks or guarantee focus restoration
+for virtualized children.
 This adapter is a tested vertical slice, not a claim of full VirtualList parity.
+
+Intrinsic cross sizing and Infer sizing
+-------------------------------------
+
+The frozen GPUI implementation measures one selected row, rather than every
+row, to obtain the cross extent. The styled CUI adapter now supports this via
+`options.measure`: a host callback receives the clamped `measure_index`, stable
+key, and previous vertical viewport width (zero means unconstrained). Horizontal
+measurement is unconstrained. It returns an intrinsic `cui_size`; the model
+continues to own every main-axis item extent. Empty lists skip measurement.
+Explicit content cross dimensions override the measured cross dimension.
+Measurement runs once each styled draw, before any scroll state mutation.
+Failure or nonfinite/negative measured dimensions rejects that draw. Hosts must
+keep model keys/heights unchanged during measurement as during rendering.
+
+`CUI_VIRTUAL_SIZE_INFER` resolves each viewport dimension from explicit scroll
+width/height, then `available`, then intrinsic content extent. An otherwise empty
+axis uses a one-pixel minimum because the scroll API reserves zero for its
+legacy default. `CUI_VIRTUAL_SIZE_AUTO` remains the zero/default behavior with
+320 by 240 fallback dimensions. The drawing-free reducer can use Infer with
+explicit content cross dimensions; it does not invoke host measurement. This is
+explicit host measurement, not automatic offscreen measurement of render rows.
+The adapter does not reproduce the upstream horizontal Infer implementation's
+use of known width when resolving height: explicit width and height remain
+independent.

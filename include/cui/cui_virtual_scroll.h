@@ -6,14 +6,27 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef enum { CUI_VIRTUAL_SIZE_AUTO, CUI_VIRTUAL_SIZE_INFER } cui_virtual_sizing;
+/* Host intrinsic measurement; available_cross is zero when unconstrained.
+ * The selected index is clamped. Return false to reject the frame. */
+typedef bool (*cui_virtual_measure_item_fn)(void *user, size_t index, uint64_t key,
+                                            float available_cross, cui_size *output);
 typedef struct {
     cui_scroll_options scroll;
     size_t overscan;
     bool horizontal; /* Model heights become item widths for horizontal lists. */
     bool no_item_semantics;
+    cui_virtual_sizing sizing;
+    /* Infer: explicit scroll dimensions, then available dimensions, then
+     * model main extent / measured cross extent. Zero means unspecified. */
+    cui_size available;
+    size_t measure_index;
+    cui_virtual_measure_item_fn measure;
+    void *measure_user;
 } cui_virtual_widget_options;
 typedef struct {
     cui_scroll_state scroll;
+    cui_size last_viewport;
 } cui_virtual_widget_state;
 typedef struct {
     cui_virtual_result error;

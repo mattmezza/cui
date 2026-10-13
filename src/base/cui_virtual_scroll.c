@@ -9,6 +9,9 @@ bool cui_virtual_widget_scroll_options(const cui_virtual_list *v, cui_virtual_wi
         o.scroll.content_width < 0 || !isfinite(o.scroll.content_height) ||
         o.scroll.content_height < 0 || !isfinite(o.scroll.bar_thickness) ||
         o.scroll.bar_thickness < 0 || !isfinite(o.scroll.wheel_step) || o.scroll.wheel_step < 0 ||
+        !isfinite(o.available.width) || o.available.width < 0 || !isfinite(o.available.height) ||
+        o.available.height < 0 ||
+        (o.sizing != CUI_VIRTUAL_SIZE_AUTO && o.sizing != CUI_VIRTUAL_SIZE_INFER) ||
         o.scroll.gap != 0 || cui_virtual_total(v) > FLT_MAX / 4)
         return false;
     cui_scroll_options resolved = o.scroll;
@@ -19,6 +22,14 @@ bool cui_virtual_widget_scroll_options(const cui_virtual_list *v, cui_virtual_wi
     } else {
         resolved.vertical = true;
         resolved.content_height = (float)cui_virtual_total(v);
+    }
+    if (o.sizing == CUI_VIRTUAL_SIZE_INFER) {
+        if (resolved.width == 0)
+            resolved.width =
+                o.available.width > 0 ? o.available.width : fmaxf(1, resolved.content_width);
+        if (resolved.height == 0)
+            resolved.height =
+                o.available.height > 0 ? o.available.height : fmaxf(1, resolved.content_height);
     }
     *output = resolved;
     return true;
@@ -80,6 +91,7 @@ cui_virtual_widget_result cui_base_virtual_list(cui_context *ui, cui_id id,
             cui_set_semantic_details(ui, id, details);
             break;
         }
+    s->last_viewport = (cui_size){g.viewport.width, g.viewport.height};
     out.error = CUI_VIRTUAL_OK;
     out.view = cui_virtual_viewport(v, *value, viewport, o.overscan);
     out.scroll_changed = before_x != s->scroll.x || before_y != s->scroll.y;

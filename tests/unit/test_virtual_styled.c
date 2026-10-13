@@ -243,7 +243,69 @@ static void cross_axis_and_large_offsets(void) {
     cui_destroy(ui);
     cui_virtual_destroy(v);
 }
+typedef struct {
+    size_t calls, index;
+    float available;
+    bool fail;
+} measure_probe;
+static bool measure(void *user, size_t index, uint64_t key, float available, cui_size *out) {
+    measure_probe *p = user;
+    ++p->calls;
+    p->index = index;
+    p->available = available;
+    assert(key == 107);
+    *out = (cui_size){80, 35};
+    return !p->fail;
+}
+static void intrinsic_sizing(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_theme t = cui_theme_light();
+    cui_virtual_list *v = model();
+    cui_virtual_widget_state state = {0};
+    row_probe rows = {0};
+    measure_probe p = {0};
+    cui_virtual_widget_options o = {.scroll = {.hide_scrollbars = true},
+                                    .sizing = CUI_VIRTUAL_SIZE_INFER,
+                                    .measure = measure,
+                                    .measure_user = &p,
+                                    .measure_index = 999};
+    assert(frame(ui, &t, v, &state, o, &rows, NULL).error == CUI_VIRTUAL_OK);
+    cui_rect bounds = cui_bounds(ui, 10);
+    assert(bounds.w == 80 && bounds.h == 200 && rows.calls == 8);
+    assert(p.calls == 1 && p.index == 7 && p.available == 0);
+    o.available = (cui_size){100, 60};
+    assert(frame(ui, &t, v, &state, o, &rows, NULL).error == CUI_VIRTUAL_OK);
+    bounds = cui_bounds(ui, 10);
+    assert(bounds.w == 100 && bounds.h == 60 && p.available == 80);
+    o.scroll.width = 120;
+    o.scroll.height = 40;
+    frame(ui, &t, v, &state, o, &rows, NULL);
+    bounds = cui_bounds(ui, 10);
+    assert(bounds.w == 120 && bounds.h == 40 && p.available == 100);
+    o.horizontal = true;
+    o.scroll.width = o.scroll.height = 0;
+    o.available = (cui_size){0};
+    frame(ui, &t, v, &state, o, &rows, NULL);
+    bounds = cui_bounds(ui, 10);
+    assert(bounds.w == 200 && bounds.h == 35 && p.available == 0);
+    cui_virtual_widget_state saved = state;
+    p.fail = true;
+    assert(frame(ui, &t, v, &state, o, &rows, NULL).error == CUI_VIRTUAL_INVALID);
+    assert(!memcmp(&state, &saved, sizeof(state)) && rows.calls == 0);
+    p.fail = false;
+    o.available.width = NAN;
+    size_t calls = p.calls;
+    assert(frame(ui, &t, v, &state, o, &rows, NULL).error == CUI_VIRTUAL_INVALID);
+    assert(p.calls == calls && !memcmp(&state, &saved, sizeof(state)));
+    o.available.width = 0;
+    assert(cui_virtual_rebuild(v, NULL, NULL, 0) == CUI_VIRTUAL_OK);
+    assert(frame(ui, &t, v, &state, o, &rows, NULL).error == CUI_VIRTUAL_OK);
+    assert(p.calls == calls && rows.calls == 0);
+    cui_destroy(ui);
+    cui_virtual_destroy(v);
+}
 int main(void) {
+    intrinsic_sizing();
     cross_axis_and_large_offsets();
     layout_and_wheel();
     keyboard_and_scrollbars();

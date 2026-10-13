@@ -11,6 +11,26 @@ cui_virtual_widget_result cui_virtual_list_draw(cui_context *ui, cui_id id, cons
     cui_scroll_options scroll;
     if (!t || !render || !cui_virtual_widget_scroll_options(v, o, &scroll))
         return out;
+    if (!ui || !id || !s)
+        return out;
+    if (o.measure && cui_virtual_count(v)) {
+        size_t index =
+            o.measure_index < cui_virtual_count(v) ? o.measure_index : cui_virtual_count(v) - 1;
+        uint64_t key;
+        cui_size measured = {0};
+        if (!cui_virtual_key(v, index, &key) ||
+            !o.measure(o.measure_user, index, key, o.horizontal ? 0 : s->last_viewport.width,
+                       &measured) ||
+            !isfinite(measured.width) || measured.width < 0 || !isfinite(measured.height) ||
+            measured.height < 0)
+            return out;
+        if (o.horizontal && o.scroll.content_height == 0)
+            o.scroll.content_height = measured.height;
+        if (!o.horizontal && o.scroll.content_width == 0)
+            o.scroll.content_width = measured.width;
+        if (!cui_virtual_widget_scroll_options(v, o, &scroll))
+            return out;
+    }
     out = cui_base_virtual_list(ui, id, v, s, o);
     if (out.error != CUI_VIRTUAL_OK)
         return out;

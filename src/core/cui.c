@@ -2088,9 +2088,21 @@ static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderComman
     }
     return bounds;
 }
+/* MSVC's C11 stddef.h does not declare max_align_t. These scalar members
+ * cover its fundamental payload alignments without adding a public ABI type. */
+#if defined(_MSC_VER) && !defined(__cplusplus)
+typedef union {
+    long double real;
+    long long integer;
+    void *pointer;
+    void (*function)(void);
+} cui_core_max_alignment;
+#endif
 static void *cui_core_frame_copy(cui_context *ui, const void *data, size_t bytes) {
 #if defined(__cplusplus)
     size_t alignment = alignof(max_align_t);
+#elif defined(_MSC_VER)
+    size_t alignment = _Alignof(cui_core_max_alignment);
 #else
     size_t alignment = _Alignof(max_align_t);
 #endif

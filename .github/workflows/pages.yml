@@ -59,6 +59,8 @@ jobs:
         run: uv run tests/web/test_avatar_message.py
       - name: Verify shared scrollbar appearance and idle hiding
         run: uv run tests/web/test_scrollbar_appearance.py
+      - name: Verify controlled radio groups and touch cancellation
+        run: uv run tests/web/test_radio_group.py
       - name: Upload static gallery
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

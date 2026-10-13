@@ -18,6 +18,7 @@ ZIG_VERSION = "0.16.0"
 WASMTIME_VERSION = "49.0.0"
 SOURCES = (
     "src/core/cui.c",
+    "src/base/cui_radio_group.c", "src/components/cui_radio_group.c",
     "src/effects/cui_effects.c",
     "src/base/cui_base.c",
     "src/base/cui_models.c",
@@ -88,7 +89,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit")
+SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -101,7 +102,7 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
     paths += ["web/touch_page_host.h", "examples/native_starter/app.c", "examples/native_starter/app.h", "examples/native_starter/test_app.c"]
-    paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c"]
+    paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c", "tests/unit/test_radio_group_base.c"]
     paths += [str(path.relative_to(root)) for path in (root / "third_party/sheenbidi").rglob("*") if path.is_file()]
     paths += ["third_party/clay/clay.h", "tests/unit/cui_edit_grapheme_tests.inc", "tests/unit/cui_edit_word_tests.inc"]
     digest = hashlib.sha256()
@@ -217,6 +218,7 @@ def main() -> int:
                 "-o", str(bidi_object)], root)
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("radio_group_base_only", ["tests/unit/test_radio_group_base.c", "src/core/cui.c", "src/base/cui_radio_group.c"], False, [])]
         targets += [("native_starter", ["examples/native_starter/app.c", "examples/native_starter/test_app.c"], True, [])]
         targets += [("bidi", ["tests/unit/test_bidi.c", "src/text/cui_bidi.c"], False,
                      bidi_include + [str(bidi_object)])]

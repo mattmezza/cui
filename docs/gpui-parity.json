@@ -350,15 +350,22 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Named UTF-8 initials fallback, circular themed surface and explicit size tested. Image loading/failure state, avatar groups, custom icon slots and exact typographic centering pending."
+        "Caller-owned bounded RGBA circle/cover cache, source revision updates, named initials and interactive overlapping stacks with overflow, keyboard and touch cancellation are tested. Image acquisition/loading remains host-owned; explicit failure-state transitions, custom icon slots and complete typography/theme variants remain unverified."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "image source and fallback initials",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c",
+            "tests/web/test_avatar_message.py",
+            "docs/AVATAR_MESSAGE_EXAMPLES.md"
+          ],
+          "limitations": [
+            "Host supplies decoded RGBA and persistent cache storage. Async/network loading and native image acquisition are not an Avatar service."
+          ]
         },
         {
           "name": "size variants",
@@ -1595,7 +1602,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending."
+        "Compact incoming/outgoing gallery examples use real photo avatars, headers/body/footer, bounded bubbles and explicit action callbacks. Native/headless/browser checks cover optional avatars and contact scrolling. Built-in Image/TextView/Attachment body variants, inherited font weights, broader style slots and jump-button tooltip/variants remain incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1605,7 +1612,9 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_message.c",
-            "docs/MESSAGE.md"
+            "docs/MESSAGE.md",
+            "tests/web/test_avatar_message.py",
+            "docs/AVATAR_MESSAGE_EXAMPLES.md"
           ]
         },
         {
@@ -1613,7 +1622,9 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_message.c",
-            "docs/MESSAGE.md"
+            "docs/MESSAGE.md",
+            "tests/web/test_avatar_message.py",
+            "docs/AVATAR_MESSAGE_EXAMPLES.md"
           ]
         },
         {
@@ -1621,7 +1632,9 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_message.c",
-            "docs/MESSAGE.md"
+            "docs/MESSAGE.md",
+            "tests/web/test_avatar_message.py",
+            "docs/AVATAR_MESSAGE_EXAMPLES.md"
           ]
         }
       ],
@@ -1974,25 +1987,37 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_components.h",
-      "sample": "gallery/main.c",
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_radio_group.c",
+        "tests/unit/test_radio_group_base.c",
+        "tests/web/test_radio_group.py"
       ],
       "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled checked/unchecked geometry, four sizes, disabled colors, labels, custom content, and keyboard activation tested. Checkbox also exposes mixed state. Spring mark animation, wrapped inherited text styling, tooltip integration and exact pointer focus behavior remain pending; not full parity."
+        "Bounded controlled RadioGroup supplies same-frame single selection, one Tab stop, arrow/Home/End roving, disabled/removal cleanup and collection semantics. Headless/base-only, sanitizer and browser contact tests cover all14 design metrics. Spring marks, richer child composition, integrated tooltip and full styling/OS accessibility acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "group exclusivity and roving focus",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_radio_group.c",
+            "tests/unit/test_radio_group_base.c",
+            "tests/web/test_radio_group.py",
+            "docs/RADIO_GROUP.md"
+          ],
+          "limitations": [
+            "Group callback accepts or rejects synchronously before painting. Stable-ID selection removal remains caller-owned; primitive shared-integer radios retain their compatibility behavior."
+          ]
         },
         {
           "name": "controlled selection",
@@ -2000,10 +2025,14 @@
           "evidence": [
             "docs/validation/control-family-audit-next21.json",
             "tests/unit/test_components.c:test_radio_geometry,test_radio_shared_redraw",
-            "tests/unit/test_base.c"
+            "tests/unit/test_base.c",
+            "tests/unit/test_radio_group.c",
+            "tests/unit/test_radio_group_base.c",
+            "tests/web/test_radio_group.py",
+            "docs/RADIO_GROUP.md"
           ],
           "limitations": [
-            "Shared caller integer changes on Enter/Space; selected activation is a no-op; sibling snapshot converges on redraw, not same-frame reconciliation."
+            "Group callback accepts or rejects synchronously before painting. Stable-ID selection removal remains caller-owned; primitive shared-integer radios retain their compatibility behavior."
           ]
         },
         {
@@ -2012,10 +2041,14 @@
           "evidence": [
             "docs/validation/control-family-audit-next21.json",
             "tests/unit/test_components.c:test_radio_geometry",
-            "tests/unit/test_base.c"
+            "tests/unit/test_base.c",
+            "tests/unit/test_radio_group.c",
+            "tests/unit/test_radio_group_base.c",
+            "tests/web/test_radio_group.py",
+            "docs/RADIO_GROUP.md"
           ],
           "limitations": [
-            "Disabled selected radio styling and keyboard selection tested; group-level disabled/roving semantics remain absent."
+            "Group callback accepts or rejects synchronously before painting. Stable-ID selection removal remains caller-owned; primitive shared-integer radios retain their compatibility behavior."
           ]
         }
       ],

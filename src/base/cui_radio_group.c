@@ -1,13 +1,14 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_radio_group.h"
 #include <math.h>
-static size_t find(const cui_radio_group_item *items, size_t count, cui_id id) {
+static size_t cui_radio_group_find(const cui_radio_group_item *items, size_t count, cui_id id) {
     for (size_t i = 0; i < count; i++)
         if (items[i].id == id)
             return i;
     return count;
 }
-static size_t enabled(const cui_radio_group_item *items, size_t count, size_t from, int direction) {
+static size_t cui_radio_group_enabled(const cui_radio_group_item *items, size_t count, size_t from,
+                                      int direction) {
     for (size_t n = 0; n < count; n++) {
         from = direction > 0 ? (from + 1) % count : (from + count - 1) % count;
         if (!items[from].disabled)
@@ -40,7 +41,8 @@ cui_radio_group_result cui_base_radio_group(cui_context *ui, cui_id id,
             break;
         }
     cui_id focused = cui_focused(ui);
-    size_t active = find(items, count, focused), chosen = find(items, count, *selected);
+    size_t active = cui_radio_group_find(items, count, focused),
+           chosen = cui_radio_group_find(items, count, *selected);
     size_t tab = chosen < count && !items[chosen].disabled ? chosen : first;
     if (!o.disabled && first < count &&
         (active < count || (state->had_focus && (!focused || focused == state->focused)))) {
@@ -57,8 +59,8 @@ cui_radio_group_result cui_base_radio_group(cui_context *ui, cui_id id,
     for (size_t e = 0; e < event_count; e++) {
         if (cui_event_consumed(ui, e))
             continue;
-        size_t target = find(items, count, cui_event_target(ui, e));
-        size_t activate = find(items, count, cui_event_activation(ui, e));
+        size_t target = cui_radio_group_find(items, count, cui_event_target(ui, e));
+        size_t activate = cui_radio_group_find(items, count, cui_event_activation(ui, e));
         size_t request = count;
         if (activate < count) {
             cui_cancel_event_activation(ui, e);
@@ -67,17 +69,17 @@ cui_radio_group_result cui_base_radio_group(cui_context *ui, cui_id id,
                 request = activate;
         } else if (!o.disabled && target < count && !items[target].disabled &&
                    events[e].type == CUI_EVENT_KEY_DOWN) {
-            size_t current = find(items, count, cui_focused(ui));
+            size_t current = cui_radio_group_find(items, count, cui_focused(ui));
             if (current < count && !items[current].disabled)
                 target = current;
             switch (events[e].key) {
             case CUI_KEY_RIGHT:
             case CUI_KEY_DOWN:
-                request = enabled(items, count, target, 1);
+                request = cui_radio_group_enabled(items, count, target, 1);
                 break;
             case CUI_KEY_LEFT:
             case CUI_KEY_UP:
-                request = enabled(items, count, target, -1);
+                request = cui_radio_group_enabled(items, count, target, -1);
                 break;
             case CUI_KEY_HOME:
                 request = first;
@@ -112,7 +114,7 @@ cui_radio_group_result cui_base_radio_group(cui_context *ui, cui_id id,
     if (!o.disabled && !o.skip_tab && tab < count)
         r.tab_stop = items[tab].id;
     state->focused = cui_focused(ui);
-    state->had_focus = find(items, count, state->focused) < count;
+    state->had_focus = cui_radio_group_find(items, count, state->focused) < count;
     cui_interact(ui, id, CUI_ROLE_RADIOGROUP, o.name, o.disabled, false, 0);
     cui_set_tab_stop(ui, id, false);
     cui_set_semantic_details(ui, id,

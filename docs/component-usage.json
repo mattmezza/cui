@@ -552,11 +552,14 @@
         "cui_radio",
         "cui_radio_ex"
       ],
-      "state_types": [],
-      "state_ownership": "Caller retains int selected option.",
-      "interaction": "Returns true when selection changes.",
-      "usage": "Submit each option with the same selected pointer and a distinct option value/ID.",
+      "state_types": [
+        "cui_radio_group_state"
+      ],
+      "state_ownership": "For grouped choices, retain one selected cui_id and cui_radio_group_state per collection; standalone radios retain one shared integer.",
+      "interaction": "cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop; standalone functions return true when selection changes.",
+      "usage": "Submit stable unique item IDs to cui_radio_group; synchronously accept or reject on_change requests in your application model. Keep selected and navigation between frames.",
       "docs": [
+        "docs/RADIO_GROUP.md",
         "docs/CONTROLS.md"
       ],
       "callback_symbols": [],

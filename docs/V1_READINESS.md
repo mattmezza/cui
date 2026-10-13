@@ -2,7 +2,7 @@
 
 CUI is a working alpha. A live gallery and passing tests demonstrate useful functionality; they do not establish production readiness or complete component parity. This assessment is dated 13 October 2026.
 
-The catalog contains all 78 families: 76 tested subsets, two implemented families and zero fully verified families. The feature ledger contains 321 entries: 263 tested, four implemented and 54 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.
+The catalog contains all 78 families: 76 tested subsets, two implemented families and zero fully verified families. The feature ledger contains 321 entries: 265 tested, four implemented and 52 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.
 
 ## Release gates
 

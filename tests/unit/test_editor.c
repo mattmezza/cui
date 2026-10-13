@@ -1125,6 +1125,82 @@ static cui_textarea_result multi_key(cui_context *ui, cui_editor_state *editor,
     cui_draw_list commands;
     return draw(ui, editor, o, &commands);
 }
+static void multicursor_column_history(void) {
+    char buffer[128] = "abcd\nx\nabcdef";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 512,
+                                                      .max_history_steps = 3});
+    cui_edit_selection live[4];
+    cui_edit_selection_snapshot history[4];
+    cui_edit_column_anchor columns[4];
+    cui_edit_column_snapshot column_history[4];
+    assert(edit && cui_edit_attach_selections(edit, live, 4, history, 4) == CUI_EDIT_OK);
+    assert(cui_edit_attach_columns(edit, columns, 4, column_history, 4) == CUI_EDIT_OK);
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_cursor_anchor anchors[4];
+    assert(cui_editor_state_init(&editor, edit, lines, 32) &&
+           cui_editor_multicursor_init(&editor, anchors, 4));
+    cui_context *ui =
+        cui_create((cui_config){.width = 400, .height = 300, .measure_styled = search_measure});
+    cui_focus(ui, 10);
+    cui_editor_options options = cui_editor_default();
+    options.line_numbers = false;
+    options.textarea.width = 240;
+    options.textarea.height = 100;
+    cui_draw_list commands;
+    draw(ui, &editor, options, &commands);
+    assert(cui_edit_select(edit, 3, 3) == CUI_EDIT_OK);
+    draw(ui, &editor, options, &commands);
+    assert(multi_key(ui, &editor, options, CUI_KEY_DOWN, 0).selection_changed);
+    assert(live[0].cursor == 6 && anchors[0].valid);
+    float preferred = anchors[0].x;
+    size_t count = 0;
+    const cui_edit_column_anchor *stored = cui_edit_get_columns(edit, &count);
+    assert(count == 1 && stored[0].valid && stored[0].x == preferred && stored[0].column == 3);
+    assert(cui_edit_insert(edit, cui_string("!")) == CUI_EDIT_OK);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && live[0].cursor == 6);
+    stored = cui_edit_get_columns(edit, &count);
+    assert(count == 1 && stored[0].valid && stored[0].x == preferred && stored[0].column == 3);
+    draw(ui, &editor, options, &commands);
+    assert(anchors[0].valid && anchors[0].x == preferred);
+    options.textarea.text_style.family = 7;
+    draw(ui, &editor, options, &commands);
+    assert(anchors[0].valid && anchors[0].x == 27);
+    assert(multi_key(ui, &editor, options, CUI_KEY_DOWN, 0).selection_changed);
+    assert(live[0].cursor == 10);
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("abcdefghijklmnop")) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    options.textarea.width = 40;
+    options.textarea.no_wrap = false;
+    draw(ui, &editor, options, &commands);
+    assert(editor.view.count > 1);
+    assert(multi_key(ui, &editor, options, CUI_KEY_DOWN, 0).selection_changed);
+    stored = cui_edit_get_columns(edit, &count);
+    assert(live[0].cursor == 3 && count == 1 && stored[0].column == 1 && stored[0].valid);
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("aa\nbb\ncc\ndd\nee")) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    cui_editor_fold fold = {0, 3, true};
+    assert(cui_editor_set_folds(&editor, &fold, 1));
+    options.textarea.no_wrap = true;
+    draw(ui, &editor, options, &commands);
+    assert(multi_key(ui, &editor, options, CUI_KEY_DOWN, 0).selection_changed);
+    stored = cui_edit_get_columns(edit, &count);
+    assert(live[0].cursor == 10 && fold.collapsed && count == 1 && stored[0].column == 1);
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("a\xC3\xA9Z\nx\nabc")) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 3, 3) == CUI_EDIT_OK);
+    draw(ui, &editor, options, &commands);
+    assert(multi_key(ui, &editor, options, CUI_KEY_DOWN, 0).selection_changed);
+    stored = cui_edit_get_columns(edit, &count);
+    assert(live[0].cursor == 6 && count == 1 && stored[0].column == 2 && stored[0].valid);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 static void multicursor_clipboard_and_indent(void) {
     char buffer[128] = "1\n2\n3", scratch[128];
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
@@ -1481,6 +1557,7 @@ int main(void) {
     rectangle_selection();
     multicursor_clipboard_and_indent();
     multicursor_visual_rows();
+    multicursor_column_history();
     multiple_cursor_adapter();
     search_activation_and_paint();
     replacement_panel();

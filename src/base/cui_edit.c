@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_edit.h"
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 /* BEGIN GENERATED UNICODE GRAPHEME TABLE */
@@ -2935,6 +2936,9 @@ struct cui_edit {
     cui_edit_selection *selections;
     size_t selection_capacity, selection_count;
     cui_edit_selection_snapshot *selection_history;
+    cui_edit_column_anchor *columns;
+    size_t column_capacity, column_count;
+    cui_edit_column_snapshot *column_history;
 };
 static bool cui_edit_private_decode(const unsigned char *s, size_t n, size_t *width) {
     if (!n)
@@ -3485,6 +3489,25 @@ static void cui_edit_private_save_state(cui_edit *e) {
             memcpy(snapshot->items, e->selections, e->selection_count * sizeof(*e->selections));
         }
     }
+    if (e->columns && e->selections) {
+        cui_edit_column_anchor next[CUI_EDIT_MAX_SELECTIONS];
+        for (size_t i = 0; i < e->selection_count; ++i) {
+            next[i] = (cui_edit_column_anchor){.id = e->selections[i].id,
+                                               .cursor = e->selections[i].cursor};
+            for (size_t j = 0; j < e->column_count; ++j)
+                if (e->columns[j].id == next[i].id && e->columns[j].cursor == next[i].cursor) {
+                    next[i] = e->columns[j];
+                    break;
+                }
+        }
+        memcpy(e->columns, next, e->selection_count * sizeof(*next));
+        e->column_count = e->selection_count;
+        if (e->slots) {
+            cui_edit_column_snapshot *snapshot = &e->column_history[e->index];
+            snapshot->count = e->column_count;
+            memcpy(snapshot->items, e->columns, e->column_count * sizeof(*e->columns));
+        }
+    }
     if (e->slots)
         e->states[e->index] = (cui_edit_private_snapshot){e->length, e->cursor, e->anchor};
 }
@@ -3890,7 +3913,7 @@ size_t cui_edit_selection_history_slots(const cui_edit *edit) {
 cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *storage,
                                            size_t capacity, cui_edit_selection_snapshot *history,
                                            size_t history_slots) {
-    if (!edit || !edit->config.multiline || edit->token_count || !storage || !capacity ||
+    if (!edit || !edit->config.multiline || edit->token_count || edit->columns || !storage || !capacity ||
         capacity > CUI_EDIT_MAX_SELECTIONS || history_slots < edit->slots ||
         (edit->slots && !history) || history_slots > SIZE_MAX / sizeof(*history))
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -3917,10 +3940,72 @@ cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *s
 void cui_edit_detach_selections(cui_edit *edit) {
     if (!edit)
         return;
+    cui_edit_detach_columns(edit);
     cui_edit_break_coalescing(edit);
     edit->selections = NULL;
     edit->selection_history = NULL;
     edit->selection_count = edit->selection_capacity = 0;
+}
+void cui_edit_detach_columns(cui_edit *edit) {
+    if (!edit)
+        return;
+    edit->columns = NULL;
+    edit->column_history = NULL;
+    edit->column_capacity = edit->column_count = 0;
+}
+const cui_edit_column_anchor *cui_edit_get_columns(const cui_edit *edit, size_t *count) {
+    if (count)
+        *count = edit ? edit->column_count : 0;
+    return edit ? edit->columns : NULL;
+}
+cui_edit_result cui_edit_attach_columns(cui_edit *edit, cui_edit_column_anchor *storage,
+                                        size_t capacity, cui_edit_column_snapshot *history,
+                                        size_t history_slots) {
+    if (!edit || !edit->selections || edit->columns || !storage ||
+        capacity < edit->selection_capacity || capacity > CUI_EDIT_MAX_SELECTIONS ||
+        history_slots < edit->slots || (edit->slots && !history) ||
+        history_slots > SIZE_MAX / sizeof(*history))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t bytes = capacity * sizeof(*storage), history_bytes = history_slots * sizeof(*history);
+    if (cui_edit_private_storage_overlap(storage, bytes, history, history_bytes) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit->selections,
+                                         edit->selection_capacity * sizeof(*edit->selections)) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit->selection_history,
+                                         edit->slots * sizeof(*edit->selection_history)) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit->config.buffer,
+                                         edit->config.capacity) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit, sizeof(*edit)) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit->selections,
+                                         edit->selection_capacity * sizeof(*edit->selections)) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit->selection_history,
+                                         edit->slots * sizeof(*edit->selection_history)) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit->config.buffer,
+                                         edit->config.capacity) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit, sizeof(*edit)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    edit->columns = storage;
+    edit->column_capacity = capacity;
+    edit->column_history = history;
+    edit->column_count = 0;
+    for (size_t i = 0; i < edit->slots; ++i)
+        history[i].count = 0;
+    cui_edit_private_save_state(edit);
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_set_columns(cui_edit *edit, const cui_edit_column_anchor *input,
+                                     size_t count) {
+    if (!edit || !edit->columns || !input || count != edit->selection_count ||
+        count > edit->column_capacity)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    for (size_t i = 0; i < count; ++i)
+        if (input[i].id != edit->selections[i].id ||
+            input[i].cursor != edit->selections[i].cursor ||
+            (input[i].valid && (!isfinite(input[i].x) || input[i].x < 0)))
+            return CUI_EDIT_INVALID_ARGUMENT;
+    memcpy(edit->columns, input, count * sizeof(*input));
+    edit->column_count = count;
+    cui_edit_private_save_state(edit);
+    return CUI_EDIT_OK;
 }
 const cui_edit_selection *cui_edit_get_selections(const cui_edit *edit, size_t *count) {
     if (count)
@@ -4804,6 +4889,13 @@ static void cui_edit_private_restore(cui_edit *e) {
             e->selection_count = 1;
             e->selections[0] = (cui_edit_selection){0, e->anchor, e->cursor};
         }
+    }
+    if (e->columns) {
+        const cui_edit_column_snapshot *snapshot = &e->column_history[e->index];
+        e->column_count = snapshot->count;
+        if (e->column_count)
+            memcpy(e->columns, snapshot->items, e->column_count * sizeof(*e->columns));
+        cui_edit_private_save_state(e);
     }
 }
 cui_edit_result cui_edit_undo(cui_edit *e) {

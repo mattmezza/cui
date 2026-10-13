@@ -536,8 +536,14 @@ Consecutive interactive text batches with unchanged cursor collection coalesce
 into one Undo step, up to 1000 batches. Navigation, selection changes, folds,
 clipboard actions and atomic edits break the group; paste and completion remain
 individual Undo steps. This slice does not implement multiple IME composition
-ranges. Preferred columns remain view metadata rather
-than Undo state. Inline-token annotations are excluded from these attached
+ranges. Optional caller-owned `cui_edit_column_anchor` storage and one
+`cui_edit_column_snapshot` per document-history slot retain each cursor's
+preferred pixel x, logical grapheme column, and soft-wrap affinity across
+Undo/Redo. Attach it with `cui_edit_attach_columns` after selection storage;
+the Editor uses it automatically for multi-cursor vertical navigation. It
+recomputes x from the logical column when text style or font size changes.
+Without this optional storage, preferred columns live only in the view.
+Inline-token annotations are excluded from these attached
 multicursor models and CodeEditor, so token-aware clipboard/indent remapping is not
 claimed. Search mode buttons show selected presentation as well as their semantic
 checked state.

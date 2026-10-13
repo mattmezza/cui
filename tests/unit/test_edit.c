@@ -1131,7 +1131,50 @@ static void test_typing_history_batch_limit(void) {
     assert(cui_edit_undo(edit) == CUI_EDIT_OK && !buffer[0]);
     cui_edit_destroy(edit);
 }
+static void test_column_anchor_history(void) {
+    char buffer[64] = "wide\nx\nlonger";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 256,
+                                                      .max_history_steps = 3});
+    assert(edit);
+    cui_edit_selection selections[3];
+    cui_edit_selection_snapshot history[4];
+    cui_edit_column_anchor columns[3];
+    cui_edit_column_snapshot column_history[4];
+    assert(cui_edit_attach_selections(edit, selections, 3, history, 4) == CUI_EDIT_OK);
+    assert(cui_edit_attach_columns(edit, columns, 3, column_history, 4) == CUI_EDIT_OK);
+    cui_edit_selection cursors[] = {{7, 3, 3}, {8, 6, 6}};
+    assert(cui_edit_select_many(edit, cursors, 2) == CUI_EDIT_OK);
+    cui_edit_column_anchor preferred[] = {{.id = 7, .cursor = 3, .column = 3, .x = 30, .valid = true},
+                                          {.id = 8, .cursor = 6, .column = 3, .x = 30, .valid = true}};
+    assert(cui_edit_set_columns(edit, preferred, 2) == CUI_EDIT_OK);
+    preferred[1].cursor = 5;
+    assert(cui_edit_set_columns(edit, preferred, 2) == CUI_EDIT_INVALID_ARGUMENT);
+    preferred[1].cursor = 6;
+    assert(cui_edit_replace_selections(edit, cui_string("!")) == CUI_EDIT_OK);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    size_t count = 0;
+    const cui_edit_column_anchor *restored = cui_edit_get_columns(edit, &count);
+    assert(count == 2 && restored[0].id == 7 && restored[0].cursor == 3 &&
+           restored[0].valid && restored[0].column == 3 && restored[0].x == 30 &&
+           restored[1].id == 8 && restored[1].valid && restored[1].column == 3);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_edit_insert(edit, cui_string("this exceeds the available buffer by a wide margin; "
+                                              "this exceeds the available buffer again")) ==
+           CUI_EDIT_CAPACITY);
+    restored = cui_edit_get_columns(edit, &count);
+    assert(cui_edit_get_state(edit).revision == revision && count == 2 &&
+           restored[0].valid && restored[0].column == 3);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK);
+    assert(cui_edit_get_columns(edit, &count) && count == 2);
+    cui_edit_detach_selections(edit);
+    assert(!cui_edit_get_columns(edit, &count) && count == 0);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_column_anchor_history();
     test_typing_history_batch_limit();
     test_multicursor_typing_history();
     test_typing_history_coalescing();

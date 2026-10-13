@@ -49,6 +49,19 @@ typedef struct {
     size_t count;
     cui_edit_selection items[CUI_EDIT_MAX_SELECTIONS];
 } cui_edit_selection_snapshot;
+/* Optional per-ID vertical-motion anchor. x is in the current text metrics;
+ * column is the logical grapheme column for metrics changes. */
+typedef struct {
+    uint64_t id;
+    size_t cursor, column;
+    float x, font_size;
+    cui_text_style style;
+    bool valid, upstream;
+} cui_edit_column_anchor;
+typedef struct {
+    size_t count;
+    cui_edit_column_anchor items[CUI_EDIT_MAX_SELECTIONS];
+} cui_edit_column_snapshot;
 /* Existing document slot count; attach does not allocate or resize history. */
 size_t cui_edit_selection_history_slots(const cui_edit *);
 /* Opt-in multiline selection storage. Arrays must be disjoint from each other
@@ -60,6 +73,14 @@ cui_edit_result cui_edit_attach_selections(cui_edit *, cui_edit_selection *stora
                                            cui_edit_selection_snapshot *history,
                                            size_t history_slots);
 void cui_edit_detach_selections(cui_edit *);
+/* Optional caller-owned vertical anchors and parallel Undo storage. Attach
+ * after selections; history needs one entry per document-history slot. */
+cui_edit_result cui_edit_attach_columns(cui_edit *, cui_edit_column_anchor *storage,
+                                        size_t capacity, cui_edit_column_snapshot *history,
+                                        size_t history_slots);
+void cui_edit_detach_columns(cui_edit *);
+const cui_edit_column_anchor *cui_edit_get_columns(const cui_edit *, size_t *count);
+cui_edit_result cui_edit_set_columns(cui_edit *, const cui_edit_column_anchor *, size_t count);
 const cui_edit_selection *cui_edit_get_selections(const cui_edit *, size_t *count);
 /* Validates grapheme endpoints, merges overlapping/adjacent ranges, and preserves
  * active ID/orientation. Failure preserves model and attached arrays. */

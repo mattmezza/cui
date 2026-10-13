@@ -65,6 +65,10 @@ jobs:
         run: uv run tests/web/test_attachment_sizes.py
       - name: Verify responsive content and large type containment
         run: uv run tests/web/test_responsive_gallery.py
+      - name: Verify Checkbox motion wrapping and help behavior
+        run: uv run tests/web/test_checkbox_motion.py
+      - name: Verify semantic alerts and aligned reaction slots
+        run: uv run tests/web/test_alert_bubble_slots.py
       - name: Upload static gallery
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

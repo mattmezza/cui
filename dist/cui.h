@@ -14,6 +14,12 @@ typedef struct {
     const char *data;
     size_t length;
 } cui_str;
+/* Full paragraph plus caller-selected line, in original UTF-8 bytes.
+ * Hard paragraph separators are excluded; U+2028 retains paragraph context. */
+typedef struct {
+    cui_str paragraph;
+    size_t byte_start, byte_end; /* Half-open; paragraph-relative. */
+} cui_text_line_source;
 typedef struct {
     float x, y, w, h;
 } cui_rect;
@@ -369,6 +375,11 @@ typedef struct {
     bool italic, monospace;
     uint32_t family; /* Application-defined font-family ID; zero selects default. */
 } cui_text_style;
+enum { CUI_TEXT_COLOR_SPAN_MAX = 4096 };
+typedef struct {
+    size_t byte_start, byte_end; /* Paragraph-relative; sorted, nonoverlapping. */
+    cui_color color;             /* A shaped cluster takes the color at its first byte. */
+} cui_text_color_span;
 typedef struct {
     cui_draw_type type;
     cui_rect bounds;
@@ -381,6 +392,9 @@ typedef struct {
     bool custom_corners, custom_border_edges;
     cui_bitmap_paint bitmap;
     cui_mesh_paint mesh;
+    cui_text_line_source text_source;       /* Frame-owned; zero = legacy text. */
+    const cui_text_color_span *text_colors; /* Frame-owned. */
+    size_t text_color_count;
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;
@@ -438,6 +452,8 @@ typedef struct {
 } cui_text_geometry;
 typedef cui_text_layout_status (*cui_text_geometry_fn)(void *, cui_str, float, cui_text_style,
                                                        cui_text_geometry *);
+typedef cui_text_layout_status (*cui_text_geometry_line_fn)(void *, cui_text_line_source, float,
+                                                            cui_text_style, cui_text_geometry *);
 typedef struct {
     float width, height;
     size_t max_elements, max_commands, frame_bytes;
@@ -451,6 +467,7 @@ typedef struct {
     cui_font_metrics_fn font_metrics; /* Optional; shares measure_user. */
     cui_text_geometry_fn
         text_geometry; /* Optional single-line visual factory; shares measure_user. */
+    cui_text_geometry_line_fn text_geometry_line; /* Optional contextual line factory. */
 } cui_config;
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
@@ -465,6 +482,7 @@ bool cui_accessibility_action_supported(const cui_context *, cui_id, cui_accessi
 bool cui_queue_accessibility_action(cui_context *, cui_id, cui_accessibility_action);
 
 bool cui_begin_frame(cui_context *ui, float width, float height, float dt);
+bool cui_frame_active(const cui_context *);
 cui_draw_list cui_end_frame(cui_context *ui);
 cui_id cui_id_from(cui_context *ui, const char *key);
 bool cui_push_id(cui_context *ui, const char *key);
@@ -501,6 +519,17 @@ void cui_text(cui_context *ui, cui_str text, float font_size, cui_color color);
 /* Explicit logical line height; zero selects the measured natural line height. */
 void cui_text_with_line_height(cui_context *, cui_str, float font_size, cui_color,
                                float line_height);
+/* Validation performs no allocation. Ranges must end at UTF-8 scalar boundaries.
+ * Contextual submission copies the full paragraph into bounded frame storage.
+ * False leaves submission/storage unchanged; text/layout errors are observable. */
+bool cui_text_line_source_valid(cui_text_line_source source);
+bool cui_text_context_line(cui_context *, cui_text_line_source, float, cui_color, float,
+                           cui_text_style);
+bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, cui_color, float,
+                                   cui_text_style, const cui_text_color_span *, size_t);
+bool cui_has_text_geometry_line(const cui_context *);
+cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
+                                                  cui_text_style, cui_text_geometry *);
 void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_height,
                  cui_text_style);
 /* Unwrapped text for caller-laid-out lines. Overflows narrow boxes; use a
@@ -5775,6 +5804,12 @@ typedef struct {
     cui_resource_fn collect, destroy;
     bool touched;
 } cui_core_resource;
+typedef struct {
+    cui_str submitted;
+    cui_text_line_source source;
+    const cui_text_color_span *colors;
+    size_t color_count;
+} cui_core_text_source;
 struct cui_context {
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
         previous_focus_scopes[CUI_CORE_STACK_MAX];
@@ -5786,6 +5821,8 @@ struct cui_context {
     void *arena;
     Clay__ScrollContainerDataInternal *clip_containers;
     cui_config config;
+    cui_core_text_source *text_sources;
+    size_t text_source_count;
     cui_core_text_style *text_styles;
     size_t text_style_count, text_style_capacity;
     uint64_t text_metrics_revision;
@@ -5880,6 +5917,89 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         result.height < 0)
         return (cui_size){0};
     return result;
+}
+static bool cui_core_text_scalar(cui_str text, size_t *offset, uint32_t *out) {
+    size_t i = *offset;
+    if (!text.data || i >= text.length)
+        return false;
+    uint32_t c = (unsigned char)text.data[i++], minimum = 0;
+    unsigned extra = 0;
+    if (c >= 0xc2 && c <= 0xdf) {
+        c &= 31;
+        extra = 1;
+        minimum = 0x80;
+    } else if (c >= 0xe0 && c <= 0xef) {
+        c &= 15;
+        extra = 2;
+        minimum = 0x800;
+    } else if (c >= 0xf0 && c <= 0xf4) {
+        c &= 7;
+        extra = 3;
+        minimum = 0x10000;
+    } else if (c >= 0x80)
+        return false;
+    if (extra > text.length - i)
+        return false;
+    while (extra--) {
+        unsigned b = (unsigned char)text.data[i++];
+        if ((b & 0xc0) != 0x80)
+            return false;
+        c = (c << 6) | (b & 63);
+    }
+    if (c < minimum || c > 0x10ffff || (c >= 0xd800 && c <= 0xdfff))
+        return false;
+    *offset = i;
+    *out = c;
+    return true;
+}
+bool cui_text_line_source_valid(cui_text_line_source source) {
+    if ((!source.paragraph.data && source.paragraph.length) ||
+        source.byte_start > source.byte_end || source.byte_end > source.paragraph.length)
+        return false;
+    bool start = source.byte_start == 0, end = source.byte_end == 0;
+    size_t offset = 0;
+    uint32_t cp;
+    while (offset < source.paragraph.length) {
+        if (!cui_core_text_scalar(source.paragraph, &offset, &cp) || cp == 10 || cp == 13 ||
+            cp == 0x85 || cp == 0x2029 || cp == 0x1c || cp == 0x1d || cp == 0x1e)
+            return false;
+        start |= offset == source.byte_start;
+        end |= offset == source.byte_end;
+    }
+    return start && end;
+}
+bool cui_frame_active(const cui_context *ui) {
+    return ui && ui->in_frame;
+}
+bool cui_has_text_geometry_line(const cui_context *ui) {
+    return ui && (ui->config.text_geometry_line || ui->config.text_geometry);
+}
+cui_text_layout_status cui_get_text_geometry_line(cui_context *ui, cui_text_line_source source,
+                                                  float size, cui_text_style style,
+                                                  cui_text_geometry *out) {
+    if (!ui || !out || !cui_text_line_source_valid(source) || !isfinite(size) || size <= 0 ||
+        !cui_core_text_style_valid(style))
+        return CUI_TEXT_LAYOUT_INVALID;
+    if (!ui->config.text_geometry_line) {
+        if (source.byte_start == 0 && source.byte_end == source.paragraph.length)
+            return cui_get_text_geometry(ui, source.paragraph, size, style, out);
+        return CUI_TEXT_LAYOUT_UNAVAILABLE;
+    }
+    cui_text_geometry result = {0};
+    cui_text_layout_status status = ui->config.text_geometry_line(
+        ui->config.measure_user, source, fminf(size, 65535), style, &result);
+    if (status != CUI_TEXT_LAYOUT_OK) {
+        cui_release_text_geometry(&result);
+        return status;
+    }
+    if (!result.ops || !result.ops->carets || !result.ops->hit_test || !result.ops->selection ||
+        !result.ops->release || !isfinite(result.width) || !isfinite(result.height) ||
+        result.width < 0 || result.height < 0 || result.byte_length != source.paragraph.length) {
+        cui_release_text_geometry(&result);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
+    *out = result;
+    return CUI_TEXT_LAYOUT_OK;
 }
 bool cui_has_text_geometry(const cui_context *ui) {
     return ui && ui->config.text_geometry;
@@ -6047,6 +6167,7 @@ cui_context *cui_create(cui_config config) {
     ui->dirty = true;
     ui->top_modal = ui->previous_top_modal = SIZE_MAX;
     ui->text_style_capacity = config.max_elements > 32767 ? 65535 : config.max_elements * 2;
+    ui->text_sources = calloc(config.max_elements, sizeof(*ui->text_sources));
     ui->text_styles = calloc(ui->text_style_capacity, sizeof(*ui->text_styles));
     ui->resources = calloc(config.max_resources, sizeof(*ui->resources));
     ui->commands = calloc(config.max_commands, sizeof(*ui->commands));
@@ -6076,11 +6197,12 @@ cui_context *cui_create(cui_config config) {
     Clay_SetMaxElementCount((int32_t)(config.max_elements * 2 + 32));
     size_t n = Clay_MinMemorySize();
     ui->arena = malloc(n);
-    if (!ui->resources || !ui->text_styles || !ui->commands || !ui->semantics || !ui->previous ||
-        !ui->ids || !ui->activations || !ui->semantic_scopes || !ui->previous_semantic_scopes ||
-        !ui->scroll_gestures || !ui->previous_scroll_gestures || !ui->strings || !ui->nodes ||
-        !ui->semantic_nodes || !ui->previous_parents || !ui->previous_hits || !ui->bounds_tracks ||
-        !ui->previous_layers || !ui->previous_order || !ui->clip_containers || !ui->arena) {
+    if (!ui->text_sources || !ui->resources || !ui->text_styles || !ui->commands ||
+        !ui->semantics || !ui->previous || !ui->ids || !ui->activations || !ui->semantic_scopes ||
+        !ui->previous_semantic_scopes || !ui->scroll_gestures || !ui->previous_scroll_gestures ||
+        !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_parents ||
+        !ui->previous_hits || !ui->bounds_tracks || !ui->previous_layers || !ui->previous_order ||
+        !ui->clip_containers || !ui->arena) {
         Clay_SetCurrentContext(saved);
         cui_destroy(ui);
         return NULL;
@@ -6124,6 +6246,7 @@ void cui_destroy(cui_context *ui) {
     free(ui->resources);
     free(ui->semantic_scopes);
     free(ui->previous_semantic_scopes);
+    free(ui->text_sources);
     free(ui->text_styles);
     free(ui->nodes);
     free(ui->bounds_tracks);
@@ -6880,6 +7003,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         ui->event_consumed[previous] = ui->event_consumed[i];
         ui->event_consumed[i] = consumed;
     }
+    ui->text_source_count = 0;
     ui->node_count = 0;
     ui->paint_root_count = 0;
     ui->bounds_track_count = 0;
@@ -7277,7 +7401,9 @@ static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_h
     return (uint16_t)ui->text_style_count;
 }
 static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
-                          cui_text_style text_style, bool nowrap) {
+                          cui_text_style text_style, bool nowrap,
+                          const cui_text_line_source *source, const cui_text_color_span *colors,
+                          size_t color_count) {
     if (!cui_core_active(ui))
         return;
     if (!cui_core_text_style_valid(text_style))
@@ -7293,11 +7419,47 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
     bool special = size != floorf(size) || line_height != floorf(line_height) ||
                    text_style.weight || text_style.italic || text_style.monospace ||
                    text_style.family;
+    cui_str original = source ? source->paragraph : t;
+    cui_str retained_paragraph = {0};
+    if (source)
+        for (size_t i = 0; i < ui->text_source_count; i++) {
+            cui_str candidate = ui->text_sources[i].source.paragraph;
+            if (candidate.length == original.length &&
+                (!original.length || !memcmp(candidate.data, original.data, original.length))) {
+                retained_paragraph = candidate;
+                break;
+            }
+        }
+    size_t available = ui->config.frame_bytes - ui->string_used;
+    size_t paragraph_bytes = retained_paragraph.data || !original.length ? 0 : original.length + 1;
+    size_t line_bytes = source ? source->byte_end - source->byte_start + 1 : 0;
+    if ((!original.data && original.length) || original.length > INT32_MAX ||
+        paragraph_bytes > available || line_bytes > available - paragraph_bytes) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return;
+    }
     uint16_t style = special ? cui_core_text_style_id(ui, size, line_height, text_style) : 0;
     if (special && !style)
         return;
     ui->element_count++;
-    t = cui_core_copy_string(ui, t);
+    original = retained_paragraph.data ? retained_paragraph : cui_core_copy_string(ui, original);
+    cui_text_line_source retained =
+        source ? *source : (cui_text_line_source){original, 0, original.length};
+    retained.paragraph = original;
+    if (source) {
+        /* Unique slice storage gives Clay exact submission identity even when shared
+         * paragraphs have the same start with different ranges/styles/colors. */
+        char *slice = ui->strings + ui->string_used;
+        size_t length = source->byte_end - source->byte_start;
+        if (length)
+            memcpy(slice, original.data + source->byte_start, length);
+        slice[length] = 0;
+        ui->string_used += length + 1;
+        t = (cui_str){slice, length};
+    } else
+        t = original;
+    ui->text_sources[ui->text_source_count++] =
+        (cui_core_text_source){t, retained, colors, color_count};
     Clay__OpenTextElement(
         (Clay_String){false, (int32_t)t.length, t.data},
         (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? (void *)ui
@@ -7309,13 +7471,73 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
                                  .lineHeight = style ? 0 : cui_core_scalar(line_height),
                                  .textColor = {c.r, c.g, c.b, c.a}});
 }
+bool cui_text_context_line(cui_context *ui, cui_text_line_source source, float size,
+                           cui_color color, float line_height, cui_text_style style) {
+    if (!ui || !cui_text_line_source_valid(source) || !isfinite(size) || size <= 0 ||
+        !isfinite(line_height) || line_height < 0 || !cui_core_text_style_valid(style))
+        return false;
+    size_t before = ui->text_source_count;
+    cui_core_text(ui, (cui_str){0}, size, color, line_height, style, true, &source, NULL, 0);
+    return ui->text_source_count != before;
+}
+bool cui_text_context_line_colored(cui_context *ui, cui_text_line_source source, float size,
+                                   cui_color color, float line_height, cui_text_style style,
+                                   const cui_text_color_span *colors, size_t count) {
+    if (!ui || !cui_frame_active(ui) || !cui_text_line_source_valid(source) || (!colors && count) ||
+        !isfinite(size) || size <= 0 || !isfinite(line_height) || line_height < 0 ||
+        !cui_core_text_style_valid(style))
+        return false;
+    size_t scan = source.byte_start;
+    uint32_t cp;
+    while (scan < source.byte_end)
+        if (!cui_core_text_scalar(source.paragraph, &scan, &cp) || cp == 0x2028)
+            return false;
+    if (count > CUI_TEXT_COLOR_SPAN_MAX) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    if (!count)
+        return cui_text_context_line(ui, source, size, color, line_height, style);
+    size_t previous = source.byte_start;
+    for (size_t i = 0; i < count; i++) {
+        cui_text_line_source range = {source.paragraph, colors[i].byte_start, colors[i].byte_end};
+        if (range.byte_start < previous || range.byte_end > source.byte_end ||
+            !cui_text_line_source_valid(range))
+            return false;
+        previous = range.byte_end;
+    }
+    size_t padding =
+        (_Alignof(cui_text_color_span) - ui->string_used % _Alignof(cui_text_color_span)) %
+        _Alignof(cui_text_color_span);
+    size_t available = ui->config.frame_bytes - ui->string_used;
+    if (padding > available || count > (available - padding) / sizeof *colors) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    size_t before_bytes = ui->string_used, before_count = ui->text_source_count;
+    cui_text_color_span *copy = (void *)(ui->strings + ui->string_used + padding);
+    if (count)
+        memcpy(copy, colors, count * sizeof *colors);
+    float opacity = ui->depth && !cui_core_layout_only(ui)
+                        ? ui->nodes[ui->node_stack[ui->depth - 1]].opacity
+                        : 1;
+    for (size_t i = 0; i < count; i++)
+        copy[i].color.a = (uint8_t)(copy[i].color.a * opacity);
+    ui->string_used += padding + count * sizeof *colors;
+    cui_core_text(ui, (cui_str){0}, size, color, line_height, style, true, &source, copy, count);
+    if (ui->text_source_count == before_count) {
+        ui->string_used = before_bytes;
+        return false;
+    }
+    return true;
+}
 void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                  cui_text_style style) {
-    cui_core_text(ui, t, size, c, line_height, style, false);
+    cui_core_text(ui, t, size, c, line_height, style, false, NULL, NULL, 0);
 }
 void cui_text_line(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                    cui_text_style style) {
-    cui_core_text(ui, t, size, c, line_height, style, true);
+    cui_core_text(ui, t, size, c, line_height, style, true, NULL, NULL, 0);
 }
 void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
                                float line_height) {
@@ -7658,6 +7880,70 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.type = CUI_DRAW_TEXT;
             d.text = (cui_str){c->renderData.text.stringContents.chars,
                                (size_t)c->renderData.text.stringContents.length};
+            for (size_t source = 0; source < ui->text_source_count; source++) {
+                const cui_core_text_source *record = &ui->text_sources[source];
+                if (record->submitted.data != c->renderData.text.stringContents.baseChars)
+                    continue;
+                size_t offset = (size_t)(d.text.data - record->submitted.data);
+                if (offset > record->submitted.length ||
+                    d.text.length > record->submitted.length - offset)
+                    break;
+                d.text_source = record->source;
+                d.text_colors = record->colors;
+                d.text_color_count = record->color_count;
+                d.text_source.byte_start += offset;
+                d.text_source.byte_end = d.text_source.byte_start + d.text.length;
+                /* Narrow an ordinary multi-paragraph submission to its original hard paragraph. */
+                size_t scan = 0, paragraph_start = 0,
+                       paragraph_end = record->source.paragraph.length;
+                uint32_t cp;
+                while (scan < record->source.paragraph.length) {
+                    size_t start = scan;
+                    if (!cui_core_text_scalar(record->source.paragraph, &scan, &cp)) {
+                        d.text_source = (cui_text_line_source){0};
+                        break;
+                    }
+                    if (cp == 10 || cp == 13 || cp == 0x85 || cp == 0x2029 || cp == 0x1c ||
+                        cp == 0x1d || cp == 0x1e) {
+                        if (start < d.text_source.byte_start)
+                            paragraph_start = scan;
+                        else {
+                            paragraph_end = start;
+                            break;
+                        }
+                    }
+                }
+                if (d.text_source.paragraph.data && d.text_source.byte_end > paragraph_end &&
+                    paragraph_end >= d.text_source.byte_start) {
+                    /* Clay splits LF but can retain a trailing CR. Trim only separator
+                     * suffixes; never discard a later paragraph in the same command. */
+                    size_t trailing = paragraph_end;
+                    bool suffix = true;
+                    while (trailing < d.text_source.byte_end) {
+                        uint32_t separator;
+                        if (!cui_core_text_scalar(record->source.paragraph, &trailing,
+                                                  &separator) ||
+                            !(separator == 10 || separator == 13 || separator == 0x85 ||
+                              separator == 0x2029 || separator == 0x1c || separator == 0x1d ||
+                              separator == 0x1e)) {
+                            suffix = false;
+                            break;
+                        }
+                    }
+                    if (suffix) {
+                        d.text.length = paragraph_end - d.text_source.byte_start;
+                        d.text_source.byte_end = paragraph_end;
+                    }
+                }
+                if (d.text_source.paragraph.data && d.text_source.byte_end <= paragraph_end) {
+                    d.text_source.paragraph.data += paragraph_start;
+                    d.text_source.paragraph.length = paragraph_end - paragraph_start;
+                    d.text_source.byte_start -= paragraph_start;
+                    d.text_source.byte_end -= paragraph_start;
+                } else
+                    d.text_source = (cui_text_line_source){0};
+                break;
+            }
             d.font_size = c->renderData.text.fontSize;
             if (c->renderData.text.fontId && c->renderData.text.fontId <= ui->text_style_count) {
                 cui_core_text_style style = ui->text_styles[c->renderData.text.fontId - 1];

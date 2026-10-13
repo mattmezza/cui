@@ -377,7 +377,7 @@ typedef struct {
 enum { CUI_TEXT_COLOR_SPAN_MAX = 4096 };
 typedef struct {
     size_t byte_start, byte_end; /* Paragraph-relative; sorted, nonoverlapping. */
-    cui_color color; /* A shaped cluster takes the color at its first byte. */
+    cui_color color;             /* A shaped cluster takes the color at its first byte. */
 } cui_text_color_span;
 typedef struct {
     cui_draw_type type;
@@ -391,7 +391,7 @@ typedef struct {
     bool custom_corners, custom_border_edges;
     cui_bitmap_paint bitmap;
     cui_mesh_paint mesh;
-    cui_text_line_source text_source; /* Frame-owned; zero = legacy text. */
+    cui_text_line_source text_source;       /* Frame-owned; zero = legacy text. */
     const cui_text_color_span *text_colors; /* Frame-owned. */
     size_t text_color_count;
 } cui_draw_command;
@@ -528,7 +528,7 @@ bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, c
                                    cui_text_style, const cui_text_color_span *, size_t);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
-                                                   cui_text_style, cui_text_geometry *);
+                                                  cui_text_style, cui_text_geometry *);
 void cui_text_ex(cui_context *, cui_str, float font_size, cui_color, float line_height,
                  cui_text_style);
 /* Unwrapped text for caller-laid-out lines. Overflows narrow boxes; use a

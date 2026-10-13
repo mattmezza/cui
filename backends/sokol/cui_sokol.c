@@ -467,18 +467,18 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch,
         quad(r, (cui_rect){(float)x, (float)y, (float)w, (float)h}, r->ink, 0, 0, 2, texture);
 }
 static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
-                         const unsigned char *data, cui_color color) {
+                        const unsigned char *data, cui_color color) {
     cui_sokol *r = user;
     r->ink = color;
-    glyph(user,x,y,w,h,pitch,data);
+    glyph(user, x, y, w, h, pitch, data);
 }
 static bool text_draw(cui_sokol *r, const cui_draw_command *c) {
     if (c->text_color_count)
-        return cui_font_draw_context_line_colored(r->config.font,c->text_source,c->font_size,
-            c->text_style,c->bounds.x,c->bounds.y,c->color,c->text_colors,c->text_color_count,
-            color_glyph,r);
-    return cui_font_draw_context_line(r->config.font,c->text,c->text_source,c->font_size,c->text_style,
-                                      c->bounds.x,c->bounds.y,glyph,r);
+        return cui_font_draw_context_line_colored(
+            r->config.font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
+            c->color, c->text_colors, c->text_color_count, color_glyph, r);
+    return cui_font_draw_context_line(r->config.font, c->text, c->text_source, c->font_size,
+                                      c->text_style, c->bounds.x, c->bounds.y, glyph, r);
 }
 
 #endif
@@ -609,8 +609,7 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
         case CUI_DRAW_TEXT:
 #ifdef CUI_HAS_TEXT
             r->ink = c->color;
-            if (!r->config.font ||
-                !text_draw(r, c))
+            if (!r->config.font || !text_draw(r, c))
                 return fail(r, "CUI Sokol font shaping failed");
 #else
             return fail(r, "CUI Sokol text support is disabled");

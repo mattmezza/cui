@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_textarea.h"
-#include "cui_textarea_geometry.h"
-#include <stdlib.h>
 #include "cui/cui_base.h"
+#include "cui_textarea_geometry.h"
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 /* The edit model guarantees stable valid UTF-8 and row starts are cluster
  * boundaries. Seed an iterator here without rescanning the remaining document. */
@@ -192,28 +192,40 @@ static void cui_textarea_preedit_destroy(void *payload) {
     free(snapshot->preedit);
 }
 static cui_textarea_preedit_snapshot *cui_textarea_preedit_resource(cui_context *ui,
-                                                                  cui_textarea_state *state) {
-    if (!cui_frame_active(ui)) return NULL;
-    return cui_resource_get(ui,(cui_id)(uintptr_t)state,UINT64_C(0x13d8f6949e840242),
-                            sizeof(cui_textarea_preedit_snapshot),NULL,cui_textarea_preedit_destroy);
+                                                                    cui_textarea_state *state) {
+    if (!cui_frame_active(ui))
+        return NULL;
+    return cui_resource_get(ui, (cui_id)(uintptr_t)state, UINT64_C(0x13d8f6949e840242),
+                            sizeof(cui_textarea_preedit_snapshot), NULL,
+                            cui_textarea_preedit_destroy);
 }
 static bool cui_textarea_preedit_matches(const cui_textarea_preedit_snapshot *snapshot,
-                                         const cui_edit *edit,const cui_edit_composition *c) {
+                                         const cui_edit *edit, const cui_edit_composition *c) {
     return snapshot && snapshot->valid && c && c->active && snapshot->model == edit &&
-        snapshot->revision == c->revision && snapshot->start == c->start && snapshot->end == c->end &&
-        snapshot->length == c->length && (!c->length || !memcmp(snapshot->preedit,c->buffer,c->length));
+           snapshot->revision == c->revision && snapshot->start == c->start &&
+           snapshot->end == c->end && snapshot->length == c->length &&
+           (!c->length || !memcmp(snapshot->preedit, c->buffer, c->length));
 }
-static void cui_textarea_preedit_save(cui_textarea_preedit_snapshot *snapshot,const cui_edit *edit,
-                                     const cui_edit_composition *c) {
-    if (!snapshot || !c || !c->active || c->length > 65535) return;
-    if (c->length+1 > snapshot->capacity) {
-        char *buffer = malloc(c->length+1);
-        if (!buffer) return;
-        free(snapshot->preedit);snapshot->preedit=buffer;snapshot->capacity=c->length+1;
+static void cui_textarea_preedit_save(cui_textarea_preedit_snapshot *snapshot, const cui_edit *edit,
+                                      const cui_edit_composition *c) {
+    if (!snapshot || !c || !c->active || c->length > 65535)
+        return;
+    if (c->length + 1 > snapshot->capacity) {
+        char *buffer = malloc(c->length + 1);
+        if (!buffer)
+            return;
+        free(snapshot->preedit);
+        snapshot->preedit = buffer;
+        snapshot->capacity = c->length + 1;
     }
-    if (c->length) memcpy(snapshot->preedit,c->buffer,c->length);
-    snapshot->length=c->length;snapshot->start=c->start;snapshot->end=c->end;
-    snapshot->model=edit;snapshot->revision=c->revision;snapshot->valid=true;
+    if (c->length)
+        memcpy(snapshot->preedit, c->buffer, c->length);
+    snapshot->length = c->length;
+    snapshot->start = c->start;
+    snapshot->end = c->end;
+    snapshot->model = edit;
+    snapshot->revision = c->revision;
+    snapshot->valid = true;
 }
 cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
                                           cui_textarea_state *state, cui_textarea_metrics metrics,
@@ -235,15 +247,15 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     bool composing = state->composition && state->composition->active;
     if (composing)
         content = (cui_edit_content){.text = text};
-    cui_textarea_preedit_snapshot *snapshot = composing && cui_has_text_geometry_line(ui) ?
-                                                cui_textarea_preedit_resource(ui,state) : NULL;
+    cui_textarea_preedit_snapshot *snapshot = composing && cui_has_text_geometry_line(ui)
+                                                  ? cui_textarea_preedit_resource(ui, state)
+                                                  : NULL;
     bool composition_reusable = composing && state->layout_composing &&
-                              cui_textarea_preedit_matches(snapshot,edit,state->composition);
+                                cui_textarea_preedit_matches(snapshot, edit, state->composition);
     bool reusable =
         ((!composing && !state->layout_composing) || composition_reusable) && state->initialized &&
-        state->layout_model == edit &&
-        state->error == CUI_TEXTAREA_OK && !state->fold_count && !content.token_count &&
-        !state->layout_fold_count && !state->layout_token_count &&
+        state->layout_model == edit && state->error == CUI_TEXTAREA_OK && !state->fold_count &&
+        !content.token_count && !state->layout_fold_count && !state->layout_token_count &&
         state->lines == state->layout_lines && state->capacity == state->layout_capacity &&
         state->text_metrics_revision == cui_text_metrics_revision(ui) &&
         state->font_size == metrics.font_size && state->line_height == metrics.line_height &&
@@ -262,7 +274,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
             isfinite(state->scroll_x) ? fminf(state->maximum_x, fmaxf(0, state->scroll_x)) : 0;
         return CUI_TEXTAREA_OK;
     }
-    if (composing && snapshot) snapshot->valid = false;
+    if (composing && snapshot)
+        snapshot->valid = false;
     state->layout_composing = composing;
     size_t prefix_count = 0;
     if (reusable && state->count && state->revision + 1 == selection.revision) {
@@ -366,13 +379,17 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
             end++;
         size_t paragraph_end = end;
         bool soft = false;
-        for (size_t at = start; at+2 < end; at++)
-            if ((unsigned char)text.data[at] == 0xe2 &&
-                (unsigned char)text.data[at+1] == 0x80 &&
-                (unsigned char)text.data[at+2] == 0xa8) { end = at; soft = true; break; }
+        for (size_t at = start; at + 2 < end; at++)
+            if ((unsigned char)text.data[at] == 0xe2 && (unsigned char)text.data[at + 1] == 0x80 &&
+                (unsigned char)text.data[at + 2] == 0xa8) {
+                end = at;
+                soft = true;
+                break;
+            }
         size_t next = end;
         bool hard = !soft && end < text.length;
-        if (soft) next += 3;
+        if (soft)
+            next += 3;
         else if (hard) {
             next++;
             if (text.data[end] == '\r' && next < text.length && text.data[next] == '\n')
@@ -401,7 +418,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
             maximum = measured;
             widest_row = state->count;
         }
-        state->lines[state->count++] = (cui_textarea_line){start, finish, next, measured, hard, paragraph_start, paragraph_end, logical_line};
+        state->lines[state->count++] = (cui_textarea_line){
+            start, finish, next, measured, hard, paragraph_start, paragraph_end, logical_line};
         if (finish == text.length)
             break;
         start = next;
@@ -425,7 +443,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     state->scroll_y =
         isfinite(state->scroll_y) ? fminf(state->maximum_y, fmaxf(0, state->scroll_y)) : 0;
     state->layout_model = edit;
-    if (composing) cui_textarea_preedit_save(snapshot,edit,state->composition);
+    if (composing)
+        cui_textarea_preedit_save(snapshot, edit, state->composition);
     return state->error = CUI_TEXTAREA_OK;
 }
 cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_textarea_state *state,
@@ -434,7 +453,10 @@ cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_text
 }
 
 enum { CUI_TEXTAREA_VISUAL_LINES = 64, CUI_TEXTAREA_VISUAL_BYTES = 1048576 };
-typedef struct { char *data; size_t length; } cui_textarea_visual_source;
+typedef struct {
+    char *data;
+    size_t length;
+} cui_textarea_visual_source;
 typedef struct {
     cui_text_geometry geometry;
     size_t source, start, end;
@@ -450,90 +472,118 @@ static void cui_textarea_visual_clear(void *payload) {
     cui_textarea_visual_cache *cache = payload;
     for (size_t i = 0; i < cache->line_count; i++)
         cui_release_text_geometry(&cache->lines[i].geometry);
-    for (size_t i = 0; i < cache->source_count; i++) free(cache->sources[i].data);
+    for (size_t i = 0; i < cache->source_count; i++)
+        free(cache->sources[i].data);
     memset(cache, 0, sizeof *cache);
 }
 static size_t cui_textarea_paragraph_base(cui_textarea_line line) {
-    return line.paragraph_end < line.end || line.paragraph_start > line.start ?
-           line.start : line.paragraph_start;
+    return line.paragraph_end < line.end || line.paragraph_start > line.start
+               ? line.start
+               : line.paragraph_start;
 }
 cui_text_line_source cui_textarea_line_source(cui_str text, cui_textarea_line line) {
     size_t start = line.paragraph_start, end = line.paragraph_end;
     /* Compatibility for caller-constructed legacy rows. */
-    if (end < line.end || start > line.start) { start = line.start; end = line.end; }
-    if (end > text.length || line.start > line.end || line.end > end ||
-        (!text.data && text.length)) return (cui_text_line_source){0};
-    return (cui_text_line_source){{text.data ? text.data+start : "", end-start},
-                                 line.start-start, line.end-start};
+    if (end < line.end || start > line.start) {
+        start = line.start;
+        end = line.end;
+    }
+    if (end > text.length || line.start > line.end || line.end > end || (!text.data && text.length))
+        return (cui_text_line_source){0};
+    return (cui_text_line_source){
+        {text.data ? text.data + start : "", end - start}, line.start - start, line.end - start};
 }
 cui_text_layout_status cui_textarea_visual_geometry(cui_context *ui, cui_str text,
-                                                     cui_textarea_line line, float size,
-                                                     cui_text_style style,
-                                                     cui_text_geometry *owned,
-                                                     const cui_text_geometry **out) {
-    if (!owned || !out) return CUI_TEXT_LAYOUT_INVALID;
+                                                    cui_textarea_line line, float size,
+                                                    cui_text_style style, cui_text_geometry *owned,
+                                                    const cui_text_geometry **out) {
+    if (!owned || !out)
+        return CUI_TEXT_LAYOUT_INVALID;
     cui_text_line_source source = cui_textarea_line_source(text, line);
-    if (!source.paragraph.data) return CUI_TEXT_LAYOUT_INVALID;
-    if (!cui_has_text_geometry_line(ui)) return CUI_TEXT_LAYOUT_UNAVAILABLE;
+    if (!source.paragraph.data)
+        return CUI_TEXT_LAYOUT_INVALID;
+    if (!cui_has_text_geometry_line(ui))
+        return CUI_TEXT_LAYOUT_UNAVAILABLE;
     if (!cui_frame_active(ui)) {
         cui_text_layout_status status = cui_get_text_geometry_line(ui, source, size, style, owned);
-        if (status == CUI_TEXT_LAYOUT_OK) *out = owned;
+        if (status == CUI_TEXT_LAYOUT_OK)
+            *out = owned;
         return status;
     }
-    cui_textarea_visual_cache *cache = cui_resource_get(ui, UINT64_C(0xbc812b9fd2e07a15),
-                        UINT64_C(0x6b9fcfd365caa233), sizeof *cache,
-                        cui_textarea_visual_clear, cui_textarea_visual_clear);
-    if (!cache) return CUI_TEXT_LAYOUT_CAPACITY;
+    cui_textarea_visual_cache *cache =
+        cui_resource_get(ui, UINT64_C(0xbc812b9fd2e07a15), UINT64_C(0x6b9fcfd365caa233),
+                         sizeof *cache, cui_textarea_visual_clear, cui_textarea_visual_clear);
+    if (!cache)
+        return CUI_TEXT_LAYOUT_CAPACITY;
     size_t index = 0;
     for (; index < cache->source_count; index++)
         if (cache->sources[index].length == source.paragraph.length &&
-            (!source.paragraph.length || !memcmp(cache->sources[index].data,
-                                 source.paragraph.data, source.paragraph.length))) break;
+            (!source.paragraph.length ||
+             !memcmp(cache->sources[index].data, source.paragraph.data, source.paragraph.length)))
+            break;
     for (size_t i = 0; i < cache->line_count; i++) {
         cui_textarea_visual_line *cached = &cache->lines[i];
         if (cached->source == index && cached->start == source.byte_start &&
             cached->end == source.byte_end && cached->size == size &&
             cached->style.weight == style.weight && cached->style.italic == style.italic &&
             cached->style.monospace == style.monospace && cached->style.family == style.family) {
-            *out = &cached->geometry; return CUI_TEXT_LAYOUT_OK;
+            *out = &cached->geometry;
+            return CUI_TEXT_LAYOUT_OK;
         }
     }
     if (cache->line_count == CUI_TEXTAREA_VISUAL_LINES ||
-        (index == cache->source_count && source.paragraph.length >=
-                                         CUI_TEXTAREA_VISUAL_BYTES-cache->bytes))
+        (index == cache->source_count &&
+         source.paragraph.length >= CUI_TEXTAREA_VISUAL_BYTES - cache->bytes))
         return CUI_TEXT_LAYOUT_CAPACITY;
     char *copy = NULL;
     if (index == cache->source_count) {
-        copy = malloc(source.paragraph.length+1);
-        if (!copy) return CUI_TEXT_LAYOUT_MEMORY;
-        if (source.paragraph.length) memcpy(copy, source.paragraph.data, source.paragraph.length);
+        copy = malloc(source.paragraph.length + 1);
+        if (!copy)
+            return CUI_TEXT_LAYOUT_MEMORY;
+        if (source.paragraph.length)
+            memcpy(copy, source.paragraph.data, source.paragraph.length);
         copy[source.paragraph.length] = 0;
         source.paragraph.data = copy;
-    } else source.paragraph.data = cache->sources[index].data;
+    } else
+        source.paragraph.data = cache->sources[index].data;
     cui_text_geometry geometry = {0};
     cui_text_layout_status status = cui_get_text_geometry_line(ui, source, size, style, &geometry);
-    if (status != CUI_TEXT_LAYOUT_OK) { free(copy); return status; }
+    if (status != CUI_TEXT_LAYOUT_OK) {
+        free(copy);
+        return status;
+    }
     if (copy) {
-        cache->sources[cache->source_count++] = (cui_textarea_visual_source){copy, source.paragraph.length};
-        cache->bytes += source.paragraph.length+1;
+        cache->sources[cache->source_count++] =
+            (cui_textarea_visual_source){copy, source.paragraph.length};
+        cache->bytes += source.paragraph.length + 1;
     }
     cui_textarea_visual_line *cached = &cache->lines[cache->line_count++];
-    *cached = (cui_textarea_visual_line){geometry, index, source.byte_start, source.byte_end, size, style};
-    *out = &cached->geometry; return CUI_TEXT_LAYOUT_OK;
+    *cached = (cui_textarea_visual_line){geometry,        index, source.byte_start,
+                                         source.byte_end, size,  style};
+    *out = &cached->geometry;
+    return CUI_TEXT_LAYOUT_OK;
 }
 float cui_textarea_visual_x(cui_context *ui, cui_str text, cui_textarea_line line, size_t offset,
                             float size, cui_text_style style, cui_text_affinity affinity) {
-    if (offset < line.start) offset = line.start;
-    if (offset > line.end) offset = line.end;
-    cui_text_geometry owned = {0}; const cui_text_geometry *geometry = NULL;
-    cui_text_caret carets[2]; size_t count = 0;
+    if (offset < line.start)
+        offset = line.start;
+    if (offset > line.end)
+        offset = line.end;
+    cui_text_geometry owned = {0};
+    const cui_text_geometry *geometry = NULL;
+    cui_text_caret carets[2];
+    size_t count = 0;
     if (cui_textarea_visual_geometry(ui, text, line, size, style, &owned, &geometry) ==
-                CUI_TEXT_LAYOUT_OK && geometry->ops->carets(geometry->session,
-                    offset-cui_textarea_paragraph_base(line),
-                    carets, 2, &count) == CUI_TEXT_LAYOUT_OK && count) {
+            CUI_TEXT_LAYOUT_OK &&
+        geometry->ops->carets(geometry->session, offset - cui_textarea_paragraph_base(line), carets,
+                              2, &count) == CUI_TEXT_LAYOUT_OK &&
+        count) {
         float x = carets[0].x;
-        for (size_t i = 0; i < count; i++) if (carets[i].affinity == affinity) x = carets[i].x;
-        cui_release_text_geometry(&owned); return x;
+        for (size_t i = 0; i < count; i++)
+            if (carets[i].affinity == affinity)
+                x = carets[i].x;
+        cui_release_text_geometry(&owned);
+        return x;
     }
     cui_release_text_geometry(&owned);
     return cui_textarea_width(ui, text, line.start, offset, size, style);
@@ -541,14 +591,16 @@ float cui_textarea_visual_x(cui_context *ui, cui_str text, cui_textarea_line lin
 static size_t cui_textarea_offset(cui_context *ui, cui_str text, const cui_textarea_state *state,
                                   size_t row, float x) {
     cui_textarea_line line = state->lines[row];
-    cui_text_geometry owned = {0}; const cui_text_geometry *geometry = NULL;
+    cui_text_geometry owned = {0};
+    const cui_text_geometry *geometry = NULL;
     cui_text_caret caret;
-    if (cui_textarea_visual_geometry(ui, text, line, state->font_size, state->text_style,
-                                     &owned, &geometry) == CUI_TEXT_LAYOUT_OK &&
+    if (cui_textarea_visual_geometry(ui, text, line, state->font_size, state->text_style, &owned,
+                                     &geometry) == CUI_TEXT_LAYOUT_OK &&
         geometry->ops->hit_test(geometry->session, x, 0, CUI_TEXT_DOWNSTREAM, &caret) ==
-                                     CUI_TEXT_LAYOUT_OK) {
-        size_t result = caret.byte_offset+cui_textarea_paragraph_base(line);
-        cui_release_text_geometry(&owned); return result;
+            CUI_TEXT_LAYOUT_OK) {
+        size_t result = caret.byte_offset + cui_textarea_paragraph_base(line);
+        cui_release_text_geometry(&owned);
+        return result;
     }
     cui_release_text_geometry(&owned);
     if (x <= 0)
@@ -596,11 +648,12 @@ float cui_textarea_row_x(cui_context *ui, cui_edit *edit, const cui_textarea_sta
         offset = line.start;
     if (offset > line.end)
         offset = line.end;
-    return cui_textarea_visual_x(ui, cui_edit_get_text(edit), line, offset, state->font_size,
-                                  state->text_style, state->visual_affinity_valid && state->visual_model == edit &&
-                                  state->visual_caret_byte == offset &&
-                                  state->visual_revision == state->revision ?
-                                  state->visual_affinity : CUI_TEXT_DOWNSTREAM);
+    return cui_textarea_visual_x(
+        ui, cui_edit_get_text(edit), line, offset, state->font_size, state->text_style,
+        state->visual_affinity_valid && state->visual_model == edit &&
+                state->visual_caret_byte == offset && state->visual_revision == state->revision
+            ? state->visual_affinity
+            : CUI_TEXT_DOWNSTREAM);
 }
 size_t cui_textarea_hit_test(cui_context *ui, cui_edit *edit, cui_textarea_state *state, float x,
                              float y) {
@@ -614,13 +667,14 @@ size_t cui_textarea_hit_test(cui_context *ui, cui_edit *edit, cui_textarea_state
         cui_edit_token_boundary(cui_edit_get_content(edit), cursor, false, &cursor) != CUI_EDIT_OK)
         return SIZE_MAX;
     state->visual_affinity_valid = false;
-    cui_text_geometry owned = {0}; const cui_text_geometry *geometry = NULL;
+    cui_text_geometry owned = {0};
+    const cui_text_geometry *geometry = NULL;
     cui_text_caret caret;
     cui_str text = cui_edit_get_text(edit);
-    if (cui_textarea_visual_geometry(ui,text,state->lines[row],state->font_size,state->text_style,
-                                    &owned,&geometry) == CUI_TEXT_LAYOUT_OK &&
-        geometry->ops->hit_test(geometry->session,x-state->viewport.x+state->scroll_x,0,
-                               CUI_TEXT_DOWNSTREAM,&caret) == CUI_TEXT_LAYOUT_OK) {
+    if (cui_textarea_visual_geometry(ui, text, state->lines[row], state->font_size,
+                                     state->text_style, &owned, &geometry) == CUI_TEXT_LAYOUT_OK &&
+        geometry->ops->hit_test(geometry->session, x - state->viewport.x + state->scroll_x, 0,
+                                CUI_TEXT_DOWNSTREAM, &caret) == CUI_TEXT_LAYOUT_OK) {
         state->visual_affinity = caret.affinity;
         state->visual_caret_byte = cursor;
         state->visual_model = edit;
@@ -635,9 +689,10 @@ static void cui_textarea_reveal(cui_context *ui, cui_edit *edit, cui_textarea_st
     cui_str text = cui_edit_composition_view(edit, state->composition);
     cui_textarea_line line = state->lines[state->caret_line];
     size_t cursor = state->cursor < line.end ? state->cursor : line.end;
-    float x = cui_textarea_visual_x(ui, text, line, cursor, state->font_size, state->text_style,
-                 state->visual_affinity_valid && state->visual_caret_byte == cursor ?
-                 state->visual_affinity : CUI_TEXT_DOWNSTREAM);
+    float x = cui_textarea_visual_x(
+        ui, text, line, cursor, state->font_size, state->text_style,
+        state->visual_affinity_valid && state->visual_caret_byte == cursor ? state->visual_affinity
+                                                                           : CUI_TEXT_DOWNSTREAM);
     float y = state->caret_line * state->line_height;
     if (x < state->scroll_x)
         state->scroll_x = x;
@@ -677,7 +732,8 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
         result.error = CUI_TEXTAREA_INVALID;
         return result;
     }
-    if (state->visual_model != edit || state->visual_revision != cui_edit_get_state(edit).revision ||
+    if (state->visual_model != edit ||
+        state->visual_revision != cui_edit_get_state(edit).revision ||
         state->visual_caret_byte != cui_edit_get_state(edit).cursor)
         state->visual_affinity_valid = false;
     if (cui_edit_get_content(edit).token_count &&
@@ -848,9 +904,11 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             }
             cui_textarea_line line = state->lines[row];
             if (!state->preferred_valid) {
-                state->preferred_x = cui_textarea_visual_x(ui,text,line,effective,metrics.font_size,
-                    options.text_style,state->visual_affinity_valid &&
-                    state->visual_caret_byte == effective ? state->visual_affinity : CUI_TEXT_DOWNSTREAM);
+                state->preferred_x = cui_textarea_visual_x(
+                    ui, text, line, effective, metrics.font_size, options.text_style,
+                    state->visual_affinity_valid && state->visual_caret_byte == effective
+                        ? state->visual_affinity
+                        : CUI_TEXT_DOWNSTREAM);
                 state->preferred_valid = true;
             }
             size_t step = event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN
@@ -979,21 +1037,30 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
 bool cui_textarea_visual_paint_range(cui_context *ui, cui_id id, cui_str text,
                                      cui_textarea_line line, size_t first, size_t last, float size,
                                      cui_text_style style, cui_color color, float y, float height) {
-    if (first < line.start) first = line.start;
-    if (last > line.end) last = line.end;
-    if (first >= last) return false;
-    cui_text_geometry owned = {0}; const cui_text_geometry *geometry = NULL;
-    cui_text_selection_rect rects[64]; size_t count = 0;
+    if (first < line.start)
+        first = line.start;
+    if (last > line.end)
+        last = line.end;
+    if (first >= last)
+        return false;
+    cui_text_geometry owned = {0};
+    const cui_text_geometry *geometry = NULL;
+    cui_text_selection_rect rects[64];
+    size_t count = 0;
     size_t base = cui_textarea_paragraph_base(line);
     if (cui_textarea_visual_geometry(ui, text, line, size, style, &owned, &geometry) !=
-               CUI_TEXT_LAYOUT_OK || geometry->ops->selection(geometry->session, first-base,
-                       last-base, rects, 64, &count) != CUI_TEXT_LAYOUT_OK) {
-        cui_release_text_geometry(&owned); return false;
+            CUI_TEXT_LAYOUT_OK ||
+        geometry->ops->selection(geometry->session, first - base, last - base, rects, 64, &count) !=
+            CUI_TEXT_LAYOUT_OK) {
+        cui_release_text_geometry(&owned);
+        return false;
     }
     for (size_t i = 0; i < count; i++) {
-        cui_begin_absolute_box(ui, id ^ ((i+1)*UINT64_C(0xdcd85d8e00cda997)),
-            (cui_box){.background=color}, (cui_rect){rects[i].bounds.x, y, rects[i].bounds.w,height});
+        cui_begin_absolute_box(ui, id ^ ((i + 1) * UINT64_C(0xdcd85d8e00cda997)),
+                               (cui_box){.background = color},
+                               (cui_rect){rects[i].bounds.x, y, rects[i].bounds.w, height});
         cui_end_box(ui);
     }
-    cui_release_text_geometry(&owned); return true;
+    cui_release_text_geometry(&owned);
+    return true;
 }

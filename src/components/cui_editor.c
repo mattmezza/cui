@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_editor.h"
+#include "../base/cui_textarea_geometry.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_scroll.h"
-#include "../base/cui_textarea_geometry.h"
 #include <math.h>
 #include <stdio.h>
 static cui_id cui_editor_child(cui_id id, size_t row, unsigned part) {
@@ -29,8 +29,8 @@ static float cui_editor_prefix(cui_context *ui, cui_str text, cui_textarea_line 
                                float font, cui_text_style style) {
     return cui_textarea_visual_x(ui, text, line, offset, font, style, CUI_TEXT_DOWNSTREAM);
 }
-static float cui_editor_gutter(cui_context *ui, cui_editor_state *editor, cui_str document, float font, cui_text_style style,
-                               bool numbers, size_t fold_count) {
+static float cui_editor_gutter(cui_context *ui, cui_editor_state *editor, cui_str document,
+                               float font, cui_text_style style, bool numbers, size_t fold_count) {
     if (!numbers)
         return 0;
     uint64_t revision = cui_edit_get_state(editor->edit).revision;
@@ -40,16 +40,20 @@ static float cui_editor_gutter(cui_context *ui, cui_editor_state *editor, cui_st
         for (size_t i = 0; i < document.length; ++i) {
             if (document.data[i] == '\r') {
                 ++count;
-                if (i+1 < document.length && document.data[i+1] == '\n') ++i;
-            } else if (document.data[i] == '\n') ++count;
+                if (i + 1 < document.length && document.data[i + 1] == '\n')
+                    ++i;
+            } else if (document.data[i] == '\n')
+                ++count;
         }
-        editor->gutter_model=editor->edit;editor->gutter_revision=revision;
-        editor->gutter_line_count=count;editor->gutter_valid=true;
+        editor->gutter_model = editor->edit;
+        editor->gutter_revision = revision;
+        editor->gutter_line_count = count;
+        editor->gutter_valid = true;
     }
     size_t count = editor->gutter_line_count;
     if (editor->view.layout_composing && editor->view.composition &&
         editor->view.composition->active && editor->view.count)
-        count = editor->view.lines[editor->view.count-1].logical_line+1;
+        count = editor->view.lines[editor->view.count - 1].logical_line + 1;
     char digits[32];
     int length = snprintf(digits, sizeof digits, "%zu", count);
     return cui_measure_text_ex(ui, (cui_str){digits, (size_t)length}, font, style).width + 16 +
@@ -222,8 +226,9 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     if (result.error != CUI_TEXTAREA_OK)
         return result;
     document = cui_edit_composition_view(edit, state->composition);
-    float updated_gutter = cui_editor_gutter(ui, editor, document, metrics.font_size, options.text_style,
-                                             config.line_numbers, state->fold_count);
+    float updated_gutter =
+        cui_editor_gutter(ui, editor, document, metrics.font_size, options.text_style,
+                          config.line_numbers, state->fold_count);
     width = fmaxf(1, width + gutter - updated_gutter);
     gutter = updated_gutter;
     state->viewport.w = width;
@@ -287,12 +292,14 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
             ui, id ^ UINT64_C(0x147dc03f2198af04),
             (cui_box){
                 .width = gutter, .fixed_width = true, .height = state->viewport.h, .clip = true});
-        size_t first_row=(size_t)floorf(state->scroll_y/metrics.line_height);
-        if (first_row >= state->count) first_row=state->count-1;
-        size_t visible_rows=(size_t)ceilf(state->viewport.h/metrics.line_height)+2;
-        size_t last_row=visible_rows > state->count-first_row ? state->count : first_row+visible_rows;
-        for (size_t row=first_row; row<last_row; ++row) {
-            size_t logical=state->lines[row].logical_line;
+        size_t first_row = (size_t)floorf(state->scroll_y / metrics.line_height);
+        if (first_row >= state->count)
+            first_row = state->count - 1;
+        size_t visible_rows = (size_t)ceilf(state->viewport.h / metrics.line_height) + 2;
+        size_t last_row =
+            visible_rows > state->count - first_row ? state->count : first_row + visible_rows;
+        for (size_t row = first_row; row < last_row; ++row) {
+            size_t logical = state->lines[row].logical_line;
             if (state->lines[row].start == state->lines[row].paragraph_start) {
                 char number[32];
                 int n = snprintf(number, sizeof number, "%zu", logical + 1);
@@ -385,9 +392,10 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     }
     for (size_t row = begin; row < end; row++) {
         cui_textarea_line line = state->lines[row];
-        cui_text_geometry owned_geometry = {0}; const cui_text_geometry *line_geometry = NULL;
-        cui_text_layout_status visual_status = cui_textarea_visual_geometry(ui,text,line,
-            metrics.font_size,options.text_style,&owned_geometry,&line_geometry);
+        cui_text_geometry owned_geometry = {0};
+        const cui_text_geometry *line_geometry = NULL;
+        cui_text_layout_status visual_status = cui_textarea_visual_geometry(
+            ui, text, line, metrics.font_size, options.text_style, &owned_geometry, &line_geometry);
         if (visual_status != CUI_TEXT_LAYOUT_OK && result.visual_error == CUI_TEXT_LAYOUT_OK)
             result.visual_error = visual_status;
         cui_release_text_geometry(&owned_geometry);
@@ -441,9 +449,11 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
             size_t last = selected.anchor > selected.cursor ? selected.anchor : selected.cursor;
             if (first >= line.next || last <= line.start)
                 continue;
-            if (cui_textarea_visual_paint_range(ui,cui_editor_cursor_child(id,row,selected.id,75),
-                    text,line,first,last,metrics.font_size,options.text_style,theme->selection,
-                    0,metrics.line_height)) continue;
+            if (cui_textarea_visual_paint_range(
+                    ui, cui_editor_cursor_child(id, row, selected.id, 75), text, line, first, last,
+                    metrics.font_size, options.text_style, theme->selection, 0,
+                    metrics.line_height))
+                continue;
             float left =
                 cui_editor_prefix(ui, text, line, first, metrics.font_size, options.text_style);
             float right =
@@ -463,32 +473,34 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
             cui_text_line(ui, options.placeholder, metrics.font_size, theme->muted,
                           metrics.line_height, options.text_style);
         else if (line.end > line.start && config.highlight && visual_status == CUI_TEXT_LAYOUT_OK) {
-            cui_text_color_span spans[64]; size_t count = 0, start = line.start;
+            cui_text_color_span spans[64];
+            size_t count = 0, start = line.start;
             while (start < line.end && count < 64) {
                 cui_color color = foreground;
-                size_t next = config.highlight(config.highlight_user,config.language,text,
-                                               start,line.end,&color);
+                size_t next = config.highlight(config.highlight_user, config.language, text, start,
+                                               line.end, &color);
                 if (next <= start || next > line.end ||
-                    (next < text.length && ((unsigned char)text.data[next]&0xc0)==0x80)) {
-                    next = line.end; color = foreground;
+                    (next < text.length && ((unsigned char)text.data[next] & 0xc0) == 0x80)) {
+                    next = line.end;
+                    color = foreground;
                 }
-                spans[count++] = (cui_text_color_span){start-line.paragraph_start,
-                                                       next-line.paragraph_start,color};
+                spans[count++] = (cui_text_color_span){start - line.paragraph_start,
+                                                       next - line.paragraph_start, color};
                 start = next;
             }
             /* Bounded workspace: excessive highlight spans preserve a correct plain line. */
             if (start == line.end)
-                cui_text_context_line_colored(ui,cui_textarea_line_source(text,line),
-                    metrics.font_size,foreground,metrics.line_height,options.text_style,spans,count);
+                cui_text_context_line_colored(ui, cui_textarea_line_source(text, line),
+                                              metrics.font_size, foreground, metrics.line_height,
+                                              options.text_style, spans, count);
             else {
                 result.error = CUI_TEXTAREA_CAPACITY;
-                cui_text_context_line(ui,cui_textarea_line_source(text,line),metrics.font_size,
-                                      foreground,metrics.line_height,options.text_style);
+                cui_text_context_line(ui, cui_textarea_line_source(text, line), metrics.font_size,
+                                      foreground, metrics.line_height, options.text_style);
             }
-        }
-        else if (line.end > line.start && !config.highlight)
-            cui_text_context_line(ui,cui_textarea_line_source(text,line),metrics.font_size,
-                                  foreground,metrics.line_height,options.text_style);
+        } else if (line.end > line.start && !config.highlight)
+            cui_text_context_line(ui, cui_textarea_line_source(text, line), metrics.font_size,
+                                  foreground, metrics.line_height, options.text_style);
         else if (line.end > line.start) {
             size_t start = line.start;
             while (start < line.end) {
@@ -516,9 +528,9 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
             cui_edit_composition *c = state->composition;
             size_t a = c->start > line.start ? c->start : line.start;
             size_t b = c->start + c->length < line.end ? c->start + c->length : line.end;
-            if (a < b && !cui_textarea_visual_paint_range(ui,cui_editor_child(id,row,76),
-                    text,line,a,b,metrics.font_size,options.text_style,theme->caret,
-                    metrics.line_height-1,1)) {
+            if (a < b && !cui_textarea_visual_paint_range(
+                             ui, cui_editor_child(id, row, 76), text, line, a, b, metrics.font_size,
+                             options.text_style, theme->caret, metrics.line_height - 1, 1)) {
                 float left =
                     cui_editor_prefix(ui, text, line, a, metrics.font_size, options.text_style);
                 float right =
@@ -535,16 +547,21 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                         upstream = editor->cursor_anchors[anchor].upstream;
                 if (row != cui_textarea_row_for_offset(state, selections[cursor].cursor, upstream))
                     continue;
-                float x = cui_textarea_visual_x(ui,text,line,selections[cursor].cursor,metrics.font_size,
-                    options.text_style,cursor == 0 && state->visual_affinity_valid &&
-                    state->visual_caret_byte == selections[cursor].cursor ?
-                    state->visual_affinity : CUI_TEXT_DOWNSTREAM);
-                cui_begin_absolute_box(ui,
-                                       cui_editor_cursor_child(id, row, selections[cursor].id, 74),
-                                       (cui_box){.background = caret ? theme->caret : (cui_color){0}},
-                                       (cui_rect){x, 0, 1, metrics.line_height});
-                if (cursor == 0) cui_set_text_input_geometry_rect(ui,id,
-                    cui_editor_cursor_child(id,row,selections[cursor].id,74),metrics.line_height);
+                float x = cui_textarea_visual_x(ui, text, line, selections[cursor].cursor,
+                                                metrics.font_size, options.text_style,
+                                                cursor == 0 && state->visual_affinity_valid &&
+                                                        state->visual_caret_byte ==
+                                                            selections[cursor].cursor
+                                                    ? state->visual_affinity
+                                                    : CUI_TEXT_DOWNSTREAM);
+                cui_begin_absolute_box(
+                    ui, cui_editor_cursor_child(id, row, selections[cursor].id, 74),
+                    (cui_box){.background = caret ? theme->caret : (cui_color){0}},
+                    (cui_rect){x, 0, 1, metrics.line_height});
+                if (cursor == 0)
+                    cui_set_text_input_geometry_rect(
+                        ui, id, cui_editor_cursor_child(id, row, selections[cursor].id, 74),
+                        metrics.line_height);
                 cui_end_box(ui);
             }
         cui_end_box(ui);

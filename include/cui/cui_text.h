@@ -49,7 +49,8 @@ cui_text_layout_status cui_font_text_geometry_line(void *, cui_text_line_source,
 /* Zero source retains legacy drawing; contextual ranges retain bidi paragraph analysis. */
 bool cui_font_draw_context_line(cui_font *, cui_str, cui_text_line_source, float, cui_text_style,
                                 float, float, cui_glyph_fn, void *);
-typedef void (*cui_color_glyph_fn)(void *, int, int, int, int, int, const unsigned char *, cui_color);
+typedef void (*cui_color_glyph_fn)(void *, int, int, int, int, int, const unsigned char *,
+                                   cui_color);
 /* Colors change glyph coverage only after full-line shaping; cluster-start wins.
  * Requires native bidi support; disabled builds return false without emission. */
 bool cui_font_draw_context_line_colored(cui_font *, cui_text_line_source, float, cui_text_style,

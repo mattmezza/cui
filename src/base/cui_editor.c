@@ -180,8 +180,8 @@ static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor, cu
                                 at = cui_grapheme_next(text, at);
                                 position++;
                             }
-                            next[i].x = cui_textarea_visual_x(ui,text,editor->view.lines[row],at,
-                                                               font,style,CUI_TEXT_DOWNSTREAM);
+                            next[i].x = cui_textarea_visual_x(ui, text, editor->view.lines[row], at,
+                                                              font, style, CUI_TEXT_DOWNSTREAM);
                             if (position < columns[j].column)
                                 next[i].x +=
                                     (columns[j].column - position) *

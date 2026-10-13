@@ -224,18 +224,18 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
         }
 }
 static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
-                         const unsigned char *data, cui_color color) {
+                        const unsigned char *data, cui_color color) {
     cui_software *r = user;
     r->ink = color;
-    glyph(user,x,y,w,h,pitch,data);
+    glyph(user, x, y, w, h, pitch, data);
 }
 static bool text_draw(cui_software *r, const cui_draw_command *c) {
     if (c->text_color_count)
-        return cui_font_draw_context_line_colored(r->font,c->text_source,c->font_size,
-            c->text_style,c->bounds.x,c->bounds.y,c->color,c->text_colors,c->text_color_count,
-            color_glyph,r);
-    return cui_font_draw_context_line(r->font,c->text,c->text_source,c->font_size,c->text_style,
-                                      c->bounds.x,c->bounds.y,glyph,r);
+        return cui_font_draw_context_line_colored(
+            r->font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
+            c->color, c->text_colors, c->text_color_count, color_glyph, r);
+    return cui_font_draw_context_line(r->font, c->text, c->text_source, c->font_size, c->text_style,
+                                      c->bounds.x, c->bounds.y, glyph, r);
 }
 
 #endif

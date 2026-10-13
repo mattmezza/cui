@@ -455,18 +455,18 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
         s->glyph_ok = false;
 }
 static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
-                         const unsigned char *data, cui_color color) {
+                        const unsigned char *data, cui_color color) {
     cui_sdl3 *s = user;
     s->ink = color;
-    glyph(user,x,y,w,h,pitch,data);
+    glyph(user, x, y, w, h, pitch, data);
 }
 static bool text_draw(cui_sdl3 *s, const cui_draw_command *c) {
     if (c->text_color_count)
-        return cui_font_draw_context_line_colored(s->font,c->text_source,c->font_size,
-            c->text_style,c->bounds.x,c->bounds.y,c->color,c->text_colors,c->text_color_count,
-            color_glyph,s);
-    return cui_font_draw_context_line(s->font,c->text,c->text_source,c->font_size,c->text_style,
-                                      c->bounds.x,c->bounds.y,glyph,s);
+        return cui_font_draw_context_line_colored(
+            s->font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
+            c->color, c->text_colors, c->text_color_count, color_glyph, s);
+    return cui_font_draw_context_line(s->font, c->text, c->text_source, c->font_size, c->text_style,
+                                      c->bounds.x, c->bounds.y, glyph, s);
 }
 
 static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c) {
@@ -553,9 +553,7 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
         case CUI_DRAW_TEXT:
             s->ink = c->color;
             s->glyph_ok = true;
-            if (!s->font ||
-                !text_draw(s, c) ||
-                !s->glyph_ok)
+            if (!s->font || !text_draw(s, c) || !s->glyph_ok)
                 return false;
             break;
         case CUI_DRAW_CLIP_PUSH: {

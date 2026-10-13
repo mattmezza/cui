@@ -11,8 +11,11 @@ typedef enum {
     CUI_ALERT_INFO,
     CUI_ALERT_SUCCESS,
     CUI_ALERT_WARNING,
-    CUI_ALERT_ERROR
+    CUI_ALERT_ERROR,
+    CUI_ALERT_DEFAULT
 } cui_alert_kind;
+typedef void (*cui_content_slot_fn)(cui_context *, const cui_theme *, cui_color foreground,
+                                    void *user);
 typedef struct {
     cui_alert_kind kind;
     cui_str title, message, icon;
@@ -23,6 +26,9 @@ typedef struct {
     bool dismissible;
     /* Named SVG; empty selects the kind's default. Legacy icon text overrides it. */
     cui_str icon_name;
+    cui_content_slot_fn title_content, content, action;
+    void *user;
+    cui_str accessible_name; /* Required for custom content without message text. */
 } cui_alert_options;
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options);
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
@@ -85,6 +91,38 @@ typedef enum {
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *theme,
                       cui_bubble_variant variant, float width);
 void cui_end_bubble(cui_context *ui);
+/* Slot foreground is semantic; custom children choose their own paint explicitly. */
+cui_color cui_bubble_foreground(const cui_theme *, cui_bubble_variant);
+typedef enum { CUI_BUBBLE_INCOMING, CUI_BUBBLE_OUTGOING } cui_bubble_alignment;
+typedef enum { CUI_BUBBLE_REACTIONS_BOTTOM, CUI_BUBBLE_REACTIONS_TOP } cui_bubble_reaction_side;
+typedef enum {
+    CUI_BUBBLE_ANNOUNCE_NONE,
+    CUI_BUBBLE_ANNOUNCE_POLITE,
+    CUI_BUBBLE_ANNOUNCE_ASSERTIVE
+} cui_bubble_announcement;
+/* Optional caller-owned measurement cache; zero initialize, never share between IDs. */
+typedef struct {
+    cui_rect surface, reactions, row;
+    bool measured;
+    uint64_t revision;
+    float width, font_size, padding;
+    unsigned configuration;
+} cui_bubble_state;
+typedef struct {
+    cui_bubble_variant variant;
+    cui_bubble_alignment alignment;
+    cui_bubble_reaction_side reaction_side;
+    cui_bubble_alignment reaction_alignment;
+    cui_bubble_announcement announcement;
+    float width; /* Row width; surface is capped at 80%, ghost at 100%. */
+    cui_str message, accessible_name;
+    cui_content_slot_fn content, reactions;
+    void *user;
+    cui_bubble_state *state;   /* NULL retains normal-flow reactions. */
+    uint64_t content_revision; /* Increment when custom slot geometry changes. */
+} cui_bubble_options;
+/* Synchronous borrowed slots. Reaction controls retain their base button semantics. */
+void cui_bubble(cui_context *, cui_id, const cui_theme *, cui_bubble_options);
 void cui_empty(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,
                cui_str description, float width);
 void cui_begin_group_box(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,
@@ -317,13 +355,14 @@ static cui_id cui_content_child(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x874e65fa19c80721) + UINT64_C(0x9e3779b97f4a7c15) * index);
 }
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options o) {
-    if (!ui || !t || o.kind < CUI_ALERT_INFO || o.kind > CUI_ALERT_ERROR ||
+    if (!ui || !t || o.kind < CUI_ALERT_INFO || o.kind > CUI_ALERT_DEFAULT ||
         (o.visible && !*o.visible))
         return false;
     float scale = cui_content_positive(o.scale, 1);
     cui_color accent = o.kind == CUI_ALERT_ERROR     ? t->danger
                        : o.kind == CUI_ALERT_SUCCESS ? t->success
                        : o.kind == CUI_ALERT_WARNING ? t->warning
+                       : o.kind == CUI_ALERT_DEFAULT ? t->text
                                                      : t->info;
     const char *kind = o.kind == CUI_ALERT_SUCCESS   ? "Success"
                        : o.kind == CUI_ALERT_WARNING ? "Warning"
@@ -334,10 +373,16 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options
                             .padding = t->padding * scale,
                             .gap = t->gap * scale,
                             .radius = o.banner ? 0 : t->radius,
-                            .border = accent,
-                            .border_width = 1,
-                            .background = cui_content_blend(t->surface, accent, .1f)});
-    cui_content_semantic(ui, id, CUI_ROLE_ALERT, o.message, false, false, 0);
+                            .border = o.kind == CUI_ALERT_DEFAULT ? t->border : accent,
+                            .border_width = o.banner ? 0 : 1,
+                            .background = o.kind == CUI_ALERT_DEFAULT
+                                              ? t->background
+                                              : cui_content_blend(t->surface, accent, .1f)});
+    cui_content_semantic(ui, id, CUI_ROLE_ALERT,
+                         o.accessible_name.length ? o.accessible_name
+                         : o.message.length       ? o.message
+                                                  : o.title,
+                         false, false, 0);
     cui_begin_box(ui, cui_content_child(id, 2),
                   (cui_box){.row = true, .align_y = CUI_ALIGN_CENTER, .gap = t->gap * scale});
     if (o.icon.length)
@@ -354,11 +399,21 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options
                                           .custom_color = true,
                                           .color = accent});
     }
-    cui_text(ui, cui_string(kind), t->font_size * .8f * scale, accent);
+    if (o.kind != CUI_ALERT_DEFAULT)
+        cui_text(ui, cui_string(kind), t->font_size * .8f * scale, accent);
     cui_end_box(ui);
-    if (!o.banner && o.title.length)
-        cui_text(ui, o.title, t->font_size * scale, t->text);
-    cui_text(ui, o.message, t->font_size * scale, t->text);
+    if (!o.banner) {
+        if (o.title_content)
+            o.title_content(ui, t, accent, o.user);
+        else if (o.title.length)
+            cui_text(ui, o.title, t->font_size * scale, accent);
+    }
+    if (o.content)
+        o.content(ui, t, accent, o.user);
+    else if (o.message.length)
+        cui_text(ui, o.message, t->font_size * scale, accent);
+    if (o.action)
+        o.action(ui, t, accent, o.user);
     bool closed = false;
     if (o.dismissible) {
         closed = cui_button(ui, cui_content_child(id, 1), t, cui_string("Dismiss"), false);
@@ -577,7 +632,7 @@ void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble
     cui_color bg = t->surface;
     if (v == CUI_BUBBLE_FILLED)
         bg = t->primary;
-    else if (v == CUI_BUBBLE_MUTED)
+    else if (v == CUI_BUBBLE_SECONDARY || v == CUI_BUBBLE_MUTED)
         bg = cui_content_blend(t->surface, t->border, .5f);
     else if (v == CUI_BUBBLE_TINTED)
         bg = cui_content_blend(t->surface, t->primary, .15f);
@@ -589,8 +644,10 @@ void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble
                            : v == CUI_BUBBLE_ERROR   ? t->danger
                                                      : t->info;
         bg = cui_content_blend(t->surface, accent, .15f);
-    } else if (v == CUI_BUBBLE_GHOST || v == CUI_BUBBLE_OUTLINE)
+    } else if (v == CUI_BUBBLE_GHOST)
         bg.a = 0;
+    else if (v == CUI_BUBBLE_OUTLINE)
+        bg = t->background;
     cui_begin_box(ui, id,
                   (cui_box){.width = width > 0 ? width : 0,
                             .padding = v == CUI_BUBBLE_GHOST ? 0 : t->padding,
@@ -601,6 +658,145 @@ void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble
                             .border_width = v == CUI_BUBBLE_OUTLINE ? 1 : 0});
 }
 void cui_end_bubble(cui_context *ui) {
+    cui_end_box(ui);
+}
+cui_color cui_bubble_foreground(const cui_theme *t, cui_bubble_variant v) {
+    if (!t)
+        return (cui_color){0};
+    switch (v) {
+    case CUI_BUBBLE_FILLED:
+        return t->on_primary;
+    case CUI_BUBBLE_DESTRUCTIVE:
+    case CUI_BUBBLE_ERROR:
+        return t->danger;
+    case CUI_BUBBLE_INFO:
+        return t->info;
+    case CUI_BUBBLE_SUCCESS:
+        return t->success;
+    case CUI_BUBBLE_WARNING:
+        return t->warning;
+    default:
+        return t->text;
+    }
+}
+static void cui_bubble_reactions(cui_context *ui, cui_id id, const cui_theme *t,
+                                 cui_bubble_options o) {
+    bool floating = o.state && o.state->measured;
+    if (!floating)
+        cui_begin_box(ui, cui_content_child(id, 4),
+                      (cui_box){.width = 1,
+                                .width_percent = true,
+                                .align_x = o.reaction_alignment == CUI_BUBBLE_OUTGOING
+                                               ? CUI_ALIGN_END
+                                               : CUI_ALIGN_START});
+    cui_box pill = {.row = true,
+                    .gap = t->gap,
+                    .radius = t->radius * 2,
+                    .padding = t->padding * .25f,
+                    .background = cui_content_blend(t->surface, t->border, .5f),
+                    .border = t->background,
+                    .border_width = 2};
+    if (floating) {
+        cui_bubble_state *state = o.state;
+        float inset = fminf(t->padding, state->surface.w * .25f);
+        float x = state->surface.x - state->row.x + inset;
+        if (o.reaction_alignment == CUI_BUBBLE_OUTGOING)
+            x = state->surface.x - state->row.x + state->surface.w - state->reactions.w - inset;
+        float y = state->surface.y - state->row.y;
+        y += o.reaction_side == CUI_BUBBLE_REACTIONS_TOP
+                 ? -state->reactions.h * .75f
+                 : state->surface.h - state->reactions.h * .25f;
+        cui_begin_absolute_box(ui, cui_content_child(id, 5), pill,
+                               (cui_rect){x, y, state->reactions.w, state->reactions.h});
+    } else
+        cui_begin_box(ui, cui_content_child(id, 5), pill);
+    o.reactions(ui, t, t->text, o.user);
+    cui_end_box(ui);
+    if (!floating)
+        cui_end_box(ui);
+}
+void cui_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble_options o) {
+    if (!ui || !t || o.variant < CUI_BUBBLE_FILLED || o.variant > CUI_BUBBLE_ERROR ||
+        o.alignment < CUI_BUBBLE_INCOMING || o.alignment > CUI_BUBBLE_OUTGOING ||
+        o.reaction_alignment < CUI_BUBBLE_INCOMING || o.reaction_alignment > CUI_BUBBLE_OUTGOING ||
+        o.reaction_side < CUI_BUBBLE_REACTIONS_BOTTOM ||
+        o.reaction_side > CUI_BUBBLE_REACTIONS_TOP || o.announcement < CUI_BUBBLE_ANNOUNCE_NONE ||
+        o.announcement > CUI_BUBBLE_ANNOUNCE_ASSERTIVE)
+        return;
+    float row_width = cui_content_positive(o.width, 0);
+    if (o.state) {
+        float font_size = isfinite(t->font_size) ? t->font_size : 0;
+        float padding = isfinite(t->padding) ? t->padding : 0;
+        unsigned configuration = (unsigned)o.variant | ((unsigned)o.alignment << 4) |
+                                 ((unsigned)o.reaction_side << 5) |
+                                 ((unsigned)o.reaction_alignment << 6) | (o.reactions ? 128u : 0u);
+        float width = row_width;
+        bool reset = o.state->revision != o.content_revision || o.state->width != width ||
+                     o.state->configuration != configuration || o.state->font_size != font_size ||
+                     o.state->padding != padding;
+        cui_rect surface = cui_bounds(ui, cui_content_child(id, 3));
+        cui_rect reactions = cui_bounds(ui, cui_content_child(id, 5));
+        cui_rect row = cui_bounds(ui, id);
+        if (o.state->measured && row.w != o.state->row.w)
+            reset = true;
+        bool measured = !reset && o.reactions && surface.w > 0 && surface.h > 0 &&
+                        reactions.w > 0 && reactions.h > 0;
+        if (reset || measured != o.state->measured ||
+            memcmp(&surface, &o.state->surface, sizeof surface) ||
+            memcmp(&reactions, &o.state->reactions, sizeof reactions) ||
+            memcmp(&row, &o.state->row, sizeof row)) {
+            *o.state = (cui_bubble_state){.surface = surface,
+                                          .reactions = reactions,
+                                          .row = row,
+                                          .measured = measured,
+                                          .revision = o.content_revision,
+                                          .width = width,
+                                          .configuration = configuration,
+                                          .font_size = font_size,
+                                          .padding = padding};
+            cui_invalidate(ui);
+        }
+    }
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = row_width > 0 ? row_width : 1,
+                  .width_percent = !(row_width > 0),
+                  .gap = t->gap * .5f,
+                  .align_x = o.alignment == CUI_BUBBLE_OUTGOING ? CUI_ALIGN_END : CUI_ALIGN_START});
+    cui_role role = o.announcement == CUI_BUBBLE_ANNOUNCE_ASSERTIVE ? CUI_ROLE_ALERT
+                    : o.announcement == CUI_BUBBLE_ANNOUNCE_POLITE  ? CUI_ROLE_STATUS
+                                                                    : CUI_ROLE_GROUP;
+    cui_content_semantic(ui, id, role, o.accessible_name.length ? o.accessible_name : o.message,
+                         false, false, 0);
+    if (o.reactions && o.reaction_side == CUI_BUBBLE_REACTIONS_TOP) {
+        if (o.state && o.state->measured) {
+            cui_begin_box(ui, cui_content_child(id, 6),
+                          (cui_box){.height = o.state->reactions.h * .75f, .fixed_height = true});
+            cui_end_box(ui);
+        }
+        cui_bubble_reactions(ui, id, t, o);
+    }
+    cui_begin_box(
+        ui, cui_content_child(id, 2),
+        (cui_box){.width = o.variant == CUI_BUBBLE_GHOST ? 1 : .8f,
+                  .width_percent = true,
+                  .align_x = o.alignment == CUI_BUBBLE_OUTGOING ? CUI_ALIGN_END : CUI_ALIGN_START});
+    cui_begin_bubble(ui, cui_content_child(id, 3), t, o.variant, 0);
+    cui_color fg = cui_bubble_foreground(t, o.variant);
+    if (o.content)
+        o.content(ui, t, fg, o.user);
+    else if (o.message.length)
+        cui_text(ui, o.message, t->font_size, fg);
+    cui_end_bubble(ui);
+    cui_end_box(ui);
+    if (o.reactions && o.reaction_side != CUI_BUBBLE_REACTIONS_TOP) {
+        cui_bubble_reactions(ui, id, t, o);
+        if (o.state && o.state->measured) {
+            cui_begin_box(ui, cui_content_child(id, 6),
+                          (cui_box){.height = o.state->reactions.h * .75f, .fixed_height = true});
+            cui_end_box(ui);
+        }
+    }
     cui_end_box(ui);
 }
 void cui_empty(cui_context *ui, cui_id id, const cui_theme *t, cui_str title, cui_str description,

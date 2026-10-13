@@ -1424,6 +1424,37 @@ static void test_composition_activation(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_live_pointer_position(void) {
+    cui_context *ui = make();
+    float x = 19, y = 37;
+    assert(cui_pointer_position(ui, &x, &y) && x == 0 && y == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 27, .y = 83}));
+    assert(cui_pointer_position(ui, &x, &y) && x == 0 && y == 0);
+    begin(ui);
+    assert(cui_pointer_position(ui, &x, &y) && x == 27 && y == 83);
+    cui_end_frame(ui);
+    begin(ui);
+    assert(cui_pointer_position(ui, &x, &y) && x == 27 && y == 83);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 12, .y = 40}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 15, .y = 44}));
+    begin(ui);
+    assert(cui_pointer_position(ui, &x, &y) && x == 15 && y == 44);
+    cui_end_frame(ui);
+    assert(!cui_pointer_position(NULL, &x, &y) && x == 15 && y == 44);
+    assert(!cui_pointer_position(ui, NULL, &y) && y == 44);
+    assert(!cui_pointer_position(ui, &x, NULL) && x == 15);
+    assert(!cui_pointer_position(ui, &x, &x) && x == 15);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = NAN, .y = 1}));
+    begin(ui);
+    assert(!cui_pointer_position(ui, &x, &y) && x == 15 && y == 44);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 9, .y = 11}));
+    begin(ui);
+    assert(cui_pointer_position(ui, &x, &y) && x == 9 && y == 11);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 static void test_shortcut_key_characters(void) {
     /* Existing host numeric key mappings retain their original identities. */
     assert(CUI_KEY_A == 13 && CUI_KEY_PAGEDOWN == 20);
@@ -1434,6 +1465,10 @@ static void test_shortcut_key_characters(void) {
     }
     for (char c = '0'; c <= '9'; c++)
         assert(cui_key_character(cui_key_from_character(c)) == c);
+    assert(cui_key_from_character('[') == CUI_KEY_LEFT_BRACKET);
+    assert(cui_key_from_character(']') == CUI_KEY_RIGHT_BRACKET);
+    assert(cui_key_character(CUI_KEY_LEFT_BRACKET) == '[');
+    assert(cui_key_character(CUI_KEY_RIGHT_BRACKET) == ']');
     assert(cui_key_from_character('!') == CUI_KEY_NONE);
     assert(cui_key_from_character((char)0xff) == CUI_KEY_NONE);
     assert(!cui_key_character(CUI_KEY_ENTER));
@@ -2552,6 +2587,7 @@ int main(void) {
     test_nested_wheel_routing();
     test_dominant_axis_scroll();
     test_persistent_scroll_routing();
+    test_live_pointer_position();
     test_shortcut_key_characters();
     test_composition_activation();
     test_perceptual_color_mix();

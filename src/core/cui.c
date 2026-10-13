@@ -1992,9 +1992,17 @@ cui_key cui_key_from_character(char character) {
         return letters[character - 'A'];
     if (character >= '0' && character <= '9')
         return (cui_key)(CUI_KEY_0 + character - '0');
+    if (character == '[')
+        return CUI_KEY_LEFT_BRACKET;
+    if (character == ']')
+        return CUI_KEY_RIGHT_BRACKET;
     return CUI_KEY_NONE;
 }
 char cui_key_character(cui_key key) {
+    if (key == CUI_KEY_LEFT_BRACKET)
+        return '[';
+    if (key == CUI_KEY_RIGHT_BRACKET)
+        return ']';
     if (key >= CUI_KEY_0 && key <= CUI_KEY_9)
         return (char)('0' + key - CUI_KEY_0);
     for (char c = 'A'; c <= 'Z'; c++)
@@ -2037,5 +2045,13 @@ bool cui_scroll_gesture_filter(cui_scroll_gesture *state, cui_event *event, doub
         else
             event->dx = 0;
     }
+    return true;
+}
+
+bool cui_pointer_position(const cui_context *ui, float *x, float *y) {
+    if (!ui || !x || !y || x == y || !isfinite(ui->pointer_x) || !isfinite(ui->pointer_y))
+        return false;
+    *x = ui->pointer_x;
+    *y = ui->pointer_y;
     return true;
 }

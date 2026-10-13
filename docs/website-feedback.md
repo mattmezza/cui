@@ -21,13 +21,13 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.
 - [x] Input Group: constrain the field so addons stay on the same row. — 87721c1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks all four sizes; browser checks 390px/1280px inline layout and block-mode opt-in. Publication pending.
 - [ ] Textarea: word/vertical navigation is implemented/tested in the navigation batch; repeated Down/content visibility remains under investigation.
-- [ ] Dock: a visible, interactive docking demonstration and instructions.
+- [x] Dock: visible composed panes, tab selection, split and reset controls with instructions. — 1f4dd88 passes Chromium78 with physical interactions and pane geometry checks. The public styled Dock and tab/divider dragging remain incomplete. Publication pending.
 - [x] Resizable: a composed workspace visibly resizes Explorer/editor panes and switches example files. — 1ceb567 passes Chromium78 with physical drag and visible geometry assertions; portable code is unchanged from validated 41de104. Publication pending.
 - [ ] Scrollable and Sidebar: natural wheel sensitivity and working scrollbar.
 - [ ] Sheet: enter/exit animation with reduced-motion handling.
 - [ ] Theme: understandable, functional token demonstration.
-- [ ] VirtualList: visibly scroll a genuinely virtualized large list.
-- [ ] Chart: continuous, adequately thick curved line rendering.
+- [x] VirtualList: wheel/scrollbar/Home/End scroll real task rows from the 100,000-key model. — 85531a4 passes Chromium78 and submits at most nine rows; native model75 passes. Offscreen focus, asynchronous measurement and a public styled widget remain incomplete. Publication pending.
+- [x] Chart: configurable 2px default strokes with smooth edges. — d564c70 passes native75, sanitizers75, WASI67 and Chromium78. Coverage regression fails the old raster; width/cache/clamping checks pass. Publication pending.
 - [x] Command: content spans panel width. — 76c36ba checks full scroll/row width at two panel sizes, passes the same gates and fails old code. Publication pending.
 - [x] DataTable: headers sort actual gallery rows and use themed SVG indicators. — 41de104 passes native75, sanitizers75, WASI67 and Chromium78; the graphic regression fails old code. Application-owned model sorting is documented. Publication pending.
 - [ ] Plot: visible, interactive plot with clear instructions.

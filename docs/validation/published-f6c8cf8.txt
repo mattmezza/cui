@@ -1,0 +1,29 @@
+Published source: f6c8cf8109b5575f54e15344095c150b81e13507
+Library CI38324678570 and Pages38324678554 both PASS.
+URL: https://matteo.merola.co/cui/
+Scope: actual HTTPS Chromium78 plus twenty artifact byte comparisons. This publishes the centered/fixed alert, Stepper, Calendar/DatePicker SVG and centering, choice/Command widths, InputGroup layout and clean Message preview. Full GPUI parity and remaining website feedback are incomplete.
+Installed 4 packages in 14ms
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+Alert second confirmation: {'attempts': 2, 'open': 0, 'pointers': [1, 1, 134, 134], 'canvas': [339, 371.390625], 'semantics': [{'name': 'Delete workspace', 'role': 1, 'bounds': [24, 24, 136.73153686523438, 32], 'focused': 1, 'scroll': 0, 'maximum': 0}]}
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+PASS index.html 9a74c2d6f0698202bde21b1a924147a640dcaa847f7268bdb7feb992a8f6103c
+PASS gallery.wasm e23198a95eb2bd3ead9b84da264a2b9884406ba9613e731065309dff040a769c
+PASS gallery.js 0507533a81c799ec7803adc9295bc4697777112b11a1748625f8a6506aa51350
+PASS gallery.css f46c2ffe07b2dd8a6adcff079166a1fd03b5f0e991e96c8e816c73739ad66ade
+PASS catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+PASS themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+PASS docs.json 170629d184d9de0a6a290c8a829632522aea1360a6b09665d17c37a825b56380
+PASS assets/alpine-lake.jpg 92a48f1cc90763ed83e23f6db9dc1b76fa05c72b82908f895f84b363d95a9be6
+PASS llms.txt 98f0c8613b7db29e7cc02b944c4b20ad51adcaaf027f58ddf97283704c17dc4a
+PASS llm.txt 98f0c8613b7db29e7cc02b944c4b20ad51adcaaf027f58ddf97283704c17dc4a
+PASS llms-full.txt 08c706d8771a793860e5a4ba3e17735d2e39c8b0360b9610e94733e43f36c286
+PASS llm-full.txt 08c706d8771a793860e5a4ba3e17735d2e39c8b0360b9610e94733e43f36c286
+PASS markdown/docs/START_HERE.md 9500b82d2baedc9b608792da0975a52d8bd0dec1dd1e27f0552316e244a3586a
+PASS markdown/docs/IMMEDIATE_AND_STATE.md 695a750f7185d036fbc20ee97f27e0388e1add9be082e922c028c36a38094bc0
+PASS markdown/docs/AI_AGENTS.md 232ddacfcc165cb0967cb2111c64de2440c67ca19e3e8ef734984813a4ba2f18
+PASS markdown/docs/SURFACES.md 4818d50960e8901a97c8779457bbf7faff4f7431e75c44ad8af51c11e9d02f44
+PASS markdown/docs/NUMERIC.md f5ef1be865e3b981beabfba23dc92c8bbe0a2adff5b36879a08960ceae4ad588
+PASS markdown/docs/PICKERS.md 91e1dd9c679211ab519b1378b4d43f6470d80e2e60b4d73eb25923e5c7355028
+PASS markdown/docs/CHOICE.md 15b41eb9dee27fa7a3c6bb3b360b47d769a173da698b77ae94e8f976d9ce023b
+PASS markdown/docs/COMMAND.md 389f28ce8df93b86a6e14b3e3795f5921d80d2418188b47e5473a0958f281fcb
+20/20 published files byte-match the Pages artifact

@@ -247,6 +247,8 @@ typedef cui_edit_result (*cui_edit_prepare_fn)(void *user,
 typedef struct {
     cui_edit_prepare_fn prepare;
     void *user;
+    size_t user_bytes; /* exact frontend state extent; NULL requires zero */
+    cui_edit_workspace caller_descriptor; /* optional caller mask-storage descriptor */
     cui_edit_workspace caller_workspaces[3];
     size_t caller_workspace_count; /* 0..3; fixed buffers declare all */
 } cui_edit_presentation;
@@ -263,8 +265,11 @@ same-model guards are active during it, including void destroy and cache getters
 attempted mutation makes the checked request fail before commit. Exact declared
 caller workspace extents are validated before callbacks against engine/model/
 history/selection/columns, current session/preedit/view buffers, the original
-payload and each other. Known descriptor/user-state aliases must also be rejected
-before writes. Direct writes to undeclared buffers/external callbacks still lie
+payload and each other. The declared `caller_descriptor` and `user/user_bytes` extents are checked
+against model/session/workspace storage before invoking preparation. Non-NULL user
+requires a nonzero accurate extent; NULL user requires zero. Stateless callbacks
+may use NULL. Built-in setup supplies its concrete frontend state/descriptor sizes.
+Known descriptor/user-state aliases are therefore rejected before writes. Direct writes to undeclared buffers/external callbacks still lie
 outside the enforceable C borrowing contract; this seam must not promise global
 UI reentry protection. No allocator or text factory is called by portable Core.
 

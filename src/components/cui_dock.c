@@ -1467,6 +1467,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
 
 struct cui_dock_workspace {
     cui_dock_workspace_snapshot snapshot;
+    cui_rect bounds;
     bool locked;
     bool schema_present[3], has_version;
     size_t version;
@@ -1505,6 +1506,9 @@ void cui_dock_workspace_set_locked(cui_dock_workspace *state, bool locked) {
 }
 bool cui_dock_workspace_locked(const cui_dock_workspace *state) {
     return state && state->locked;
+}
+cui_rect cui_dock_workspace_bounds(const cui_dock_workspace *state) {
+    return state ? state->bounds : (cui_rect){0};
 }
 bool cui_dock_workspace_set_edge(cui_dock_workspace *state, cui_dock_region edge, bool open,
                                  float size) {
@@ -2367,6 +2371,9 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                             .height = options.view.height,
                             .clip = true,
                             .background = theme->background});
+    if (!cui_track_bounds(ui, id, &state->bounds))
+        scene.result.error = cui_last_error(ui) == CUI_ERROR_CAPACITY ? CUI_DOCK_CAPACITY
+                                                                     : CUI_DOCK_INVALID;
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Dock area"), options.view.disabled, false, 0);
     cui_set_semantic_details(ui, id,
                              (cui_semantic_details){.pointer_activatable = true, .no_focus = true});

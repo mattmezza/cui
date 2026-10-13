@@ -1754,6 +1754,7 @@ static void test_workspace_constraints(void) {
 static void test_workspace_lock(void) {
     edges = cui_dock_workspace_create();
     assert(edges && !cui_dock_workspace_locked(edges));
+    assert(cui_dock_workspace_bounds(edges).w == 0);
     edge_options = (cui_dock_workspace_options){.view = cui_dock_view_options_default()};
     edge_options.view.width = 640;
     edge_options.view.height = 480;
@@ -1781,6 +1782,16 @@ static void test_workspace_lock(void) {
     edge_frame();
     edge_frame();
     assert(constraint_calls > 0);
+    cui_rect bounds = cui_dock_workspace_bounds(edges);
+    assert(bounds.x == 0 && bounds.y == 0 && bounds.w == 640 && bounds.h == 480);
+    edge_options.view.width = 500;
+    edge_options.view.height = 300;
+    edge_frame();
+    bounds = cui_dock_workspace_bounds(edges);
+    assert(bounds.w == 500 && bounds.h == 300);
+    edge_options.view.width = 640;
+    edge_options.view.height = 480;
+    edge_frame();
     cui_id center = cui_dock_region_id(700, CUI_DOCK_CENTER);
     assert(cui_bounds(ui, cui_dock_close_id(center, 0)).w == 0);
     cui_rect tab = cui_bounds(ui, cui_dock_tab_id(center, 1));

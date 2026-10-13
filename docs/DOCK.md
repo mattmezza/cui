@@ -234,6 +234,8 @@ The callback receives the actual model and tab-node ID, including configured clo
 
 `cui_dock_workspace_set_locked` retains the frozen `DockArea::set_locked` policy across frames. It composes with every host group constraint: user close, reorder, drag, split and drop are blocked across all regions, while tab selection, content controls, zoom and splitter resizing remain available. Locking during a workspace drag cancels it. The lock is transient UI state, separate from snapshots and typed persistence. Render again after changing it so the scene reflects the new affordances.
 
+`cui_dock_workspace_bounds` reports the actual laid-out workspace rectangle from the last completed frame, matching the frozen area's prepaint bounds. It starts at zero, and `cui_track_bounds` updates it at `cui_end_frame`; the workspace object must remain alive until that call completes. This is the current layout result, including host positioning, rather than the preferred width and height passed in render options.
+
 ```c
 static cui_dock_group_constraints constraints(void *user, const cui_dock *model,
                                                cui_dock_node group) {
@@ -335,6 +337,21 @@ The export-family table above is complemented by these operation mappings. CUI e
 | `TabGroup` sealed/in-split constraints, active/displayed panel, close/zoom and renderer | Group constraint constructors/callback, visibility-aware queries, real view controls, menu/policy callbacks and scene callbacks. |
 | `Panel` visible, closable, zoomable, title/style/suffix, toolbar, menu, focus and lifecycle | Borrowed descriptors and presentation callbacks, visibility predicate, factory/dump helpers and caller-owned lifecycle reconciliation. Optional simple-title palettes match the source; custom title scenes choose their own explicit ink. |
 | `DockSizing` bounds/minima, pointer resize, collapsed-bottom reopen | Retained workspace handles, minimum compression and collapsibility flags; no native window creation. |
+
+The frozen public `DockArea` methods have these more precise counterparts:
+
+| Source methods | CUI counterpart and remaining boundary |
+| --- | --- |
+| `new`, `with_renderer`, `id`, `version`, `set_version` | Caller constructs a workspace and four models/views, supplies the view ID/theme at render, and uses workspace version accessors. There is no Rust entity or renderer object. |
+| `bounds`, `layout`, `panel`, `is_empty` | `workspace_bounds` retains completed-frame geometry; hosts query each model and borrowed descriptor registry. `visible_count`/`displayed_panel` plus edge presence answer emptiness; there is no one-object area lookup. |
+| `is_locked`, `set_locked` | Retained workspace lock composes with host group constraints and leaves resizing available. |
+| `set_center`, `set_dock`, `remove_dock`, `has_dock` | Models are caller-owned; typed area import atomically replaces all four and tracks optional edges. Individual add/remove uses model edits and workspace edge state. No single CUI call owns/reclaims live panel instances. |
+| `is_dock_open`, `toggle_dock`, `is_dock_collapsible`, `set_dock_collapsible`, `dock_size`, `set_dock_size` | Edge snapshot and setters carry open, collapsible and preferred size. Hosts can read the snapshot; absent and closed are distinct in typed area export. |
+| `add_panel`, `add_panel_view`, `remove_panel`, `move_panel`, `select_panel`, `set_split_sizes`, `split_at` | Model insert/remove/move/transfer/activate/sizing operations and styled gestures. Host descriptors supply the live panel behavior; explicit callbacks and model operations replace entity ownership. |
+| `set_zoomed_in`, `set_zoomed_out`, `is_zoomed`, `zoomed_group` | View zoom setters/query identify a panel and its group; zoom remains transient. |
+| `load`, `dump` | Atomic typed area/model conversion and host JSON/payload callbacks. Workspace export resolves positive split sizes from matching rendered views, stored sizes, then the frozen minimum. |
+
+Frozen `StackPanel` and `TabPanel` state names and the bare default Panel are represented by the typed schema converter. The styled title accepts host render callbacks in explicit clipped width slots; GPUI element flex sizing for arbitrary title children is not reproduced. CUI's event targets come from the preceding completed frame's clipped hits, so an event in the same frame as a new layout uses prior hit geometry. Lifecycle deliveries remain explicit next-tick net-state reconciliation instead of automatic Rust entity updates. These differences still prevent a full Dock-family parity claim.
 
 Lifecycle reconciliation is explicitly deferred and net-state based; it does not reproduce every synchronous Rust entity arrival or intermediate zoom event. Typed source-state conversion preserves the frozen field contract while JSON text parsing/encoding and payload envelopes remain caller-owned. These remaining differences prevent a full Dock-family parity claim.
 

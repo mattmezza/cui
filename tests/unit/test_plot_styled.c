@@ -81,6 +81,81 @@ static void axes(cui_context *ui) {
     assert(texts == 3 && lines == 1);
     assert(cui_last_error(ui) == CUI_OK);
 }
+static void source_axis_grid(cui_context *ui) {
+    cui_plot_axis_text x = {.text = {"AB", 2}, .tick = 40, .font_size = 20, .align = CUI_ALIGN_END};
+    cui_plot_axis_text y = {
+        .text = {"AB", 2}, .tick = 40, .font_size = 30, .align = CUI_ALIGN_CENTER};
+    cui_plot_axis_options o = cui_plot_axis_source_defaults(100, 100);
+    assert(o.source_offsets && o.explicit_colors && o.x_line && !o.y_line);
+    o.has_x = o.has_y = true;
+    o.x = 60;
+    o.y = 10;
+    o.y_line = true;
+    o.x_side = o.y_side = CUI_PLOT_AXIS_START;
+    o.x_labels = &x;
+    o.x_count = 1;
+    o.y_labels = &y;
+    o.y_count = 1;
+    cui_plot_axis_label_geometry geometry[2], old[2];
+    size_t required;
+    assert(cui_plot_axis_layout(ui, &o, geometry, 2, &required) == CUI_PLOT_OK && required == 2);
+    assert(geometry[0].bounds.x == 20 && geometry[0].bounds.y == 46);
+    assert(geometry[1].bounds.x == -7 && geometry[1].bounds.y == 35);
+    memcpy(old, geometry, sizeof old);
+    assert(cui_plot_axis_layout(ui, &o, geometry, 1, &required) == CUI_PLOT_CAPACITY);
+    assert(memcmp(old, geometry, sizeof old) == 0);
+    o.x_side = o.y_side = CUI_PLOT_AXIS_END;
+    assert(cui_plot_axis_layout(ui, &o, geometry, 2, &required) == CUI_PLOT_OK);
+    assert(geometry[0].bounds.y == 66 && geometry[1].bounds.x == -3 && geometry[1].bounds.y == 35);
+    cui_theme theme = cui_theme_light();
+    theme.border = red;
+    theme.muted = green;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_axis(ui, 190, &theme, &o) == CUI_PLOT_OK);
+    cui_draw_list draw = cui_end_frame(ui);
+    size_t texts = 0;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            assert(draw.commands[i].color.a == 0);
+            ++texts;
+        }
+    assert(texts == 2);
+    /* Pixel proof for lines is font-independent; text colors were inspected above. */
+    o.x_count = o.y_count = 0;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_axis(ui, 190, &theme, &o) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    cui_software *renderer = cui_software_create(100, 100, NULL);
+    assert(renderer);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    unsigned w, h;
+    const unsigned char *pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(59 * w + 50) * 4 + 3] == 0 && pixels[(50 * w + 9) * 4 + 3] == 0);
+    o.explicit_colors = false;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_axis(ui, 190, &theme, &o) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(59 * w + 50) * 4] == 255);
+    o.has_x = o.has_y = false;
+    assert(cui_plot_axis_layout(ui, &o, NULL, 0, &required) == CUI_PLOT_OK && required == 0);
+    double positions[] = {20};
+    cui_plot_grid_options grid = {.width = 100, .height = 100, .x = positions, .x_count = 1};
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_grid_ex(ui, 191, &theme, &grid, (cui_color){0}, true) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(50 * w + 19) * 4 + 3] == 0);
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_grid_ex(ui, 191, &theme, &grid, blue, true) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(50 * w + 19) * 4 + 2] == 255);
+    cui_software_destroy(renderer);
+}
 static void grid_pixels(cui_context *ui) {
     const double x[] = {10}, y[] = {20}, dash[] = {4, 2};
     cui_plot_grid_options grid = {.width = 40,
@@ -540,6 +615,7 @@ int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 100, .height = 100, .measure = measure});
     assert(ui);
     general_labels(ui);
+    source_axis_grid(ui);
     axes(ui);
     grid_pixels(ui);
     marker_pixels(ui);

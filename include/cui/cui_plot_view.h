@@ -31,7 +31,8 @@ cui_plot_result cui_plot_truncate_text(cui_context *, cui_str, float font_size, 
                                        char *output, size_t capacity, size_t *required);
 #define CUI_PLOT_AXIS_LIMIT 256u
 /* Borrowed labels; font size zero selects 10px. START/CENTER/END alignment is
- * applied about tick (source left/center/right). Alpha zero uses theme muted. */
+ * applied about tick (source left/center/right). Alpha zero uses theme muted
+ * unless axis options select explicit_colors. */
 typedef struct {
     cui_str text;
     float tick, font_size;
@@ -46,6 +47,7 @@ typedef struct {
     const cui_plot_axis_text *x_labels, *y_labels;
     size_t x_count, y_count;
     cui_color stroke;
+    bool source_offsets, explicit_colors;
 } cui_plot_axis_options;
 typedef struct {
     cui_rect bounds;
@@ -54,10 +56,14 @@ typedef struct {
 } cui_plot_axis_label_geometry;
 /* Default x line shown, y line hidden; axes absent until has_x/has_y is set. */
 cui_plot_axis_options cui_plot_axis_defaults(float width, float height);
+/* Frozen base paint contract: fixed10px-derived offsets at every font size,
+ * explicit colors (including alpha zero) rather than theme fallback. */
+cui_plot_axis_options cui_plot_axis_source_defaults(float width, float height);
 float cui_plot_axis_gutter(float font_size);
 /* At default 10px, source offsets match; larger fonts scale the upper gap
  * and vertical centering: x end +6/start -(font+4), y end +2/start -2, vertically
- * centered by font/2. Geometry uses Core measurement and is transactional. */
+ * centered by font/2. source_offsets instead uses fixed x start=-14/y center=-5
+ * at every font size. Geometry uses Core measurement and is transactional. */
 cui_plot_result cui_plot_axis_layout(cui_context *, const cui_plot_axis_options *,
                                      cui_plot_axis_label_geometry *, size_t capacity,
                                      size_t *required);
@@ -93,6 +99,11 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
  * Alpha-zero stroke selects theme border. Preflight failures submit nothing. */
 cui_plot_result cui_plot_grid(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_grid_options *, cui_color stroke);
+/* explicit_color=true preserves source stroke verbatim, including transparent;
+ * false retains legacy alpha-zero theme fallback. Geometry unchanged. */
+cui_plot_result cui_plot_grid_ex(cui_context *, cui_id, const cui_theme *,
+                                 const cui_plot_grid_options *, cui_color stroke,
+                                 bool explicit_color);
 typedef struct {
     double size;
     cui_color fill, stroke;

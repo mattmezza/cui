@@ -416,3 +416,29 @@ now supplies topology, alignment and relayout independently of Chart. Use
 source-default options for standalone Plot; the Chart adapter preserves its
 own defaults, raw throughput reporting and legacy zero-flow alignment. The graph and tapered
 ribbon path are caller-owned math outputs, not an automatic styled Sankey widget.
+
+## Frozen Axis offsets and explicit colors
+
+`cui_plot_axis_source_defaults` selects the frozen base Axis contract without
+changing existing styled calls. It sets `source_offsets` and `explicit_colors`.
+X labels sit at axis+6px on End or axis-14px on Start; Y labels sit at axis±2px
+and tick-5px. These offsets stay fixed even for 20px or 30px fonts, exactly as the
+source derives them from its 10px constants. Measured text alignment still
+subtracts half/full width for CENTER/END, and each label retains its selected
+font size. The source route submits a single normal line through Core; shaping
+and baseline metrics remain backend-specific rather than identical GPUI pixels.
+
+Explicit colors preserve alpha zero for labels and axis strokes; supply the
+actual solid colors you want. Alpha zero no longer chooses theme muted/border.
+With legacy `cui_plot_axis_defaults`, offsets continue to scale the Start gap
+and Y centering with font size, and zero-alpha colors continue to use theme
+fallback. The two appended booleans can be selected independently. Axis absence
+and line visibility still gate line/labels independently as before; no automatic
+gutters, tick formatter or placement policy is introduced.
+
+`cui_plot_grid_ex(...,stroke,true)` likewise preserves its supplied color,
+including transparent, matching the source Grid stroke behavior. Pass false or
+use the unchanged `cui_plot_grid` for alpha-zero theme fallback. Dash geometry
+and its existing bounded-output/error contract are shared by both paint routes.
+General gradient/Background fills and renderer path caching remain separate
+unsupported features; these options implement actual solid-color behavior.

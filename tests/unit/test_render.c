@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_software.h"
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -228,7 +229,94 @@ static void test_bitmap_pixels(void) {
     assert(!cui_software_render(r, &list, (cui_color){0}));
     cui_software_destroy(r);
 }
+static void test_mesh_pixels(void) {
+    cui_software *r = cui_software_create(8, 8, NULL);
+    assert(r && (cui_software_interface(r).capabilities & CUI_RENDER_MESH));
+    cui_mesh_vertex square[] = {{0,0,0,0}, {4,0,0,0}, {4,4,0,0},
+                                {0,0,0,0}, {4,4,0,0}, {0,4,0,0}};
+    cui_mesh_vertex saved[6];
+    memcpy(saved, square, sizeof(square));
+    cui_draw_command command = {.type = CUI_DRAW_MESH,
+        .mesh = {.vertices = square, .vertex_count = 6, .scale = 1,
+                 .color = {.125f, .25f, .5f, .5f}}};
+    cui_draw_list list = {&command, 1, 8, 8};
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    /* Unpremultiply linear .25/.5/1 and sRGB encode; diagonal covered once. */
+    for (int y = 0; y < 4; y++)
+        for (int x = 0; x < 4; x++) {
+            const unsigned char *p = pixel(r,x,y);
+            assert(p[0] == 137 && p[1] == 188 && p[2] == 255 && p[3] == 128);
+        }
+    assert(pixel(r,4,2)[3] == 0 && memcmp(saved,square,sizeof(square)) == 0);
+    /* Reverse winding keeps the same coverage and shared-edge ownership. */
+    for (size_t i = 0; i < 6; i += 3) {
+        cui_mesh_vertex swap = square[i+1]; square[i+1] = square[i+2]; square[i+2] = swap;
+    }
+    assert(cui_software_render(r, &list, (cui_color){0}));
+    for (int i = 0; i < 4; i++) assert(pixel(r,i,i)[3] == 128);
+    command.mesh.origin_x = 2; command.mesh.origin_y = 1; command.mesh.scale = .5f;
+    cui_draw_command clipped[] = {{.type=CUI_DRAW_CLIP_PUSH,.bounds={3,0,5,8}},
+                                  command, {.type=CUI_DRAW_CLIP_POP}};
+    cui_draw_list clips = {clipped,3,8,8};
+    assert(cui_software_render(r,&clips,(cui_color){0}));
+    assert(pixel(r,2,1)[3] == 0 && pixel(r,3,1)[3] == 128 && pixel(r,4,1)[3] == 0);
+    /* S=y/4, T=1/4. At y=.5, coverage clamps to 1; at y=1.5
+     * .5-(.375^2-.25)/(.1875) = 13/12 clamps to 1; at y=2.5
+     * .5-(.625^2-.25)/(.3125) = .05 -> byte alpha 13. */
+    cui_mesh_vertex analytic[] = {{0,0,0,.25f},{8,0,0,.25f},{0,8,2,.25f}};
+    command.mesh = (cui_mesh_paint){analytic,3,0,0,1,{1,0,0,1}};
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,0)[3] == 255 && pixel(r,0,1)[3] == 255);
+    assert(pixel(r,0,2)[3] == 13 && pixel(r,0,3)[3] == 0);
+    /* Horizontal derivative: S=x/4, T=.25 gives the same oracle. */
+    analytic[1].s=2; analytic[2].s=0;
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,2,0)[3] == 13 && pixel(r,3,0)[3] == 0);
+    /* Nonconstant T checks both terms of the analytic gradient:
+     * S=x/4, T=y/4 at (.5,.5): f=-7/64, |grad|=sqrt(17)/16. */
+    analytic[0].t=0; analytic[1].t=0; analytic[2].t=2;
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,0)[3] == 236);
+    /* Transform only XY. At transformed (.5,1.5), local (.25,.75),
+     * S=.0625,T=.1875, gradient=(-.125*.125,-.125) in magnitude. */
+    command.mesh.scale=2;
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,1)[3] == 255);
+    command.mesh.scale=1;
+    /* The constant-S shader fastpath ignores T, even outside the curve. */
+    for (size_t i=0;i<3;i++) { analytic[i].s=0; analytic[i].t=-100; }
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,0)[3] == 255);
+    /* Degenerate and extreme off-screen geometry safely produce no pixels. */
+    cui_mesh_vertex extreme[] = {{FLT_MAX,0,0,0},{FLT_MAX,1,0,0},{FLT_MAX,2,0,0}};
+    command.mesh.vertices=extreme;
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,0)[3] == 0);
+    extreme[1].x=FLT_MAX/2; extreme[2].y=3;
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,0)[3] == 0);
+    cui_mesh_vertex spanning[] = {{-1e30f,-1e30f,0,0},{1e30f,-1e30f,0,0},{0,1e30f,0,0}};
+    command.mesh.vertices=spanning;
+    assert(cui_software_render(r,&list,(cui_color){0}));
+    assert(pixel(r,0,0)[3] == 255 && pixel(r,7,7)[3] == 255);
+    command.mesh.vertices=extreme;
+    cui_draw_list empty={0};
+    assert(cui_software_render(r,&empty,(cui_color){7,8,9,10}));
+    unsigned char before[8*8*4]; memcpy(before,cui_software_pixels(r,NULL,NULL),sizeof(before));
+    cui_draw_command invalid[] = {{.type=CUI_DRAW_RECT,.bounds={0,0,8,8},.color={255,0,0,255}}, command};
+    cui_draw_list bad={invalid,2,8,8};
+    invalid[1].mesh.vertex_count=2;
+    assert(!cui_software_render(r,&bad,(cui_color){0}));
+    assert(memcmp(before,cui_software_pixels(r,NULL,NULL),sizeof(before)) == 0);
+    invalid[1].mesh.vertex_count=3; extreme[0].s=NAN;
+    assert(!cui_software_render(r,&bad,(cui_color){0}));
+    assert(memcmp(before,cui_software_pixels(r,NULL,NULL),sizeof(before)) == 0);
+    extreme[0].s=0; invalid[1].mesh.scale=0;
+    assert(!cui_software_render(r,&bad,(cui_color){0}));
+    cui_software_destroy(r);
+}
 int main(void) {
+    test_mesh_pixels();
 #ifdef CUI_HAS_TEXT
     test_styled_font_faces();
 #endif

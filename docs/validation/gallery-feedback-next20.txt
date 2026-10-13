@@ -1,0 +1,37 @@
+Integrated gallery feedback, source bc9d062f79bb4bebb025e4768da25a74e0ba9d60.
+Portable input SHA256: fc800ff6b3345909b9769683ac6dd95efd35afc4deca9cb425cc70aafe62bbf2
+WASI began at56f82b6. Subsequent changes were confined to browser fixtures and
+gallery preview bounds; the portable input fingerprint remains identical.
+Warning build and native CTest:97/97 passed.
+ASan/UBSan CTest including GPU runtime gates:97/97 passed, detect_leaks=0.
+WASI Preview1 / Zig0.16.0 / Wasmtime49.0.0:80/80 passed, finite40B fuel/module.
+Full Chromium:78 catalog entries/stories and78 compiled displayed C snippets,
+interaction regression,390px layout and /cui/hosting passed.
+Dedicated design sizes:12 families x14 real sizes, density, circle raster and
+both square SVG Tabs overflow axes passed.
+Calendar/DatePicker:28/28 locale/year-grid mouse/CDP-touch cases passed.
+Plot:17/17 viewport gesture cases and actual pan repaint across all7 shapes.
+Sidebar: actual image alpha clipping above/below body viewport passed.
+HoverCard/TitleBar/Toolbar: intrinsic height, simulated host actions/fullscreen,
+Find editing/matches/disabled/shortcut passed.
+Notification: headless action/close separation fails old implementation; actual
+browser independently asserts action/close semantic bounds do not intersect.
+Semantic Alert/Bubble colors and custom Table row drawing have light/dark
+headless regressions; gallery displays all4 semantic kinds and striped rows.
+Native Input shaped visual geometry has dedicated real-font and mock tests;
+wrapped Textarea geometry remains explicitly incomplete.
+Touch: shared contact/gesture tests,42/42 catalog,16/16 follow-up and19/19 page
+navigation cases passed. Actual pane resize:24/24 across390/1280/1920, both
+axes, densities and pointer types passed.
+IME: Input/Textarea/Editor/Questionnaire and Numeric/OTP/Combobox passed.
+Site extensions: all78 usage guides, effects, typography and composed app passed.
+Docs5/5 and sharing3/3 passed.
+Python/Go/Rust/JavaScript/TypeScript headless examples all passed. Native Python,
+JavaScript and TypeScript real-pointer callbacks and nonempty captures passed
+after rebuilding the shared host against this source.
+Initial Toolbar preview overflow was preserved in next20-browser.log and
+next20-browser-final.log; bounded rows plus adequate canvas height passed the
+unchanged mobile overflow check in next20-browser-height-fix.log.
+Evidence logs reside at /home/matteo/.cache/cui-validation/next20-*.
+Publication remains pending until CI, Pages and direct public checks succeed.
+All78 manifest families remain present; this does not certify full parity.

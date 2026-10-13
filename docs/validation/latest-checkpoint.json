@@ -1,19 +1,19 @@
 {
-  "source": "3bd96c1",
-  "compiled_source": "3bd96c1",
-  "published_source": "ddd0ae3ad5e151893abf236616d74cada362358a",
+  "source": "bc9d062",
+  "compiled_source": "bc9d062",
+  "published_source": "cdf5199cb1b7f01cc5baecb637c5b4f09d2af8a5",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Next19 gallery polish passes native96, sanitizer96, WASI80, browser78, actual Resizable24, touch42+16, page-touch19 and IME checks. Select/Pagination alignment, Shift-wheel Tabs, pixel DataTable wheel, Command width and retained page scroll have targeted browser regressions. Publication pending. Native starter release ddd0ae3 is deployed: six CI jobs and Pages pass,301 exact HTTPS artifact files and actual public guide screenshots/clipboard checked. Full family verification remains0/78; remaining user feedback and full ecosystem acceptance stay active.",
+  "summary": "Next20 integrates locale/year grids, 14-size legacy controls, sidebar clipping, Plot gestures, semantic content colors, Notification spacing, intrinsic HoverCard and functional Toolbar/TitleBar demos; Python and Node native examples pass. Native97, sanitizer97, WASI80, full browser78, date28, Plot17, Resize24, touch42+16+19 and IME checks pass. Publication pending. Published cdf5199 passed six CI jobs, Pages,303 exact HTTPS files, visual interactions and24 public resize cases. Full family verification remains0/78; scrollbar, avatar/message and ecosystem work remains active.",
   "checks": [
     {
       "name": "native",
-      "passed": 96,
-      "total": 96
+      "passed": 97,
+      "total": 97
     },
     {
       "name": "sanitizers",
-      "passed": 96,
-      "total": 96
+      "passed": 97,
+      "total": 97
     },
     {
       "name": "WASI",
@@ -24,6 +24,21 @@
       "name": "browser_stories",
       "passed": 78,
       "total": 78
+    },
+    {
+      "name": "date_locale_year",
+      "passed": 28,
+      "total": 28
+    },
+    {
+      "name": "plot_interactions",
+      "passed": 17,
+      "total": 17
+    },
+    {
+      "name": "resizable",
+      "passed": 24,
+      "total": 24
     },
     {
       "name": "touch_catalog_cases",
@@ -40,5 +55,7 @@
       "passed": 19,
       "total": 19
     }
-  ]
+  ],
+  "portable_test_source": "56f82b6",
+  "portable_source_sha256": "fc800ff6b3345909b9769683ac6dd95efd35afc4deca9cb425cc70aafe62bbf2"
 }

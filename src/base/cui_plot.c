@@ -1119,3 +1119,67 @@ cui_plot_result cui_plot_dot_layout(cui_plot_point center, double size,
         *out = geometry;
     return result;
 }
+
+cui_plot_result cui_plot_hover_track(cui_plot_hover_memory *memory,
+                                     const cui_plot_tooltip_state *live,
+                                     const cui_plot_point *cursor, double progress) {
+    if (!memory || !isfinite(progress) || progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    if (live) {
+        if (!cursor || !isfinite(cursor->x) || !isfinite(cursor->y) ||
+            !isfinite(live->cross_line.x) || !isfinite(live->cross_line.y) ||
+            (live->dot_count && !live->dots) || live->dot_count > 4096)
+            return CUI_PLOT_INVALID;
+        for (size_t i = 0; i < live->dot_count; ++i)
+            if (!isfinite(live->dots[i].x) || !isfinite(live->dots[i].y))
+                return CUI_PLOT_INVALID;
+    }
+    cui_plot_hover_memory next = *memory;
+    next.hovered = live != NULL;
+    next.progress = progress;
+    next.entering = next.hovered && progress == 0;
+    if (live) {
+        next.state = *live;
+        next.cursor = *cursor;
+        next.has_state = true;
+    } else if (progress == 0) {
+        next.state = (cui_plot_tooltip_state){0};
+        next.has_state = false;
+    }
+    *memory = next;
+    return CUI_PLOT_OK;
+}
+bool cui_plot_appear_complete(cui_plot_appear_scope *scope, uint64_t identity,
+                              uint64_t generation) {
+    if (!scope)
+        return false;
+    if (scope->identity != identity)
+        *scope = (cui_plot_appear_scope){.identity = identity};
+    return scope->has_completed && scope->completed_generation == generation;
+}
+cui_plot_result cui_plot_appear_record(cui_plot_appear_scope *scope, uint64_t identity,
+                                       uint64_t generation, double progress) {
+    if (!scope || !isfinite(progress) || progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    (void)cui_plot_appear_complete(scope, identity, generation);
+    if (progress == 1) {
+        scope->completed_generation = generation;
+        scope->has_completed = true;
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_stagger(double progress, size_t index, size_t count, double spread,
+                                        double *out) {
+    if (!out || !isfinite(progress) || progress < 0 || progress > 1 || !isfinite(spread))
+        return CUI_PLOT_INVALID;
+    double local = progress;
+    if (count > 1 && progress < 1) {
+        spread = fmax(0, fmin(.95, spread));
+        if (index >= count)
+            index = count - 1;
+        double start = spread * ((double)index / (double)(count - 1));
+        local = fmax(0, fmin(1, (progress - start) / (1 - spread)));
+    }
+    *out = local;
+    return CUI_PLOT_OK;
+}

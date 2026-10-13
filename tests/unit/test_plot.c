@@ -687,7 +687,51 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_lifecycle(void) {
+    cui_plot_hover_memory memory = {0};
+    cui_plot_point dots[] = {{2, 3}}, cursor = {4, 5};
+    cui_plot_tooltip_state state = {7, {8, 9}, dots, 1};
+    assert(cui_plot_hover_track(&memory, &state, &cursor, 0) == CUI_PLOT_OK);
+    assert(memory.entering && memory.hovered && memory.has_state);
+    assert(cui_plot_hover_track(&memory, NULL, NULL, .4) == CUI_PLOT_OK);
+    assert(!memory.entering && !memory.hovered && memory.has_state);
+    assert(memory.state.index == 7 && memory.state.dots == dots && memory.cursor.x == 4);
+    cui_plot_hover_memory before = memory;
+    assert(cui_plot_hover_track(&memory, &state, NULL, .5) == CUI_PLOT_INVALID);
+    assert(memcmp(&memory, &before, sizeof memory) == 0);
+    dots[0].x = NAN;
+    assert(cui_plot_hover_track(&memory, &state, &cursor, .5) == CUI_PLOT_INVALID);
+    assert(memcmp(&memory, &before, sizeof memory) == 0);
+    dots[0].x = 2;
+    state.index = 8;
+    assert(cui_plot_hover_track(&memory, &state, &cursor, .4) == CUI_PLOT_OK);
+    assert(memory.hovered && !memory.entering && memory.state.index == 8);
+    assert(cui_plot_hover_track(&memory, NULL, NULL, 0) == CUI_PLOT_OK);
+    assert(!memory.has_state && memory.state.dots == NULL);
+    cui_plot_appear_scope scope = {0};
+    assert(!cui_plot_appear_complete(&scope, 12, 1));
+    assert(cui_plot_appear_record(&scope, 12, 1, .5) == CUI_PLOT_OK);
+    assert(!cui_plot_appear_complete(&scope, 12, 1));
+    assert(cui_plot_appear_record(&scope, 12, 1, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_complete(&scope, 12, 1));
+    assert(!cui_plot_appear_complete(&scope, 12, 2));
+    assert(cui_plot_appear_complete(&scope, 12, 1));
+    cui_plot_appear_scope old = scope;
+    assert(cui_plot_appear_record(&scope, 99, 2, NAN) == CUI_PLOT_INVALID);
+    assert(memcmp(&old, &scope, sizeof scope) == 0);
+    assert(!cui_plot_appear_complete(&scope, 99, 1));
+    assert(!scope.has_completed);
+    double local = -1;
+    assert(cui_plot_appear_stagger(.5, 1, 3, .5, &local) == CUI_PLOT_OK);
+    assert(local == .5);
+    assert(cui_plot_appear_stagger(.5, 99, 3, .5, &local) == CUI_PLOT_OK && local == 0);
+    assert(cui_plot_appear_stagger(1, 99, 3, .95, &local) == CUI_PLOT_OK && local == 1);
+    assert(cui_plot_appear_stagger(.25, 0, 0, 3, &local) == CUI_PLOT_OK && local == .25);
+    assert(cui_plot_appear_stagger(.25, 0, 3, -2, &local) == CUI_PLOT_OK && local == .25);
+    assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
+}
 int main(void) {
+    test_lifecycle();
     shape_geometry();
     pie_geometry();
     arc_and_radial_paths();

@@ -265,6 +265,37 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+/* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
+ * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
+ * Zero initialize. Invalid input leaves memory unchanged. */
+typedef struct {
+    size_t index;
+    cui_plot_point cross_line;
+    const cui_plot_point *dots;
+    size_t dot_count;
+} cui_plot_tooltip_state;
+typedef struct {
+    cui_plot_tooltip_state state;
+    cui_plot_point cursor;
+    double progress;
+    bool has_state, hovered, entering;
+} cui_plot_hover_memory;
+cui_plot_result cui_plot_hover_track(cui_plot_hover_memory *, const cui_plot_tooltip_state *live,
+                                     const cui_plot_point *cursor, double progress);
+/* Explicit scope entry: one slot per stable application identity. Only completed
+ * generations persist across disappearance; unfinished appearances restart.
+ * An identity change clears the slot. No allocation or implicit frame tracking. */
+typedef struct {
+    uint64_t identity, completed_generation;
+    bool has_completed;
+} cui_plot_appear_scope;
+bool cui_plot_appear_complete(cui_plot_appear_scope *, uint64_t identity, uint64_t generation);
+cui_plot_result cui_plot_appear_record(cui_plot_appear_scope *, uint64_t identity,
+                                       uint64_t generation, double linear_progress);
+/* Stagger the linear clock before applying the caller's existing easing policy.
+ * Spread clamps to [0,.95], index clamps to count-1. count<=1 is unstaggered. */
+cui_plot_result cui_plot_appear_stagger(double linear_progress, size_t index, size_t count,
+                                        double spread, double *local_progress);
 #ifdef __cplusplus
 }
 #endif

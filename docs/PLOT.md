@@ -213,7 +213,7 @@ The [complete frozen export audit](PLOT_MODEL.md#complete-frozen-plot-export-aud
 lists exact supported routes and remaining differences. In particular this
 styled layer does not yet implement arbitrary gradient backgrounds or label-content callbacks,
 PlotLabel truncation/content collections, tessellation caches, hover/tooltip
-state and exit motion, appear-generation/scope tracking, or the PlotElement
+automatic event routing and exit motion clocks, implicit appear scope tracking, or the PlotElement
 prepaint lifecycle. Chart-specific versions of some features do not automatically
 satisfy standalone Plot parity. Axis default positions and centered strokes are
 covered, while nondefault font scaling and theme fallback are deliberate CUI
@@ -309,3 +309,17 @@ C11 flags above. Tests cover circular corner exclusion, custom/fallback border
 pixels, theme fills, radial centers, independent rounded/square bar corners,
 renderer clamping, fill callback inputs, missing/degenerate samples and invalid
 preflight suppression.
+
+## Tooltip and appearance state
+
+Use the pure caller-owned lifecycle helpers described in
+[PLOT_MODEL.md](PLOT_MODEL.md#caller-owned-hover-and-appearance-lifecycle) to retain
+a selected datum during exit. Keep its borrowed dot array alive until
+`has_state` becomes false, and paint the tooltip only when `has_state` is true.
+The bitmap view does not populate this state automatically. Feed progress from
+the application's existing animation policy and request another frame with
+`cui_invalidate` while the clock is moving. Honor `cui_reduced_motion` by snapping
+to the target, and suppress hover overlays while appearance is incomplete if
+you want the source PlotElement ordering. Completed appearance generations and
+linear stagger timing are reusable independently of drawing; the application
+owns scope disposal, easing, pointer springs, and the tooltip's content/layout.

@@ -596,8 +596,8 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `Text`, `PlotLabel`, text width/truncation helpers | Core measurement/text and explicit axis labels | No general PlotLabel collection, ellipsis helper or automatic content measurement/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
 | `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned commands/bitmap revision | No origin-translated tessellation cache, keyed state slots/pairs or source hash key contract; source `is_warm` means a key exists, including after an initial empty build |
 | `PlotMotion` pointer Spring, enter/exit/appear Transitions | Chart has specialized motion; standalone Plot view is immediate | No standalone projected motion policy/enter-exit spring lifecycle; generic Core/effects availability is not this Plot API |
-| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Application-owned state or Chart appearance | No Plot generation/scope persistence, first-paint appear tracking, per-mark stagger or scope retention; reduced-motion behavior must be explicit in application composition |
-| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Pure nearest/arc queries; Chart specialized hover; view activation callback | No standalone hovered-index/dots/crosshair object, lingering exit state, projected pointer spring or tooltip scope helper |
+| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot and linear stagger clock | No implicit frame/scope tree, first-paint clock or scheduler; easing and reduced-motion policy remain explicit |
+| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | No projected pointer spring, scope lookup, tooltip rendering or event-to-datum routing |
 | `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | `cui_plot_view` fixed bitmap+axes and activation | No generic prepaint children/tooltip overlay driver, identity-driven motion/cache contract or custom trait-equivalent lifecycle |
 | `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; no source touch long-press/drag tooltip rules or animation scheduling |
 | `origin_point` translation utility | Caller adds relative offsets before raster; Core offsets styled children | No separate named pure translation helper; ordinary finite coordinate addition remains caller responsibility |
@@ -625,3 +625,34 @@ The frozen dot stroke fallback is reproduced for supported solid colors: explici
 stroke overrides fill, otherwise the 1px border uses the resolved fill color.
 Theme defaults are a deliberate styled-layer policy, while frozen base dots
 default to transparent fill and frozen base bars default to black.
+
+## Caller-owned hover and appearance lifecycle
+
+`cui_plot_hover_track` follows the frozen hover memory contract: a live datum
+updates the index, crosshair, borrowed dots and cursor; exit retains the last
+state until progress is zero. `hovered` means a currently live datum, while
+`has_state` also includes a fading tooltip. `entering` means live with exactly
+zero progress, which lets an application snap its existing pointer spring on
+entry. Unlike the source's optional cursor path, this API rejects live data
+without a cursor. Dot storage must remain valid throughout the exit fade;
+clearing at zero releases the borrowed pointer. Invalid inputs preserve memory.
+The helper does not resolve a datum, draw a tooltip or schedule frames.
+
+`cui_plot_appear_scope` is one slot per application identity, rather than the
+source's keyed map/thread-local scope. Call `cui_plot_appear_complete` before
+starting a clock. Record its linear progress with `cui_plot_appear_record`;
+only a completed generation persists. An interrupted appearance therefore
+restarts when reconstructed; a completed generation can resume immediately.
+Identity changes clear the slot. A new generation can replay without forgetting
+the old completed generation until the new one completes. Reset the slot when
+the enclosing application scope disappears: the helper cannot infer that event.
+
+`cui_plot_appear_stagger` implements the source's linear-time staggering:
+spread clamps to 0 through .95, the index clamps to the last mark, and count
+zero or one uses the original clock. Apply the application's existing easing
+**after** staggering. All clocks must be finite and in [0,1]. Pass progress one
+for appearance and live hover (zero for exited hover) when `cui_reduced_motion`
+is true; record completion so later frames do not restart the appearance.
+Outside a source-style hover scope, use progress one and entering false.
+This is a state contract, not an implementation of PlotElement, motion presets,
+retained element scopes, tooltip layout, occlusion or renderer path caches.

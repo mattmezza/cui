@@ -597,7 +597,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `Text`, `PlotLabel`, text width/truncation helpers | Caller-owned PlotLabel collection/layout/paint and measured UTF-8 ellipsis helper | No automatic tooltip content/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
 | `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned commands/bitmap revision | No origin-translated tessellation cache, keyed state slots/pairs or source hash key contract; source `is_warm` means a key exists, including after an initial empty build |
 | `PlotMotion` pointer Spring, enter/exit/appear Transitions | Chart has specialized motion; standalone Plot view is immediate | No standalone projected motion policy/enter-exit spring lifecycle; generic Core/effects availability is not this Plot API |
-| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot and linear stagger clock | No implicit frame/scope tree, first-paint clock or scheduler; easing and reduced-motion policy remain explicit |
+| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot/registry and linear stagger clock | Bounded multi-plot completed map with explicit consecutive-frame lifetime; no implicit frame/scope tree, first-paint clock or scheduler; easing/reduced motion remain explicit |
 | `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | No projected pointer spring, scope lookup, tooltip rendering or event-to-datum routing |
 | `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | `cui_plot_view` fixed bitmap+axes and activation | No generic prepaint children/tooltip overlay driver, identity-driven motion/cache contract or custom trait-equivalent lifecycle |
 | `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; explicit caller-owned desktop/long-press cursor gate now covers visibility/coordinate transitions; no automatic OS gesture routing, occlusion hitbox or animation scheduling |
@@ -895,6 +895,61 @@ int main(void) {
     options.extent=(cui_plot_rect){0,0,200,100};
     assert(cui_plot_sankey_layout_from(&graph,&options)==CUI_PLOT_OK);
     assert(graph.nodes[1].value==3 && graph.links[1].value==2);
+    return 0;
+}
+```
+
+## Bounded appearance scope registry
+
+The frozen `PlotAppearScope` holds a map from plot global identity to its last
+completed generation. This matters in virtual lists: a plot that disappeared
+after completion skips its draw-in when it returns, while an interrupted plot
+starts again. `cui_plot_appear_registry` now models that multi-plot behavior
+rather than asking one single slot to represent the entire scope.
+
+Initialize it with caller-owned `cui_plot_appear_scope` storage (capacity 0..4096),
+then call `cui_plot_appear_registry_begin` for every frame the scope is painted,
+using a stable scope identity and host frame serial. The same serial is
+idempotent; the next serial preserves completed entries. A skipped/backward
+frame or changed scope identity clears the logical count. Serial wrap is treated
+as a discontinuity. Call end when leaving the scope. Query/record require an
+active scope, preventing accidental use of a disposed scope's entries. Explicit
+init discards remembered completions without touching borrowed storage.
+
+Before starting a plot's clock, query `(plot_identity,generation)`. A completed
+match draws immediately at progress one. Otherwise run its independent clock
+and record linear progress. Only progress one inserts/replaces the completed
+generation. An incomplete appearance consumes no slot and leaves the previous
+completed generation intact, exactly as the source map does. A completed plot's
+entry remains when that child disappears while the enclosing scope is still
+painted. At capacity, completing a new identity returns CAPACITY without mutation;
+replacing an existing identity still succeeds. The host chooses a storage/error
+policy instead of silently evicting remembered plots.
+
+Nested source scopes choose the innermost map. Portable composition passes the
+explicit inner registry to its children; after leaving it, use the outer one
+again. There is no global/thread-local lookup, retained Element child, implicit
+window state or first-paint scheduler. Identity values represent application
+plot identities unique inside that scope (not automatic global path hashing).
+The registry stores only numeric completed generations, not plots/resources or
+motion state. Scope disposal and frame cadence remain host responsibilities.
+
+```c
+#include <assert.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    cui_plot_appear_scope entries[4];
+    cui_plot_appear_registry scope;
+    bool complete;
+    assert(cui_plot_appear_registry_init(&scope,entries,4)==CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&scope,100,1)==CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_record(&scope,7,42,1)==CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_end(&scope)==CUI_PLOT_OK);
+    /* Child 7 may be absent in frame 2; scope persistence remains. */
+    assert(cui_plot_appear_registry_begin(&scope,100,2)==CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_complete(&scope,7,42,&complete)==CUI_PLOT_OK);
+    assert(complete);
+    assert(cui_plot_appear_registry_end(&scope)==CUI_PLOT_OK);
     return 0;
 }
 ```

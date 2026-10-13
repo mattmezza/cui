@@ -2093,3 +2093,68 @@ cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *g) {
         memcpy(g->links, ls, g->link_count * sizeof(*ls));
     return CUI_PLOT_OK;
 }
+
+static bool plot_appear_registry_valid(const cui_plot_appear_registry *registry) {
+    return registry && registry->capacity <= 4096 && registry->count <= registry->capacity &&
+           (!registry->capacity || registry->entries);
+}
+cui_plot_result cui_plot_appear_registry_init(cui_plot_appear_registry *registry,
+                                              cui_plot_appear_scope *storage, size_t capacity) {
+    if (!registry || capacity > 4096 || (capacity && !storage))
+        return CUI_PLOT_INVALID;
+    *registry = (cui_plot_appear_registry){.entries = storage, .capacity = capacity};
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_begin(cui_plot_appear_registry *registry,
+                                               uint64_t identity, uint64_t frame) {
+    if (!plot_appear_registry_valid(registry))
+        return CUI_PLOT_INVALID;
+    if (!registry->initialized || registry->identity != identity ||
+        (registry->last_frame != frame &&
+         (registry->last_frame == UINT64_MAX || frame != registry->last_frame + 1)))
+        registry->count = 0;
+    registry->identity = identity;
+    registry->last_frame = frame;
+    registry->initialized = true;
+    registry->active = true;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_end(cui_plot_appear_registry *registry) {
+    if (!plot_appear_registry_valid(registry) || !registry->active)
+        return CUI_PLOT_INVALID;
+    registry->active = false;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_complete(const cui_plot_appear_registry *registry,
+                                                  uint64_t identity, uint64_t generation,
+                                                  bool *out) {
+    if (!out || !plot_appear_registry_valid(registry) || !registry->active)
+        return CUI_PLOT_INVALID;
+    bool complete = false;
+    for (size_t i = 0; i < registry->count; ++i)
+        if (registry->entries[i].identity == identity) {
+            complete = registry->entries[i].has_completed &&
+                       registry->entries[i].completed_generation == generation;
+            break;
+        }
+    *out = complete;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *registry,
+                                                uint64_t identity, uint64_t generation,
+                                                double progress) {
+    if (!plot_appear_registry_valid(registry) || !registry->active || !isfinite(progress) ||
+        progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    if (progress < 1)
+        return CUI_PLOT_OK;
+    size_t index = 0;
+    while (index < registry->count && registry->entries[index].identity != identity)
+        ++index;
+    if (index == registry->count && index == registry->capacity)
+        return CUI_PLOT_CAPACITY;
+    registry->entries[index] = (cui_plot_appear_scope){identity, generation, true};
+    if (index == registry->count)
+        ++registry->count;
+    return CUI_PLOT_OK;
+}

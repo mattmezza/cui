@@ -448,6 +448,31 @@ typedef struct {
 bool cui_plot_appear_complete(cui_plot_appear_scope *, uint64_t identity, uint64_t generation);
 cui_plot_result cui_plot_appear_record(cui_plot_appear_scope *, uint64_t identity,
                                        uint64_t generation, double linear_progress);
+/* Bounded model of source PlotAppearScope's completed-generation map. Storage
+ * belongs to caller and stays live. Stable plot identities must be unique within
+ * a scope. Frame serials are supplied by the host; repeated same-frame begin is
+ * idempotent, a skipped/backward frame or scope identity change clears entries.
+ * Begin/end explicitly delimit access; nested composition passes the innermost
+ * registry. No retained element tree, implicit frame hooks or motion clock. */
+typedef struct {
+    cui_plot_appear_scope *entries;
+    size_t count, capacity;
+    uint64_t identity, last_frame;
+    bool initialized, active;
+} cui_plot_appear_registry;
+cui_plot_result cui_plot_appear_registry_init(cui_plot_appear_registry *,
+                                              cui_plot_appear_scope *storage, size_t capacity);
+cui_plot_result cui_plot_appear_registry_begin(cui_plot_appear_registry *, uint64_t scope_identity,
+                                               uint64_t frame_serial);
+cui_plot_result cui_plot_appear_registry_end(cui_plot_appear_registry *);
+cui_plot_result cui_plot_appear_registry_complete(const cui_plot_appear_registry *,
+                                                  uint64_t plot_identity, uint64_t generation,
+                                                  bool *complete);
+/* Only progress==1 inserts/replaces a completed generation. Partial appearance
+ * never consumes storage or evicts the last completed generation. CAPACITY and
+ * invalid inputs preserve registry/storage; explicit init discards all memory. */
+cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *, uint64_t plot_identity,
+                                                uint64_t generation, double linear_progress);
 /* Stagger the linear clock before applying the caller's existing easing policy.
  * Spread clamps to [0,.95], index clamps to count-1. count<=1 is unstaggered. */
 cui_plot_result cui_plot_appear_stagger(double linear_progress, size_t index, size_t count,

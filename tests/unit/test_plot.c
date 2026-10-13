@@ -1081,6 +1081,77 @@ static void test_linear_extent(void) {
     assert(cui_plot_linear_extent_tick(NULL, 1, &pixel) == CUI_PLOT_INVALID);
     assert(cui_plot_linear_extent_tick(&s, 1, NULL) == CUI_PLOT_INVALID);
 }
+static void test_appear_registry(void) {
+    cui_plot_appear_scope storage[2], old_storage[2];
+    memset(storage, 0x5a, sizeof storage);
+    cui_plot_appear_registry registry;
+    assert(cui_plot_appear_registry_init(&registry, storage, 2) == CUI_PLOT_OK);
+    bool complete = true;
+    assert(cui_plot_appear_registry_complete(&registry, 7, 1, &complete) == CUI_PLOT_INVALID &&
+           complete);
+    assert(cui_plot_appear_registry_begin(&registry, 100, 10) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_record(&registry, 7, 1, .5) == CUI_PLOT_OK &&
+           registry.count == 0);
+    assert(cui_plot_appear_registry_complete(&registry, 7, 1, &complete) == CUI_PLOT_OK &&
+           !complete);
+    assert(cui_plot_appear_registry_record(&registry, 7, 1, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_record(&registry, 8, 1, 1) == CUI_PLOT_OK &&
+           registry.count == 2);
+    assert(cui_plot_appear_registry_complete(&registry, 7, 1, &complete) == CUI_PLOT_OK &&
+           complete);
+    assert(cui_plot_appear_registry_end(&registry) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&registry, 100, 11) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_complete(&registry, 7, 1, &complete) == CUI_PLOT_OK &&
+           complete);
+    /* Missing child7 for this frame does not discard its completed entry. */
+    assert(cui_plot_appear_registry_record(&registry, 8, 2, .3) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_complete(&registry, 8, 1, &complete) == CUI_PLOT_OK &&
+           complete);
+    assert(cui_plot_appear_registry_complete(&registry, 8, 2, &complete) == CUI_PLOT_OK &&
+           !complete);
+    memcpy(old_storage, storage, sizeof storage);
+    cui_plot_appear_registry before = registry;
+    assert(cui_plot_appear_registry_record(&registry, 9, 1, 1) == CUI_PLOT_CAPACITY);
+    assert(memcmp(&before, &registry, sizeof registry) == 0 &&
+           memcmp(old_storage, storage, sizeof storage) == 0);
+    assert(cui_plot_appear_registry_record(&registry, 9, 1, .1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_record(&registry, 8, 2, 1) == CUI_PLOT_OK &&
+           registry.count == 2);
+    assert(cui_plot_appear_registry_record(&registry, 8, 2, NAN) == CUI_PLOT_INVALID);
+    assert(cui_plot_appear_registry_end(&registry) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&registry, 100, 11) == CUI_PLOT_OK &&
+           registry.count == 2);
+    assert(cui_plot_appear_registry_begin(&registry, 100, 12) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_complete(&registry, 7, 1, &complete) == CUI_PLOT_OK &&
+           complete);
+    assert(cui_plot_appear_registry_complete(&registry, 8, 2, &complete) == CUI_PLOT_OK &&
+           complete);
+    assert(cui_plot_appear_registry_begin(&registry, 100, 14) == CUI_PLOT_OK &&
+           registry.count == 0);
+    assert(cui_plot_appear_registry_record(&registry, 7, 1, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&registry, 101, 14) == CUI_PLOT_OK &&
+           registry.count == 0);
+    assert(cui_plot_appear_registry_record(&registry, 7, 1, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&registry, 101, 13) == CUI_PLOT_OK &&
+           registry.count == 0);
+    /* Explicit innermost selection keeps nested scopes independent. */
+    cui_plot_appear_scope inner_storage[1];
+    cui_plot_appear_registry inner;
+    assert(cui_plot_appear_registry_record(&registry, 7, 1, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_init(&inner, inner_storage, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&inner, 200, 13) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_complete(&inner, 7, 1, &complete) == CUI_PLOT_OK && !complete);
+    assert(cui_plot_appear_registry_record(&inner, 7, 2, 1) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_complete(&registry, 7, 1, &complete) == CUI_PLOT_OK &&
+           complete);
+    assert(cui_plot_appear_registry_complete(&inner, 7, 2, &complete) == CUI_PLOT_OK && complete);
+    assert(cui_plot_appear_registry_end(&inner) == CUI_PLOT_OK);
+    before = inner;
+    assert(cui_plot_appear_registry_record(&inner, 7, 3, 1) == CUI_PLOT_INVALID);
+    assert(memcmp(&before, &inner, sizeof inner) == 0);
+    assert(cui_plot_appear_registry_init(&inner, NULL, 1) == CUI_PLOT_INVALID);
+    assert(memcmp(&before, &inner, sizeof inner) == 0);
+}
 static void test_lifecycle(void) {
     cui_plot_hover_memory memory = {0};
     cui_plot_point dots[] = {{2, 3}}, cursor = {4, 5};
@@ -1132,6 +1203,7 @@ int main(void) {
     test_source_arc_padding();
     test_rounded_bar_path();
     test_linear_extent();
+    test_appear_registry();
     test_lifecycle();
     shape_geometry();
     pie_geometry();

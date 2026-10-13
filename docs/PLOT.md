@@ -442,3 +442,11 @@ use the unchanged `cui_plot_grid` for alpha-zero theme fallback. Dash geometry
 and its existing bounded-output/error contract are shared by both paint routes.
 General gradient/Background fills and renderer path caching remain separate
 unsupported features; these options implement actual solid-color behavior.
+
+For a virtualized list of plots, the
+[bounded appearance scope registry](PLOT_MODEL.md#bounded-appearance-scope-registry)
+remembers multiple completed generations while its enclosing scope is painted
+consecutively. Begin/end it explicitly each host frame and pass the innermost
+registry into child composition. Returning completed children can skip draw-in;
+interrupted children restart. No retained list/plot tree or implicit scheduler
+is introduced by this numeric state helper.

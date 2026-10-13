@@ -134,6 +134,31 @@ typedef size_t (*cui_chart_pie_tooltip_value_fn)(const cui_chart_datum *, size_t
                                                  size_t capacity, void *user);
 typedef cui_color (*cui_chart_tooltip_value_color_fn)(const cui_chart_datum *, size_t index,
                                                       size_t series, double value, void *user);
+/* Transient copying builder: at most 32 rows, 4096 aggregate bytes, and
+ * 1024 bytes per string. Setter/add-row copy valid UTF-8 synchronously. */
+typedef struct cui_chart_tooltip_builder cui_chart_tooltip_builder;
+typedef struct {
+    bool has_swatch, has_value_color;
+    cui_color swatch, value_color;
+    cui_str label, value;
+} cui_chart_tooltip_row;
+typedef struct {
+    cui_chart_kind kind;
+    size_t index, value_count; /* at most eight raw values; four for candles */
+    const cui_chart_datum *datum;
+    double values[8];
+    cui_str series_labels[8];
+    cui_color series_colors[8];
+    bool has_fallback_title;
+    cui_str fallback_title;
+} cui_chart_tooltip_info;
+bool cui_chart_tooltip_set_title(cui_chart_tooltip_builder *, cui_str);
+bool cui_chart_tooltip_add_row(cui_chart_tooltip_builder *, const cui_chart_tooltip_row *);
+/* Info/builder are callback-local. Data/user remain borrowed through the frame.
+ * False or any failed setter rejects the complete tooltip/owner paint; external
+ * callback side effects and borrowed raster writes cannot be rolled back. */
+typedef bool (*cui_chart_tooltip_build_fn)(const cui_chart_tooltip_info *,
+                                           cui_chart_tooltip_builder *, void *);
 typedef struct {
     cui_chart_kind kind;
     const cui_chart_datum *data;
@@ -253,6 +278,11 @@ typedef struct {
      * label callbacks. Explicit tooltip_title/custom content retain precedence.
      * Zero keeps legacy titles; nonzero is valid only for Radar. */
     cui_chart_radar_tooltip_title_mode radar_tooltip_title_mode;
+    /* Replaces automatic title/rows and their formatters. Incompatible with
+     * tooltip_content/measure. AUTO selects current-frame; explicit LEGACY
+     * stages copied content before layout. Existing box styling is retained. */
+    cui_chart_tooltip_build_fn tooltip_build;
+    void *tooltip_build_user;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

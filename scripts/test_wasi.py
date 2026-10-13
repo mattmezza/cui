@@ -253,7 +253,7 @@ def main() -> int:
         targets += [("effects_distribution", ["tests/distribution/effects.c"], False, distribution_flags)]
         targets += [("distribution_single", ["tests/distribution/single.c"], False, distribution_flags),
                     ("distribution_multi", ["tests/distribution/implementation.c", "tests/distribution/consumer.c"], False, distribution_flags)]
-        targets += [("theme_registry_distribution", ["tests/distribution/theme_registry.c"], False, [])]
+        targets += [("theme_registry_distribution", ["tests/distribution/theme_registry.c"], False, distribution_flags)]
         failures = []
         for name, sources, link_library, extra in targets:
             started = time.monotonic()

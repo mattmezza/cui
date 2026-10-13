@@ -5444,8 +5444,12 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_components.c",
-        "tests/unit/test_components.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_theme_registry.c",
+        "tests/integration/test_theme_registry_native.c",
+        "tests/integration/test_theme_registry_source.c",
+        "tests/distribution/theme_registry.c",
+        "tests/web/test_theme_registry.py"
       ],
       "status": "tested",
       "platforms": {
@@ -5454,7 +5458,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "38 pinned named palettes, token derivation, themed button surfaces and CSS/WASM palette equality are tested. Website system appearance, persistence and live OS changes are tested. Native OS preference adapters, complete upstream theme tokens, gradient brushes, font and syntax themes remain partial; Aurora gradients use their first stop. See docs/THEME_PRESETS.md."
+        "38 pinned palettes, caller-owned bounded registry, transactional supported legacy/semantic imports, explicit host appearance/high-contrast/reduced-motion projection, semantic typography/shadow snapshots and native font-backed import rendering are tested. Native OS preference observation is pending; application must pass host preferences explicitly. Semantic font/spacing/shadow and motion snapshots require explicit consumer integration. Unsupported source gradients, syntax/highlight and nonrepresentable fields reject by default, or return an observable partial import when opted in. Registry name ordering uses ASCII case folding. See docs/THEME_REGISTRY_GUIDE.md and docs/THEME_PRESETS.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5494,6 +5498,24 @@
             "tests/web/test_browser.py",
             "docs/validation/published-picker-1b453ab.txt"
           ]
+        },
+        {
+          "name": "bounded owned registry and transactional semantic and legacy imports",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_theme_registry.c",
+            "tests/integration/test_theme_registry_source.c",
+            "tests/distribution/theme_registry.c"
+          ]
+        },
+        {
+          "name": "explicit host appearance and reduced motion projection with native semantic rendering",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_theme_registry.c",
+            "tests/integration/test_theme_registry_native.c",
+            "tests/web/test_theme_registry.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5504,7 +5526,7 @@
           "Theme Registry"
         ]
       },
-      "last_tested_commit": "1b453ab1aa0da2678ee280b901debdb1723796d1",
+      "last_tested_commit": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -5841,14 +5863,16 @@
       "public_header": "include/cui/cui_chart.h",
       "sample": null,
       "tests": [
-        "tests/unit/test_chart.c"
+        "tests/unit/test_chart.c",
+        "tests/web/test_chart_appearance_hover.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Basic rendering for seven chart families, bounded geometry, explicit Sankey topology, theme colors and pointer hover are tested. Source-complete axes, legends, tooltips, gradients, layout refinement and animation remain unfinished; see docs/CHART.md."
+        "Basic rendering for seven chart families, bounded geometry, explicit Sankey topology, theme colors and pointer hover are tested. Source-complete axes, legends, tooltips, gradients, layout refinement and animation remain unfinished; see docs/CHART.md.",
+        "Chart appearance gates new tooltip entry by linear timeline completion and resumes a valid stationary pointer. Current-frame origin/occlusion, arbitrary tooltip layout and complete source owner motion remain unfinished; see docs/CHART_APPEARANCE_HOVER.md and docs/validation/core-prepaint-contract-next23.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5885,6 +5909,14 @@
           "name": "complete source chart layout, motion, tooltip and accessibility parity",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "appearance-gated hover with stationary pointer completion and reduced-motion bypass",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart.c",
+            "tests/web/test_chart_appearance_hover.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5929,7 +5961,8 @@
           "With State Management",
           "Real-time Updates"
         ]
-      }
+      },
+      "last_tested_commit": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d"
     },
     {
       "name": "Command",

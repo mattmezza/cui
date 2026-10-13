@@ -1,29 +1,24 @@
 {
-  "source": "3f4e108fa82a3284240e371f0aad8ac716fc731f",
-  "compiled_source": "3f4e108fa82a3284240e371f0aad8ac716fc731f",
+  "source": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
+  "compiled_source": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
   "published_source": "3b28a2c26f9e0ed448fc72055b198fdeff8f39a5",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Next22 integrates Checkbox springs/wrapping/tooltip, contextual native paragraph shaping, semantic Alert/Bubble slots, pointer-focus policy, caller-clocked Spinner/Skeleton motion, richer Button contracts and named/design-sized Table parts with selection-only DataTable policies. Native112/112, WASI91/91, browser78 and all78 compiled excerpts pass; focused Checkbox34, Button11, Attachment62, Table, Alert/Bubble, motion and responsive proofs pass. Raw sanitizer111/112 has an SDL/Xlib-only reproducer failure; the actual GPU test passes with default leak checking when Xlib stays loaded. Published3b28a2c passes all six framework CI jobs and Pages;355 files match HTTPS and actual published Attachment62 passes. Local next23 Theme registry/Chart gating passes native117 and sanitizer115 (GPU/Sokol unregistered), plus actual Theme preference/Chart browser proofs; portable verification pending. Full family verification remains0/78.",
+  "summary": "Next23 portable bounded Theme registry, semantic/legacy imports, motion projection, native import rendering and standalone header plus Chart appearance hover gate and Core timing audit fixture pass native117/117, sanitizer115/115 (GPU/Sokol not registered), WASI94/94, browser78 and all78 compiled excerpts. Actual preference, Chart, Attachment62 and site design/composed-app checks pass. Initial WASI93/94 missing test include path corrected; complete94/94 rerun retained. Current-frame prepaint, native OS observation and consumer owner motion are active separate work. Published3b28a2c passes six CI jobs and Pages,355/355 files match actual HTTPS, Attachment62 passes. Full family verification remains0/78.",
   "checks": [
     {
       "name": "native",
-      "passed": 112,
-      "total": 112
+      "passed": 117,
+      "total": 117
     },
     {
-      "name": "sanitizers_raw",
-      "passed": 111,
-      "total": 112
-    },
-    {
-      "name": "gpu_sanitizer_xlib_retained",
-      "passed": 1,
-      "total": 1
+      "name": "sanitizers_gpu_sokol_unregistered",
+      "passed": 115,
+      "total": 115
     },
     {
       "name": "WASI",
-      "passed": 91,
-      "total": 91
+      "passed": 94,
+      "total": 94
     },
     {
       "name": "browser_stories",
@@ -36,23 +31,13 @@
       "total": 78
     },
     {
-      "name": "checkbox_motion",
-      "passed": 34,
-      "total": 34
-    },
-    {
-      "name": "button_behavior",
-      "passed": 11,
-      "total": 11
-    },
-    {
       "name": "attachment_size_containment",
       "passed": 62,
       "total": 62
     }
   ],
-  "portable_test_source": "3f4e108fa82a3284240e371f0aad8ac716fc731f",
-  "portable_source_sha256": "2261cee25e77353757e125d1bf2298a25246667c1f4381ae1b0257f4cae843ad",
+  "portable_test_source": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
+  "portable_source_sha256": "554cdcd16bd2be962940b1f9ba0c3438f1288a401b0bf2b38ca2578a94fcd6b0",
   "publication": {
     "pages_run": 38430968688,
     "framework_run": 38430968598,

@@ -532,8 +532,11 @@ plus 400,000 document bytes. These are single-run CPU measurements; host font
 providers, document content, and load change the results. No 60 Hz guarantee
 follows from this headless workload.
 
-This slice does not implement typing-history coalescing or multiple IME
-composition ranges. Preferred columns remain view metadata rather
+Consecutive interactive text batches with unchanged cursor collection coalesce
+into one Undo step, up to 1000 batches. Navigation, selection changes, folds,
+clipboard actions and atomic edits break the group; paste and completion remain
+individual Undo steps. This slice does not implement multiple IME composition
+ranges. Preferred columns remain view metadata rather
 than Undo state. Inline-token annotations are excluded from these attached
 multicursor models and CodeEditor, so token-aware clipboard/indent remapping is not
 claimed. Search mode buttons show selected presentation as well as their semantic

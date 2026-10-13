@@ -425,6 +425,8 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
         if (!vertical && !pointer && !rectangle && !key && !clipboard && !indent &&
             event.type != CUI_EVENT_TEXT)
             continue;
+        if (event.type != CUI_EVENT_TEXT)
+            cui_edit_break_coalescing(editor->edit);
         if (event.key == CUI_KEY_ESCAPE && count == 1)
             continue;
         if (options.readonly && (indent || (clipboard && event.key == CUI_KEY_V) ||
@@ -595,8 +597,8 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                         ++length;
                     error = length == sizeof event.text
                                 ? CUI_EDIT_INVALID_UTF8
-                                : cui_edit_replace_selections(editor->edit,
-                                                              (cui_str){event.text, length});
+                                : cui_edit_type_selections(editor->edit,
+                                                           (cui_str){event.text, length});
                 }
             }
         } else if (event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE) {

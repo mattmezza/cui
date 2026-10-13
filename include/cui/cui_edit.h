@@ -74,6 +74,10 @@ cui_edit_result cui_edit_select_disjoint(cui_edit *, const cui_edit_selection *,
  * all selections with attached history. Single-selection APIs collapse extras.
  * Inline-token content is excluded while selection storage is attached. */
 cui_edit_result cui_edit_replace_selections(cui_edit *, cui_str text);
+/* Interactive text input. Adjacent batches with unchanged cursor collection
+ * coalesce into one bounded Undo entry (at most 1000 batches). Other edits
+ * remain atomic. Navigation/selection breaks the typing group. */
+cui_edit_result cui_edit_type_selections(cui_edit *, cui_str text);
 typedef enum {
     CUI_EDIT_PREVIOUS,
     CUI_EDIT_NEXT,
@@ -209,6 +213,8 @@ cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
  * visual wrapping and pixel-column movement belong to the styled textarea. */
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
 cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
+cui_edit_result cui_edit_type(cui_edit *edit, cui_str text);
+void cui_edit_break_coalescing(cui_edit *edit);
 /* Replace a UTF-8 byte range as one history step without first changing the
  * selection. Attached atomic spans expand overlapping ranges outward; collapsed
  * insertion snaps right. Undo restores the original selection; success collapses

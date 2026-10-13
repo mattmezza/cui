@@ -99,6 +99,7 @@ bool cui_textarea_set_folds(cui_textarea_state *state, cui_edit *edit, cui_texta
     if (!state || !edit || !cui_edit_get_state(edit).multiline ||
         !cui_textarea_folds_valid(cui_edit_get_text(edit), folds, count))
         return false;
+    cui_edit_break_coalescing(edit);
     state->folds = folds;
     state->fold_count = count;
     state->fold_revision = cui_edit_get_state(edit).revision;

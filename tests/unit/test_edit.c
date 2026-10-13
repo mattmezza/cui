@@ -1066,7 +1066,59 @@ static void test_change_span_metadata(void) {
     assert(cui_edit_get_change(edit).first_byte == 3);
     cui_edit_destroy(edit);
 }
+static void test_typing_history_coalescing(void) {
+    char buffer[128] = "";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 1024,
+                                                      .max_history_steps = 8});
+    assert(edit);
+    assert(cui_edit_type(edit, cui_string("a")) == CUI_EDIT_OK);
+    assert(cui_edit_type(edit, cui_string("b")) == CUI_EDIT_OK);
+    assert(cui_edit_type(edit, cui_string("c")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "abc"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, ""));
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abc"));
+    assert(cui_edit_move(edit, CUI_EDIT_GRAPHEME_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_type(edit, cui_string("X")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "abXc"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abc"));
+    assert(cui_edit_type(edit, cui_string("!")) == CUI_EDIT_OK);
+    assert(cui_edit_insert(edit, cui_string("?")) == CUI_EDIT_OK);
+    assert(cui_edit_type(edit, cui_string("z")) == CUI_EDIT_OK);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "ab!?c"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "ab!c"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abc"));
+    cui_edit_destroy(edit);
+}
+static void test_multicursor_typing_history(void) {
+    char buffer[128] = "ab\ncd";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 1024,
+                                                      .max_history_steps = 8});
+    assert(edit);
+    cui_edit_selection selections[4];
+    cui_edit_selection_snapshot history[9];
+    assert(cui_edit_attach_selections(edit, selections, 4, history, 9) == CUI_EDIT_OK);
+    cui_edit_selection cursors[] = {{11, 1, 1}, {22, 4, 4}};
+    assert(cui_edit_select_many(edit, cursors, 2) == CUI_EDIT_OK);
+    assert(cui_edit_type_selections(edit, cui_string("x")) == CUI_EDIT_OK);
+    assert(cui_edit_type_selections(edit, cui_string("y")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "axyb\ncxyd"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "ab\ncd"));
+    size_t count = 0;
+    const cui_edit_selection *restored = cui_edit_get_selections(edit, &count);
+    assert(count == 2 && restored[0].id == 11 && restored[0].cursor == 1 &&
+           restored[1].id == 22 && restored[1].cursor == 4);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK && !strcmp(buffer, "axyb\ncxyd"));
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_multicursor_typing_history();
+    test_typing_history_coalescing();
     test_change_span_metadata();
     test_multi_indent_and_clipboard();
     test_multi_motion_and_erasure();

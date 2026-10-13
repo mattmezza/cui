@@ -1,0 +1,42 @@
+{
+  "scope": "read-only remaining Chart source audit",
+  "upstream_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "cui_commit": "12ad7ef7b75f33fb7be2a55e337f4c9fd4d8b114",
+  "production_edits": false,
+  "source_required_gaps": [
+    "point chart18px gutter and corresponding label placement",
+    "point_count clamped to data count",
+    "typed structured/plain tooltip rows and theme typography/surface",
+    "current-frame arbitrary layout tooltip boundary",
+    "dot half-pixel offset and dashed crosshair theme color",
+    "Radar element-label default tooltip title suppression",
+    "mobile accepted long-press integration"
+  ],
+  "code_path_unverified": [
+    "prior-frame Pie/Sankey static label appearance under current-frame paint"
+  ],
+  "not_source_chart_requirements": [
+    "built-in legend",
+    "keyboard datum navigation"
+  ],
+  "platform_unverified": [
+    "native mobile long-press detection",
+    "native accessibility certification",
+    "GPU shadow/raster equivalence"
+  ],
+  "next_slice": {
+    "name": "opt-in source Line/Area point-axis geometry",
+    "legacy_zero_preserved": true,
+    "source_gutter_px": 18,
+    "legacy_gutter_px": 20,
+    "point_count": "source max(requested,data_len); legacy unchanged",
+    "approval_required_before_production_edits": true,
+    "proposed_ownership": [
+      "include/cui/cui_chart.h",
+      "src/base/cui_chart.c",
+      "src/components/cui_chart.c",
+      "new scoped tests/docs"
+    ]
+  },
+  "runtime_evidence": "existing tests inspected; no new runtime experiment in read-only audit"
+}

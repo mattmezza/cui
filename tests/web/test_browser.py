@@ -767,6 +767,33 @@ def main():
                 control_change('control-size', size)
                 heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Project notes', 6)))
             assert heights[-1] > heights[0], heights
+            # Repeated Down must leave the last rows visible, then Home restores the first.
+            textarea_original = page.evaluate('()=>{const e=cuiGallery.exports;return new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_textarea_text(),e.gallery_textarea_stats(0)));}')
+            control_change('textarea-grow', False)
+            control_change('textarea-rows', '2')
+            control_change('control-size', '1')
+            click_semantic('Project notes', 6)
+            page.keyboard.press('Control+a')
+            page.keyboard.type('\n'.join(f'Row {i:02d}' for i in range(1,11)))
+            page.wait_for_function('cuiGallery.exports.gallery_textarea_stats(1)===10')
+            page.keyboard.press('Control+Home')
+            page.wait_for_function('cuiGallery.exports.gallery_textarea_stats(2)===0&&cuiGallery.exports.gallery_textarea_stats(4)===0')
+            for _ in range(20):
+                page.keyboard.press('ArrowDown')
+            page.wait_for_function('cuiGallery.exports.gallery_textarea_stats(2)===63')
+            textarea_bottom = page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
+                const row=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&
+                    d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Row 10');
+                const box=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>e.gallery_semantic(i,0)===6&&
+                    d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==='Project notes');
+                return [e.gallery_command(row,2),e.gallery_command(row,4),e.gallery_semantic(box,2),e.gallery_semantic(box,4)];}''')
+            assert textarea_bottom[0]>=textarea_bottom[2] and textarea_bottom[0]+textarea_bottom[1]<=textarea_bottom[2]+textarea_bottom[3], textarea_bottom
+            page.screenshot(path='/tmp/cui-web-textarea-down.png')
+            page.keyboard.press('Control+Home')
+            page.wait_for_function('cuiGallery.exports.gallery_textarea_stats(4)===0')
+            page.keyboard.press('Control+a')
+            page.keyboard.type(textarea_original)
+            page.wait_for_function('(length)=>cuiGallery.exports.gallery_textarea_stats(0)===length', arg=len(textarea_original.encode()))
             character_flags = page.evaluate('''() => {
                 const e=cuiGallery.exports, canvas=document.querySelector('canvas');
                 const result=[];

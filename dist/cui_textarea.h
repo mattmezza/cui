@@ -622,18 +622,20 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         (cui_box){.width = -1, .row = true, .height = state->viewport.h, .fixed_height = true});
     cui_begin_box(ui, cui_textarea_child(id, 0, 3), (cui_box){.width = px, .fixed_width = true});
     cui_end_box(ui);
-    cui_begin_box(
-        ui, cui_textarea_viewport_id(id),
-        (cui_box){.width = -1, .height = state->viewport.h, .fixed_height = true, .clip = true});
+    cui_begin_box(ui, cui_textarea_viewport_id(id),
+                  (cui_box){.width = -1,
+                            .height = state->viewport.h,
+                            .fixed_height = true,
+                            .clip = true,
+                            .offset_x = -state->scroll_x,
+                            .offset_y = -state->scroll_y});
     cui_track_bounds(ui, cui_textarea_viewport_id(id), &state->viewport);
     float content_width = width + state->maximum_x;
     cui_begin_box(ui, cui_textarea_child(id, 0, 4),
                   (cui_box){.width = content_width,
                             .fixed_width = true,
                             .height = state->count * metrics.line_height,
-                            .fixed_height = true,
-                            .offset_x = -state->scroll_x,
-                            .offset_y = -state->scroll_y});
+                            .fixed_height = true});
     cui_str text = cui_edit_get_text(edit);
     cui_edit_state selection = cui_edit_get_state(edit);
     size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;

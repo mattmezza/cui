@@ -371,7 +371,49 @@ static void test_composition_navigation(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void assert_visible_line(cui_textarea_state *state, const char *line) {
+    bool found = false;
+    for (size_t i = 0; i < drawing.count; ++i) {
+        const cui_draw_command *command = &drawing.commands[i];
+        if (command->type == CUI_DRAW_TEXT && command->text.length == strlen(line) &&
+            memcmp(command->text.data, line, command->text.length) == 0) {
+            found = true;
+            assert(command->bounds.y >= state->viewport.y - .1f);
+            assert(command->bounds.y + command->bounds.h <=
+                   state->viewport.y + state->viewport.h + 1);
+        }
+    }
+    assert(found);
+}
+static void test_repeated_down_visible_rows(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    char buffer[256] =
+        "Row 01\nRow 02\nRow 03\nRow 04\nRow 05\nRow 06\nRow 07\nRow 08\nRow 09\nRow 10";
+    cui_edit *edit = editor(buffer, sizeof(buffer));
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_options options = {.width = 180, .rows = 2};
+    frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 0, 0);
+    for (unsigned press = 0; press < 20; ++press) {
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        if (press >= 9) {
+            assert(state.caret_line == 9 && state.scroll_y == state.maximum_y);
+            assert_visible_line(&state, "Row 10");
+        }
+    }
+    key(ui, CUI_KEY_HOME, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(state.scroll_y == 0);
+    assert_visible_line(&state, "Row 01");
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_repeated_down_visible_rows();
     test_composition_navigation();
     test_tab_indent_and_focus();
     test_submit_and_horizontal();

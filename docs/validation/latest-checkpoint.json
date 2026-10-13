@@ -1,36 +1,46 @@
 {
-  "source": "cf11f39",
-  "published_source": "e6a5395d8c2d7a5940d0c344ce17a9c23182883b",
+  "source": "5b87567",
+  "published_source": "f6c8cf8109b5575f54e15344095c150b81e13507",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Combined component presentation fixes pass native77, sanitizer75, WASI67, Chromium78, visual regressions and quality. Portable source matches validated593bbb1. Stepper selection, calendar SVG/centering, choice/Command width, InputGroup inline sizing/frame, clean Message preview and centered scrollable AlertDialog are fixed. Published e6a5395 is HTTPS78/fifteen-file verified. Full78-entry parity and remaining feedback are incomplete.",
+  "summary": "Combined sorting/SVG, indeterminate Progress, composed Resizable/Dock, scrolling VirtualList, continuous Chart strokes and Plot zoom/pan pass native77, sanitizer75, WASI67, Chromium78, visual and quality checks. Portable source is unchanged from8e4e15b. Publishedf6c8cf8 passes HTTPS78 and twenty artifact file comparisons. Full78-family parity and remaining user feedback are unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "cf11f39",
+      "source": "8e4e15b",
       "passed": 77,
       "total": 77,
-      "log": "native-cf11f39.txt"
+      "log": "native-8e4e15b.txt"
     },
     {
       "name": "sanitizers",
-      "source": "593bbb1",
+      "source": "8e4e15b",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-593bbb1.txt"
+      "log": "sanitizers-8e4e15b.txt"
     },
     {
       "name": "WASI",
-      "source": "593bbb1",
+      "source": "8e4e15b",
       "passed": 67,
       "total": 67,
-      "log": "wasi-593bbb1.txt"
+      "log": "wasi-8e4e15b.txt"
     },
     {
       "name": "browser",
-      "source": "cf11f39",
+      "source": "5b87567",
       "passed": 78,
       "total": 78,
-      "log": "browser-cf11f39.txt"
+      "log": "browser-5b87567.txt"
+    },
+    {
+      "name": "visual",
+      "source": "8e4e15b",
+      "log": "visual-8e4e15b.txt"
+    },
+    {
+      "name": "quality",
+      "source": "8e4e15b",
+      "log": "quality-8e4e15b.txt"
     }
   ],
   "visual_regressions": "visual-cf11f39.txt",

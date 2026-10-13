@@ -49,7 +49,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] Callback, event and host integration examples.
 - [ ] Reproducible Go, Rust, JavaScript and TypeScript examples with actual support limits.
 - [ ] Improved browsable documentation and intuitive getting-started path.
-- [ ] Copyable agent prompt and generated llms.txt / llms-full.txt (including requested aliases).
+- [x] Copyable agent prompt and generated llms.txt / llms-full.txt, with llm.txt and llm-full.txt aliases. — Published f6c8cf8; actual HTTPS copy/export checks and artifact byte comparisons pass. Broader documentation and bindings remain open.
 - [ ] Original professional media with recorded provenance.
 - [ ] Complete Open Graph coverage, validated share images and metadata.
 

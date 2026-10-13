@@ -2,7 +2,7 @@
 
 The Dock view composes the portable Dock model, Tabs, Buttons and Resizable into a themed workspace. Each leaf shows an overflow-scrolling tab strip and calls only its active panel's content renderer. Nested horizontal and vertical splits use pointer and keyboard resize handles; changed ratios are written back to the model and therefore included in its serialization.
 
-This implementation was checked against the frozen GPUI Kit 0.7.1 reference, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, including `crates/component/src/dock/dock.rs`, `tab_panel.rs` and `website/component/dock.md`. It implements a specific subset, not full Dock family parity. Edge docks, floating windows, zoom/maximize and panel toolbars/menus are not implemented. Programmatic `cui_dock_move` and `cui_dock_split` remain available. No platform or Clay types appear in the public API.
+This implementation was checked against the frozen GPUI Kit 0.7.1 reference, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, including `crates/component/src/dock/dock.rs`, `tab_panel.rs` and `website/component/dock.md`. It implements a specific subset, not full Dock family parity. Edge docks, floating windows and panel menus are not implemented. Programmatic `cui_dock_move` and `cui_dock_split` remain available. No platform or Clay types appear in the public API.
 
 ## Minimal composition
 
@@ -59,6 +59,14 @@ During a drag, an inert title preview follows the pointer inside the workspace a
 
 For generated standalone distribution use, `CUI_DOCK_BASE_ONLY` opts out of the styled Dock implementation so the pure model can be embedded without the component library. Define it before `CUI_DOCK_IMPLEMENTATION` and including `dist/cui_dock.h`. The normal styled bundle requires its documented CUI component dependencies; this macro does not remove public model declarations.
 
+## Active-panel toolbars and zoom
+
+An optional `cui_dock_panel.toolbar` callback submits ordinary controls in a clipped row below the tab strip. It receives the same key/user data as content. Only the active panel in each visible leaf runs this callback. `toolbar_height` defaults to 32 logical pixels when the row is present; content receives the remaining height. Disabled panels/workspaces render the toolbar inert.
+
+`panel.zoomable` exposes a maximize control. Its stable ID is `cui_dock_zoom_id(view_id, panel_key)`. A view retains a stable maximized-panel key and renders its leaf across the workspace, hiding other split leaves. Tab selection within that leaf updates the retained key. Zoom changes presentation, not split ratios or model serialization. `cui_dock_view_zoomed` queries it; `cui_dock_view_set_zoom` allows trusted host actions and activates the requested panel. Zoom-in consults `allow_operation` with `CUI_DOCK_ZOOMED` and emits that event on success. Restore emits `CUI_DOCK_RESTORED` and is always available while maximized, even when zoom capability, policy or workspace interactivity is later revoked. It bypasses veto to avoid trapping the user. Restoring requests focus on the panel tab; disabled tabs follow the core's normal focus eligibility rules.
+
+Node generations can change during model restore while the maximized key survives. Removing the maximized panel automatically restores the workspace and requests a surviving tab's focus on the next frame. View reset clears zoom. Toolbar callbacks and all policy/event callbacks must respect the rendering ownership contract.
+
 ## Validation
 
 The headless styled test exercises active-only callbacks, stable keys including zero/`UINT64_MAX`, disabled controls, keyboard focus/navigation, close shortcuts, collapse, same-group pointer reorder, nested pointer/keyboard resize, infeasible minima, restore/reset and capacity rejection. The model unit test checks split geometry against leaf layout and transactional validation failures. Cross-group and all four edge drops are tested with queued pointer events, including cancellation, outside drops, disabled/reorder-off and full-capacity rejection. Draw-command tests verify accepted/rejected custom preview palettes, preview suppression, motion settings and cancellation cleanup. Host veto tests cover close buttons/shortcuts, reorder, move and split. No native window or browser-specific behavior was tested for this adapter.
@@ -79,6 +87,6 @@ After integration, applications link the usual CUI library containing the styled
 
 ## Remaining reference work
 
-The frozen panel presentation trait exposes `toolbar_buttons` and `zoom_control` separately from base capabilities such as closable/zoomable. A next portable increment can add an active-panel toolbar submission callback and a retained maximized-panel key, preserving the ordinary split model while showing only that leaf. Restore must remain available even if a host later revokes zoom permission, matching the reference's safeguard against trapping a zoomed panel. Headless tests should cover focus restoration, model edits/removal while zoomed and toolbar ownership.
+The frozen panel presentation trait exposes `toolbar_buttons` and `zoom_control` separately from base capabilities such as closable/zoomable. The active-panel toolbar callback and retained zoom support now cover that composition, with tests for focus, persistence, model edits/removal and toolbar ownership. Panel menus and customizable zoom-control placement remain future presentation work.
 
 The reference's edge docks are independently openable/resizable left, right and bottom regions around the center Dock area. They need explicit retained region models, visibility/size state and bounded minimum-size allocation, rather than interpreting the current center split tree as edge-dock parity. This can follow toolbar/zoom with tests for all regions, toggles, constrained layouts and persistence. Native floating windows require a host window-management contract and are not implied by portable layout/render support.

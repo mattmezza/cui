@@ -293,6 +293,77 @@ static void test_policy_preview(void) {
     options.policy_user = NULL;
     options.custom_palette = false;
 }
+static unsigned toolbar_calls[5], toolbar_clicks;
+static void toolbar(cui_context *ctx, uint64_t panel, void *user) {
+    (void)user;
+    ++toolbar_calls[panel];
+    cui_theme theme = cui_theme_light();
+    if (cui_button(ctx, 950 + panel, &theme, cui_string("Panel tool"), false))
+        ++toolbar_clicks;
+}
+static void test_zoom_toolbar(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    cui_dock_node left = cui_dock_root(model), right;
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .3, 1, false, &right) ==
+           CUI_DOCK_OK);
+    panels[0].toolbar = toolbar;
+    panels[1].toolbar = toolbar;
+    panels[0].zoomable = panels[1].zoomable = true;
+    frame();
+    frame();
+    assert(toolbar_calls[0] && toolbar_calls[1]);
+    click(950);
+    assert(toolbar_clicks == 1);
+    char before[4096], after[4096];
+    size_t length;
+    assert(cui_dock_serialize(model, before, sizeof before, &length) == CUI_DOCK_OK);
+    options.allow_operation = policy;
+    options.policy_user = &policy_calls;
+    deny_operation = CUI_DOCK_ZOOMED;
+    click(cui_dock_zoom_id(workspace, 0));
+    assert(result.denied && !cui_dock_view_zoomed(view, NULL));
+    deny_operation = CUI_DOCK_CLOSED;
+    click(cui_dock_zoom_id(workspace, 0));
+    uint64_t maximized;
+    assert(result.zoomed && cui_dock_view_zoomed(view, &maximized) && maximized == 0);
+    unsigned other = toolbar_calls[1];
+    frame();
+    frame();
+    assert(toolbar_calls[1] == other);
+    cui_rect bounds = cui_bounds(ui, cui_dock_group_id(workspace, left));
+    assert(bounds.w == options.width && bounds.h == options.height);
+    assert(cui_dock_serialize(model, after, sizeof after, &length) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    panels[0].zoomable = false;
+    panels[0].disabled = true;
+    options.disabled = true;
+    deny_operation = CUI_DOCK_RESTORED;
+    frame();
+    click(cui_dock_zoom_id(workspace, 0));
+    assert(result.restored && !cui_dock_view_zoomed(view, NULL));
+    panels[0].disabled = false;
+    options.disabled = false;
+    assert(cui_dock_view_set_zoom(view, model, 1, true));
+    frame();
+    assert(cui_dock_view_zoomed(view, &maximized) && maximized == 1);
+    frame();
+    click(cui_dock_zoom_id(workspace, 1));
+    assert(result.restored && cui_focused(ui) == cui_dock_tab_id(workspace, 1));
+    assert(cui_dock_view_set_zoom(view, model, 1, true));
+    frame();
+    assert(cui_dock_restore(model, (cui_str){before, strlen(before)}) == CUI_DOCK_OK);
+    frame();
+    assert(cui_dock_view_zoomed(view, NULL)); /* Stable key survives node generations. */
+    assert(cui_dock_remove(model, 1) == CUI_DOCK_OK);
+    frame();
+    assert(result.restored && !cui_dock_view_zoomed(view, NULL));
+    panels[0].toolbar = panels[1].toolbar = NULL;
+    panels[1].zoomable = false;
+    options.allow_operation = NULL;
+    options.policy_user = NULL;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -416,6 +487,7 @@ int main(void) {
     cui_dock_view_destroy(small);
     test_cross_group();
     test_policy_preview();
+    test_zoom_toolbar();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

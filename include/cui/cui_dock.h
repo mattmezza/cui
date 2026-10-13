@@ -87,6 +87,8 @@ typedef struct {
     bool closable, disabled;
     void (*render)(cui_context *, uint64_t panel, void *user);
     void *user;
+    bool zoomable;
+    void (*toolbar)(cui_context *, uint64_t panel, void *user);
     cui_id focus_target; /* Optional content control; used when focus_content is enabled. */
 } cui_dock_panel;
 typedef enum {
@@ -95,7 +97,9 @@ typedef enum {
     CUI_DOCK_REORDERED,
     CUI_DOCK_RESIZED,
     CUI_DOCK_MOVED,
-    CUI_DOCK_SPLIT
+    CUI_DOCK_SPLIT,
+    CUI_DOCK_ZOOMED,
+    CUI_DOCK_RESTORED
 } cui_dock_event;
 typedef struct {
     cui_dock_event operation; /* CLOSED, MOVED, SPLIT or REORDERED */
@@ -119,11 +123,12 @@ typedef struct {
     void *policy_user;
     bool disable_preview, custom_palette;
     cui_dock_drag_palette drag_palette;
+    float toolbar_height; /* Zero defaults to 32 when a toolbar/control is present. */
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;
     bool selected, closed, reordered, resized, fit_minimum;
-    bool moved, split, denied;
+    bool moved, split, denied, zoomed, restored;
     uint64_t moved_panel;
     uint64_t selected_panel, closed_panel, reordered_panel;
 } cui_dock_view_result;
@@ -132,6 +137,10 @@ cui_dock_view *cui_dock_view_create(size_t node_capacity, size_t panel_capacity)
 void cui_dock_view_destroy(cui_dock_view *);
 void cui_dock_view_reset(cui_dock_view *);
 cui_dock_view_options cui_dock_view_options_default(void);
+/* View-only zoom leaves model serialization unchanged. Programmatic setters bypass policies. */
+bool cui_dock_view_set_zoom(cui_dock_view *, cui_dock *, uint64_t panel, bool zoomed);
+bool cui_dock_view_zoomed(const cui_dock_view *, uint64_t *panel);
+cui_id cui_dock_zoom_id(cui_id view, uint64_t panel);
 cui_id cui_dock_tab_id(cui_id view, uint64_t panel);
 cui_id cui_dock_close_id(cui_id view, uint64_t panel);
 cui_id cui_dock_group_id(cui_id view, cui_dock_node node);

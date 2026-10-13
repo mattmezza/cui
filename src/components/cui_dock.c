@@ -20,7 +20,8 @@ struct cui_dock_view {
     uint64_t *keys;
     const cui_dock *model;
     cui_id id;
-    bool dragging, crossed;
+    bool dragging, crossed, zoomed;
+    uint64_t zoom_key;
     uint64_t drag_key;
     float drag_x, drag_y, pointer_x, pointer_y;
 };
@@ -35,7 +36,8 @@ struct dock_scene {
     size_t panel_count;
     cui_dock_view_options options;
     cui_dock_view_result result;
-    bool pending_close, pending_reorder;
+    bool pending_close, pending_reorder, pending_zoom, zoom_in;
+    uint64_t zoom_key;
     uint64_t close_key, reorder_key;
     size_t reorder_index;
     bool pending_drop, edge_before;
@@ -221,6 +223,25 @@ static cui_id dock_part(cui_id id, uint64_t key, uint64_t tag) {
     x ^= x >> 31;
     return x ? x : tag;
 }
+cui_id cui_dock_zoom_id(cui_id view, uint64_t panel) {
+    return dock_part(view, panel, UINT64_C(0x46ac8d37ab16317e));
+}
+bool cui_dock_view_set_zoom(cui_dock_view *view, cui_dock *model, uint64_t panel, bool zoomed) {
+    if (!view || (zoomed && !cui_dock_panel_find(model, panel, NULL, NULL)))
+        return false;
+    if (zoomed)
+        cui_dock_activate(model, panel);
+    view->zoomed = zoomed;
+    view->zoom_key = panel;
+    return true;
+}
+bool cui_dock_view_zoomed(const cui_dock_view *view, uint64_t *panel) {
+    if (!view || !view->zoomed)
+        return false;
+    if (panel)
+        *panel = view->zoom_key;
+    return true;
+}
 cui_id cui_dock_tab_id(cui_id view, uint64_t panel) {
     return dock_part(view, panel, UINT64_C(0x4989cd35cae1d3a7));
 }
@@ -275,6 +296,7 @@ void cui_dock_view_reset(cui_dock_view *view) {
     view->count = 0;
     view->dragging = false;
     view->crossed = false;
+    view->zoomed = false;
     view->model = NULL;
     view->id = 0;
 }
@@ -400,6 +422,8 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
             if (s->view->items[i].id == selected) {
                 uint64_t key = s->view->keys[i];
                 if (cui_dock_activate(s->dock, key) == CUI_DOCK_OK) {
+                    if (s->view->zoomed)
+                        s->view->zoom_key = key;
                     info.active_panel = key;
                     info.has_active = true;
                     s->result.selected = true;
@@ -446,7 +470,42 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
             cui_consume_event(s->ui, i);
         }
     }
-    float content_height = fmaxf(0, h - s->options.tab_height);
+    bool controls = active && (active->toolbar || active->zoomable || s->view->zoomed);
+    float toolbar_height =
+        controls ? fminf(s->options.toolbar_height, fmaxf(0, h - s->options.tab_height)) : 0;
+    if (controls) {
+        cui_begin_box(s->ui, dock_part(s->id, info.id, UINT64_C(0x2e89ac418f65c15a)),
+                      (cui_box){.width = -1,
+                                .height = toolbar_height,
+                                .fixed_height = toolbar_height == 0,
+                                .row = true,
+                                .clip = true,
+                                .background = s->theme->surface});
+        if (active->toolbar) {
+            cui_begin_box(s->ui, dock_part(s->id, info.id, UINT64_C(0x4f856e247ac4c168)),
+                          (cui_box){.width = -1,
+                                    .height = -1,
+                                    .clip = true,
+                                    .inert = s->options.disabled || active->disabled});
+            active->toolbar(s->ui, active->key, active->user);
+            cui_end_box(s->ui);
+        }
+        if (active->zoomable || s->view->zoomed) {
+            bool zoomed = s->view->zoomed;
+            if (cui_button_ex(s->ui, cui_dock_zoom_id(s->id, active->key), s->theme,
+                              cui_string(zoomed ? "Restore workspace" : "Maximize panel"),
+                              (cui_button_options){.variant = CUI_BUTTON_GHOST,
+                                                   .size = CUI_CONTROL_SMALL,
+                                                   .disabled = !zoomed && (s->options.disabled ||
+                                                                           active->disabled)})) {
+                s->pending_zoom = true;
+                s->zoom_in = !zoomed;
+                s->zoom_key = active->key;
+            }
+        }
+        cui_end_box(s->ui);
+    }
+    float content_height = fmaxf(0, h - s->options.tab_height - toolbar_height);
     cui_begin_box(s->ui, dock_part(s->id, info.id, UINT64_C(0x3721baf9de47c631)),
                   (cui_box){.width = -1,
                             .height = content_height,
@@ -564,10 +623,13 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
         count > CUI_DOCK_PANEL_LIMIT || !isfinite(options.width) || options.width <= 0 ||
         !isfinite(options.height) || options.height <= 0 || !isfinite(options.tab_height) ||
         options.tab_height < 0 || !isfinite(options.key_step) || options.key_step < 0 ||
-        !isfinite(options.now_seconds))
+        !isfinite(options.now_seconds) || !isfinite(options.toolbar_height) ||
+        options.toolbar_height < 0)
         return invalid;
     if (!options.tab_height)
         options.tab_height = 36;
+    if (!options.toolbar_height)
+        options.toolbar_height = 32;
     if (!options.key_step)
         options.key_step = 8;
     for (size_t i = 0; i < count; ++i) {
@@ -583,7 +645,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
         return (cui_dock_view_result){.error = error};
     if (nodes > view->node_capacity || model_panels > view->panel_capacity)
         return (cui_dock_view_result){.error = CUI_DOCK_CAPACITY};
-    if (view->model != model || view->id != id)
+    if ((view->model && view->model != model) || (view->id && view->id != id))
         cui_dock_view_reset(view);
     view->model = model;
     view->id = id;
@@ -610,10 +672,41 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                             .clip = true,
                             .background = theme->background});
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Dock workspace"), options.disabled, false, 0);
-    render_node(&scene, cui_dock_root(model), options.width, options.height);
+    cui_dock_node visible_root = cui_dock_root(model);
+    if (view->zoomed) {
+        if (cui_dock_panel_find(model, view->zoom_key, &visible_root, NULL)) {
+            cui_dock_node_info info;
+            cui_dock_node_get(model, visible_root, &info);
+            scene.result.fit_minimum =
+                options.width >= info.min_width && options.height >= info.min_height;
+        } else {
+            view->zoomed = false;
+            scene.result.restored = true;
+            emit(&scene, CUI_DOCK_RESTORED, view->zoom_key, 0);
+            uint64_t survivor;
+            if (first_active(model, cui_dock_root(model), &survivor))
+                cui_focus(ui, cui_dock_tab_id(id, survivor));
+            visible_root = cui_dock_root(model);
+        }
+    }
+    render_node(&scene, visible_root, options.width, options.height);
     drag_preview(&scene);
     cui_end_box(ui);
-    if (scene.pending_close) {
+    if (scene.pending_zoom) {
+        if (scene.zoom_in && !allowed(&scene, CUI_DOCK_ZOOMED, scene.zoom_key, visible_root, 0,
+                                      CUI_DOCK_TABS, false))
+            scene.result.denied = true;
+        else {
+            view->zoomed = scene.zoom_in;
+            view->zoom_key = scene.zoom_key;
+            scene.result.zoomed = scene.zoom_in;
+            scene.result.restored = !scene.zoom_in;
+            emit(&scene, scene.zoom_in ? CUI_DOCK_ZOOMED : CUI_DOCK_RESTORED, scene.zoom_key,
+                 visible_root);
+            cui_focus(ui, cui_dock_tab_id(id, scene.zoom_key));
+            cui_invalidate(ui);
+        }
+    } else if (scene.pending_close) {
         cui_dock_node node;
         if (!allowed(&scene, CUI_DOCK_CLOSED, scene.close_key, 0, 0, CUI_DOCK_TABS, false))
             scene.result.denied = true;

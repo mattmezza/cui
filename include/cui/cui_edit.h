@@ -89,7 +89,7 @@ typedef enum {
 } cui_edit_format_kind;
 typedef struct {
     cui_edit_format_kind kind;
-    cui_str pattern; /* Immutable, borrowed only during a synchronous request. */
+    cui_str pattern;    /* Immutable, borrowed only during a synchronous request. */
     bool has_separator; /* NUMBER: true uses a non-NUL Unicode scalar separator. */
     uint32_t separator;
     bool fraction_limited;

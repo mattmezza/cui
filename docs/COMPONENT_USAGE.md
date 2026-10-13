@@ -611,7 +611,7 @@ API: `cui_form`. [Public header](../include/cui/cui_form.h); [guide](FORMS.md).
 
 **State:** Caller retains cui_edit and its backing buffer; cui_input_ex additionally uses caller-owned cui_input_state.
 
-**Interaction:** cui_input_result reports changed, submitted, rejected and errors. Optional whole-value validate callback decides whether a proposed edit is accepted.
+**Interaction:** cui_input_result reports changed, submitted, rejected and errors. Optional whole-value validate callback decides whether a proposed edit is accepted. Checked pattern and number formatting use caller-owned workspace and commit as one Undo step.
 
 **Usage:** Create an editor once; submit it each frame and perform application submission only on the result event.
 

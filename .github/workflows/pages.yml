@@ -26,6 +26,8 @@ jobs:
         run: python scripts/build_web.py --zig "$(python -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).parent / "zig")')"
       - name: Verify complete static sharing metadata
         run: python tests/test_sharing.py
+      - name: Compile selected gallery usage across modes and sizes
+        run: python tests/test_selected_usage.py
       - name: Exercise component behavior in Chromium
         run: uv run tests/web/test_browser.py
       - name: Verify real touch contacts scrolling and opt-in pinch
@@ -38,6 +40,12 @@ jobs:
         run: uv run tests/web/test_button_collection_gallery.py
       - name: Gallery password modes and secure host bridge
         run: uv run tests/web/test_password_gallery.py
+      - name: Secure Input native composition cancellation and recovery
+        run: uv run tests/web/test_secure_input.py --output build/secure-input-proof
+      - name: Gallery checked pattern and number formatting
+        run: uv run tests/web/test_input_format_gallery.py
+      - name: Copy actual selected gallery examples to the clipboard
+        run: uv run tests/web/test_selected_usage_gallery.py
       - name: Verify live Input whole-value acceptance and guide links
         run: uv run tests/web/test_input_acceptance_gallery.py
       - name: Verify numeric OTP and combobox native composition

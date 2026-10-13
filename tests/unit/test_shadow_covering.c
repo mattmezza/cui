@@ -2,8 +2,8 @@
 /* Source: gpui-pre 0.3.8 Window::cover_bounds and Bounds::dilate,
  * locked by shadow_covering_source.json. */
 #include "../../backends/software/cui_shadow.h"
-#include "cui_effects.h"
-#include "cui_software.h"
+#include "cui/cui_effects.h"
+#include "cui/cui_software.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>

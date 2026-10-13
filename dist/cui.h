@@ -324,7 +324,8 @@ typedef struct {
     cui_corner_radii radii; /* Clamped to original caster, never to spread bounds. */
     cui_drop_shadow layer;
 } cui_drop_shadow_paint;
-/* Invalid input leaves output untouched. Collapsed spread is an empty extent. */
+/* Invalid input leaves output untouched. Logical support is metadata; checked physical covering
+ * determines empty paint. */
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint, cui_rect *out);
 typedef struct {
     float left, right, top, bottom;
@@ -802,6 +803,14 @@ void cui_set_reduced_motion(cui_context *, bool);
 /* Private value-only geometry shared by Core and standalone Effects.
  * The including translation unit supplies the public CUI value types. */
 #include <math.h>
+/* Preserve source Bounds::dilate materialization and f32 operation order.
+ * Covering uses this stored origin plus stored size, not an algebraic rewrite. */
+static inline cui_rect cui_drop_shadow_logical_bounds(cui_drop_shadow_paint p) {
+    return (cui_rect){(p.caster.x + p.layer.offset_x) - p.layer.spread,
+                      (p.caster.y + p.layer.offset_y) - p.layer.spread,
+                      p.caster.w + (p.layer.spread + p.layer.spread),
+                      p.caster.h + (p.layer.spread + p.layer.spread)};
+}
 static inline bool cui_drop_shadow_bounds_checked(cui_drop_shadow_paint p, cui_rect *out) {
     const float values[] = {p.caster.x,        p.caster.y,          p.caster.w,
                             p.caster.h,        p.layer.offset_x,    p.layer.offset_y,
@@ -820,14 +829,12 @@ static inline bool cui_drop_shadow_bounds_checked(cui_drop_shadow_paint p, cui_r
         p.radii.bottom_right < 0 || p.radii.top_left > 16384 || p.radii.top_right > 16384 ||
         p.radii.bottom_left > 16384 || p.radii.bottom_right > 16384)
         return false;
-    cui_rect next = {0};
-    if (p.caster.w > 0 && p.caster.h > 0 && p.caster.w + 2 * p.layer.spread > 0 &&
-        p.caster.h + 2 * p.layer.spread > 0) {
-        float margin = p.layer.spread + 3 * p.layer.sigma + 1;
-        next = (cui_rect){p.caster.x + p.layer.offset_x - margin,
-                          p.caster.y + p.layer.offset_y - margin, p.caster.w + 2 * margin,
-                          p.caster.h + 2 * margin};
-    }
+    cui_rect logical = cui_drop_shadow_logical_bounds(p);
+    float margin = 3 * p.layer.sigma + 1;
+    /* Metadata is conservative logical support, not the checked physical
+     * covering. Even a negative logical size can cover a physical pixel. */
+    cui_rect next = {logical.x - margin, logical.y - margin, fmaxf(logical.w, 0) + 2 * margin,
+                     fmaxf(logical.h, 0) + 2 * margin};
     *out = next;
     return true;
 }

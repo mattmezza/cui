@@ -1599,6 +1599,7 @@ static float slider = 40;
 static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
 static cui_input_state input_state;
+static char input_format_workspace[1024];
 static int input_mode;
 static bool input_rejected;
 static bool gallery_name_acceptance(void *user, cui_str value) {
@@ -3519,13 +3520,27 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 6: {
         cui_input_result result = cui_input_ex(
             ui, cui_id_from(ui, "input"), &t,
-            cui_string(input_mode >= 4 ? "Password" : "Display name"), edit, &input_state,
+            cui_string(input_mode == 7   ? "Phone number"
+                       : input_mode == 8 ? "Amount"
+                       : input_mode >= 4 ? "Password"
+                                         : "Display name"),
+            edit, &input_state,
             (cui_input_options){
                 .disabled = disabled,
                 .masked = input_mode == 4 || input_mode == 6,
-                .content_type = input_mode == 6   ? CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD
-                                : input_mode >= 4 ? CUI_TEXT_INPUT_PURPOSE_PASSWORD
-                                                  : CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED,
+                .content_type = input_mode == 6 ? CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD
+                                : input_mode >= 4 && input_mode <= 6
+                                    ? CUI_TEXT_INPUT_PURPOSE_PASSWORD
+                                    : CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED,
+                .format = input_mode == 7   ? (cui_edit_format){.kind = CUI_EDIT_FORMAT_PATTERN,
+                                                                .pattern = {"(999) 999-9999", 14}}
+                          : input_mode == 8 ? (cui_edit_format){.kind = CUI_EDIT_FORMAT_NUMBER,
+                                                                .has_separator = true,
+                                                                .separator = ',',
+                                                                .fraction_limited = true,
+                                                                .fraction_digits = 2}
+                                            : (cui_edit_format){0},
+                .format_workspace = {input_format_workspace, sizeof input_format_workspace},
                 .readonly = input_mode == 1,
                 .validate = input_mode == 3 ? gallery_name_acceptance : NULL,
                 .normalization =
@@ -3544,6 +3559,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                       cui_string(input_rejected
                                      ? "Number rejected; your name is unchanged."
                                      : "Names can contain Unicode text, but no digits."));
+        if (input_mode == 7 || input_mode == 8)
+            cui_label(ui, &t,
+                      cui_string(input_mode == 7 ? "Select all and type 4155550123: (415) 555-0123."
+                                                 : "Select all and type 12345.678: 12,345.67."));
         break;
     }
     case 60: {
@@ -5726,7 +5745,7 @@ int gallery_alert_attempts(void) {
     return alert_attempts;
 }
 void gallery_input_mode(int mode) {
-    if (mode < 0 || mode > 6)
+    if (mode < 0 || mode > 8)
         mode = 0;
     if (input_mode != mode)
         input_rejected = false;

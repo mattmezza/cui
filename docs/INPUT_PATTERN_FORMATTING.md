@@ -7,7 +7,7 @@ Legacy zero options are unchanged. No full Input parity claim follows.
 ```c
 char formatted_workspace[128];
 cui_input_options options = {
-    .format = {CUI_EDIT_FORMAT_PATTERN, {"99-99", 5}},
+    .format = {.kind = CUI_EDIT_FORMAT_PATTERN, .pattern = {"99-99", 5}},
     .format_workspace = {formatted_workspace, sizeof formatted_workspace}
 };
 /* Paste 1234 stores/paints 12-34; the final caret is byte 5. */

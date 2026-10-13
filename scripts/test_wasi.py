@@ -17,6 +17,7 @@ import time
 ZIG_VERSION = "0.16.0"
 WASMTIME_VERSION = "49.0.0"
 SOURCES = (
+    "src/base/cui_button_group.c",
     "src/core/cui.c",
     "src/base/cui_radio_group.c", "src/components/cui_radio_group.c",
     "src/effects/cui_effects.c",
@@ -89,11 +90,11 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts", "plot_chart_prepaint", "pointer_presence", "input_acceptance", "chart_source_point_axis", "input_normalization", "chart_radar_tooltip_title", "chart_typed_tooltip", "pointer_activation_blocker", "button_activation_blocker", "pointer_blocker_scroll_scope", "password_engine", "chart_tooltip_appearance")
+SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts", "plot_chart_prepaint", "pointer_presence", "input_acceptance", "chart_source_point_axis", "input_normalization", "chart_radar_tooltip_title", "chart_typed_tooltip", "pointer_activation_blocker", "button_activation_blocker", "pointer_blocker_scroll_scope", "password_engine", "chart_tooltip_appearance", "button_group", "button_callback_events", "password_present", "password_start", "password_input", "secure_focus", "secure_focus_generation", "drop_shadow")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
-    paths = list(SOURCES)
+    paths = list(SOURCES) + ["backends/software/cui_shadow.h", "backends/software/cui_bitmap.h", "src/core/cui_drop_shadow_bounds_internal.h", "tests/distribution/drop_shadow_effects.c"]
     paths += [f"tests/unit/test_{name}.c" for name in SUITES]
     paths += ["tests/unit/test_core_embed.c", "tests/distribution/single.c",
               "tests/distribution/implementation.c", "tests/distribution/consumer.c",
@@ -103,7 +104,7 @@ def source_fingerprint(root: pathlib.Path) -> str:
               for path in (root / folder).glob("*.h")]
     paths += ["src/base/cui_textarea_geometry.h", "src/theme/cui_theme_json.h", "src/theme/cui_theme_equal.h", "src/theme/cui_theme_palette.inc", "src/theme/cui_theme_legacy_fields.inc"]
     paths += ["web/touch_page_host.h", "examples/native_starter/app.c", "examples/native_starter/app.h", "examples/native_starter/test_app.c", "examples/system_theme/main.c", "tests/integration/test_system_theme_app.c"]
-    paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c", "tests/unit/test_radio_group_base.c"]
+    paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c", "tests/unit/test_radio_group_base.c", "tests/unit/test_accepted_activation.c", "tests/unit/test_button_group_base.c"]
     paths += [str(path.relative_to(root)) for path in (root / "third_party/sheenbidi").rglob("*") if path.is_file()]
     paths += ["third_party/clay/clay.h", "tests/unit/cui_edit_grapheme_tests.inc", "tests/unit/cui_edit_word_tests.inc"]
     digest = hashlib.sha256()
@@ -223,6 +224,8 @@ def main() -> int:
                     (["src/core/cui.c"] if name == "pointer_presence" else []),
                     name != "pointer_presence",
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("accepted_activation_core_only", ["tests/unit/test_accepted_activation.c", "src/core/cui.c"], False, [])]
+        targets += [("button_group_base_only", ["tests/unit/test_button_group_base.c", "src/core/cui.c", "src/base/cui_button_group.c"], False, [])]
         targets += [("radio_group_base_only", ["tests/unit/test_radio_group_base.c", "src/core/cui.c", "src/base/cui_radio_group.c"], False, [])]
         targets += [("native_starter", ["examples/native_starter/app.c", "examples/native_starter/test_app.c"], True, [])]
         targets += [("system_theme_app", ["tests/integration/test_system_theme_app.c"], True, [])]
@@ -249,6 +252,7 @@ def main() -> int:
         targets += [("otp_base_only", ["tests/unit/test_otp.c", "src/core/cui.c", "src/base/cui_edit.c", "src/base/cui_otp.c"], False, ["-DCUI_OTP_BASE_ONLY=1"])]
         targets += [("form_base_only", ["tests/unit/test_form.c", "src/core/cui.c", "src/base/cui_form.c", "src/base/cui_base.c", "src/base/cui_edit.c"], False, ["-DCUI_FORM_BASE_ONLY=1"])]
         targets += [("surface_base_only", ["tests/unit/test_surface.c", "src/core/cui.c", "src/base/cui_models.c", "src/base/cui_overlay.c", "src/base/cui_surface.c"], False, ["-DCUI_SURFACE_BASE_ONLY=1"])]
+        targets += [("drop_shadow_effects_distribution", ["tests/distribution/drop_shadow_effects.c"], False, ["-I", str(root / "dist")])]
         targets += [("implementation_embedding", ["tests/unit/test_core_embed.c"], False, [])]
         targets += [(f"example_{name}", [f"examples/{name}/main.c"], True, [])
                     for name in ("unstyled", "styled_settings")]

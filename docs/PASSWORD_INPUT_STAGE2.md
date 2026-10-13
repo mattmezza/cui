@@ -145,7 +145,7 @@ input, and clears transient value/preedit on blur, generation rebind/reset/dispo
 Composing shortcuts yield to the browser IME. Native DOM selection represents the
 range the browser exposes; no claim of every platform's internal IME clause range.
 The module provides no async clipboard implementation or cross-platform virtual
-keyboard guarantee. Root gallery integration is separate from this isolated fixture.
+keyboard guarantee. The website Input preview exposes hidden, revealed, and new-password modes through this bridge. Its finalized owner and generation preserve all 64 bits across the WASM host boundary.
 
 The standalone fixture uses actual CUI Core/styled Input compiled to WASM, with
 real Chromium CDP imeSetComposition/insertText and actual canvas font measurement
@@ -163,5 +163,4 @@ Headless tests: test_password_present, test_password_start, test_password_input,
 test_secure_focus_generation and optional test_password_accessibility. Native font
 proof: test_password_native (actual NotoSans bullets, plaintext cache teardown,
 factory failure before writes); SDL proof: test_password_sdl3 (real SDL property
-calls and queued Unicode editing/commit, Xvfb). Registration is integrator-owned.
-Stage 2 distribution headers remain stale until integrator regeneration.
+calls and queued Unicode editing/commit, Xvfb). These tests are registered in CMake; portable tests also run under WASI. Generated distribution headers include these APIs.

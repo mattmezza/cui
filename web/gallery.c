@@ -1143,6 +1143,25 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
 }
 static int clicks;
 static cui_button_state gallery_button_label;
+static int button_collection;
+static bool button_collection_selected[3] = {true, false, false};
+static unsigned button_collection_requests;
+static cui_button_group_style_workspace button_collection_workspace;
+static void gallery_button_collection_change(void *user, const cui_button_group_request *request) {
+    (void)user;
+    memset(button_collection_selected, 0, sizeof button_collection_selected);
+    for (size_t i = 0; i < request->selected_count; ++i)
+        if (request->selected_indices[i] < 3)
+            button_collection_selected[request->selected_indices[i]] = true;
+    ++button_collection_requests;
+}
+void gallery_button_collection(int mode) {
+    button_collection = mode >= 0 && mode <= 3 ? mode : 0;
+}
+unsigned gallery_button_collection_stat(unsigned field) {
+    return field < 3 ? button_collection_selected[field] : button_collection_requests;
+}
+
 static void gallery_button_action(void *user) {
     (void)user;
     clicks++;
@@ -2460,6 +2479,47 @@ void gallery_composition(int phase, const char *text, size_t length, unsigned an
         gallery_ime_owner = 0;
     }
 }
+/* Finalized portable configuration; preserve all 64 bits across the JS ABI. */
+unsigned gallery_text_config(unsigned field) {
+    cui_text_input_state state;
+    if (!cui_get_text_input_config(ui, &state))
+        return 0;
+    switch (field) {
+    case 0:
+        return 1;
+    case 1:
+        return (unsigned)state.owner;
+    case 2:
+        return (unsigned)(state.owner >> 32);
+    case 3:
+        return (unsigned)state.generation;
+    case 4:
+        return (unsigned)(state.generation >> 32);
+    case 5:
+        return (unsigned)state.config.type;
+    case 6:
+        return (unsigned)state.config.purpose;
+    case 7:
+        return state.multiline;
+    default:
+        return 0;
+    }
+}
+void gallery_composition_bytes(int phase, const char *text, size_t length, unsigned anchor,
+                               unsigned cursor, unsigned owner_low, unsigned owner_high) {
+    if (!ui || phase < 0 || phase > 3 || (!text && length))
+        return;
+    cui_id owner = (cui_id)owner_low | ((cui_id)owner_high << 32);
+    if (!owner)
+        return;
+    (void)cui_queue_event(ui,
+                          (cui_event){.type = (cui_event_type)(CUI_EVENT_COMPOSITION_START + phase),
+                                      .composition_target = owner,
+                                      .text_data = text,
+                                      .text_length = length,
+                                      .composition_anchor = anchor,
+                                      .composition_cursor = cursor});
+}
 float gallery_ime_rect(unsigned field) {
     cui_rect rect;
     if (!cui_text_input_rect(ui, &rect))
@@ -3261,6 +3321,36 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 0: {
         char label[64];
+        if (button_collection) {
+            cui_button_group_styled_item items[] = {
+                {.id = cui_id_from(ui, "collection-day"), .label = cui_string("Day")},
+                {.id = cui_id_from(ui, "collection-week"), .label = cui_string("Week")},
+                {.id = cui_id_from(ui, "collection-month"), .label = cui_string("Month")},
+            };
+            for (size_t i = 0; i < 3; ++i) {
+                items[i].options.custom_cursor = true;
+                items[i].options.cursor = CUI_CURSOR_POINTER;
+            }
+            cui_button_group_ex(
+                ui, cui_id_from(ui, "button-collection"), &t, items, button_collection_selected, 3,
+                &button_collection_workspace,
+                (cui_button_group_style_options){
+                    .behavior = {.multiple = button_collection == 2,
+                                 .vertical = button_collection == 3,
+                                 .disabled = disabled,
+                                 .activation_policy = CUI_BUTTON_GROUP_ALL_ACTIVATIONS,
+                                 .accessibility_label = cui_string("Calendar view"),
+                                 .on_change = gallery_button_collection_change},
+                    .override_size = true,
+                    .size = (cui_control_size)control_size,
+                    .design_size = design_size,
+                    .override_variant = true,
+                    .variant = CUI_BUTTON_OUTLINE},
+                NULL);
+            snprintf(label, sizeof label, "Selection callbacks: %u", button_collection_requests);
+            cui_label(ui, &t, cui_string(label));
+            break;
+        }
         cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
                       (cui_button_options){.size = (cui_control_size)control_size,
                                            .design_size = design_size,
@@ -3428,18 +3518,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     case 6: {
         cui_input_result result = cui_input_ex(
-            ui, cui_id_from(ui, "input"), &t, cui_string("Display name"), edit, &input_state,
-            (cui_input_options){.disabled = disabled,
-                                .readonly = input_mode == 1,
-                                .validate = input_mode == 3 ? gallery_name_acceptance : NULL,
-                                .normalization = input_mode == 3
-                                                     ? CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF
-                                                     : CUI_EDIT_NORMALIZE_NONE,
-                                .required = input_mode == 2,
-                                .invalid = input_mode == 2,
-                                .size = (cui_input_size)control_size,
-                                .design_size = design_size,
-                                .width = width > 360 ? 280 : width - 48});
+            ui, cui_id_from(ui, "input"), &t,
+            cui_string(input_mode >= 4 ? "Password" : "Display name"), edit, &input_state,
+            (cui_input_options){
+                .disabled = disabled,
+                .masked = input_mode == 4 || input_mode == 6,
+                .content_type = input_mode == 6   ? CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD
+                                : input_mode >= 4 ? CUI_TEXT_INPUT_PURPOSE_PASSWORD
+                                                  : CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED,
+                .readonly = input_mode == 1,
+                .validate = input_mode == 3 ? gallery_name_acceptance : NULL,
+                .normalization =
+                    input_mode == 3 ? CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF : CUI_EDIT_NORMALIZE_NONE,
+                .required = input_mode == 2,
+                .invalid = input_mode == 2,
+                .size = (cui_input_size)control_size,
+                .design_size = design_size,
+                .width = width > 360 ? 280 : width - 48});
         if (result.rejected)
             input_rejected = true;
         else if (result.changed)
@@ -5314,6 +5409,17 @@ float gallery_command(unsigned i, unsigned field) {
         return 0;
     }
 }
+float gallery_shadow_value(unsigned i, unsigned field) {
+    if (i >= draw.count || draw.commands[i].type != CUI_DRAW_DROP_SHADOW || field >= 16)
+        return 0;
+    const cui_drop_shadow_paint *p = &draw.commands[i].shadow;
+    const float values[] = {
+        p->caster.x,       p->caster.y,        p->caster.w,          p->caster.h,
+        p->radii.top_left, p->radii.top_right, p->radii.bottom_left, p->radii.bottom_right,
+        p->layer.offset_x, p->layer.offset_y,  p->layer.sigma,       p->layer.spread,
+        p->layer.color.r,  p->layer.color.g,   p->layer.color.b,     p->layer.color.a};
+    return values[field];
+}
 const char *gallery_command_text(unsigned i) {
     return i < draw.count ? draw.commands[i].text.data : NULL;
 }
@@ -5620,7 +5726,7 @@ int gallery_alert_attempts(void) {
     return alert_attempts;
 }
 void gallery_input_mode(int mode) {
-    if (mode < 0 || mode > 3)
+    if (mode < 0 || mode > 6)
         mode = 0;
     if (input_mode != mode)
         input_rejected = false;

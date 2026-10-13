@@ -24,7 +24,7 @@ SDL Renderer suspends its rounded logical clip while painting a prepared, physic
 
 ## Canvas host wiring
 
-`web/modules/cui_shadow.js` exports `createCuiShadowRenderer` and `cuiShadowWasmRasterizer`. `web/modules/cui_shadow_bridge.c` is the standalone bridge/example schema for the existing pure C kernel; it is not automatically linked into applications. Root Gallery wiring is a separate integrator change.
+`web/modules/cui_shadow.js` exports `createCuiShadowRenderer` and `cuiShadowWasmRasterizer`. `web/modules/cui_shadow_bridge.c` is the standalone bridge/example schema for the existing pure C kernel; it is not automatically linked into applications. The gallery links this bridge, copies each shadow value command, preflights all rasters before either resizing or clearing its Canvas, and suspends ordinary fractional clips while drawing the prepared physical masks.
 
 The host decodes commands to `{type:'shadow',values:[caster x,y,w,h; original radii TL,TR,BL,BR; offset x,y,sigma,spread; R,G,B,A]}`, clip commands to `{type:'clipPush',bounds:[x,y,w,h]}`/`{type:'clipPop'}`, and other commands to `{type:'other'}`. All 16 values are copied. Call `renderer.prepare(commands,ctx,logicalWidth,logicalHeight)` **before** clearing the target; errors leave target pixels unchanged. The checked C query and raster provider returns copied metadata and borrowed pixels used only synchronously during preparation. WASM memory views are recreated after each call to tolerate memory growth.
 

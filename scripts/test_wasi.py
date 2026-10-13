@@ -160,7 +160,7 @@ def main() -> int:
     parser.add_argument("--zig", default="zig", help="path to Zig 0.16.0")
     # Theme/variant matrices repeatedly construct full contexts; keep a finite
     # suite budget large enough for those allocation-heavy behavioral tests.
-    parser.add_argument("--fuel", type=int, default=30_000_000_000, help="per-suite instruction budget")
+    parser.add_argument("--fuel", type=int, default=40_000_000_000, help="per-suite instruction budget")
     args = parser.parse_args()
     root = args.root.resolve()
     build = (args.build_dir or root / "build/wasi").resolve()

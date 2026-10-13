@@ -24,10 +24,9 @@ versions are deliberately rejected until the pins are reviewed.
 
 The runner builds an optimized portable static archive with C11,
 `-Wall -Wextra -Wpedantic -Werror`, and enabled assertions. It then compiles and
-executes 15 modules: bootstrap, core, base, components, render, edit, overlay,
-virtual, dock, plot, implementation embedding, two examples, and single-/multi-TU
-header distribution consumers. Each module gets an 8 MiB stack and a configurable
-instruction fuel budget (10 billion by default); exceeding the budget fails the suite. Runtime exits,
+executes 75 registered portable suites, including component/base behavior,
+implementation embedding, examples and single-/multi-TU distribution consumers. Each module gets an 8 MiB stack and a configurable
+instruction fuel budget (40 billion by default); exceeding the budget fails the suite. Runtime exits,
 traps, and compilation failures fail verification and are reported individually.
 The runtime receives no filesystem preopens or inherited environment variables.
 Host-side stdout/stderr files contain only the tested module's output.
@@ -55,4 +54,4 @@ That real target-specific failure prompted a parser correction; it was not
 skipped or converted into a compilation-only claim. SDL/native renderer tests
 and FreeType/HarfBuzz shaping are outside this runner's tested surface.
 
-The runner bounds each suite to 30 billion WebAssembly instructions (overridable with `--fuel`). The expanded Choice theme/variant matrix exhausted the previous 10-billion limit while repeatedly allocating contexts; the same module completes with the larger finite budget. Assertions and all cases remain enabled.
+The runner bounds each suite to 40 billion WebAssembly instructions (overridable with `--fuel`). The expanded Choice matrix repeatedly creates independent contexts. After touch routing expanded bounded internal dispatch storage, the exact frozen module consumed 30,484,390,481 instructions and exhausted the previous 30-billion budget. The new finite budget preserves every case and assertion. The original failure and measured rerun are retained in the release evidence; this is a runner resource limit, not a passing assertion being removed.

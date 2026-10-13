@@ -119,13 +119,14 @@ static void point_scales(void) {
     double pixel = 987;
     size_t index = 876;
     assert(cui_plot_point_map(&scale, 5, &pixel) == CUI_PLOT_OK && pixel == 40);
-    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && pixel == 80);
+    /* Long double is binary64 on some targets; 2/3 interpolation may differ by one ULP. */
+    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && close(pixel, 80));
     assert(cui_plot_point_at(&scale, 3, &pixel) == CUI_PLOT_OK && pixel == 100);
     assert(cui_plot_point_nearest(&scale, 50, &index) == CUI_PLOT_OK && index == 1);
     assert(cui_plot_point_nearest(&scale, 30, &index) == CUI_PLOT_OK && index == 0);
     assert(cui_plot_point_nearest(&scale, 110, &index) == CUI_PLOT_OK && index == 3);
     assert(cui_plot_point_init(&scale, keys, 4, 100, 40) == CUI_PLOT_OK);
-    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && pixel == 60);
+    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && close(pixel, 60));
     assert(cui_plot_point_nearest(&scale, 90, &index) == CUI_PLOT_OK && index == 1);
     assert(cui_plot_point_nearest(&scale, 120, &index) == CUI_PLOT_OK && index == 0);
     assert(cui_plot_point_nearest(&scale, 10, &index) == CUI_PLOT_OK && index == 3);

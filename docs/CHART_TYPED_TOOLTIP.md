@@ -3,6 +3,9 @@
 Append `tooltip_build` and `tooltip_build_user` to opt into structured tooltip content. The builder copies title, label, and value bytes synchronously; local formatting buffers can be changed or leave scope immediately after a setter returns. No builder or string pointers escape into owner state.
 
 ```c
+#include "cui/cui_chart.h"
+#include <stdio.h>
+
 static bool tooltip(const cui_chart_tooltip_info *info,
                     cui_chart_tooltip_builder *builder, void *user) {
     (void)user;
@@ -26,6 +29,13 @@ static bool tooltip(const cui_chart_tooltip_info *info,
 }
 /* options.tooltip_build = tooltip; */
 ```
+
+Choose **Custom tooltip rows** in the Chart gallery to see a swatched series row
+and a plain reporting-period row. The application callback receives real values
+and fills its rows with these copying helpers. Configure `options.tooltip_build`
+before submitting the Chart; retain any `tooltip_build_user` data through frame
+completion. This callback describes paint content and should not perform
+application actions or change the UI during prepaint.
 
 The immutable callback info contains Chart kind, retained visual datum/index, at most eight raw values (four Open/High/Low/Close values for candles), default series labels/colors, and optional fallback title. Sankey supplies current retained throughput. Pie supplies raw values rather than formatted share percentages; callers wanting ratios have their caller-owned data/user context. Automatic title/value/label/value-color/pie formatter callbacks are skipped when the builder is selected. The builder supplies the complete title/row content. `tooltip_content` or `tooltip_measure` together with a builder is rejected before mutation; existing custom layout callbacks retain their original behavior when no builder is supplied.
 

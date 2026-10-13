@@ -570,7 +570,12 @@
       "tests": [
         "tests/unit/test_components.c",
         "tests/unit/test_button_behavior.c",
-        "tests/web/test_button_behavior.py"
+        "tests/web/test_button_behavior.py",
+        "tests/unit/test_pointer_activation_blocker.c",
+        "tests/unit/test_button_activation_blocker.c",
+        "tests/unit/test_pointer_blocker_scroll_scope.c",
+        "tests/web/test_button_activation_blocker.py",
+        "tests/web/test_button_blocker_scroll_scope.py"
       ],
       "status": "tested",
       "platforms": {
@@ -633,6 +638,18 @@
             "tests/unit/test_icon.c",
             "docs/BUTTON.md"
           ]
+        },
+        {
+          "name": "disabled and loading pointer activation barriers with capture cleanup and independent scroll scope routing",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_pointer_activation_blocker.c",
+            "tests/unit/test_button_activation_blocker.c",
+            "tests/unit/test_pointer_blocker_scroll_scope.c",
+            "tests/web/test_button_activation_blocker.py",
+            "tests/web/test_button_blocker_scroll_scope.py",
+            "docs/BUTTON_ACTIVATION_BLOCKING.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -658,7 +675,7 @@
           "Custom Children"
         ]
       },
-      "last_tested_commit": "5fb6c11",
+      "last_tested_commit": "8e701b342945e1a3ff8d7cb9e3a1223a44ba4aad",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -5902,15 +5919,20 @@
       "sample": null,
       "tests": [
         "tests/unit/test_chart.c",
-        "tests/web/test_chart_appearance_hover.py"
+        "tests/web/test_chart_appearance_hover.py",
+        "tests/unit/test_chart_typed_tooltip.c",
+        "tests/web/test_chart_typed_tooltip.py",
+        "tests/web/test_chart_tooltip_gallery.py",
+        "tests/unit/test_chart_radar_tooltip_title.c",
+        "tests/web/test_chart_radar_tooltip_title.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Basic rendering for seven chart families, bounded geometry, explicit Sankey topology, theme colors and pointer hover are tested. Source-complete axes, legends, tooltips, gradients, layout refinement and animation remain unfinished; see docs/CHART.md.",
-        "Appearance gates tooltip entry by linear completion and resumes stationary hover. Explicit CURRENT_FRAME consumes current layout, clipping and occlusion with deferred paint-only tooltips. Source point-axis geometry is opt-in for Line/Area. Complete typed/custom tooltip composition, native mobile long-press lifecycle and full source chart behavior remain incomplete; see docs/PLOT_CHART_CURRENT_FRAME.md and docs/CHART_SOURCE_POINT_AXIS.md.",
+        "Seven chart families, bounded geometry, Sankey topology, measured axes, theme colors and current-frame hover have scoped tests. Full source tooltips/styles/shadows, native mobile long-press and arbitrary current-frame child layout remain unfinished; see docs/CHART.md.",
+        "Copied typed title/rows, plain/mixed/transparent slots, value color and failure rollback pass both consumers; the gallery exposes custom rows and a copyable callback guide. Radar custom-label fallback omission and Line/Area point-axis geometry are opt-ins. Source popover style/shadows, arbitrary retained current-frame content and mobile long-press remain incomplete.",
         "Value-owned motion and independent pointer clocks pass headless and actual WASM tests. Existing zero/AUTO Chart options retain legacy manual-hover compatibility; explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks. Legacy composition remains available; this does not certify complete layout/tooltip parity."
       ],
       "owner": "integrator",
@@ -5983,6 +6005,25 @@
             "tests/web/test_chart_source_point_axis.py",
             "docs/CHART_SOURCE_POINT_AXIS.md"
           ]
+        },
+        {
+          "name": "bounded copied tooltip title/rows with plain and swatched slots, explicit value colors and both staged consumers",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart_typed_tooltip.c",
+            "tests/web/test_chart_typed_tooltip.py",
+            "tests/web/test_chart_tooltip_gallery.py",
+            "docs/CHART_TYPED_TOOLTIP.md"
+          ]
+        },
+        {
+          "name": "opt-in Radar custom-label automatic tooltip title omission and explicit title precedence",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart_radar_tooltip_title.c",
+            "tests/web/test_chart_radar_tooltip_title.py",
+            "docs/CHART_RADAR_TOOLTIP_TITLE.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -6028,7 +6069,7 @@
           "Real-time Updates"
         ]
       },
-      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc"
+      "last_tested_commit": "8e701b342945e1a3ff8d7cb9e3a1223a44ba4aad"
     },
     {
       "name": "Command",

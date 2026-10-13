@@ -247,6 +247,8 @@ static bool gallery_text_view_load(void);
 static unsigned char chart_pixels[1600 * 800 * 4];
 static cui_chart_state chart_state;
 static int chart_kind, chart_curve, chart_dots, chart_labels, chart_animate;
+static bool chart_custom_rows;
+static unsigned chart_tooltip_calls;
 static cui_plot_result chart_result;
 static unsigned chart_revision = 1;
 static cui_questionnaire_state questionnaire_state;
@@ -415,11 +417,43 @@ void gallery_chart_options(int kind, int curve, int dots, int labels, int animat
     chart_labels = labels;
     chart_animate = animate;
 }
+void gallery_chart_content(int custom_rows) {
+    bool next = custom_rows != 0;
+    if (next != chart_custom_rows) {
+        chart_custom_rows = next;
+        redraw = true;
+    }
+}
+static bool gallery_chart_tooltip(const cui_chart_tooltip_info *info,
+                                  cui_chart_tooltip_builder *builder, void *user) {
+    (void)user;
+    chart_tooltip_calls++;
+    if (info->has_fallback_title && !cui_chart_tooltip_set_title(builder, info->fallback_title))
+        return false;
+    for (size_t i = 0; i < info->value_count; i++) {
+        char value[48];
+        int written = snprintf(value, sizeof value, "%.0f", info->values[i]);
+        if (written < 0 || (size_t)written >= sizeof value)
+            return false;
+        cui_chart_tooltip_row row = {.has_swatch = true,
+                                     .swatch = info->series_colors[i],
+                                     .label = info->series_labels[i].length
+                                                  ? info->series_labels[i]
+                                                  : cui_string("Activity"),
+                                     .value = {value, (size_t)written}};
+        if (!cui_chart_tooltip_add_row(builder, &row))
+            return false;
+    }
+    return cui_chart_tooltip_add_row(
+        builder, &(cui_chart_tooltip_row){.label = {"Reporting period", 16}, .value = {"2026", 4}});
+}
 float gallery_chart_stats(int field) {
     return field == 0   ? (float)chart_result
            : field == 1 ? (float)chart_state.hovered
            : field == 2 ? chart_state.rendered_reveal_progress
            : field == 3 ? (float)chart_state.revision
+           : field == 5 ? (float)chart_tooltip_calls
+           : field == 6 ? (float)chart_custom_rows
                         : (float)chart_revision;
 }
 typedef struct {
@@ -3059,6 +3093,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             .sankey_show_values = chart_labels != 0,
             .inner_radius = chart_labels ? 42 : 0};
         options = cui_chart_theme(options, &t);
+        options.tooltip_build = chart_custom_rows ? gallery_chart_tooltip : NULL;
         chart_result = cui_chart_render_animated(ui, &chart_state, &options);
         if (chart_result == CUI_PLOT_OK)
             (void)cui_chart(ui, cui_id_from(ui, "chart-preview"), &chart_state, &options,

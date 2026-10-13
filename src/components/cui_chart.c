@@ -423,12 +423,15 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     double duration = chart_appear_duration(options);
     frame.reveal_enabled = true;
     frame.reduced_motion = options->reduced_motion || cui_reduced_motion(ui);
+    bool appearance_active = false;
     if (options->disable_appear || frame.reduced_motion)
         frame.reveal_progress = 1;
     else {
         double delay = options->custom_motion ? options->motion.appear.delay : 0;
         double elapsed = fmax(0, now - started - delay);
         double t = duration == 0 ? 1 : fmax(0, fmin(1, elapsed / duration));
+        /* Paint may round to1 before the linear hover gate completes. */
+        appearance_active = t < 1;
         double sampled = 1 - pow(1 - t, 4);
         if (options->custom_motion &&
             cui_plot_motion_sample(&options->motion.appear, t, &sampled) != CUI_PLOT_OK)
@@ -447,7 +450,7 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     if (options->custom_motion)
         state->animated_motion = options->motion;
     state->animated_request_key = cui_chart_frame_key(&request, state);
-    if (frame.reveal_progress < 1)
+    if (appearance_active)
         cui_invalidate(ui);
     return CUI_PLOT_OK;
 }

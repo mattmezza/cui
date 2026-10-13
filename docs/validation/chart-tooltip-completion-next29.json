@@ -1,0 +1,46 @@
+{
+  "baseline": "7a90246",
+  "upstream": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "status": "read_only_proposal",
+  "source_files": [
+    "crates/component/src/plot/tooltip.rs",
+    "crates/component/src/styled.rs",
+    "crates/component/src/chart/mod.rs",
+    "crates/base/src/plot/element.rs"
+  ],
+  "confirmed_gaps": [
+    "theme metric/color projection",
+    "Gaussian shadow/ring rendering",
+    "bare tooltip appearance",
+    "current-frame arbitrary content",
+    "accepted mobile long-press dispatch/prevention"
+  ],
+  "not_requirements": [
+    "exporting private TooltipRow/TooltipContent",
+    "invented keyboard or legend APIs"
+  ],
+  "unverified": [
+    "native iOS/Android delivery",
+    "source Gaussian pixel parity"
+  ],
+  "next_slice": "value-only opt-in theme appearance projection with both consumers; shadows remain separate Core capability",
+  "production_edits": false,
+  "verified_metrics_rem": {
+    "font": 0.75,
+    "vertical_gap": 0.25,
+    "row_gap": 0.75,
+    "swatch_gap": 0.375,
+    "swatch_size": 0.5,
+    "padding": 0.5
+  },
+  "dependency_checksums_verified": true,
+  "validation": {
+    "build_exit": 0,
+    "ctest_exit": 8,
+    "passed": 122,
+    "total": 123,
+    "failures": [
+      "stale distribution"
+    ]
+  }
+}

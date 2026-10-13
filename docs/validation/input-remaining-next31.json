@@ -1,0 +1,167 @@
+{
+  "kind": "read_only_input_remaining_contract_audit",
+  "cui_base": "c866950",
+  "reference": {
+    "project": "gpui-component",
+    "version": "0.7.1",
+    "commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+    "verified_local_checkout": true
+  },
+  "implemented_slices": [
+    "checked whole-value acceptance with old-invalid healing",
+    "opt-in single-line CR/LF normalization",
+    "staged scalar password presentation and focused host configuration",
+    "Pattern token formatting",
+    "Number grouping/truncation and Unicode numeric normalization"
+  ],
+  "explicit_differences": [
+    "enabled NUL Number separator rejected by inherited embedded-NUL text restriction",
+    "checked formatting rejects CR/LF separators",
+    "multiline, inline-token and multiple-selection formatting unsupported",
+    "default model seed normalization is explicit/opt-in",
+    "provisional IME does not mutate committed document"
+  ],
+  "remaining": [
+    {
+      "contract": "ordinary pointer/wheel selection",
+      "source": [
+        "base/state.rs:2297-2415",
+        "base/state.rs:2464-2493",
+        "base/state.rs:4543-4560"
+      ],
+      "cui": "ordinary double/triple click lacks source word/line selection; scroll_x reveals caret but no Input wheel reducer",
+      "disabled_wheel": "source listener attached unconditionally; actual composed dispatch needs source test before parity claim"
+    },
+    {
+      "contract": "clear/reveal/loading composition",
+      "source": [
+        "component/input/input.rs:719-725",
+        "component/input/input.rs:818-845"
+      ],
+      "cui": "masked controlled state exists; built-in affordances absent"
+    },
+    {
+      "contract": "default menu and paste hook",
+      "source": [
+        "base/state.rs:637-647",
+        "component/input/input.rs:608-670",
+        "component/input/input.rs:837-845"
+      ],
+      "cui": "synchronous text clipboard exists, no Input default/custom menu or editable-only intercept hook"
+    },
+    {
+      "contract": "event/blink lifecycle",
+      "source": [
+        "base/state.rs:126-131",
+        "base/state.rs:3390-3416",
+        "base/blink_cursor.rs:1-126"
+      ],
+      "cui": "changed/submitted and focus history grouping exist, full event modifiers and blink deadlines absent"
+    },
+    {
+      "contract": "regex",
+      "source": [
+        "base/state.rs:3534-3553",
+        "base/state.rs:10538-10565"
+      ],
+      "cui": "no compiled regex API; generic callback not source chain parity",
+      "semantics": "Unicode Rust regex search is_match, empty bypass, custom validator then mask then regex, old-invalid healing"
+    },
+    {
+      "contract": "content purposes/platform actions",
+      "source": [
+        "component/input/content_type.rs:7-174",
+        "base/state.rs:134-302"
+      ],
+      "cui": "2 of45 source purposes plus UNSPECIFIED;43 absent; platform shortcut/autofill/character palette incomplete"
+    }
+  ],
+  "ranked_slices": [
+    {
+      "rank": 1,
+      "name": "ordinary selection and manual horizontal wheel",
+      "resources": "caller-owned word-anchor/click state, existing geometry and bounded wake deadlines",
+      "tests": [
+        "actual Unicode double/triple click and reverse word drag",
+        "precise wheel bounds/ancestor propagation",
+        "blur retained selection",
+        "native-font and real CDP pointer/wheel"
+      ]
+    },
+    {
+      "rank": 2,
+      "name": "clear/reveal/loading and typed event results",
+      "resources": "zero-off appended options, stable child IDs, staged current presentation, bounded caller event array",
+      "tests": [
+        "secret factory/allocator rollback",
+        "clear one Undo and acceptance rejection",
+        "loading/disabled/readonly",
+        "Enter modifiers and focus transitions"
+      ]
+    },
+    {
+      "rank": 3,
+      "name": "portable edit menu and paste intercept",
+      "resources": "caller-owned menu model identity/revision/focus-generation snapshot, action API shares checked mutation",
+      "tests": [
+        "right-up deferred opening and capability matrix",
+        "secret clipboard denial",
+        "consumed/rejected paste/cut",
+        "stale owner/model and actual browser menu focus"
+      ]
+    },
+    {
+      "rank": 4,
+      "name": "regex chain/provider decision",
+      "resources": "immutable compiled object plus declared storage, synchronous hard-error matcher and bounded scratch; no default platform dependency",
+      "tests": [
+        "anchors versus search",
+        "Unicode classes/flags/boundaries",
+        "unsupported syntax and exhausted budgets hard error",
+        "callback order/healing/IME/history"
+      ],
+      "remaining_after_ascii_subset": "full Rust regex remains unresolved"
+    },
+    {
+      "rank": 5,
+      "name": "45 content purposes and capability-aware host mapping",
+      "resources": "append Core ordinals independent of components, finalized owner/generation state and honest host capabilities",
+      "tests": [
+        "complete source mapping table",
+        "invalid enums and reset/rebind",
+        "document/history unchanged",
+        "actual DOM and supported pinned SDL hints"
+      ]
+    }
+  ],
+  "regex_dependency_receipt": {
+    "regex": {
+      "version": "1.13.1",
+      "cargo_checksum": "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
+    },
+    "regex-automata": {
+      "version": "0.4.18",
+      "cargo_checksum": "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
+    },
+    "regex-syntax": {
+      "version": "0.8.11",
+      "cargo_checksum": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
+    },
+    "proposal": "no fetch/install; full equivalence needs separate reviewed pinned optional provider/Unicode data plan; portable C11 bounded subset must be named as subset"
+  },
+  "validation": {
+    "strict_warning_build": "pass",
+    "ctest": {
+      "passed": 144,
+      "total": 145,
+      "failed": [
+        "distribution"
+      ],
+      "reason": "integrator-owned generated headers stale"
+    },
+    "new_behavior_tests": "none; docs-only audit",
+    "logs_prefix": "/home/matteo/.cache/cui-validation/input-remaining-next31-"
+  },
+  "full_input_parity": false,
+  "production_modified": false
+}

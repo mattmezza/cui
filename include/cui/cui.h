@@ -292,13 +292,39 @@ bool cui_bitmap_valid(cui_bitmap);
 /* A zero source rectangle selects the whole bitmap. Opacity is explicitly 0..1.
  * FIT dimensions default to source pixel dimensions. */
 bool cui_paint_bitmap(cui_context *, cui_id, cui_bitmap_paint, cui_box);
+/* Expanded, non-indexed triangles. XY is local logical geometry; ST contains
+ * analytic quadratic coverage coordinates and is never scaled/translated. */
+typedef struct {
+    float x, y, s, t;
+} cui_mesh_vertex;
+/* Linear RGB premultiplied by alpha, before coverage. RGB remains unclamped
+ * (for out-of-gamut/HDR color); alpha is finite in0..1. Adapters convert to
+ * their target color space before blending. */
+typedef struct {
+    float r, g, b, a;
+} cui_linear_color;
+typedef struct {
+    const cui_mesh_vertex *vertices;
+    size_t vertex_count;
+    float origin_x, origin_y, scale;
+    cui_linear_color color;
+} cui_mesh_paint;
+/* Positive multiple-of-three count; finite vertices/origin/color; scale>0;
+ * finite transformed bounds. Degenerate triangles are valid empty geometry. */
+bool cui_mesh_valid(cui_mesh_paint);
+/* Borrowed vertices remain valid through renderer completion. Box placement
+ * adds to origin; only XY is transformed. FIT defaults to transformed AABB
+ * spans, without normalizing local coordinates; origin=-min normalizes them.
+ * Ancestor clips apply, including geometry extending outside the layout box. */
+bool cui_paint_mesh(cui_context *, cui_id, cui_mesh_paint, cui_box);
 typedef enum {
     CUI_DRAW_RECT,
     CUI_DRAW_BORDER,
     CUI_DRAW_TEXT,
     CUI_DRAW_CLIP_PUSH,
     CUI_DRAW_CLIP_POP,
-    CUI_DRAW_IMAGE
+    CUI_DRAW_IMAGE,
+    CUI_DRAW_MESH
 } cui_draw_type;
 typedef enum {
     CUI_TEXT_WEIGHT_NORMAL,
@@ -322,6 +348,7 @@ typedef struct {
     cui_border_edges border_edges;
     bool custom_corners, custom_border_edges;
     cui_bitmap_paint bitmap;
+    cui_mesh_paint mesh;
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;

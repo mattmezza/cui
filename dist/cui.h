@@ -293,13 +293,39 @@ bool cui_bitmap_valid(cui_bitmap);
 /* A zero source rectangle selects the whole bitmap. Opacity is explicitly 0..1.
  * FIT dimensions default to source pixel dimensions. */
 bool cui_paint_bitmap(cui_context *, cui_id, cui_bitmap_paint, cui_box);
+/* Expanded, non-indexed triangles. XY is local logical geometry; ST contains
+ * analytic quadratic coverage coordinates and is never scaled/translated. */
+typedef struct {
+    float x, y, s, t;
+} cui_mesh_vertex;
+/* Linear RGB premultiplied by alpha, before coverage. RGB remains unclamped
+ * (for out-of-gamut/HDR color); alpha is finite in0..1. Adapters convert to
+ * their target color space before blending. */
+typedef struct {
+    float r, g, b, a;
+} cui_linear_color;
+typedef struct {
+    const cui_mesh_vertex *vertices;
+    size_t vertex_count;
+    float origin_x, origin_y, scale;
+    cui_linear_color color;
+} cui_mesh_paint;
+/* Positive multiple-of-three count; finite vertices/origin/color; scale>0;
+ * finite transformed bounds. Degenerate triangles are valid empty geometry. */
+bool cui_mesh_valid(cui_mesh_paint);
+/* Borrowed vertices remain valid through renderer completion. Box placement
+ * adds to origin; only XY is transformed. FIT defaults to transformed AABB
+ * spans, without normalizing local coordinates; origin=-min normalizes them.
+ * Ancestor clips apply, including geometry extending outside the layout box. */
+bool cui_paint_mesh(cui_context *, cui_id, cui_mesh_paint, cui_box);
 typedef enum {
     CUI_DRAW_RECT,
     CUI_DRAW_BORDER,
     CUI_DRAW_TEXT,
     CUI_DRAW_CLIP_PUSH,
     CUI_DRAW_CLIP_POP,
-    CUI_DRAW_IMAGE
+    CUI_DRAW_IMAGE,
+    CUI_DRAW_MESH
 } cui_draw_type;
 typedef enum {
     CUI_TEXT_WEIGHT_NORMAL,
@@ -323,6 +349,7 @@ typedef struct {
     cui_border_edges border_edges;
     bool custom_corners, custom_border_edges;
     cui_bitmap_paint bitmap;
+    cui_mesh_paint mesh;
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;
@@ -5612,6 +5639,8 @@ typedef struct {
     float opacity;
     uint32_t paint_root;
     cui_bitmap_paint bitmap;
+    cui_mesh_paint mesh;
+    bool has_mesh;
     bool bitmap_underlay, has_underlay;
     float outline_width;
     cui_color outline_color;
@@ -6497,6 +6526,55 @@ bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_bo
     cui_end_box(ui);
     return ok;
 }
+static bool cui_core_mesh_bounds(cui_mesh_paint paint, cui_rect *bounds) {
+    if (!paint.vertices || !paint.vertex_count || paint.vertex_count % 3 ||
+        paint.vertex_count > SIZE_MAX / sizeof(*paint.vertices) || !isfinite(paint.origin_x) ||
+        !isfinite(paint.origin_y) || !isfinite(paint.scale) || paint.scale <= 0 ||
+        !isfinite(paint.color.r) || !isfinite(paint.color.g) || !isfinite(paint.color.b) ||
+        !isfinite(paint.color.a) || paint.color.a < 0 || paint.color.a > 1)
+        return false;
+    float left = INFINITY, top = INFINITY, right = -INFINITY, bottom = -INFINITY;
+    for (size_t i = 0; i < paint.vertex_count; ++i) {
+        cui_mesh_vertex vertex = paint.vertices[i];
+        float x = vertex.x * paint.scale + paint.origin_x;
+        float y = vertex.y * paint.scale + paint.origin_y;
+        if (!isfinite(vertex.x) || !isfinite(vertex.y) || !isfinite(vertex.s) ||
+            !isfinite(vertex.t) || !isfinite(x) || !isfinite(y))
+            return false;
+        left = fminf(left, x);
+        top = fminf(top, y);
+        right = fmaxf(right, x);
+        bottom = fmaxf(bottom, y);
+    }
+    float width = right - left, height = bottom - top;
+    if (!isfinite(width) || !isfinite(height))
+        return false;
+    if (bounds)
+        *bounds = (cui_rect){left, top, width, height};
+    return true;
+}
+bool cui_mesh_valid(cui_mesh_paint paint) {
+    return cui_core_mesh_bounds(paint, NULL);
+}
+bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box box) {
+    cui_rect bounds;
+    if (!ui || !ui->in_frame || !cui_core_mesh_bounds(paint, &bounds))
+        return false;
+    if (!box.width && !box.fixed_width)
+        box.width = bounds.w;
+    if (!box.height && !box.fixed_height)
+        box.height = bounds.h;
+    cui_core_begin_box(ui, id, box, NULL, 0, false);
+    bool ok = !ui->overflow_depth && ui->depth && ui->opened[ui->depth - 1];
+    if (ok) {
+        cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+        node->mesh = paint;
+        node->has_mesh = true;
+        Clay__GetOpenLayoutElement()->config.custom.customData = node;
+    }
+    cui_end_box(ui);
+    return ok;
+}
 bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
         !isfinite(width) || width < 0 || !isfinite(radii.top_left) || !isfinite(radii.top_right) ||
@@ -6858,7 +6936,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
             background.a = (uint8_t)(background.a * opacity);
             size_t needed = (node->has_underlay ? 3 : 0) + (background.a ? 1 : 0) +
-                            (node->outline_width > 0 ? 1 : 0);
+                            (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0);
             if (needed > ui->config.max_commands - ui->count) {
                 cui_core_fail(ui, CUI_ERROR_CAPACITY);
                 ui->count = 0;
@@ -6888,6 +6966,23 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                        .custom_corners = true,
                                        .corner_radii = {radius.topLeft, radius.topRight,
                                                         radius.bottomLeft, radius.bottomRight}};
+            }
+            if (node->has_mesh) {
+                cui_mesh_paint mesh = node->mesh;
+                mesh.origin_x += d.bounds.x;
+                mesh.origin_y += d.bounds.y;
+                mesh.color.r *= opacity;
+                mesh.color.g *= opacity;
+                mesh.color.b *= opacity;
+                mesh.color.a *= opacity;
+                cui_rect mesh_bounds;
+                if (!cui_core_mesh_bounds(mesh, &mesh_bounds)) {
+                    cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                    ui->count = 0;
+                    goto cui_core_commands_done;
+                }
+                ui->commands[ui->count++] =
+                    (cui_draw_command){.type = CUI_DRAW_MESH, .bounds = mesh_bounds, .mesh = mesh};
             }
             if (!node->has_underlay)
                 continue;

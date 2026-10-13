@@ -1,5 +1,6 @@
 #include "cui/cui.h"
 #include <assert.h>
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -2567,7 +2568,104 @@ static void test_metrics_revision(void) {
     cui_destroy(a);
     cui_destroy(b);
 }
+static void test_mesh_contract(void) {
+    cui_mesh_vertex vertices[] = {{0, 0, 0, 0}, {10, 0, .5f, 0}, {10, 20, 1, 1}};
+    cui_mesh_vertex original[3];
+    memcpy(original, vertices, sizeof vertices);
+    cui_mesh_paint paint = {.vertices = vertices,
+                            .vertex_count = 3,
+                            .origin_x = 3,
+                            .origin_y = 4,
+                            .scale = 2,
+                            .color = {.2f, .1f, .05f, .4f}};
+    assert(cui_mesh_valid(paint));
+    cui_context *ui = make();
+    assert(!cui_paint_mesh(ui, 900, paint, (cui_box){0}));
+    for (unsigned phase = 0; phase < 2; ++phase) {
+        begin(ui);
+        cui_begin_box(ui, 800,
+                      (cui_box){.width = 180,
+                                .height = 130,
+                                .padding = 11 + phase * 5,
+                                .clip = true,
+                                .custom_opacity = true,
+                                .opacity = .5f});
+        assert(cui_paint_mesh(ui, 900, paint, (cui_box){.background = {12, 24, 36, 255}}));
+        cui_end_box(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        cui_rect box = cui_bounds(ui, 900);
+        assert(fabsf(box.w - 20) < .1f && fabsf(box.h - 40) < .1f);
+        size_t mesh_index = SIZE_MAX;
+        for (size_t n = 0; n < list.count; ++n)
+            if (list.commands[n].type == CUI_DRAW_MESH) {
+                assert(mesh_index == SIZE_MAX);
+                mesh_index = n;
+            }
+        assert(mesh_index != SIZE_MAX && mesh_index > 0 && mesh_index + 1 < list.count);
+        const cui_draw_command *mesh = &list.commands[mesh_index];
+        assert(list.commands[mesh_index - 1].type == CUI_DRAW_RECT);
+        assert(list.commands[mesh_index + 1].type == CUI_DRAW_CLIP_POP);
+        assert(mesh->mesh.vertices == vertices && mesh->mesh.vertex_count == 3);
+        assert(mesh->mesh.scale == 2);
+        assert(fabsf(mesh->mesh.origin_x - box.x - 3) < .01f);
+        assert(fabsf(mesh->mesh.origin_y - box.y - 4) < .01f);
+        assert(fabsf(mesh->bounds.x - box.x - 3) < .01f);
+        assert(fabsf(mesh->bounds.y - box.y - 4) < .01f);
+        assert(mesh->bounds.w == 20 && mesh->bounds.h == 40);
+        assert(fabsf(mesh->mesh.color.r - .1f) < .001f);
+        assert(fabsf(mesh->mesh.color.g - .05f) < .001f);
+        assert(fabsf(mesh->mesh.color.b - .025f) < .001f);
+        assert(fabsf(mesh->mesh.color.a - .2f) < .001f);
+        assert(!memcmp(vertices, original, sizeof vertices));
+    }
+    begin(ui);
+    cui_begin_box(ui, 800, (cui_box){.layout_only = true});
+    assert(cui_paint_mesh(ui, 900, paint, (cui_box){0}));
+    cui_end_box(ui);
+    cui_draw_list hidden = cui_end_frame(ui);
+    for (size_t n = 0; n < hidden.count; ++n)
+        assert(hidden.commands[n].type != CUI_DRAW_MESH);
+    cui_destroy(ui);
+    cui_mesh_paint invalid = paint;
+    invalid.vertex_count = 4;
+    assert(!cui_mesh_valid(invalid));
+    invalid.vertex_count = SIZE_MAX;
+    assert(!cui_mesh_valid(invalid));
+    invalid = paint;
+    invalid.vertices = NULL;
+    assert(!cui_mesh_valid(invalid));
+    invalid = paint;
+    invalid.scale = 0;
+    assert(!cui_mesh_valid(invalid));
+    invalid.scale = FLT_MAX;
+    assert(!cui_mesh_valid(invalid));
+    invalid = paint;
+    invalid.color.a = 2;
+    assert(!cui_mesh_valid(invalid));
+    invalid.color.a = NAN;
+    assert(!cui_mesh_valid(invalid));
+    invalid = paint;
+    invalid.color.r = INFINITY;
+    assert(!cui_mesh_valid(invalid));
+    vertices[1].s = INFINITY;
+    assert(!cui_mesh_valid(paint));
+    vertices[1] = original[1];
+    vertices[1].x = NAN;
+    assert(!cui_mesh_valid(paint));
+    memcpy(vertices, original, sizeof vertices);
+    ui = cui_create((cui_config){
+        .width = 300, .height = 200, .max_elements = 64, .max_commands = 1, .frame_bytes = 2048});
+    assert(ui);
+    begin(ui);
+    assert(!cui_paint_mesh(ui, 900, invalid, (cui_box){0}));
+    assert(cui_paint_mesh(ui, 900, paint, (cui_box){.background = {1, 2, 3, 255}}));
+    cui_draw_list exhausted = cui_end_frame(ui);
+    assert(exhausted.count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_mesh_contract();
     test_metrics_revision();
     test_pointer_click_metadata();
     test_unpainted_semantic_does_not_own_ancestor();

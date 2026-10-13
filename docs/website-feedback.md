@@ -47,7 +47,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 
 - [ ] Every component explains its immediate/retained state and ownership.
 - [ ] Callback, event and host integration examples.
-- [ ] Reproducible Go, Rust, JavaScript and TypeScript examples with actual support limits.
+- [x] Reproducible Go, Rust, JavaScript and TypeScript examples with actual support limits. Integrated `fc56f33`; four headless clients and four SDL3/Xvfb native windows pass actual pointer-click callbacks. The small example host ABI is not a full component binding. See [LANGUAGE_BINDINGS.md](LANGUAGE_BINDINGS.md).
 - [ ] Improved browsable documentation and intuitive getting-started path.
 - [x] Copyable agent prompt and generated llms.txt / llms-full.txt, with llm.txt and llm-full.txt aliases. — Published f6c8cf8; actual HTTPS copy/export checks and artifact byte comparisons pass. Broader documentation and bindings remain open.
 - [x] Original product media with recorded provenance. — 31847cc adds real CUI WASM workspace captures for light/dark, a 1200×630 original social card and a pinned regeneration script. The larger composed-app gallery remains open. Published in 1dc98a9; HTTPS78 and all 147 page artifacts verified.

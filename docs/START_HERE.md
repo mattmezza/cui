@@ -63,3 +63,10 @@ Read [state and callbacks](IMMEDIATE_AND_STATE.md) for immediate frame compositi
 ## Work with an AI coding agent
 
 Use the [copyable agent setup prompt](AI_AGENTS.md). The website also publishes `llms.txt` as a documentation index and `llms-full.txt` as a plain-text bundle. Both are generated from these repository documents, alongside the component-status manifest. The requested `llm.txt` and `llm-full.txt` names are aliases.
+
+## Build with another language
+
+Try the runnable [Go, Rust, JavaScript and TypeScript examples](LANGUAGE_BINDINGS.md).
+They use a small C host ABI and real CUI controls with synchronous callbacks.
+The guide includes headless checks, native-window commands and the observed
+Linux support limits; these examples are a starting point for bindings.

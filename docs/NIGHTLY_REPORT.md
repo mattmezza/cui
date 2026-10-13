@@ -6,7 +6,9 @@ Published fixes cover alignment and SVG choices/icons, real image media, input n
 
 Integrated Sheet motion `8777cc4` passes native77, sanitizer75, WASI67, Chromium78 and quality. It animates all four edges, reverses an exit and respects reduced motion; focus/results/close callbacks wait for exit. Sharing/media is now public:147 static pages, complete crawler-visible metadata and original product captures.
 
-The remaining feedback is tracked in [website-feedback.md](website-feedback.md). Design-system expansion, composed apps, bindings, deeper docs and full family parity remain unfinished. No dependency installation is needed from the user. Preserved worker work and the Questionnaire event-order experiment remain intact.
+Integrated language examples `fc56f33` pass four headless clients, all four native-window pointer-click callback checks and combined native77/Chromium78. Go/cgo, Rust C ABI, Node N-API and TypeScript share an example C host; Linux/X11 is validated, and complete language bindings remain unfinished.
+
+The remaining feedback is tracked in [website-feedback.md](website-feedback.md). Design-system expansion, composed apps, full bindings, deeper docs and full family parity remain unfinished. No dependency installation is needed from the user. Preserved worker work and the Questionnaire event-order experiment remain intact.
 
 Build with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. The browser renders real CUI WASM draw lists; browser checks do not certify native GPU or accessibility support across all platforms.
 

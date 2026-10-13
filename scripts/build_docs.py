@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'https://github.com/mattmezza/cui/blob/main/'
 GUIDES = {'API', 'ARCHITECTURE', 'CORE', 'INTERFACES', 'THEME_GUIDE',
           'COMPONENT_AUTHORING', 'ACCESSIBILITY', 'PLATFORM_MATRIX', 'DEPENDENCIES',
-          'WEB_GALLERY', 'WASI', 'EDITING', 'PERFORMANCE', 'IMMEDIATE_AND_STATE'}
+          'WEB_GALLERY', 'WASI', 'EDITING', 'PERFORMANCE', 'IMMEDIATE_AND_STATE', 'LANGUAGE_BINDINGS'}
 DEVELOPMENT = {'NIGHTLY_REPORT', 'swarm-status', 'ROADMAP', 'DECISIONS',
                'MAINTAINER_ACTIONS', 'upstream-baseline'}
 
@@ -40,7 +40,8 @@ def document_slug(path, root):
         return 'getting-started'
     guide_slugs = {'docs/START_HERE.md': 'start-here',
                    'docs/AI_AGENTS.md': 'ai-agents',
-                   'docs/IMMEDIATE_AND_STATE.md': 'immediate-and-state'}
+                   'docs/IMMEDIATE_AND_STATE.md': 'immediate-and-state',
+                   'docs/LANGUAGE_BINDINGS.md': 'language-bindings'}
     if relative.as_posix() in guide_slugs:
         return guide_slugs[relative.as_posix()]
     if relative.parts[0] == 'docs':

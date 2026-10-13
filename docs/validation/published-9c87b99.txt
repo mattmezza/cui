@@ -1,0 +1,36 @@
+Published source: 9c87b99.
+Library CI38326210497 and Pages38326210454 both PASS.
+URL: https://matteo.merola.co/cui/
+Scope: actual HTTPS78 and 27 artifact file comparisons. Sorting, animated Progress, composed Resizable/Dock, scrolling VirtualList, thicker Chart strokes and Plot zoom/pan are now published. Full78-family parity and the remaining feedback remain incomplete.
+Installed 4 packages in 18ms
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+Alert second confirmation: {'attempts': 2, 'open': 0, 'pointers': [1, 1, 142, 142], 'canvas': [339, 371.390625], 'semantics': [{'name': 'Delete workspace', 'role': 1, 'bounds': [24, 24, 136.73153686523438, 32], 'focused': 1, 'scroll': 0, 'maximum': 0}]}
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+PASS index.html c476acec4623f6bf5de97b54d3905dfd5f6d72349b8b6986f6d905ce52137679
+PASS gallery.wasm 68359927c48db2ad096d7268a8be536039b1a58d45e7fef7428a293a5c566355
+PASS gallery.js cf6e85968715002f99eacc06c9aca2f8d040eacc3fb6e07d28edb5e4e47bbf25
+PASS gallery.css f46c2ffe07b2dd8a6adcff079166a1fd03b5f0e991e96c8e816c73739ad66ade
+PASS catalog.json 9530bc876b06a7331be444770bcaaf1cf3e1e2698a3899f43ff8190e562dd292
+PASS themes.json cc0933e7b5398b70a4f4d6e1d95aa497950aca0332e11e46e66472d1aeb7fa29
+PASS docs.json 04b89fbe781b74017e2ae5554956ffe3cd61f68ecd8a666b4147cbbd9eb1a1d9
+PASS assets/alpine-lake.jpg 92a48f1cc90763ed83e23f6db9dc1b76fa05c72b82908f895f84b363d95a9be6
+PASS llms.txt 6a780df0b0844629ec5c9b326d1ffca9ad9fd59469a30b7933bb322f3ef7c8fa
+PASS llm.txt 6a780df0b0844629ec5c9b326d1ffca9ad9fd59469a30b7933bb322f3ef7c8fa
+PASS llms-full.txt ed724675293a9dc0326049f65442809cc3ecd4672a251a180bda77bc58d708d3
+PASS llm-full.txt ed724675293a9dc0326049f65442809cc3ecd4672a251a180bda77bc58d708d3
+PASS markdown/docs/START_HERE.md 9500b82d2baedc9b608792da0975a52d8bd0dec1dd1e27f0552316e244a3586a
+PASS markdown/docs/IMMEDIATE_AND_STATE.md 695a750f7185d036fbc20ee97f27e0388e1add9be082e922c028c36a38094bc0
+PASS markdown/docs/AI_AGENTS.md 232ddacfcc165cb0967cb2111c64de2440c67ca19e3e8ef734984813a4ba2f18
+PASS markdown/docs/PROGRESS.md f5c6ec3520485e6e5840af594d12e5bceb4f25b2587c4f9c97ff88f6521b6ff3
+PASS markdown/docs/TABLE.md 2a9092a8c308ec5189731c9e61553ec83048762d296bd355f77aa140c795b293
+PASS markdown/docs/DOCK_MODEL.md 285a195a9e62953f3973c6a306da2c4f425c47a663798467a474e4f357ebfa5e
+PASS markdown/docs/PLOT_MODEL.md 5f0ce3420d4ac3022afd50b4eaa025f4e6edd7729128ce5e5a1e811b799c3ae6
+PASS markdown/docs/VIRTUALIZATION.md 50d4b04f6b22248fdac799afb2a116a63d964578247c7b67d2a436c0f31ff16f
+PASS markdown/docs/RESIZABLE.md 6aae01bd68c22abf2933a8725e1fe719ccd29751a0a96adfab51b3296be11300
+PASS markdown/docs/CHART.md 652c92ab7c26eb230d189c494cb2aa6e746a77187522fe3df936bfa6e6eda28a
+PASS markdown/docs/NUMERIC.md f5ef1be865e3b981beabfba23dc92c8bbe0a2adff5b36879a08960ceae4ad588
+PASS markdown/docs/FORMS.md e0617be8cb97553da058849d72a2574043f4e73da7b8707fe6ed6e065624707d
+PASS markdown/docs/PICKERS.md 91e1dd9c679211ab519b1378b4d43f6470d80e2e60b4d73eb25923e5c7355028
+PASS markdown/docs/CHOICE.md 15b41eb9dee27fa7a3c6bb3b360b47d769a173da698b77ae94e8f976d9ce023b
+PASS markdown/docs/COMMAND.md 389f28ce8df93b86a6e14b3e3795f5921d80d2418188b47e5473a0958f281fcb
+27/27 published files byte-match the Pages artifact

@@ -6,7 +6,9 @@ Frozen Next27 production `6e36b5a` passes native127/127, sanitizer122/122, WASI1
 
 Line/Area point-axis layout and single-line CR/LF normalization are explicit opt-ins. Whole-value validation examples and guide links are live in the compiled next gallery. Applied Tabs scroll deltas now consume their events; refused deltas defer to eligible ancestors. Source-complete chart content/styles/long-press, masked Input/regex/content types, ButtonGroup and several Button contracts remain incomplete. Subsequent isolated workers address these concrete audited gaps.
 
-The ledger records284 tested subsets,4 implemented and44 not_started (332 total), with **0 fully verified families**. These evidence counts are not a completion percentage. No user dependency installation is required.
+The ledger records287 tested subsets,4 implemented and44 not_started (335 total), with **0 fully verified families**. These evidence counts are not a completion percentage. No user dependency installation is required.
+
+Frozen Next28 portable source `8e701b3` passes native132/132, sanitizer127/127 and WASI108/108. Native includes five GPU/Sokol/accessibility tests absent from this sanitizer configuration. The actual gallery passes all78 stories and78 snippet compilations, plus copied custom Chart tooltip rows on desktop/390px, runtime opt-out, canvas pixels and clipboard code. Radar titles and disabled/loading Button activation barriers have separate actual WASM tests; overlapping disabled siblings preserve wheel/touch scroll scope queries. These are tested subsets: source-complete tooltip appearance, shadows and other remaining family contracts are still pending. See [Next28 integration evidence](validation/gallery-next28.txt).
 
 ## Working architecture
 

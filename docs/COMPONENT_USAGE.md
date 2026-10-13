@@ -977,6 +977,8 @@ API: `cui_virtual_list_draw`, `cui_base_virtual_list`. [Public header](../includ
 
 API: `cui_chart`, `cui_chart_hit_test`. [Public header](../include/cui/cui_chart.h); [guide](CHART.md).
 
+The gallery custom tooltip toggle uses `cui_chart_tooltip_build_fn` with copied row strings. See [the callback example](CHART_TYPED_TOOLTIP.md), [point-axis layout](CHART_SOURCE_POINT_AXIS.md), [Radar title policy](CHART_RADAR_TOOLTIP_TITLE.md) and [current-frame painting](PLOT_CHART_CURRENT_FRAME.md).
+
 ## Command
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.

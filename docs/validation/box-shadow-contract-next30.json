@@ -1,0 +1,77 @@
+{
+  "baseline": "911e0e9b3ae38eb2a7d11fa1dcb5565fcc90f0f8",
+  "upstream": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "read_only": true,
+  "dependency_version": "0.3.8",
+  "verified_checksums": {
+    "gpui-pre": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
+    "gpui-pre-platform": "e200b7b78836f1a0fc70767d971768e88f29d8b91b697285c15fb8e373635a3e",
+    "gpui-pre-wgpu": "439c5421cafe1a7cf68d0c0ae5cc82b26fad6b0e6345ac98d20acaf1f2463914",
+    "gpui-pre-macos": "0d756813ff1cd741a502af60fd18869e0677795936d7349642b41c49f43120c0",
+    "gpui-pre-apple": "bfdd914311cd12894367c8b9908947bb0c27fd42f8b9a5ff7a0730551a83fa4c"
+  },
+  "shader_paths": [
+    "gpui-pre-wgpu/src/shaders.wgsl",
+    "gpui-pre-apple/src/shaders.metal"
+  ],
+  "source_kernel": {
+    "sigma_is_standard_deviation": true,
+    "vertical_midpoint_samples": 4,
+    "tail_support_sigma": 3,
+    "horizontal_erf": "rational approximation",
+    "spread_changes_radius": false,
+    "sigma_zero": "filled rounded SDF coverage under surface"
+  },
+  "popover_layers": [
+    {
+      "offset": [
+        0,
+        0
+      ],
+      "sigma": 0,
+      "spread": 1,
+      "color": "foreground alpha.1"
+    },
+    {
+      "offset": [
+        0,
+        4
+      ],
+      "sigma": 3,
+      "spread": -1,
+      "color": "black alpha.1"
+    },
+    {
+      "offset": [
+        0,
+        2
+      ],
+      "sigma": 2,
+      "spread": -2,
+      "color": "black alpha.1"
+    }
+  ],
+  "confirmed_correction": "626648e",
+  "current_effect_blur": "separable box, not source Gaussian kernel",
+  "proposal": "Core value drop-shadow command + shared source-kernel raster + every adapter fallback + actual three-layer owner consumption",
+  "unresolved": [
+    "per-adapter logical/physical scale ownership",
+    "final approved budget limits",
+    "source unblurred-bounds mask culling choice"
+  ],
+  "not_completed": [
+    "native source image identity",
+    "public inset parity",
+    "production shadow capability"
+  ],
+  "execution_evidence": "source audit only; separate sigma-zero correction has native/WASM proofs",
+  "validation": {
+    "strict_warning_build_exit": 0,
+    "ctest_exit": 8,
+    "ctest_passed": 126,
+    "ctest_total": 127,
+    "baseline_failure": "distribution: stale generated distribution",
+    "production_changes": false,
+    "native_source_renderer_execution": false
+  }
+}

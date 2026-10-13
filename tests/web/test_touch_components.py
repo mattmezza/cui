@@ -70,13 +70,18 @@ class Audit:
             y = rect['y'] + target['f'][2] + target['f'][4] * ry
             top = self.page.evaluate('document.querySelector("header").getBoundingClientRect().bottom+8')
             if y < top:
-                self.page.evaluate('(delta)=>scrollBy(0,delta)', y-top)
-            elif y > 870:
-                self.page.evaluate('(delta)=>scrollBy(0,delta)', y-870)
+                # Browser scroll offsets round to pixels; leave clearance instead of
+                # repeatedly requesting an ineffective fractional-pixel correction.
+                self.page.evaluate('(delta)=>scrollBy({top:delta,behavior:"instant"})', y-top-1)
+            elif y > self.page.viewport_size['height'] - 30:
+                self.page.evaluate('(delta)=>scrollBy({top:delta,behavior:"instant"})',
+                                   y - (self.page.viewport_size['height'] - 30) + 1)
             else:
                 assert self.page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x': x, 'y': y}), f'Target is occluded by DOM: {target["name"]}'
                 return {'id': 1, 'x': x, 'y': y}
-        raise AssertionError(f'Touch target is outside browser viewport: {target["name"]}')
+        raise AssertionError(f'Touch target is outside browser viewport: {target["name"]}; '
+                             f'canvas={rect}, local={target["f"][1:5]}, point={(x,y)}, '
+                             f'scroll={self.page.evaluate("window.scrollY")}, header={top}')
 
     def dispatch(self, kind, points):
         if kind == 'touchCancel' and not self.active_touch:

@@ -61,6 +61,10 @@ jobs:
         run: uv run tests/web/test_scrollbar_appearance.py
       - name: Verify controlled radio groups and touch cancellation
         run: uv run tests/web/test_radio_group.py
+      - name: Verify attachment sizes and visible metadata
+        run: uv run tests/web/test_attachment_sizes.py
+      - name: Verify responsive content and large type containment
+        run: uv run tests/web/test_responsive_gallery.py
       - name: Upload static gallery
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

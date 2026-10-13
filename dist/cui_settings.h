@@ -487,6 +487,7 @@ typedef struct {
     cui_str query;
     float content_width, height;
     const cui_theme *control_theme;
+    bool stacked;
 } settings_frame;
 typedef struct {
     settings_frame *frame;
@@ -915,7 +916,8 @@ static void render_group(settings_frame *f, size_t p, size_t g, bool stacked) {
 }
 static void content(cui_context *ui, void *user) {
     settings_frame *f = user;
-    f->content_width = fmaxf(1, f->state->resize.slots[1].size);
+    if (!f->stacked)
+        f->content_width = fmaxf(1, f->state->resize.slots[1].size);
     size_t p = f->state->selected_page;
     if (p >= f->count)
         return;
@@ -1079,11 +1081,33 @@ cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *th
                             state->search ? cui_edit_get_text(state->search) : options.query,
                             fmaxf(1, width - state->sidebar_width),
                             height,
-                            control_theme};
+                            control_theme,
+                            false};
     if (!frame.options.search_placeholder.length)
         frame.options.search_placeholder = cui_string("Search settings");
     if (!frame.options.reset_label.length)
         frame.options.reset_label = cui_string("Reset All");
+    /* A narrow viewport needs a full-width content pane. Keep the desktop
+     * splitter state intact while presenting navigation above the content. */
+    if (width < minimum + fmaxf(240, theme->font_size * 12)) {
+        float sidebar_height = fminf(height * .4f, 220 * theme->font_size / 16);
+        frame.stacked = true;
+        frame.content_width = width;
+        cui_begin_box(ui, id, (cui_box){.width = width, .height = height, .clip = true});
+        cui_track_bounds(ui, id, &state->bounds);
+        frame.height = sidebar_height;
+        cui_begin_box(ui, part(&frame, 0, 0, 0, 40),
+                      (cui_box){.width = width, .height = sidebar_height, .clip = true});
+        sidebar(ui, &frame);
+        cui_end_box(ui);
+        frame.height = fmaxf(1, height - sidebar_height);
+        cui_begin_box(ui, part(&frame, 0, 0, 0, 41),
+                      (cui_box){.width = width, .height = frame.height, .clip = true});
+        content(ui, &frame);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        return result;
+    }
     cui_resizable_panel panels[2] = {
         {.id = part(&frame, 0, 0, 0, 40),
          .initial_size = state->sidebar_width,

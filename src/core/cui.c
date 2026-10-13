@@ -103,6 +103,7 @@ struct cui_context {
     bool event_consumed[CUI_CORE_DISPATCH_MAX];
     cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
+    cui_id event_previous_focus[CUI_CORE_DISPATCH_MAX];
     size_t event_activation_slots[CUI_CORE_DISPATCH_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
     size_t scope_count;
@@ -440,7 +441,7 @@ static bool cui_core_scope_contains(const cui_core_focus_scope *scopes, size_t c
     }
     return false;
 }
-static bool cui_core_previous_allowed(cui_context *ui, size_t i) {
+static bool cui_core_previous_allowed(const cui_context *ui, size_t i) {
     return cui_core_scope_contains(ui->previous_focus_scopes, ui->previous_semantic_scopes[i],
                                    ui->previous_top_modal);
 }
@@ -773,12 +774,62 @@ static void cui_core_tab(cui_context *ui, bool reverse) {
     }
     ui->focus_visible = true;
 }
+static bool cui_core_accessibility_activate(const cui_semantic *s) {
+    if (s->disabled)
+        return false;
+    if (s->details.pointer_activatable)
+        return true;
+    if (s->details.no_focus)
+        return false;
+    switch (s->role) {
+    case CUI_ROLE_BUTTON:
+    case CUI_ROLE_LINK:
+    case CUI_ROLE_CHECKBOX:
+    case CUI_ROLE_SWITCH:
+    case CUI_ROLE_RADIO:
+    case CUI_ROLE_MENUITEM:
+    case CUI_ROLE_MENUITEMCHECKBOX:
+    case CUI_ROLE_MENUITEMRADIO:
+        return true;
+    default:
+        return false;
+    }
+}
+static bool cui_core_accessibility_supported(const cui_context *ui, cui_id id,
+                                             cui_accessibility_action action) {
+    if (!ui || !id || (action != CUI_ACCESSIBILITY_FOCUS && action != CUI_ACCESSIBILITY_ACTIVATE))
+        return false;
+    for (size_t i = 0; i < ui->previous_count; i++)
+        if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i))
+            return action == CUI_ACCESSIBILITY_FOCUS
+                       ? cui_core_focusable(&ui->previous[i])
+                       : cui_core_accessibility_activate(&ui->previous[i]);
+    return false;
+}
+bool cui_accessibility_action_supported(const cui_context *ui, cui_id id,
+                                        cui_accessibility_action action) {
+    return ui && !ui->in_frame && cui_core_accessibility_supported(ui, id, action);
+}
+bool cui_queue_accessibility_action(cui_context *ui, cui_id id, cui_accessibility_action action) {
+    return cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                           .accessibility_target = id,
+                                           .accessibility_action = action});
+}
 bool cui_queue_event(cui_context *ui, cui_event e) {
     if (!ui)
         return false;
     if (ui->in_frame) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
         return false;
+    }
+    if (e.type == CUI_EVENT_ACCESSIBILITY_ACTION) {
+        if (!cui_core_accessibility_supported(ui, e.accessibility_target, e.accessibility_action)) {
+            cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+            return false;
+        }
+        e = (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                        .accessibility_target = e.accessibility_target,
+                        .accessibility_action = e.accessibility_action};
     }
     if (ui->queued_count == CUI_CORE_EVENT_MAX) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
@@ -864,6 +915,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     cui_id touch_cancellations[CUI_CORE_DISPATCH_MAX] = {0};
     for (size_t i = 0; i < ui->event_count; i++) {
         cui_event e = ui->events[i];
+        ui->event_previous_focus[i] = ui->focus;
         if (e.pointer_type == CUI_POINTER_TOUCH &&
             (e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_MOVE ||
              e.type == CUI_EVENT_POINTER_UP) &&
@@ -907,6 +959,24 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         size_t before_activation = ui->activation_count;
         ui->event_activations[i] = 0;
         ui->event_activation_slots[i] = SIZE_MAX;
+        if (e.type == CUI_EVENT_ACCESSIBILITY_ACTION) {
+            ui->event_targets[i] = 0;
+            if (!cui_core_accessibility_supported(ui, e.accessibility_target,
+                                                  e.accessibility_action)) {
+                ui->event_consumed[i] = true;
+                continue;
+            }
+            ui->event_targets[i] = e.accessibility_target;
+            if (e.accessibility_action == CUI_ACCESSIBILITY_FOCUS) {
+                ui->focus = e.accessibility_target;
+                ui->focus_visible = true;
+            } else {
+                cui_core_activate(ui, e.accessibility_target);
+                ui->event_activations[i] = e.accessibility_target;
+                ui->event_activation_slots[i] = ui->activation_count - 1;
+            }
+            continue;
+        }
         cui_id cancellation_target = touch_cancellations[i];
         if (!cancellation_target && e.type == CUI_EVENT_CANCEL &&
             e.pointer_type == CUI_POINTER_TOUCH)
@@ -1054,6 +1124,9 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         cui_id owner = ui->event_touch_owners[previous];
         ui->event_touch_owners[previous] = ui->event_touch_owners[i];
         ui->event_touch_owners[i] = owner;
+        cui_id previous_focus = ui->event_previous_focus[previous];
+        ui->event_previous_focus[previous] = ui->event_previous_focus[i];
+        ui->event_previous_focus[i] = previous_focus;
         cui_id activation = ui->event_activations[previous];
         ui->event_activations[previous] = ui->event_activations[i];
         ui->event_activations[i] = activation;
@@ -1589,8 +1662,19 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
         return out;
     }
     if (disabled) {
-        if (ui->focus == id)
-            ui->focus = 0;
+        if (ui->focus == id) {
+            cui_id restored = 0;
+            for (size_t e = ui->event_count; e-- > 0;)
+                if (ui->events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION &&
+                    ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS &&
+                    ui->events[e].accessibility_target == id && !ui->event_consumed[e]) {
+                    restored = ui->event_previous_focus[e];
+                    ui->event_consumed[e] = true;
+                    ui->event_targets[e] = 0;
+                    break;
+                }
+            ui->focus = restored;
+        }
         if (ui->capture == id)
             ui->capture = 0;
         if (ui->space_capture == id)
@@ -1605,7 +1689,24 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
     }
     for (size_t i = 0; i < ui->activation_count; i++)
         if (ui->activations[i] == id) {
-            out.activated = !disabled;
+            bool allowed = !disabled;
+            for (size_t e = 0; e < ui->event_count; e++)
+                if (ui->events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION &&
+                    ui->event_activation_slots[e] == i) {
+                    bool same_role = false;
+                    for (size_t n = 0; n < ui->previous_count; n++)
+                        same_role |= ui->previous[n].id == id && ui->previous[n].role == role;
+                    size_t scope =
+                        ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX;
+                    allowed &= same_role && !ui->event_consumed[e] &&
+                               cui_core_scope_contains(ui->focus_scopes, scope, ui->top_modal);
+                    if (!allowed) {
+                        ui->event_consumed[e] = true;
+                        ui->event_targets[e] = 0;
+                        ui->event_activations[e] = 0;
+                    }
+                }
+            out.activated |= allowed;
             ui->activations[i] = 0;
         }
     ui->semantic_scopes[ui->semantic_count] =
@@ -1849,6 +1950,33 @@ cui_core_commands_done:
         ui->semantic_nodes[visible++] = node;
     }
     ui->semantic_count = visible;
+    /* Withdraw targeted actions whose widget disappeared or lost eligibility in
+     * this frame. They never survive into a later frame or reused widget ID. */
+    for (size_t e = ui->event_count; e-- > 0;) {
+        if (ui->events[e].type != CUI_EVENT_ACCESSIBILITY_ACTION)
+            continue;
+        bool allowed = false;
+        for (size_t n = 0; n < ui->semantic_count; n++)
+            if (ui->semantics[n].id == ui->events[e].accessibility_target &&
+                cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
+                for (size_t p = 0; p < ui->previous_count; p++)
+                    if (ui->previous[p].id == ui->semantics[n].id &&
+                        ui->previous[p].role == ui->semantics[n].role)
+                        allowed = ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS
+                                      ? cui_core_focusable(&ui->semantics[n])
+                                      : cui_core_accessibility_activate(&ui->semantics[n]);
+        if (!allowed) {
+            if (ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS &&
+                ui->focus == ui->events[e].accessibility_target)
+                ui->focus = ui->event_previous_focus[e];
+            size_t slot = ui->event_activation_slots[e];
+            if (slot < ui->activation_count)
+                ui->activations[slot] = 0;
+            ui->event_consumed[e] = true;
+            ui->event_targets[e] = 0;
+            ui->event_activations[e] = 0;
+        }
+    }
     bool retained = false, captured = false, space = false;
     for (size_t i = 0; i < ui->semantic_count; i++) {
         cui_semantic *s = &ui->semantics[i];
@@ -2110,6 +2238,10 @@ bool cui_consume_event(cui_context *ui, size_t index) {
     if (!ui || !ui->in_frame || cui_core_inert(ui) || index >= ui->event_count)
         return false;
     ui->event_consumed[index] = true;
+    if (ui->events[index].type == CUI_EVENT_ACCESSIBILITY_ACTION) {
+        (void)cui_cancel_event_activation(ui, index);
+        ui->event_activations[index] = 0;
+    }
     return true;
 }
 bool cui_cancel_event_activation(cui_context *ui, size_t index) {

@@ -28,7 +28,8 @@ typedef enum {
     CUI_ERROR_CAPACITY,
     CUI_ERROR_DUPLICATE_ID,
     CUI_ERROR_LIFECYCLE,
-    CUI_ERROR_LAYOUT
+    CUI_ERROR_LAYOUT,
+    CUI_ERROR_INVALID_ACTION
 } cui_error;
 typedef enum {
     CUI_EVENT_POINTER_MOVE,
@@ -43,8 +44,11 @@ typedef enum {
     CUI_EVENT_COMPOSITION_START,
     CUI_EVENT_COMPOSITION_UPDATE,
     CUI_EVENT_COMPOSITION_COMMIT,
-    CUI_EVENT_COMPOSITION_CANCEL
+    CUI_EVENT_COMPOSITION_CANCEL,
+    CUI_EVENT_ACCESSIBILITY_ACTION
 } cui_event_type;
+/* Targeted semantic actions, independent of pointer or keyboard input. */
+typedef enum { CUI_ACCESSIBILITY_FOCUS, CUI_ACCESSIBILITY_ACTIVATE } cui_accessibility_action;
 typedef enum {
     CUI_KEY_NONE,
     CUI_KEY_TAB,
@@ -141,6 +145,8 @@ typedef struct {
     uint64_t pointer_id;           /* Contact identity, scoped to type/device. */
     uint64_t pointer_device;       /* Zero for hosts without a device namespace. */
     float gesture_scale;           /* Relative pinch multiplier; 1 for pan/end/cancel. */
+    cui_id accessibility_target;
+    cui_accessibility_action accessibility_action;
 } cui_event;
 /* Caller-owned gesture filter. Clock is monotonic seconds; no allocation.
  * Precise gestures lock their initial dominant axis, release on strong turns,
@@ -409,6 +415,14 @@ cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
 void cui_destroy(cui_context *ui);
 bool cui_queue_event(cui_context *ui, cui_event event);
+/* Completed-frame eligibility only; false while a frame is open. Focus includes
+ * programmatic-only tab stops. Activate never changes focus or pointer capture.
+ * Queued actions share the bounded input queue and are validated again on dispatch.
+ * Missing/disabled/modal-blocked/unsupported targets report INVALID_ACTION;
+ * lifecycle/capacity failure leaves the queue and interaction state unchanged. */
+bool cui_accessibility_action_supported(const cui_context *, cui_id, cui_accessibility_action);
+bool cui_queue_accessibility_action(cui_context *, cui_id, cui_accessibility_action);
+
 bool cui_begin_frame(cui_context *ui, float width, float height, float dt);
 cui_draw_list cui_end_frame(cui_context *ui);
 cui_id cui_id_from(cui_context *ui, const char *key);
@@ -483,7 +497,8 @@ bool cui_defer_scroll_event(cui_context *, size_t index, cui_id from_id);
  * Zero for cancelled pointer/Space capture, repeats, and non-activation events. */
 cui_id cui_event_activation(cui_context *ui, size_t index);
 /* Cooperative bubbling: leaf handlers consume events before ancestor handlers.
- * Event targets remain available for diagnostics; callers check consumption. */
+ * Event targets remain available for diagnostics; callers check consumption.
+ * Consuming an accessibility action also cancels its pending activation. */
 bool cui_event_consumed(cui_context *, size_t index);
 bool cui_consume_event(cui_context *, size_t index);
 /* Capture-phase cancellation: suppress only this event's pending activation.

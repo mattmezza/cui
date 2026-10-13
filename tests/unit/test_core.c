@@ -1,4 +1,5 @@
 #include "cui/cui.h"
+#include "cui/cui_components.h"
 #include <assert.h>
 #include <float.h>
 #include <math.h>
@@ -3021,7 +3022,304 @@ static void test_ime_payload_ownership(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+static void accessibility_controls(cui_context *ui, bool *checked, unsigned *clicks, bool disabled,
+                                   bool include_button) {
+    cui_theme theme = cui_theme_light();
+    if (include_button && cui_button(ui, 11, &theme, cui_string("Run"), disabled))
+        (*clicks)++;
+    (void)cui_checkbox(ui, 12, &theme, cui_string("Check"), checked, disabled);
+}
+static void test_accessibility_actions(void) {
+    assert(CUI_EVENT_COMPOSITION_CANCEL == 12 && CUI_EVENT_ACCESSIBILITY_ACTION == 13);
+    cui_context *ui = make();
+    bool checked = false;
+    unsigned clicks = 0;
+    assert(!cui_accessibility_action_supported(ui, 11, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_queue_accessibility_action(NULL, 11, CUI_ACCESSIBILITY_FOCUS));
+    begin(ui);
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(cui_accessibility_action_supported(ui, 11, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_accessibility_action_supported(ui, 12, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(!cui_queue_accessibility_action(ui, 999, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_last_error(ui) == CUI_ERROR_INVALID_ACTION);
+    cui_clear_error(ui);
+    assert(!cui_queue_accessibility_action(ui, 11, (cui_accessibility_action)-1));
+    assert(cui_last_error(ui) == CUI_ERROR_INVALID_ACTION);
+    cui_clear_error(ui);
+    assert(!cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                            .accessibility_target = 11,
+                                            .accessibility_action = (cui_accessibility_action)2}));
+    cui_clear_error(ui);
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(ui, 12, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    assert(count == 2 && events[0].type == CUI_EVENT_ACCESSIBILITY_ACTION &&
+           events[1].accessibility_target == 12);
+    assert(cui_event_target(ui, 0) == 11 && !cui_event_activation(ui, 0));
+    assert(cui_event_target(ui, 1) == 12 && cui_event_activation(ui, 1) == 12);
+    assert(cui_focused(ui) == 11 && !cui_pressed(ui, 11) && !cui_pressed(ui, 12));
+    assert(!cui_accessibility_action_supported(ui, 11, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_last_error(ui) == CUI_ERROR_LIFECYCLE);
+    cui_clear_error(ui);
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(checked && clicks == 0 && cui_focused(ui) == 11);
+    begin(ui);
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(checked && clicks == 0); /* No callback replay on idle frames. */
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    assert(cui_event_activation(ui, 0) == 11 && cui_event_activation(ui, 1) == 11);
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(clicks == 1); /* Existing bool-interact coalescing, exactly as normal clicks. */
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_queue_accessibility_action(ui, 12, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    assert(cui_consume_event(ui, 0) && !cui_event_activation(ui, 0));
+    assert(!cui_cancel_event_activation(ui, 0));
+    assert(cui_cancel_event_activation(ui, 1));
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(clicks == 1 && checked);
+    /* Deferred owner handles the event once, then consumes its activation. */
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    if (!cui_event_consumed(ui, 0) && cui_event_activation(ui, 0) == 11)
+        clicks++;
+    assert(cui_consume_event(ui, 0));
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(clicks == 2);
+    /* Current-frame disabled controls reject a previously admitted activation/focus. */
+    assert(cui_queue_accessibility_action(ui, 12, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(ui, 12, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    accessibility_controls(ui, &checked, &clicks, true, true);
+    cui_end_frame(ui);
+    assert(checked && clicks == 2 && !cui_event_target(ui, 1) && cui_event_consumed(ui, 1));
+    assert(!cui_queue_accessibility_action(ui, 12, CUI_ACCESSIBILITY_ACTIVATE));
+    cui_clear_error(ui);
+    begin(ui);
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    cui_focus(ui, 12);
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    accessibility_controls(ui, &checked, &clicks, false, false);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 12 && clicks == 2 && !cui_event_target(ui, 0) &&
+           !cui_event_activation(ui, 1));
+    assert(!cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_FOCUS));
+    cui_clear_error(ui);
+    begin(ui);
+    accessibility_controls(ui, &checked, &clicks, false, true);
+    cui_end_frame(ui);
+    assert(clicks == 2); /* Reintroduced ID has no stale pending action. */
+    /* A changed semantic role cannot inherit old activation permission. */
+    assert(cui_queue_accessibility_action(ui, 11, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    cui_begin_box(ui, 11, (cui_box){.width = 100, .height = 30});
+    assert(!cui_interact(ui, 11, CUI_ROLE_LABEL, cui_string("Replacement"), false, false, 0)
+                .activated);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_event_consumed(ui, 0) && !cui_event_target(ui, 0));
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+static void test_accessibility_eligibility(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_set_tab_stop(ui, 1, false); /* Programmatic focus remains allowed. */
+    control(ui, 2, false);
+    cui_set_semantic_details(ui, 2,
+                             (cui_semantic_details){.no_focus = true, .pointer_activatable = true});
+    cui_begin_box(ui, 3, (cui_box){.width = 100, .height = 30});
+    cui_interact(ui, 3, CUI_ROLE_TAB, cui_string("Tab"), false, false, 0);
+    cui_end_box(ui);
+    cui_begin_box(ui, 4, (cui_box){.width = 100, .height = 30});
+    cui_interact(ui, 4, CUI_ROLE_TEXTBOX, cui_string("Text"), false, false, 0);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_accessibility_action_supported(ui, 1, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_accessibility_action_supported(ui, 2, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_accessibility_action_supported(ui, 2, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_accessibility_action_supported(ui, 3, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_accessibility_action_supported(ui, 3, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(!cui_accessibility_action_supported(ui, 4, CUI_ACCESSIBILITY_ACTIVATE));
+    cui_focus(ui, 1);
+    assert(cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    assert(cui_focused(ui) == 1 && cui_event_activation(ui, 0) == 2);
+    control(ui, 1, false);
+    assert(control(ui, 2, false).activated);
+    cui_set_semantic_details(ui, 2,
+                             (cui_semantic_details){.no_focus = true, .pointer_activatable = true});
+    cui_end_frame(ui);
+    /* Shared bounded queue: failure appends nothing and cannot change focus/capture. */
+    for (size_t i = 0; i < 256; i++)
+        assert(cui_queue_accessibility_action(ui, 1, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY && cui_focused(ui) == 1);
+    cui_clear_error(ui);
+    begin(ui);
+    size_t count;
+    cui_frame_events(ui, &count);
+    assert(count == 256);
+    control(ui, 1, false);
+    assert(!control(ui, 2, false).activated);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    ui = make();
+    begin(ui);
+    modal_frame(ui, true);
+    cui_end_frame(ui);
+    assert(!cui_accessibility_action_supported(ui, 1, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_ACTIVATE));
+    cui_clear_error(ui);
+    assert(cui_queue_accessibility_action(ui, 4, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    assert(cui_event_activation(ui, 0) == 4);
+    modal_frame(ui, true);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+static void test_accessibility_current_frame_guards(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 1);
+    assert(cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    control(ui, 1, false);
+    assert(!control(ui, 2, true).activated);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 1 && cui_event_consumed(ui, 0) && !cui_event_target(ui, 1));
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_queue_accessibility_action(ui, 1, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    assert(cui_begin_focus_scope(ui, 100, true));
+    control(ui, 2, false);
+    cui_end_focus_scope(ui);
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 2 && !cui_event_target(ui, 0));
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_queue_accessibility_action(ui, 1, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    cui_begin_box(ui, 900, (cui_box){.width = 100, .height = 30, .inert = true});
+    assert(!control(ui, 1, false).activated);
+    cui_end_box(ui);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(!cui_event_target(ui, 0) && !cui_event_activation(ui, 0));
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    control(ui, 3, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 3);
+    assert(cui_queue_accessibility_action(ui, 1, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_FOCUS));
+    begin(ui);
+    control(ui, 3, false);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 3); /* Reverse invalidation restores the surviving focus. */
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_queue_accessibility_action(ui, 1, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_FOCUS));
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_ENTER, 0);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 1 && cui_event_target(ui, 1) == 2 &&
+           cui_event_target(ui, 2) == 2);
+    assert(!control(ui, 1, false).activated && control(ui, 2, false).activated);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 2 && cui_last_error(ui) == CUI_OK);
+    assert(cui_queue_accessibility_action(ui, 1, CUI_ACCESSIBILITY_FOCUS));
+    begin(ui);
+    cui_begin_box(ui, 1, (cui_box){.width = 100, .height = 30});
+    cui_interact(ui, 1, CUI_ROLE_CHECKBOX, cui_string("Replacement"), false, false, 0);
+    cui_end_box(ui);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_focused(ui) == 2 && !cui_event_target(ui, 0));
+    cui_destroy(ui);
+}
+static void test_accessibility_capture_preservation(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_DOWN, 10, 10, 0, 0);
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_pressed(ui, 1) && cui_hovered(ui, 1));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                           .accessibility_target = 2,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE,
+                                           .x = 1000,
+                                           .y = 1000,
+                                           .pointer_type = CUI_POINTER_TOUCH}));
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 2 && cui_event_activation(ui, 0) == 2 &&
+           cui_focused(ui) == 1);
+    assert(cui_pressed(ui, 1) && cui_hovered(ui, 1));
+    assert(control(ui, 1, false).pressed && control(ui, 2, false).activated);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_POINTER_UP, 10, 10, 0, 0);
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_DOWN, 0, 0, CUI_KEY_SPACE, 0);
+    begin(ui);
+    control(ui, 1, false);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_pressed(ui, 1));
+    assert(cui_queue_accessibility_action(ui, 2, CUI_ACCESSIBILITY_ACTIVATE));
+    begin(ui);
+    assert(control(ui, 1, false).pressed);
+    assert(control(ui, 2, false).activated);
+    cui_end_frame(ui);
+    queue(ui, CUI_EVENT_KEY_UP, 0, 0, CUI_KEY_SPACE, 0);
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    control(ui, 2, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_accessibility_actions();
+    test_accessibility_eligibility();
+    test_accessibility_capture_preservation();
+    test_accessibility_current_frame_guards();
     test_ime_core_shortcuts();
     test_ime_payload_ownership();
     test_mesh_contract();

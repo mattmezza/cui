@@ -14,18 +14,93 @@ static const unsigned char *pixel(cui_software *r, int x, int y) {
 #ifdef CUI_HAS_TEXT
 typedef struct {
     unsigned glyphs, coverage;
+    uint64_t hash;
 } glyph_stats;
 static void glyph_count(void *user, int x, int y, int w, int h, int pitch,
                         const unsigned char *data) {
     glyph_stats *s = user;
-    (void)x;
-    (void)y;
+    s->hash = s->hash * 31 + (unsigned)x;
+    s->hash = s->hash * 31 + (unsigned)y;
+    s->hash = s->hash * 31 + (unsigned)w;
+    s->hash = s->hash * 31 + (unsigned)h;
     if (!data)
         return;
     s->glyphs++;
     for (int j = 0; j < h; j++)
-        for (int i = 0; i < w; i++)
+        for (int i = 0; i < w; i++) {
             s->coverage += data[j * pitch + i] != 0;
+            s->hash = s->hash * 31 + data[j * pitch + i];
+        }
+}
+static void test_rtl_fallback(cui_font *primary, const char *label, cui_str text, const char *env,
+                              const char *const *paths, size_t count) {
+    const char *requested = getenv(env);
+    cui_font *fallback = NULL;
+    cui_text_layout *source = NULL;
+    const char *chosen = NULL;
+    for (size_t i = 0; i < (requested ? 1 : count); ++i) {
+        const char *path = requested ? requested : paths[i];
+        cui_font *candidate = cui_font_open(path);
+        if (!candidate)
+            continue;
+        cui_text_layout_status status = cui_font_layout_line(
+            candidate, text, 20, (cui_text_style){0}, CUI_BIDI_RTL, 0, SIZE_MAX, NULL, &source);
+        if (status == CUI_TEXT_LAYOUT_UNAVAILABLE) {
+            cui_font_close(candidate);
+            printf("%s source-glyph raster check skipped: bidi layout unavailable (legacy text "
+                   "remains tested)\n",
+                   label);
+            return;
+        }
+        assert(status != CUI_TEXT_LAYOUT_MEMORY);
+        if (status != CUI_TEXT_LAYOUT_OK) {
+            cui_font_close(candidate);
+            continue;
+        }
+        fallback = candidate;
+        chosen = path;
+        break;
+    }
+    if (!fallback) {
+        printf("%s source-glyph raster check skipped: no supporting fixture; set %s\n", label, env);
+        return;
+    }
+    cui_text_layout_view view;
+    assert(cui_text_layout_get(source, &view));
+    assert(view.glyph_count > 0 && view.paragraph_level == 1);
+    for (size_t i = 0; i < view.glyph_count; ++i)
+        assert(view.glyphs[i].glyph_id != 0);
+    glyph_stats supported = {0};
+    assert(cui_text_layout_draw(source, 0, 0, glyph_count, &supported));
+    assert(supported.glyphs > 0 && supported.coverage > 0);
+    cui_text_layout_destroy(source);
+    cui_font *chain[] = {fallback};
+    assert(cui_font_set_fallbacks(primary, chain, 1));
+    cui_text_layout *actual = NULL;
+    assert(cui_font_layout_line(primary, text, 20, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 0,
+                                SIZE_MAX, NULL, &actual) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_get(actual, &view));
+    assert(view.glyph_count > 0 && view.paragraph_level == 1);
+    for (size_t i = 0; i < view.glyph_count; ++i)
+        assert(view.glyphs[i].glyph_id != 0);
+    for (size_t r = 0; r < view.run_count; ++r) {
+        assert(view.runs[r].face_index < view.face_count);
+        if (view.runs[r].face_index)
+            assert(view.faces[view.runs[r].face_index] == fallback);
+    }
+    glyph_stats explicit_layout = {0}, ordinary = {0};
+    assert(cui_text_layout_draw(actual, 0, 0, glyph_count, &explicit_layout));
+    assert(cui_font_draw(primary, text, 20, 0, 0, glyph_count, &ordinary));
+    assert(ordinary.glyphs > 0 && ordinary.coverage > 0 &&
+           ordinary.glyphs == explicit_layout.glyphs &&
+           ordinary.coverage == explicit_layout.coverage && ordinary.hash == explicit_layout.hash);
+    cui_size measured = cui_font_measure(primary, text, 20);
+    assert(measured.width == view.width && measured.height == view.height);
+    cui_text_layout_destroy(actual);
+    assert(cui_font_set_fallbacks(primary, NULL, 0));
+    cui_font_close(fallback);
+    printf("%s supported source glyphs and registered-fallback raster passed using %s\n", label,
+           chosen);
 }
 static void test_text(void) {
     assert(!cui_font_open(NULL));
@@ -72,16 +147,21 @@ static void test_text(void) {
     assert(stats.glyphs > 0 && stats.glyphs <= 3);
     if (!requested)
         assert(stats.glyphs < 3); /* packaged default fonts have an ffi ligature */
-    const char rtl[] = {'\xd8', '\xb3', '\xd9', '\x84', '\xd8', '\xa7', '\xd9', '\x85'};
-    stats = (glyph_stats){0};
-    assert(cui_font_draw(font, (cui_str){rtl, sizeof(rtl)}, 20, 0, 0, glyph_count, &stats));
-    assert(stats.glyphs > 0);
+    const char *const arabic_paths[] = {"/usr/share/fonts/noto/NotoSansArabic-Regular.ttf",
+                                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                        "/usr/share/fonts/TTF/DejaVuSans.ttf"};
+    const char *const hebrew_paths[] = {"/usr/share/fonts/noto/NotoSansHebrew-Regular.ttf",
+                                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                                        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"};
+    test_rtl_fallback(font, "Arabic", cui_string("سلام"), "CUI_TEST_ARABIC_FONT", arabic_paths, 3);
+    test_rtl_fallback(font, "Hebrew", cui_string("שָׁלוֹם"), "CUI_TEST_HEBREW_FONT", hebrew_paths, 4);
     assert(cui_font_measure(font, str, NAN).width == 0);
     assert(cui_font_measure(font, str, -1).width == 0);
     assert(cui_font_measure(font, (cui_str){NULL, 4}, 18).width == 0);
     assert(!cui_font_draw(font, str, 18, INFINITY, 0, glyph_count, &stats));
     cui_font_close(font);
-    puts("HarfBuzz multilingual shaping and FreeType coverage passed");
+    puts("HarfBuzz ASCII shaping and FreeType coverage passed; RTL fixture checks reported above");
 }
 static void test_styled_font_faces(void) {
     const char *regular = "/usr/share/fonts/noto/NotoSans-Regular.ttf";

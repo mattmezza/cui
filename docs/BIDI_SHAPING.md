@@ -190,3 +190,18 @@ layout creation remains UNAVAILABLE. There is no automatic system font discovery
 color-emoji rendering, per-grapheme mixed-face segmentation, automatic word
 wrapping, or caret/selection/hit-test implementation. Whole-run coverage may fail
 when separate fonts collectively cover a run but no one font covers it completely.
+
+## Renderer fixture validation
+
+The native software renderer test no longer treats nonempty `.notdef` pixels as
+multilingual evidence. Its Arabic and Hebrew samples first create layouts on
+explicit optional fixture faces and assert every source glyph ID is nonzero.
+Those validated faces are registered in the primary font's fallback chain, and
+ordinary drawing is checked against the explicit layout's raster checksum,
+coverage and measurement. Existing ASCII/ligature and renderer geometry checks
+remain independent. Tests search known portable Noto/DejaVu/Liberation fixture
+paths, or honor `CUI_TEST_ARABIC_FONT` and `CUI_TEST_HEBREW_FONT`; missing or
+unsupported fixtures explicitly report the script case skipped. With bidi OFF,
+the test reports source-glyph proof unavailable and keeps its ordinary ASCII
+regressions. Legacy nonempty tofu pixels are never labeled successful RTL proof.
+This fixture search is test setup, not production OS font discovery.

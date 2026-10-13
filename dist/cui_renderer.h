@@ -8,7 +8,8 @@ enum {
     CUI_RENDER_CLIP = 8,
     CUI_RENDER_IMAGE = 16,
     CUI_RENDER_MESH = 32,
-    CUI_RENDER_DROP_SHADOW = 64
+    CUI_RENDER_DROP_SHADOW = 64,
+    CUI_RENDER_INSET_SHADOW = 128
 };
 typedef struct {
     void *user;

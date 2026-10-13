@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = ["playwright==1.58.0"]
+# ///
 """Actual Canvas+pure C shadow pixels, DPR and pre-clear rejection."""
 import argparse
 from pathlib import Path

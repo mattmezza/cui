@@ -27,6 +27,22 @@ typedef struct {
 } cui_effect_buffer;
 bool cui_effect_drop_shadow_raster(cui_drop_shadow_paint, float scale, float origin_x,
                                    float origin_y, cui_effect_buffer output);
+/* Same checked transform/finite domain and caller-owned buffer contract as DROP.
+ * Empty physical hole/element yields an empty raster. Consumers cull against
+ * covered_hole but paint/crop covered_element; pure calls have no ancestor mask.
+ * Invalid query/sample/raster calls preserve output. */
+typedef struct {
+    cui_rect bounds;                        /* Logical placement of covered-element raster. */
+    cui_rect covered_hole, covered_element; /* Physical integer geometry. */
+    unsigned width, height;
+    size_t bytes;
+} cui_inset_shadow_raster;
+bool cui_effect_inset_shadow_query(cui_inset_shadow_paint, float scale, float origin_x,
+                                   float origin_y, cui_inset_shadow_raster *out);
+bool cui_effect_inset_shadow_sample(cui_inset_shadow_paint, float scale, float origin_x,
+                                    float origin_y, float x, float y, float *out);
+bool cui_effect_inset_shadow_raster(cui_inset_shadow_paint, float scale, float origin_x,
+                                    float origin_y, cui_effect_buffer output);
 /* Checked point sample in physical pixels, source f32 four-midpoint kernel. */
 bool cui_effect_drop_shadow_sample(cui_drop_shadow_paint, float scale, float origin_x,
                                    float origin_y, float x, float y, float *out);
@@ -101,6 +117,13 @@ static inline bool cui_drop_shadow_bounds_checked(cui_drop_shadow_paint p, cui_r
                      fmaxf(logical.h, 0) + 2 * margin};
     *out = next;
     return true;
+}
+static inline bool cui_inset_shadow_bounds_checked(cui_inset_shadow_paint p, cui_rect *out) {
+    cui_rect ignored;
+    if (!out || !cui_drop_shadow_bounds_checked(p, &ignored))
+        return false;
+    p.layer.offset_x = p.layer.offset_y = p.layer.spread = p.layer.sigma = 0;
+    return cui_drop_shadow_bounds_checked(p, out);
 }
 #endif
 
@@ -366,6 +389,113 @@ bool cui_effect_drop_shadow_raster(cui_drop_shadow_paint p, float scale, float o
             pixel[2] = p.layer.color.b;
             pixel[3] = (unsigned char)lroundf(
                 p.layer.color.a * shadow_sample(p, scale, b, r, x + ix + .5f, y + iy + .5f));
+        }
+    return true;
+}
+
+static bool inset_geometry(cui_inset_shadow_paint p, float scale, float ox, float oy,
+                           cui_rect *hole, cui_rect *element, cui_corner_radii *hr,
+                           cui_corner_radii *er) {
+    cui_drop_shadow_paint h = p, e = p;
+    h.layer.spread = -p.layer.spread;
+    e.layer.offset_x = e.layer.offset_y = e.layer.spread = 0;
+    if (!shadow_geometry(h, scale, ox, oy, hole, hr) ||
+        !shadow_geometry(e, scale, ox, oy, element, er))
+        return false;
+    float limit = fminf(p.caster.w, p.caster.h) / 2;
+    *hr = (cui_corner_radii){fmaxf(fminf(limit, p.radii.top_left) - p.layer.spread, 0) * scale,
+                             fmaxf(fminf(limit, p.radii.top_right) - p.layer.spread, 0) * scale,
+                             fmaxf(fminf(limit, p.radii.bottom_left) - p.layer.spread, 0) * scale,
+                             fmaxf(fminf(limit, p.radii.bottom_right) - p.layer.spread, 0) * scale};
+    return true;
+}
+bool cui_effect_inset_shadow_query(cui_inset_shadow_paint p, float scale, float ox, float oy,
+                                   cui_inset_shadow_raster *out) {
+    cui_rect h, e;
+    cui_corner_radii hr, er;
+    if (!out || !inset_geometry(p, scale, ox, oy, &h, &e, &hr, &er))
+        return false;
+    cui_inset_shadow_raster next = {.covered_hole = h, .covered_element = e};
+    if (h.w > 0 && h.h > 0 && e.w > 0 && e.h > 0) {
+        if (e.w > 16384 || e.h > 16384 || (size_t)e.w * (size_t)e.h > 16777216)
+            return false;
+        next.width = (unsigned)e.w;
+        next.height = (unsigned)e.h;
+        next.bytes = (size_t)next.width * next.height * 4;
+        next.bounds = (cui_rect){(e.x - ox) / scale, (e.y - oy) / scale, e.w / scale, e.h / scale};
+    }
+    *out = next;
+    return true;
+}
+static float inset_sdf(cui_rect b, cui_corner_radii r, float x, float y) {
+    float px = x - (b.x + b.w / 2), py = y - (b.y + b.h / 2);
+    float radius =
+        px < 0 ? (py < 0 ? r.top_left : r.bottom_left) : (py < 0 ? r.top_right : r.bottom_right);
+    float qx = fabsf(px) - b.w / 2 + radius, qy = fabsf(py) - b.h / 2 + radius;
+    if (radius == 0)
+        return fmaxf(qx, qy);
+    return sqrtf(fmaxf(qx, 0) * fmaxf(qx, 0) + fmaxf(qy, 0) * fmaxf(qy, 0)) +
+           fminf(fmaxf(qx, qy), 0) - radius;
+}
+static float inset_sample(cui_inset_shadow_paint p, float scale, cui_rect h, cui_rect e,
+                          cui_corner_radii hr, cui_corner_radii er, float x, float y) {
+    if (h.w <= 0 || h.h <= 0 || e.w <= 0 || e.h <= 0 || x < e.x || y < e.y || x >= e.x + e.w ||
+        y >= e.y + e.h)
+        return 0;
+    float sigma = p.layer.sigma * scale, coverage;
+    if (sigma == 0)
+        coverage = shadow_clamp(.5f - inset_sdf(h, hr, x, y), 0, 1);
+    else {
+        float hx = h.w / 2, hy = h.h / 2, px = x - (h.x + hx), py = y - (h.y + hy);
+        float corner = px < 0 ? (py < 0 ? hr.top_left : hr.bottom_left)
+                              : (py < 0 ? hr.top_right : hr.bottom_right);
+        float start = shadow_clamp(-3 * sigma, py - hy, py + hy),
+              end = shadow_clamp(3 * sigma, py - hy, py + hy);
+        float step = (end - start) / 4, ys = start + step * .5f;
+        coverage = 0;
+        for (unsigned i = 0; i < 4; i++, ys += step) {
+            float delta = fminf(hy - corner - fabsf(py - ys), 0);
+            float curved = hx - corner + sqrtf(fmaxf(0, corner * corner - delta * delta));
+            float factor = .7071067811865475244f / sigma;
+            float low = .5f + .5f * shadow_erf((px - curved) * factor);
+            float high = .5f + .5f * shadow_erf((px + curved) * factor);
+            float gaussian = expf(-(ys * ys) / (2 * sigma * sigma)) / (2.5066282746310005f * sigma);
+            coverage += (high - low) * gaussian * step;
+        }
+    }
+    return shadow_clamp((1 - coverage) * shadow_clamp(.5f - inset_sdf(e, er, x, y), 0, 1), 0, 1);
+}
+bool cui_effect_inset_shadow_sample(cui_inset_shadow_paint p, float scale, float ox, float oy,
+                                    float x, float y, float *out) {
+    cui_rect h, e;
+    cui_corner_radii hr, er;
+    if (!out || !isfinite(x) || !isfinite(y) || !inset_geometry(p, scale, ox, oy, &h, &e, &hr, &er))
+        return false;
+    *out = inset_sample(p, scale, h, e, hr, er, x, y);
+    return true;
+}
+bool cui_effect_inset_shadow_raster(cui_inset_shadow_paint p, float scale, float ox, float oy,
+                                    cui_effect_buffer output) {
+    cui_inset_shadow_raster q;
+    cui_rect h, e;
+    cui_corner_radii hr, er;
+    size_t extent;
+    if (!cui_effect_inset_shadow_query(p, scale, ox, oy, &q) ||
+        !inset_geometry(p, scale, ox, oy, &h, &e, &hr, &er))
+        return false;
+    if (!q.width)
+        return output.width == 0 && output.height == 0;
+    if (output.width != q.width || output.height != q.height || !effects_buffer(output, &extent))
+        return false;
+    for (unsigned y = 0; y < q.height; y++)
+        for (unsigned x = 0; x < q.width; x++) {
+            unsigned char *pixel = output.pixels + (size_t)y * output.stride + (size_t)x * 4;
+            pixel[0] = p.layer.color.r;
+            pixel[1] = p.layer.color.g;
+            pixel[2] = p.layer.color.b;
+            pixel[3] = (unsigned char)lroundf(p.layer.color.a * inset_sample(p, scale, h, e, hr, er,
+                                                                             e.x + x + .5f,
+                                                                             e.y + y + .5f));
         }
     return true;
 }

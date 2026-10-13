@@ -120,6 +120,10 @@ jobs:
         run: uv run tests/web/test_chart_source_point_axis.py
       - name: Verify current-frame Chart and Plot geometry and tooltip pixels
         run: uv run tests/web/test_plot_chart_prepaint.py
+      - name: Verify inset shadow pixels and atomic preparation
+        run: |
+          uv run tests/web/test_inset_shadow_canvas.py --output build/inset-shadow-probe
+          uv run tests/web/test_inset_shadow_gallery.py
       - name: Verify current-frame prepaint clipping and pointer occlusion
         run: uv run tests/web/test_core_prepaint.py
       - name: Verify independent Plot and Chart motion policies

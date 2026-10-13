@@ -3994,6 +3994,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                 .corner_radii = {24, 0, 0, 18},
                                 .custom_border_edges = true,
                                 .border_edges = {0, 8, 4, 0}});
+        const cui_box_shadow shape_depth[] = {
+            {.layer = {.offset_y = 3, .sigma = 3, .color = {0, 0, 0, 64}},
+             .kind = CUI_BOX_SHADOW_DROP},
+            {.layer = {.offset_y = 1, .sigma = 2, .spread = 2, .color = {0, 0, 0, 96}},
+             .kind = CUI_BOX_SHADOW_INSET}};
+        cui_set_box_shadows(ui, shape_depth, 2, (cui_corner_radii){24, 0, 0, 18});
         cui_end_box(ui);
         for (unsigned focusable = 0; focusable < 2; focusable++) {
             cui_id id = cui_id_from(ui, focusable ? "focusable-log" : "passive-log");
@@ -5432,7 +5438,10 @@ float gallery_command(unsigned i, unsigned field) {
     }
 }
 float gallery_shadow_value(unsigned i, unsigned field) {
-    if (i >= draw.count || draw.commands[i].type != CUI_DRAW_DROP_SHADOW || field >= 16)
+    if (i >= draw.count ||
+        (draw.commands[i].type != CUI_DRAW_DROP_SHADOW &&
+         draw.commands[i].type != CUI_DRAW_INSET_SHADOW) ||
+        field >= 16)
         return 0;
     const cui_drop_shadow_paint *p = &draw.commands[i].shadow;
     const float values[] = {

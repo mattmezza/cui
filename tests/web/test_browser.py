@@ -2404,7 +2404,7 @@ def main():
             page.wait_for_function('''before=>cuiGallery.frame>before.frame&&JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))!==before.signature''', arg=before)
             before_reduce = page.evaluate('cuiGallery.frame')
             page.emulate_media(reduced_motion='reduce')
-            page.wait_for_function('(frame)=>cuiGallery.frame>frame&&cuiGallery.exports.gallery_redraw()===0', arg=before_reduce)
+            page.wait_for_function('(frame)=>cuiGallery.frame>frame&&cuiGallery.renderedReducedMotion===true&&cuiGallery.exports.gallery_redraw()===0&&cuiGallery.exports.gallery_next_wake()===0', arg=before_reduce)
             settled = page.evaluate('''()=>({frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))})''')
             after = page.evaluate('''async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>requestAnimationFrame(resolve));return {frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))};}''')
             assert after == settled, (settled, after)

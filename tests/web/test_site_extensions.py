@@ -37,7 +37,10 @@ def main():
             for required in ['SDL3', 'Python 3', 'CMake', 'Ninja', '-std=c11', 'pkg-config --static --libs cui-sdl3', 'account menu', '--font']:
                 assert required in content,required
             assert page.locator('#docs-content img').count()==3
-            page.wait_for_function('Array.from(document.querySelectorAll("#docs-content img")).every(i=>i.complete&&i.naturalWidth>0)')
+            for image in page.locator('#docs-content img').all():
+                image.scroll_into_view_if_needed()
+                image.evaluate('(i)=>i.decode()')
+                assert image.evaluate('(i)=>i.complete&&i.naturalWidth>0')
             compile_block=page.locator('#docs-content pre').filter(has_text='cc -std=c11')
             compile_block.locator('button.docs-copy').click()
             page.wait_for_function('Array.from(document.querySelectorAll("#docs-content button.docs-copy")).some(b=>b.textContent==="Copied")')

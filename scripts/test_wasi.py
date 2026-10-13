@@ -100,6 +100,8 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += [f"examples/{name}/main.c" for name in ("unstyled", "styled_settings")]
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
+    paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c"]
+    paths += [str(path.relative_to(root)) for path in (root / "third_party/sheenbidi").rglob("*") if path.is_file()]
     paths += ["third_party/clay/clay.h", "tests/unit/cui_edit_grapheme_tests.inc", "tests/unit/cui_edit_word_tests.inc"]
     digest = hashlib.sha256()
     for path in sorted(set(paths)):
@@ -203,8 +205,19 @@ def main() -> int:
         # benchmark branch using clock(), so compile its explicit wall-clock
         # compatibility library even though normal assertions do not run it.
         virtual_clock = ["-D_WASI_EMULATED_PROCESS_CLOCKS", "-lwasi-emulated-process-clocks"]
+        # Compile the unmodified backend separately: upstream warning exceptions
+        # must not weaken strict warnings on the CUI wrapper or its assertions.
+        bidi_include = ["-I", str(root / "third_party/sheenbidi/Headers"),
+                        "-I", str(root / "third_party/sheenbidi/Source")]
+        bidi_object = build / "sheenbidi.o"
+        command(flags + bidi_include + ["-DSB_CONFIG_UNITY", "-Wno-unused-parameter",
+                "-Wno-unused-value", "-Wno-unused-function", "-Wno-implicit-fallthrough",
+                "-c", str(root / "third_party/sheenbidi/Source/SheenBidi.c"),
+                "-o", str(bidi_object)], root)
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("bidi", ["tests/unit/test_bidi.c", "src/text/cui_bidi.c"], False,
+                     bidi_include + [str(bidi_object)])]
         targets += [("speech_base_only", ["tests/unit/test_speech.c", "src/base/cui_speech.c"], False, ["-DCUI_SPEECH_BASE_ONLY=1"])]
         targets += [("chart_base_only", ["tests/unit/test_chart.c", "src/base/cui_chart.c", "src/base/cui_plot.c"], False, ["-DCUI_CHART_BASE_ONLY=1"])]
         targets += [("text_view_base_only", ["tests/unit/test_text_view.c", "src/base/cui_text_view.c"], False, ["-DCUI_TEXT_VIEW_BASE_ONLY=1"])]

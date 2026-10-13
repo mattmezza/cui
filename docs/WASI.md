@@ -24,7 +24,7 @@ versions are deliberately rejected until the pins are reviewed.
 
 The runner builds an optimized portable static archive with C11,
 `-Wall -Wextra -Wpedantic -Werror`, and enabled assertions. It then compiles and
-executes 75 registered portable suites, including component/base behavior,
+executes 76 registered portable suites, including component/base behavior,
 implementation embedding, examples and single-/multi-TU distribution consumers. Each module gets an 8 MiB stack and a configurable
 instruction fuel budget (40 billion by default); exceeding the budget fails the suite. Runtime exits,
 traps, and compilation failures fail verification and are reported individually.
@@ -55,3 +55,5 @@ skipped or converted into a compilation-only claim. SDL/native renderer tests
 and FreeType/HarfBuzz shaping are outside this runner's tested surface.
 
 The runner bounds each suite to 40 billion WebAssembly instructions (overridable with `--fuel`). The expanded Choice matrix repeatedly creates independent contexts. After touch routing expanded bounded internal dispatch storage, the exact frozen module consumed 30,484,390,481 instructions and exhausted the previous 30-billion budget. The new finite budget preserves every case and assertion. The original failure and measured rerun are retained in the release evidence; this is a runner resource limit, not a passing assertion being removed.
+
+The optional bidi module also compiles and executes under WASI, including mixed-direction wrapped lines compared directly with the pinned backend, paragraph ownership and atomic failures. Its unmodified private backend receives the same documented upstream warning exceptions as CMake; CUI wrapper/tests remain strict. This no-filesystem runtime invocation does not read Unicode conformance fixtures. The complete 861,948-case conformance suite remains a separate native/sanitizer check.

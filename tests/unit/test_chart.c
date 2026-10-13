@@ -108,6 +108,21 @@ static size_t format_q(double value, char *buffer, size_t capacity, void *user) 
         buffer[0] = 'Q';
     return capacity ? 1 : 0;
 }
+typedef struct {
+    size_t count;
+    double first, last;
+} axis_tick_capture;
+static size_t capture_axis_tick(double value, char *buffer, size_t capacity, void *user) {
+    axis_tick_capture *capture = user;
+    assert(isfinite(value));
+    if (!capture->count)
+        capture->first = value;
+    capture->last = value;
+    capture->count++;
+    if (capacity)
+        buffer[0] = 'T';
+    return capacity ? 1 : 0;
+}
 static size_t format_wide_tick(double value, char *buffer, size_t capacity, void *user) {
     (void)value;
     (void)user;
@@ -1338,6 +1353,102 @@ int main(void) {
             old_fraction_tick |= item.length == 4 && memcmp(item.data, "3.14", 4) == 0;
         }
     assert(source_fraction_tick && !old_fraction_tick);
+    /* Source does not subsample value labels at 32 ticks. Explicit category count
+     * zero suppresses labels while leaving grid and category line available. */
+    axis_tick_capture capture = {0};
+    cui_chart_options many_ticks = fractional_axis;
+    many_ticks.bar_alignment = CUI_CHART_BAR_LEFT;
+    many_ticks.custom_horizontal_bar_gutters = true;
+    many_ticks.bar_category_gutter = 20;
+    many_ticks.bar_value_end_gutter = 8;
+    many_ticks.domain_min = -DBL_MAX;
+    many_ticks.domain_max = DBL_MAX;
+    many_ticks.tick_count = 65;
+    many_ticks.y_tick_format = capture_axis_tick;
+    many_ticks.format_user = &capture;
+    many_ticks.custom_x_tick_count = true;
+    many_ticks.x_tick_count = 0;
+    many_ticks.hide_axes = false;
+    many_ticks.noninteractive = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 910, &state, &many_ticks, (cui_str){"All ticks", 9}));
+    tick_draw = cui_end_frame(ui);
+    assert(capture.count == 65 && capture.first == -DBL_MAX && capture.last == DBL_MAX);
+    size_t painted_ticks = 0;
+    for (size_t i = 0; i < tick_draw.count; i++)
+        if (tick_draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str item = tick_draw.commands[i].text;
+            painted_ticks += item.length == 1 && item.data[0] == 'T';
+            assert(!(item.length == 1 && item.data[0] >= 'A' && item.data[0] <= 'C'));
+        }
+    assert(painted_ticks > 32); /* Endpoint text may clip at the chart edge. */
+    capture = (axis_tick_capture){0};
+    many_ticks.hide_axes = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 910, &state, &many_ticks, (cui_str){"Hidden axes", 11}));
+    (void)cui_end_frame(ui);
+    assert(capture.count == 0);
+    /* Point labels align inward at both endpoints, including a scaled bitmap. */
+    cui_chart_options endpoint_axis = fractional_axis;
+    endpoint_axis.kind = CUI_CHART_LINE;
+    endpoint_axis.show_y_axis = false;
+    endpoint_axis.hide_axes = false;
+    endpoint_axis.logical_width = 128;
+    endpoint_axis.logical_height = 96;
+    endpoint_axis.x_tick_count = 2;
+    endpoint_axis.noninteractive = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 911, &state, &endpoint_axis, (cui_str){"Endpoints", 9}));
+    tick_draw = cui_end_frame(ui);
+    bool left_endpoint = false, right_endpoint = false;
+    for (size_t i = 0; i < tick_draw.count; i++)
+        if (tick_draw.commands[i].type == CUI_DRAW_TEXT) {
+            const cui_draw_command *command = &tick_draw.commands[i];
+            if (command->text.length == 1 && command->text.data[0] == 'A') {
+                assert(fabsf(command->bounds.x - state.bounds.x) < .01f);
+                left_endpoint = true;
+            }
+            if (command->text.length == 1 && command->text.data[0] == 'C') {
+                assert(command->bounds.x + command->bounds.w <=
+                       state.bounds.x + state.bounds.w + .01f);
+                right_endpoint = true;
+            }
+        }
+    assert(left_endpoint && right_endpoint);
+    endpoint_axis.show_y_axis = true;
+    endpoint_axis.y_axis_inside = true;
+    endpoint_axis.tick_count = 3;
+    endpoint_axis.y_tick_format = format_q;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 912, &state, &endpoint_axis, (cui_str){"Inside ticks", 12}));
+    tick_draw = cui_end_frame(ui);
+    size_t inside_ticks = 0;
+    for (size_t i = 0; i < tick_draw.count; i++)
+        if (tick_draw.commands[i].type == CUI_DRAW_TEXT && tick_draw.commands[i].text.length == 1 &&
+            tick_draw.commands[i].text.data[0] == 'Q') {
+            assert(fabsf(tick_draw.commands[i].bounds.x - state.bounds.x - 2) < .01f);
+            assert(tick_draw.commands[i].bounds.y >= state.bounds.y &&
+                   tick_draw.commands[i].bounds.y + 10 <= state.bounds.y + 76);
+            inside_ticks++;
+        }
+    assert(inside_ticks == 3);
+    endpoint_axis.y_axis_inside = false;
+    endpoint_axis.value_axis_gutter = 32;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 913, &state, &endpoint_axis, (cui_str){"Outside ticks", 13}));
+    tick_draw = cui_end_frame(ui);
+    size_t outside_ticks = 0;
+    for (size_t i = 0; i < tick_draw.count; i++)
+        if (tick_draw.commands[i].type == CUI_DRAW_TEXT && tick_draw.commands[i].text.length == 1 &&
+            tick_draw.commands[i].text.data[0] == 'Q') {
+            assert(fabsf(tick_draw.commands[i].bounds.x + tick_draw.commands[i].bounds.w -
+                         state.bounds.x - 28) < .01f);
+            assert(tick_draw.commands[i].bounds.y >= state.bounds.y &&
+                   tick_draw.commands[i].bounds.y + 10 <= state.bounds.y + 76);
+            outside_ticks++;
+        }
+    assert(outside_ticks == 3);
+
     cui_chart_datum raw_data[] = {{.label = {"A", 1}, .value = 12.3456},
                                   {.label = {"B", 1}, .value = 2}};
     cui_chart_options raw_tooltip = options;
@@ -1637,8 +1748,8 @@ int main(void) {
     unsigned horizontal_ticks = 0;
     for (size_t i = 0; i < draw.count; i++)
         if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 1 &&
-            draw.commands[i].text.data[0] == 'Q' && draw.commands[i].bounds.y >= 13 &&
-            draw.commands[i].bounds.y <= 17) {
+            draw.commands[i].text.data[0] == 'Q' && draw.commands[i].bounds.y >= 21 &&
+            draw.commands[i].bounds.y <= 23) {
             horizontal_ticks++;
             first_tick_x = fminf(first_tick_x, draw.commands[i].bounds.x);
             last_tick_x = fmaxf(last_tick_x, draw.commands[i].bounds.x);

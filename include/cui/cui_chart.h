@@ -232,6 +232,8 @@ typedef struct {
     cui_color primary_fill;                         /* area/radar fill for the first series */
     cui_chart_region_fill_fn area_radar_fill_pixel; /* chart-space gradients/patterns */
     void *area_radar_fill_user;
+    /* Distinguishes source explicit x_tick_count(0) from default stride selection. */
+    bool custom_x_tick_count;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

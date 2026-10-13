@@ -153,7 +153,7 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
         count = 2;
     if (count > 1000)
         return 0;
-    unsigned visible = count < 32 ? count : 32;
+    unsigned visible = count;
     float gutter = 32;
     bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
     double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 0;
@@ -162,8 +162,11 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
                                 : 0;
     cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
     for (unsigned i = 0; i < visible; i++) {
-        unsigned tick = (count - 1) * i / (visible - 1);
-        double value = hi - (hi - lo) * tick / (count - 1);
+        unsigned tick = i;
+        double value = 0;
+        cui_plot_scale tick_scale = {CUI_PLOT_LINEAR, lo, hi, 1, 0, true};
+        if (cui_plot_inverse(&tick_scale, (double)tick / (count - 1), &value) != CUI_PLOT_OK)
+            return 0;
         if (point_chart) {
             double pixel_y = (o->height - (o->hide_x_axis ? 0 : 20)) * tick / (count - 1);
             if (cui_plot_inverse(&scale, pixel_y, &value) != CUI_PLOT_OK)
@@ -297,10 +300,12 @@ cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_char
 }
 static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
     size_t slots = o->point_count > o->count ? o->point_count : o->count;
-    if (!o->x_tick_count) {
+    if (!o->x_tick_count && !o->custom_x_tick_count) {
         size_t margin = o->x_tick_margin ? o->x_tick_margin : 1;
         return (index + 1) % margin == 0;
     }
+    if (!o->x_tick_count)
+        return false;
     if (o->x_tick_count >= slots)
         return true;
     if (o->x_tick_count == 1)
@@ -806,6 +811,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float box_width = fmaxf(1, measured.width);
             float box_height = fmaxf(12, measured.height);
             float box_x = x - box_width / 2;
+            if (point_chart && slots > 1) {
+                if (i == 0)
+                    box_x = x;
+                else if (i == slots - 1)
+                    box_x = x - box_width;
+            }
             if (o->kind == CUI_CHART_CANDLESTICK) {
                 cui_chart_candle_geometry candle;
                 if (cui_chart_candle_bounds(o, i, &candle) == CUI_PLOT_OK) {
@@ -819,7 +830,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     double lo, hi;
                     if (!cui_chart_value_domain(o, &lo, &hi))
                         continue;
-                    float fraction = (float)((0 - lo) / (hi - lo));
+                    double zero_fraction;
+                    cui_plot_scale zero_scale = {CUI_PLOT_LINEAR, lo, hi, 0, 1, true};
+                    if (cui_plot_map(&zero_scale, 0, &zero_fraction) != CUI_PLOT_OK)
+                        continue;
+                    float fraction = (float)zero_fraction;
                     if (o->bar_alignment == CUI_CHART_BAR_LEFT ||
                         o->bar_alignment == CUI_CHART_BAR_RIGHT) {
                         float bar_left, bar_right;
@@ -861,14 +876,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_end_box(ui);
         }
     }
-    if (o->show_y_axis && o->kind != CUI_CHART_PIE && o->kind != CUI_CHART_RADAR &&
+    if (!o->hide_axes && o->show_y_axis && o->kind != CUI_CHART_PIE && o->kind != CUI_CHART_RADAR &&
         o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40 && o->width >= 60 && o->height >= 40) {
         double lo, hi;
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
             if (count < 2)
                 count = 2;
-            unsigned visible = count < 32 ? count : 32;
+            unsigned visible = count;
             bool horizontal_bar =
                 o->kind == CUI_CHART_BAR &&
                 (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT);
@@ -891,21 +906,30 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                     top_bar ? bottom : top, true};
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
-                unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
+                unsigned tick = i;
                 double pixel_y = point_chart ? (o->height - (o->hide_x_axis ? 0 : 20)) *
                                                    (double)tick / (count - 1)
                                              : top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
-                if (horizontal_bar)
-                    value = lo + (hi - lo) * tick / (count - 1);
-                else
+                if (horizontal_bar) {
+                    cui_plot_scale tick_scale = {CUI_PLOT_LINEAR, lo, hi, 0, 1, true};
+                    if (cui_plot_inverse(&tick_scale, (double)tick / (count - 1), &value) !=
+                        CUI_PLOT_OK)
+                        continue;
+                } else
                     (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label = cui_chart_tick_number(text, sizeof text, value, o->y_tick_format,
                                                       o->format_user);
                 float y = (float)(pixel_y * h / o->height);
                 float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 32;
-                float x = o->y_axis_inside ? 26 * w / o->width : 0;
-                float label_width = o->y_axis_inside ? 48 : gutter - 4;
+                cui_size measured = cui_measure_text(ui, label, 10);
+                float label_width = fmaxf(1, measured.width);
+                float x = o->y_axis_inside ? 2 : gutter * w / o->width - 4 - label_width;
+                float label_y = o->y_axis_inside ? (y < 12 ? y + 2 : y - 12) : y - 5;
+                if (point_chart && !o->y_axis_inside)
+                    label_y = fmaxf(
+                        0, fminf(label_y,
+                                 (o->height - (o->hide_x_axis ? 0 : 20)) * h / o->height - 10));
                 if (horizontal_bar) {
                     float bar_left, bar_right;
                     cui_chart_horizontal_bar_extent(o, &bar_left, &bar_right);
@@ -915,16 +939,15 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     x = (o->bar_alignment == CUI_CHART_BAR_LEFT
                              ? left + (right - left) * fraction
                              : right - (right - left) * fraction) -
-                        24;
-                    y = o->y_axis_inside ? h - 14 : h - 28;
-                    label_width = 48;
+                        label_width / 2;
+                    label_y = o->y_axis_inside ? h - 12 : h - 26;
                 }
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
                                        (cui_box){.width = label_width,
                                                  .height = 12,
                                                  .fixed_width = true,
                                                  .fixed_height = true},
-                                       (cui_rect){x, y - 6, label_width, 12});
+                                       (cui_rect){x, label_y, label_width, 12});
                 cui_text(ui, label, 10, o->foreground);
                 cui_end_box(ui);
             }

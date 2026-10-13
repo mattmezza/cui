@@ -1374,6 +1374,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->sankey_min_link_width));
     h = cui_chart_mix(h, o->hide_grid);
     h = cui_chart_mix(h, o->hide_axes);
+    h = cui_chart_mix(h, o->custom_x_tick_count);
     h = cui_chart_mix(h, o->hide_x_axis);
     h = cui_chart_mix(h, o->show_y_axis);
     h = cui_chart_mix(h, o->show_bar_values);

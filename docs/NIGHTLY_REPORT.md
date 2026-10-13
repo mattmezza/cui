@@ -1,8 +1,10 @@
 # Current report — 13 October 2026
 
-The [C/WASM gallery](https://matteo.merola.co/cui/) contains all 78 component families. Deployment check `54e3410` passes library CI, Pages and 188 actual HTTPS artifact comparisons; its asset-equivalent deployment passes the full browser and design/app suites. See [deployed proof](validation/published-54e3410.txt). The locally validated `160cee1` integration adds Unicode editing, completion examples, Badge variants and further Dock/Plot APIs: [integration proof](validation/unicode-badge-160cee1.txt).
+The [C/WASM gallery](https://matteo.merola.co/cui/) contains all 78 component families. Published `55e904a` passes library CI, Pages, 194 actual HTTPS artifact comparisons and both complete browser suites. See [deployed proof](validation/published-55e904a.txt). It includes the Unicode editing, completion examples, Badge variants and further Dock/Plot APIs covered by [integration proof](validation/unicode-badge-160cee1.txt).
 
-Full family parity remains unfinished: **78 entries, 4 implemented, 74 tested, 0 verified**. “Tested” means a documented subset has behavioral evidence. The [manifest](gpui-parity.json) and source export audits identify remaining features; documentation or gallery presence alone does not verify a family.
+The next integration adds source Progress cycles/value transitions, token-aware Input/Textarea editing, Dock visibility/group policies/measured sizing/panel factories and Plot labels/truncation. It remains under combined sanitizer, WASI and browser validation.
+
+Full family parity remains unfinished: **78 entries, 3 implemented, 75 tested, 0 verified**. “Tested” means a documented subset has behavioral evidence. The [manifest](gpui-parity.json) and source export audits identify remaining features; documentation or gallery presence alone does not verify a family.
 
 The website includes a marketing homepage, browsable documentation, per-component state/callback explanations, slash-key fuzzy search, copyable compiled C examples, system-first light/dark behavior and 38 named presets. Typography, extended control scales, spacing units, radii, backgrounds/gradients, opacity, blur and configurable/reduced motion have real C/WASM examples. Original media, native composed-app captures and metadata cover all shared routes. Go, Rust, Node and TypeScript examples use a narrow native C bridge; full language bindings remain unfinished.
 

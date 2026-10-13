@@ -8,6 +8,28 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* Source Text/PlotLabel: caller-owned labels relative to this fixed surface.
+ * Size zero selects10px; explicit colors (including transparent) are preserved.
+ * Source font_weight is ignored by PlotLabel.paint, so this contract uses normal.
+ * Borrowed text remains valid through renderer completion. <=256 labels. */
+typedef struct {
+    cui_str text;
+    cui_plot_point origin;
+    float font_size;
+    cui_color color;
+    cui_align align;
+} cui_plot_label;
+cui_plot_result cui_plot_labels_layout(cui_context *, const cui_plot_label *, size_t count,
+                                       cui_rect *, size_t capacity, size_t *required);
+cui_plot_result cui_plot_labels(cui_context *, cui_id, cui_size extent, const cui_plot_label *,
+                                size_t count);
+/* Copy source-style measured UTF-8 truncation into caller storage, NUL terminated.
+ * <=4096 input bytes, strict UTF-8, zero size defaults10. max_width<=0 keeps text;
+ * when truncated, returns at least ellipsis even if that exceeds the budget.
+ * required includes NUL; errors preserve output, CAPACITY sets required.
+ * Input may alias output. No grapheme clustering/locale or automatic layout. */
+cui_plot_result cui_plot_truncate_text(cui_context *, cui_str, float font_size, float max_width,
+                                       char *output, size_t capacity, size_t *required);
 #define CUI_PLOT_AXIS_LIMIT 256u
 /* Borrowed labels; font size zero selects 10px. START/CENTER/END alignment is
  * applied about tick (source left/center/right). Alpha zero uses theme muted. */
@@ -636,6 +658,152 @@ cui_plot_result cui_plot_bars(cui_context *ui, cui_id id, const cui_theme *theme
             cui_end_box(ui);
         }
     cui_end_box(ui);
+    return CUI_PLOT_OK;
+}
+
+static bool plot_label_valid(const cui_plot_label *label) {
+    return (!label->text.length || label->text.data) && label->text.length <= 4096 &&
+           isfinite(label->origin.x) && isfinite(label->origin.y) &&
+           fabs(label->origin.x) <= 16384 && fabs(label->origin.y) <= 16384 &&
+           isfinite(label->font_size) && label->font_size >= 0 && label->font_size <= 1024 &&
+           label->align >= CUI_ALIGN_START && label->align <= CUI_ALIGN_END;
+}
+static bool plot_label_measure(cui_context *ui, cui_str text, float size, cui_size *out) {
+    *out = text.length ? cui_measure_text(ui, text, size) : (cui_size){0, size};
+    return isfinite(out->width) && isfinite(out->height) && out->width >= 0 && out->height >= 0 &&
+           out->width <= 16777216 && out->height <= 16777216;
+}
+cui_plot_result cui_plot_labels_layout(cui_context *ui, const cui_plot_label *labels, size_t count,
+                                       cui_rect *out, size_t capacity, size_t *required) {
+    if (!ui || !required || (count && !labels) || count > 256 || (!out && capacity))
+        return CUI_PLOT_INVALID;
+    cui_rect geometry[256];
+    for (size_t i = 0; i < count; ++i) {
+        cui_size size;
+        if (!plot_label_valid(labels + i) ||
+            !plot_label_measure(ui, labels[i].text, labels[i].font_size ? labels[i].font_size : 10,
+                                &size))
+            return CUI_PLOT_INVALID;
+        float x = labels[i].origin.x;
+        if (labels[i].align == CUI_ALIGN_CENTER)
+            x -= size.width / 2;
+        else if (labels[i].align == CUI_ALIGN_END)
+            x -= size.width;
+        geometry[i] = (cui_rect){x, labels[i].origin.y, size.width, size.height};
+    }
+    *required = count;
+    if (capacity < count)
+        return CUI_PLOT_CAPACITY;
+    if (count)
+        memcpy(out, geometry, count * sizeof *out);
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_labels(cui_context *ui, cui_id id, cui_size extent,
+                                const cui_plot_label *labels, size_t count) {
+    if (!id || !isfinite(extent.width) || !isfinite(extent.height) || extent.width <= 0 ||
+        extent.height <= 0 || extent.width > 16384 || extent.height > 16384)
+        return CUI_PLOT_INVALID;
+    cui_rect geometry[256];
+    size_t required;
+    cui_plot_result result = cui_plot_labels_layout(ui, labels, count, geometry, 256, &required);
+    if (result != CUI_PLOT_OK)
+        return result;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = extent.width,
+                            .height = extent.height,
+                            .fixed_width = true,
+                            .fixed_height = true});
+    for (size_t i = 0; i < count; ++i) {
+        cui_begin_absolute_box(ui, id ^ UINT64_C(0x52773d2976650000) ^ (i + 1), (cui_box){0},
+                               geometry[i]);
+        cui_text_line(ui, labels[i].text, labels[i].font_size ? labels[i].font_size : 10,
+                      labels[i].color, geometry[i].h, (cui_text_style){0});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return CUI_PLOT_OK;
+}
+/* Decode scalar boundaries rather than slicing continuation bytes. */
+static bool plot_utf8_cuts(cui_str text, size_t *cuts, size_t *count) {
+    *count = 0;
+    for (size_t i = 0; i < text.length;) {
+        unsigned char c = (unsigned char)text.data[i];
+        size_t n;
+        uint32_t value;
+        if (c < 0x80) {
+            n = 1;
+            value = c;
+        } else if (c >= 0xc2 && c <= 0xdf) {
+            n = 2;
+            value = c & 31;
+        } else if (c >= 0xe0 && c <= 0xef) {
+            n = 3;
+            value = c & 15;
+        } else if (c >= 0xf0 && c <= 0xf4) {
+            n = 4;
+            value = c & 7;
+        } else
+            return false;
+        if (n > text.length - i)
+            return false;
+        for (size_t j = 1; j < n; ++j) {
+            unsigned char d = (unsigned char)text.data[i + j];
+            if ((d & 0xc0) != 0x80)
+                return false;
+            value = (value << 6) | (d & 63);
+        }
+        if ((n == 3 && value < 0x800) || (n == 4 && value < 0x10000) ||
+            (value >= 0xd800 && value <= 0xdfff) || value > 0x10ffff)
+            return false;
+        i += n;
+        if (i < text.length)
+            cuts[(*count)++] = i;
+    }
+    return true;
+}
+cui_plot_result cui_plot_truncate_text(cui_context *ui, cui_str text, float size, float budget,
+                                       char *out, size_t capacity, size_t *required) {
+    if (!ui || !required || (!out && capacity) || (!text.data && text.length) ||
+        text.length > 4096 || !isfinite(size) || size < 0 || size > 1024 || !isfinite(budget))
+        return CUI_PLOT_INVALID;
+    size_t cuts[4096], count;
+    if (!plot_utf8_cuts(text, cuts, &count))
+        return CUI_PLOT_INVALID;
+    if (!size)
+        size = 10;
+    char buffer[4100];
+    size_t length = text.length;
+    cui_size measured;
+    if (budget > 0) {
+        if (!plot_label_measure(ui, text, size, &measured))
+            return CUI_PLOT_INVALID;
+        if (measured.width > budget) {
+            size_t lo = 0, hi = count, best = 0;
+            while (lo < hi) {
+                size_t mid = lo + (hi - lo) / 2, prefix = cuts[mid];
+                memcpy(buffer, text.data, prefix);
+                memcpy(buffer + prefix, "\xe2\x80\xa6", 3);
+                if (!plot_label_measure(ui, (cui_str){buffer, prefix + 3}, size, &measured))
+                    return CUI_PLOT_INVALID;
+                if (measured.width <= budget) {
+                    best = prefix;
+                    lo = mid + 1;
+                } else
+                    hi = mid;
+            }
+            if (best)
+                memcpy(buffer, text.data, best);
+            memcpy(buffer + best, "\xe2\x80\xa6", 3);
+            length = best + 3;
+        } else if (length)
+            memcpy(buffer, text.data, length);
+    } else if (length)
+        memcpy(buffer, text.data, length);
+    buffer[length] = 0;
+    *required = length + 1;
+    if (capacity < length + 1)
+        return CUI_PLOT_CAPACITY;
+    memcpy(out, buffer, length + 1);
     return CUI_PLOT_OK;
 }
 

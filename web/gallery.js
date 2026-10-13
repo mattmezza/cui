@@ -519,7 +519,7 @@ function selectComponent(){
  for(const id of ['text-view-format','text-view-scroll-control','text-view-fade-control','motion-duration','motion-stagger','motion-easing'])$(id).hidden=selected.name!=='TextView';
  $('motion-duration').value='0.35';$('motion-stagger').value='0';$('motion-easing').value='0';$('text-view-format').value='0';$('text-view-scroll').checked=false;$('text-view-fade').checked=false;
  for(const id of ['command-modal-control','command-loading-control','command-filterable-control'])$(id).hidden=selected.name!=='Command';
- $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea','Input','NumberInput'].includes(selected.name);
+ $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Badge','Progress','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea','Input','NumberInput'].includes(selected.name);
  $('control-size').value='0';
  $('control-size').disabled=false;
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';

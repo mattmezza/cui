@@ -1,0 +1,12 @@
+Published commit: 55e904a98296f1b3df502af2bae7508700c67fe7
+Library CI 38347004234: success.
+Pages CI/deployment 38347004239: success.
+Actual HTTPS https://matteo.merola.co/cui/:
+194/194 selected files byte-match the downloaded Pages artifact, including all
+160 shareable route HTML files, gallery.wasm/JS/CSS, catalogs, docs, agent files,
+LICENSE.txt, original media, native captures and newly published component guides.
+Full Chromium test_browser.py against actual HTTPS: pass, all78 actual C/WASM
+stories and78 displayed C excerpts compiled from this published revision.
+Actual HTTPS test_site_extensions.py: pass, usage78/design/background pixel
+checks, typography/motion and composed-app interactions, including mobile.
+No full-family parity claim:4implemented/74tested/0verified at this revision.

@@ -248,6 +248,7 @@ static unsigned char chart_pixels[1600 * 800 * 4];
 static cui_chart_state chart_state;
 static int chart_kind, chart_curve, chart_dots, chart_labels, chart_animate;
 static bool chart_custom_rows;
+static int chart_tooltip_appearance;
 static unsigned chart_tooltip_calls;
 static cui_plot_result chart_result;
 static unsigned chart_revision = 1;
@@ -424,6 +425,14 @@ void gallery_chart_content(int custom_rows) {
         redraw = true;
     }
 }
+void gallery_chart_appearance(int appearance) {
+    if (appearance < 0 || appearance > 2)
+        return;
+    if (chart_tooltip_appearance != appearance) {
+        chart_tooltip_appearance = appearance;
+        redraw = true;
+    }
+}
 static bool gallery_chart_tooltip(const cui_chart_tooltip_info *info,
                                   cui_chart_tooltip_builder *builder, void *user) {
     (void)user;
@@ -454,6 +463,7 @@ float gallery_chart_stats(int field) {
            : field == 3 ? (float)chart_state.revision
            : field == 5 ? (float)chart_tooltip_calls
            : field == 6 ? (float)chart_custom_rows
+           : field == 7 ? (float)chart_tooltip_appearance
                         : (float)chart_revision;
 }
 typedef struct {
@@ -3094,6 +3104,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             .inner_radius = chart_labels ? 42 : 0};
         options = cui_chart_theme(options, &t);
         options.tooltip_build = chart_custom_rows ? gallery_chart_tooltip : NULL;
+        cui_chart_tooltip_style tooltip_style;
+        if (chart_tooltip_appearance) {
+            float line_height = roundf(.75f * t.font_size * 1.618034f);
+            if (!cui_chart_tooltip_style_project(&t, t.font_size, line_height, &tooltip_style)) {
+                chart_result = CUI_PLOT_INVALID;
+                break;
+            }
+            tooltip_style.appearance =
+                chart_tooltip_appearance == 2 ? CUI_CHART_TOOLTIP_BARE : CUI_CHART_TOOLTIP_BOXED;
+            options.tooltip_style = &tooltip_style;
+        }
         chart_result = cui_chart_render_animated(ui, &chart_state, &options);
         if (chart_result == CUI_PLOT_OK)
             (void)cui_chart(ui, cui_id_from(ui, "chart-preview"), &chart_state, &options,

@@ -34,3 +34,5 @@ Source popovers have an outside translucent foreground ring and two Gaussian sha
 Worker validation: strict warning build and scoped native test passed; GCC ASAN/UBSAN/leaks with runtime use-after-return detection passed; real Chromium 1208 WASM probe passed. Full CTest on isolated f8b7f43 completed 125/126, only stale generated distribution failed. Integrator registers the new native/browser tests and regenerates distributions; worker changes no global registrations.
 
 A focused correction replaces the former outline/border approximation: the pre-fix native regression against093e927 fails because the source requires filled-under-surface shadow geometry with unchanged radii. Full baseline CTest still reports125/126, only stale distribution. Gaussian layers are separate remaining work.
+
+In the website Chart preview, choose Classic tooltip, Popover tooltip or Bare tooltip. Combine the choice with Custom tooltip rows to compare automatic and callback content. The gallery resolves rem from the current theme font size and supplies the inherited compact line height; other applications can supply their own resolved metrics.

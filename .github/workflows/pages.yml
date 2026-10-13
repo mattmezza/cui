@@ -94,6 +94,8 @@ jobs:
         run: |
           uv run tests/web/test_chart_typed_tooltip.py
           uv run tests/web/test_chart_tooltip_gallery.py
+          uv run tests/web/test_chart_tooltip_appearance.py
+          uv run tests/web/test_chart_appearance_gallery.py
       - name: Verify Radar custom-label tooltip titles with actual WASM pixels
         run: uv run tests/web/test_chart_radar_tooltip_title.py
       - name: Verify source point-axis geometry with actual WASM pixels

@@ -146,7 +146,7 @@ typedef struct {
     cui_color background, foreground, muted_foreground, ring_color;
 } cui_chart_tooltip_style;
 /* Checked atomic source projection: rem-relative metrics, Theme popover roles,
- * radius/half-radius; caller supplies resolved inherited line height. No shadow. */
+ * radius/half-radius; caller supplies resolved inherited line height. No Gaussian shadows. */
 bool cui_chart_tooltip_style_project(const cui_theme *, float rem_size, float inherited_line_height,
                                      cui_chart_tooltip_style *out);
 /* Transient copying builder: at most 32 rows, 4096 aggregate bytes, and

@@ -1592,7 +1592,8 @@
         "docs/CHART_TYPED_TOOLTIP.md",
         "docs/CHART_SOURCE_POINT_AXIS.md",
         "docs/CHART_RADAR_TOOLTIP_TITLE.md",
-        "docs/PLOT_CHART_CURRENT_FRAME.md"
+        "docs/PLOT_CHART_CURRENT_FRAME.md",
+        "docs/CHART_TOOLTIP_APPEARANCE.md"
       ],
       "callback_symbols": [
         "cui_chart_tooltip_fn",

@@ -2,7 +2,7 @@
 
 The Dock view composes the portable Dock model, Tabs, Buttons and Resizable into a themed workspace. Each leaf shows an overflow-scrolling tab strip and calls only its active panel's content renderer. Nested horizontal and vertical splits use pointer and keyboard resize handles; changed ratios are written back to the model and therefore included in its serialization.
 
-This implementation was checked against the frozen GPUI Kit 0.7.1 reference, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, including `crates/component/src/dock/dock.rs`, `tab_panel.rs` and `website/component/dock.md`. It implements a specific subset, not full Dock family parity. Edge docks, floating windows and panel menus are not implemented. Programmatic `cui_dock_move` and `cui_dock_split` remain available. No platform or Clay types appear in the public API.
+This implementation was checked against the frozen GPUI Kit 0.7.1 reference, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, including `crates/component/src/dock/dock.rs`, `tab_panel.rs` and `website/component/dock.md`. It implements a specific subset, not full Dock family parity. Floating windows and panel menus are not implemented. Edge regions have explicit limits described below. Programmatic `cui_dock_move` and `cui_dock_split` remain available. No platform or Clay types appear in the public API.
 
 ## Minimal composition
 
@@ -67,9 +67,45 @@ An optional `cui_dock_panel.toolbar` callback submits ordinary controls in a cli
 
 Node generations can change during model restore while the maximized key survives. Removing the maximized panel automatically restores the workspace and requests a surviving tab's focus on the next frame. View reset clears zoom. Toolbar callbacks and all policy/event callbacks must respect the rendering ownership contract.
 
+## Independently resizable edge regions
+
+`cui_dock_workspace` wraps four independent model/view/registry descriptors ordered `CENTER`, `LEFT`, `RIGHT`, `BOTTOM`. Left/right run the full workspace height; bottom sits below the center between the side regions. Each open region can itself contain nested splits and tabs. Stable `cui_dock_region_id` values namespace controls, and `cui_dock_edge_resize_id` exposes keyboard-focusable resize handles.
+
+```c
+cui_dock_workspace *area = cui_dock_workspace_create();
+/* Create and check distinct models/views for every region you will open. */
+cui_dock_region_content regions[4] = {
+    {.model = center_model, .view = center_view,
+     .panels = center_registry, .panel_count = center_count},
+    {.model = left_model, .view = left_view,
+     .panels = left_registry, .panel_count = left_count},
+    {.model = right_model, .view = right_view,
+     .panels = right_registry, .panel_count = right_count},
+    {.model = bottom_model, .view = bottom_view,
+     .panels = bottom_registry, .panel_count = bottom_count}
+};
+cui_dock_workspace_set_edge(area, CUI_DOCK_LEFT, true, 200);
+cui_dock_workspace_set_edge(area, CUI_DOCK_BOTTOM, true, 160);
+/* Within a frame; an unopened descriptor may be empty. */
+cui_dock_workspace_options area_options = {
+    .view = cui_dock_view_options_default()
+};
+area_options.view.width = available_width;
+area_options.view.height = available_height;
+cui_dock_workspace_result area_result = cui_dock_workspace_render(
+    ui, 100, &theme, area, regions, area_options);
+/* Destroy area and separately destroy all owned models/views when done. */
+```
+
+Use `cui_dock_workspace_set_edge` between frames to open/close a region and assign its preferred size; a closed region runs no panel callbacks. Actual sizes respect aggregate model minima and optional region minima, defaulting to 64 logical pixels for center and 48 for edges. Infeasible minima are proportionally compressed inside the viewport and reported by `fit_minimum == false`. Preferred sizes survive closing and temporary viewport compression. Real handle adjustments update them and invoke `on_resize` with the edge and new logical-pixel size. Disabled/motion settings propagate to all handles and views. The wrapper performs descriptor/capacity validation before submitting its root. Region models/views must be distinct while open.
+
+`cui_dock_workspace_save` and `restore` copy a portable field-based snapshot containing three open flags and preferred sizes. Restore validates every positive finite size before changing state. Encode these fields in the host's persistence format alongside each region model's ordinary serialization; the snapshot is not a specified binary file format. Model callbacks, panel registries and transient focus/drag state are not serialized. Mutate neither workspace state nor region models from render/policy/resize callbacks.
+
+Zoom is local to the selected region's view; other edge regions remain present. Drag/drop is local to a region model, including its nested groups. Cross-region transfer between independently owned models and drag-to-open closed edges are not implemented; trusted host code can transfer ownership between frames. The wrapper supplies layout and callbacks, not built-in toggle menus or native floating windows.
+
 ## Validation
 
-The headless styled test exercises active-only callbacks, stable keys including zero/`UINT64_MAX`, disabled controls, keyboard focus/navigation, close shortcuts, collapse, same-group pointer reorder, nested pointer/keyboard resize, infeasible minima, restore/reset and capacity rejection. The model unit test checks split geometry against leaf layout and transactional validation failures. Cross-group and all four edge drops are tested with queued pointer events, including cancellation, outside drops, disabled/reorder-off and full-capacity rejection. Draw-command tests verify accepted/rejected custom preview palettes, preview suppression, motion settings and cancellation cleanup. Host veto tests cover close buttons/shortcuts, reorder, move and split. No native window or browser-specific behavior was tested for this adapter.
+The headless styled test exercises active-only callbacks, stable keys including zero/`UINT64_MAX`, disabled controls, keyboard focus/navigation, close shortcuts, collapse, same-group pointer reorder, nested pointer/keyboard resize, infeasible minima, restore/reset and capacity rejection. The model unit test checks split geometry against leaf layout and transactional validation failures. Cross-group and all four edge drops are tested with queued pointer events, including cancellation, outside drops, disabled/reorder-off and full-capacity rejection. Draw-command tests verify accepted/rejected custom preview palettes, preview suppression, motion settings and cancellation cleanup. Host veto tests cover close buttons/shortcuts, reorder, move and split. Toolbar/zoom tests cover active callbacks, controls, focus, persistence and removal recovery. Edge-region tests cover independent geometry, real pointer/keyboard resize, callbacks, hide/reopen, model minima, disabled controls, constrained viewport preference retention and rejected snapshot restoration. No native window or browser-specific behavior was tested for this adapter.
 
 Until the integrator wires the new component source and test into CMake, reproduce from the repository root:
 
@@ -89,4 +125,4 @@ After integration, applications link the usual CUI library containing the styled
 
 The frozen panel presentation trait exposes `toolbar_buttons` and `zoom_control` separately from base capabilities such as closable/zoomable. The active-panel toolbar callback and retained zoom support now cover that composition, with tests for focus, persistence, model edits/removal and toolbar ownership. Panel menus and customizable zoom-control placement remain future presentation work.
 
-The reference's edge docks are independently openable/resizable left, right and bottom regions around the center Dock area. They need explicit retained region models, visibility/size state and bounded minimum-size allocation, rather than interpreting the current center split tree as edge-dock parity. This can follow toolbar/zoom with tests for all regions, toggles, constrained layouts and persistence. Native floating windows require a host window-management contract and are not implied by portable layout/render support.
+The reference's edge docks are independently openable/resizable left, right and bottom regions around the center Dock area. The workspace wrapper now implements those retained regions, minimum allocation, pointer/keyboard resizing, toggles and field-based persistence. Remaining parity work includes cross-region panel transfer, drag-to-open closed edges, panel menus and configurable toolbar/zoom placement. Native floating windows require a host window-management contract and are not implied by portable layout/render support.

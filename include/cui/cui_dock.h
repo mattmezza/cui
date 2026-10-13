@@ -87,9 +87,9 @@ typedef struct {
     bool closable, disabled;
     void (*render)(cui_context *, uint64_t panel, void *user);
     void *user;
+    cui_id focus_target; /* Optional content control; used when focus_content is enabled. */
     bool zoomable;
     void (*toolbar)(cui_context *, uint64_t panel, void *user);
-    cui_id focus_target; /* Optional content control; used when focus_content is enabled. */
 } cui_dock_panel;
 typedef enum {
     CUI_DOCK_SELECTED,
@@ -102,7 +102,7 @@ typedef enum {
     CUI_DOCK_RESTORED
 } cui_dock_event;
 typedef struct {
-    cui_dock_event operation; /* CLOSED, MOVED, SPLIT or REORDERED */
+    cui_dock_event operation; /* CLOSED, MOVED, SPLIT, REORDERED or ZOOMED */
     uint64_t panel;
     cui_dock_node source, destination;
     size_t index;
@@ -128,9 +128,10 @@ typedef struct {
 typedef struct {
     cui_dock_result error;
     bool selected, closed, reordered, resized, fit_minimum;
-    bool moved, split, denied, zoomed, restored;
+    bool moved, split, denied;
     uint64_t moved_panel;
     uint64_t selected_panel, closed_panel, reordered_panel;
+    bool zoomed, restored;
 } cui_dock_view_result;
 /* Bounded retained interaction storage, no per-frame allocation. Defaults 128/256. */
 cui_dock_view *cui_dock_view_create(size_t node_capacity, size_t panel_capacity);
@@ -154,6 +155,43 @@ cui_id cui_dock_resize_id(cui_id view, const cui_dock *, cui_dock_node split);
 cui_dock_view_result cui_dock_view_render(cui_context *, cui_id view_id, const cui_theme *,
                                           cui_dock *, cui_dock_view *, const cui_dock_panel *,
                                           size_t panel_count, cui_dock_view_options);
+/* Independently retained edge docks around an ordinary center model/view. */
+typedef enum { CUI_DOCK_CENTER, CUI_DOCK_LEFT, CUI_DOCK_RIGHT, CUI_DOCK_BOTTOM } cui_dock_region;
+typedef struct cui_dock_workspace cui_dock_workspace;
+typedef struct {
+    cui_dock *model;
+    cui_dock_view *view;
+    const cui_dock_panel *panels;
+    size_t panel_count;
+    cui_size minimum; /* Zero dimensions default to 64 center / 48 edge. */
+} cui_dock_region_content;
+typedef struct {
+    bool open[3];  /* left, right, bottom */
+    float size[3]; /* preferred logical pixels, retained when closed/constrained */
+} cui_dock_workspace_snapshot;
+typedef struct {
+    cui_dock_view_options view;
+    void (*on_resize)(void *, cui_dock_region, float size);
+    void *resize_user;
+} cui_dock_workspace_options;
+typedef struct {
+    cui_dock_result error;
+    bool fit_minimum, resized;
+    cui_dock_view_result regions[4];
+} cui_dock_workspace_result;
+cui_dock_workspace *cui_dock_workspace_create(void);
+void cui_dock_workspace_destroy(cui_dock_workspace *);
+bool cui_dock_workspace_set_edge(cui_dock_workspace *, cui_dock_region, bool open, float size);
+bool cui_dock_workspace_save(const cui_dock_workspace *, cui_dock_workspace_snapshot *);
+bool cui_dock_workspace_restore(cui_dock_workspace *, const cui_dock_workspace_snapshot *);
+cui_id cui_dock_region_id(cui_id workspace, cui_dock_region);
+cui_id cui_dock_edge_resize_id(cui_id workspace, cui_dock_region);
+/* regions are CENTER, LEFT, RIGHT, BOTTOM; open regions require distinct models/views.
+ * Model persistence remains separate from the portable edge-size/open snapshot. */
+cui_dock_workspace_result cui_dock_workspace_render(cui_context *, cui_id, const cui_theme *,
+                                                    cui_dock_workspace *,
+                                                    const cui_dock_region_content regions[4],
+                                                    cui_dock_workspace_options);
 #ifdef __cplusplus
 }
 #endif

@@ -100,6 +100,8 @@ if (x < 2) puts("<script>");
             self.assertIn('getting-started', {p['slug'] for p in pages})
             self.assertTrue({'start-here', 'ai-agents', 'immediate-and-state'} <= {p['slug'] for p in pages})
             self.assertEqual(len(pages), len({p['slug'] for p in pages}))
+            readiness = next(p for p in pages if p['slug'] == 'v1_readiness')
+            self.assertEqual(readiness['category'], 'Guides')
             self.assertTrue(all(p['title'] and p['html'] for p in pages))
             index = (Path(directory) / 'llms.txt').read_text()
             full = (Path(directory) / 'llms-full.txt').read_text()

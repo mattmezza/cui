@@ -256,6 +256,19 @@ bool cui_progress_circle(cui_context *, cui_id, const cui_theme *, float fractio
                          cui_button_content_fn, void *user);
 void cui_progress(cui_context *, cui_id, const cui_theme *, float fraction, float width);
 void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
+typedef struct {
+    float length; /* Zero defaults to160; explicit positive pixels, at most4096. */
+    bool vertical, dashed, has_label, custom_color;
+    cui_str label;
+    cui_color color;
+} cui_separator_options;
+cui_separator_options cui_separator_defaults(void);
+/* One-pixel line; dashed uses4px on/2px off. Label, including an explicitly
+ * empty label, overlays the line with theme background and8px/4px padding.
+ * Text is borrowed through renderer completion. Invalid options submit nothing.
+ * Length is explicit; caller resolves parent fill extent. No keyboard behavior. */
+bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_options);
+
 #ifdef __cplusplus
 }
 #endif
@@ -1376,6 +1389,48 @@ void cui_separator(cui_context *ui, cui_id id, const cui_theme *t, float width) 
     cui_begin_box(
         ui, id, (cui_box){.width = width != 0 ? width : 160, .height = 1, .background = t->border});
     cui_end_box(ui);
+}
+
+cui_separator_options cui_separator_defaults(void) {
+    return (cui_separator_options){.length = 160};
+}
+bool cui_separator_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_separator_options o) {
+    if (!ui || !id || !t || !isfinite(o.length) || o.length < 0 || o.length > 4096 ||
+        (o.label.length && !o.label.data) || !isfinite(t->font_size) || t->font_size <= 0 ||
+        t->font_size > 4096)
+        return false;
+    float length = o.length ? o.length : 160;
+    float font = t->font_size * .75f, line_height = t->font_size;
+    float label_width = o.has_label ? cui_measure_text(ui, o.label, font).width + 16 : 0;
+    float label_height = o.has_label ? line_height + 8 : 0;
+    if (!isfinite(label_width) || !isfinite(label_height))
+        return false;
+    float width = o.vertical ? fmaxf(1, label_width) : length;
+    float height = o.vertical ? length : fmaxf(1, label_height);
+    cui_color color = o.custom_color ? o.color : t->border;
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = width, .height = height, .fixed_width = true, .fixed_height = true});
+    float increment = o.dashed ? 6 : length;
+    for (float offset = 0; offset < length; offset += increment) {
+        float segment = o.dashed ? fminf(4, length - offset) : length;
+        cui_rect rect = o.vertical ? (cui_rect){(width - 1) / 2, offset, 1, segment}
+                                   : (cui_rect){offset, (height - 1) / 2, segment, 1};
+        cui_begin_absolute_box(ui, 0, (cui_box){.background = color}, rect);
+        cui_end_box(ui);
+    }
+    if (o.has_label) {
+        cui_begin_absolute_box(ui, 0, (cui_box){.background = t->background},
+                               (cui_rect){(width - label_width) / 2, (height - label_height) / 2,
+                                          label_width, label_height});
+        cui_begin_absolute_box(ui, 0, (cui_box){0},
+                               (cui_rect){8, 4, label_width - 16, line_height});
+        cui_text_line(ui, o.label, font, t->muted, line_height, (cui_text_style){0});
+        cui_end_box(ui);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return true;
 }
 
 bool cui_input_measure(cui_input_options options, float root_font_size,

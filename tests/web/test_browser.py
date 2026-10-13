@@ -603,6 +603,28 @@ def main():
             dock_regions = page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
                 .filter(i=>e.gallery_semantic(i,0)===41).map(i=>[1,2,3,4].map(f=>e.gallery_semantic(i,f)));}''')
             assert len(dock_regions) == 2 and dock_regions[0][0]+dock_regions[0][2] <= dock_regions[1][0]+0.01, dock_regions
+            click_semantic('Split panel', 1)
+            wait_semantic('Panel 4', 8)
+            wait_semantic('Workspace panel 4', 41)
+            page.wait_for_function('cuiGallery.exports.gallery_dock_stat(7)===3&&cuiGallery.exports.gallery_dock_stat(8)===1')
+            dock_geometry = '''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
+                .filter(i=>e.gallery_semantic(i,0)===41).map(i=>[1,2,3,4].map(f=>e.gallery_semantic(i,f)));}'''
+            before = page.evaluate(dock_geometry)
+            assert len(before) == 3 and all(before[i][0]+before[i][2] <= before[i+1][0]+.01 for i in range(2)), before
+            handles = page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
+                .filter(i=>e.gallery_semantic(i,0)===40&&e.gallery_semantic(i,4)>e.gallery_semantic(i,3)).map(i=>[1,2,3,4].map(f=>e.gallery_semantic(i,f))).sort((a,b)=>a[0]-b[0]);}''')
+            assert len(handles) == 2, handles
+            canvas.scroll_into_view_if_needed()
+            dock_canvas = canvas.bounding_box()
+            handle = handles[1]
+            drag_x, drag_y = dock_canvas['x']+handle[0]+handle[2]/2, dock_canvas['y']+handle[1]+handle[3]/2
+            page.mouse.move(drag_x, drag_y)
+            page.mouse.down()
+            page.mouse.move(drag_x+24, drag_y, steps=6)
+            page.mouse.up()
+            page.wait_for_function('(before)=>(%s)()[1][2]>before[1][2]+10' % dock_geometry, arg=before)
+            after = page.evaluate(dock_geometry)
+            assert abs(after[0][2]-before[0][2]) < 2 and after[2][2] < before[2][2]-10, (before,after)
             page.screenshot(path='/tmp/cui-web-dock.png')
             click_semantic('Maximize panel', 1)
             page.wait_for_function('cuiGallery.exports.gallery_dock_stat(6)===1')

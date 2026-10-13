@@ -1099,7 +1099,12 @@ double gallery_dock_stat(int field) {
         return snapshot.open[field];
     if (field >= 3 && field < 6)
         return snapshot.size[field - 3];
-    return field == 6 ? cui_dock_view_zoomed(dock_view, NULL) : -1;
+    if (field == 6)
+        return cui_dock_view_zoomed(dock_view, NULL);
+    cui_dock_node_info root;
+    if ((field == 7 || field == 8) && cui_dock_node_get(dock, cui_dock_root(dock), &root))
+        return field == 7 ? (double)root.child_count : root.nary;
+    return -1;
 }
 static bool dock_disabled;
 static unsigned dock_refreshes[12];
@@ -1145,7 +1150,8 @@ static float rating = 3;
 static cui_id dock_serial = 3;
 static uint64_t dock_active_panel = 1;
 static void gallery_dock_reset(void) {
-    cui_dock *fresh = cui_dock_create((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
+    cui_dock *fresh =
+        cui_dock_create_nary((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
     if (!fresh)
         return;
     if (cui_dock_insert(fresh, cui_dock_root(fresh), 1, 0) != CUI_DOCK_OK ||
@@ -1156,7 +1162,7 @@ static void gallery_dock_reset(void) {
     cui_dock *fresh_edges[3] = {0};
     for (int i = 0; i < 3; i++) {
         fresh_edges[i] =
-            cui_dock_create((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
+            cui_dock_create_nary((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
         if (!fresh_edges[i] || cui_dock_insert(fresh_edges[i], cui_dock_root(fresh_edges[i]),
                                                (uint64_t)i + 10, 0) != CUI_DOCK_OK) {
             for (int j = 0; j < 3; j++)
@@ -1187,8 +1193,15 @@ static uint64_t gallery_dock_first_active(cui_dock_node node) {
         return 0;
     if (info.kind == CUI_DOCK_TABS)
         return info.has_active ? info.active_panel : 0;
-    uint64_t first = gallery_dock_first_active(info.first);
-    return first ? first : gallery_dock_first_active(info.second);
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        if (cui_dock_child_at(dock, node, i, &child, NULL)) {
+            uint64_t active = gallery_dock_first_active(child);
+            if (active)
+                return active;
+        }
+    }
+    return 0;
 }
 static void gallery_dock_event(void *user, cui_dock_event event, uint64_t key, cui_dock_node node) {
     (void)user;
@@ -1871,7 +1884,7 @@ int gallery_init(void) {
     }
     free(keys);
     dock_view = cui_dock_view_create(15, 16);
-    dock = cui_dock_create((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
+    dock = cui_dock_create_nary((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
     if (dock) {
         cui_dock_insert(dock, cui_dock_root(dock), 1, 0);
         cui_dock_insert(dock, cui_dock_root(dock), 2, 1);
@@ -1881,7 +1894,7 @@ int gallery_init(void) {
         return 0;
     for (int i = 0; i < 3; i++) {
         dock_edges[i] =
-            cui_dock_create((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
+            cui_dock_create_nary((cui_dock_config){.node_capacity = 15, .panel_capacity = 16});
         dock_edge_views[i] = cui_dock_view_create(15, 16);
         if (!dock_edges[i] || !dock_edge_views[i] ||
             cui_dock_insert(dock_edges[i], cui_dock_root(dock_edges[i]), (uint64_t)i + 10, 0) !=

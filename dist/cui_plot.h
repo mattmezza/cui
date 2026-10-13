@@ -422,6 +422,57 @@ cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *, cui_plot_re
 cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *, cui_plot_rect bounds,
                                         cui_plot_point live_global_position, bool appearing,
                                         cui_plot_point *relative, bool *resolved);
+/* Projected scalar transition clock used by Plot enter/exit policies. Seconds
+ * are caller-supplied monotonic timestamps; backward time saturates elapsed to
+ * zero. Zero-initialize each independently keyed channel. First target is
+ * adopted immediately. NULL easing uses source cubic-out; callback is synchronous
+ * and must return a finite sample. Invalid inputs preserve state and output. */
+typedef double (*cui_plot_easing_fn)(double progress, void *user);
+typedef struct {
+    double duration, delay;
+    cui_plot_easing_fn easing;
+    void *user;
+} cui_plot_transition_policy;
+typedef struct {
+    double from, target, started_at, reversing_factor, duration;
+    bool initialized;
+} cui_plot_transition_clock;
+typedef enum {
+    CUI_PLOT_MOTION_IDLE,
+    CUI_PLOT_MOTION_DELAYED,
+    CUI_PLOT_MOTION_RUNNING,
+    CUI_PLOT_MOTION_FINISHED
+} cui_plot_motion_status;
+typedef struct {
+    double value;
+    cui_plot_motion_status status;
+    bool request_frame;
+} cui_plot_motion_value;
+cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *, double target, double now,
+                                         cui_plot_transition_policy, bool reduced_motion,
+                                         cui_plot_motion_value *);
+/* Scalar pointer glide: source PlotHover.glide targets one Pixels channel.
+ * The host owns one zero-initialized state per channel and supplies seconds.
+ * Elapsed time advances toward the PREVIOUS target before retargeting. */
+typedef struct {
+    double response, damping, epsilon;
+    bool travel;
+} cui_plot_spring_policy;
+typedef struct {
+    double position, velocity, target, updated_at;
+    bool initialized;
+} cui_plot_spring_clock;
+typedef struct {
+    double value, velocity;
+    bool request_frame;
+} cui_plot_spring_value;
+/* Source default damping=1, epsilon=.001, travel=true; response zero snaps. */
+cui_plot_spring_policy cui_plot_spring_defaults(double response);
+/* entering implements PlotHover.is_entering's temporary travel=false policy.
+ * Invalid inputs/state and numeric overflow preserve clock and output. */
+cui_plot_result cui_plot_spring_step(cui_plot_spring_clock *, double target, double now,
+                                     cui_plot_spring_policy, bool reduced_motion, bool entering,
+                                     cui_plot_spring_value *);
 /* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
  * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
  * Zero initialize. Invalid input leaves memory unchanged. */
@@ -449,6 +500,31 @@ typedef struct {
 bool cui_plot_appear_complete(cui_plot_appear_scope *, uint64_t identity, uint64_t generation);
 cui_plot_result cui_plot_appear_record(cui_plot_appear_scope *, uint64_t identity,
                                        uint64_t generation, double linear_progress);
+/* Bounded model of source PlotAppearScope's completed-generation map. Storage
+ * belongs to caller and stays live. Stable plot identities must be unique within
+ * a scope. Frame serials are supplied by the host; repeated same-frame begin is
+ * idempotent, a skipped/backward frame or scope identity change clears entries.
+ * Begin/end explicitly delimit access; nested composition passes the innermost
+ * registry. No retained element tree, implicit frame hooks or motion clock. */
+typedef struct {
+    cui_plot_appear_scope *entries;
+    size_t count, capacity;
+    uint64_t identity, last_frame;
+    bool initialized, active;
+} cui_plot_appear_registry;
+cui_plot_result cui_plot_appear_registry_init(cui_plot_appear_registry *,
+                                              cui_plot_appear_scope *storage, size_t capacity);
+cui_plot_result cui_plot_appear_registry_begin(cui_plot_appear_registry *, uint64_t scope_identity,
+                                               uint64_t frame_serial);
+cui_plot_result cui_plot_appear_registry_end(cui_plot_appear_registry *);
+cui_plot_result cui_plot_appear_registry_complete(const cui_plot_appear_registry *,
+                                                  uint64_t plot_identity, uint64_t generation,
+                                                  bool *complete);
+/* Only progress==1 inserts/replaces a completed generation. Partial appearance
+ * never consumes storage or evicts the last completed generation. CAPACITY and
+ * invalid inputs preserve registry/storage; explicit init discards all memory. */
+cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *, uint64_t plot_identity,
+                                                uint64_t generation, double linear_progress);
 /* Stagger the linear clock before applying the caller's existing easing policy.
  * Spread clamps to [0,.95], index clamps to count-1. count<=1 is unstaggered. */
 cui_plot_result cui_plot_appear_stagger(double linear_progress, size_t index, size_t count,
@@ -2554,6 +2630,231 @@ cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *g) {
             return CUI_PLOT_OVERFLOW;
     if (g->link_count)
         memcpy(g->links, ls, g->link_count * sizeof(*ls));
+    return CUI_PLOT_OK;
+}
+
+static bool plot_appear_registry_valid(const cui_plot_appear_registry *registry) {
+    return registry && registry->capacity <= 4096 && registry->count <= registry->capacity &&
+           (!registry->capacity || registry->entries);
+}
+cui_plot_result cui_plot_appear_registry_init(cui_plot_appear_registry *registry,
+                                              cui_plot_appear_scope *storage, size_t capacity) {
+    if (!registry || capacity > 4096 || (capacity && !storage))
+        return CUI_PLOT_INVALID;
+    *registry = (cui_plot_appear_registry){.entries = storage, .capacity = capacity};
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_begin(cui_plot_appear_registry *registry,
+                                               uint64_t identity, uint64_t frame) {
+    if (!plot_appear_registry_valid(registry))
+        return CUI_PLOT_INVALID;
+    if (!registry->initialized || registry->identity != identity ||
+        (registry->last_frame != frame &&
+         (registry->last_frame == UINT64_MAX || frame != registry->last_frame + 1)))
+        registry->count = 0;
+    registry->identity = identity;
+    registry->last_frame = frame;
+    registry->initialized = true;
+    registry->active = true;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_end(cui_plot_appear_registry *registry) {
+    if (!plot_appear_registry_valid(registry) || !registry->active)
+        return CUI_PLOT_INVALID;
+    registry->active = false;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_complete(const cui_plot_appear_registry *registry,
+                                                  uint64_t identity, uint64_t generation,
+                                                  bool *out) {
+    if (!out || !plot_appear_registry_valid(registry) || !registry->active)
+        return CUI_PLOT_INVALID;
+    bool complete = false;
+    for (size_t i = 0; i < registry->count; ++i)
+        if (registry->entries[i].identity == identity) {
+            complete = registry->entries[i].has_completed &&
+                       registry->entries[i].completed_generation == generation;
+            break;
+        }
+    *out = complete;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *registry,
+                                                uint64_t identity, uint64_t generation,
+                                                double progress) {
+    if (!plot_appear_registry_valid(registry) || !registry->active || !isfinite(progress) ||
+        progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    if (progress < 1)
+        return CUI_PLOT_OK;
+    size_t index = 0;
+    while (index < registry->count && registry->entries[index].identity != identity)
+        ++index;
+    if (index == registry->count && index == registry->capacity)
+        return CUI_PLOT_CAPACITY;
+    registry->entries[index] = (cui_plot_appear_scope){identity, generation, true};
+    if (index == registry->count)
+        ++registry->count;
+    return CUI_PLOT_OK;
+}
+
+static double plot_transition_progress(double elapsed, double duration, double delay,
+                                       cui_plot_motion_status *status) {
+    double active = elapsed - delay;
+    if (active < 0) {
+        *status = CUI_PLOT_MOTION_DELAYED;
+        return 0;
+    }
+    if (duration == 0 || active >= duration) {
+        *status = CUI_PLOT_MOTION_FINISHED;
+        return 1;
+    }
+    *status = CUI_PLOT_MOTION_RUNNING;
+    return active / duration;
+}
+static double plot_transition_sample(cui_plot_transition_policy policy, double progress) {
+    if (policy.easing)
+        return policy.easing(progress, policy.user);
+    double remaining = 1 - progress;
+    return 1 - remaining * remaining * remaining;
+}
+cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *clock, double target,
+                                         double now, cui_plot_transition_policy policy,
+                                         bool reduced_motion, cui_plot_motion_value *out) {
+    if (!clock || !out || !isfinite(target) || !isfinite(now) || now < 0 ||
+        !isfinite(policy.duration) || policy.duration < 0 || !isfinite(policy.delay))
+        return CUI_PLOT_INVALID;
+    cui_plot_transition_clock next = *clock;
+    if (!next.initialized)
+        next = (cui_plot_transition_clock){target, target, now, 1, policy.duration, true};
+    if (!isfinite(next.from) || !isfinite(next.target) || !isfinite(next.started_at) ||
+        next.started_at < 0 || !isfinite(next.reversing_factor) || next.reversing_factor < 0 ||
+        next.reversing_factor > 1 || !isfinite(next.duration) || next.duration < 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_motion_value value = {target, CUI_PLOT_MOTION_FINISHED, false};
+    if (reduced_motion || policy.duration == 0) {
+        if (next.from != target || next.target != target)
+            next = (cui_plot_transition_clock){target, target, now, 1, policy.duration, true};
+    } else {
+        double elapsed = now > next.started_at ? now - next.started_at : 0;
+        double progress =
+            plot_transition_progress(elapsed, next.duration, policy.delay, &value.status);
+        double eased = plot_transition_sample(policy, progress);
+        if (!isfinite(eased))
+            return CUI_PLOT_INVALID;
+        /* Weighted interpolation avoids overflowing target-from. */
+        double sampled = (1 - eased) * next.from + eased * next.target;
+        if (next.target != target) {
+            double factor =
+                target == next.from ? eased * next.reversing_factor + 1 - next.reversing_factor : 1;
+            factor = fmax(0, fmin(1, factor));
+            next = (cui_plot_transition_clock){
+                sampled, target, now, factor, policy.duration * factor, true};
+            progress = plot_transition_progress(0, next.duration, policy.delay, &value.status);
+            eased = plot_transition_sample(policy, progress);
+            if (!isfinite(eased))
+                return CUI_PLOT_INVALID;
+            value.value = (1 - eased) * sampled + eased * target;
+        } else {
+            value.value = sampled;
+            if (next.from == next.target)
+                value.status = CUI_PLOT_MOTION_IDLE;
+        }
+        if (!isfinite(value.value) || !isfinite(next.from))
+            return CUI_PLOT_OVERFLOW;
+        value.request_frame =
+            value.status == CUI_PLOT_MOTION_DELAYED || value.status == CUI_PLOT_MOTION_RUNNING;
+    }
+    *clock = next;
+    *out = value;
+    return CUI_PLOT_OK;
+}
+
+cui_plot_spring_policy cui_plot_spring_defaults(double response) {
+    return (cui_plot_spring_policy){response, 1, .001, true};
+}
+/* Analytic damped oscillator, adapted from CUI tab spring math. This clock's
+ * ordering differs: advance the old target, then adopt the incoming target. */
+static bool plot_spring_advance(cui_plot_spring_clock *state, double elapsed,
+                                cui_plot_spring_policy policy) {
+    if (elapsed == 0)
+        return true;
+    double omega = 6.28318530717958647692 / policy.response;
+    double displacement = state->position - state->target, speed = state->velocity;
+    if (displacement == 0 && speed == 0)
+        return true;
+    double damping = policy.damping, next, next_speed;
+    if (!isfinite(omega) || !isfinite(displacement))
+        return false;
+    if (damping == 1) {
+        double sum = speed + omega * displacement;
+        double decay = exp(-omega * elapsed);
+        if (decay == 0) {
+            next = next_speed = 0;
+        } else {
+            next = (displacement + sum * elapsed) * decay;
+            next_speed = (speed - omega * sum * elapsed) * decay;
+        }
+    } else if (damping < 1) {
+        double frequency = omega * sqrt((1 - damping) * (1 + damping));
+        double decay = exp(-damping * omega * elapsed);
+        double angle = frequency * elapsed;
+        if (!isfinite(angle))
+            return false;
+        double sine = sin(angle), cosine = cos(angle);
+        next = decay * (displacement * cosine +
+                        (speed + damping * omega * displacement) / frequency * sine);
+        next_speed =
+            decay * (speed * cosine -
+                     (damping * omega * speed + omega * omega * displacement) / frequency * sine);
+    } else {
+        double factor = damping + sqrt(damping - 1) * sqrt(damping + 1);
+        double slow = -omega / factor, fast = -omega * factor;
+        double first = (speed - fast * displacement) / (slow - fast);
+        double second = displacement - first;
+        next = first * exp(slow * elapsed) + second * exp(fast * elapsed);
+        next_speed = slow * first * exp(slow * elapsed) + fast * second * exp(fast * elapsed);
+    }
+    state->position = state->target + next;
+    state->velocity = next_speed;
+    return isfinite(state->position) && isfinite(state->velocity);
+}
+cui_plot_result cui_plot_spring_step(cui_plot_spring_clock *clock, double target, double now,
+                                     cui_plot_spring_policy policy, bool reduced_motion,
+                                     bool entering, cui_plot_spring_value *out) {
+    if (!clock || !out || !isfinite(target) || !isfinite(now) || now < 0 ||
+        !isfinite(policy.response) || policy.response < 0 || !isfinite(policy.damping) ||
+        policy.damping < 0 || !isfinite(policy.epsilon) || policy.epsilon <= 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_spring_clock next = *clock;
+    if (!next.initialized)
+        next = (cui_plot_spring_clock){target, 0, target, now, true};
+    if (!isfinite(next.position) || !isfinite(next.velocity) || !isfinite(next.target) ||
+        !isfinite(next.updated_at) || next.updated_at < 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_spring_value value = {next.position, next.velocity, false};
+    /* Resting returns without updating even the stale timestamp, as source does. */
+    if (next.position != target || next.velocity != 0) {
+        if (reduced_motion || entering || !policy.travel || policy.response == 0) {
+            next = (cui_plot_spring_clock){target, 0, target, now, true};
+        } else {
+            double elapsed = now > next.updated_at ? now - next.updated_at : 0;
+            if (!plot_spring_advance(&next, elapsed, policy))
+                return CUI_PLOT_OVERFLOW;
+            if (fabs(next.position - target) < policy.epsilon &&
+                fabs(next.velocity) < policy.epsilon)
+                next = (cui_plot_spring_clock){target, 0, target, now, true};
+            else {
+                next.target = target;
+                next.updated_at = now;
+                value.request_frame = true;
+            }
+        }
+        value.value = next.position;
+        value.velocity = next.velocity;
+    }
+    *clock = next;
+    *out = value;
     return CUI_PLOT_OK;
 }
 

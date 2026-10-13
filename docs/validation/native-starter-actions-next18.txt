@@ -1,0 +1,11 @@
+Compiled source9fa5acc6ab082246da2da71dc2f1c6926980e4cf; ad79cbd changes lazy-image browser fixture only.
+Portable source SHA256:d14d433bba0cec8c91688a9286b4334db3cc529d2983677308a58d8ca7b3fa4b.
+Warnings+nativeCTest96/96 PASS, ASAN/UBSAN96/96 PASS (driver-lifetime leak detection disabled), WASI80/80 PASS finite40Bfuel/frozenfingerprint.
+Native starter installed-prefix CMake/CTest1/1, Make-Werror, directcc-Werror+actualstaticpkgconfig flags and real SDL3/Xvfb native window capture PASS.
+Meaningful registered portable starter callbacks/nav/account/settings tests PASS native/WASI. Worker actualxdotool app navigation/sign-in/settingsediting/save/sign-out PASS with actualnative screenshots.
+Make initial absoluteBUILD_DIR test path failed due ./ prefix; corrected path and rerunPASS. Initial docs fixture guessed hyphenslug then awaited offscreenlazyimgs, failurespreserved; friendlyslugmapping and scroll/decode verificationPASS. Product images existed and loaded when visible.
+Full browser78/compiledexcerpts78 PASS; websiteextensions including actualguide links, three screenshots, actualclipboard copied linkerrecipePASS.
+ActualCDPtouch42/42+16/16+page19/19 PASS; nativeChromium composition acrossfourtext+Numeric/OTP/ComboboxPASS.
+Core targetedFocus/Activate prerequisites with meaningfulheadlessguard/capacity/lifecycle/callbacktestsPASS; noOSaccessibilitybridge inthisrelease. NativeHBcluster caret/hit/selection APIs tested, not wired intoeditorsyet, nofullgrapheme/GDEFclaim.
+Docs5/5, format/dist/licensehash/manifest78 PASS. Logs:/home/matteo/.cache/cui-validation/next18-{starter-test,asan-test,wasi,browser,starter-extensions-settled,touch-page,touch-components,touch-more,ime,ime-additional,starter-standalone-test,starter-make-rerun,starter-native}.log.
+Known user feedback beingfixedseparately: Resizable at1920viewport saturatespane maxima, Paginationcounter alignment, remaininglegacyfour-sizecontrols, DatePickerlocales/yeargrid. Nofullfamily acceptance claimed.

@@ -22,7 +22,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Integrated next17 compiled source 2d291fe9741addc322a6e107e15d03bf97e0d650 passes native95/95, ASan/UBSan95/95, WASI79/79, all78 browser stories and compiled excerpts, extensions, native Chromium composition across seven consumers, touch42/42 plus16/16 and page navigation19/19. Explicit native font fallback, Numeric/OTP composition, ListMulti callback ownership and page-swipe fallback are integrated. Published source remains30deb99 until CI/deployment verification. Full family verification remains0/78; physical devices, native accessibility, bidi editing/wrapping and full platform/ecosystem acceptance remain unfinished. See [next17 proof](validation/fallback-ime-touch-next17.txt) and [previous publication](validation/published-30deb99.txt).
+Next18 native app starter, targeted accessibility action prerequisite and native text cluster geometry pass native96/96, sanitizer96/96 and WASI80/80. Installed-prefix CMake/Make/direct compiler builds and native SDL3/Xvfb window pass; website guide links/screenshots/copy recipes and full78 browser stories pass. Next18 is awaiting publication. Published44819c1 passes six CI jobs/Pages and292 exact HTTPS files, public78 browser stories, page-touch19/19 and additionalIME. Full family verification remains0/78; native OS accessibility, international editing/wrapping, physicaldevices, remaining control feedback and full ecosystem acceptance remain active. See [next18 proof](validation/native-starter-actions-next18.txt) and [publication](validation/published-44819c1.txt).
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 

@@ -139,8 +139,8 @@ The screenshot above is from the actual SDL3 window, not a browser mockup.
 
 The starter was checked against an actual local installation of this revision:
 standalone CMake/CTest, Make with warnings treated as errors, the direct compiler
-command, and a Core-only build of `app.c` plus `test_app.c` all passed. Repository
-CTest passed 93/93. An Xvfb SDL3 window exercised Projects navigation, bottom-menu
+command, and a Core-only build of `app.c` plus `test_app.c` all passed. Integrated repository
+CTest passed 96/96, sanitizer checks 96/96 and portable WASI suites 80/80. An Xvfb SDL3 window exercised Projects navigation, bottom-menu
 sign-in/out, Settings navigation, editing the name to Grace, disabling
 notifications and saving; callbacks reported the resulting state. These checks
 cover the starter, not every platform, font or IME.

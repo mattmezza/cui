@@ -134,9 +134,9 @@ static void drag_events(dock_scene *s) {
                 const cui_dock_panel *panel = &s->panels[i];
                 if (!panel->disabled && cui_dock_panel_find(s->dock, panel->key, NULL, NULL) &&
                     dock_contains(cui_bounds(s->ui, cui_dock_tab_id(s->id, panel->key)), event.x,
-                             event.y) &&
+                                  event.y) &&
                     !dock_contains(cui_bounds(s->ui, cui_dock_close_id(s->id, panel->key)), event.x,
-                              event.y)) {
+                                   event.y)) {
                     v->dragging = true;
                     v->crossed = false;
                     v->drag_key = panel->key;

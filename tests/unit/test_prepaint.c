@@ -254,16 +254,23 @@ int main(void) {
     d = cui_end_frame(ui);
     assert(d.count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
     cui_destroy(ui);
-    ui = create(64, 32);
+    /* Fill the arena with one valid copied payload, independent of pointer size. */
+    ui = create(64, sizeof(payload));
     assert(cui_begin_frame(ui, 300, 200, .016f));
     cui_begin_box(ui, 20, (cui_box){.width = 100, .height = 40});
     payload p = {ui, &info, &calls, 0, 1234.5};
+    assert(cui_set_prepaint(
+        ui, (cui_prepaint_options){
+                .callback = paint, .payload = &p, .payload_bytes = sizeof p, .command_budget = 3}));
+    cui_end_box(ui);
+    cui_begin_box(ui, 30, (cui_box){.width = 100, .height = 40});
+    unsigned before_capacity = calls;
     assert(!cui_set_prepaint(
         ui, (cui_prepaint_options){
                 .callback = paint, .payload = &p, .payload_bytes = sizeof p, .command_budget = 3}));
     cui_end_box(ui);
     d = cui_end_frame(ui);
-    assert(d.count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    assert(d.count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY && calls == before_capacity);
     cui_destroy(ui);
     /* Negative deferred layers are invalid: existing owner layers are >=0. */
     ui = create(128, 4096);

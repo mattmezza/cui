@@ -234,6 +234,26 @@ typedef enum {
     CUI_CURSOR_WAIT,
     CUI_CURSOR_HELP
 } cui_cursor;
+typedef enum {
+    CUI_TEXT_INPUT_TEXT = 0,
+    CUI_TEXT_INPUT_PASSWORD_HIDDEN,
+    CUI_TEXT_INPUT_PASSWORD_VISIBLE
+} cui_text_input_type;
+typedef enum {
+    CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED = 0,
+    CUI_TEXT_INPUT_PURPOSE_PASSWORD,
+    CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD
+} cui_text_input_purpose;
+typedef struct {
+    cui_text_input_type type;
+    cui_text_input_purpose purpose;
+} cui_text_input_config;
+typedef struct {
+    cui_id owner;
+    cui_text_input_config config;
+    uint64_t generation;
+    bool explicit_config, multiline;
+} cui_text_input_state;
 typedef struct {
     bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy,
         scrollable;
@@ -270,6 +290,10 @@ typedef struct {
      * including release, without cancelling existing capture or blocking scroll.
      * Hover, cursor and current-prepaint occlusion remain independent. */
     bool blocks_pointer_activation;
+    bool secret, password;
+    /* Internal frame registration; use set_text_input_config instead. */
+    bool text_input_configured;
+    cui_text_input_config text_input_config;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -720,6 +744,14 @@ void *cui_resource_get(cui_context *, cui_id owner, cui_id namespace_id, size_t 
 void *cui_resource_find(cui_context *, cui_id owner, cui_id namespace_id);
 float cui_frame_delta(cui_context *);
 double cui_frame_time(cui_context *);
+/* Frame-only registration against a submitted textbox ID. Getter after end_frame
+ * resolves a live focused editable textbox (ordinary multiline is supported);
+ * explicit secure configuration is single-line only. Absent/readonly/disabled or
+ * changed focus returns false without output writes. Zero config is ordinary.
+ * Generation changes with owner/config/removal; saturation fails closed until
+ * context recreation. No strings/model/platform pointers are retained. */
+bool cui_set_text_input_config(cui_context *, cui_id owner, cui_text_input_config);
+bool cui_get_text_input_config(const cui_context *, cui_text_input_state *);
 /* Host candidate-window rectangle, logical pixels, last painted focused caret. */
 void cui_set_text_input_rect(cui_context *, cui_id, cui_rect);
 /* Resolve a painted caret child's final layout bounds for the IME line box.

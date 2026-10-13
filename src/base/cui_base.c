@@ -244,11 +244,27 @@ static void cui_input_history_focus(cui_context *ui, cui_id id, cui_edit *edit,
     state->focus_initialized = true;
     state->was_focused = focused;
 }
+static void cui_input_secure_lifecycle(cui_edit *edit, cui_input_behavior_state *state,
+                                       cui_base_input_options options) {
+    if (state->secure_initialized &&
+        (state->was_masked != options.masked ||
+         state->previous_content_type != options.content_type) &&
+        state->composition && state->composition->active)
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
+    state->secure_initialized = true;
+    state->was_masked = options.masked;
+    state->previous_content_type = options.content_type;
+}
 static cui_edit_result cui_input_checked(cui_edit *edit, cui_edit_request request,
                                          cui_base_input_options options, bool *rejected) {
     request.normalization = options.normalization;
+    request.presentation = options.presentation;
+    request.masked_words = options.masked;
     cui_edit_checked_result result = cui_edit_apply_checked(
         edit, request, (cui_edit_acceptance){options.validate, options.validate_user});
+    if (result.presentation_prepared && options.presentation_complete)
+        options.presentation_complete(options.presentation_user, true, result.presentation_applied);
     *rejected |= result.rejected;
     return result.error;
 }
@@ -262,6 +278,12 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         result.error = CUI_EDIT_INVALID_ARGUMENT;
         return result;
     }
+    if (options.content_type < CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED ||
+        options.content_type > CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD ||
+        ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
+         (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
+        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_input_secure_lifecycle(edit, state, options);
     cui_input_history_focus(ui, id, edit, state, options.disabled);
     cui_edit_state before = cui_edit_get_state(edit);
     state->composition =
@@ -300,7 +322,8 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
                                          options, &result.rejected);
         /* Host COMMIT ends the native/browser session even if acceptance
          * rejected the document edit. Engine rollback is a separate operation. */
-        if (result.rejected && event.type == CUI_EVENT_COMPOSITION_COMMIT)
+        if ((result.rejected || result.error != CUI_EDIT_OK) &&
+            event.type == CUI_EVENT_COMPOSITION_COMMIT)
             (void)cui_edit_composition_event(
                 edit, state->composition, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
         result.changed = before.revision != cui_edit_get_state(edit).revision;
@@ -350,6 +373,12 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
                 CUI_EDIT_OK &&
             snapped == current.cursor)
             cursor = snapped;
+        if (options.masked && event.type == CUI_EVENT_POINTER_DOWN && event.click_count >= 2) {
+            error = cui_edit_select_atomic(edit, 0, current.length);
+            state->dragging = false;
+            result.error = error;
+            return result;
+        }
         size_t anchor = event.type == CUI_EVENT_POINTER_DOWN && !(event.modifiers & CUI_MOD_SHIFT)
                             ? cursor
                             : current.anchor;
@@ -362,6 +391,10 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         size_t start = current.anchor < current.cursor ? current.anchor : current.cursor;
         size_t end = current.anchor > current.cursor ? current.anchor : current.cursor;
         bool paste = event.key == CUI_KEY_V;
+        if (options.masked && !paste) {
+            cui_consume_event(ui, i);
+            return result;
+        }
         if ((paste && !options.readonly) || (!paste && start != end)) {
             if (!host || !(host->capabilities & CUI_PLATFORM_CLIPBOARD) ||
                 (paste ? !host->clipboard_get : !host->clipboard_set))
@@ -406,6 +439,12 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
     cui_edit_state before = cui_edit_get_state(edit);
     (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, options.disabled, false,
                        (float)before.length);
+    if (options.content_type < CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED ||
+        options.content_type > CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD ||
+        ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
+         (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
+        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_input_secure_lifecycle(edit, state, options);
     cui_input_history_focus(ui, id, edit, state, options.disabled);
     state->composition =
         cui_base_composition(ui, id, state->composition, &state->composition_owned);
@@ -428,13 +467,24 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
     }
     cui_edit_state after = cui_edit_get_state(edit);
     result.changed = before.revision != after.revision;
-    cui_update_semantic(ui, id, false, (float)after.length);
+    bool secret = options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+    cui_update_semantic(ui, id, false, secret ? 0 : (float)after.length);
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.readonly = options.readonly,
                                .required = options.required,
                                .invalid = options.invalid || result.error != CUI_EDIT_OK,
-                               .multiline = after.multiline});
+                               .multiline = after.multiline,
+                               .secret = secret,
+                               .password =
+                                   options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED});
+    (void)cui_set_text_input_config(
+        ui, id,
+        (cui_text_input_config){.type = options.masked ? CUI_TEXT_INPUT_PASSWORD_HIDDEN
+                                        : options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED
+                                            ? CUI_TEXT_INPUT_PASSWORD_VISIBLE
+                                            : CUI_TEXT_INPUT_TEXT,
+                                .purpose = options.content_type});
     return result;
 }
 cui_input_result cui_base_input(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,

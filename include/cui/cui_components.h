@@ -248,6 +248,21 @@ bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int 
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);
+/* Optional three disjoint caller-owned staging buffers; capacities include NUL.
+ * Keep descriptor/buffers unchanged and alive through context resource release.
+ * Every slot must fit the proposed scalar mask, otherwise edits fail atomically. */
+typedef struct {
+    char *buffers[3];
+    size_t capacities[3];
+} cui_input_mask_storage;
+/* Optional mask-buffer allocator pair (zero = malloc/free). Returned storage
+ * must be fresh/disjoint. User/callbacks live through retained resource release.
+ * Geometry sessions/cache copies use their normal host/system ownership. */
+typedef struct {
+    void *user;
+    void *(*allocate)(void *user, size_t bytes);
+    void (*release)(void *user, void *storage);
+} cui_input_mask_allocator;
 typedef struct {
     cui_input_behavior_state behavior;
     float scroll_x;
@@ -280,6 +295,10 @@ typedef struct {
     cui_edit_accept_fn validate;
     void *validate_user; /* See cui_edit_apply_checked: synchronous, nonretaining. */
     cui_edit_normalization normalization; /* Zero preserves legacy CR/LF rejection. */
+    bool masked;
+    cui_text_input_purpose content_type;
+    cui_input_mask_storage *mask_storage;
+    cui_input_mask_allocator mask_allocator;
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

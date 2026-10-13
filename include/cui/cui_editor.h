@@ -21,6 +21,11 @@ typedef struct {
     bool open;
 } cui_editor_completion_state;
 typedef struct cui_editor_matcher cui_editor_matcher;
+/* Source column identity: byte offset plus rounded space-width columns past
+ * a short row's end. Rectangles clip byte columns left to grapheme boundaries. */
+typedef struct {
+    size_t offset, columns_past_end;
+} cui_editor_column_point;
 typedef struct {
     uint64_t id;
     size_t anchor, cursor;
@@ -37,6 +42,12 @@ typedef struct {
     cui_text_style cursor_anchor_style;
     float cursor_anchor_font_size;
     bool multi_pointer, clipboard_active;
+    cui_editor_column_point column_start;
+    uint64_t column_revision;
+    cui_text_style column_style;
+    float column_font_size, column_wrap_width;
+    float column_pointer_x, column_pointer_y;
+    bool column_dragged;
 
 } cui_editor_state;
 typedef struct {
@@ -63,6 +74,12 @@ bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, 
  * model/live selection/state storage, and remain unchanged by the host. No alloc.
  * Reinitialize to clear preferred columns after host font-provider changes. */
 bool cui_editor_multicursor_init(cui_editor_state *, cui_editor_cursor_anchor *, size_t capacity);
+/* Uses the current style-aware visual layout (must match model revision).
+ * Topmost visible row is active; one fresh-ID range per visible wrapped/folded
+ * row, ordered left-to-right. Capacity/validation failure preserves collection,
+ * history and ID counter. Selection itself creates no document Undo step. */
+cui_edit_result cui_editor_select_rectangle(cui_editor_state *, cui_editor_column_point start,
+                                            cui_editor_column_point end);
 /* Host supplies validated UTF-8 items and one original document byte range.
  * No copying/filtering/provider calls. Empty count closes the menu. Invalid
  * input preserves both existing menu and document. Item bytes remain immutable

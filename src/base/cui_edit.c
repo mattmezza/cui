@@ -3953,6 +3953,35 @@ cui_edit_result cui_edit_select_many(cui_edit *edit, const cui_edit_selection *i
     cui_edit_private_save_state(edit);
     return CUI_EDIT_OK;
 }
+cui_edit_result cui_edit_select_disjoint(cui_edit *edit, const cui_edit_selection *input,
+                                         size_t count) {
+    if (!edit || !edit->selections || edit->token_count || !input || !count ||
+        count > CUI_EDIT_MAX_SELECTIONS)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (count > edit->selection_capacity)
+        return CUI_EDIT_CAPACITY;
+    cui_str text = cui_edit_get_text(edit);
+    cui_edit_selection next[CUI_EDIT_MAX_SELECTIONS];
+    for (size_t i = 0; i < count; ++i) {
+        next[i] = input[i];
+        if (!cui_grapheme_boundary(text, next[i].anchor) ||
+            !cui_grapheme_boundary(text, next[i].cursor))
+            return CUI_EDIT_BOUNDARY;
+        if (i &&
+            cui_edit_private_selection_start(next[i]) < cui_edit_private_selection_end(next[i - 1]))
+            return CUI_EDIT_INVALID_ARGUMENT;
+        for (size_t j = 0; j < i; ++j)
+            if (next[i].id == next[j].id)
+                return CUI_EDIT_INVALID_ARGUMENT;
+    }
+    memcpy(edit->selections, next, count * sizeof(*next));
+    edit->selection_count = count;
+    edit->anchor = next[0].anchor;
+    edit->cursor = next[0].cursor;
+    edit->preferred_column_valid = false;
+    cui_edit_private_save_state(edit);
+    return CUI_EDIT_OK;
+}
 static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_str text,
                                                            const cui_edit_selection *input,
                                                            size_t count, bool merge_ranges,

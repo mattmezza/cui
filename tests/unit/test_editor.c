@@ -1225,7 +1225,223 @@ static void multicursor_clipboard_and_indent(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void rectangle_selection(void) {
+    char buffer[256] = "abcdef\nab\nabcdef";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 4});
+    cui_edit_selection live[8];
+    cui_edit_selection_snapshot history[5];
+    assert(edit && cui_edit_attach_selections(edit, live, 8, history, 5) == CUI_EDIT_OK);
+    cui_textarea_line lines[64];
+    cui_editor_state editor;
+    cui_editor_cursor_anchor anchors[8];
+    assert(cui_editor_state_init(&editor, edit, lines, 64) &&
+           cui_editor_multicursor_init(&editor, anchors, 8));
+    cui_context *ui =
+        cui_create((cui_config){.width = 400, .height = 300, .measure_styled = search_measure});
+    cui_focus(ui, 10);
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 240;
+    o.textarea.height = 180;
+    o.textarea.text_style.family = 7;
+    cui_draw_list commands;
+    draw(ui, &editor, o, &commands);
+    /* End on a short row three space columns beyond its clipped end. */
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){1, 0},
+                                       (cui_editor_column_point){9, 3}) == CUI_EDIT_OK);
+    size_t count;
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2 && live[0].anchor == 1 && live[0].cursor == 5 && live[1].anchor == 8 &&
+           live[1].cursor == 9);
+    assert(cui_edit_undo(edit) == CUI_EDIT_NO_HISTORY);
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){15, 0},
+                                       (cui_editor_column_point){1, 0}) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3);
+    assert(live[0].anchor == 1 && live[0].cursor == 5 && live[1].anchor == 8 &&
+           live[1].cursor == 9 && live[2].anchor == 11 && live[2].cursor == 15);
+    cui_edit_selection saved[3];
+    memcpy(saved, live, sizeof saved);
+    uint64_t next = editor.next_cursor_id;
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){1, SIZE_MAX},
+                                       (cui_editor_column_point){9, 0}) == CUI_EDIT_BOUNDARY);
+    assert(!memcmp(saved, live, sizeof saved) && next == editor.next_cursor_id);
+    assert(cui_edit_replace_selections(edit, cui_string("!")) == CUI_EDIT_OK &&
+           !strcmp(buffer, "a!f\na!\na!f"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abcdef\nab\nabcdef") &&
+           !memcmp(saved, live, sizeof saved));
+    draw(ui, &editor, o, &commands);
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    draw(ui, &editor, o, &commands);
+    float x = editor.view.viewport.x, y = editor.view.viewport.y, h = editor.view.line_height;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = x + 9,
+                                           .y = y + h * .5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .modifiers = CUI_MOD_ALT}));
+    draw(ui, &editor, o, &commands);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = x + 45,
+                                           .y = y + h * 1.5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    assert(draw(ui, &editor, o, &commands).selection_changed);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2 && live[0].anchor == 1 && live[0].cursor == 5 && live[1].anchor == 8 &&
+           live[1].cursor == 9);
+    assert(editor.multi_pointer && editor.column_dragged);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = x + 45,
+                                           .y = y + h * 1.5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    draw(ui, &editor, o, &commands);
+    memcpy(saved, live, 2 * sizeof(*live));
+    assert(!editor.multi_pointer);
+    draw(ui, &editor, o, &commands);
+    assert(!memcmp(saved, live, 2 * sizeof(*live)));
+    /* Explicit block press replaces old cursors; readonly still permits selection. */
+    o.textarea.readonly = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = x + 45,
+                                           .y = y + h * 2.5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .modifiers = CUI_MOD_ALT | CUI_MOD_SHIFT}));
+    draw(ui, &editor, o, &commands);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 1 && live[0].cursor == 15);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = x + 9,
+                                           .y = y + h * .5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    draw(ui, &editor, o, &commands);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3 && live[0].anchor == 1 && live[0].cursor == 5);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "NO"}));
+    assert(!draw(ui, &editor, o, &commands).changed && !strcmp(buffer, "abcdef\nab\nabcdef"));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    draw(ui, &editor, o, &commands);
+    assert(!editor.multi_pointer && !editor.column_dragged);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3);
+    memcpy(saved, live, sizeof saved);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x + 18, .y = y + h * .5f}));
+    draw(ui, &editor, o, &commands);
+    assert(!memcmp(saved, live, sizeof saved));
+    /* Folded interiors contribute no rectangular rows. */
+    o.textarea.readonly = false;
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("aaaa\nbbbb\ncccc\ndddd\neeee")) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    cui_editor_fold fold = {0, 3, true};
+    assert(cui_editor_set_folds(&editor, &fold, 1));
+    draw(ui, &editor, o, &commands);
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){1, 0},
+                                       (cui_editor_column_point){23, 0}) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3 && live[1].anchor == 16 && live[1].cursor == 18 && fold.collapsed);
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){6, 0},
+                                       (cui_editor_column_point){23, 0}) == CUI_EDIT_BOUNDARY);
+    /* Caller capacity failure preserves collection and fresh-ID counter. */
+    assert(cui_edit_attach_selections(edit, live, 2, history, 5) == CUI_EDIT_OK);
+    assert(cui_editor_multicursor_init(&editor, anchors, 8));
+    cui_edit_selection before_capacity = live[0];
+    next = editor.next_cursor_id;
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){1, 0},
+                                       (cui_editor_column_point){23, 0}) == CUI_EDIT_CAPACITY);
+    assert(!memcmp(&before_capacity, live, sizeof before_capacity) &&
+           editor.next_cursor_id == next);
+    x = editor.view.viewport.x;
+    y = editor.view.viewport.y;
+    h = editor.view.line_height;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = x + 9,
+                                           .y = y + h * .5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .modifiers = CUI_MOD_ALT | CUI_MOD_SHIFT}));
+    draw(ui, &editor, o, &commands);
+    before_capacity = live[0];
+    next = editor.next_cursor_id;
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = x + 27, .y = y + h * 2.5f}));
+    cui_textarea_result failed = draw(ui, &editor, o, &commands);
+    assert(failed.edit_error == CUI_EDIT_CAPACITY &&
+           !memcmp(&before_capacity, live, sizeof before_capacity) &&
+           editor.next_cursor_id == next);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    draw(ui, &editor, o, &commands);
+    assert(cui_edit_attach_selections(edit, live, 8, history, 5) == CUI_EDIT_OK);
+    assert(cui_editor_multicursor_init(&editor, anchors, 8));
+    assert(cui_editor_set_folds(&editor, NULL, 0));
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("abcdefghijklmnop")) == CUI_EDIT_OK);
+    o.line_numbers = false;
+    o.textarea.width = 90;
+    o.textarea.no_wrap = false;
+    draw(ui, &editor, o, &commands);
+    draw(ui, &editor, o, &commands);
+    assert(editor.view.count > 1 && editor.view.count <= 8);
+    size_t row_count = editor.view.count;
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){0, 0},
+                                       (cui_editor_column_point){16, 20}) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == row_count);
+    for (size_t i = 0; i < count; ++i)
+        assert(live[i].anchor == lines[i].start && live[i].cursor == lines[i].end);
+    /* Adjacent soft-wrap ranges stay distinct through the next atomic edit/Undo. */
+    assert(cui_edit_replace_selections(edit, cui_string("!")) == CUI_EDIT_OK);
+    assert(cui_edit_get_text(edit).length == row_count);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abcdefghijklmnop"));
+    cui_edit_get_selections(edit, &count);
+    assert(count == row_count);
+    assert(cui_edit_replace_range(edit, 0, 16, cui_string("abcd\na\xcc\x81z")) == CUI_EDIT_OK);
+    o.textarea.width = 240;
+    o.textarea.no_wrap = true;
+    draw(ui, &editor, o, &commands);
+    assert(cui_editor_select_rectangle(&editor, (cui_editor_column_point){2, 0},
+                                       (cui_editor_column_point){5, 0}) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2 && live[0].anchor == 0 && live[0].cursor == 2 && live[1].anchor == 5 &&
+           live[1].cursor == 5);
+    /* Auto-scroll continues on stationary-pointer frames and stops on cancel. */
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("aa\naa\naa\naa\naa\naa\naa\naa\naa\naa\naa\naa")) ==
+           CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    editor.view.scroll_y = 0;
+    o.textarea.height = 60;
+    draw(ui, &editor, o, &commands);
+    draw(ui, &editor, o, &commands);
+    x = editor.view.viewport.x;
+    y = editor.view.viewport.y;
+    h = editor.view.line_height;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = x + 9,
+                                           .y = y + h * .5f,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .modifiers = CUI_MOD_ALT | CUI_MOD_SHIFT}));
+    draw(ui, &editor, o, &commands);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = x + 18,
+                                           .y = y + editor.view.viewport.h - 1}));
+    assert(draw(ui, &editor, o, &commands).scrolled);
+    float scroll = editor.view.scroll_y;
+    assert(scroll > 0);
+    assert(draw(ui, &editor, o, &commands).scrolled && editor.view.scroll_y > scroll);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    draw(ui, &editor, o, &commands);
+    scroll = editor.view.scroll_y;
+    draw(ui, &editor, o, &commands);
+    assert(editor.view.scroll_y == scroll && !editor.multi_pointer);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    rectangle_selection();
     multicursor_clipboard_and_indent();
     multicursor_visual_rows();
     multiple_cursor_adapter();

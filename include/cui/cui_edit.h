@@ -55,6 +55,10 @@ const cui_edit_selection *cui_edit_get_selections(const cui_edit *, size_t *coun
 /* Validates grapheme endpoints, merges overlapping/adjacent ranges, and preserves
  * active ID/orientation. Failure preserves model and attached arrays. */
 cui_edit_result cui_edit_select_many(cui_edit *, const cui_edit_selection *, size_t count);
+/* Preserve ordered disjoint row ranges without adjacency/coincidence merging.
+ * Endpoints must be grapheme boundaries; IDs unique, first entry active. Selection
+ * changes update current history metadata but create no document Undo entry. */
+cui_edit_result cui_edit_select_disjoint(cui_edit *, const cui_edit_selection *, size_t count);
 /* Repeat the same UTF-8 text across normalized selections, atomically. One
  * document/history step; resulting cursors preserve IDs and active-first order.
  * Candidate cursor endpoints must remain grapheme boundaries. Undo/Redo restore

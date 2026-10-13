@@ -1,0 +1,9 @@
+Published source:badef388be6a1ca77407cdc5fcfb507629b3a7d9
+Gallery:https://matteo.merola.co/cui/
+Framework CI:https://github.com/mattmezza/cui/actions/runs/38448843386 (all six jobs successful)
+Pages:https://github.com/mattmezza/cui/actions/runs/38448843363 (retry builds/deploys successfully)
+First Pages attempt passes preceding gallery/IME/touch checks, then Chromium1208 crashes in BrowserType.launch with SIGSEGV before site_extensions loads any website. Same source/job rerun passes all gates. Failure log retained at /home/matteo/.cache/cui-validation/pages-badef38-failed.log.
+Actual HTTPS artifact comparison:379/379 files match SHA256.
+Actual public Attachment:62/62 PASS across all14 sizes, both densities/orientations, mobile subtitle pixels and actual offscreen-action touch access.
+Raw files:/home/matteo/.cache/cui-validation/published-badef38-{files.log,attachment.log,attachment.json}; CI metadata:{ci,pages}-badef38.json.
+Full78-family parity and physical mobile/OS window lifecycle remain unverified.

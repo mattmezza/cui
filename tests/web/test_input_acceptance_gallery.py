@@ -57,13 +57,33 @@ def main():
             assert 'AdaéX' in audit.texts()
             # Legacy editable mode removes the example predicate and accepts the same digit.
             audit.configure('input-mode',0)
+            audit.page.wait_for_function('!('+TEXTS+ ')().some(text => text.startsWith("Names can") || text.startsWith("Number rejected"))')
             field = audit.target('Display name',6)
             point = audit.point(field,.9,.5)
             audit.page.mouse.click(point['x'],point['y'])
+            audit.page.wait_for_function('document.activeElement.id === "cui-ime-input"')
             audit.page.keyboard.press('End')
+            audit.page.wait_for_function('cuiGallery.exports.gallery_input_selection(1)===cuiGallery.exports.gallery_input_selection(2)')
             audit.session.send('Input.insertText',{'text':'7'})
             audit.page.wait_for_function('cuiGallery.exports.gallery_input_selection(2)===7')
             assert 'AdaéX7' in audit.texts()
+            before_mobile = audit.page.evaluate('cuiGallery.frame')
+            audit.page.set_viewport_size({'width':390,'height':900})
+            audit.page.wait_for_function('(frame)=>cuiGallery.frame>frame',arg=before_mobile)
+            audit.configure('input-mode',3)
+            field = audit.target('Display name',6)
+            point = audit.point(field,.5,.5)
+            audit.page.mouse.click(point['x'],point['y'])
+            audit.page.wait_for_function('document.activeElement.id === "cui-ime-input"')
+            audit.page.keyboard.press('Control+a')
+            audit.session.send('Input.insertText',{'text':'Ada'})
+            audit.page.wait_for_function('cuiGallery.exports.gallery_input_selection(2)===3')
+            audit.session.send('Input.insertText',{'text':'7'})
+            audit.page.wait_for_function('('+TEXTS+ ')().join(" ").includes("Number rejected;")')
+            assert audit.page.evaluate('cuiGallery.exports.gallery_input_selection(2)') == 3
+            width = audit.page.locator('canvas').bounding_box()['width']
+            painted = audit.page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>({type:e.gallery_command(i,0),x:e.gallery_command(i,1),w:e.gallery_command(i,3)})).filter(c=>c.type===2);}''')
+            assert all(c['x']>=0 and c['x']+c['w']<=width+.5 for c in painted),(width,painted)
             guides = audit.page.locator('#component-guides a').all_text_contents()
             assert any('acceptance' in g.lower() for g in guides),guides
             assert any('normalization' in g.lower() for g in guides),guides

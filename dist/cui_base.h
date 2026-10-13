@@ -67,8 +67,17 @@ typedef struct {
     cui_rect viewport;
     float font_size, scroll_x;
 } cui_input_hit_geometry;
-/* Reusable measured scalar hit test. Invalid input returns SIZE_MAX. */
+/* Optional visual host geometry, otherwise measured scalar hit test. */
 size_t cui_base_input_hit_test(void *geometry, cui_str, float x, float y);
+/* Explicit measurement-only legacy path; never calls optional geometry factory. */
+size_t cui_base_input_measured_hit_test(void *geometry, cui_str, float x, float y);
+/* Borrowed immutable visual session plus existing viewport/scroll mapping. */
+typedef struct {
+    cui_input_hit_geometry measured;
+    const cui_text_geometry *visual;
+    cui_text_affinity *affinity; /* Optional output, preserved on failed hit. */
+} cui_input_visual_hit_geometry;
+size_t cui_base_input_visual_hit_test(void *geometry, cui_str, float x, float y);
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;
@@ -532,7 +541,43 @@ cui_input_result cui_base_input(cui_context *ui, cui_id id, cui_str name, cui_ed
                              (cui_base_input_options){.disabled = disabled});
 }
 
+size_t cui_base_input_visual_hit_test(void *user, cui_str text, float x, float y) {
+    cui_input_visual_hit_geometry *hit = user;
+    if (!hit || !hit->visual || !hit->visual->ops || !hit->visual->ops->hit_test ||
+        (!text.data && text.length) || text.length != hit->visual->byte_length || !isfinite(x) ||
+        !isfinite(y))
+        return SIZE_MAX;
+    cui_text_caret caret;
+    if (hit->visual->ops->hit_test(
+            hit->visual->session, x - hit->measured.viewport.x + hit->measured.scroll_x,
+            y - hit->measured.viewport.y, CUI_TEXT_DOWNSTREAM, &caret) != CUI_TEXT_LAYOUT_OK ||
+        caret.byte_offset > text.length || !isfinite(caret.x) || !isfinite(caret.y) ||
+        !isfinite(caret.height) || caret.height < 0 ||
+        (unsigned)caret.affinity > CUI_TEXT_DOWNSTREAM ||
+        (caret.byte_offset < text.length &&
+         ((unsigned char)text.data[caret.byte_offset] & 0xc0) == 0x80))
+        return SIZE_MAX;
+    if (hit->affinity)
+        *hit->affinity = caret.affinity;
+    return caret.byte_offset;
+}
 size_t cui_base_input_hit_test(void *user, cui_str text, float x, float y) {
+    cui_input_hit_geometry *hit = user;
+    if (!hit || !hit->ui || !isfinite(x) || !isfinite(y) || !isfinite(hit->font_size) ||
+        hit->font_size <= 0 || !cui_edit_valid_utf8(text))
+        return SIZE_MAX;
+    cui_text_geometry visual;
+    if (cui_get_text_geometry(hit->ui, text, hit->font_size, (cui_text_style){0}, &visual) ==
+        CUI_TEXT_LAYOUT_OK) {
+        cui_input_visual_hit_geometry geometry = {*hit, &visual, NULL};
+        size_t byte = cui_base_input_visual_hit_test(&geometry, text, x, y);
+        cui_release_text_geometry(&visual);
+        if (byte != SIZE_MAX)
+            return byte;
+    }
+    return cui_base_input_measured_hit_test(user, text, x, y);
+}
+size_t cui_base_input_measured_hit_test(void *user, cui_str text, float x, float y) {
     (void)y;
     cui_input_hit_geometry *hit = user;
     if (!hit || !hit->ui || !isfinite(x) || !isfinite(hit->font_size) || hit->font_size <= 0 ||

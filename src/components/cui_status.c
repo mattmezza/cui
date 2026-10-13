@@ -765,7 +765,7 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                           2 * t->padding * .8f + 12
                     : 0;
             float content_width =
-                fmaxf(1, e->motion_width - 32 - (has_icon ? 28 : 0) - action_width);
+                fmaxf(1, e->motion_width - 32 - (has_icon ? 28 : 0) - action_width - 24);
             cui_begin_box(ui, cui_status_child_id(card, 302),
                           (cui_box){.width = content_width, .gap = 4, .clip = true});
             if (n.title.length)
@@ -785,6 +785,11 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                                                         .variant = CUI_BUTTON_PRIMARY}) &&
                      n.on_action)
                 n.on_action(n.user, n.id);
+            /* Keep action content clear of the independent close hit target.
+             * Reserve this lane even when Close is hidden to avoid hover reflow. */
+            cui_begin_box(ui, cui_status_child_id(card, 316),
+                          (cui_box){.width = 24, .height = 1});
+            cui_end_box(ui);
             cui_end_box(ui);
             cui_status_spacer(ui, cui_status_child_id(card, 312), 2);
             bool close = false;

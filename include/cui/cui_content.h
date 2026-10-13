@@ -20,6 +20,8 @@ typedef struct {
     /* Optional controlled visibility; false omits layout and semantics. */
     bool *visible;
     bool dismissible;
+    /* Named SVG; empty selects the kind's default. Legacy icon text overrides it. */
+    cui_str icon_name;
 } cui_alert_options;
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options);
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
@@ -32,7 +34,11 @@ typedef enum {
     CUI_BUBBLE_TINTED,
     CUI_BUBBLE_OUTLINE,
     CUI_BUBBLE_GHOST,
-    CUI_BUBBLE_DESTRUCTIVE
+    CUI_BUBBLE_DESTRUCTIVE,
+    CUI_BUBBLE_INFO,
+    CUI_BUBBLE_SUCCESS,
+    CUI_BUBBLE_WARNING,
+    CUI_BUBBLE_ERROR
 } cui_bubble_variant;
 /* Composable surface. Alignment and wrapping belong to the parent layout. */
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *theme,

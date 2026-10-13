@@ -162,7 +162,50 @@ static void hover_panels(void) {
     }
 }
 
+static void semantic_colors(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark()};
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    for (size_t theme = 0; theme < 2; theme++) {
+        const cui_theme *t = &themes[theme];
+        cui_color accents[] = {t->info, t->success, t->warning, t->danger};
+        cui_color bubble_colors[4];
+        for (unsigned kind = 0; kind < 4; kind++) {
+            cui_begin_frame(ui, 500, 300, .016f);
+            cui_alert(ui, 100, t, (cui_alert_options){.kind = (cui_alert_kind)kind,
+                                                    .message = cui_string("Status"), .width = 400});
+            cui_draw_list draw = cui_end_frame(ui);
+            bool border = false, svg = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                if (draw.commands[i].type == CUI_DRAW_BORDER &&
+                    draw.commands[i].bounds.w == 400) {
+                    assert(!memcmp(&draw.commands[i].color, &accents[kind], sizeof(cui_color)));
+                    border = true;
+                }
+                svg |= draw.commands[i].type == CUI_DRAW_IMAGE;
+            }
+            assert(border && svg);
+            cui_begin_frame(ui, 500, 300, .016f);
+            cui_begin_bubble(ui, 101, t, (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), 400);
+            cui_text(ui, cui_string("Status"), t->font_size, t->text);
+            cui_end_bubble(ui);
+            draw = cui_end_frame(ui);
+            bool found = false;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 400) {
+                    bubble_colors[kind] = draw.commands[i].color;
+                    found = true;
+                }
+            assert(found);
+        }
+        for (unsigned a = 0; a < 4; a++)
+            for (unsigned b = a + 1; b < 4; b++)
+                assert(memcmp(&bubble_colors[a], &bubble_colors[b], sizeof(cui_color)));
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    semantic_colors();
     hover_panels();
     models();
     cui_context *ui = cui_create((cui_config){.width = 800, .height = 1000});

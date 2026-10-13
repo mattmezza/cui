@@ -7381,6 +7381,47 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
 static cui_color cui_core_color(Clay_Color c) {
     return (cui_color){(uint8_t)c.r, (uint8_t)c.g, (uint8_t)c.b, (uint8_t)c.a};
 }
+/* Clay emits floating-root scissor commands with NULL userData and only the
+ * nearest clipping ancestor. That root is painted outside its parent's draw
+ * stack, so restore the complete CUI clip ancestry before renderer conversion.
+ * Detached portals have parent == SIZE_MAX and retain their escape semantics. */
+static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderCommand *command,
+                                        cui_rect bounds) {
+    uint32_t clip_id = command->id;
+    if (!command->userData) {
+        clip_id = 0;
+        for (int32_t i = 0; i < ui->clay->layoutElementTreeRoots.length; i++) {
+            const Clay__LayoutElementTreeRoot *root =
+                &ui->clay->layoutElementTreeRoots.internalArray[i];
+            const Clay_LayoutElement *element =
+                &ui->clay->layoutElements.internalArray[root->layoutElementIndex];
+            if (root->clipElementId &&
+                Clay__HashNumber(element->id, element->children.length + 10).id == command->id) {
+                clip_id = root->clipElementId;
+                break;
+            }
+        }
+    }
+    for (size_t i = 0; i < ui->node_count; i++) {
+        if (ui->nodes[i].clay_id != clip_id)
+            continue;
+        for (size_t n = i; n != SIZE_MAX; n = ui->nodes[n].parent) {
+            if (!ui->nodes[n].clip)
+                continue;
+            Clay_ElementData data =
+                Clay_GetElementData((Clay_ElementId){.id = ui->nodes[n].clay_id});
+            if (!data.found)
+                continue;
+            float left = fmaxf(bounds.x, data.boundingBox.x);
+            float top = fmaxf(bounds.y, data.boundingBox.y);
+            float right = fminf(bounds.x + bounds.w, data.boundingBox.x + data.boundingBox.width);
+            float bottom = fminf(bounds.y + bounds.h, data.boundingBox.y + data.boundingBox.height);
+            bounds = (cui_rect){left, top, fmaxf(0, right - left), fmaxf(0, bottom - top)};
+        }
+        break;
+    }
+    return bounds;
+}
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
@@ -7542,6 +7583,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.color = cui_core_color(c->renderData.text.textColor);
             break;
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START:
+            d.bounds = cui_core_ancestral_clip(ui, c, d.bounds);
             d.type = CUI_DRAW_CLIP_PUSH;
             break;
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END:

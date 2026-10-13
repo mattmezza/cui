@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 static void defaults(void) {
     cui_table_model *m = cui_table_create(1);
     cui_table_row row = {.key = 1};
@@ -871,7 +872,47 @@ static void virtual_scene(void) {
     free(rows);
 }
 #endif
+#ifndef CUI_TABLE_BASE_ONLY
+static void custom_row_backgrounds(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 128});
+    assert(ui);
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark()};
+    cui_color colors[] = {{24, 72, 120, 255}, {40, 44, 52, 255}, {54, 60, 70, 255}};
+    for (size_t theme = 0; theme < 2; theme++) {
+        cui_begin_frame(ui, 400, 200, .016f);
+        cui_table_begin(ui, 1, &themes[theme], 360);
+        for (unsigned row = 0; row < 5; row++) {
+            cui_table_begin_row_ex(ui, 10 + row, &themes[theme],
+                                   (cui_table_row_options){.height = 30, .header = row == 0,
+                                      .custom_background = true,
+                                      .background = colors[row == 0 ? 0 : 1 + (row % 2)]});
+            cui_table_begin_cell(ui, 100 + row, 360, 30, CUI_TABLE_ALIGN_LEFT);
+            cui_text(ui, cui_string(row == 0 ? "Header" : "Body"), 16, themes[theme].text);
+            cui_table_end(ui);
+            cui_table_end(ui);
+        }
+        cui_table_end(ui);
+        cui_draw_list draw = cui_end_frame(ui);
+        unsigned rows = 0;
+        for (size_t i = 0; i < draw.count; i++) {
+            const cui_draw_command *cmd = &draw.commands[i];
+            if (cmd->type == CUI_DRAW_RECT && fabsf(cmd->bounds.h - 30) < .01f &&
+                fabsf(cmd->bounds.w - 360) < .01f) {
+                assert(rows < 5);
+                const cui_color expected = colors[rows == 0 ? 0 : 1 + (rows % 2)];
+                assert(!memcmp(&cmd->color, &expected, sizeof(expected)));
+                rows++;
+            }
+        }
+        assert(rows == 5 && cui_last_error(ui) == CUI_OK);
+    }
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifndef CUI_TABLE_BASE_ONLY
+    custom_row_backgrounds();
+#endif
     defaults();
     models();
     spans();

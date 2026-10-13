@@ -29,7 +29,7 @@ bool cui_base_message(cui_message_options o, cui_message_plan *out) {
                           .footer = cui_message_private_slot_present(o.footer)};
     for (size_t i = 0; i < o.body_count; i++) {
         if (!cui_message_private_slot_valid(o.body[i].slot) ||
-            o.body[i].bubble < CUI_BUBBLE_FILLED || o.body[i].bubble > CUI_BUBBLE_DESTRUCTIVE)
+            o.body[i].bubble < CUI_BUBBLE_FILLED || o.body[i].bubble > CUI_BUBBLE_ERROR)
             return false;
         p.ghost |= o.body[i].typed_bubble && o.body[i].bubble == CUI_BUBBLE_GHOST;
     }

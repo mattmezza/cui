@@ -152,7 +152,87 @@ static void base_and_utf8(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static cui_editor_search_result search_frame(cui_context *ui, cui_editor_state *editor,
+                                             cui_editor_search_state *search, bool disabled) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_editor_search_result result =
+        cui_editor_find_bar(ui, 20, 10, &theme, editor, search, 500, disabled);
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 500;
+    assert(cui_editor(ui, 10, &theme, cui_string("Code"), editor, o).error == CUI_TEXTAREA_OK);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void find_panel(void) {
+    char document[128] = "one two one";
+    char query[64] = "one";
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = document, .capacity = sizeof document, .multiline = true});
+    cui_edit *q = cui_edit_create((cui_edit_config){.buffer = query, .capacity = sizeof query});
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_search_state search;
+    assert(cui_editor_state_init(&editor, edit, lines, 32));
+    assert(cui_editor_search_init(&search, q));
+    assert(!cui_editor_search_init(&search, edit));
+    assert(cui_editor_match_count(&editor, cui_string("one")) == 2);
+    assert(cui_editor_match_count(&editor, cui_string("")) == 0);
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    search_frame(ui, &editor, &search, false);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 0, 0);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_F, .modifiers = CUI_MOD_CTRL}));
+    cui_editor_search_result r = search_frame(ui, &editor, &search, false);
+    cui_id field = 20 ^ UINT64_C(0x790a4100f05b190d);
+    assert(search.open && cui_focused(ui) == field && r.matches == 2);
+    assert(cui_edit_get_state(q).anchor == 0 && cui_edit_get_state(q).cursor == 3);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(r.navigated && cui_edit_get_state(edit).anchor == 0 && !r.query_changed);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(r.navigated && cui_edit_get_state(edit).anchor == 8);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .modifiers = CUI_MOD_SHIFT}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(r.navigated && cui_edit_get_state(edit).anchor == 0);
+    cui_rect next = cui_bounds(ui, 20 ^ UINT64_C(0x73bbf8e9cae70b45));
+    assert(next.w > 0 && next.h > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = next.x + next.w / 2,
+                                           .y = next.y + next.h / 2,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    search_frame(ui, &editor, &search, false);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = next.x + next.w / 2,
+                                           .y = next.y + next.h / 2,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(r.navigated && cui_edit_get_state(edit).anchor == 8);
+    cui_focus(ui, field);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "zzz"}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(r.query_changed && r.matches == 0 && !strcmp(query, "zzz"));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(!r.navigated && r.error == CUI_EDIT_BOUNDARY);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+    r = search_frame(ui, &editor, &search, false);
+    assert(r.closed && !search.open && cui_focused(ui) == 10);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_F, .modifiers = CUI_MOD_CTRL}));
+    search_frame(ui, &editor, &search, true);
+    assert(!search.open);
+    cui_destroy(ui);
+    cui_edit_destroy(q);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    find_panel();
     base_and_utf8();
     editor_interactions();
     puts("editor tests passed");

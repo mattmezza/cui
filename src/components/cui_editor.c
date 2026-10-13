@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_editor.h"
+#include "cui/cui_components.h"
 #include <math.h>
 #include <stdio.h>
 static cui_id cui_editor_child(cui_id id, size_t row, unsigned part) {
@@ -235,5 +236,88 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     cui_begin_box(ui, cui_editor_child(id, 0, 7), (cui_box){.height = py, .fixed_height = true});
     cui_end_box(ui);
     cui_end_box(ui);
+    return result;
+}
+
+cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id editor_id,
+                                             const cui_theme *theme, cui_editor_state *editor,
+                                             cui_editor_search_state *state, float width,
+                                             bool disabled) {
+    cui_editor_search_result result = {.error = CUI_EDIT_INVALID_ARGUMENT};
+    if (!ui || !id || !editor_id || id == editor_id || !theme || !editor || !editor->edit ||
+        !state || !state->query || cui_edit_get_state(state->query).multiline || !isfinite(width) ||
+        width < 0 || width > 1000000)
+        return result;
+    cui_id field = id ^ UINT64_C(0x790a4100f05b190d);
+    bool navigate = false, reverse = false, close = false;
+    size_t event_count;
+    const cui_event *events = cui_frame_events(ui, &event_count);
+    for (size_t i = 0; i < event_count && !disabled; ++i) {
+        cui_event e = events[i];
+        if (e.type != CUI_EVENT_KEY_DOWN || cui_event_consumed(ui, i))
+            continue;
+        cui_id target = cui_event_target(ui, i);
+        if (e.key == CUI_KEY_F && (e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
+            (target == editor_id || (state->open && target == field))) {
+            state->open = true;
+            cui_edit_select(state->query, 0, cui_edit_get_text(state->query).length);
+            cui_focus(ui, field);
+            cui_consume_event(ui, i);
+        } else if (state->open && target == field && e.key == CUI_KEY_ENTER) {
+            navigate = true;
+            reverse = (e.modifiers & CUI_MOD_SHIFT) != 0;
+            cui_consume_event(ui, i);
+        } else if (state->open && target == field && e.key == CUI_KEY_ESCAPE) {
+            close = true;
+            cui_consume_event(ui, i);
+        }
+    }
+    result.error = CUI_EDIT_OK;
+    if (!state->open)
+        return result;
+    cui_begin_box(
+        ui, id,
+        (cui_box){
+            .width = width > 0 ? width : 500, .row = true, .gap = 4, .background = theme->surface});
+    cui_input_state input = {.behavior = state->input, .scroll_x = state->scroll_x};
+    cui_input_result edited = cui_input_ex(
+        ui, field, theme, cui_string("Find"), state->query, &input,
+        (cui_input_options){
+            .width = -1, .disabled = disabled, .placeholder = cui_string("Find literal text")});
+    state->input = input.behavior;
+    state->scroll_x = input.scroll_x;
+    result.query_changed = edited.changed;
+    if (edited.error != CUI_EDIT_OK)
+        result.error = edited.error;
+    cui_str query = cui_edit_get_text(state->query);
+    result.matches = cui_editor_match_count(editor, query);
+    if (cui_button(ui, id ^ UINT64_C(0x391cfd020af58d20), theme, cui_string("Prev"),
+                   disabled || !result.matches)) {
+        navigate = true;
+        reverse = true;
+    }
+    if (cui_button(ui, id ^ UINT64_C(0x73bbf8e9cae70b45), theme, cui_string("Next"),
+                   disabled || !result.matches)) {
+        navigate = true;
+        reverse = false;
+    }
+    char status[48];
+    int length = snprintf(status, sizeof status, "%zu matches", result.matches);
+    cui_text(ui, (cui_str){status, (size_t)length}, theme->font_size, theme->muted);
+    close =
+        cui_button(ui, id ^ UINT64_C(0x0092b880a17f63dd), theme, cui_string("Close"), disabled) ||
+        close;
+    cui_end_box(ui);
+    if (navigate && !disabled) {
+        result.error = cui_editor_find(editor, query, reverse, true);
+        result.navigated = result.error == CUI_EDIT_OK;
+        cui_invalidate(ui);
+    }
+    if (close && !disabled) {
+        state->open = false;
+        result.closed = true;
+        cui_focus(ui, editor_id);
+        cui_invalidate(ui);
+    }
     return result;
 }

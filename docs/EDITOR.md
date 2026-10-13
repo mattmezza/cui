@@ -60,3 +60,17 @@ height continue to follow textarea size/design metrics. Fonts and shaping
 follow the configured core/text backend. Capacity
 errors require a larger visual-row workspace; document mutation is exclusively
 through the attached edit model.
+
+The optional `cui_editor_find_bar` renders a single-line query input, match count,
+Previous/Next actions, and Close. Initialize `cui_editor_search_state` with a
+borrowed **single-line** edit model. Call the bar before the editor every frame,
+including when closed, passing the editor's ID. Ctrl/Meta-F on that editor opens
+and focuses the query, selecting its current contents. Enter navigates forward,
+Shift-Enter backward, and Escape closes and returns focus to the editor. Buttons
+expose ordinary button semantics; no-match navigation buttons are disabled.
+A host may also set `search.open` directly. The query remains caller-owned and
+no buffer or match array is allocated. Match counts use nonoverlapping literal
+matches; query edits update counts immediately, while navigation explicitly
+selects a match. Search bars use the existing Input/Button styled components,
+so editor amalgamations require the basic components module as well as textarea.
+This panel adds no replace mode, regex, case-folding, or all-match decorations.

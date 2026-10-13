@@ -455,24 +455,22 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.pointer_activatable = !o->noninteractive, .no_focus = true});
-    if (!o->noninteractive) {
+    if (o->noninteractive)
+        (void)cui_chart_update_hover(state, o, NAN, NAN);
+    else {
+        if (state->hovered < o->count && state->tooltip_cursor_valid)
+            (void)cui_chart_update_hover(state, o, state->tooltip_cursor_x,
+                                         state->tooltip_cursor_y);
         size_t count = 0;
         const cui_event *events = cui_frame_events(ui, &count);
         for (size_t i = 0; i < count; i++) {
             if (events[i].type == CUI_EVENT_POINTER_MOVE) {
                 if (cui_event_target(ui, i) != id && !cui_hovered(ui, id)) {
-                    state->hovered = SIZE_MAX;
+                    (void)cui_chart_update_hover(state, o, NAN, NAN);
                     continue;
                 }
-                cui_chart_hit hit = cui_chart_hit_test(o, events[i].x - state->bounds.x,
-                                                       events[i].y - state->bounds.y);
-                state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
-                state->hovered_value = hit.valid ? hit.value : 0;
-                if (hit.valid) {
-                    state->tooltip_cursor_x = events[i].x - state->bounds.x;
-                    state->tooltip_cursor_y = events[i].y - state->bounds.y;
-                    state->tooltip_cursor_valid = true;
-                }
+                (void)cui_chart_update_hover(state, o, events[i].x - state->bounds.x,
+                                             events[i].y - state->bounds.y);
             }
         }
     }
@@ -1212,7 +1210,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     formatted =
                         (cui_str){value, written < sizeof value ? written : sizeof value - 1};
                 } else if (o->kind == CUI_CHART_PIE && !o->tooltip_format) {
-                    int written = snprintf(value, sizeof value, "%.3g (%.1f%%)", number, pie_share);
+                    char raw_value[32];
+                    cui_str raw = cui_chart_number(raw_value, sizeof raw_value, number, NULL, NULL);
+                    int written = snprintf(value, sizeof value, "%.*s (%.1f%%)", (int)raw.length,
+                                           raw.data, pie_share);
                     formatted =
                         (cui_str){value, written <= 0                     ? 0
                                          : (size_t)written < sizeof value ? (size_t)written
@@ -1224,8 +1225,6 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                          : o->kind == CUI_CHART_SANKEY ? o->sankey_value_format
                                                                        : NULL,
                                          o->format_user);
-                if (!formatted.length)
-                    continue;
                 memcpy(row_text[row_count], formatted.data, formatted.length);
                 row_length[row_count] = formatted.length;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
@@ -1235,9 +1234,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     row_swatch[row_count] = datum->close > datum->open ? o->bullish : o->bearish;
                 } else if (o->kind == CUI_CHART_PIE) {
                     row_label[row_count] = name;
-                    row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
+                    row_swatch[row_count] =
+                        datum->color.a ? datum->color : o->series[tooltip_index % 8];
                 } else if (o->kind == CUI_CHART_SANKEY) {
-                    row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
+                    row_swatch[row_count] =
+                        datum->color.a ? datum->color : o->series[tooltip_index % 8];
                 } else if (o->kind == CUI_CHART_BAR) {
                     row_label[row_count] = name;
                     row_swatch[row_count] = o->bar_gradient_start.a ? o->bar_gradient_start
@@ -1297,9 +1298,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                          (cui_rect){state->bounds.x + tooltip_x, state->bounds.y + tooltip_y,
                                     tooltip_width, tooltip_height},
                          120);
-        if (o->tooltip_content)
+        if (o->tooltip_content) {
+            cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b669),
+                                   (cui_box){.width = tooltip_width - 16,
+                                             .height = tooltip_height - 16,
+                                             .fixed_width = true,
+                                             .fixed_height = true},
+                                   (cui_rect){8, 8, tooltip_width - 16, tooltip_height - 16});
             o->tooltip_content(ui, id, tooltip_index, datum, o->tooltip_user);
-        else {
+            cui_end_box(ui);
+        } else {
             float row_y = 8;
             if (title.length && title.data) {
                 cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),

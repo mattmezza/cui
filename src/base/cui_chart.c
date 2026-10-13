@@ -39,8 +39,8 @@ static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *in
         arc.datum = &o->data[i];
         arc.index = i;
         arc.value = o->data[i].value;
-        arc.start_angle = (double)(2 * CUI_CHART_PI * before / total);
-        arc.end_angle = (double)(2 * CUI_CHART_PI * (before + arc.value) / total);
+        arc.start_angle = 2 * CUI_CHART_PI * (double)(before / total);
+        arc.end_angle = 2 * CUI_CHART_PI * (double)((before + arc.value) / total);
         arc.pad_angle = o->pad_angle;
     }
     *inner = o->pie_inner_arc_radius_fn
@@ -1613,20 +1613,18 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
             a += 2 * CUI_CHART_PI;
         double cumulative = 0;
         for (index = 0; index < o->count; index++) {
-            double start = cumulative;
-            cumulative += 2 * CUI_CHART_PI * o->data[index].value / sum;
-            if (a < cumulative) {
-                if (a < start + o->pad_angle / 2 || a >= cumulative - o->pad_angle / 2)
-                    return hit;
+            cumulative += 2 * CUI_CHART_PI * (o->data[index].value / sum);
+            /* Source Arc::contains selects the original angular interval,
+             * including the padded painted gap at its edges. */
+            if (a < cumulative)
                 break;
-            }
         }
         if (index == o->count)
             return hit;
         double slice_inner, slice_outer;
-        if (!cui_chart_pie_radii(o, index, &slice_inner, &slice_outer) ||
-            dx * dx + dy * dy < slice_inner * slice_inner ||
-            dx * dx + dy * dy > slice_outer * slice_outer)
+        double radius = hypot(dx, dy);
+        if (!cui_chart_pie_radii(o, index, &slice_inner, &slice_outer) || radius < slice_inner ||
+            radius > slice_outer)
             return hit;
     } else if (o->kind == CUI_CHART_RADAR) {
         double dx = x - o->width / 2.0, dy = y - o->height / 2.0;
@@ -1685,5 +1683,23 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
     hit.hovered = index;
     hit.label = o->data[index].label;
     hit.value = o->kind == CUI_CHART_CANDLESTICK ? o->data[index].close : o->data[index].value;
+    return hit;
+}
+
+cui_chart_hit cui_chart_update_hover(cui_chart_state *state, const cui_chart_options *options,
+                                     float x, float y) {
+    cui_chart_hit hit = {0};
+    if (!state)
+        return hit;
+    hit = cui_chart_hit_test(options, x, y);
+    state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
+    state->hovered_value = hit.valid ? hit.value : 0;
+    if (hit.valid) {
+        state->tooltip_cursor_x = x;
+        state->tooltip_cursor_y = y;
+        state->tooltip_cursor_valid = true;
+    } else if (!options || options->noninteractive)
+        state->tooltip_cursor_valid = false;
+    /* Retain the visual index/cursor on ordinary exit for the styled fade. */
     return hit;
 }

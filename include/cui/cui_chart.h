@@ -320,6 +320,12 @@ cui_plot_result cui_chart_pie_labels(const cui_chart_options *, cui_chart_pie_la
                                      size_t capacity);
 /* Read-only hit geometry over a successfully rendered chart. */
 cui_chart_hit cui_chart_hit_test(const cui_chart_options *, float x, float y);
+/* Update caller-owned hover selection from chart-local logical coordinates.
+ * Invalid/outside coordinates dismiss the active selection but retain visual fade
+ * state; noninteractive options also clear the pointer anchor. No raster is needed.
+ * Use validated options (the same geometry passed to render/hit_test). */
+cui_chart_hit cui_chart_update_hover(cui_chart_state *, const cui_chart_options *, float x,
+                                     float y);
 /* Renders and draws the caller-owned bitmap, labels and a named image semantic. */
 bool cui_chart(cui_context *, cui_id, cui_chart_state *, const cui_chart_options *, cui_str name);
 /* Colors from the active theme; caller options override individual fields. */

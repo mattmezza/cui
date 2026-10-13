@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 static bool differs(const unsigned char *pixels, size_t count, cui_color background) {
     for (size_t i = 0; i < count; i++)
@@ -346,7 +347,121 @@ static void shared_sankey_adapter(void) {
     assert(cui_chart_sankey_link_bounds(&o, arbitrary, geometry, 2) == CUI_PLOT_CAPACITY);
     assert(memcmp(old, geometry, sizeof old) == 0);
 }
+#ifndef CUI_CHART_BASE_ONLY
+typedef struct {
+    size_t values, labels, colors, content, titles;
+} empty_tooltip_calls;
+static size_t empty_tooltip_value(const cui_chart_datum *datum, size_t index, size_t series,
+                                  double value, char *buffer, size_t capacity, void *user) {
+    empty_tooltip_calls *calls = user;
+    assert(datum && index == 0 && series < 2 && isfinite(value) && buffer && capacity);
+    calls->values++;
+    return 0;
+}
+static cui_str empty_tooltip_label(const cui_chart_datum *datum, size_t index, size_t series,
+                                   void *user) {
+    empty_tooltip_calls *calls = user;
+    assert(datum && index == 0 && series < 2);
+    calls->labels++;
+    return (cui_str){"Still shown", 11};
+}
+static cui_color empty_tooltip_color(const cui_chart_datum *datum, size_t index, size_t series,
+                                     double value, void *user) {
+    empty_tooltip_calls *calls = user;
+    assert(datum && index == 0 && series < 2 && isfinite(value));
+    calls->colors++;
+    return (cui_color){7, 209, 33, 255};
+}
+static cui_str empty_tooltip_title(const cui_chart_datum *datum, size_t index, void *user) {
+    empty_tooltip_calls *calls = user;
+    assert(datum && index == 0);
+    calls->titles++;
+    return (cui_str){"Unexpected", 10};
+}
+static void override_empty_tooltip(cui_context *ui, cui_id id, size_t index,
+                                   const cui_chart_datum *datum, void *user) {
+    empty_tooltip_calls *calls = user;
+    assert(ui && id == 922 && datum && index == 0);
+    calls->content++;
+    cui_text(ui, (cui_str){"Override", 8}, 11, (cui_color){240, 240, 240, 255});
+}
+static size_t tooltip_value_with_unit(const cui_chart_datum *datum, size_t index, size_t series,
+                                      double value, char *buffer, size_t capacity, void *user) {
+    (void)datum;
+    (void)index;
+    (void)series;
+    const char *unit = user;
+    int written = snprintf(buffer, capacity, "%.2f%s", value, unit);
+    return written > 0 ? (size_t)written : 0;
+}
+typedef struct {
+    size_t calls;
+    double last;
+} tooltip_value_capture;
+static size_t capture_tooltip_value(const cui_chart_datum *datum, size_t index, size_t series,
+                                    double value, char *buffer, size_t capacity, void *user) {
+    tooltip_value_capture *capture = user;
+    assert(datum && index == 0 && series == 0 && isfinite(value) && capacity);
+    capture->calls++;
+    capture->last = value;
+    buffer[0] = 'H';
+    return 1;
+}
+#endif
+static void test_reusable_chart_hover(void) {
+    cui_chart_datum values[] = {{.label = {"Right", 5}, .value = DBL_MAX / 2},
+                                {.label = {"Left", 4}, .value = DBL_MAX / 2}};
+    cui_chart_options o = {.kind = CUI_CHART_PIE,
+                           .data = values,
+                           .count = 2,
+                           .width = 128,
+                           .height = 96,
+                           .logical_width = 64,
+                           .logical_height = 48,
+                           .pie_outer_radius = 32,
+                           .inner_radius = 8,
+                           .pad_angle = .2};
+    cui_chart_state hover = {0};
+    /* A valid extreme Pie has two half-circle angular intervals. Source selects
+     * original intervals even where pad_angle removes painted edge pixels. */
+    cui_chart_hit hit = cui_chart_update_hover(&hover, &o, 44, 24);
+    assert(hit.valid && hit.hovered == 0 && hit.value == DBL_MAX / 2);
+    hit = cui_chart_update_hover(&hover, &o, 20, 24);
+    assert(hit.valid && hit.hovered == 1 && hover.hovered == 1);
+    hit = cui_chart_update_hover(&hover, &o, 32, 12);
+    assert(hit.valid && hit.hovered == 0);
+    hit = cui_chart_update_hover(&hover, &o, 32, 36);
+    assert(hit.valid && hit.hovered == 1);
+    assert(!cui_chart_update_hover(&hover, &o, 32, 24).valid); /* Donut hole. */
+    assert(!cui_chart_update_hover(&hover, &o, 50, 24).valid); /* Beyond radius. */
+    assert(!cui_chart_update_hover(&hover, &o, NAN, 24).valid);
+    assert(!cui_chart_update_hover(NULL, &o, 44, 24).valid);
+    assert(cui_chart_update_hover(&hover, &o, 44, 24).valid);
+    hover.tooltip_visual_index = 0;
+    hover.tooltip_focus = .5f;
+    assert(!cui_chart_update_hover(&hover, &o, -1, 24).valid);
+    assert(hover.hovered == SIZE_MAX && hover.hovered_value == 0 &&
+           hover.tooltip_visual_index == 0 && hover.tooltip_focus == .5f &&
+           hover.tooltip_cursor_valid && hover.tooltip_cursor_x == 44);
+    o.noninteractive = true;
+    assert(!cui_chart_update_hover(&hover, &o, 44, 24).valid);
+    assert(hover.hovered == SIZE_MAX && !hover.tooltip_cursor_valid);
+    o.noninteractive = false;
+    o.kind = CUI_CHART_LINE;
+    o.has_domain = true;
+    o.domain_min = -DBL_MAX;
+    o.domain_max = DBL_MAX;
+    values[0].value = -DBL_MAX;
+    values[1].value = DBL_MAX;
+    o.show_y_axis = true;
+    o.value_axis_gutter = 32;
+    assert(!cui_chart_update_hover(&hover, &o, 15, 20).valid);
+    assert(cui_chart_update_hover(&hover, &o, 16, 20).hovered == 0);
+    assert(cui_chart_update_hover(&hover, &o, 63, 20).hovered == 1);
+    assert(!cui_chart_update_hover(&hover, &o, 32, 39).valid); /* Category gutter. */
+}
 int main(void) {
+    test_reusable_chart_hover();
     shared_sankey_adapter();
     continuous_curve_stroke();
     cui_chart_datum points[] = {
@@ -1912,6 +2027,19 @@ int main(void) {
             fabsf(draw.commands[i].bounds.h - 106) < .01f)
             measured_custom = true;
     assert(measured_custom && tooltip_calls == 2);
+    cui_rect custom_portal = {0}, custom_content_bounds = {0};
+    for (size_t i = 0; i < draw.count; i++) {
+        if (draw.commands[i].type == CUI_DRAW_RECT &&
+            fabsf(draw.commands[i].bounds.w - 236) < .01f &&
+            fabsf(draw.commands[i].bounds.h - 106) < .01f)
+            custom_portal = draw.commands[i].bounds;
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 6 &&
+            memcmp(draw.commands[i].text.data, "Custom", 6) == 0)
+            custom_content_bounds = draw.commands[i].bounds;
+    }
+    assert(fabsf(custom_content_bounds.x - custom_portal.x - 8) < .01f &&
+           fabsf(custom_content_bounds.y - custom_portal.y - 8) < .01f);
+
     const cui_size bad_sizes[] = {{NAN, 20}, {-1, 20}, {16369, 20}, {20, INFINITY}};
     for (size_t bad = 0; bad < sizeof bad_sizes / sizeof bad_sizes[0]; bad++) {
         custom_tooltip_size = bad_sizes[bad];
@@ -2450,6 +2578,144 @@ int main(void) {
            state.tooltip_focus > entering_focus * .8f);
     options.logical_width = 64;
     options.logical_height = 48;
+    /* Empty formatter text retains the source row, its label and swatch. */
+    cui_chart_datum empty_row_data[] = {{.label = {"Category", 8}, .value = 12.3456},
+                                        {.label = {"Other", 5}, .value = 20}};
+    double second_row_values[] = {9, 17};
+    cui_chart_series empty_row_series = {
+        .values = second_row_values, .count = 2, .name = {"Second", 6}, .color = {1, 211, 39, 255}};
+    empty_tooltip_calls empty_calls = {0};
+    cui_chart_options empty_rows = {.kind = CUI_CHART_LINE,
+                                    .data = empty_row_data,
+                                    .count = 2,
+                                    .width = 128,
+                                    .height = 96,
+                                    .hide_axes = true,
+                                    .hide_grid = true,
+                                    .hide_legend = true,
+                                    .hide_x_axis = true,
+                                    .extra_series = &empty_row_series,
+                                    .extra_series_count = 1,
+                                    .disable_appear = true,
+                                    .reduced_motion = true,
+                                    .tooltip_value = empty_tooltip_value,
+                                    .tooltip_label = empty_tooltip_label,
+                                    .tooltip_value_color = empty_tooltip_color,
+                                    .tooltip_user = &empty_calls,
+                                    .background = {19, 23, 31, 255},
+                                    .foreground = {240, 240, 240, 255},
+                                    .series = {{201, 7, 33, 255}, {3, 209, 47, 255}}};
+    static unsigned char empty_row_pixels[128 * 96 * 4];
+    cui_chart_state empty_state = {.pixels = empty_row_pixels,
+                                   .byte_capacity = sizeof empty_row_pixels};
+    assert(cui_chart_render(&empty_state, &empty_rows) == CUI_PLOT_OK);
+    assert(cui_chart_update_hover(&empty_state, &empty_rows, 0, 20).valid);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 922, &empty_state, &empty_rows, (cui_str){"Rows", 4}));
+    draw = cui_end_frame(ui);
+    size_t retained_empty_labels = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 11 &&
+            memcmp(draw.commands[i].text.data, "Still shown", 11) == 0)
+            retained_empty_labels++;
+    assert(empty_calls.values == 2 && empty_calls.labels == 2 && empty_calls.colors == 2 &&
+           retained_empty_labels == 2);
+    empty_rows.tooltip_content = override_empty_tooltip;
+    empty_rows.tooltip_title = empty_tooltip_title;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 922, &empty_state, &empty_rows, (cui_str){"Rows", 4}));
+    draw = cui_end_frame(ui);
+    bool custom_only = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str text = draw.commands[i].text;
+            custom_only |= text.length == 8 && memcmp(text.data, "Override", 8) == 0;
+            assert(!(text.length == 11 && memcmp(text.data, "Still shown", 11) == 0));
+        }
+    assert(custom_only && empty_calls.content == 1 && empty_calls.titles == 0 &&
+           empty_calls.values == 2 && empty_calls.labels == 2 && empty_calls.colors == 2);
+    empty_rows.tooltip_content = NULL;
+    empty_rows.tooltip_title = NULL;
+    empty_rows.tooltip_value = tooltip_value_with_unit;
+    empty_rows.tooltip_label = NULL;
+    empty_rows.tooltip_value_color = NULL;
+    empty_rows.tooltip_user = " USD";
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 922, &empty_state, &empty_rows, (cui_str){"Rows", 4}));
+    draw = cui_end_frame(ui);
+    bool formatted_unit = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 9 &&
+            memcmp(draw.commands[i].text.data, "12.35 USD", 9) == 0)
+            formatted_unit = true;
+    assert(formatted_unit);
+    empty_rows.noninteractive = true;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 922, &empty_state, &empty_rows, (cui_str){"Rows", 4}));
+    draw = cui_end_frame(ui);
+    assert(empty_state.hovered == SIZE_MAX && !empty_state.tooltip_cursor_valid &&
+           empty_calls.values == 2);
+    empty_rows.noninteractive = false;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 922, &empty_state, &empty_rows, (cui_str){"Rows", 4}));
+    (void)cui_end_frame(ui);
+    assert(empty_state.hovered == SIZE_MAX && empty_calls.values == 2);
+    empty_rows.kind = CUI_CHART_PIE;
+    empty_rows.extra_series = NULL;
+    empty_rows.extra_series_count = 0;
+    empty_rows.tooltip_value = NULL;
+    empty_rows.tooltip_label = NULL;
+    empty_rows.tooltip_value_color = NULL;
+    empty_rows.pie_outer_radius = 30;
+    assert(cui_chart_render(&empty_state, &empty_rows) == CUI_PLOT_OK);
+    assert(cui_chart_update_hover(&empty_state, &empty_rows, 84, 48).hovered == 0);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 923, &empty_state, &empty_rows, (cui_str){"Shares", 6}));
+    draw = cui_end_frame(ui);
+    bool exact_pie_value = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length >= 8 &&
+            memcmp(draw.commands[i].text.data, "12.3456 ", 8) == 0)
+            exact_pie_value = true;
+    assert(exact_pie_value);
+    assert(cui_chart_update_hover(&empty_state, &empty_rows, 44, 48).hovered == 1);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 923, &empty_state, &empty_rows, (cui_str){"Shares", 6}));
+    draw = cui_end_frame(ui);
+    bool matching_pie_swatch = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && fabsf(draw.commands[i].bounds.w - 8) < .01f &&
+            draw.commands[i].color.r == 3 && draw.commands[i].color.g == 209 &&
+            draw.commands[i].color.b == 47)
+            matching_pie_swatch = true;
+    assert(matching_pie_swatch);
+    /* Source builds Sankey tooltip throughput from current data, including when
+     * the pointer stays still between revisions. */
+    cui_chart_link changing_link = {.source = 0, .target = 1, .value = 10};
+    tooltip_value_capture throughput_capture = {0};
+    empty_rows.kind = CUI_CHART_SANKEY;
+    empty_rows.links = &changing_link;
+    empty_rows.link_count = 1;
+    empty_rows.custom_sankey_margins = true;
+    empty_rows.tooltip_value = capture_tooltip_value;
+    empty_rows.tooltip_user = &throughput_capture;
+    cui_chart_sankey_node changing_nodes[2];
+    assert(cui_chart_render(&empty_state, &empty_rows) == CUI_PLOT_OK);
+    assert(cui_chart_sankey_layout(&empty_rows, changing_nodes, 2) == CUI_PLOT_OK);
+    float node_x = (changing_nodes[0].x0 + changing_nodes[0].x1) / 2;
+    float node_y = (changing_nodes[0].y0 + changing_nodes[0].y1) / 2;
+    assert(cui_chart_update_hover(&empty_state, &empty_rows, node_x, node_y).valid);
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 924, &empty_state, &empty_rows, (cui_str){"Flow", 4}));
+    (void)cui_end_frame(ui);
+    assert(throughput_capture.calls == 1 && throughput_capture.last == 10);
+    changing_link.value = 20;
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 924, &empty_state, &empty_rows, (cui_str){"Flow", 4}));
+    (void)cui_end_frame(ui);
+    assert(throughput_capture.calls == 2 && throughput_capture.last == 20 &&
+           empty_state.hovered_value == 20);
+
     cui_destroy(ui);
 #endif
     points[0].value = -DBL_MAX;

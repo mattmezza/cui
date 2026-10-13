@@ -1,0 +1,14 @@
+Validated source: 86d8f9ee2cd9d7bbe09c707c9d85b2492fd94b0a
+Portable source SHA256: 09f9240b0023ad41d2fb31c15f156e593b19f83e2f8279bbd6f0c7eb7e8ad503
+Native warnings CTest90/90; ASAN/UBSAN88/88; WASI75/75 pass.
+WASI original sourceHEAD8e00114+tracked next12 changes; committed86d8f9e has identical fingerprint.
+All78 C/WASM browser stories and78 compiled usage excerpts pass.
+Full Chromium design/app/mobile extensions pass.
+Usage5/docs3/sharing3;78 manifestentries,license/pins,format,amalgamation pass.
+N-ary Dock gallery opens3 sibling panes and resizes second divider independently.
+Editor gallery uses8 borrowed cursor slots and validates atomic typing/Undo/Redo.
+Plot gallery has7 distinct projected shape modes with zoom/pan/reset.
+Source Separator is documented Base primitive, preserving78 catalogentries.
+Tests are documented subsets; full-family parity unfinished2 implemented/76 tested/0 verified.
+Next12 logs: /home/matteo/.cache/cui-validation/next12-{native-test,asan-test,wasi,browser,extensions}.log
+Platform CI and actualHTTPS publication of this revision remain pending.

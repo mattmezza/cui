@@ -73,8 +73,7 @@ arbitrary source style refinement and exact GPUI native shader/AA/color identity
 remain separate work. Source behavior is not inferred from the private shadow
 helper's name. The unchanged LEGACY approximation remains available explicitly.
 
-Integrator registration: add `test_notification_shadows.c` with Components,
-Effects and Software; add the native adapter fixture with SDL Renderer/GPU/Sokol
-and the existing four GNU SDL wrap flags (native GNU/Clang only); run
-`test_notification_shadows.py --output <cache-dir> --chromium <pinned-browser>`.
-No generated headers or global registrations are included in this worker commit.
+The native/unit/WASI/browser fixtures are registered by the integrator; generated
+headers include the optional policy and checked entrypoint. The four GNU SDL
+wrap flags capture actual completed drawing before presentation. Reproduce
+Canvas with `uv run tests/web/test_notification_shadows.py --output build/notification-shadow-probe`.

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# /// script
+# dependencies = ["playwright==1.58.0"]
+# ///
 """Actual notification component commands through Canvas, light/dark DPR1/2."""
 import argparse
 from pathlib import Path

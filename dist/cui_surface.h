@@ -40,6 +40,38 @@ typedef struct {
     bool sheet_motion_enabled, sheet_closing;
     cui_surface_result sheet_close_result;
 } cui_surface_state;
+/* Opt-in Popover defaults; zero retains the legacy surface appearance. */
+typedef enum {
+    CUI_POPOVER_APPEARANCE_LEGACY = 0,
+    CUI_POPOVER_APPEARANCE_SOURCE,
+    CUI_POPOVER_APPEARANCE_NONE
+} cui_popover_appearance;
+enum {
+    CUI_POPOVER_REFINE_BACKGROUND = 1u << 0,
+    CUI_POPOVER_REFINE_FOREGROUND = 1u << 1,
+    CUI_POPOVER_REFINE_RADIUS = 1u << 2,
+    CUI_POPOVER_REFINE_PADDING = 1u << 3,
+    CUI_POPOVER_REFINE_BORDER = 1u << 4,
+    CUI_POPOVER_REFINE_SHADOWS = 1u << 5
+};
+typedef struct {
+    unsigned flags;
+    cui_color background, foreground, border;
+    float radius, padding, border_width;
+    size_t shadow_count;
+    cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
+} cui_popover_refinement;
+typedef struct {
+    cui_color background, foreground, border;
+    float radius, padding, border_width;
+    size_t shadow_count;
+    cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
+} cui_popover_style;
+/* Pure validators/resolver; invalid input leaves output untouched. Source p_3 is
+ * 12 logical pixels at pinned 16px rem; customize padding for another host rem. */
+bool cui_popover_refinement_valid(cui_popover_appearance, cui_popover_refinement);
+bool cui_popover_style_resolve(const cui_theme *, cui_popover_appearance, cui_popover_refinement,
+                               cui_popover_style *out);
 typedef struct {
     cui_rect viewport, anchor;
     float width, height, margin;
@@ -58,6 +90,9 @@ typedef struct {
     float sheet_animation_seconds;
     bool reduced_motion;
     const cui_scrollbar_style *scrollbar_style; /* Borrowed during begin; NULL uses theme. */
+    /* Consumed only for POPOVER; copied values, no retained layer pointers. */
+    cui_popover_appearance popover_appearance;
+    cui_popover_refinement popover_refinement;
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
@@ -99,6 +134,37 @@ void cui_alert_dialog(cui_context *, const cui_theme *, cui_surface_state *, cui
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
+bool cui_popover_refinement_valid(cui_popover_appearance appearance, cui_popover_refinement r) {
+    if (appearance < CUI_POPOVER_APPEARANCE_LEGACY || appearance > CUI_POPOVER_APPEARANCE_NONE ||
+        (r.flags & ~63u) || r.shadow_count > CUI_BOX_SHADOW_MAX)
+        return false;
+    if (((r.flags & CUI_POPOVER_REFINE_RADIUS) &&
+         (!isfinite(r.radius) || r.radius < 0 || r.radius > 4096)) ||
+        ((r.flags & CUI_POPOVER_REFINE_PADDING) &&
+         (!isfinite(r.padding) || r.padding < 0 || r.padding > 4096)) ||
+        ((r.flags & CUI_POPOVER_REFINE_BORDER) &&
+         (!isfinite(r.border_width) || r.border_width < 0 || r.border_width > 4096)))
+        return false;
+    if (r.flags & CUI_POPOVER_REFINE_SHADOWS) {
+        float radius = r.flags & CUI_POPOVER_REFINE_RADIUS ? r.radius : 0;
+        cui_corner_radii radii = {radius, radius, radius, radius};
+        for (size_t i = 0; i < r.shadow_count; ++i) {
+            cui_rect bounds;
+            if ((r.shadows[i].kind != CUI_BOX_SHADOW_DROP &&
+                 r.shadows[i].kind != CUI_BOX_SHADOW_INSET) ||
+                !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                                .radii = radii,
+                                                                .layer = r.shadows[i].layer},
+                                        &bounds))
+                return false;
+        }
+    }
+    return true;
+}
+static bool cui_surface_popover_valid(const cui_surface_state *s, cui_surface_options o) {
+    return s->kind != CUI_SURFACE_POPOVER ||
+           cui_popover_refinement_valid(o.popover_appearance, o.popover_refinement);
+}
 static float cui_surface_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
 }
@@ -297,7 +363,7 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
     }
 }
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
-    if (!ui || !s)
+    if (!ui || !s || !cui_surface_popover_valid(s, o))
         return false;
     s->sheet_animation_seconds =
         isfinite(o.sheet_animation_seconds) && o.sheet_animation_seconds > 0
@@ -397,7 +463,7 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
 }
 bool cui_base_surface_begin(cui_context *ui, cui_surface_state *s, cui_str title,
                             cui_str description, cui_surface_options o) {
-    if (!ui || !s)
+    if (!ui || !s || !cui_surface_popover_valid(s, o))
         return false;
     cui_base_surface_update(ui, s, o);
     if (!s->overlay.open || !cui_overlay_begin(ui, &s->overlay))
@@ -460,6 +526,53 @@ void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
 
 
 #include <math.h>
+bool cui_popover_style_resolve(const cui_theme *t, cui_popover_appearance appearance,
+                               cui_popover_refinement r, cui_popover_style *out) {
+    if (!t || !out || !cui_popover_refinement_valid(appearance, r))
+        return false;
+    cui_popover_style next = {.foreground = t->text};
+    if (appearance == CUI_POPOVER_APPEARANCE_LEGACY)
+        next = (cui_popover_style){.background = t->surface,
+                                   .foreground = t->text,
+                                   .border = t->border,
+                                   .border_width = 1,
+                                   .radius = t->radius,
+                                   .padding = t->padding};
+    else if (appearance == CUI_POPOVER_APPEARANCE_SOURCE) {
+        next = (cui_popover_style){.background = t->popover,
+                                   .foreground = t->popover_foreground,
+                                   .radius = t->radius,
+                                   .padding = 12,
+                                   .shadow_count = 3};
+        cui_drop_shadow layers[3];
+        if (!cui_theme_popover_shadows(t, 1, layers))
+            return false;
+        for (size_t i = 0; i < 3; ++i)
+            next.shadows[i] = (cui_box_shadow){.layer = layers[i]};
+    }
+    if (r.flags & CUI_POPOVER_REFINE_BACKGROUND)
+        next.background = r.background;
+    if (r.flags & CUI_POPOVER_REFINE_FOREGROUND)
+        next.foreground = r.foreground;
+    if (r.flags & CUI_POPOVER_REFINE_RADIUS)
+        next.radius = r.radius;
+    if (r.flags & CUI_POPOVER_REFINE_PADDING)
+        next.padding = r.padding;
+    if (r.flags & CUI_POPOVER_REFINE_BORDER) {
+        next.border = r.border;
+        next.border_width = r.border_width;
+    }
+    if (r.flags & CUI_POPOVER_REFINE_SHADOWS) {
+        next.shadow_count = r.shadow_count;
+        for (size_t i = 0; i < r.shadow_count; ++i)
+            next.shadows[i] = r.shadows[i];
+    }
+    if (!isfinite(next.padding) || next.padding < 0 || next.padding > 4096 ||
+        !isfinite(next.radius) || next.radius < 0 || next.radius > 4096)
+        return false;
+    *out = next;
+    return true;
+}
 #define CUI_SURFACE_SKIN_OWNER UINT64_C(0x1a45de91b7956712)
 #define CUI_SURFACE_SKIN_NAMESPACE UINT64_C(0xac3286f910fdcc31)
 typedef struct {
@@ -521,6 +634,15 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_rect bounds = s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
     if (!t || bounds.w <= 0 || bounds.h <= 0)
         return false;
+    cui_popover_style style = {.background = t->surface,
+                               .foreground = t->text,
+                               .border = t->border,
+                               .border_width = 1,
+                               .radius = t->radius,
+                               .padding = t->padding};
+    if (s->kind == CUI_SURFACE_POPOVER &&
+        !cui_popover_style_resolve(t, o.popover_appearance, o.popover_refinement, &style))
+        return false;
     const cui_scrollbar_style *skin = o.scrollbar_style ? o.scrollbar_style : &t->scrollbar;
     bool active =
         skin->visibility == CUI_SCROLLBAR_VISIBLE || skin->visibility == CUI_SCROLLBAR_AUTO_HIDE;
@@ -554,20 +676,24 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
         cui_end_box(ui);
     }
     cui_begin_portal(ui, s->overlay.id,
-                     (cui_box){.padding = t->padding,
+                     (cui_box){.padding = style.padding,
                                .gap = t->gap,
-                               .radius = t->radius,
-                               .background = t->surface,
-                               .border = t->border,
-                               .border_width = 1},
+                               .radius = style.radius,
+                               .background = style.background,
+                               .border = style.border,
+                               .border_width = style.border_width},
                      bounds, (int16_t)(layer + 1));
+    if (style.shadow_count)
+        cui_set_box_shadows(
+            ui, style.shadows, style.shadow_count,
+            (cui_corner_radii){style.radius, style.radius, style.radius, style.radius});
     bool centered = s->kind == CUI_SURFACE_ALERT;
-    float body_width = fmaxf(0, bounds.w - 2 * fmaxf(0, t->padding));
+    float body_width = fmaxf(0, bounds.w - 2 * fmaxf(0, style.padding));
     if (centered)
         cui_surface_body_begin(ui, t, s, true, body_width);
     cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = t->gap});
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 4), (cui_box){.width = -1});
-    cui_text(ui, title, t->font_size * 1.1f, t->text);
+    cui_text(ui, title, t->font_size * 1.1f, style.foreground);
     cui_end_box(ui);
     if (!o.hide_close && (s->kind != CUI_SURFACE_ALERT || o.show_alert_close))
         cui_button_ex(ui, cui_surface_part_id(s->overlay.id, 1), t, cui_string("Close"),

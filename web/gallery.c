@@ -2205,6 +2205,7 @@ int gallery_init(void) {
                                                         .history_bytes = 2048,
                                                         .max_history_steps = 16});
     cui_notification_settings notification_settings = cui_notification_settings_default();
+    notification_settings.shadow_policy = CUI_NOTIFICATION_SHADOW_SOURCE;
     notification_settings.width = 330;
     notification_settings.margin_top = 164;
     notification_settings.max_visible = 4;
@@ -2342,6 +2343,7 @@ int gallery_init(void) {
     cui_surface_init(&root_dialog_surface, cui_id_from(ui, "root-dialog"), CUI_SURFACE_DIALOG);
     cui_surface_init(&root_sheet_surface, cui_id_from(ui, "root-sheet"), CUI_SURFACE_SHEET);
     cui_notification_settings root_notice_settings = cui_notification_settings_default();
+    root_notice_settings.shadow_policy = CUI_NOTIFICATION_SHADOW_SOURCE;
     root_notice_settings.width = 280;
     root_notice_settings.max_visible = 2;
     if (!cui_notification_init(&root_notices, root_notice_entries, 4, root_notice_settings,
@@ -4947,7 +4949,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                        .width = width > 500 ? 340 : width - 48,
                                        .height = 190,
                                        .margin = 12,
-                                       .side = CUI_POPUP_BELOW};
+                                       .side = CUI_POPUP_BELOW,
+                                       .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
         if (cui_surface_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
                               cui_string("Maintainer · Portable UI systems"), options)) {
             cui_avatar(ui, cui_id_from(ui, "popover-avatar"), &t, cui_string("Alex Morgan"), 40);

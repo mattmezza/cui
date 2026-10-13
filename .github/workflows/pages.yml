@@ -32,8 +32,16 @@ jobs:
         run: |
           uv run --with wasmtime==49.0.0 python tests/integration/test_regex_wasi.py build/regex-fixture/regex.wasm
           uv run tests/web/test_input_regex.py --fixture build/regex-fixture
+      - name: Build default gallery without optional regex archive
+        run: python scripts/build_web.py --output build/web-default
       - name: Build actual CUI WebAssembly gallery
-        run: python scripts/build_web.py --zig "$(python -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).parent / "zig")')"
+        run: python scripts/build_web.py --zig "$(python -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).parent / "zig")')" --regex-library build/regex-wasi/target/wasm32-wasip1/release/libcui_regex.a
+      - name: Optional and default gallery regex acceptance and IME
+        run: uv run tests/web/test_input_regex_gallery.py --directory build/web --default-directory build/web-default
+      - name: Actual Popover appearance consumers
+        run: uv run tests/web/test_popover_appearance.py --output build/popover-appearance-probe
+      - name: Gallery Popover and Notification shadow policies
+        run: uv run tests/web/test_surface_shadow_gallery.py
       - name: Verify complete static sharing metadata
         run: python tests/test_sharing.py
       - name: Compile selected gallery usage across modes and sizes
@@ -110,6 +118,8 @@ jobs:
         run: uv run tests/web/test_button_passive_lifecycle.py
       - name: Verify numeric Button metrics open presentation and caret tint
         run: uv run tests/web/test_button_numeric.py
+      - name: Notification component source shadow consumers
+        run: uv run tests/web/test_notification_shadows.py --output build/notification-shadow-probe
       - name: Copied button click events
         run: uv run tests/web/test_button_click_event.py
       - name: Verify Button callbacks slots focus and painted states

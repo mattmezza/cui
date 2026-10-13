@@ -3,6 +3,7 @@
 from html.parser import HTMLParser
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 import tempfile
 import unittest
@@ -74,6 +75,24 @@ class SharingTests(unittest.TestCase):
         routes = SHARING.build(output)
         self.assertEqual(before, (output / 'components/checkbox/index.html').read_bytes())
         self.assertEqual(len(routes), len(json.loads((output / 'routes.json').read_text())))
+
+    def test_literal_regex_backslashes_survive_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            (output / 'assets').mkdir()
+            shutil.copyfile(ROOT / 'build/web/catalog.json', output / 'catalog.json')
+            shutil.copyfile(ROOT / 'web/assets/cui-social.png', output / 'assets/cui-social.png')
+            title = r'Regex \p{L} <docs>'
+            description = r'Match \p{L} and \1 literally & safely.'
+            documents = [{'slug': 'regex-probe', 'title': title,
+                          'html': r'<p>Match \p{L} and \1 literally &amp; safely.</p>'}]
+            (output / 'docs.json').write_text(json.dumps(documents))
+            SHARING.build(output)
+            head = Head()
+            head.feed((output / 'docs/regex-probe/index.html').read_text())
+            self.assertEqual(head.metadata['og:title'], title + ' · CUI')
+            self.assertEqual(head.metadata['og:description'], description)
+            self.assertEqual(head.metadata['description'], description)
 
     def test_invalid_origins_are_rejected_before_writes(self):
         with tempfile.TemporaryDirectory() as directory:

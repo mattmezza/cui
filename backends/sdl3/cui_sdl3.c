@@ -176,7 +176,7 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         cui_event v = {0};
-        bool send = true;
+        bool send = true, leave_after = false;
         switch (e.type) {
         case SDL_EVENT_SYSTEM_THEME_CHANGED:
             s->appearance.appearance = system_appearance();
@@ -207,6 +207,12 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             v.y = e.tfinger.y * height;
             break;
         }
+        case SDL_EVENT_WINDOW_MOUSE_ENTER:
+            v.type = CUI_EVENT_POINTER_ENTER;
+            break;
+        case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+            v.type = CUI_EVENT_POINTER_LEAVE;
+            break;
         case SDL_EVENT_MOUSE_MOTION:
             if (e.motion.which == SDL_TOUCH_MOUSEID) {
                 send = false;
@@ -301,6 +307,7 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             s->input_suspended = true;
             s->ime_composing = s->ime_commit_pending = false;
             v.type = CUI_EVENT_CANCEL;
+            leave_after = true;
             break;
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_EXPOSED:
@@ -311,8 +318,19 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             send = false;
             break;
         }
-        if (send)
+        if (send) {
             cui_queue_event(ui, v);
+            if (v.pointer_type == CUI_POINTER_MOUSE &&
+                (v.type == CUI_EVENT_POINTER_MOVE || v.type == CUI_EVENT_POINTER_DOWN ||
+                 v.type == CUI_EVENT_POINTER_UP)) {
+                int width = 0, height = 0;
+                if (SDL_GetWindowSize(s->window, &width, &height) &&
+                    (v.x < 0 || v.y < 0 || v.x >= width || v.y >= height))
+                    leave_after = true;
+            }
+            if (leave_after)
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_LEAVE});
+        }
     }
     return !s->quit;
 }

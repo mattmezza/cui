@@ -84,6 +84,83 @@ static void shapes(cui_sdl3 *s) {
            abs(red - 128) <= 1);
     SDL_DestroySurface(surface);
 }
+/* Queued SDL window signals exercise the adapter; this is not physical leave evidence. */
+static void presence_scene(cui_context *ui) {
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    cui_begin_box(ui, 10, (cui_box){.width = 80, .height = 40});
+    cui_interact(ui, 10, CUI_ROLE_BUTTON, cui_string("Presence"), false, false, 0);
+    cui_set_cursor(ui, 10, CUI_CURSOR_GRAB);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+}
+static void pointer_presence(cui_sdl3 *s) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 32, .max_commands = 128});
+    assert(ui);
+    presence_scene(ui);
+    SDL_Event event = {.type = SDL_EVENT_WINDOW_MOUSE_ENTER};
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    bool enter = false;
+    for (size_t i = 0; i < count; i++)
+        enter |= events[i].type == CUI_EVENT_POINTER_ENTER;
+    assert(enter);
+    event = (SDL_Event){.type = SDL_EVENT_MOUSE_MOTION};
+    event.motion.x = 15;
+    event.motion.y = 15;
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    assert(cui_hovered(ui, 10) && cui_pointer_cursor(ui) == CUI_CURSOR_GRAB);
+    event = (SDL_Event){.type = SDL_EVENT_MOUSE_BUTTON_DOWN};
+    event.button.button = SDL_BUTTON_LEFT;
+    event.button.x = 15;
+    event.button.y = 15;
+    assert(SDL_PushEvent(&event));
+    event = (SDL_Event){.type = SDL_EVENT_WINDOW_MOUSE_LEAVE};
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    assert(!cui_hovered(ui, 10) && cui_pressed(ui, 10) && cui_focused(ui) == 10 &&
+           cui_pointer_cursor(ui) == CUI_CURSOR_GRAB);
+    event = (SDL_Event){.type = SDL_EVENT_WINDOW_MOUSE_ENTER};
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    assert(cui_hovered(ui, 10) && cui_pressed(ui, 10));
+    event = (SDL_Event){.type = SDL_EVENT_MOUSE_MOTION};
+    event.motion.x = 330;
+    event.motion.y = 15;
+    event.motion.state = SDL_BUTTON_LMASK;
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    events = cui_frame_events(ui, &count);
+    bool outside_pair = false;
+    for (size_t i = 0; i + 1 < count; i++)
+        if (events[i].type == CUI_EVENT_POINTER_MOVE && events[i].x == 330)
+            outside_pair = events[i + 1].type == CUI_EVENT_POINTER_LEAVE;
+    assert(outside_pair && !cui_hovered(ui, 10) && cui_pressed(ui, 10));
+    event = (SDL_Event){.type = SDL_EVENT_WINDOW_FOCUS_LOST};
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    events = cui_frame_events(ui, &count);
+    bool focus_pair = false;
+    for (size_t i = 0; i + 1 < count; i++)
+        if (events[i].type == CUI_EVENT_CANCEL)
+            focus_pair = events[i + 1].type == CUI_EVENT_POINTER_LEAVE;
+    assert(focus_pair && !cui_pressed(ui, 10) && !cui_hovered(ui, 10) && cui_focused(ui) == 10 &&
+           cui_pointer_cursor(ui) == CUI_CURSOR_DEFAULT);
+    event = (SDL_Event){.type = SDL_EVENT_WINDOW_FOCUS_GAINED};
+    assert(SDL_PushEvent(&event));
+    assert(cui_sdl3_poll(s, ui));
+    presence_scene(ui);
+    assert(!cui_hovered(ui, 10));
+    cui_destroy(ui);
+}
 int main(int argc, char **argv) {
     if (argc > 2) {
         fprintf(stderr, "Usage: test_sdl3 [FONT]\n");
@@ -252,7 +329,8 @@ int main(int argc, char **argv) {
     assert(cui_sdl3_poll(s, ui));
     assert(cui_begin_frame(ui, 320, 160, .016f));
     committed = cui_frame_events(ui, &composition_count);
-    assert(composition_count == 1 && committed[0].type == CUI_EVENT_CANCEL);
+    assert(composition_count == 2 && committed[0].type == CUI_EVENT_CANCEL &&
+           committed[1].type == CUI_EVENT_POINTER_LEAVE);
     cui_end_frame(ui);
     SDL_Event gained = {.type = SDL_EVENT_WINDOW_FOCUS_GAINED};
     assert(SDL_PushEvent(&gained) && SDL_PushEvent(&ime_commit));
@@ -324,6 +402,7 @@ int main(int argc, char **argv) {
 #endif
         assert(cui_sdl3_set_decorated(s, true));
     }
+    pointer_presence(s);
     assert(window.perform(window.user, CUI_WINDOW_CLOSE, 0, 0));
     assert(!cui_sdl3_poll(s, ui));
     cui_destroy(ui);

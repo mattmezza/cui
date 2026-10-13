@@ -426,3 +426,85 @@ The default is installed Chromium 1208; `--chromium` may select its matching
 headless shell. The output includes the exact compiled WASM, HTML host, and a
 scroll-state PNG. This is Chromium/WASM Core seam evidence, not full Chart/Plot
 integration, physical touchscreen, or native Windows validation.
+
+## Explicit host pointer presence
+
+The new append-only `CUI_EVENT_POINTER_ENTER` and `CUI_EVENT_POINTER_LEAVE`
+supersede the earlier documented absence of a host presence signal. These are
+surface-level hover signals, not touch contact creation/removal or capture
+cancellation. Core ignores their coordinates, pointer identity, and other event
+payload fields. ENTER marks presence but never invents a known position. LEAVE
+clears presence while retaining the last coordinates, position knowledge, focus,
+composition, capture and active contacts. Both events are consumed by Core with
+no dispatch target or activation. Event order within the frame is preserved.
+
+Existing positional MOVE/DOWN/UP input implicitly establishes presence, retaining
+compatibility for hosts that do not send ENTER. `cui_prepaint_info.pointer_present`
+exposes the host signal; `pointer_valid` now requires both known finite position
+and presence. `pointer_inside`, current hit selection, `pointer_visible`,
+`cui_interact().hovered`, `cui_hovered` and `cui_hover_within` use that same gate.
+ENTER before the first position has present=true but valid=false and cannot
+create hover. Reenter after a known position may use retained coordinates until
+a fresh positional event updates them. Current clipping and modal/passive
+occlusion continue to apply independently of presence.
+
+The pointer cursor uses hover only while position is known and present. Its
+existing captured-control cursor remains available during a drag outside the
+surface; LEAVE does not cancel that drag. CANCEL remains a lifecycle signal and
+does not imply physical leave. Hosts report focus loss explicitly as CANCEL
+followed by LEAVE. Unexpected capture loss sends CANCEL alone, preserving hover
+presence. A captured positional event outside a host may imply presence through
+legacy input, so hosts follow that event with LEAVE: reducers still receive the
+real outside position and capture is preserved, while hover is absent.
+
+SDL maps WINDOW_MOUSE_ENTER/LEAVE directly and emits the explicit focus-loss
+pair. Enter has no SDL event coordinates, so Core retains position knowledge;
+the next real motion refreshes it. Mouse motion/button positions outside actual
+logical window bounds are followed by LEAVE. Focus gain does not fabricate a
+presence or position event. Queued SDL PushEvent regressions run with the dummy
+software driver and under Xvfb/OpenGL, checking mapped event order, retained
+capture/focus, outside motion, and focus-loss cancellation. They are adapter
+signal evidence, not physical OS leave/capture-loss coverage. This change does
+not fix the legacy poller's multiwindow queue/window-ID routing limitation or
+add an SDL mouse capture-loss event that SDL's event surface does not provide.
+
+The browser gallery replaces the offscreen-coordinate sentinel with ENTER and
+LEAVE. Actual pointerenter coordinates then supply a genuine MOVE. Non-touch
+captured events outside the canvas are delivered before LEAVE; ordinary contact
+routing and touch page-pan policy stay separate. Unexpected mouse/pen capture
+loss cancels the active capture once, while normal loss after pointerup does not
+cancel again. Canvas/window blur explicitly clears capture and presence; the
+existing canvas-to-IME focus transfer exception is preserved. Repeated blur
+notifications are idempotent until a new focus/interaction. No physical leave is
+inferred solely from cancellation.
+
+`tests/unit/test_pointer_presence.c` verifies unknown first position, ENTER-only,
+real motion, retained coordinates/focus/capture on LEAVE, reentry, ordered
+CANCEL+LEAVE versus CANCEL alone, capture-derived cursors, outside drag/release
+without activation, exact next-click activation, and passive/modal prepaint
+eligibility. `tests/web/pointer_presence_probe.c` and
+`test_pointer_presence.py` provide actual WASM canvas pixels and real Chromium
+mouse enter/leave, applied pointer capture/releasePointerCapture,
+lostpointercapture, captured outside motion, keyboard-driven canvas blur, and
+next-click checks. Run the actual gallery regression too with:
+
+```sh
+uv run --script tests/web/test_pointer_presence.py \
+  --output build/pointer-presence-probe --directory build/web
+```
+
+Without `--directory`, only the independent Core host fixture runs; it does not
+claim production gallery evidence. The default uses pinned Playwright 1.58.0,
+Chromium 1208 and strict Zig 0.16.0 WASM compilation. Actual pointer-presence
+browser evidence does not certify physical touch devices, all platform hosts,
+or completed Chart/Plot consumer integration.
+
+Presence validation also checks that repeated genuine canvas focus/Tab-blur
+transitions rearm cancellation, and that pure presence events at a reused input
+slot have zero activation metadata. A live touch contact survives LEAVE and can
+complete normally; LEAVE remains independent of contact cancellation. The
+actual gallery test explicitly releases applied Button pointer capture and
+verifies its following mouseup does not activate. A headless Chromium tab-switch
+experiment did not emit Window blur, so physical browser-window focus loss is
+not counted as runtime evidence; its explicit handler mapping is inspected and
+native focus loss is covered only through queued SDL signals.

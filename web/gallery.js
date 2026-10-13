@@ -723,6 +723,21 @@ function applyTouchPageFallback(){
  }
 }
 
+let hoverPointerCapture=null,pointerFocusSuspended=false;
+function pointerFocusLoss(){
+ hoverPointerCapture=null;plotMouseDrag=false;
+ if(!pointerFocusSuspended){wasm?.gallery_event(7,0,0,0,0,0,0,0);pointerFocusSuspended=true;}
+ pointerPresenceLeave();
+}
+canvas.addEventListener('focus',()=>{pointerFocusSuspended=false;});
+window.addEventListener('focus',()=>{pointerFocusSuspended=false;});
+function pointerPresenceLeave(){wasm?.gallery_event(15,0,0,0,0,0,0,0);requestFrame();}
+function pointerOutsideCanvas(e,rect){return e.clientX<rect.left||e.clientY<rect.top||e.clientX>=rect.right||e.clientY>=rect.bottom;}
+canvas.addEventListener('pointerenter',e=>{
+ if(!wasm||e.pointerType==='touch')return;pointerFocusSuspended=false;const rect=canvas.getBoundingClientRect();
+ wasm.gallery_event(14,0,0,0,0,0,0,0);
+ wasm.gallery_event(0,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,0,0);requestFrame();
+});
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
  if(!wasm)return;
  const rect=canvas.getBoundingClientRect();
@@ -740,21 +755,24 @@ for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])
    t.x=e.clientX;t.y=e.clientY;if(type===2)pageTouches.delete(e.pointerId);
   }}
  }
- if(type===1){canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=e.pointerType!=='mouse';}
+ if(type===1){pointerFocusSuspended=false;if(e.pointerType!=='touch')hoverPointerCapture=e.pointerId;canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=e.pointerType!=='mouse';}
+ if(type===2&&hoverPointerCapture===e.pointerId)hoverPointerCapture=null;
  if(type!==0&&e.pointerType==='mouse')return; // MouseEvent.detail carries the click count; PointerEvent.detail is zero.
  if(e.pointerType==='touch'||e.pointerType==='pen')wasm.gallery_touch(type,e.clientX-rect.left,e.clientY-rect.top,e.pointerId,e.pointerType==='touch'?1:2);
- else wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),type===0?0:1);requestFrame();
+ else wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),type===0?0:1);
+ if(e.pointerType!=='touch'&&pointerOutsideCanvas(e,rect))pointerPresenceLeave();requestFrame();
 });
 for(const [event,type] of [['mousedown',1],['mouseup',2]])canvas.addEventListener(event,e=>{
  if(!wasm||suppressCompatibilityMouse)return;
  const rect=canvas.getBoundingClientRect();
- wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),Math.max(1,e.detail));requestFrame();
+ wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),Math.max(1,e.detail));
+ if(pointerOutsideCanvas(e,rect))pointerPresenceLeave();requestFrame();
 });
 let plotMouseDrag=false;
 canvas.addEventListener('mousedown',e=>{if(selected.name==='Plot'&&e.button===0&&e.shiftKey)plotMouseDrag=true;});
 canvas.addEventListener('pointerup',e=>{if(e.pointerType==='mouse')plotMouseDrag=false;});
 canvas.addEventListener('mouseup',()=>{plotMouseDrag=false;});
-function cancelPlotMouse(e){if(e.pointerType==='mouse'&&plotMouseDrag){plotMouseDrag=false;wasm?.gallery_event(7,0,0,0,0,0,0,0);requestFrame();}}
+function cancelPlotMouse(e){if(e.pointerType!=='touch'&&(plotMouseDrag||hoverPointerCapture===e.pointerId)){plotMouseDrag=false;hoverPointerCapture=null;wasm?.gallery_event(7,0,0,0,0,0,0,0);requestFrame();}}
 canvas.addEventListener('lostpointercapture',cancelPlotMouse);
 canvas.addEventListener('pointercancel',cancelPlotMouse);
 canvas.addEventListener('wheel',e=>{
@@ -770,15 +788,15 @@ canvas.addEventListener('wheel',e=>{
  const consumes=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>{const f=n=>wasm.gallery_semantic(i,n);if(!f(17)||f(5)||x<f(1)||y<f(2)||x>=f(1)+f(3)||y>=f(2)+f(4))return false;return(dx>0&&f(18)<f(20))||(dx<0&&f(18)>0)||(dy>0&&f(19)<f(21))||(dy<0&&f(19)>0);});
  if(consumes){e.preventDefault();if(selected.example||['Scrollable','Sidebar','VirtualList','DataTable','Tabs'].includes(selected.name))wasm.gallery_scroll_pixels(x,y,-dx,-dy);else wasm.gallery_scroll(x,y,-dx/32,-dy/32);requestFrame();}
 },{passive:false});
-canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0,0,0);requestFrame();});
+canvas.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch')pointerPresenceLeave();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('click',()=>{suppressCompatibilityMouse=false;});
 canvas.style.touchAction='none';
 function cancelPageTouches(){for(const [id,t] of pageTouches)if(!t.owned)wasm?.gallery_touch(7,0,0,id,1);pageTouches.clear();requestFrame();}
-window.addEventListener('blur',cancelPageTouches);window.addEventListener('hashchange',cancelPageTouches);
+window.addEventListener('blur',()=>{cancelPageTouches();pointerFocusLoss();});window.addEventListener('hashchange',cancelPageTouches);
 canvas.addEventListener('lostpointercapture',e=>{const t=pageTouches.get(e.pointerId);if(!t)return;pageTouches.delete(e.pointerId);if(!t.owned)wasm?.gallery_touch(7,0,0,e.pointerId,1);requestFrame();});
 canvas.addEventListener('pointercancel',e=>{const t=pageTouches.get(e.pointerId);pageTouches.delete(e.pointerId);if(!t?.owned)wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
-canvas.addEventListener('blur',e=>{if(e.relatedTarget===imeTarget)return;wasm?.gallery_event(7,0,0,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
+canvas.addEventListener('blur',e=>{if(e.relatedTarget===imeTarget)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});
 for(const target of [canvas,imeTarget])for(const [event,type] of [['keydown',3],['keyup',4]])target.addEventListener(event,e=>{
  if(!wasm)return;const key=keyIdentity(e.key);
  if(e.key==='Tab'&&!composing&&!e.isComposing){

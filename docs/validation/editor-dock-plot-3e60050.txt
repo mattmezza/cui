@@ -1,0 +1,14 @@
+Validated integration source: 3e6005020c61b6c8f2026c9119c0ec0191d77692
+Portable source fingerprint: 7327ccc6655b47b89a34cd2b7b009f1295da9a6f4235c3a5e4e61943df3ddb9b
+Documentation-only readiness/manifest/report edits follow this source validation.
+
+Native warning build/CTest: 90/90 PASS (next14-native-test3.log).
+ASan/UBSan: 88/88 PASS (next14-asan-test-final.log).
+Pinned WASI runtime: 75/75 PASS (next14-wasi-final.log).
+Chromium full gallery: all78 stories and78 compiled excerpts PASS (next14-browser3.log).
+Final extensions PASS (next14-extensions-final.log).
+Docs5/usage5/sharing3 PASS (next14-{docs,usage,sharing}-final.log).
+Final web build and format/distribution/manifest/license/theme checks PASS.
+Logs preserved under /home/matteo/.cache/cui-validation/.
+
+This does not verify whole component families. Native mesh and generalized touch branches are separate, not part of this source release. Publication remains pending at this checkpoint.

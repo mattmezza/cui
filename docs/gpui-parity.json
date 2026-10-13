@@ -3047,7 +3047,7 @@
       "limitations": [
         "Styled multiline caret/selection/scroll, gutter/wrap, host syntax colors, ASCII-insensitive retained search and atomic replacement, visible match highlights, caller-owned folding and completion have headless/browser tests.",
         "Unicode17 grapheme and word keyboard editing passes pinned conformance fixtures; explicit scalar APIs remain compatible.",
-        "Measured multicursor interaction supports cursor creation, rectangular Alt-drag selection, grapheme navigation, wraps/folds, readonly behavior, atomic typing, multirange indentation, synchronous host clipboard distribution and full-selection Undo/Redo. Undo coalescing, multicursor IME, restored preferred columns, parsers/LSP, diagnostics and bidi remain incomplete. Folds require host refresh after edits; browser clipboard does not yet expose the synchronous native seam.",
+        "Measured multicursor interaction supports cursor creation, rectangular Alt-drag selection, grapheme navigation, wraps/folds, readonly behavior, atomic typing, multirange indentation, synchronous host clipboard distribution and full-selection Undo/Redo. Grouped typing/backspace/forward-delete undo, the 1,000-change boundary, caller-owned preferred columns and history eviction have headless coverage. Multicursor IME, parsers/LSP, diagnostics and bidi remain incomplete. Folds require host refresh after edits; browser clipboard does not yet expose the synchronous native seam.",
         "200,000-line document correctness is tested; performance targets and viewport-only incremental layout are not yet validated in this release."
       ],
       "owner": "integrator",
@@ -4308,7 +4308,7 @@
       "limitations": [
         "Styled tabs, menus, bulk close, zoom placement, nested resize, independent edge regions and atomic cross-region transfers are headless tested.",
         "Opt-in collapsed bottom tab strip and real resize reopening match the frozen bottom-edge behavior.",
-        "Canonical n-ary layouts, root policies, locks, visibility, title palettes, typed PanelState/DockAreaState atomic persistence and full-state factory reconstruction are tested subsets. Workspace dumps prefer matching rendered split sizes, then retained sizes, then source minimum. JSON parsing, automatic lifecycle delivery, host descriptor ownership and exact current-layout geometry integration remain incomplete. See DOCK.md frozen export audit."
+        "Canonical n-ary layouts, root policies, locks, visibility, title palettes, typed PanelState/DockAreaState atomic persistence and full-state factory reconstruction are tested subsets. Workspace dumps prefer matching rendered split sizes, then retained sizes, then source minimum. Owned descriptor aggregates, explicit reconciliation, coalesced lifecycle ticks, completed layout bounds, edge operations and atomic zoom rollback have tests. JSON parsing and automatic framework lifecycle/prepaint delivery remain incomplete. See DOCK.md frozen export audit."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5966,7 +5966,7 @@
       "limitations": [
         "Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.",
         "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.",
-        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Broader scale/legend/selection backlog, Core automatic prepaint, native meshes/caching, Oklab and patterns remain incomplete in this release."
+        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Complex fills/holes, closed/dashed/round stroke variants, broader scale/legend/selection behavior, automatic prepaint and native mesh integration remain incomplete in this release."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

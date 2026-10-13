@@ -2,11 +2,9 @@
 
 ## Current priorities — 13 October
 
-Verified public release `1dc98a9` passes library CI, Pages, actual HTTPS78 and 164 artifact file comparisons. See [published-1dc98a9.txt](validation/published-1dc98a9.txt). All 78 manifest entries remain: 5 implemented, 73 tested, 0 verified. Full GPUI Kit parity is unfinished.
+Published website feedback release `1f9ddda` passes CI, Pages, 196 HTTPS artifact comparisons and both full browser suites; see [publication proof](validation/published-1f9ddda.txt). All 78 families remain: two implemented, 76 tested subsets, zero verified. The next editor/Dock/Plot integration passes native90/90, sanitizer88/88, WASI75/75 and all78 browser stories; deployment is pending.
 
-[website-feedback.md](website-feedback.md) records published component repairs, controlled browser screen picking, clearer themes and visible Markdown code. Integrated Sheet motion `8777cc4` passes native77, ASan75, WASI67, Chromium78 and quality. The sharing release is public:147 canonical component/docs/home pages with metadata and original product media.
-
-Only root integrates. Earlier workers reached model usage limits, so root continues independently. Their branches and the Questionnaire event-order experiment remain preserved. No user dependency installation is required. Impeccable metadata is removed.
+Shared touch/contact routing, nested pixel scrolling, optional pan/pinch and extended cursor support are active isolated work. Native path meshes have separate Core/GPU worker evidence and await integration. [V1 readiness](V1_READINESS.md) records the remaining gates. Only root integrates; workers have explicit isolated ownership. No user dependency installation is required.
 
 ## Historical checkpoints
 

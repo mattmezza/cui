@@ -1109,10 +1109,9 @@ static bool chart_tooltip_emit_styled(const cui_prepaint_info *info, cui_prepain
     float alpha = state->tooltip_focus;
     if (!bare &&
         !chart_emit(writer,
-                    (cui_draw_command){.type = CUI_DRAW_BORDER,
+                    (cui_draw_command){.type = CUI_DRAW_RECT,
                                        .bounds = {rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2},
-                                       .radius = style->radius + 1,
-                                       .stroke = 1,
+                                       .radius = style->radius,
                                        .color = chart_alpha(style->ring_color, alpha)},
                     true))
         return false;
@@ -1201,6 +1200,21 @@ static void chart_tooltip_compose_styled(cui_context *ui, cui_id id, const cui_c
     float pad = bare ? 0 : style->padding;
     cui_rect rect = chart_tooltip_placement((cui_rect){state->bounds.x, state->bounds.y, w, h},
                                             state, style, layout);
+    if (!bare) {
+        /* Source sigma-zero shadow fills expanded bounds beneath the surface.
+         * Spread does not change its corner radii. Each layer carries progress. */
+        cui_begin_portal(ui, id ^ UINT64_C(0x7419919551190000),
+                         (cui_box){.width = rect.w + 2,
+                                   .height = rect.h + 2,
+                                   .fixed_width = true,
+                                   .fixed_height = true,
+                                   .radius = style->radius,
+                                   .background = style->ring_color,
+                                   .custom_opacity = true,
+                                   .opacity = state->tooltip_focus},
+                         (cui_rect){rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2}, 120);
+        cui_end_box(ui);
+    }
     cui_begin_portal(ui, id ^ UINT64_C(0xd8a736411cb50000),
                      (cui_box){.width = rect.w,
                                .height = rect.h,
@@ -1211,10 +1225,6 @@ static void chart_tooltip_compose_styled(cui_context *ui, cui_id id, const cui_c
                                .custom_opacity = true,
                                .opacity = state->tooltip_focus},
                      rect, 120);
-    if (!bare)
-        (void)cui_set_outline(
-            ui, 1, style->ring_color,
-            (cui_corner_radii){style->radius, style->radius, style->radius, style->radius});
     if (o->tooltip_content) {
         cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b669),
                                (cui_box){.width = rect.w - 2 * pad,

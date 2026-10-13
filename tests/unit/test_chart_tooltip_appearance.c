@@ -46,7 +46,7 @@ static const cui_draw_command *surface(cui_draw_list d) {
 }
 static const cui_draw_command *ring(cui_draw_list d) {
     for (size_t i = 0; i < d.count; i++)
-        if (d.commands[i].type == CUI_DRAW_BORDER && d.commands[i].color.r == 250 &&
+        if (d.commands[i].type == CUI_DRAW_RECT && d.commands[i].color.r == 250 &&
             d.commands[i].color.g == 0)
             return &d.commands[i];
     return NULL;
@@ -59,9 +59,9 @@ static void ring_geometry(cui_draw_list d, bool bare, unsigned alpha) {
     const cui_draw_command *r = ring(d), *box = surface(d);
     assert(r && box && r < box && r->bounds.x == box->bounds.x - 1 &&
            r->bounds.y == box->bounds.y - 1 && r->bounds.w == box->bounds.w + 2 &&
-           r->bounds.h == box->bounds.h + 2 && r->stroke == 1 && r->color.a == alpha);
+           r->bounds.h == box->bounds.h + 2 && r->stroke == 0 && r->color.a == alpha);
     assert((r->custom_corners ? r->corner_radii.top_left : r->radius) ==
-           (box->custom_corners ? box->corner_radii.top_left : box->radius) + 1);
+           (box->custom_corners ? box->corner_radii.top_left : box->radius));
 }
 static cui_theme theme(void) {
     return (cui_theme){.radius = 10,

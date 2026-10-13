@@ -61,6 +61,8 @@ int probe_frame(unsigned selected, int legacy, float left, float width) {
     if (!cui_chart_tooltip_style_project(&theme, 16, 20, &style))
         return 8;
     style.appearance = (mode & 1) ? CUI_CHART_TOOLTIP_BARE : CUI_CHART_TOOLTIP_BOXED;
+    if (mode & 8)
+        style.background.a = 128;
     cui_chart_options o = {.kind = CUI_CHART_LINE,
                            .data = data,
                            .count = 2,
@@ -79,6 +81,15 @@ int probe_frame(unsigned selected, int legacy, float left, float width) {
                            .foreground = {0, 0, 0, 255},
                            .grid = {120, 120, 120, 255},
                            .series = {{0, 120, 220, 255}}};
+    if (mode & 16) {
+        o.reduced_motion = false;
+        o.hover_duration = 1000000;
+        chart.tooltip_focus = .5f;
+        chart.tooltip_from = .5f;
+        chart.tooltip_phase = 0;
+        chart.tooltip_active = false;
+        chart.tooltip_started = true;
+    }
     if (!cui_begin_frame(ui, 400, 260, .016f))
         return 1;
     cui_begin_box(ui, 3, (cui_box){.width = 400, .height = 260});
@@ -101,6 +112,9 @@ int probe_frame(unsigned selected, int legacy, float left, float width) {
     cui_end_box(ui);
     draw = cui_end_frame(ui);
     return ok ? cui_last_error(ui) : 4;
+}
+float probe_focus(void) {
+    return chart.tooltip_focus;
 }
 unsigned probe_calls(void) {
     return calls;

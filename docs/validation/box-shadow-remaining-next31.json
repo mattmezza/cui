@@ -1,0 +1,161 @@
+{
+  "baseline": "534a9db2a96b2cf4760d76f61fd9d4fb52ba184a",
+  "upstream": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "component_version": "0.7.1",
+  "read_only": true,
+  "dependencies": {
+    "gpui-pre": {
+      "version": "0.3.8",
+      "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/style.rs": "b4a0e838fc7050cef25f71aae623cf86010c2ec361600479d24ce1aaff91bdc1",
+        "src/window.rs": "2fe230dc311a9dc9b0475e2b5bbe3fbd6b4f54251e38c2b1a977d806fa3ae3e0",
+        "src/geometry.rs": "900fc506a964cda44ed0cf1f97c01ff28d7268c87c9eeadbf7a4f1bb50e33edd",
+        "src/scene.rs": "c48da8a1e703faca710eda4e7ab4247b709af29fc1a072832945aac5ffa0595e",
+        "src/elements/div.rs": "f320948b8f90e36b7100ac3e0e061235d1e9422aeb323918e313f7d69980cfa9"
+      }
+    },
+    "gpui-pre-macros": {
+      "version": "0.3.8",
+      "archive_sha256": "d2ad26ca759364694cb55487bebff4c1b7dd6accab49990ff3cda6f7a818a9f4",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/styles.rs": "5fbd5dac9b7cdc954860a018f6b6925e49c82b4dcfe29424ecea828d47a3ff40"
+      }
+    },
+    "gpui-pre-wgpu": {
+      "version": "0.3.8",
+      "archive_sha256": "439c5421cafe1a7cf68d0c0ae5cc82b26fad6b0e6345ac98d20acaf1f2463914",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/shaders.wgsl": "1d91f2c8a1958a241f1b659a4137c160592c8076b9be09049db4c9fb9a344529",
+        "src/wgpu_renderer.rs": "8dd047382c133f1d2caa08c711a12998ffb7386638aa74d8d0b3a580d078074a"
+      }
+    },
+    "gpui-pre-apple": {
+      "version": "0.3.8",
+      "archive_sha256": "bfdd914311cd12894367c8b9908947bb0c27fd42f8b9a5ff7a0730551a83fa4c",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/shaders.metal": "436647169d914d26092fcf3bfd4020a6638a97d1ea3b39466fd2d4641d1c219e",
+        "src/metal_renderer.rs": "72928305adc4671f3b8f4d97e2344738980e4c3e662926d840f4b69fc674f227"
+      }
+    }
+  },
+  "source_public_fields": [
+    "color: Hsla",
+    "offset: Point<Pixels>",
+    "blur_radius: Pixels",
+    "spread_radius: Pixels",
+    "inset: bool"
+  ],
+  "source_constructor": {
+    "requires_color_and_offsets": true,
+    "blur_radius": 0,
+    "spread_radius": 0,
+    "inset": false,
+    "default_trait": false
+  },
+  "source_paint_order": [
+    "non-inset supplied order",
+    "background",
+    "inset supplied order",
+    "children under own overflow",
+    "border"
+  ],
+  "source_inset": {
+    "hole": "offset original bounds, then dilate by negative spread",
+    "hole_radii": "max(original-clamped radius - spread, 0), then physical scale",
+    "geometry": "covered element bounds",
+    "coverage": "(1 - blurred hole coverage) * element rounded-SDF coverage",
+    "cull": "covered hole intersects current covered ancestor mask",
+    "hole_empty_cull_after_cover": true,
+    "horizontal_hole_tail_rect_cutoff": false,
+    "extra_hole_radius_clamp_in_shader": false
+  },
+  "confirmed_cui_gaps": [
+    {
+      "id": "drop_f32_far_order",
+      "evidence": "independent source-order f32 calculation + actual standalone CUI query",
+      "input": {
+        "x": 4000.1001,
+        "y": 20.25,
+        "width": 32,
+        "height": 4,
+        "offset_x": 1.5,
+        "spread": -0.6,
+        "sigma": 0
+      },
+      "source_covered_width": 32,
+      "cui_covered_width": 31
+    },
+    {
+      "id": "drop_precovers_empty",
+      "input": {
+        "x": 20.25,
+        "y": 20.25,
+        "width": 1,
+        "height": 1,
+        "spread": -0.6,
+        "sigma": 0
+      },
+      "source_covered_size": [
+        1,
+        1
+      ],
+      "cui_raster_size": [
+        0,
+        0
+      ],
+      "native_gpui_execution": false
+    },
+    {
+      "id": "inset_missing",
+      "public_cui_support": false
+    },
+    {
+      "id": "mixed_phase_list_missing",
+      "public_cui_support": false
+    }
+  ],
+  "probe": {
+    "path": "/home/matteo/.cache/cui-validation/shadow-remaining-cover-probe.c",
+    "sha256": "aab5206eafee2536ee247fa9a92635abe0da1f68a6bd2459c13c51de5c8f8c24",
+    "source": "#define CUI_EFFECTS_IMPLEMENTATION\n#include \"cui_effects.h\"\n#include <stdio.h>\nstatic float source_width(float x,float w,float offset,float spread) {\n    float origin=(x+offset)-spread;\n    float size=w+(spread+spread);\n    float near=floorf(origin),far=fmaxf(near,ceilf(origin+size));\n    return far-near;\n}\nint main(void) {\n    const float xs[]={0,.1f,1.25f,16384,4000.1f,-16384};\n    const float ws[]={0,.0001f,.01f,.2f,1.0001f,32};\n    const float ss[]={0,.0001f,.001f,.01f,.1f,.6f,-.6f,-.5001f,-.001f};\n    const float os[]={0,.001f,1.5f,4096,-4096};\n    unsigned printed=0,geometry=0,collapsed=0;\n    for(unsigned ix=0;ix<6;ix++)for(unsigned iw=0;iw<6;iw++)for(unsigned is=0;is<9;is++)for(unsigned io=0;io<5;io++) {\n        cui_drop_shadow_paint p={.caster={xs[ix],20.25f,ws[iw],4},.layer={.offset_x=os[io],.spread=ss[is],.color={0,0,0,255}}};\n        cui_drop_shadow_raster q;\n        if(!cui_effect_drop_shadow_query(p,1,0,0,&q))return 2;\n        float expected=source_width(p.caster.x,p.caster.w,p.layer.offset_x,p.layer.spread);\n        if(expected!=q.covered_layer.w) {\n            bool empty=p.caster.w==0||p.caster.w+2*p.layer.spread<=0;\n            if(empty)collapsed++;else geometry++;\n            if(printed<12 && !empty){printf(\"positive_geometry x=%.9g w=%.9g offset=%.9g spread=%.9g source=%.9g cui=%.9g\\n\",p.caster.x,p.caster.w,p.layer.offset_x,p.layer.spread,expected,q.covered_layer.w);printed++;}\n        }\n    }\n    cui_drop_shadow_paint p={.caster={20.25f,20.25f,1,1},.layer={.spread=-.6f,.color={0,0,0,255}}};\n    cui_drop_shadow_raster q;\n    if(!cui_effect_drop_shadow_query(p,1,0,0,&q))return 3;\n    printf(\"fractional_collapse source=%.9g cui=%u\\n\",source_width(p.caster.x,p.caster.w,0,p.layer.spread),q.width);\n    printf(\"mismatched_cases positive=%u collapsed=%u\\n\",geometry,collapsed);\n    return 0;\n}\n",
+    "log": "positive_geometry x=0 w=9.99999975e-05 offset=4096 spread=9.99999975e-05 source=1 cui=0\npositive_geometry x=0 w=9.99999975e-05 offset=-4096 spread=9.99999975e-05 source=1 cui=0\npositive_geometry x=0 w=1.00010002 offset=4096 spread=9.99999975e-05 source=2 cui=1\npositive_geometry x=0 w=1.00010002 offset=-4096 spread=9.99999975e-05 source=2 cui=1\npositive_geometry x=0 w=32 offset=-4096 spread=9.99999975e-05 source=33 cui=32\npositive_geometry x=16384 w=9.99999975e-05 offset=4096 spread=0.00100000005 source=1 cui=2\npositive_geometry x=16384 w=1.00010002 offset=4096 spread=0.00100000005 source=2 cui=3\npositive_geometry x=16384 w=1.00010002 offset=0.00100000005 spread=-0.00100000005 source=2 cui=1\npositive_geometry x=16384 w=32 offset=4096 spread=0.00100000005 source=33 cui=34\npositive_geometry x=16384 w=32 offset=0.00100000005 spread=-0.00100000005 source=33 cui=32\npositive_geometry x=4000.1001 w=32 offset=1.5 spread=-0.600000024 source=32 cui=31\npositive_geometry x=-16384 w=9.99999975e-05 offset=0 spread=0.00100000005 source=1 cui=2\nfractional_collapse source=1 cui=0\nmismatched_cases positive=17 collapsed=257\n",
+    "cases": 1620,
+    "positive_dimension_width_mismatches": 17,
+    "logical_empty_width_mismatches": 257,
+    "native_gpui_execution": false
+  },
+  "prior_evidence_boundaries": {
+    "five_cui_consumers_have_drop_paths": true,
+    "fresh_next31_native_adapter_or_browser_execution": false,
+    "native_gpui_shader_image_identity": false,
+    "arbitrary_anisotropic_support": false
+  },
+  "recommendation": [
+    "First correct source operation ordering and covering before empty/culling, no new public API",
+    "Then bounded generic mixed drop/inset value-list + inset pure kernel + all five consumers, preserving drop compatibility"
+  ],
+  "future_inset_api_status": "proposal only; not approved for production",
+  "validation": {
+    "strict_warning_build_exit": 0,
+    "build_native_enabled": false,
+    "ctest_exit": 0,
+    "ctest_passed": 131,
+    "ctest_total": 131,
+    "production_changes": false,
+    "global_registration_changes": false
+  },
+  "negative_dimension_semantics": {
+    "logical_negative_not_itself_culled": true,
+    "cover_clamps_after_floor_ceil": true,
+    "scene_checks_covered_bounds": true,
+    "positive_covered_quad_reaches_renderer": true,
+    "wgpu_renderer_location": "src/wgpu_renderer.rs:1532-1537,1735-1758",
+    "metal_renderer_location": "src/metal_renderer.rs:856-899",
+    "native_gpui_execution": false
+  }
+}

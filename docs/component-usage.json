@@ -898,13 +898,15 @@
         "cui_input_state"
       ],
       "state_ownership": "Caller retains cui_edit and its backing buffer; cui_input_ex additionally uses caller-owned cui_input_state.",
-      "interaction": "cui_input_result reports changed, submitted, rejected and errors. Optional whole-value validate callback decides whether a proposed edit is accepted.",
+      "interaction": "cui_input_result reports changed, submitted, rejected and errors. Optional whole-value validate callback decides whether a proposed edit is accepted. Checked pattern and number formatting use caller-owned workspace and commit as one Undo step.",
       "usage": "Create an editor once; submit it each frame and perform application submission only on the result event.",
       "docs": [
         "docs/INPUT.md",
         "docs/INPUT_ACCEPTANCE.md",
         "docs/INPUT_NORMALIZATION.md",
-        "docs/PASSWORD_INPUT_STAGE2.md"
+        "docs/PASSWORD_INPUT_STAGE2.md",
+        "docs/INPUT_PATTERN_FORMATTING.md",
+        "docs/INPUT_NUMBER_FORMATTING.md"
       ],
       "callback_symbols": [
         "cui_edit_accept_fn"

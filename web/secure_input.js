@@ -46,13 +46,20 @@ export function createSecureInputBridge({parent, text, composition, key, focusLo
     proxy.addEventListener('compositionend', event => {
       if (!composing) { clear(); return; }
       const value = event.data || ''; composing = false;
-      ended = value; emit(value ? 'commit' : 'cancel', value); clear();
+      ended = value || null; emit(value ? 'commit' : 'cancel', value); clear();
       // beforeinput/input following compositionend belong to that same commit.
       setTimeout(() => { ended = null; }, 0);
     });
     proxy.addEventListener('beforeinput', event => {
       if (event.inputType === 'insertFromPaste') return; // Browser input event supplies transient text.
-      if (!composing && ended !== null && /Composition|insertText/.test(event.inputType)) event.preventDefault();
+      if (!composing && ended !== null) {
+        const duplicate = event.data === ended ||
+          (event.data == null && /Composition/.test(event.inputType));
+        if (duplicate) {
+          event.preventDefault();
+          if (event.cancelable) ended = null;
+        } else if (event.inputType === 'insertText') ended = null;
+      }
     });
     proxy.addEventListener('input', event => {
       if (composing || event.isComposing) return;

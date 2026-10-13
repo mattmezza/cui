@@ -2213,7 +2213,8 @@ typedef union {
     void (*function)(void);
 } cui_core_max_alignment;
 #endif
-static void *cui_core_frame_copy(cui_context *ui, const void *data, size_t bytes) {
+static void *cui_core_frame_copy_parts(cui_context *ui, const void *data, size_t bytes,
+                                       const void *tail, size_t tail_bytes) {
 #if defined(__cplusplus)
     size_t alignment = alignof(max_align_t);
 #elif defined(_MSC_VER)
@@ -2221,17 +2222,27 @@ static void *cui_core_frame_copy(cui_context *ui, const void *data, size_t bytes
 #else
     size_t alignment = _Alignof(max_align_t);
 #endif
+    if (tail_bytes > SIZE_MAX - bytes) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return NULL;
+    }
+    size_t total = bytes + tail_bytes;
     size_t padding = (alignment - ui->string_used % alignment) % alignment;
     size_t available = ui->config.frame_bytes - ui->string_used;
-    if (padding > available || bytes > available - padding) {
+    if (padding > available || total > available - padding) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
         return NULL;
     }
     void *copy = ui->strings + ui->string_used + padding;
     if (bytes)
         memcpy(copy, data, bytes);
-    ui->string_used += padding + bytes;
+    if (tail_bytes)
+        memcpy((unsigned char *)copy + bytes, tail, tail_bytes);
+    ui->string_used += padding + total;
     return copy;
+}
+static void *cui_core_frame_copy(cui_context *ui, const void *data, size_t bytes) {
+    return cui_core_frame_copy_parts(ui, data, bytes, NULL, 0);
 }
 bool cui_set_hover_hitbox(cui_context *ui, bool enabled) {
     if (!cui_core_active(ui) || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1])
@@ -2243,12 +2254,16 @@ bool cui_set_hover_hitbox(cui_context *ui, bool enabled) {
     return true;
 }
 bool cui_set_prepaint(cui_context *ui, cui_prepaint_options options) {
+    return cui_set_prepaint_parts(ui, options, NULL, 0);
+}
+bool cui_set_prepaint_parts(cui_context *ui, cui_prepaint_options options, const void *tail,
+                            size_t tail_bytes) {
     if (!cui_core_active(ui) || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1])
         return false;
     size_t n = ui->node_stack[ui->depth - 1];
     cui_core_box_node *node = &ui->nodes[n];
     if (!node->id || !options.callback || !options.command_budget ||
-        (options.payload_bytes && !options.payload))
+        (options.payload_bytes && !options.payload) || (tail_bytes && !tail))
         return false;
     if (node->prepaint != SIZE_MAX) {
         cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
@@ -2265,14 +2280,16 @@ bool cui_set_prepaint(cui_context *ui, cui_prepaint_options options) {
         return false;
     }
     const void *payload = NULL;
-    if (options.payload_bytes) {
-        payload = cui_core_frame_copy(ui, options.payload, options.payload_bytes);
+    if (options.payload_bytes || tail_bytes) {
+        payload =
+            cui_core_frame_copy_parts(ui, options.payload, options.payload_bytes, tail, tail_bytes);
         if (!payload) {
             ui->prepaint_capacity = true;
             return false;
         }
     }
     options.payload = payload;
+    options.payload_bytes += tail_bytes;
     node->prepaint = ui->prepaint_count;
     if (options.hover_hitbox)
         node->hover_hitbox = true;
@@ -2635,6 +2652,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     ui->count = 0;
     uint32_t underlay_background_id = 0;
     size_t conversion_clip_depth = 0;
+    size_t layout_clip_depth = 0;
     if (ui->prepaint_capacity)
         goto cui_core_commands_done;
     for (int32_t i = 0; i < a.length; i++) {
@@ -2646,8 +2664,19 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             conversion_clip_depth++;
         else if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END && conversion_clip_depth)
             conversion_clip_depth--;
-        if (c->userData == ui && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
-            c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END)
+        // Clay's closing scissor has no userData. Match suppressed starts by
+        // nesting depth so layout-only descendants emit neither half of a clip.
+        // Inert painted nodes retain ordinary clipping and their paint.
+        if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
+            (layout_clip_depth || c->userData == ui)) {
+            layout_clip_depth++;
+            continue;
+        }
+        if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END && layout_clip_depth) {
+            layout_clip_depth--;
+            continue;
+        }
+        if (layout_clip_depth || c->userData == ui)
             continue;
         float opacity = c->userData && c->userData != ui
                             ? ((const cui_core_box_node *)c->userData)->opacity

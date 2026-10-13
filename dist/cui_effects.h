@@ -13,10 +13,10 @@ typedef struct {
     size_t bytes;
 } cui_drop_shadow_raster;
 /* Uniform physical transform: device = logical*scale + origin. Query validates
- * all input before publishing. Empty collapsed spread has zero dimensions.
- * Scale [1/65536,64]; positive physical sigma below 4*sqrt(FLT_MIN)
- * is rejected atomically (source f32 division would underflow).
- * Max 16384 per side, 16M pixels. Raster storage is caller owned. */
+ * all input before publishing. Physical covering, after materializing logical bounds, determines
+ * empty paint. Scale [1/65536,64]; positive physical sigma below 4*sqrt(FLT_MIN) is rejected
+ * atomically (source f32 division would underflow). Max 16384 per side, 16M pixels. Raster storage
+ * is caller owned. */
 bool cui_effect_drop_shadow_query(cui_drop_shadow_paint, float scale, float origin_x,
                                   float origin_y, cui_drop_shadow_raster *out);
 /* Caller-owned writable straight-alpha RGBA8 storage; size includes padding. */
@@ -67,6 +67,14 @@ bool cui_effect_blur(cui_bitmap source, cui_effect_buffer output, unsigned radiu
 /* Private value-only geometry shared by Core and standalone Effects.
  * The including translation unit supplies the public CUI value types. */
 #include <math.h>
+/* Preserve source Bounds::dilate materialization and f32 operation order.
+ * Covering uses this stored origin plus stored size, not an algebraic rewrite. */
+static inline cui_rect cui_drop_shadow_logical_bounds(cui_drop_shadow_paint p) {
+    return (cui_rect){(p.caster.x + p.layer.offset_x) - p.layer.spread,
+                      (p.caster.y + p.layer.offset_y) - p.layer.spread,
+                      p.caster.w + (p.layer.spread + p.layer.spread),
+                      p.caster.h + (p.layer.spread + p.layer.spread)};
+}
 static inline bool cui_drop_shadow_bounds_checked(cui_drop_shadow_paint p, cui_rect *out) {
     const float values[] = {p.caster.x,        p.caster.y,          p.caster.w,
                             p.caster.h,        p.layer.offset_x,    p.layer.offset_y,
@@ -85,14 +93,12 @@ static inline bool cui_drop_shadow_bounds_checked(cui_drop_shadow_paint p, cui_r
         p.radii.bottom_right < 0 || p.radii.top_left > 16384 || p.radii.top_right > 16384 ||
         p.radii.bottom_left > 16384 || p.radii.bottom_right > 16384)
         return false;
-    cui_rect next = {0};
-    if (p.caster.w > 0 && p.caster.h > 0 && p.caster.w + 2 * p.layer.spread > 0 &&
-        p.caster.h + 2 * p.layer.spread > 0) {
-        float margin = p.layer.spread + 3 * p.layer.sigma + 1;
-        next = (cui_rect){p.caster.x + p.layer.offset_x - margin,
-                          p.caster.y + p.layer.offset_y - margin, p.caster.w + 2 * margin,
-                          p.caster.h + 2 * margin};
-    }
+    cui_rect logical = cui_drop_shadow_logical_bounds(p);
+    float margin = 3 * p.layer.sigma + 1;
+    /* Metadata is conservative logical support, not the checked physical
+     * covering. Even a negative logical size can cover a physical pixel. */
+    cui_rect next = {logical.x - margin, logical.y - margin, fmaxf(logical.w, 0) + 2 * margin,
+                     fmaxf(logical.h, 0) + 2 * margin};
     *out = next;
     return true;
 }
@@ -262,16 +268,13 @@ static bool shadow_geometry(cui_drop_shadow_paint p, float scale, float ox, floa
     *radii = (cui_corner_radii){
         fminf(limit, p.radii.top_left) * scale, fminf(limit, p.radii.top_right) * scale,
         fminf(limit, p.radii.bottom_left) * scale, fminf(limit, p.radii.bottom_right) * scale};
-    float x = (p.caster.x + p.layer.offset_x - p.layer.spread) * scale + ox;
-    float y = (p.caster.y + p.layer.offset_y - p.layer.spread) * scale + oy;
-    float w = p.caster.w + 2 * p.layer.spread, h = p.caster.h + 2 * p.layer.spread;
-    if (w <= 0 || h <= 0 || p.caster.w == 0 || p.caster.h == 0) {
-        *bounds = (cui_rect){0};
-        return true;
-    }
-    float far_x = (p.caster.x + p.layer.offset_x + p.caster.w + p.layer.spread) * scale + ox;
-    float far_y = (p.caster.y + p.layer.offset_y + p.caster.h + p.layer.spread) * scale + oy;
-    *bounds = (cui_rect){floorf(x), floorf(y), ceilf(far_x) - floorf(x), ceilf(far_y) - floorf(y)};
+    cui_rect logical = cui_drop_shadow_logical_bounds(p);
+    float x = logical.x * scale + ox, y = logical.y * scale + oy;
+    float far_x = (logical.x + logical.w) * scale + ox;
+    float far_y = (logical.y + logical.h) * scale + oy;
+    float near_x = floorf(x), near_y = floorf(y);
+    *bounds = (cui_rect){near_x, near_y, fmaxf(ceilf(far_x), near_x) - near_x,
+                         fmaxf(ceilf(far_y), near_y) - near_y};
     return isfinite(bounds->w) && isfinite(bounds->h);
 }
 bool cui_effect_drop_shadow_query(cui_drop_shadow_paint p, float scale, float ox, float oy,

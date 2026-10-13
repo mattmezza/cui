@@ -56,6 +56,108 @@ static cui_str cui_button_label(cui_context *ui, cui_button_state *state, cui_st
     state->label[prefix + ellipsis.length] = 0;
     return (cui_str){state->label, prefix + ellipsis.length};
 }
+typedef struct {
+    size_t bytes;
+    float font;
+    cui_color color;
+    cui_button_state *state;
+    bool underline;
+} cui_button_label_paint;
+static bool cui_button_label_prepaint(const cui_prepaint_info *info, const void *data,
+                                      cui_prepaint_writer *writer) {
+    const cui_button_label_paint *p = data;
+    cui_str name = {(const char *)data + sizeof *p, p->bytes};
+    if (!name.length || info->bounds.w <= 0 || info->bounds.h <= 0) {
+        if (name.length && p->state && !info->inert)
+            p->state->label[0] = 0;
+        return true;
+    }
+    float width = info->bounds.w;
+    cui_size natural = cui_prepaint_measure(writer, name, p->font, (cui_text_style){0});
+    if (!isfinite(natural.width) || !isfinite(natural.height) || natural.width < 0 ||
+        natural.height < 0)
+        return false;
+    size_t prefix = name.length;
+    float prefix_width = natural.width, tail_width = 0;
+    cui_str tail = cui_string("…");
+    /* The constrained row reserves two representable steps for fractional
+     * child advances. Allow those plus subtraction rounding when deciding a
+     * measured exact fit; the existing viewport still clips physical paint. */
+    float fit_limit = width;
+    for (unsigned i = 0; i < 4; ++i)
+        fit_limit = nextafterf(fit_limit, INFINITY);
+    bool truncated = natural.width > fit_limit;
+    if (truncated) {
+        if (p->state && !info->inert)
+            p->state->label[0] = 0;
+        tail_width = cui_prepaint_measure(writer, tail, p->font, (cui_text_style){0}).width;
+        if (tail_width > width)
+            return true;
+        size_t cap = p->state ? sizeof p->state->label - 4 : name.length;
+        size_t clusters = 0, offset = 0;
+        while (offset < name.length) {
+            size_t next = cui_grapheme_next(name, offset);
+            if (next <= offset || next > cap)
+                break;
+            offset = next;
+            ++clusters;
+        }
+        size_t low = 0, high = clusters;
+        while (low < high) {
+            size_t middle = low + (high - low + 1) / 2, end = 0;
+            for (size_t i = 0; i < middle; ++i)
+                end = cui_grapheme_next(name, end);
+            float measured = cui_prepaint_measure(writer, (cui_str){name.data, end}, p->font,
+                                                  (cui_text_style){0})
+                                 .width;
+            if (measured + tail_width <= width)
+                low = middle;
+            else
+                high = middle - 1;
+        }
+        prefix = 0;
+        for (size_t i = 0; i < low; ++i)
+            prefix = cui_grapheme_next(name, prefix);
+        prefix_width =
+            cui_prepaint_measure(writer, (cui_str){name.data, prefix}, p->font, (cui_text_style){0})
+                .width;
+        if (p->state && !info->inert) {
+            memcpy(p->state->label, name.data, prefix);
+            memcpy(p->state->label + prefix, tail.data, tail.length);
+            p->state->label[prefix + tail.length] = 0;
+        }
+    }
+    float total = prefix_width + tail_width;
+    float x = info->bounds.x + fmaxf(0, (width - total) * .5f);
+    cui_color color = p->color;
+    color.a = (uint8_t)(color.a * info->opacity);
+    cui_draw_command command = {
+        .type = CUI_DRAW_TEXT,
+        .bounds = {x,
+                   info->bounds.y +
+                       (info->bounds.h - natural.height - (p->underline ? 1 : 0)) * .5f,
+                   prefix_width, natural.height},
+        .color = color,
+        .font_size = p->font,
+        .text = {name.data, prefix}};
+    if (prefix && !cui_prepaint_emit(writer, &command, false))
+        return false;
+    if (truncated) {
+        command.bounds.x += prefix_width;
+        command.bounds.w = tail_width;
+        command.text = tail;
+        if (!cui_prepaint_emit(writer, &command, false))
+            return false;
+    }
+    if (p->underline && total > 0) {
+        command = (cui_draw_command){.type = CUI_DRAW_RECT,
+                                     .bounds = {x, info->bounds.y + info->bounds.h - 1, total, 1},
+                                     .color = color};
+        if (!cui_prepaint_emit(writer, &command, false))
+            return false;
+    }
+    return true;
+}
 static bool cui_button_shape_valid(cui_button_options);
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state) {
@@ -98,6 +200,8 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         font = o.font_size;
     if (cui_button_dimension(o.icon_size))
         icon = o.icon_size;
+    /* Raster icons occupy integral pixels; reserve the complete painted extent. */
+    icon = ceilf(icon);
     if (o.compact) {
         if (o.design_size != CUI_DESIGN_INHERIT)
             padding *= .8f;
@@ -159,7 +263,7 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     }
     b.align_x = CUI_ALIGN_CENTER;
     b.align_y = CUI_ALIGN_CENTER;
-    b.clip = b.width > 0;
+    b.clip = b.width != 0 && !o.allow_content_overflow;
     if (o.rounding == CUI_BUTTON_ROUNDED_NONE)
         b.radius = 0;
     else if (o.rounding == CUI_BUTTON_ROUNDED_SMALL)
@@ -237,14 +341,21 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     cui_begin_box(ui, id, b);
     cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
-    cui_begin_box(ui, 0,
-                  (cui_box){.width = b.width ? -1 : 0,
-                            .row = true,
-                            .clip = b.width > 0,
-                            .align_x = CUI_ALIGN_CENTER,
-                            .align_y = CUI_ALIGN_CENTER,
-                            .gap = gap});
-    if (text && !o.icon_only && !o.content) {
+    /* Leave two representable steps for summed fractional child advances. */
+    cui_begin_box(
+        ui, 0,
+        (cui_box){.width = b.width ? -1 : 0,
+                  .max_width = b.width > 0
+                                   ? nextafterf(nextafterf(fmaxf(0, b.width - 2 * padding), 0), 0)
+                                   : 0,
+                  .row = true,
+                  .height = b.height,
+                  .fixed_height = b.height > 0,
+                  .clip = !o.allow_content_overflow,
+                  .align_x = CUI_ALIGN_CENTER,
+                  .align_y = CUI_ALIGN_CENTER,
+                  .gap = gap});
+    if (text && !b.height && !o.icon_only && !o.content) {
         float minimum = fmaxf(font * 1.25f, cui_measure_text(ui, name, font).height);
         cui_begin_box(
             ui, 0,
@@ -277,25 +388,53 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     if (o.content)
         o.content(ui, o.content_user);
     else if (!o.icon_only) {
-        cui_str visible = cui_button_label(ui, o.state, name, font, o.label_width);
-        cui_begin_box(ui, 0,
-                      (cui_box){.width = cui_button_dimension(o.label_width) ? o.label_width : 0,
-                                .fixed_width = cui_button_dimension(o.label_width),
-                                .clip = cui_button_dimension(o.label_width),
-                                .align_x = CUI_ALIGN_CENTER});
-        if (cui_button_dimension(o.label_width))
-            cui_text_line(ui, visible, font, foreground, font * 1.25f, (cui_text_style){0});
-        else
-            cui_text_with_line_height(ui, visible, font, foreground, font * 1.25f);
-        if (o.variant == CUI_BUTTON_LINK && visible.length) {
-            float underline = cui_measure_text(ui, visible, font).width;
+        bool constrained = b.width != 0 || cui_button_dimension(o.label_width);
+        if (constrained && !o.allow_content_overflow) {
+            bool explicit_width = !b.width && cui_button_dimension(o.label_width);
+            cui_id label_id = id ^ UINT64_C(0x2a7251d89c831be7);
+            if (!label_id)
+                label_id = ~id;
+            cui_begin_box(
+                ui, label_id,
+                (cui_box){.width = explicit_width ? o.label_width : -1,
+                          .fixed_width = explicit_width,
+                          .max_width = cui_button_dimension(o.label_width) ? o.label_width : 0,
+                          .height = fmaxf(font * 1.25f, cui_measure_text(ui, name, font).height) +
+                                    (o.variant == CUI_BUTTON_LINK ? 1 : 0),
+                          .fixed_height = true,
+                          .clip = true});
+            cui_button_label_paint label = {name.length, font, foreground, o.state,
+                                            o.variant == CUI_BUTTON_LINK};
+            (void)cui_set_prepaint_parts(
+                ui,
+                (cui_prepaint_options){.callback = cui_button_label_prepaint,
+                                       .payload = &label,
+                                       .payload_bytes = sizeof label,
+                                       .command_budget = 5},
+                name.data, name.length);
+            cui_end_box(ui);
+        } else {
+            cui_str visible = cui_button_label(ui, o.state, name, font, o.label_width);
+            cui_begin_box(
+                ui, 0,
+                (cui_box){.width = cui_button_dimension(o.label_width) ? o.label_width : 0,
+                          .fixed_width = cui_button_dimension(o.label_width),
+                          .clip = cui_button_dimension(o.label_width),
+                          .align_x = CUI_ALIGN_CENTER});
             if (cui_button_dimension(o.label_width))
-                underline = fminf(underline, o.label_width);
-            cui_begin_box(ui, 0,
-                          (cui_box){.width = underline, .height = 1, .background = foreground});
+                cui_text_line(ui, visible, font, foreground, font * 1.25f, (cui_text_style){0});
+            else
+                cui_text_with_line_height(ui, visible, font, foreground, font * 1.25f);
+            if (o.variant == CUI_BUTTON_LINK && visible.length) {
+                float underline = cui_measure_text(ui, visible, font).width;
+                if (cui_button_dimension(o.label_width))
+                    underline = fminf(underline, o.label_width);
+                cui_begin_box(ui, 0,
+                              (cui_box){.width = underline, .height = 1, .background = foreground});
+                cui_end_box(ui);
+            }
             cui_end_box(ui);
         }
-        cui_end_box(ui);
     }
     if (o.children)
         o.children(ui, o.children_user);
@@ -306,7 +445,8 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     else if (o.trailing.length)
         cui_text_with_line_height(ui, o.trailing, font, foreground, font * 1.25f);
     if (o.dropdown_caret) {
-        if (b.width) {
+        if (b.width && (o.allow_content_overflow || o.content || o.icon_only ||
+                        cui_button_dimension(o.label_width))) {
             cui_begin_box(ui, 0, (cui_box){.width = -1});
             cui_end_box(ui);
         }
@@ -2149,6 +2289,23 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
         ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
          (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_edit_checked_result configured =
+        cui_edit_apply_checked(edit,
+                               (cui_edit_request){.kind = CUI_EDIT_REQUEST_PRESENT,
+                                                  .format = options.format,
+                                                  .format_workspace = options.format_workspace},
+                               (cui_edit_acceptance){0});
+    if (configured.error != CUI_EDIT_OK)
+        return (cui_input_result){.error = configured.error};
+    bool pattern_placeholder = options.format.pattern.length && !options.placeholder.length;
+    if (pattern_placeholder) {
+        cui_str placeholder;
+        cui_edit_result error =
+            cui_edit_format_placeholder(options.format, options.format_workspace.data,
+                                        options.format_workspace.bytes, &placeholder);
+        if (error != CUI_EDIT_OK)
+            return (cui_input_result){.error = error};
+    }
     cui_input_mask_cache *mask = NULL;
     if (options.masked) {
         cui_input_visual_cache *plain = cui_input_visual_resource(ui, id);
@@ -2207,6 +2364,8 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
             .validate = options.validate,
             .validate_user = options.validate_user,
             .normalization = options.normalization,
+            .format = options.format,
+            .format_workspace = options.format_workspace,
             .masked = options.masked,
             .content_type = options.content_type,
             .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},
@@ -2221,6 +2380,12 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
         mask->revision = cui_edit_get_state(edit).revision;
         if (!state->behavior.composition || !state->behavior.composition->active)
             mask->visible = mask->committed;
+    }
+    if (pattern_placeholder) {
+        cui_str placeholder;
+        (void)cui_edit_format_placeholder(options.format, options.format_workspace.data,
+                                          options.format_workspace.bytes, &placeholder);
+        options.placeholder = placeholder;
     }
     options.invalid = options.invalid || result.error != CUI_EDIT_OK;
     cui_input_paint(ui, id, t, name, edit, state, options);

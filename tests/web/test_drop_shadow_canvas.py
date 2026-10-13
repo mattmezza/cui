@@ -40,6 +40,12 @@ def main():
             const ix=px-Math.round(original.bounds[0]*scale),iy=py-Math.round(original.bounds[1]*scale),a=original.pixels[(iy*original.width+ix)*4+3]/255;
             same(Array.from(ctx.getImageData(px,py,1,1).data),[255*(1-a),255*(1-a),255*(1-a),255]);
             same(Array.from(ctx.getImageData(Math.ceil(21.25*scale),py,1,1).data),[255,255,255,255]);
+            const collapsed=[20.25,20.25,1,1,0,0,0,0,0,0,0,-.6,0,0,0,255];
+            prepared=renderer.prepare([{type:'shadow',values:collapsed}],ctx,64.25,64);
+            ctx.fillStyle='white';ctx.fillRect(0,0,64.25,64);prepared.draw(0,ctx,{unclipped:true});
+            const covered=scale===1?20:41;
+            same(Array.from(ctx.getImageData(covered,covered,1,1).data),[0,0,0,255]);
+            same(Array.from(ctx.getImageData(covered+1,covered,1,1).data),[255,255,255,255]);
             results.push({scale,actualTransform:ctx.getTransform().a,backingWidth:canvas.width,listWidth:64.25});
           }
           // Integer translated caster and opacity reuse coverage; fractional phase does not.
@@ -50,6 +56,14 @@ def main():
           const highPrepared=highRenderer.prepare(highCommands,c,16392,128);c.fillStyle='white';c.fillRect(16384,0,128,128);highPrepared.draw(1,c,{unclipped:true});
           const highRaster=raster(high,1,-16384,0),alpha=highRaster.pixels[((25-Math.round(highRaster.bounds[1]))*highRaster.width-Math.round(highRaster.bounds[0]-16384))*4+3]/255;
           same(Array.from(c.getImageData(0,25,1,1).data),[255*(1-alpha),255*(1-alpha),255*(1-alpha),255]);
+          // Literal source far edge: materialized f32 origin+size covers x33,
+          // whereas the former algebraic rewrite stopped at x32.
+          const far=[Math.fround(4000.1001),20.25,32,4,0,0,0,0,1.5,0,0,Math.fround(-.6),0,0,0,255];
+          c.setTransform(1,0,0,1,-4000,0);
+          const farRenderer=m.createCuiShadowRenderer(raster),farPrepared=farRenderer.prepare([{type:'shadow',values:far}],c,4040,128);
+          c.fillStyle='white';c.fillRect(4000,0,128,128);farPrepared.draw(0,c,{unclipped:true});
+          same(Array.from(c.getImageData(33,21,1,1).data),[0,0,0,255]);
+          same(Array.from(c.getImageData(34,21,1,1).data),[255,255,255,255]);
           return {results,cache:r.stats()};
         }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()])
         assert [r['scale'] for r in result['results']]==[1,2],result

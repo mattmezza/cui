@@ -1,0 +1,16 @@
+{
+  "source": "gpui-component 0.7.1 locked gpui-pre 0.3.8",
+  "component_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
+  "files": {
+    "src/window.rs": {
+      "sha256": "2fe230dc311a9dc9b0475e2b5bbe3fbd6b4f54251e38c2b1a977d806fa3ae3e0",
+      "lines": "3196-3205: cover_bounds; floor near, ceil stored far, max near"
+    },
+    "src/geometry.rs": {
+      "sha256": "900fc506a964cda44ed0cf1f97c01ff28d7268c87c9eeadbf7a4f1bb50e33edd",
+      "lines": "1067-1073: dilate; 1323: right"
+    }
+  },
+  "proof_boundary": "Source-derived f32 geometry fixtures and actual CUI pixels; not native GPUI renderer execution."
+}

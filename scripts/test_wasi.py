@@ -90,13 +90,13 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts", "plot_chart_prepaint", "pointer_presence", "input_acceptance", "chart_source_point_axis", "input_normalization", "chart_radar_tooltip_title", "chart_typed_tooltip", "pointer_activation_blocker", "button_activation_blocker", "pointer_blocker_scroll_scope", "password_engine", "chart_tooltip_appearance", "button_group", "button_callback_events", "password_present", "password_start", "password_input", "secure_focus", "secure_focus_generation", "drop_shadow")
+SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts", "plot_chart_prepaint", "pointer_presence", "input_acceptance", "chart_source_point_axis", "input_normalization", "chart_radar_tooltip_title", "chart_typed_tooltip", "pointer_activation_blocker", "button_activation_blocker", "pointer_blocker_scroll_scope", "password_engine", "chart_tooltip_appearance", "button_group", "button_callback_events", "password_present", "password_start", "password_input", "secure_focus", "secure_focus_generation", "drop_shadow", "input_format_engine", "input_format_control", "input_number_engine", "input_number_control", "shadow_covering", "button_label_layout")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
     paths = list(SOURCES) + ["backends/software/cui_shadow.h", "backends/software/cui_bitmap.h", "src/core/cui_drop_shadow_bounds_internal.h", "tests/distribution/drop_shadow_effects.c"]
     paths += [f"tests/unit/test_{name}.c" for name in SUITES]
-    paths += ["tests/unit/test_core_embed.c", "tests/distribution/single.c",
+    paths += ["tests/unit/test_prepaint_parts.c", "tests/unit/test_layout_only_clips.c", "tests/unit/test_core_embed.c", "tests/distribution/single.c",
               "tests/distribution/implementation.c", "tests/distribution/consumer.c",
               "tests/distribution/effects.c", "tests/distribution/theme_registry.c", "tests/distribution/dock_model.c", "tests/distribution/virtual_model.c"]
     paths += [f"examples/{name}/main.c" for name in ("unstyled", "styled_settings")]
@@ -224,6 +224,8 @@ def main() -> int:
                     (["src/core/cui.c"] if name == "pointer_presence" else []),
                     name != "pointer_presence",
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("prepaint_parts_core_only", ["tests/unit/test_prepaint_parts.c"], False, [])]
+        targets += [("layout_only_clips_core_only", ["tests/unit/test_layout_only_clips.c", "src/core/cui.c"], False, [])]
         targets += [("accepted_activation_core_only", ["tests/unit/test_accepted_activation.c", "src/core/cui.c"], False, [])]
         targets += [("button_group_base_only", ["tests/unit/test_button_group_base.c", "src/core/cui.c", "src/base/cui_button_group.c"], False, [])]
         targets += [("radio_group_base_only", ["tests/unit/test_radio_group_base.c", "src/core/cui.c", "src/base/cui_radio_group.c"], False, [])]

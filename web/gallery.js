@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
+import {selectedUsage} from "./modules/cui_usage.js";
 let shadowRenderer;
 const $ = id => document.getElementById(id);
 // Freeze the asset root before shareable paths change the current document URL.
@@ -434,6 +435,10 @@ function render(){
  syncImeTarget();
  canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed','crosshair','grab','grabbing','zoom-in','zoom-out','wait','help'][wasm.gallery_cursor()]||'default';
  syncSemantics();
+ if(selected.name==='Button'||selected.name==='Input'){
+  const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
+  $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
+ }
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));
  if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
@@ -774,7 +779,11 @@ for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])
  if(e.pointerType!=='touch'&&pointerOutsideCanvas(e,rect))pointerPresenceLeave();requestFrame();
 });
 for(const [event,type] of [['mousedown',1],['mouseup',2]])canvas.addEventListener(event,e=>{
- if(!wasm||suppressCompatibilityMouse)return;
+ if(!wasm)return;
+ // A touch tap may synthesize mouse events after the finalized text proxy has
+ // taken focus. Suppress their browser default as well as duplicate CUI input:
+ // the default mousedown would focus canvas again and clear the text owner.
+ if(suppressCompatibilityMouse){e.preventDefault();return;}
  const rect=canvas.getBoundingClientRect();
  wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),Math.max(1,e.detail));
  if(pointerOutsideCanvas(e,rect))pointerPresenceLeave();requestFrame();
@@ -807,7 +816,7 @@ function cancelPageTouches(){for(const [id,t] of pageTouches)if(!t.owned)wasm?.g
 window.addEventListener('blur',()=>{cancelPageTouches();pointerFocusLoss();secureInput.reset();imeTarget=null;composing=false;wasm?.gallery_focus(0xffffffff);requestFrame();});window.addEventListener('hashchange',cancelPageTouches);
 canvas.addEventListener('lostpointercapture',e=>{const t=pageTouches.get(e.pointerId);if(!t)return;pageTouches.delete(e.pointerId);if(!t.owned)wasm?.gallery_touch(7,0,0,e.pointerId,1);requestFrame();});
 canvas.addEventListener('pointercancel',e=>{const t=pageTouches.get(e.pointerId);pageTouches.delete(e.pointerId);if(!t?.owned)wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
-canvas.addEventListener('blur',e=>{if(e.relatedTarget===secureInput.element)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});
+canvas.addEventListener('blur',e=>{if(secureInput.element&&e.relatedTarget===secureInput.element)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});
 function handleCanvasKey(e,type){
  if(!wasm)return;const key=keyIdentity(e.key);
  if(e.key==='Tab'&&!composing&&!e.isComposing){

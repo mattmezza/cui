@@ -59,7 +59,13 @@ def main():
         assert page.locator('#cui-secure-input').input_value()==''
         page.keyboard.press('Control+z');page.wait_for_timeout(80);assert page.evaluate('proof.value()')=='secret'
         session.send('Input.imeSetComposition',{'text':'取消','selectionStart':2,'selectionEnd':2});page.wait_for_timeout(50)
-        session.send('Input.imeSetComposition',{'text':'','selectionStart':0,'selectionEnd':0});page.wait_for_timeout(80);assert page.evaluate('proof.value()')=='secret'
+        session.send('Input.imeSetComposition',{'text':'','selectionStart':0,'selectionEnd':0})
+        # A cancellation must not swallow the next native insertion, even without
+        # a delay to let the composition-end duplicate guard expire.
+        session.send('Input.insertText',{'text':'x'});page.wait_for_timeout(80)
+        assert page.evaluate('proof.value()')=='x',page.evaluate('({value:proof.value(),active:proof.e.probe_active(),events:window.events})')
+        page.keyboard.press('Control+z');page.wait_for_timeout(80)
+        assert page.evaluate('proof.value()')=='secret'
         page.evaluate('proof.e.probe_fixed(1);proof.frame()')
         page.keyboard.press('Control+a');page.wait_for_timeout(50)
         session.send('Input.imeSetComposition',{'text':'candidate exceeds ten scalars','selectionStart':2,'selectionEnd':3});page.wait_for_timeout(80)

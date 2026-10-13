@@ -79,6 +79,32 @@ typedef struct {
     cui_edit_workspace caller_workspaces[3];
     size_t caller_workspace_count;
 } cui_edit_presentation;
+/* Formatting changes stored text; it is independent of password display masks.
+ * Tokens: 9 ASCII digit, A ASCII letter, # ASCII alphanumeric, * UTF-8 scalar;
+ * all other scalars are literals. Empty pattern behaves as NONE. */
+typedef enum {
+    CUI_EDIT_FORMAT_NONE = 0,
+    CUI_EDIT_FORMAT_PATTERN,
+    CUI_EDIT_FORMAT_NUMBER
+} cui_edit_format_kind;
+typedef struct {
+    cui_edit_format_kind kind;
+    cui_str pattern;    /* Immutable, borrowed only during a synchronous request. */
+    bool has_separator; /* NUMBER: true uses a non-NUL Unicode scalar separator. */
+    uint32_t separator;
+    bool fraction_limited;
+    size_t fraction_digits; /* NUMBER: truncates only when has_separator is true. */
+} cui_edit_format;
+/* Pure helpers: all input/destination/output extents must be disjoint. Outputs
+ * are unchanged on malformed UTF-8, alias or capacity failure. Text helpers
+ * append NUL; placeholder is empty for NONE. Validity accepts partial prefixes. */
+cui_edit_result cui_edit_format_valid(cui_edit_format, cui_str, bool *valid);
+cui_edit_result cui_edit_format_text(cui_edit_format, cui_str, char *destination, size_t capacity,
+                                     cui_str *formatted);
+cui_edit_result cui_edit_format_placeholder(cui_edit_format, char *destination, size_t capacity,
+                                            cui_str *placeholder);
+cui_edit_result cui_edit_unformat_text(cui_edit_format, cui_str, char *destination, size_t capacity,
+                                       cui_str *unformatted);
 typedef enum {
     CUI_EDIT_REQUEST_EVENT,
     CUI_EDIT_REQUEST_INSERT,
@@ -86,6 +112,14 @@ typedef enum {
     CUI_EDIT_REQUEST_COMPOSITION,
     CUI_EDIT_REQUEST_PRESENT /* Nonmutating initial/current presentation; see below. */
 } cui_edit_request_kind;
+/* Pure numeric insertion normalization (fullwidth digits/signs/dot/comma,
+ * U+2212 minus and U+3002 dot), then the requested CR/LF policy. Endpoint is
+ * an original UTF-8 scalar boundary; mapped output is a normalized byte offset.
+ * Disjoint outputs and source; failures leave outputs unchanged. */
+cui_edit_result cui_edit_normalize_number_text(cui_str, cui_edit_normalization, char *destination,
+                                               size_t capacity, cui_str *normalized);
+cui_edit_result cui_edit_number_offset(cui_str, cui_edit_normalization, size_t source_byte,
+                                       size_t *normalized_byte);
 typedef struct {
     cui_edit_request_kind kind;
     cui_event event;
@@ -95,6 +129,8 @@ typedef struct {
     cui_edit_normalization normalization;
     cui_edit_presentation presentation;
     bool masked_words; /* Checked-call word boundaries become whole-value endpoints. */
+    cui_edit_format format;
+    cui_edit_workspace format_workspace; /* Final value + NUL; disjoint caller storage. */
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;
@@ -127,6 +163,13 @@ typedef struct {
  * says prepare returned OK (even if later guard/predicate fails); applied says
  * the checked operation adopted that candidate. Completion is outside engine
  * rollback; no callbacks/foreign pointers are retained after the request. */
+/* Nonempty PATTERN and NUMBER are single-line/single-selection only; inline tokens are
+ * unsupported. Normalize then validate the unformatted whole candidate (custom
+ * predicate before token validity); old-invalid healing is preserved. Committed
+ * text is formatted once before mutation, with final resource prepare preceding
+ * predicates. UPDATE remains unformatted; replay/PRESENT/START/CANCEL never
+ * format. Formatting rewrites use one atomic history entry. Caller workspace and
+ * pattern must not overlap any model/session/payload/presentation storage. */
 cui_edit_checked_result cui_edit_apply_checked(cui_edit *, cui_edit_request, cui_edit_acceptance);
 /* Disabled/read-only/unfocused callers pass editable=false to cancel. Update
  * never changes document/history. Commit is exactly one undo transaction. */

@@ -80,6 +80,32 @@ typedef struct {
     cui_edit_workspace caller_workspaces[3];
     size_t caller_workspace_count;
 } cui_edit_presentation;
+/* Formatting changes stored text; it is independent of password display masks.
+ * Tokens: 9 ASCII digit, A ASCII letter, # ASCII alphanumeric, * UTF-8 scalar;
+ * all other scalars are literals. Empty pattern behaves as NONE. */
+typedef enum {
+    CUI_EDIT_FORMAT_NONE = 0,
+    CUI_EDIT_FORMAT_PATTERN,
+    CUI_EDIT_FORMAT_NUMBER
+} cui_edit_format_kind;
+typedef struct {
+    cui_edit_format_kind kind;
+    cui_str pattern;    /* Immutable, borrowed only during a synchronous request. */
+    bool has_separator; /* NUMBER: true uses a non-NUL Unicode scalar separator. */
+    uint32_t separator;
+    bool fraction_limited;
+    size_t fraction_digits; /* NUMBER: truncates only when has_separator is true. */
+} cui_edit_format;
+/* Pure helpers: all input/destination/output extents must be disjoint. Outputs
+ * are unchanged on malformed UTF-8, alias or capacity failure. Text helpers
+ * append NUL; placeholder is empty for NONE. Validity accepts partial prefixes. */
+cui_edit_result cui_edit_format_valid(cui_edit_format, cui_str, bool *valid);
+cui_edit_result cui_edit_format_text(cui_edit_format, cui_str, char *destination, size_t capacity,
+                                     cui_str *formatted);
+cui_edit_result cui_edit_format_placeholder(cui_edit_format, char *destination, size_t capacity,
+                                            cui_str *placeholder);
+cui_edit_result cui_edit_unformat_text(cui_edit_format, cui_str, char *destination, size_t capacity,
+                                       cui_str *unformatted);
 typedef enum {
     CUI_EDIT_REQUEST_EVENT,
     CUI_EDIT_REQUEST_INSERT,
@@ -87,6 +113,14 @@ typedef enum {
     CUI_EDIT_REQUEST_COMPOSITION,
     CUI_EDIT_REQUEST_PRESENT /* Nonmutating initial/current presentation; see below. */
 } cui_edit_request_kind;
+/* Pure numeric insertion normalization (fullwidth digits/signs/dot/comma,
+ * U+2212 minus and U+3002 dot), then the requested CR/LF policy. Endpoint is
+ * an original UTF-8 scalar boundary; mapped output is a normalized byte offset.
+ * Disjoint outputs and source; failures leave outputs unchanged. */
+cui_edit_result cui_edit_normalize_number_text(cui_str, cui_edit_normalization, char *destination,
+                                               size_t capacity, cui_str *normalized);
+cui_edit_result cui_edit_number_offset(cui_str, cui_edit_normalization, size_t source_byte,
+                                       size_t *normalized_byte);
 typedef struct {
     cui_edit_request_kind kind;
     cui_event event;
@@ -96,6 +130,8 @@ typedef struct {
     cui_edit_normalization normalization;
     cui_edit_presentation presentation;
     bool masked_words; /* Checked-call word boundaries become whole-value endpoints. */
+    cui_edit_format format;
+    cui_edit_workspace format_workspace; /* Final value + NUL; disjoint caller storage. */
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;
@@ -128,6 +164,13 @@ typedef struct {
  * says prepare returned OK (even if later guard/predicate fails); applied says
  * the checked operation adopted that candidate. Completion is outside engine
  * rollback; no callbacks/foreign pointers are retained after the request. */
+/* Nonempty PATTERN and NUMBER are single-line/single-selection only; inline tokens are
+ * unsupported. Normalize then validate the unformatted whole candidate (custom
+ * predicate before token validity); old-invalid healing is preserved. Committed
+ * text is formatted once before mutation, with final resource prepare preceding
+ * predicates. UPDATE remains unformatted; replay/PRESENT/START/CANCEL never
+ * format. Formatting rewrites use one atomic history entry. Caller workspace and
+ * pattern must not overlap any model/session/payload/presentation storage. */
 cui_edit_checked_result cui_edit_apply_checked(cui_edit *, cui_edit_request, cui_edit_acceptance);
 /* Disabled/read-only/unfocused callers pass editable=false to cancel. Update
  * never changes document/history. Commit is exactly one undo transaction. */
@@ -3355,9 +3398,17 @@ struct cui_edit {
     cui_edit_acceptance acceptance;
     cui_edit_normalization normalization;
     cui_edit_presentation presentation;
+    cui_edit_format format;
+    cui_edit_workspace format_workspace;
+    bool format_ready;
+    size_t format_length;
     bool presentation_prepared, presentation_skip, masked_words;
     bool callback_active, acceptance_violation, acceptance_rejected, acceptance_skip;
 };
+static bool cui_edit_private_format_enabled(cui_edit_format f) {
+    return f.kind == CUI_EDIT_FORMAT_NUMBER ||
+           (f.kind == CUI_EDIT_FORMAT_PATTERN && f.pattern.length);
+}
 static bool cui_edit_private_callback_guard(const cui_edit *e) {
     if (!e || !e->callback_active)
         return false;
@@ -3368,12 +3419,19 @@ static bool cui_edit_private_predicate(cui_edit *e, cui_str value) {
     if (!value.length)
         return true;
     e->callback_active = true;
-    bool accepted = e->acceptance.validate(e->acceptance.user, value);
+    bool accepted = !e->acceptance.validate || e->acceptance.validate(e->acceptance.user, value);
     e->callback_active = false;
+    if (accepted && cui_edit_private_format_enabled(e->format)) {
+        bool valid = false;
+        if (cui_edit_format_valid(e->format, value, &valid) != CUI_EDIT_OK)
+            return false;
+        accepted = valid;
+    }
     return accepted;
 }
 static cui_edit_result cui_edit_private_accept_value(cui_edit *e, cui_str candidate, cui_str old) {
-    if (!e->acceptance.validate || e->config.multiline || e->acceptance_skip)
+    if ((!e->acceptance.validate && !cui_edit_private_format_enabled(e->format)) ||
+        e->config.multiline || e->acceptance_skip)
         return CUI_EDIT_OK;
     bool accepted = cui_edit_private_predicate(e, candidate);
     if (e->acceptance_violation)
@@ -4325,24 +4383,421 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
 }
 static bool cui_edit_private_storage_overlap(const void *, size_t, const void *, size_t);
 /* Counting/removal operates on ASCII bytes only after UTF-8 validation. */
-static size_t cui_edit_private_normal_length(cui_str text, size_t end, bool strip) {
-    if (!strip)
-        return end;
-    size_t n = 0;
-    for (size_t i = 0; i < end; i++)
-        n += !strip || (text.data[i] != '\r' && text.data[i] != '\n');
+static uint32_t cui_edit_private_scalar_value(cui_str ch) {
+    const unsigned char *p = (const unsigned char *)ch.data;
+    if (ch.length == 1)
+        return p[0];
+    uint32_t cp = p[0] & (ch.length == 2 ? 31u : ch.length == 3 ? 15u : 7u);
+    for (size_t i = 1; i < ch.length; i++)
+        cp = (cp << 6) | (p[i] & 63u);
+    return cp;
+}
+static char cui_edit_private_number_char(uint32_t cp) {
+    if (cp >= 0xff10 && cp <= 0xff19)
+        return (char)('0' + cp - 0xff10);
+    if (cp == 0xff0b)
+        return '+';
+    if (cp == 0xff0d || cp == 0x2212)
+        return '-';
+    if (cp == 0xff0e || cp == 0x3002)
+        return '.';
+    if (cp == 0xff0c)
+        return ',';
+    return 0;
+}
+static size_t cui_edit_private_normal_run(char *destination, cui_str text, size_t end, bool strip,
+                                          bool number) {
+    size_t at = 0, n = 0;
+    while (at < end) {
+        size_t width = 0;
+        (void)cui_edit_private_decode((const unsigned char *)text.data + at, text.length - at,
+                                      &width);
+        cui_str ch = {text.data + at, width};
+        at += width;
+        if (strip && width == 1 && (ch.data[0] == '\r' || ch.data[0] == '\n'))
+            continue;
+        char ascii = number ? cui_edit_private_number_char(cui_edit_private_scalar_value(ch)) : 0;
+        if (ascii) {
+            if (destination)
+                destination[n] = ascii;
+            n++;
+        } else {
+            if (destination)
+                memmove(destination + n, ch.data, width);
+            n += width;
+        }
+    }
     return n;
 }
-static void cui_edit_private_normal_copy(char *destination, cui_str text, bool strip) {
-    if (!strip) {
-        if (text.length)
-            memcpy(destination, text.data, text.length);
-        return;
+static size_t cui_edit_private_normal_length(cui_str text, size_t end, bool strip, bool number) {
+    return cui_edit_private_normal_run(NULL, text, end, strip, number);
+}
+static void cui_edit_private_normal_copy(char *destination, cui_str text, bool strip, bool number) {
+    (void)cui_edit_private_normal_run(destination, text, text.length, strip, number);
+}
+static bool cui_edit_private_format_config(cui_edit_format f) {
+    if (f.kind < CUI_EDIT_FORMAT_NONE || f.kind > CUI_EDIT_FORMAT_NUMBER)
+        return false;
+    if (f.kind != CUI_EDIT_FORMAT_NUMBER &&
+        (f.has_separator || f.separator || f.fraction_limited || f.fraction_digits))
+        return false;
+    if (f.kind == CUI_EDIT_FORMAT_NUMBER) {
+        return !f.pattern.data && !f.pattern.length &&
+               (f.has_separator ? f.separator && f.separator <= 0x10ffff &&
+                                      !(f.separator >= 0xd800 && f.separator <= 0xdfff)
+                                : !f.separator) &&
+               (f.fraction_limited || !f.fraction_digits);
     }
-    size_t n = 0;
-    for (size_t i = 0; i < text.length; i++)
-        if (!strip || (text.data[i] != '\r' && text.data[i] != '\n'))
-            destination[n++] = text.data[i];
+    return (f.kind != CUI_EDIT_FORMAT_NONE || (!f.pattern.data && !f.pattern.length)) &&
+           (!f.pattern.length ||
+            (f.pattern.data && f.pattern.length <= UINTPTR_MAX - (uintptr_t)f.pattern.data)) &&
+           cui_edit_valid_utf8(f.pattern);
+}
+static bool cui_edit_private_format_match(cui_str token, cui_str ch) {
+    unsigned char c = (unsigned char)ch.data[0];
+    if (token.length == 1) {
+        char t = token.data[0];
+        bool digit = ch.length == 1 && c >= '0' && c <= '9';
+        bool letter = ch.length == 1 && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
+        if (t == '9')
+            return digit;
+        if (t == 'A')
+            return letter;
+        if (t == '#')
+            return digit || letter;
+        if (t == '*')
+            return true;
+    }
+    return token.length == ch.length && !memcmp(token.data, ch.data, ch.length);
+}
+static bool cui_edit_private_format_literal(cui_str token) {
+    return token.length != 1 || (token.data[0] != '9' && token.data[0] != 'A' &&
+                                 token.data[0] != '#' && token.data[0] != '*');
+}
+static cui_str cui_edit_private_format_scalar(cui_str text, size_t *at) {
+    size_t width = 0;
+    (void)cui_edit_private_decode((const unsigned char *)text.data + *at, text.length - *at,
+                                  &width);
+    cui_str ch = {text.data + *at, width};
+    *at += width;
+    return ch;
+}
+static bool cui_edit_private_number_sep(cui_edit_format f, cui_str ch) {
+    return f.has_separator && cui_edit_private_scalar_value(ch) == f.separator;
+}
+static bool cui_edit_private_number_valid(cui_edit_format f, cui_str value) {
+    size_t at = 0, integer_position = 0;
+    bool fraction = false, sign = false;
+    while (at < value.length) {
+        cui_str ch = cui_edit_private_format_scalar(value, &at);
+        uint32_t cp = cui_edit_private_scalar_value(ch);
+        if (cp == '.') {
+            if (fraction)
+                return false;
+            fraction = true;
+            continue;
+        }
+        bool is_sign = cp == '+' || cp == '-';
+        if (!fraction && is_sign) {
+            if (sign || integer_position)
+                return false;
+            sign = true;
+        }
+        bool digit = cp >= '0' && cp <= '9';
+        if (!(digit || (!fraction && is_sign && !integer_position) ||
+              cui_edit_private_number_sep(f, ch)))
+            return false;
+        if (!fraction)
+            integer_position++;
+    }
+    return true;
+}
+static cui_str cui_edit_private_number_encode(uint32_t cp, char bytes[4]) {
+    size_t n;
+    if (cp < 0x80) {
+        bytes[0] = (char)cp;
+        n = 1;
+    } else if (cp < 0x800) {
+        bytes[0] = (char)(0xc0 | (cp >> 6));
+        bytes[1] = (char)(0x80 | (cp & 63));
+        n = 2;
+    } else if (cp < 0x10000) {
+        bytes[0] = (char)(0xe0 | (cp >> 12));
+        bytes[1] = (char)(0x80 | ((cp >> 6) & 63));
+        bytes[2] = (char)(0x80 | (cp & 63));
+        n = 3;
+    } else {
+        bytes[0] = (char)(0xf0 | (cp >> 18));
+        bytes[1] = (char)(0x80 | ((cp >> 12) & 63));
+        bytes[2] = (char)(0x80 | ((cp >> 6) & 63));
+        bytes[3] = (char)(0x80 | (cp & 63));
+        n = 4;
+    }
+    return (cui_str){bytes, n};
+}
+static bool cui_edit_private_number_emit(char *out, size_t *n, cui_str piece) {
+    if (piece.length > SIZE_MAX - *n)
+        return false;
+    if (out)
+        memcpy(out + *n, piece.data, piece.length);
+    *n += piece.length;
+    return true;
+}
+static size_t cui_edit_private_number_run(cui_edit_format f, cui_str value, char *out, int mode) {
+    if (mode == 1)
+        return 0;
+    if (!f.has_separator) {
+        if (out && value.length)
+            memcpy(out, value.data, value.length);
+        return value.length;
+    }
+    if (mode == 2) {
+        size_t at = 0, n = 0, zeros = 0;
+        bool dot = false;
+        while (at < value.length) {
+            cui_str ch = cui_edit_private_format_scalar(value, &at);
+            if (cui_edit_private_number_sep(f, ch))
+                continue;
+            n += ch.length;
+            dot |= ch.length == 1 && ch.data[0] == '.';
+            zeros = ch.length == 1 && ch.data[0] == '0' ? zeros + 1 : 0;
+        }
+        size_t limit = dot ? n - zeros : n;
+        if (out) {
+            at = 0;
+            n = 0;
+            while (at < value.length && n < limit) {
+                cui_str ch = cui_edit_private_format_scalar(value, &at);
+                if (cui_edit_private_number_sep(f, ch))
+                    continue;
+                memcpy(out + n, ch.data, ch.length);
+                n += ch.length;
+            }
+        }
+        return limit;
+    }
+    size_t at = 0, int_end = value.length, fraction_start = value.length, sign_at = SIZE_MAX,
+           count = 0;
+    cui_str sign = {0};
+    bool fraction = false;
+    while (at < value.length) {
+        size_t start = at;
+        cui_str ch = cui_edit_private_format_scalar(value, &at);
+        if (cui_edit_private_number_sep(f, ch))
+            continue;
+        if (ch.length == 1 && ch.data[0] == '.') {
+            int_end = start;
+            fraction_start = at;
+            fraction = true;
+            break;
+        }
+        count++;
+        if (ch.length == 1 && (ch.data[0] == '+' || ch.data[0] == '-')) {
+            sign_at = start;
+            sign = ch;
+        }
+    }
+    if (sign_at != SIZE_MAX)
+        count--;
+    size_t n = 0, emitted = 0;
+    char encoded[4];
+    cui_str separator = cui_edit_private_number_encode(f.separator, encoded);
+    if (sign.length && !cui_edit_private_number_emit(out, &n, sign))
+        return SIZE_MAX;
+    at = 0;
+    while (at < int_end) {
+        size_t start = at;
+        cui_str ch = cui_edit_private_format_scalar(value, &at);
+        if (start == sign_at || cui_edit_private_number_sep(f, ch))
+            continue;
+        if (emitted && (count - emitted) % 3 == 0 &&
+            !cui_edit_private_number_emit(out, &n, separator))
+            return SIZE_MAX;
+        if (!cui_edit_private_number_emit(out, &n, ch))
+            return SIZE_MAX;
+        emitted++;
+    }
+    if (fraction && (!f.fraction_limited || f.fraction_digits)) {
+        if (!cui_edit_private_number_emit(out, &n, (cui_str){".", 1}))
+            return SIZE_MAX;
+        at = fraction_start;
+        size_t digits = 0;
+        while (at < value.length && (!f.fraction_limited || digits < f.fraction_digits)) {
+            cui_str ch = cui_edit_private_format_scalar(value, &at);
+            if (cui_edit_private_number_sep(f, ch))
+                continue;
+            if (ch.length == 1 && ch.data[0] == '.')
+                break;
+            if (!cui_edit_private_number_emit(out, &n, ch))
+                return SIZE_MAX;
+            digits++;
+        }
+    }
+    return n;
+}
+cui_edit_result cui_edit_format_valid(cui_edit_format f, cui_str value, bool *valid) {
+    if (!valid ||
+        (value.length && (!value.data || value.length > UINTPTR_MAX - (uintptr_t)value.data)) ||
+        !cui_edit_private_format_config(f))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_storage_overlap(valid, sizeof *valid, f.pattern.data, f.pattern.length) ||
+        cui_edit_private_storage_overlap(valid, sizeof *valid, value.data, value.length))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_valid_utf8(value))
+        return CUI_EDIT_INVALID_UTF8;
+    if (f.kind == CUI_EDIT_FORMAT_NUMBER) {
+        *valid = cui_edit_private_number_valid(f, value);
+        return CUI_EDIT_OK;
+    }
+    if (!f.pattern.length) {
+        *valid = true;
+        return CUI_EDIT_OK;
+    }
+    size_t p = 0, at = 0;
+    while (p < f.pattern.length && at < value.length) {
+        cui_str token = cui_edit_private_format_scalar(f.pattern, &p);
+        size_t next = at;
+        cui_str ch = cui_edit_private_format_scalar(value, &next);
+        if (cui_edit_private_format_match(token, ch))
+            at = next;
+    }
+    *valid = at == value.length;
+    return CUI_EDIT_OK;
+}
+/* Measure first, then emit: no destination writes before all failures are known. */
+static size_t cui_edit_private_format_run(cui_edit_format f, cui_str value, char *out, int mode) {
+    if (f.kind == CUI_EDIT_FORMAT_NUMBER)
+        return cui_edit_private_number_run(f, value, out, mode);
+    size_t p = 0, at = 0, n = 0;
+    if (!f.pattern.length && mode != 1) {
+        if (out && value.length)
+            memcpy(out, value.data, value.length);
+        return value.length;
+    }
+    while (p < f.pattern.length && (mode == 1 || at < value.length)) {
+        cui_str token = cui_edit_private_format_scalar(f.pattern, &p), emit = token;
+        bool literal = cui_edit_private_format_literal(token);
+        if (mode == 1) {
+            if (!literal)
+                emit = (cui_str){"_", 1};
+        } else {
+            size_t next = at;
+            cui_str ch = cui_edit_private_format_scalar(value, &next);
+            if (mode == 2) {
+                at = next;
+                if (literal)
+                    continue;
+                emit = ch;
+            } else {
+                if (!literal && !cui_edit_private_format_match(token, ch))
+                    break;
+                if (!literal)
+                    emit = ch;
+                if (cui_edit_private_format_match(token, ch))
+                    at = next;
+            }
+        }
+        if (emit.length > SIZE_MAX - n)
+            return SIZE_MAX;
+        if (out)
+            memcpy(out + n, emit.data, emit.length);
+        n += emit.length;
+    }
+    return n;
+}
+static cui_edit_result cui_edit_private_format_output(cui_edit_format f, cui_str value,
+                                                      char *destination, size_t capacity,
+                                                      cui_str *result, int mode) {
+    if (!destination || !capacity || !result || capacity > UINTPTR_MAX - (uintptr_t)destination ||
+        (value.length && (!value.data || value.length > UINTPTR_MAX - (uintptr_t)value.data)) ||
+        !cui_edit_private_format_config(f))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_storage_overlap(destination, capacity, value.data, value.length) ||
+        cui_edit_private_storage_overlap(destination, capacity, f.pattern.data, f.pattern.length) ||
+        cui_edit_private_storage_overlap(result, sizeof *result, destination, capacity) ||
+        cui_edit_private_storage_overlap(result, sizeof *result, value.data, value.length) ||
+        cui_edit_private_storage_overlap(result, sizeof *result, f.pattern.data, f.pattern.length))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_valid_utf8(value))
+        return CUI_EDIT_INVALID_UTF8;
+    size_t n = cui_edit_private_format_run(f, value, NULL, mode);
+    if (n == SIZE_MAX || n >= capacity)
+        return CUI_EDIT_CAPACITY;
+    (void)cui_edit_private_format_run(f, value, destination, mode);
+    destination[n] = 0;
+    *result = (cui_str){destination, n};
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_format_text(cui_edit_format f, cui_str value, char *destination,
+                                     size_t capacity, cui_str *out) {
+    return cui_edit_private_format_output(f, value, destination, capacity, out, 0);
+}
+cui_edit_result cui_edit_format_placeholder(cui_edit_format f, char *destination, size_t capacity,
+                                            cui_str *out) {
+    return cui_edit_private_format_output(f, (cui_str){0}, destination, capacity, out, 1);
+}
+cui_edit_result cui_edit_unformat_text(cui_edit_format f, cui_str value, char *destination,
+                                       size_t capacity, cui_str *out) {
+    return cui_edit_private_format_output(f, value, destination, capacity, out, 2);
+}
+static cui_edit_result cui_edit_private_format_candidate(cui_edit *e, cui_str candidate,
+                                                         cui_str *final) {
+    *final = candidate;
+    if (!cui_edit_private_format_enabled(e->format) || e->acceptance_skip) {
+        if (e->format_ready) {
+            final->data = e->format_workspace.data;
+            final->length = e->format_length;
+        }
+        return CUI_EDIT_OK;
+    }
+    cui_edit_result r = cui_edit_format_text(e->format, candidate, e->format_workspace.data,
+                                             e->format_workspace.bytes, final);
+    if (r == CUI_EDIT_OK && final->length >= e->config.capacity)
+        return CUI_EDIT_CAPACITY;
+    if (r == CUI_EDIT_OK && !cui_edit_private_accepted(e, *final))
+        return CUI_EDIT_LINE_BREAK;
+    return r;
+}
+cui_edit_result cui_edit_normalize_number_text(cui_str source, cui_edit_normalization policy,
+                                               char *destination, size_t capacity,
+                                               cui_str *normalized) {
+    if (!destination || !capacity || !normalized || policy < CUI_EDIT_NORMALIZE_NONE ||
+        policy > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF ||
+        capacity > UINTPTR_MAX - (uintptr_t)destination ||
+        (source.length && (!source.data || source.length > UINTPTR_MAX - (uintptr_t)source.data)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_storage_overlap(destination, capacity, source.data, source.length) ||
+        cui_edit_private_storage_overlap(normalized, sizeof *normalized, destination, capacity) ||
+        cui_edit_private_storage_overlap(normalized, sizeof *normalized, source.data,
+                                         source.length))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_valid_utf8(source))
+        return CUI_EDIT_INVALID_UTF8;
+    bool strip = policy == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    size_t n = cui_edit_private_normal_length(source, source.length, strip, true);
+    if (n >= capacity)
+        return CUI_EDIT_CAPACITY;
+    cui_edit_private_normal_copy(destination, source, strip, true);
+    destination[n] = 0;
+    *normalized = (cui_str){destination, n};
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_number_offset(cui_str source, cui_edit_normalization policy,
+                                       size_t source_byte, size_t *normalized_byte) {
+    if (!normalized_byte || policy < CUI_EDIT_NORMALIZE_NONE ||
+        policy > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF ||
+        (source.length && (!source.data || source.length > UINTPTR_MAX - (uintptr_t)source.data)) ||
+        cui_edit_private_storage_overlap(normalized_byte, sizeof *normalized_byte, source.data,
+                                         source.length))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_valid_utf8(source))
+        return CUI_EDIT_INVALID_UTF8;
+    if (source_byte > source.length ||
+        (source_byte < source.length && ((unsigned char)source.data[source_byte] & 0xc0) == 0x80))
+        return CUI_EDIT_BOUNDARY;
+    *normalized_byte = cui_edit_private_normal_length(
+        source, source_byte, policy == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF, true);
+    return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_normalize_text(cui_str source, cui_edit_normalization policy,
                                         char *destination, size_t capacity, cui_str *normalized) {
@@ -4357,10 +4812,10 @@ cui_edit_result cui_edit_normalize_text(cui_str source, cui_edit_normalization p
     if (!cui_edit_valid_utf8(source))
         return CUI_EDIT_INVALID_UTF8;
     bool strip = policy == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
-    size_t length = cui_edit_private_normal_length(source, source.length, strip);
+    size_t length = cui_edit_private_normal_length(source, source.length, strip, false);
     if (length >= capacity)
         return CUI_EDIT_CAPACITY;
-    cui_edit_private_normal_copy(destination, source, strip);
+    cui_edit_private_normal_copy(destination, source, strip, false);
     destination[length] = 0;
     *normalized = (cui_str){destination, length};
     return CUI_EDIT_OK;
@@ -4450,30 +4905,74 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     bool strip = !e->config.multiline && e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
     if (!strip && !cui_edit_private_accepted(e, text))
         return CUI_EDIT_LINE_BREAK;
-    size_t length = cui_edit_private_normal_length(text, text.length, strip);
+    size_t length = cui_edit_private_normal_length(text, text.length, strip,
+                                                   e->format.kind == CUI_EDIT_FORMAT_NUMBER);
     size_t remaining = e->length - (end - start);
     if (length > e->config.capacity - 1 - remaining)
         return CUI_EDIT_CAPACITY;
-    if (!length && start == end)
+    if (!length && start == end && !cui_edit_private_format_enabled(e->format))
         return CUI_EDIT_OK;
     if (strip || (e->presentation.prepare && !e->presentation_skip) ||
-        (e->acceptance.validate && !e->config.multiline && !e->acceptance_skip)) {
+        (e->acceptance.validate && !e->config.multiline && !e->acceptance_skip) ||
+        cui_edit_private_format_enabled(e->format)) {
         /* The opaque engine knows its entire workspace extent. */
         uintptr_t source = (uintptr_t)text.data, work = (uintptr_t)e->scratch;
         if (text.length &&
             (source >= work ? source - work < e->config.capacity : work - source < text.length))
             return CUI_EDIT_INVALID_ARGUMENT;
         memcpy(e->scratch, e->config.buffer, start);
-        cui_edit_private_normal_copy(e->scratch + start, text, strip);
+        cui_edit_private_normal_copy(e->scratch + start, text, strip,
+                                     e->format.kind == CUI_EDIT_FORMAT_NUMBER);
         memcpy(e->scratch + start + length, e->config.buffer + end, e->length - end + 1);
-        cui_edit_result prepared =
-            cui_edit_private_present(e, (cui_str){e->scratch, remaining + length}, false);
+        cui_str final;
+        cui_edit_result formatted =
+            cui_edit_private_format_candidate(e, (cui_str){e->scratch, remaining + length}, &final);
+        if (formatted != CUI_EDIT_OK)
+            return formatted;
+        cui_edit_result prepared = cui_edit_private_present(e, final, false);
         if (prepared != CUI_EDIT_OK)
             return prepared;
         cui_edit_result accepted = cui_edit_private_accept_value(
             e, (cui_str){e->scratch, remaining + length}, cui_edit_get_text(e));
         if (accepted != CUI_EDIT_OK)
             return accepted;
+    }
+    if (cui_edit_private_format_enabled(e->format)) {
+        cui_str final = {e->format_workspace.data, e->format_length};
+        if (!e->format_ready)
+            final.length = cui_edit_private_format_run(
+                e->format, (cui_str){e->scratch, remaining + length}, NULL, 0);
+        bool changed_by_format = final.length != remaining + length ||
+                                 (final.length && memcmp(final.data, e->scratch, final.length));
+        size_t candidate_bytes = remaining + length;
+        size_t delta = length > SIZE_MAX - final.length ? SIZE_MAX : length + final.length;
+        delta = delta > candidate_bytes ? delta - candidate_bytes : 0;
+        size_t caret =
+            delta > final.length || start > final.length - delta ? final.length : start + delta;
+        while (caret && caret < final.length && ((unsigned char) final.data[caret] & 0xc0) == 0x80)
+            caret--;
+        e->preferred_column_valid = false;
+        if (final.length == e->length &&
+            (!final.length || !memcmp(final.data, e->config.buffer, final.length))) {
+            e->cursor = e->anchor = caret;
+            cui_edit_private_collapse_selections(e);
+            cui_edit_private_save_state(e);
+            return CUI_EDIT_OK;
+        }
+        if (changed_by_format)
+            cui_edit_break_coalescing(e);
+        cui_edit_private_save_state(e);
+        memcpy(e->config.buffer, final.data, final.length + 1);
+        e->length = final.length;
+        e->cursor = e->anchor = caret;
+        cui_edit_private_collapse_selections(e);
+        cui_edit_private_detach_tokens(e);
+        e->revision++;
+        e->change_start = changed_by_format ? 0 : start;
+        e->change_revision = e->revision;
+        e->change_valid = true;
+        cui_edit_private_record(e);
+        return CUI_EDIT_OK;
     }
     if (strip) {
         e->preferred_column_valid = false;
@@ -5834,21 +6333,26 @@ static void cui_edit_private_compose_candidate(cui_edit *e, char *work, size_t s
                                                cui_str text) {
     memcpy(work, e->config.buffer, start);
     bool strip = !e->config.multiline && e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
-    size_t length = cui_edit_private_normal_length(text, text.length, strip);
-    cui_edit_private_normal_copy(work + start, text, strip);
+    size_t length = cui_edit_private_normal_length(text, text.length, strip,
+                                                   e->format.kind == CUI_EDIT_FORMAT_NUMBER);
+    cui_edit_private_normal_copy(work + start, text, strip,
+                                 e->format.kind == CUI_EDIT_FORMAT_NUMBER);
     memcpy(work + start + length, e->config.buffer + end, e->length - end + 1);
 }
 static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit_composition *c,
                                                            cui_str text, size_t start, size_t end,
                                                            char *work, size_t capacity,
                                                            bool commit) {
-    if ((!e->acceptance.validate && !e->presentation.prepare) || e->config.multiline)
+    if ((!e->acceptance.validate && !e->presentation.prepare &&
+         !cui_edit_private_format_enabled(e->format)) ||
+        e->config.multiline)
         return CUI_EDIT_OK;
     size_t length =
         e->length - (end - start) +
         cui_edit_private_normal_length(text, text.length,
                                        !e->config.multiline &&
-                                           e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF);
+                                           e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF,
+                                       e->format.kind == CUI_EDIT_FORMAT_NUMBER);
     if (!work || length >= capacity)
         return CUI_EDIT_CAPACITY;
     if (cui_edit_private_storage_overlap(text.data, text.length, work, capacity))
@@ -5856,15 +6360,18 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
     cui_str old = cui_edit_composition_view(e, c);
     bool rebuild_old = old.data == work && c->active;
     cui_edit_private_compose_candidate(e, work, start, end, text);
-    cui_edit_result prepared = cui_edit_private_present(e, (cui_str){work, length}, !commit);
+    cui_str final = {work, length};
+    cui_edit_result prepared =
+        commit ? cui_edit_private_format_candidate(e, final, &final) : CUI_EDIT_OK;
+    if (prepared == CUI_EDIT_OK)
+        prepared = cui_edit_private_present(e, final, !commit);
     if (prepared != CUI_EDIT_OK) {
         if (rebuild_old)
             cui_edit_private_compose_candidate(e, work, c->start, c->end,
                                                (cui_str){c->buffer, c->length});
         return prepared;
     }
-    bool accepted =
-        !e->acceptance.validate || cui_edit_private_predicate(e, (cui_str){work, length});
+    bool accepted = cui_edit_private_predicate(e, (cui_str){work, length});
     if (!accepted && !e->acceptance_violation) {
         if (rebuild_old) {
             cui_edit_private_compose_candidate(e, work, c->start, c->end,
@@ -5885,6 +6392,8 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
     if (e->acceptance_violation || e->acceptance_rejected)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (commit) {
+        e->format_ready = cui_edit_private_format_enabled(e->format);
+        e->format_length = final.length;
         e->acceptance_skip = true;
         e->presentation_skip = true;
     }
@@ -5968,9 +6477,12 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
         return CUI_EDIT_BOUNDARY;
     if (text.length >= c->capacity)
         return CUI_EDIT_CAPACITY;
-    size_t length = cui_edit_private_normal_length(text, text.length, strip);
-    v.composition_anchor = cui_edit_private_normal_length(text, v.composition_anchor, strip);
-    v.composition_cursor = cui_edit_private_normal_length(text, v.composition_cursor, strip);
+    size_t length = cui_edit_private_normal_length(text, text.length, strip,
+                                                   e->format.kind == CUI_EDIT_FORMAT_NUMBER);
+    v.composition_anchor = cui_edit_private_normal_length(text, v.composition_anchor, strip,
+                                                          e->format.kind == CUI_EDIT_FORMAT_NUMBER);
+    v.composition_cursor = cui_edit_private_normal_length(text, v.composition_cursor, strip,
+                                                          e->format.kind == CUI_EDIT_FORMAT_NUMBER);
     size_t start =
         c->active ? c->start : (state.anchor < state.cursor ? state.anchor : state.cursor);
     size_t end = c->active ? c->end : (state.anchor > state.cursor ? state.anchor : state.cursor);
@@ -6010,7 +6522,9 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
             return prepared;
         }
     }
-    if ((e->acceptance.validate || e->presentation.prepare) && !state.multiline &&
+    if ((e->acceptance.validate || e->presentation.prepare ||
+         cui_edit_private_format_enabled(e->format)) &&
+        !state.multiline &&
         (v.type == CUI_EVENT_COMPOSITION_UPDATE || v.type == CUI_EVENT_COMPOSITION_COMMIT)) {
         bool commit = v.type == CUI_EVENT_COMPOSITION_COMMIT;
         char *work = commit         ? e->scratch
@@ -6057,8 +6571,9 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
         e->composition_view = grown;
         e->composition_view_capacity = grown_capacity;
     }
-    if (strip) {
-        cui_edit_private_normal_copy(c->buffer, (cui_str){c->buffer, text.length}, true);
+    if (strip || e->format.kind == CUI_EDIT_FORMAT_NUMBER) {
+        cui_edit_private_normal_copy(c->buffer, (cui_str){c->buffer, text.length}, strip,
+                                     e->format.kind == CUI_EDIT_FORMAT_NUMBER);
     }
     c->buffer[length] = 0;
     c->length = length;
@@ -6152,7 +6667,11 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
         return false;
     if (p.prepare && e->config.multiline)
         return false;
-    cui_edit_workspace spans[5] = {{p.user, p.user_bytes}, p.caller_descriptor};
+    cui_edit_workspace spans[7] = {{p.user, p.user_bytes}, p.caller_descriptor};
+    spans[5] = request.format_workspace;
+    spans[6] = (cui_edit_workspace){
+        request.format.pattern.length ? (void *)request.format.pattern.data : NULL,
+        request.format.pattern.length};
     for (size_t i = 0; i < 3; i++) {
         if (i >= p.caller_workspace_count &&
             (p.caller_workspaces[i].data || p.caller_workspaces[i].bytes))
@@ -6179,7 +6698,7 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
               cui_edit_private_storage_overlap(c->buffer, c->capacity, c->view_buffer,
                                                c->view_capacity)))
         return false;
-    for (size_t i = 0; i < 5; i++) {
+    for (size_t i = 0; i < 7; i++) {
         cui_edit_workspace a = spans[i];
         if (!cui_edit_private_workspace_valid(a) ||
             cui_edit_private_model_overlap(e, a.data, a.bytes) ||
@@ -6202,8 +6721,28 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         request.kind > CUI_EDIT_REQUEST_PRESENT ||
         request.normalization < CUI_EDIT_NORMALIZE_NONE ||
         request.normalization > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF ||
+        !cui_edit_private_format_config(request.format) ||
+        (cui_edit_private_format_enabled(request.format) &&
+         (e->config.multiline || e->selection_count > 1 || e->token_count ||
+          (request.format.kind == CUI_EDIT_FORMAT_NUMBER && request.format.has_separator &&
+           (request.format.separator == '\n' || request.format.separator == '\r')) ||
+          (request.format.pattern.length &&
+           (memchr(request.format.pattern.data, '\n', request.format.pattern.length) ||
+            memchr(request.format.pattern.data, '\r', request.format.pattern.length))) ||
+          !request.format_workspace.data || !request.format_workspace.bytes)) ||
+        (!cui_edit_private_format_enabled(request.format) &&
+         (request.format_workspace.data || request.format_workspace.bytes)) ||
         !cui_edit_private_presentation_valid(e, request))
         return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    /* Formatting failure must not follow an implicit stale-session cancellation. */
+    if (cui_edit_private_format_enabled(request.format) &&
+        request.kind == CUI_EDIT_REQUEST_COMPOSITION && request.composition) {
+        cui_edit_composition *c = request.composition;
+        if ((c->model_identity && c->model_identity != (uintptr_t)e) ||
+            (c->active && (c->revision != e->revision || c->document_anchor != e->anchor ||
+                           c->document_cursor != e->cursor)))
+            return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    }
     if (request.kind == CUI_EDIT_REQUEST_PRESENT) {
         cui_edit_composition *c = request.composition;
         if (c && c->model_identity && c->model_identity != (uintptr_t)e)
@@ -6249,6 +6788,7 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
                                          .presentation_applied = prepared && result == CUI_EDIT_OK};
     }
     if ((!acceptance.validate && !request.presentation.prepare && !request.masked_words &&
+         !cui_edit_private_format_enabled(request.format) &&
          request.normalization == CUI_EDIT_NORMALIZE_NONE) ||
         e->config.multiline) {
         cui_edit_result legacy;
@@ -6276,6 +6816,9 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
     e->acceptance = acceptance;
     e->normalization = request.normalization;
     e->presentation = request.presentation;
+    e->format = request.format;
+    e->format_workspace = request.format_workspace;
+    e->format_ready = false;
     e->masked_words = request.masked_words;
     e->presentation_prepared = e->presentation_skip = false;
     e->acceptance_violation = e->acceptance_rejected = e->acceptance_skip = false;
@@ -6307,6 +6850,10 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         e->acceptance = saved.acceptance;
         e->normalization = saved.normalization;
         e->presentation = saved.presentation;
+        e->format = saved.format;
+        e->format_workspace = saved.format_workspace;
+        e->format_ready = saved.format_ready;
+        e->format_length = saved.format_length;
         e->masked_words = saved.masked_words;
         e->presentation_prepared = saved.presentation_prepared;
         e->presentation_skip = saved.presentation_skip;

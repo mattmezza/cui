@@ -259,6 +259,8 @@ static void cui_input_secure_lifecycle(cui_edit *edit, cui_input_behavior_state 
 static cui_edit_result cui_input_checked(cui_edit *edit, cui_edit_request request,
                                          cui_base_input_options options, bool *rejected) {
     request.normalization = options.normalization;
+    request.format = options.format;
+    request.format_workspace = options.format_workspace;
     request.presentation = options.presentation;
     request.masked_words = options.masked;
     cui_edit_checked_result result = cui_edit_apply_checked(
@@ -283,6 +285,14 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
          (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_edit_checked_result configured =
+        cui_edit_apply_checked(edit,
+                               (cui_edit_request){.kind = CUI_EDIT_REQUEST_PRESENT,
+                                                  .format = options.format,
+                                                  .format_workspace = options.format_workspace},
+                               (cui_edit_acceptance){0});
+    if (configured.error != CUI_EDIT_OK)
+        return (cui_input_result){.error = configured.error};
     cui_input_secure_lifecycle(edit, state, options);
     cui_input_history_focus(ui, id, edit, state, options.disabled);
     cui_edit_state before = cui_edit_get_state(edit);
@@ -444,6 +454,14 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
         ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
          (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_edit_checked_result configured =
+        cui_edit_apply_checked(edit,
+                               (cui_edit_request){.kind = CUI_EDIT_REQUEST_PRESENT,
+                                                  .format = options.format,
+                                                  .format_workspace = options.format_workspace},
+                               (cui_edit_acceptance){0});
+    if (configured.error != CUI_EDIT_OK)
+        return (cui_input_result){.error = configured.error};
     cui_input_secure_lifecycle(edit, state, options);
     cui_input_history_focus(ui, id, edit, state, options.disabled);
     state->composition =

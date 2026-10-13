@@ -2,7 +2,6 @@
 #include "cui/cui_sdl3.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
-#include <string.h>
 static cui_system_appearance actual(void) {
     switch (SDL_GetSystemTheme()) {
     case SDL_SYSTEM_THEME_LIGHT:
@@ -27,7 +26,9 @@ int main(void) {
     cui_platform_appearance observed,
         sentinel = {.appearance = CUI_SYSTEM_APPEARANCE_DARK, .capabilities = 99, .revision = 42};
     observed = sentinel;
-    assert(!cui_sdl3_appearance(NULL, &observed) && !memcmp(&observed, &sentinel, sizeof observed));
+    assert(!cui_sdl3_appearance(NULL, &observed) && observed.appearance == sentinel.appearance &&
+           observed.capabilities == sentinel.capabilities &&
+           observed.revision == sentinel.revision);
     assert(!cui_sdl3_appearance(host, NULL));
     assert(cui_sdl3_appearance(host, &observed) && observed.appearance == actual() &&
            observed.capabilities == CUI_APPEARANCE_SYSTEM_THEME && observed.revision == 1);

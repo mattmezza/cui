@@ -60,3 +60,45 @@ notifications, and checks monotonic revision/redraw, idle stability, null-output
 atomicity and destruction/recreation. It does not fabricate light/dark data.
 Integrator: register this test linked to `cui_sdl3` and SDL3; default builds remain
 unaffected when SDL is disabled. Generated distribution remains integrator-owned.
+
+## Compiled native consumer
+
+`examples/system_theme/main.c` is a complete application, defaulting to Follow
+System with a light fallback for an initially unknown appearance. Later unknown
+observations retain the last known preference. Two custom named themes are loaded
+through the actual ThemeSet importer into owned bounded registry entries. Sidebar,
+content, palette status and three real buttons expose Follow System, Always Light
+and Always Dark. Notifications update the system preference while retaining an
+explicit mode choice; selecting Follow System later uses the newest observation.
+Application state must stay at a stable address because its registry borrows inline
+entry storage. State transitions reject stale generations, invalid enums and
+revision overflow without applying partial changes.
+
+The static scene blocks on `SDL_WaitEvent(NULL)` when Core needs no redraw. SDL
+leaves the notification queued for the adapter to dispatch; there is no periodic
+polling spin. A finite `--frames` mode deliberately renders consecutive frames
+for reproducible smoke/capture and does not wait. An application adding timed
+animations must replace indefinite waiting with its earliest animation deadline.
+No reduced-motion/high-contrast OS values are manufactured.
+
+Example manual build from the configured native tree (root owns target registration):
+
+```sh
+cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude \
+  $(pkg-config --cflags sdl3) examples/system_theme/main.c \
+  build/libcui_sdl3.a build/libcui.a build/libcui_text.a build/libcui.a \
+  build/libcui_bidi.a $(pkg-config --libs sdl3 harfbuzz freetype2) -lm \
+  -o build/system_theme
+build/system_theme --font /usr/share/fonts/noto/NotoSans-Regular.ttf
+xvfb-run -a build/system_theme --font /usr/share/fonts/noto/NotoSans-Regular.ttf \
+  --frames 3 --capture build/system-theme.bmp
+```
+
+`tests/integration/test_system_theme_app.c` compiles the same original example
+state/frame functions with its native entry point disabled. It tests actual
+Core button activation, palette changes, unknown/stale/invalid observations,
+explicit modes and bounded revision failure. Link it to `cui`; SDL headers are
+required because it includes the native example, but SDL runtime linkage is not
+required by this headless test. Native Xvfb smoke verifies the compiled renderer
+and actual font capture; a physical desktop preference event remains outside this
+validation. The adapter's queued SDL notification test covers the notification path.

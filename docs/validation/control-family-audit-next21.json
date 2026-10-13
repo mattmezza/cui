@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "audit_commit": "88aecbabecee61a6dd55ce157039c6ba0edaaa7b",
+  "reference_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "scope": "feature evidence only; no full-family certification",
+  "validation": {
+    "warning_build": "passed",
+    "standalone_focused_test": "passed",
+    "ctest": "94/95 passed; distribution stale root-owned dist only",
+    "browser": "existing test source inspected; no browser run claimed",
+    "sdl3_services": "passed in configured adapter test environment"
+  },
+  "families": [
+    {
+      "name": "Checkbox",
+      "reference_sources": [
+        "crates/component/src/checkbox.rs"
+      ],
+      "features": [
+        {
+          "name": "unchecked/checked/mixed state",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_base.c: mixed Space -> checked -> unchecked",
+            "tests/unit/test_components.c:test_checkbox_geometry"
+          ],
+          "limits": "CUI_CHECK_* model and mixed semantic value; mixed mark is a static dash, not reference spring animation."
+        },
+        {
+          "name": "controlled value and activation",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_checkbox_geometry",
+            "tests/unit/test_base.c"
+          ],
+          "limits": "Caller-owned value pointer is supported; return bool reports change. This is not the reference callback builder API."
+        },
+        {
+          "name": "disabled/keyboard/semantic state",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_checkbox_geometry",
+            "tests/unit/test_base.c"
+          ],
+          "limits": "Disabled and required/invalid snapshots, Enter and Space are covered. OS accessibility bridge is not implied."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Radio",
+      "reference_sources": [
+        "crates/component/src/radio.rs",
+        "crates/base/src/radio_group.rs"
+      ],
+      "features": [
+        {
+          "name": "group exclusivity and roving focus",
+          "ledger_status": "not_started",
+          "proposed_status": "not_started",
+          "evidence": [
+            "tests/unit/test_components.c:test_radio_shared_redraw",
+            "include/cui/cui_components.h:cui_radio_ex"
+          ],
+          "limits": "Shared integer gives exclusivity after scheduled redraw; no public RadioGroup wrapper/roving arrow navigation/set-position contract. Do not promote this combined feature."
+        },
+        {
+          "name": "controlled selection",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_radio_geometry,test_radio_shared_redraw",
+            "tests/unit/test_base.c"
+          ],
+          "limits": "Shared caller integer changes on Enter/Space; selected activation is a no-op; sibling snapshot converges on redraw, not same-frame reconciliation."
+        },
+        {
+          "name": "disabled/keyboard semantics",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_radio_geometry",
+            "tests/unit/test_base.c"
+          ],
+          "limits": "Disabled selected radio styling and keyboard selection tested; group-level disabled/roving semantics remain absent."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Switch",
+      "reference_sources": [
+        "crates/component/src/switch.rs"
+      ],
+      "features": [
+        {
+          "name": "controlled binary activation",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_switch"
+          ],
+          "limits": "Both pointer value writes and on_change controlled request without model mutation are asserted."
+        },
+        {
+          "name": "keyboard/pointer/disabled behavior",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_switch"
+          ],
+          "limits": "Label click focuses/toggles; Space toggles; Enter invokes controlled request; disabled suppresses callback and skip_tab excludes control. Physical device coverage not asserted."
+        },
+        {
+          "name": "semantic checked state and theme",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c:test_switch"
+          ],
+          "limits": "Four themes x four sizes x enabled/on states assert role, checked, disabled, track/thumb geometry/colors; retained spring, interruption, deadlines and reduced motion also tested."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Focus Trap",
+      "reference_sources": [
+        "crates/base/src/focus_trap.rs"
+      ],
+      "features": [
+        {
+          "name": "tab and reverse cycling",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c:test_focus_scopes",
+            "tests/unit/test_overlay.c:main"
+          ],
+          "limits": "Modal scope forward/reverse wrap is asserted; nonmodal scope does not promise trap confinement."
+        },
+        {
+          "name": "nested scope and restore",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c:test_focus_scopes",
+            "tests/unit/test_overlay.c:main"
+          ],
+          "limits": "Inner modal capture, Escape dismissal, outer focus and trigger restoration are covered."
+        },
+        {
+          "name": "disabled/removed target cleanup",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_core.c:test_focus_scopes",
+            "tests/unit/test_overlay.c:main"
+          ],
+          "limits": "Disabled restored target and removed trigger result in focus0. Does not establish OS accessibility modal relationships."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Clipboard",
+      "reference_sources": [
+        "crates/component/src/clipboard.rs"
+      ],
+      "features": [
+        {
+          "name": "OS read/write adapter",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_sdl3.c:main",
+            "include/cui/cui_sdl3.h:cui_sdl3_clipboard_interface"
+          ],
+          "limits": "SDL service test performs UTF8 roundtrip and embedded-NUL rejection. Runtime here is configured test adapter, not proof of macOS/Windows/Wayland clipboard behavior."
+        },
+        {
+          "name": "capability failure handling",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c:clipboard_and_readonly",
+            "tests/web/test_touch_more.py:clipboard (existing coverage, not rerun)"
+          ],
+          "limits": "Rejected copy preserves cut source and returns CUI_EDIT_CLIPBOARD_UNAVAILABLE; invalid pasted UTF8 rejected. Not every SDL OS failure is injected."
+        },
+        {
+          "name": "headless adapter tests",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c:clipboard_and_readonly",
+            "tests/unit/test_sdl3.c:main"
+          ],
+          "limits": "Mock-host cut/paste/undo/readonly and SDL service roundtrip run. No reusable reference Clipboard copy widget/value_fn/on_copied/timed icon state API exists."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Label",
+      "reference_sources": [
+        "crates/component/src/label.rs"
+      ],
+      "features": [
+        {
+          "name": "UTF-8 text and theme size",
+          "ledger_status": "not_started",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_control_family_audit.c:main",
+            "src/components/cui_components.c:cui_label"
+          ],
+          "limits": "New test directly checks UTF8 bytes, theme font and color across four themes. Underlying Core handles text layout; no Label-specific secondary/masked/highlight API."
+        },
+        {
+          "name": "control association",
+          "ledger_status": "not_started",
+          "proposed_status": "not_started",
+          "evidence": [
+            "include/cui/cui_components.h:cui_label",
+            "src/components/cui_components.c:cui_label"
+          ],
+          "limits": "Label accepts no ID/target and creates no semantic node. Generic Core labelled_by can be used manually; not a Label association API. Pinned reference Label is a rich display-text element rather than a form-for widget, so ledger terminology needs clarification."
+        },
+        {
+          "name": "disabled/error presentation",
+          "ledger_status": "not_started",
+          "proposed_status": "not_started",
+          "evidence": [
+            "include/cui/cui_components.h:cui_label"
+          ],
+          "limits": "No dedicated state/options; caller can alter theme. Not directly tested as Label behavior and not a pinned Label builder capability."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Kbd",
+      "reference_sources": [
+        "crates/component/src/kbd.rs"
+      ],
+      "features": [
+        {
+          "name": "platform key labels",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c:models",
+            "src/base/cui_content.c:cui_kbd_format"
+          ],
+          "limits": "Explicit mac_symbols modifier formatting, UTF8 truncation and required output length tested. Key string is caller supplied; reference alias/case/arrow/Enter normalization is absent."
+        },
+        {
+          "name": "grouped shortcut rendering",
+          "ledger_status": "not_started",
+          "proposed_status": "not_started",
+          "evidence": [
+            "src/components/cui_content.c:cui_kbd",
+            "include/cui/cui_content.h"
+          ],
+          "limits": "One supplied chord in one badge. Multiple badges can be composed manually, no shortcut group/action binding lookup API. Pinned Kbd itself renders one formatted stroke; grouped ledger requirement is broader than this primitive."
+        },
+        {
+          "name": "accessible description",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "Name equals supplied chord under LABEL role, directly asserted. details.description is not populated and native OS accessibility bridge is absent; interpret ledger phrase as accessible name only.",
+          "promotion_condition": "Rename feature to accessible name; semantic details.description is absent."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Skeleton",
+      "reference_sources": [
+        "crates/component/src/skeleton.rs"
+      ],
+      "features": [
+        {
+          "name": "placeholder sizes/layout",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c:main",
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "Fixed width/height, radius and secondary alpha checked. Arbitrary reference Styled refinement/full-width defaults are not mirrored."
+        },
+        {
+          "name": "loading semantics",
+          "ledger_status": "not_started",
+          "proposed_status": "not_started",
+          "evidence": [
+            "src/components/cui_content.c:cui_skeleton",
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "Skeleton submits no semantics. Loading owner/busy relationship is application responsibility. Pinned Skeleton also draws a div without explicit loading semantics; retain as product gap, not invented reference equivalence."
+        },
+        {
+          "name": "theme/motion states",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c:main",
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "Four-theme border-based color, secondary opacity, phase .5 pulse and reduced static alpha/invalidation covered. Cosine pulse differs from reference skeleton token + 2s bounce ease_in_out; exact source style/motion parity remains incomplete."
+        }
+      ],
+      "full_family_certified": false
+    },
+    {
+      "name": "Spinner",
+      "reference_sources": [
+        "crates/component/src/spinner.rs"
+      ],
+      "features": [
+        {
+          "name": "animation scheduling",
+          "ledger_status": "not_started",
+          "proposed_status": "not_started",
+          "evidence": [
+            "src/components/cui_content.c:cui_spinner",
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "Requests redraw while active, caller owns phase; no duration/easing/deadline scheduler API. Reference rotates Loader icon over .8s; CUI eight-dot alpha head is materially different."
+        },
+        {
+          "name": "sizes and theme",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "32px bounds and eight-dot geometry over four themes directly asserted. Public size float and primary color do not cover reference custom icon/color/easing options."
+        },
+        {
+          "name": "reduced motion and status semantics",
+          "ledger_status": "tested",
+          "proposed_status": "tested",
+          "evidence": [
+            "tests/unit/test_control_family_audit.c:main"
+          ],
+          "limits": "Reduced mode submits Loading STATUS and no redraw; animated mode invalidates. Name/status snapshot is not an OS screen-reader test."
+        }
+      ],
+      "full_family_certified": false
+    }
+  ]
+}

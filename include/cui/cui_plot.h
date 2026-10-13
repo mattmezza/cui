@@ -552,6 +552,25 @@ cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *, uint
  * Spread clamps to [0,.95], index clamps to count-1. count<=1 is unstaggered. */
 cui_plot_result cui_plot_appear_stagger(double linear_progress, size_t index, size_t count,
                                         double spread, double *local_progress);
+/* Native path preparation: non-indexed triangle list, relative XY and unscaled
+ * shader ST coordinates. Host owns clip/background/origin and mesh retention. */
+typedef struct {
+    cui_plot_point xy, st;
+} cui_plot_mesh_vertex;
+/* Single simple implicitly closed contour, 3..256 distinct points within
+ * +/-16384. Concave contours and either winding are supported; collinear
+ * vertices, holes, touching/self-crossing edges are rejected. Original bounded
+ * ear clipping, not the source Lyon tessellator. Each triangle has ST=(0,1).
+ * Query with out=NULL/capacity=0; CAPACITY sets required, preserves vertices and
+ * bounds. Other errors preserve all outputs. Output must not alias inputs. */
+cui_plot_result cui_plot_fill_mesh(const cui_plot_point *contour, size_t count,
+                                   cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
+                                   cui_plot_rect *bounds);
+/* Pinned path fragment coverage: ST and its screen-space derivatives; output
+ * preserved on invalid/overflow. Constant S derivatives (<.001 norm) are solid.
+ * This is analytic quadratic coverage, not generic triangle-edge antialiasing. */
+cui_plot_result cui_plot_mesh_coverage(cui_plot_point st, cui_plot_point dstdx,
+                                       cui_plot_point dstdy, double *coverage);
 #ifdef __cplusplus
 }
 #endif

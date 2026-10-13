@@ -2400,3 +2400,115 @@ cui_plot_result cui_plot_appear_value_stagger(const cui_plot_appear_value *value
     *out = progress;
     return CUI_PLOT_OK;
 }
+
+static double mesh_cross(cui_plot_point a, cui_plot_point b, cui_plot_point c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+static bool mesh_between(double a, double b, double x) {
+    return x >= fmin(a, b) && x <= fmax(a, b);
+}
+static bool mesh_edges_touch(cui_plot_point a, cui_plot_point b, cui_plot_point c,
+                             cui_plot_point d) {
+    double ab_c = mesh_cross(a, b, c), ab_d = mesh_cross(a, b, d);
+    double cd_a = mesh_cross(c, d, a), cd_b = mesh_cross(c, d, b);
+    if (((ab_c < 0 && ab_d > 0) || (ab_c > 0 && ab_d < 0)) &&
+        ((cd_a < 0 && cd_b > 0) || (cd_a > 0 && cd_b < 0)))
+        return true;
+    return (ab_c == 0 && mesh_between(a.x, b.x, c.x) && mesh_between(a.y, b.y, c.y)) ||
+           (ab_d == 0 && mesh_between(a.x, b.x, d.x) && mesh_between(a.y, b.y, d.y)) ||
+           (cd_a == 0 && mesh_between(c.x, d.x, a.x) && mesh_between(c.y, d.y, a.y)) ||
+           (cd_b == 0 && mesh_between(c.x, d.x, b.x) && mesh_between(c.y, d.y, b.y));
+}
+cui_plot_result cui_plot_fill_mesh(const cui_plot_point *p, size_t n, cui_plot_mesh_vertex *out,
+                                   size_t capacity, size_t *required, cui_plot_rect *bounds) {
+    if (!p || !required || !bounds || n < 3 || n > 256 || (capacity && !out))
+        return CUI_PLOT_INVALID;
+    cui_plot_rect box = {p[0].x, p[0].y, p[0].x, p[0].y};
+    double area = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (!isfinite(p[i].x) || !isfinite(p[i].y) || fabs(p[i].x) > 16384 || fabs(p[i].y) > 16384)
+            return CUI_PLOT_INVALID;
+        size_t j = (i + 1) % n;
+        if (p[i].x == p[j].x && p[i].y == p[j].y)
+            return CUI_PLOT_DEGENERATE;
+        if (mesh_cross(p[(i + n - 1) % n], p[i], p[j]) == 0)
+            return CUI_PLOT_DEGENERATE;
+        area += p[i].x * p[j].y - p[j].x * p[i].y;
+        box.x_min = fmin(box.x_min, p[i].x);
+        box.x_max = fmax(box.x_max, p[i].x);
+        box.y_min = fmin(box.y_min, p[i].y);
+        box.y_max = fmax(box.y_max, p[i].y);
+    }
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = i + 1; j < n; j++) {
+            if (j == i + 1 || (i == 0 && j == n - 1))
+                continue;
+            if (mesh_edges_touch(p[i], p[(i + 1) % n], p[j], p[(j + 1) % n]))
+                return CUI_PLOT_INVALID;
+        }
+    if (area == 0)
+        return CUI_PLOT_DEGENERATE;
+    size_t indices[256], triangles[254 * 3], used = 0, left = n;
+    for (size_t i = 0; i < n; i++)
+        indices[i] = i;
+    double sign = area > 0 ? 1 : -1;
+    while (left > 3) {
+        bool found = false;
+        for (size_t i = 0; i < left; i++) {
+            size_t a = indices[(i + left - 1) % left], b = indices[i], c = indices[(i + 1) % left];
+            if (sign * mesh_cross(p[a], p[b], p[c]) <= 0)
+                continue;
+            bool blocked = false;
+            for (size_t j = 0; j < left; j++) {
+                size_t v = indices[j];
+                if (v == a || v == b || v == c)
+                    continue;
+                if (sign * mesh_cross(p[a], p[b], p[v]) >= 0 &&
+                    sign * mesh_cross(p[b], p[c], p[v]) >= 0 &&
+                    sign * mesh_cross(p[c], p[a], p[v]) >= 0) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked)
+                continue;
+            triangles[used++] = a;
+            triangles[used++] = b;
+            triangles[used++] = c;
+            for (size_t j = i; j + 1 < left; j++)
+                indices[j] = indices[j + 1];
+            left--;
+            found = true;
+            break;
+        }
+        if (!found)
+            return CUI_PLOT_DEGENERATE;
+    }
+    for (size_t i = 0; i < 3; i++)
+        triangles[used++] = indices[i];
+    *required = used;
+    if (!out || capacity < used)
+        return CUI_PLOT_CAPACITY;
+    for (size_t i = 0; i < used; i++)
+        out[i] = (cui_plot_mesh_vertex){p[triangles[i]], {0, 1}};
+    *bounds = box;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_mesh_coverage(cui_plot_point st, cui_plot_point dx, cui_plot_point dy,
+                                       double *coverage) {
+    if (!coverage || !isfinite(st.x) || !isfinite(st.y) || !isfinite(dx.x) || !isfinite(dx.y) ||
+        !isfinite(dy.x) || !isfinite(dy.y))
+        return CUI_PLOT_INVALID;
+    double alpha = 1;
+    if (hypot(dx.x, dy.x) >= .001) {
+        double gx = 2 * st.x * dx.x - dx.y, gy = 2 * st.x * dy.x - dy.y;
+        double f = st.x * st.x - st.y, gradient = hypot(gx, gy);
+        if (!isfinite(f) || !isfinite(gradient))
+            return CUI_PLOT_OVERFLOW;
+        if (gradient == 0)
+            return CUI_PLOT_DEGENERATE;
+        alpha = fmax(0, fmin(1, .5 - f / gradient));
+    }
+    *coverage = alpha;
+    return CUI_PLOT_OK;
+}

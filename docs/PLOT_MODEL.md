@@ -1197,3 +1197,44 @@ attributes unchanged. Core currently exposes rectangle/text/bitmap draw routes,
 not this path/mesh contract; adding it belongs to the integrator's Core/adapter
 work. The software segment cache does not become a native stroke triangle cache
 through naming, and per-pixel rasterization still runs on each frame.
+
+### Native triangle preparation and coverage
+
+The pinned GPUI `PathBuilder` uses Lyon fill/stroke tessellation, expands its
+indexed result to triangle-list vertices and assigns every vertex ST=(0,1).
+`PathVertex` holds XY, ST and content-mask bounds; paths carry their bounds and
+Background. The separate direct quadratic `Path::curve_to` emits ST=(0,0),
+(.5,0),(1,1) on its control triangle. The path shader interpolates ST and computes
+`f=S*S-T`, screen gradient `2*S*grad(S)-grad(T)` and coverage
+`clamp(.5-f/length(gradient),0,1)`; if length(grad(S))<.001 it uses coverage1.
+Fragments produce premultiplied `(RGB*alpha*coverage,alpha*coverage)` regardless
+of the generic quad output mode. Source origin translation changes XY and bounds
+but not ST; device scaling changes XY/content masks but not ST.
+
+`cui_plot_fill_mesh` produces usable portable triangle-list vertices with relative
+`xy` and constant `st=(0,1)`, plus geometric bounds. Caller-owned arrays retain
+those vertices and can translate them when sending them to a native renderer.
+The original allocation-free ear-clipping implementation supports a single
+simple implicitly closed contour in either winding, including concave contours,
+with3..256 distinct vertices and coordinates within +/-16384. It checks all
+nonadjacent edges before tessellation. Holes, touching/self-crossing edges,
+repeated adjacent vertices and collinear corners are rejected; this is not a
+replacement for all Lyon fill rules, curve flattening or stroke joins/dashes.
+Use existing geometry/flattened paths to supply the contour, omitting the repeated
+closing endpoint. The256-vertex bound caps both stack storage and cubic-time
+worst-case ear search (under17 million candidate tests). No platform or Core
+renderer types enter this pure Base API.
+
+A NULL output with capacity0 queries the required expanded vertex count and
+returns CAPACITY. CAPACITY changes only `required`; vertices and bounds remain
+unchanged. Other errors preserve all outputs. Input/output buffers must be
+stable and disjoint. Successful output bounds include contour corners; they do
+not add an antialias margin or content mask. `cui_plot_mesh_coverage` evaluates
+the exact source analytic formula for explicit interpolated ST and derivatives;
+constant-ST triangles have solid coverage. It does not infer triangle-edge
+coverage, schedule rendering or build a retained native cache. Zero gradient
+at a nonconstant-S point is DEGENERATE; nonfinite arithmetic is OVERFLOW.
+
+Core mesh submission, background shaders, clipping, triangle-edge sampling and
+adapter resource caching remain integrator-owned renderer work. The software
+segment cache and this mesh preparation are separate representations.

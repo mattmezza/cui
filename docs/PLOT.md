@@ -595,3 +595,16 @@ The segment renderer does not reproduce GPU Hsla conversion, native path meshes
 or gradient Core quads. Existing solid widget drivers remain separate. See the
 [Background audit](PLOT_MODEL.md#background-draw-routes-and-native-renderer-gap)
 for exact pattern bounds, numeric rules and the remaining Core prerequisite.
+
+## Portable native mesh preparation
+
+`cui_plot_fill_mesh` triangulates a single simple closed contour into caller-owned
+XY/ST vertices and bounds. It handles concave contours and either winding, with
+at most256 vertices, while rejecting holes and touching/self-crossing contours.
+Pass relative positions without duplicating the closing endpoint. Query capacity
+first, retain the successful mesh yourself, and translate XY/bounds at submission;
+ST coverage coordinates remain unchanged. `cui_plot_mesh_coverage` exposes the
+pinned analytic quadratic coverage formula for renderers receiving ST derivatives.
+Neither API submits UI or promises all Lyon stroke/fill behavior. See the
+[native contract](PLOT_MODEL.md#native-triangle-preparation-and-coverage) for
+transaction rules, bounds, coverage semantics and remaining renderer work.

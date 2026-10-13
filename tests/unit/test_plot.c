@@ -1400,7 +1400,98 @@ static void first_paint_clocks(void) {
     assert(cui_plot_appear_step(NULL, 0, policy, false, &value) == CUI_PLOT_INVALID);
     assert(cui_plot_appear_value_stagger(NULL, 0, 1, 0, &stagger) == CUI_PLOT_INVALID);
 }
+static void fill_meshes(void) {
+    const cui_plot_point concave[] = {{0, 0}, {8, 0}, {8, 8}, {4, 3}, {0, 8}};
+    cui_plot_mesh_vertex mesh[12], saved[12];
+    memset(mesh, 0x5a, sizeof mesh);
+    memcpy(saved, mesh, sizeof mesh);
+    size_t required = 99;
+    cui_plot_rect bounds = {1, 2, 3, 4}, before = bounds;
+    assert(cui_plot_fill_mesh(concave, 5, NULL, 0, &required, &bounds) == CUI_PLOT_CAPACITY);
+    assert(required == 9 && memcmp(&bounds, &before, sizeof bounds) == 0);
+    assert(cui_plot_fill_mesh(concave, 5, mesh, 8, &required, &bounds) == CUI_PLOT_CAPACITY);
+    assert(memcmp(mesh, saved, sizeof mesh) == 0);
+    assert(cui_plot_fill_mesh(concave, 5, mesh, 12, &required, &bounds) == CUI_PLOT_OK);
+    assert(required == 9 && bounds.x_min == 0 && bounds.y_min == 0 && bounds.x_max == 8 &&
+           bounds.y_max == 8);
+    double area = 0;
+    for (size_t i = 0; i < required; i += 3) {
+        cui_plot_point a = mesh[i].xy, b = mesh[i + 1].xy, c = mesh[i + 2].xy;
+        double cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        assert(cross > 0);
+        area += cross / 2;
+        for (size_t j = 0; j < 3; j++)
+            assert(mesh[i + j].st.x == 0 && mesh[i + j].st.y == 1);
+    }
+    assert(close(area, 44));
+    cui_plot_point reversed[5];
+    for (size_t i = 0; i < 5; i++)
+        reversed[i] = (cui_plot_point){concave[4 - i].x + 10, concave[4 - i].y - 20};
+    assert(cui_plot_fill_mesh(reversed, 5, mesh, 12, &required, &bounds) == CUI_PLOT_OK);
+    assert(bounds.x_min == 10 && bounds.y_min == -20 && bounds.x_max == 18 && bounds.y_max == -12);
+    area = 0;
+    for (size_t i = 0; i < required; i += 3) {
+        cui_plot_point a = mesh[i].xy, b = mesh[i + 1].xy, c = mesh[i + 2].xy;
+        double cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+        assert(cross < 0);
+        area += cross / 2;
+    }
+    assert(close(area, -44));
+    memcpy(saved, mesh, sizeof mesh);
+    before = bounds;
+    size_t prior = required;
+    const cui_plot_point crossing[] = {{0, 0}, {8, 8}, {0, 8}, {8, 0}};
+    const cui_plot_point touching[] = {{0, 0}, {8, 0}, {4, 4}, {8, 8}, {0, 8}, {4, 4}};
+    const cui_plot_point flat[] = {{0, 0}, {4, 0}, {8, 0}, {8, 8}};
+    const cui_plot_point duplicate[] = {{0, 0}, {8, 0}, {8, 0}, {0, 8}};
+    assert(cui_plot_fill_mesh(crossing, 4, mesh, 12, &required, &bounds) == CUI_PLOT_INVALID);
+    assert(cui_plot_fill_mesh(touching, 6, mesh, 12, &required, &bounds) == CUI_PLOT_INVALID);
+    assert(cui_plot_fill_mesh(flat, 4, mesh, 12, &required, &bounds) == CUI_PLOT_DEGENERATE);
+    assert(cui_plot_fill_mesh(duplicate, 4, mesh, 12, &required, &bounds) == CUI_PLOT_DEGENERATE);
+    reversed[0].x = NAN;
+    assert(cui_plot_fill_mesh(reversed, 5, mesh, 12, &required, &bounds) == CUI_PLOT_INVALID);
+    assert(cui_plot_fill_mesh(concave, 257, mesh, 12, &required, &bounds) == CUI_PLOT_INVALID);
+    assert(required == prior && memcmp(mesh, saved, sizeof mesh) == 0 &&
+           memcmp(&bounds, &before, sizeof bounds) == 0);
+    cui_plot_point ring[256];
+    cui_plot_mesh_vertex large[254 * 3];
+    for (size_t i = 0; i < 256; i++) {
+        double angle = 6.2831853071795864769 * (double)i / 256;
+        ring[i] = (cui_plot_point){100 * cos(angle), 100 * sin(angle)};
+    }
+    assert(cui_plot_fill_mesh(ring, 256, large, 254 * 3, &required, &bounds) == CUI_PLOT_OK);
+    assert(required == 254 * 3 && close(bounds.x_min, -100) && close(bounds.x_max, 100));
+    assert(cui_plot_fill_mesh(NULL, 3, mesh, 12, &required, &bounds) == CUI_PLOT_INVALID);
+    assert(cui_plot_fill_mesh(concave, 5, NULL, 1, &required, &bounds) == CUI_PLOT_INVALID);
+    double alpha = -1;
+    assert(cui_plot_mesh_coverage((cui_plot_point){0, 1}, (cui_plot_point){0}, (cui_plot_point){0},
+                                  &alpha) == CUI_PLOT_OK &&
+           alpha == 1);
+    assert(cui_plot_mesh_coverage((cui_plot_point){.5, .25}, (cui_plot_point){1, 0},
+                                  (cui_plot_point){0, 1}, &alpha) == CUI_PLOT_OK &&
+           alpha == .5);
+    assert(cui_plot_mesh_coverage((cui_plot_point){.5, 0}, (cui_plot_point){1, 0},
+                                  (cui_plot_point){0, 1}, &alpha) == CUI_PLOT_OK &&
+           close(alpha, .5 - .25 / sqrt(2)));
+    assert(cui_plot_mesh_coverage((cui_plot_point){.5, 2}, (cui_plot_point){1, 0},
+                                  (cui_plot_point){0, 1}, &alpha) == CUI_PLOT_OK &&
+           alpha == 1);
+    assert(cui_plot_mesh_coverage((cui_plot_point){.5, -2}, (cui_plot_point){1, 0},
+                                  (cui_plot_point){0, 1}, &alpha) == CUI_PLOT_OK &&
+           alpha == 0);
+    alpha = .7;
+    assert(cui_plot_mesh_coverage((cui_plot_point){NAN, 0}, (cui_plot_point){0},
+                                  (cui_plot_point){0}, &alpha) == CUI_PLOT_INVALID &&
+           alpha == .7);
+    assert(cui_plot_mesh_coverage((cui_plot_point){DBL_MAX, 0}, (cui_plot_point){1, 0},
+                                  (cui_plot_point){0, 1}, &alpha) == CUI_PLOT_OVERFLOW &&
+           alpha == .7);
+    assert(cui_plot_mesh_coverage((cui_plot_point){0, 0}, (cui_plot_point){1, 0},
+                                  (cui_plot_point){0}, &alpha) == CUI_PLOT_DEGENERATE &&
+           alpha == .7);
+}
 int main(void) {
+    fill_meshes();
     first_paint_clocks();
     shape_keys();
     pointer_springs();

@@ -129,17 +129,67 @@
     "production_alias_generation_core_dispatch_proved": false
   },
   "wasm": {
-    "actual_rust_target_probe": "E0463 missing std",
-    "target_installed": false,
-    "gallery_actual_target": "Zig0.16 wasm32-wasi reactor with custom WASI imports",
-    "previous_emscripten_assumption_corrected": true,
-    "next_acquisition": "task-local complete official pinned host toolchain plus matching wasm32-wasip1 std, archive/manifest checksum freeze before authorization",
-    "candidate_toolchain": "1.85.1 (MSRV crates1.65), not yet validated/downloaded",
-    "proof_pending": [
-      "Rust WASI archive link into Zig reactor",
-      "constructor/import/allocator/compiler-builtins audit",
-      "Wasmtime reactor",
-      "actual Rust-in-CUI browser/CDP"
+    "original_target_probe": "E0463 missing std on system rustc1.99",
+    "target_installed": "task-cache only",
+    "toolchain": "Rust1.85.1 official complete host + matching wasm32-wasip1 std",
+    "official_receipt": {
+      "manifest_sha256": "1e7dae690cd12e27405a97e64704917489a27c650201bf47780a936055d67909",
+      "date": "2025-03-18",
+      "artifacts": {
+        "host": {
+          "url": "https://static.rust-lang.org/dist/2025-03-18/rust-1.85.1-x86_64-unknown-linux-gnu.tar.xz",
+          "sha256": "912c76f602f5f630138fca2388b2688c2c1aabcf823d71890b2b9155f743792e"
+        },
+        "wasi": {
+          "url": "https://static.rust-lang.org/dist/2025-03-18/rust-std-1.85.1-wasm32-wasip1.tar.xz",
+          "sha256": "98c0d9c141170c1cd26650fb853dba3fa08d454f1a440bc86073180d0fed4422"
+        }
+      }
+    },
+    "verified_before_extract": true,
+    "global_mutation": false,
+    "zig": "0.16.0",
+    "link": "wasm32-wasi reactor, libc only, C warnings strict, assertions explicitly enabled",
+    "initialize": "_initialize once; no _start",
+    "imports": [
+      "fd_close",
+      "fd_write",
+      "random_get",
+      "environ_get",
+      "environ_sizes_get",
+      "fd_seek",
+      "proc_exit"
+    ],
+    "import_namespace": "wasi_snapshot_preview1",
+    "runtimes": {
+      "wasmtime": "49.0.0",
+      "chromium_revision": 1208,
+      "chromium_version": "145.0.7632.6",
+      "playwright": "1.58.0"
+    },
+    "each_runtime": {
+      "comparisons": 58520,
+      "compiled": 385,
+      "compile_rejections": 63,
+      "prepared_match_allocations": 0,
+      "injected_cache_failures": 7,
+      "cache_fixture_heap_bytes": 332,
+      "source_compile_limit_counterexample": 768,
+      "c_lifecycle_loops": 3000,
+      "malformed_utf8_atomic": true,
+      "budget_output_atomic": true,
+      "c_malloc_realloc_rust_coexistence": true
+    },
+    "browser_linear_memory_final_bytes": 13500416,
+    "production_input_integration_proved": false,
+    "unsupported": [
+      "production lease/alias/generation/input dispatch",
+      "parser/compiler OOM recovery",
+      "WASI panic unwind recovery",
+      "forged pointers/handles",
+      "smaller stack",
+      "other browsers/threaded WASM",
+      "unknown-unknown/Emscripten"
     ]
   },
   "production_next": [
@@ -156,7 +206,13 @@
       "passed": 154,
       "total": 154
     },
-    "upstream_rust_warnings": "deprecation/lifetime warnings on rustc1.99 path dependencies retained"
+    "upstream_rust_warnings": "deprecation/lifetime warnings on rustc1.99 path dependencies retained",
+    "rust_1_85_1": "native full oracle/fault corpus pass; one retained upstream dead-code warning",
+    "reactor_followup_cui_ctest": {
+      "passed": 154,
+      "total": 154
+    },
+    "reactor_followup_build": "incremental unchanged strict-warning build pass"
   },
   "artifacts": {
     "Cargo.toml": {
@@ -177,7 +233,7 @@
     },
     "src/lib.rs": {
       "path": "/home/matteo/.cache/cui-validation/regex-feasibility/src/lib.rs",
-      "sha256": "696c642e80988e1bdb4c3b7f1af5ab3cafc1d9aac2de01a6cc022772ba54a64c"
+      "sha256": "17dcc283a78cf87cc6ee6bfd9e81797af3ce09989550f16e622dacd451db2f85"
     },
     "src/bin/line_terminator.rs": {
       "path": "/home/matteo/.cache/cui-validation/regex-feasibility/src/bin/line_terminator.rs",
@@ -202,6 +258,74 @@
     "wasm-unavailable.log": {
       "path": "/home/matteo/.cache/cui-validation/regex-feasibility/wasm-unavailable.log",
       "sha256": "58db1adb08e43bbc8aa32cbdbf53a835e9fd26b008e80467d15d8e62cd75455d"
+    },
+    "reactor.c": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/reactor.c",
+      "sha256": "f070a245198891700f9f6c7edc1acbc6e8ed403c257f3cf2804b3dce4b592ca1"
+    },
+    "reactor.wasm": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/reactor.wasm",
+      "sha256": "3a017c228f262c0cc89bd4f8dac3832baa845f714544e8c0adfaa9cd24c3fa9a"
+    },
+    "run_reactor.py": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/run_reactor.py",
+      "sha256": "9518d052cd44a86f7602026c16b0b0358574d264ce2aa4b7471611a6987ce1d8"
+    },
+    "run_browser.py": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/run_browser.py",
+      "sha256": "0c3dd945127e21d077a259ecc71938ebe9b20f830cef70df732600e9257e485b"
+    },
+    "reactor.html": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/reactor.html",
+      "sha256": "3b9207ffeee33b66ba0d7dd0a692ede06d69e5813b1cf9f4345a7fff4f812e1f"
+    },
+    "native-1.85.1.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/native-1.85.1.log",
+      "sha256": "27d1bf081df0bfe5af17635b5332c44e73402e32b4865925c2995856ffa40faf"
+    },
+    "wasm-static-libs.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/wasm-static-libs.log",
+      "sha256": "ae46ef7cf790ed2dd9791d401806c599e193fdcd1f6d2da027969a17957094a3"
+    },
+    "reactor-link.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/reactor-link.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "wasmtime-reactor.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/wasmtime-reactor.log",
+      "sha256": "2db439f3604c547f46013f7cf6e9e35ea7a81d8e7d6d9999d68085ba4e49c94c"
+    },
+    "browser-reactor.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/browser-reactor.log",
+      "sha256": "a0ccbee1c64fc2b4b55423ed37b6a0abe6e0257784d34c633929b31bdd44fa39"
+    },
+    "rust-1.85.1-download/receipt.json": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/rust-1.85.1-download/receipt.json",
+      "sha256": "ced4e1e62629672c5cb5ff9808d6ac1288e5f5552a9c2bc18844119e729a38cd"
+    },
+    "rust-1.85.1-download/channel.toml": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/rust-1.85.1-download/channel.toml",
+      "sha256": "1e7dae690cd12e27405a97e64704917489a27c650201bf47780a936055d67909"
+    },
+    "rust-1.85.1-download/channel.toml.sha256": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/rust-1.85.1-download/channel.toml.sha256",
+      "sha256": "4598c501178ebfd37a0246d6a89a0ce7ced2d879b6c4d82a383ceba0c01d8fb0"
+    },
+    "rust-install.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/rust-install.log",
+      "sha256": "de97389a4526aa5c0d2fb2c90af8ba85267bfecafe514373e158b95bd143be2d"
+    },
+    "rust-std-install.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-feasibility/rust-std-install.log",
+      "sha256": "b5917d053187099be91c66529cc8dadb8925c41431af36e8f12e240898437b33"
+    },
+    "input-regex-feasibility-ctest-reactor.log": {
+      "path": "/home/matteo/.cache/cui-validation/input-regex-feasibility-ctest-reactor.log",
+      "sha256": "76125699df63ade444ebfae16d3e326ce5d624bf916c15432e033a8e25c0da85"
+    },
+    "input-regex-feasibility-build-reactor.log": {
+      "path": "/home/matteo/.cache/cui-validation/input-regex-feasibility-build-reactor.log",
+      "sha256": "8c35b1682f73592d30612d7b0fabdb384fcfff35cb5a076cb48b85b1368aa794"
     }
   },
   "full_regex_or_input_claim": false

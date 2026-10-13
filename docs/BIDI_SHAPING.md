@@ -205,3 +205,41 @@ unsupported fixtures explicitly report the script case skipped. With bidi OFF,
 the test reports source-glyph proof unavailable and keeps its ordinary ASCII
 regressions. Legacy nonempty tofu pixels are never labeled successful RTL proof.
 This fixture search is test setup, not production OS font discovery.
+
+The native line layout also exposes a cluster-boundary geometry foundation.
+`view.clusters` partitions each shaped directional/script subrun into complete
+HarfBuzz monotone grapheme clusters, sorted by visual advance position. Byte
+ranges remain offsets into the original paragraph, including caller-selected
+wrapped lines. Geometry uses glyph advance pens, not ink extents or glyph offsets;
+selection rectangles use the layout's common baseline line height across actual
+fallback faces. Layout ownership retains both these arrays and their faces.
+
+`cui_text_layout_carets` reports the preceding logical cluster's end (upstream)
+and following logical cluster's start (downstream). At directional transitions
+these affinities can have distinct visual positions. Results sort by x, then
+upstream before downstream. Empty lines provide both affinities at x=0 and the
+original line offset. `cui_text_layout_hit_test` projects finite coordinates onto
+this single line and chooses the nearest cluster edge; equal distances prefer
+the requested affinity, then the first cluster in visual order. The y coordinate
+is validated but does not choose another line. Default-ignorable bytes omitted
+by shaping attach to the adjacent logical cluster; a wholly omitted subrun has
+one zero-width cluster. Zero-width edges follow the same deterministic tie rule.
+
+`cui_text_layout_selection` normalizes reversed logical endpoints and emits one
+rectangle per complete selected cluster, in visual order, including zero-width
+rectangles. Callers can merge adjacent rectangles for painting. Caret and
+selection endpoints inside a cluster (including interior ligature or combining
+mark offsets) are rejected. NULL output with zero capacity queries the count;
+INVALID and CAPACITY leave both output and count unchanged. Hit-test invalid
+inputs also preserve output. All three APIs return UNAVAILABLE without changing
+outputs in BIDI-off builds.
+
+This is not full editing caret parity: there are no GDEF ligature interior
+carets, independent stops inside omitted controls, cross-run grapheme analysis,
+visual keyboard navigation, multi-line hit-testing, or Core/Edit/Textarea wiring.
+Fonts can shape several characters into one cluster, so a valid UTF-8 character
+boundary need not be an accepted geometry boundary. Actual automatic word
+wrapping and editor selection/caret policies remain caller responsibilities.
+The cluster grouping follows [HarfBuzz's cluster model](https://harfbuzz.github.io/working-with-harfbuzz-clusters.html);
+interior ligature carets would additionally require the optional
+[OpenType GDEF ligature caret list](https://learn.microsoft.com/en-us/typography/opentype/spec/gdef#ligature-caret-list-table).

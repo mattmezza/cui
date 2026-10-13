@@ -322,6 +322,7 @@ struct cui_text_layout {
     cui_text_glyph *glyphs;
     cui_text_run *runs;
     cui_font **faces;
+    cui_text_cluster *clusters;
     float size;
 };
 void cui_text_layout_destroy(cui_text_layout *layout) {
@@ -329,6 +330,7 @@ void cui_text_layout_destroy(cui_text_layout *layout) {
         return;
     free(layout->glyphs);
     free(layout->runs);
+    free(layout->clusters);
     for (size_t i = 0; i < layout->view.face_count; ++i)
         cui_font_close(layout->faces[i]);
     free(layout->faces);
@@ -350,6 +352,18 @@ typedef struct {
     hb_buffer_t *buffer;
     size_t face_index;
 } layout_segment;
+static int cluster_order(const void *a, const void *b) {
+    const cui_text_cluster *x = a, *y = b;
+    if (x->left != y->left)
+        return x->left < y->left ? -1 : 1;
+    if (x->right != y->right)
+        return x->right < y->right ? -1 : 1;
+    if (x->run_index != y->run_index)
+        return x->run_index < y->run_index ? -1 : 1;
+    if (x->byte_start != y->byte_start)
+        return x->byte_start < y->byte_start ? -1 : 1;
+    return 0;
+}
 static bool weak_script(hb_script_t script) {
     return script == HB_SCRIPT_COMMON || script == HB_SCRIPT_INHERITED ||
            script == HB_SCRIPT_UNKNOWN;
@@ -444,6 +458,8 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     layout->view.height = (float)face->face->size->metrics.height / 64;
     layout->view.ascent = (float)face->face->size->metrics.ascender / 64;
     layout->view.paragraph_level = analysis.paragraph_level;
+    layout->view.byte_start = bytes[start];
+    layout->view.byte_end = bytes[start + length];
     float descent = -(float)face->face->size->metrics.descender / 64;
     if (!length) {
         *out = layout;
@@ -571,6 +587,12 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     layout->runs = calloc(segment_count, sizeof *layout->runs);
     if (!layout->glyphs || !layout->runs)
         goto done;
+    if (segment_count > SIZE_MAX - glyph_count ||
+        glyph_count + segment_count > SIZE_MAX / sizeof *layout->clusters)
+        goto done;
+    layout->clusters = calloc(glyph_count + segment_count, sizeof *layout->clusters);
+    if (!layout->clusters)
+        goto done;
     size_t glyph = 0;
     float pen = 0;
     for (size_t i = 0; i < segment_count; ++i) {
@@ -589,6 +611,11 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
                                          (uint32_t)hb_script_to_iso15924_tag(seg->script),
                                          seg->level,
                                          seg->face_index};
+        if (!count)
+            layout->clusters[layout->view.cluster_count++] =
+                (cui_text_cluster){bytes[seg->start], bytes[seg->end], i, glyph, 0, pen, pen};
+        unsigned group_start = 0;
+        float group_pen = x;
         for (unsigned j = 0; j < count; ++j) {
             layout->glyphs[glyph++] = (cui_text_glyph){infos[j].codepoint,
                                                        infos[j].cluster + bytes[start],
@@ -598,6 +625,31 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
                                                        -(float)positions[j].y_advance / 64};
             x += (float)positions[j].x_advance / 64;
             y -= (float)positions[j].y_advance / 64;
+            if (j + 1 == count || infos[j + 1].cluster != infos[j].cluster) {
+                bool rtl = (seg->level & 1) != 0;
+                size_t begin = infos[group_start].cluster + bytes[start];
+                size_t end =
+                    rtl ? (group_start ? infos[group_start - 1].cluster + bytes[start]
+                                       : bytes[seg->end])
+                        : (j + 1 < count ? infos[j + 1].cluster + bytes[start] : bytes[seg->end]);
+                if ((!rtl && !group_start) || (rtl && j + 1 == count))
+                    begin = bytes[seg->start];
+                if (begin >= end || begin < layout->view.byte_start ||
+                    end > layout->view.byte_end || !isfinite(group_pen) || !isfinite(x)) {
+                    status = CUI_TEXT_LAYOUT_INVALID;
+                    goto done;
+                }
+                layout->clusters[layout->view.cluster_count++] =
+                    (cui_text_cluster){begin,
+                                       end,
+                                       i,
+                                       glyph - (j - group_start + 1),
+                                       j - group_start + 1,
+                                       fminf(group_pen, x),
+                                       fmaxf(group_pen, x)};
+                group_start = j + 1;
+                group_pen = x;
+            }
         }
         pen += fabsf(advance);
     }
@@ -608,6 +660,8 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     layout->view.glyph_count = glyph_count;
     layout->view.run_count = segment_count;
     layout->view.width = pen;
+    qsort(layout->clusters, layout->view.cluster_count, sizeof *layout->clusters, cluster_order);
+    layout->view.clusters = layout->clusters;
     *out = layout;
     layout = NULL;
     status = CUI_TEXT_LAYOUT_OK;
@@ -795,5 +849,160 @@ static bool text_lines_create(cui_font *font, cui_str text, float size, cui_text
 failed:
     text_lines_destroy(head);
     return false;
+}
+#endif
+
+#ifdef CUI_TEXT_BIDI
+static bool cluster_boundary(const cui_text_layout *layout, size_t byte) {
+    if (byte < layout->view.byte_start || byte > layout->view.byte_end)
+        return false;
+    if (!layout->view.cluster_count)
+        return byte == layout->view.byte_start;
+    for (size_t i = 0; i < layout->view.cluster_count; ++i)
+        if (layout->clusters[i].byte_start == byte || layout->clusters[i].byte_end == byte)
+            return true;
+    return false;
+}
+static cui_text_caret cluster_caret(const cui_text_layout *layout, size_t index,
+                                    cui_text_affinity affinity) {
+    const cui_text_cluster *cluster = &layout->clusters[index];
+    bool rtl = (layout->runs[cluster->run_index].level & 1) != 0;
+    size_t byte = affinity == CUI_TEXT_DOWNSTREAM ? cluster->byte_start : cluster->byte_end;
+    float x = (rtl == (affinity == CUI_TEXT_DOWNSTREAM)) ? cluster->right : cluster->left;
+    return (cui_text_caret){byte, cluster->run_index, affinity, x, 0, layout->view.height};
+}
+cui_text_layout_status cui_text_layout_carets(const cui_text_layout *layout, size_t byte,
+                                              cui_text_caret *out, size_t capacity, size_t *count) {
+    size_t needed = 0;
+    if (!layout || !count || (!out && capacity) || !cluster_boundary(layout, byte))
+        return CUI_TEXT_LAYOUT_INVALID;
+    if (!layout->view.cluster_count)
+        needed = 2;
+    else
+        for (size_t i = 0; i < layout->view.cluster_count; ++i) {
+            needed += layout->clusters[i].byte_start == byte;
+            needed += layout->clusters[i].byte_end == byte;
+        }
+    if (!out && !capacity) {
+        *count = needed;
+        return CUI_TEXT_LAYOUT_OK;
+    }
+    if (capacity < needed)
+        return CUI_TEXT_LAYOUT_CAPACITY;
+    size_t k = 0;
+    if (!layout->view.cluster_count) {
+        out[k++] = (cui_text_caret){byte, SIZE_MAX, CUI_TEXT_UPSTREAM, 0, 0, layout->view.height};
+        out[k++] = (cui_text_caret){byte, SIZE_MAX, CUI_TEXT_DOWNSTREAM, 0, 0, layout->view.height};
+    } else
+        for (size_t i = 0; i < layout->view.cluster_count; ++i) {
+            if (layout->clusters[i].byte_start == byte)
+                out[k++] = cluster_caret(layout, i, CUI_TEXT_DOWNSTREAM);
+            if (layout->clusters[i].byte_end == byte)
+                out[k++] = cluster_caret(layout, i, CUI_TEXT_UPSTREAM);
+        }
+    /* Same original boundary has at most two logical neighbors, except that
+     * empty lines explicitly represent both affinities. Stable bounded sort. */
+    for (size_t i = 1; i < k; ++i) {
+        cui_text_caret value = out[i];
+        size_t j = i;
+        while (j && (out[j - 1].x > value.x ||
+                     (out[j - 1].x == value.x && out[j - 1].affinity > value.affinity))) {
+            out[j] = out[j - 1];
+            --j;
+        }
+        out[j] = value;
+    }
+    *count = k;
+    return CUI_TEXT_LAYOUT_OK;
+}
+cui_text_layout_status cui_text_layout_hit_test(const cui_text_layout *layout, float x, float y,
+                                                cui_text_affinity preferred, cui_text_caret *out) {
+    if (!layout || !out || !isfinite(x) || !isfinite(y) ||
+        (unsigned)preferred > CUI_TEXT_DOWNSTREAM)
+        return CUI_TEXT_LAYOUT_INVALID;
+    cui_text_caret best = {layout->view.byte_start, SIZE_MAX, preferred, 0, 0, layout->view.height};
+    double distance = HUGE_VAL;
+    bool found = false;
+    for (size_t i = 0; i < layout->view.cluster_count; ++i)
+        for (unsigned a = 0; a < 2; ++a) {
+            cui_text_caret candidate = cluster_caret(layout, i, (cui_text_affinity)a);
+            double delta = fabs((double)x - candidate.x);
+            if (!found || delta < distance ||
+                (delta == distance && candidate.affinity == preferred &&
+                 best.affinity != preferred)) {
+                best = candidate;
+                distance = delta;
+                found = true;
+            }
+        }
+    *out = best;
+    return CUI_TEXT_LAYOUT_OK;
+}
+cui_text_layout_status cui_text_layout_selection(const cui_text_layout *layout, size_t start,
+                                                 size_t end, cui_text_selection_rect *out,
+                                                 size_t capacity, size_t *count) {
+    if (!layout || !count || (!out && capacity))
+        return CUI_TEXT_LAYOUT_INVALID;
+    if (start > end) {
+        size_t temporary = start;
+        start = end;
+        end = temporary;
+    }
+    if (!cluster_boundary(layout, start) || !cluster_boundary(layout, end))
+        return CUI_TEXT_LAYOUT_INVALID;
+    size_t needed = 0;
+    if (start != end)
+        for (size_t i = 0; i < layout->view.cluster_count; ++i)
+            if (layout->clusters[i].byte_start >= start && layout->clusters[i].byte_end <= end)
+                ++needed;
+    if (!out && !capacity) {
+        *count = needed;
+        return CUI_TEXT_LAYOUT_OK;
+    }
+    if (capacity < needed)
+        return CUI_TEXT_LAYOUT_CAPACITY;
+    size_t k = 0;
+    if (start != end)
+        for (size_t i = 0; i < layout->view.cluster_count; ++i) {
+            const cui_text_cluster *cluster = &layout->clusters[i];
+            if (cluster->byte_start >= start && cluster->byte_end <= end)
+                out[k++] = (cui_text_selection_rect){
+                    {cluster->left, 0, cluster->right - cluster->left, layout->view.height},
+                    cluster->byte_start,
+                    cluster->byte_end,
+                    cluster->run_index};
+        }
+    *count = k;
+    return CUI_TEXT_LAYOUT_OK;
+}
+#else
+cui_text_layout_status cui_text_layout_carets(const cui_text_layout *layout, size_t byte,
+                                              cui_text_caret *out, size_t capacity, size_t *count) {
+    (void)layout;
+    (void)byte;
+    (void)out;
+    (void)capacity;
+    (void)count;
+    return CUI_TEXT_LAYOUT_UNAVAILABLE;
+}
+cui_text_layout_status cui_text_layout_hit_test(const cui_text_layout *layout, float x, float y,
+                                                cui_text_affinity preferred, cui_text_caret *out) {
+    (void)layout;
+    (void)x;
+    (void)y;
+    (void)preferred;
+    (void)out;
+    return CUI_TEXT_LAYOUT_UNAVAILABLE;
+}
+cui_text_layout_status cui_text_layout_selection(const cui_text_layout *layout, size_t start,
+                                                 size_t end, cui_text_selection_rect *out,
+                                                 size_t capacity, size_t *count) {
+    (void)layout;
+    (void)start;
+    (void)end;
+    (void)out;
+    (void)capacity;
+    (void)count;
+    return CUI_TEXT_LAYOUT_UNAVAILABLE;
 }
 #endif

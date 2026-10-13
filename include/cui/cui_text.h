@@ -60,6 +60,21 @@ typedef struct {
     uint8_t level;
     size_t face_index; /* Index in view.faces; glyph IDs belong to this face. */
 } cui_text_run;
+/* Shaped cluster advance spans, not ink/grapheme bounds or ligature interiors. */
+typedef struct {
+    size_t byte_start, byte_end, run_index, glyph_start, glyph_count;
+    float left, right;
+} cui_text_cluster;
+typedef enum { CUI_TEXT_UPSTREAM, CUI_TEXT_DOWNSTREAM } cui_text_affinity;
+typedef struct {
+    size_t byte_offset, run_index;
+    cui_text_affinity affinity;
+    float x, y, height;
+} cui_text_caret;
+typedef struct {
+    cui_rect bounds;
+    size_t byte_start, byte_end, run_index;
+} cui_text_selection_rect;
 typedef struct {
     const cui_text_glyph *glyphs;
     const cui_text_run *runs;
@@ -68,13 +83,16 @@ typedef struct {
     uint8_t paragraph_level;
     cui_font *const *faces; /* Borrowed layout-retained handles; do not close them. */
     size_t face_count;
+    const cui_text_cluster *clusters; /* Visual left-to-right order; zero spans retained. */
+    size_t cluster_count, byte_start, byte_end;
 } cui_text_layout_view;
 typedef enum {
     CUI_TEXT_LAYOUT_OK,
     CUI_TEXT_LAYOUT_INVALID,
     CUI_TEXT_LAYOUT_MEMORY,
     CUI_TEXT_LAYOUT_UNAVAILABLE,
-    CUI_TEXT_LAYOUT_MISSING_GLYPH
+    CUI_TEXT_LAYOUT_MISSING_GLYPH,
+    CUI_TEXT_LAYOUT_CAPACITY
 } cui_text_layout_status;
 /* Analyze a full paragraph, shape one caller-selected scalar line. SIZE_MAX
  * length means through paragraph end. Empty ranges return paragraph metrics.
@@ -95,6 +113,28 @@ void cui_text_layout_destroy(cui_text_layout *layout);
 /* Paint positioned glyphs with their selected run faces and saved size. Coordinates
  * specify the line's top-left; partial raster failure may already have emitted. */
 bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_fn emit, void *user);
+/* Cluster-edge foundation, not full editing caret support. Original paragraph
+ * byte offsets must be exact shaped-cluster boundaries; interior ligature/mark
+ * offsets are INVALID. UPSTREAM attaches to preceding logical cluster's end;
+ * DOWNSTREAM to following cluster's start. At bidi transitions these may have
+ * distinct x positions. Empty lines have both affinities at x=0/run=SIZE_MAX.
+ * NULL output with capacity zero queries required count. INVALID/CAPACITY keep
+ * outputs and count unchanged; buffers/count must be disjoint. Carets sorted by
+ * x then affinity, zero-width edges retained. Coordinates use the line top-left. */
+cui_text_layout_status cui_text_layout_carets(const cui_text_layout *layout, size_t byte_offset,
+                                              cui_text_caret *out, size_t capacity, size_t *count);
+/* Finite point projected to this line, even outside its bounds. Nearest cluster
+ * edge wins; equal distances prefer the requested affinity, then visual cluster
+ * order. Does not hit glyph ink or provide vertical navigation. */
+cui_text_layout_status cui_text_layout_hit_test(const cui_text_layout *layout, float x, float y,
+                                                cui_text_affinity preferred, cui_text_caret *out);
+/* Reversed logical endpoints normalize. Both must be cluster boundaries.
+ * One rectangle per selected cluster (including zero-width default-ignorables),
+ * in visual order; mixed bidi ranges may be disconnected. No ink bounds or
+ * partial-ligature selections. NULL/0 queries count; failures are atomic. */
+cui_text_layout_status cui_text_layout_selection(const cui_text_layout *layout, size_t byte_start,
+                                                 size_t byte_end, cui_text_selection_rect *out,
+                                                 size_t capacity, size_t *count);
 #ifdef __cplusplus
 }
 #endif

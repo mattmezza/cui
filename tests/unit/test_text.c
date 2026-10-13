@@ -10,6 +10,15 @@ int main(void) {
     assert(cui_font_layout_line(NULL, (cui_str){0}, 0, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 0, 0,
                                 NULL, &sentinel) == CUI_TEXT_LAYOUT_UNAVAILABLE);
     assert(sentinel == before);
+    size_t unchanged = 123;
+    cui_text_caret caret = {0}, original = caret;
+    assert(cui_text_layout_carets(NULL, 0, &caret, 1, &unchanged) == CUI_TEXT_LAYOUT_UNAVAILABLE);
+    assert(unchanged == 123 && caret.x == original.x);
+    assert(cui_text_layout_hit_test(NULL, 0, 0, CUI_TEXT_DOWNSTREAM, &caret) ==
+           CUI_TEXT_LAYOUT_UNAVAILABLE);
+    assert(cui_text_layout_selection(NULL, 0, 0, NULL, 0, &unchanged) ==
+           CUI_TEXT_LAYOUT_UNAVAILABLE);
+    assert(unchanged == 123);
     const char *requested = getenv("CUI_TEST_FONT");
     const char *const paths[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
                                  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -195,7 +204,13 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
             for (unsigned i = 0; i < count; ++i)
                 advance += (float)positions[i].x_advance / 64;
             float x = pen + (advance < 0 ? -advance : 0), y = 0;
+            unsigned group = 0;
+            float group_x = x;
             for (unsigned i = 0; i < count; ++i) {
+                if (!i || infos[i].cluster != infos[i - 1].cluster) {
+                    group = i;
+                    group_x = x;
+                }
                 const cui_text_glyph *g = &view.glyphs[glyph++];
                 assert(g->glyph_id != 0);
                 assert(g->glyph_id == infos[i].codepoint &&
@@ -220,12 +235,38 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
                 }
                 x += (float)positions[i].x_advance / 64;
                 y -= (float)positions[i].y_advance / 64;
+                if (i + 1 == count || infos[i + 1].cluster != infos[i].cluster) {
+                    const cui_text_cluster *cluster = NULL;
+                    for (size_t c = 0; c < view.cluster_count; ++c)
+                        if (view.clusters[c].run_index == run - 1 &&
+                            view.clusters[c].glyph_start == actual->glyph_start + group)
+                            cluster = &view.clusters[c];
+                    assert(cluster && cluster->glyph_count == i - group + 1);
+                    close_float(cluster->left, fminf(group_x, x));
+                    close_float(cluster->right, fmaxf(group_x, x));
+                    size_t begin = infos[group].cluster + byte_start;
+                    size_t end = (actual->level & 1)
+                                     ? (group ? infos[group - 1].cluster + byte_start
+                                              : actual->byte_start + actual->byte_length)
+                                     : (i + 1 < count ? infos[i + 1].cluster + byte_start
+                                                      : actual->byte_start + actual->byte_length);
+                    if (((actual->level & 1) && i + 1 == count) || (!(actual->level & 1) && !group))
+                        begin = actual->byte_start;
+                    assert(cluster->byte_start == begin && cluster->byte_end == end);
+                }
             }
             pen += fabsf(advance);
             hb_buffer_destroy(buffer);
         }
     }
     assert(run == view.run_count && glyph == view.glyph_count);
+    assert(view.byte_start == byte_start && view.byte_end == byte_end);
+    for (size_t c = 0; c < view.cluster_count; ++c) {
+        size_t edge_count = 0;
+        assert(cui_text_layout_carets(layout, view.clusters[c].byte_start, NULL, 0, &edge_count) ==
+                   CUI_TEXT_LAYOUT_OK &&
+               edge_count);
+    }
     close_float(pen, view.width);
     if (used_fallback && expected_ascent + expected_descent > expected_height)
         expected_height = expected_ascent + expected_descent;
@@ -399,6 +440,13 @@ static void fallback_contracts(const char *primary_path, cui_font *const *fallba
     assert(cui_text_layout_draw(layout, 0, 0, emit, &before));
     assert(cui_font_register_fallbacks(root, NULL, 0));
     cui_font_close(root);
+    cui_text_caret retained_edge;
+    assert(cui_text_layout_hit_test(layout, 0, 0, CUI_TEXT_DOWNSTREAM, &retained_edge) ==
+           CUI_TEXT_LAYOUT_OK);
+    size_t retained_count;
+    assert(cui_text_layout_selection(layout, view.byte_start, view.byte_end, NULL, 0,
+                                     &retained_count) == CUI_TEXT_LAYOUT_OK &&
+           retained_count == view.cluster_count);
     assert(cui_text_layout_draw(layout, 0, 0, emit, &after));
     assert(before.hash == after.hash && before.count == after.count);
     cui_text_layout_destroy(layout);
@@ -539,6 +587,113 @@ static void arabic_clusters(void) {
     printf("Arabic joining/mark raster passed using %s\n", path);
 }
 
+static void geometry(cui_font *font) {
+    cui_text_layout *layout = NULL;
+    cui_text_layout_view view;
+    cui_str text = string("abc אבג 123 xyz");
+    assert(cui_font_layout_line(font, text, 24, (cui_text_style){0}, CUI_BIDI_LTR, 0, SIZE_MAX,
+                                NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_get(layout, &view));
+    assert(view.byte_start == 0 && view.byte_end == text.length);
+    cui_text_caret carets[4], sentinel[4];
+    memset(carets, 0x37, sizeof carets);
+    memcpy(sentinel, carets, sizeof carets);
+    size_t count = 991;
+    assert(cui_text_layout_carets(layout, 5, carets, 4, &count) == CUI_TEXT_LAYOUT_INVALID);
+    assert(count == 991 && !memcmp(carets, sentinel, sizeof carets));
+    assert(cui_text_layout_carets(layout, 4, NULL, 0, &count) == CUI_TEXT_LAYOUT_OK && count == 2);
+    count = 991;
+    assert(cui_text_layout_carets(layout, 4, carets, 1, &count) == CUI_TEXT_LAYOUT_CAPACITY);
+    assert(count == 991 && !memcmp(carets, sentinel, sizeof carets));
+    assert(cui_text_layout_carets(layout, 4, carets, 4, &count) == CUI_TEXT_LAYOUT_OK &&
+           count == 2);
+    assert(carets[0].x != carets[1].x && carets[0].affinity != carets[1].affinity);
+    cui_text_caret hit = carets[0], prior = hit;
+    assert(cui_text_layout_hit_test(layout, NAN, 0, CUI_TEXT_UPSTREAM, &hit) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(!memcmp(&hit, &prior, sizeof hit));
+    assert(cui_text_layout_hit_test(layout, 0, INFINITY, CUI_TEXT_UPSTREAM, &hit) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    for (size_t c = 0; c < view.cluster_count; ++c) {
+        const cui_text_cluster *cluster = &view.clusters[c];
+        bool rtl = (view.runs[cluster->run_index].level & 1) != 0;
+        assert(cui_text_layout_hit_test(layout, rtl ? cluster->right : cluster->left, 0,
+                                        CUI_TEXT_DOWNSTREAM, &hit) == CUI_TEXT_LAYOUT_OK);
+        close_float(hit.x, rtl ? cluster->right : cluster->left);
+        assert(hit.affinity == CUI_TEXT_DOWNSTREAM);
+    }
+    cui_text_selection_rect selected[64], reversed[64];
+    assert(cui_text_layout_selection(layout, 0, text.length, NULL, 0, &count) ==
+           CUI_TEXT_LAYOUT_OK);
+    assert(count == view.cluster_count && count < 64);
+    size_t reverse_count;
+    assert(cui_text_layout_selection(layout, 0, text.length, selected, 64, &count) ==
+           CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_selection(layout, text.length, 0, reversed, 64, &reverse_count) ==
+           CUI_TEXT_LAYOUT_OK);
+    assert(count == reverse_count);
+    for (size_t c = 0; c < count; ++c) {
+        assert(selected[c].byte_start == view.clusters[c].byte_start);
+        assert(selected[c].byte_end == reversed[c].byte_end);
+        close_float(selected[c].bounds.x, view.clusters[c].left);
+        close_float(selected[c].bounds.w, view.clusters[c].right - view.clusters[c].left);
+        close_float(selected[c].bounds.h, view.height);
+    }
+    /* Selecting through the RTL letter sequence excludes the embedded number
+     * run, so the selected logical prefix has separated visual coverage. */
+    size_t partial_count;
+    assert(cui_text_layout_selection(layout, 0, 10, reversed, 64, &partial_count) ==
+           CUI_TEXT_LAYOUT_OK);
+    bool gap = false;
+    for (size_t c = 1; c < partial_count; ++c)
+        if (reversed[c].bounds.x > reversed[c - 1].bounds.x + reversed[c - 1].bounds.w + .01f)
+            gap = true;
+    assert(gap);
+    memcpy(reversed, selected, sizeof selected);
+    reverse_count = 991;
+    assert(cui_text_layout_selection(layout, 0, text.length, selected, count - 1, &reverse_count) ==
+           CUI_TEXT_LAYOUT_CAPACITY);
+    assert(reverse_count == 991 && !memcmp(selected, reversed, sizeof selected));
+    assert(cui_text_layout_selection(layout, 5, text.length, selected, 64, &reverse_count) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(reverse_count == 991 && !memcmp(selected, reversed, sizeof selected));
+    cui_text_layout_destroy(layout);
+    const char *samples[] = {"á", "ffi", "a‍️͏b", "‎"};
+    for (size_t s = 0; s < sizeof samples / sizeof samples[0]; ++s) {
+        assert(cui_font_layout_line(font, string(samples[s]), 24, (cui_text_style){0}, CUI_BIDI_LTR,
+                                    0, SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+        assert(cui_text_layout_get(layout, &view));
+        for (size_t c = 0; c < view.cluster_count; ++c)
+            for (size_t byte = view.clusters[c].byte_start + 1; byte < view.clusters[c].byte_end;
+                 ++byte) {
+                count = 991;
+                assert(cui_text_layout_carets(layout, byte, carets, 4, &count) ==
+                       CUI_TEXT_LAYOUT_INVALID);
+                assert(count == 991);
+            }
+        if (s == 0)
+            assert(view.cluster_count == 1 && view.clusters[0].byte_end == 3);
+        if (s == 3) {
+            assert(view.cluster_count == 1 && view.clusters[0].left == view.clusters[0].right);
+            assert(cui_text_layout_hit_test(layout, 0, 0, CUI_TEXT_UPSTREAM, &hit) ==
+                   CUI_TEXT_LAYOUT_OK);
+            assert(hit.byte_offset == 3 && hit.affinity == CUI_TEXT_UPSTREAM);
+        }
+        cui_text_layout_destroy(layout);
+    }
+    assert(cui_font_layout_line(font, string("abc"), 24, (cui_text_style){0}, CUI_BIDI_LTR, 2, 0,
+                                NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_carets(layout, 2, carets, 4, &count) == CUI_TEXT_LAYOUT_OK &&
+           count == 2);
+    assert(carets[0].x == 0 && carets[1].x == 0);
+    assert(cui_text_layout_hit_test(layout, 1e30f, -1e30f, CUI_TEXT_DOWNSTREAM, &hit) ==
+           CUI_TEXT_LAYOUT_OK);
+    assert(hit.byte_offset == 2 && hit.affinity == CUI_TEXT_DOWNSTREAM);
+    assert(cui_text_layout_selection(layout, 2, 2, NULL, 0, &count) == CUI_TEXT_LAYOUT_OK &&
+           !count);
+    cui_text_layout_destroy(layout);
+}
+
 int main(void) {
     const char *const paths[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
                                  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -592,6 +747,7 @@ int main(void) {
     }
     assert(cui_font_set_fallbacks(font, fallbacks, fallback_reference_count));
     fallback_contracts(path, fallbacks, fallback_reference_count, fallback_paths[0]);
+    geometry(font);
     if (!FT_Get_Char_Index(face, 0x627)) {
         cui_font *without = cui_font_open(path);
         cui_text_layout *missing = NULL;

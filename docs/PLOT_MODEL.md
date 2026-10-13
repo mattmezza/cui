@@ -455,8 +455,8 @@ linear/sqrt value scale and relaxation iterations. See
 The pure model now exposes a shared Base graph solver plus the source ribbon
 path separately; see [the shared graph contract](#shared-base-sankey-graph-model).
 The original CUI Chart solver's math was extracted and audited against frozen
-Plot Sankey. Chart migration to the shared seam is coordinated by the integrator;
-until that adapter lands, callers may opt into the pure model directly. This
+Plot Sankey. Chart now delegates topology, relaxation and end widths to that shared seam;
+its adapter preserves Chart defaults, raw throughput and caller geometry. This
 avoids counting the older Chart API itself as standalone Plot parity.
 
 
@@ -590,7 +590,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; no cache/Background |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
-| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | Shared pure topology/layout/layout_from, adjacency queries, source defaults, scaled values and tapered ribbon path available; bounded capacities/strict finite nonnegative values and checked doubles differ; Chart migration coordinated separately |
+| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Shared Base graph/path model and Chart adapter | Shared pure topology/layout/layout_from, adjacency queries, source defaults, scaled values and tapered ribbon path available; bounded capacities/strict finite nonnegative values and checked doubles differ; Chart adapter delegates while preserving its public contracts |
 | `PlotAxis`, `AxisText`, `AxisLabelSide`, `AXIS_GAP`, `axis_gutter` | Axis defaults/layout/paint/ticks/gutter | Line visibility, default offsets/alignment/theme paint covered; font-scaled nondefault offsets differ; alpha-zero fallback differs from explicit source colors; dynamic Backgrounds absent |
 | `AxisLabelPlacement::{Outside,Inside}` | Application places labels/reserves gutters; Chart has its own layer | No standalone Plot placement enum or automatic gutter allocation; source PlotAxis itself only records position/side |
 | `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
@@ -793,8 +793,9 @@ Pass existing `cui_chart_sankey_node.x1/x0` and
 into this structure to render Chart-computed layouts through the bounded Plot
 rasterizer or a custom path renderer. This keeps the pure model independent
 of Chart headers and avoids claiming that Chart topology equals full Plot
-Sankey parity. Graph construction, errors, layering, relaxation, layout_from,
-value scaling and alignment still belong to the Chart route.
+Sankey parity. Graph construction, errors, layering, relaxation, layout_from, value scaling
+and alignment are now exposed by the shared Base model below; Chart preserves
+its own adapter policies.
 
 The path uses finite doubles, finite origin and nonnegative end/min widths;
 invalid inputs and unrepresentable translated geometry preserve output and
@@ -826,8 +827,8 @@ int main(void) {
 Chart or platform dependencies. The implementation extracts the original CUI
 Chart C solver math into Base, with source-specific public contracts. This is
 shared solver provenance rather than a second independently invented layout
-algorithm. Chart adapter migration must preserve its existing defaults and raw
-throughput reporting; the pure model uses source defaults and scaled values.
+algorithm. The Chart adapter preserves its existing defaults and raw throughput reporting;
+the pure model uses source defaults and scaled values.
 
 Caller graph storage contains node/link arrays and capacities. Inputs use node
 indices; topology copies and scales link values once, computes max(incoming,
@@ -856,7 +857,10 @@ Defaults are node width 24px, padding 8px, Justify, six relaxation iterations,
 Linear scaling and extent[0,0,1,1]. Explicit zero width/padding/iterations stay
 zero, unlike the older Chart adapter's zero-selects-default policies. Alignment
 supports Left, Right, Center and Justify, including source structural-edge rules
-for isolated/zero-value nodes. Relaxation sorts neighbors, resolves collisions,
+for isolated/zero-value nodes. The explicit `legacy_value_alignment` option
+(default false) supports Chart's older sum-based Justify/Center behavior, where
+zero-flow edges do not anchor alignment. This compatibility option is a CUI
+extension, not a frozen builder export. Relaxation sorts neighbors, resolves collisions,
 centers each column, and alternates a .15-height stagger for equal-height
 single-node columns when slack permits. End widths independently fill each
 node side proportionally, including imbalanced and sqrt-scaled graphs. Nominal

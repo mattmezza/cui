@@ -332,6 +332,7 @@ typedef struct {
     unsigned iterations;
     cui_plot_sankey_align align;
     cui_plot_sankey_value_scale value_scale;
+    bool legacy_value_alignment; /* Chart compatibility: zero-flow edges do not anchor alignment. */
 } cui_plot_sankey_options;
 typedef enum {
     CUI_PLOT_SANKEY_NO_ERROR,
@@ -365,6 +366,8 @@ cui_plot_result cui_plot_sankey_layout(cui_plot_sankey_graph *, size_t node_coun
 /* Shared end-breadth calculation for adapters with caller-positioned nodes.
  * Updates link y0/y1/source_width/target_width from current node y0/y1 and
  * scaled values; nominal width and topology remain unchanged. Transactional.
+ * Requires only finite ordered node y coordinates, valid endpoint indices and
+ * finite nonnegative scaled link values; ranks/topology are not recomputed.
  * Models source compute_link_breadths, not an additional frozen public export. */
 cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *);
 size_t cui_plot_sankey_layer_count(const cui_plot_sankey_graph *);

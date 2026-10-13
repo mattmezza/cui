@@ -413,6 +413,6 @@ path builder without a second graph/layout solver or renderer cache.
 
 The [shared Base Sankey graph model](PLOT_MODEL.md#shared-base-sankey-graph-model)
 now supplies topology, alignment and relayout independently of Chart. Use
-source-default options for standalone Plot; Chart adapters must preserve their
-own defaults and raw throughput reporting when migrating. The graph and tapered
+source-default options for standalone Plot; the Chart adapter preserves its
+own defaults, raw throughput reporting and legacy zero-flow alignment. The graph and tapered
 ribbon path are caller-owned math outputs, not an automatic styled Sankey widget.

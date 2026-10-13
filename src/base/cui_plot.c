@@ -1432,6 +1432,7 @@ typedef struct {
     cui_plot_sankey_align sankey_align;
     cui_plot_sankey_value_scale sankey_value_scale;
     unsigned sankey_iterations;
+    bool legacy_value_alignment;
 } plot_sankey_work;
 static double plot_sankey_scaled(const plot_sankey_work *o, double value) {
     (void)o;
@@ -1510,10 +1511,12 @@ static cui_plot_result plot_sankey_prepare(const plot_sankey_work *o, cui_plot_s
         size_t layer = nodes[i].depth;
         if (o->sankey_align == CUI_PLOT_SANKEY_RIGHT)
             layer = layers - 1 - nodes[i].height;
-        else if (o->sankey_align == CUI_PLOT_SANKEY_JUSTIFY && !nodes[i].source_count)
+        else if (o->sankey_align == CUI_PLOT_SANKEY_JUSTIFY &&
+                 (o->legacy_value_alignment ? !outgoing[i] : !nodes[i].source_count))
             layer = layers - 1;
-        else if (o->sankey_align == CUI_PLOT_SANKEY_CENTER && !nodes[i].target_count &&
-                 nodes[i].source_count) {
+        else if (o->sankey_align == CUI_PLOT_SANKEY_CENTER &&
+                 (o->legacy_value_alignment ? (!incoming[i] && outgoing[i])
+                                            : (!nodes[i].target_count && nodes[i].source_count))) {
             size_t nearest = layers;
             for (size_t j = 0; j < o->link_count; j++)
                 if (o->links[j].source == i && nodes[o->links[j].target].depth < nearest)
@@ -1862,6 +1865,7 @@ static plot_sankey_work plot_sankey_work_options(const cui_plot_sankey_graph *g,
                               .node_padding = o->node_padding,
                               .sankey_iterations = o->iterations,
                               .sankey_align = o->align,
+                              .legacy_value_alignment = o->legacy_value_alignment,
                               .sankey_margins = {o->extent.x_min, 0, o->extent.y_min, 0}};
 }
 static bool plot_sankey_graph_valid(const cui_plot_sankey_graph *g) {
@@ -1938,11 +1942,9 @@ size_t cui_plot_sankey_layer_count(const cui_plot_sankey_graph *g) {
             layers = g->nodes[i].layer + 1;
     return layers;
 }
-cui_plot_result cui_plot_sankey_node_links(const cui_plot_sankey_graph *g, size_t node,
-                                           bool outgoing, size_t *out, size_t capacity,
-                                           size_t *required) {
-    if (!required || (!out && capacity) || !plot_sankey_graph_valid(g) || node >= g->node_count)
-        return CUI_PLOT_INVALID;
+static cui_plot_result plot_sankey_node_links(const cui_plot_sankey_graph *g, size_t node,
+                                              bool outgoing, size_t *out, size_t capacity,
+                                              size_t *required) {
     size_t order[1024], count = 0;
     for (size_t i = 0; i < g->link_count; ++i)
         if ((outgoing ? g->links[i].source : g->links[i].target) == node) {
@@ -1964,6 +1966,13 @@ cui_plot_result cui_plot_sankey_node_links(const cui_plot_sankey_graph *g, size_
     if (count)
         memcpy(out, order, count * sizeof(*out));
     return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_sankey_node_links(const cui_plot_sankey_graph *g, size_t node,
+                                           bool outgoing, size_t *out, size_t capacity,
+                                           size_t *required) {
+    if (!required || (!out && capacity) || !plot_sankey_graph_valid(g) || node >= g->node_count)
+        return CUI_PLOT_INVALID;
+    return plot_sankey_node_links(g, node, outgoing, out, capacity, required);
 }
 cui_plot_result cui_plot_sankey_layout_from(cui_plot_sankey_graph *g,
                                             const cui_plot_sankey_options *o) {
@@ -2031,10 +2040,16 @@ cui_plot_result cui_plot_sankey_layout(cui_plot_sankey_graph *g, size_t nodes,
 }
 
 cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *g) {
-    if (!plot_sankey_graph_valid(g))
+    if (!plot_sankey_storage_valid(g) || g->node_count > 256 || g->link_count > 1024 ||
+        g->node_count > g->node_capacity || g->link_count > g->link_capacity)
         return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < g->link_count; ++i)
+        if (g->links[i].source >= g->node_count || g->links[i].target >= g->node_count ||
+            !isfinite(g->links[i].value) || g->links[i].value < 0)
+            return CUI_PLOT_INVALID;
     for (size_t i = 0; i < g->node_count; ++i)
-        if (g->nodes[i].y0 > g->nodes[i].y1)
+        if (!isfinite(g->nodes[i].y0) || !isfinite(g->nodes[i].y1) ||
+            g->nodes[i].y0 > g->nodes[i].y1)
             return CUI_PLOT_INVALID;
     cui_plot_sankey_link_layout ls[1024];
     if (g->link_count)
@@ -2046,7 +2061,7 @@ cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *g) {
     for (size_t node = 0; node < g->node_count; ++node)
         for (size_t side = 0; side < 2; ++side) {
             size_t order[1024], count;
-            result = cui_plot_sankey_node_links(&temporary, node, side == 0, order, 1024, &count);
+            result = plot_sankey_node_links(&temporary, node, side == 0, order, 1024, &count);
             if (result != CUI_PLOT_OK)
                 return result;
             long double total = 0;

@@ -259,7 +259,80 @@ static void continuous_curve_stroke(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     assert(memcmp(default_pixels, pixels, sizeof pixels) == 0);
 }
+static void shared_sankey_adapter(void) {
+    cui_chart_datum data[3] = {0};
+    cui_chart_link input[] = {{.source = 0, .target = 1, .value = 9},
+                              {.source = 1, .target = 2, .value = 4}};
+    cui_chart_options o = {.kind = CUI_CHART_SANKEY,
+                           .data = data,
+                           .count = 3,
+                           .links = input,
+                           .link_count = 2,
+                           .width = 100,
+                           .height = 100};
+    cui_chart_sankey_node nodes[3], defaults[3], saved[3];
+    assert(cui_chart_sankey_layout(&o, nodes, 3) == CUI_PLOT_OK);
+    assert(nodes[0].x0 == 0 && nodes[0].x1 == 10 && nodes[1].x0 == 45 && nodes[2].x0 == 90);
+    assert(nodes[0].throughput == 9 && nodes[1].throughput == 9 && nodes[2].throughput == 4);
+    memcpy(defaults, nodes, sizeof nodes);
+    o.node_width = 10;
+    o.node_padding = 16;
+    o.sankey_iterations = 6;
+    assert(cui_chart_sankey_layout(&o, nodes, 3) == CUI_PLOT_OK);
+    for (size_t i = 0; i < 3; ++i) {
+        assert(nodes[i].x0 == defaults[i].x0 && nodes[i].x1 == defaults[i].x1);
+        assert(nodes[i].y0 == defaults[i].y0 && nodes[i].y1 == defaults[i].y1);
+    }
+    o.sankey_value_scale = CUI_CHART_SANKEY_SQRT;
+    assert(cui_chart_sankey_layout(&o, nodes, 3) == CUI_PLOT_OK);
+    assert(nodes[0].throughput == 9 && nodes[1].throughput == 9 && nodes[2].throughput == 4);
+    assert(fabs((nodes[2].y1 - nodes[2].y0) / 100.0 - 2.0 / 3) < 1e-5);
+    o.sankey_margins = (cui_chart_sankey_margins){5, 7, 3, 9};
+    assert(cui_chart_sankey_layout(&o, nodes, 3) == CUI_PLOT_OK);
+    assert(nodes[0].x0 == 5 && nodes[2].x1 == 93 && fabsf(nodes[0].y0 - 3) < .001f &&
+           fabsf(nodes[0].y1 - 91) < .001f);
+    memcpy(saved, nodes, sizeof nodes);
+    input[0].value = DBL_MAX;
+    input[1].value = DBL_MAX;
+    cui_chart_link overflow[] = {{.source = 0, .target = 1, .value = DBL_MAX},
+                                 {.source = 0, .target = 2, .value = DBL_MAX}};
+    o.links = overflow;
+    assert(cui_chart_sankey_layout(&o, nodes, 3) == CUI_PLOT_OVERFLOW);
+    assert(memcmp(saved, nodes, sizeof nodes) == 0);
+
+    cui_chart_link zero_edge[] = {{.source = 0, .target = 1, .value = 0}};
+    o.links = zero_edge;
+    o.link_count = 1;
+    o.sankey_value_scale = CUI_CHART_SANKEY_LINEAR;
+    assert(cui_chart_sankey_layout(&o, nodes, 3) == CUI_PLOT_OK);
+    assert(nodes[0].layer == 1 && nodes[1].layer == 1 && nodes[2].layer == 1);
+    /* Caller geometry carries no valid topology ranks and may have a cycle;
+     * link-bounds only distributes widths on these existing node sides. */
+    cui_chart_sankey_node arbitrary[] = {
+        {.y0 = 10, .y1 = 110}, {.y0 = 20, .y1 = 100}, {.y0 = 200, .y1 = 240}};
+    cui_chart_link positioned[] = {{.source = 0, .target = 2, .value = 1},
+                                   {.source = 0, .target = 1, .value = 3},
+                                   {.source = 1, .target = 0, .value = 2}};
+    o.links = positioned;
+    o.link_count = 3;
+    o.sankey_value_scale = CUI_CHART_SANKEY_LINEAR;
+    cui_chart_sankey_link_geometry geometry[3], old[3];
+    assert(cui_chart_sankey_link_bounds(&o, arbitrary, geometry, 3) == CUI_PLOT_OK);
+    assert(geometry[0].source_width == 25 && geometry[1].source_width == 75);
+    assert(geometry[0].source_y == 97.5f && geometry[1].source_y == 47.5f);
+    assert(geometry[0].target_width == 40 && geometry[0].target_y == 220);
+    assert(geometry[1].target_width == 80 && geometry[1].target_y == 60);
+    assert(geometry[2].source_width == 80 && geometry[2].target_width == 100);
+    memcpy(old, geometry, sizeof old);
+    arbitrary[1].y1 = 19;
+    assert(cui_chart_sankey_link_bounds(&o, arbitrary, geometry, 3) == CUI_PLOT_INVALID);
+    assert(memcmp(old, geometry, sizeof old) == 0);
+    arbitrary[1].y1 = 100;
+    assert(cui_chart_sankey_link_bounds(&o, arbitrary, geometry, 2) == CUI_PLOT_CAPACITY);
+    assert(memcmp(old, geometry, sizeof old) == 0);
+}
 int main(void) {
+    shared_sankey_adapter();
     continuous_curve_stroke();
     cui_chart_datum points[] = {
         {.label = {"A", 1}, .value = 20, .open = 15, .high = 25, .low = 10, .close = 20},

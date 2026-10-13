@@ -33,3 +33,25 @@ This maps the public builders in the pinned GPUI Kit seven-chart sources to this
 All seven source families expose `appear`, `appear_key`, `id`, and `interactive`; the shared mapping above applies to each. Source builder methods for category/value accessors map to caller-supplied `cui_chart_datum` fields rather than callback registration. Line, Area, and Radar hovered marks use the source 8px filled dot, 1px background stroke, and 20px fill-color halo whose diameter and opacity follow hover progress; Radar retains its last marks during the exit fade. Horizontal Bar releases its category-label gutter when `hide_x_axis` is set and reserves it on the appropriate side for Left or Right alignment. Styled rendering measures horizontal label widths per frame like the source; pure base rendering uses explicit preflight or the fixed 24px and 12px fallback. The explicit representation and paint differences above remain partial despite the available chart type names; this audit does not claim verified full source parity.
 
 Cartesian line and area outlines use a 2px stroke by default, with round segment ends and coverage-based edge smoothing. Set `cui_chart_options.line_width` in bitmap pixels to customize it; positive values are capped at 16px, while zero, negative or nonfinite values select the default. The width participates in the render cache key. Grid/axis strokes keep their previous dimensions. Natural, linear and step-after curves share the same stroke painter.
+
+## Shared Sankey solver
+
+Chart Sankey topology/relaxation and end-width calculation now delegate to the
+pure Base model in [PLOT_MODEL.md](PLOT_MODEL.md#shared-base-sankey-graph-model).
+The Chart API keeps its existing policies: zero node width selects 10px, zero
+padding selects 16px, zero iterations selects six, and margins define the usable
+extent. This differs deliberately from standalone Plot's 24px/8px defaults and
+explicit-zero behavior. Node `throughput` still reports raw max(incoming,outgoing)
+flow, including when heights use sqrt-scaled values. Zero-flow alignment also keeps Chart's older summed-flow policy: zero-valued
+edges do not anchor Justify/Center alignment, while source-default Plot treats
+all edges structurally. The adapter selects the explicit Base compatibility
+option. Chart's existing input,
+label, margin and capacity validation remains in the adapter.
+
+`cui_chart_sankey_link_bounds` uses caller-supplied node positions directly; it
+does not run topology or move nodes. Unranked/cyclic projected geometry remains
+usable for this width-only operation. It retains independent end widths and
+neighbor-y ordering with input-index ties. The shared Base helper validates
+finite ordered y coordinates and endpoint/value data without requiring graph
+ranks. No second Chart solver remains. Builds compiling Chart Base directly
+must also link `src/base/cui_plot.c`; public Chart types and defaults are unchanged.

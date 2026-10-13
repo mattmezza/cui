@@ -78,10 +78,13 @@ def run(a, directory):
     def message():
         bitmaps=a.page.evaluate(BITMAPS)
         assert len(bitmaps)==2 and all(all(c[3]==0 for c in b['corners']) for b in bitmaps), f'Portraits: {bitmaps}'
-        assert 'Can you review the release notes?' in a.texts(), f'Incoming body: {a.texts()}'
-        assert "Looks good. I'll ship the update." in a.texts(), f'Outgoing body: {a.texts()}'
+        # Native font metrics may wrap a body into several draw commands.
+        # Preserve paint order and check the complete body across those lines.
+        painted_text=' '.join(text for text in a.texts() if text)
+        assert 'Can you review the release notes?' in painted_text, f'Incoming body: {a.texts()}'
+        assert "Looks good. I'll ship the update." in painted_text, f'Outgoing body: {a.texts()}'
         assert 'Delivered · 09:30' in a.texts() and '09:32 · Read' in a.texts(), f'Delivery: {a.texts()}'
-        assert 'A second message body' not in a.texts() and 'Workspace is ready.' not in a.texts()
+        assert 'A second message body' not in painted_text and 'Workspace is ready.' not in painted_text
         assert len([s for s in a.snapshot() if s['f'][0]==37])==2, f'Message semantics: {a.snapshot()}'
         before=a.page.evaluate('cuiGallery.exports.gallery_message_actions()')
         a.tap(a.target('Like message',1))
@@ -155,6 +158,8 @@ def run(a, directory):
         else:
             text_bounds=a.page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.from({length:e.gallery_count()},(_,i)=>i).filter(i=>e.gallery_command(i,0)===2&&d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))).startsWith('Can you review')||d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='notes?').map(i=>[1,2,3,4].map(f=>e.gallery_command(i,f)));}''')
             assert text_bounds and all(b[2]<=280 and b[0]+b[2]<=canvas['width'] for b in text_bounds), (text_bounds,canvas)
+            painted=' '.join(text for text in a.texts() if text)
+            assert 'Can you review the release notes?' in painted, f'Wrapped mobile body lost text: {a.texts()}'
         assert a.page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
         a.page.set_viewport_size({'width':1280,'height':900})
     for family in ['Avatar','Message']:

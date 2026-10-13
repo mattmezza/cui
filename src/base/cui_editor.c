@@ -94,7 +94,7 @@ static cui_edit_result cui_editor_completion_events(cui_context *ui, cui_id id,
             continue;
         /* Never accept before an earlier queued text/navigation edit. Let the
          * textarea process that queue in order, then discard stale proposals. */
-        if (e.type == CUI_EVENT_TEXT)
+        if (e.type == CUI_EVENT_TEXT || e.type >= CUI_EVENT_COMPOSITION_START)
             break;
         if (e.type != CUI_EVENT_KEY_DOWN)
             continue;
@@ -461,6 +461,9 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t event_index = 0; event_index < event_count; ++event_index) {
         cui_event event = events[event_index];
+        if (editor->view.composition && editor->view.composition->active &&
+            event.type != CUI_EVENT_CANCEL)
+            continue;
         if (event.type == CUI_EVENT_CANCEL) {
             editor->multi_pointer = false;
             editor->column_dragged = false;
@@ -694,7 +697,10 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                     while (length < sizeof event.text && event.text[length])
                         ++length;
                     error =
-                        length == sizeof event.text
+                        event.text_data
+                            ? cui_edit_type_selections(
+                                  editor->edit, (cui_str){event.text_data, event.text_length})
+                        : length == sizeof event.text
                             ? CUI_EDIT_INVALID_UTF8
                             : cui_edit_type_selections(editor->edit, (cui_str){event.text, length});
                 }
@@ -924,6 +930,8 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     cui_edit_selection saved[CUI_EDIT_MAX_SELECTIONS];
     if (saved_live)
         memcpy(saved, saved_live, saved_count * sizeof(*saved));
+    if (s->view.composition && s->view.composition->active)
+        cui_editor_cancel_completion(s);
     cui_edit_result completion_error = cui_editor_completion_events(ui, id, s, o.textarea);
     cui_textarea_result multiple = cui_editor_multi_events(ui, id, s, o, metrics, width);
     if (multiple.error != CUI_TEXTAREA_OK)
@@ -943,7 +951,7 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     }
     if (multiple.edit_error != CUI_EDIT_OK)
         result.edit_error = multiple.edit_error;
-    if (selection_capacity)
+    if (selection_capacity && !(s->view.composition && s->view.composition->active))
         cui_editor_cursor_sync(ui, s, o.textarea.text_style, metrics.font_size);
     cui_edit_state after = cui_edit_get_state(s->edit);
     result.changed |= before.revision != after.revision;

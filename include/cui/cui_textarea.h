@@ -49,6 +49,8 @@ typedef struct {
     cui_textarea_fold *folds;
     size_t fold_count;
     uint64_t fold_revision;
+    cui_edit_composition *composition;
+    bool composition_owned, layout_composing;
 } cui_textarea_state;
 typedef struct {
     cui_textarea_size size;

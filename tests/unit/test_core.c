@@ -2922,7 +2922,68 @@ static void test_touch_extreme_coordinates(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_ime_core_shortcuts(void) {
+    cui_context *ui = make();
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    cui_focus(ui, 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_COMPOSITION_START}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    assert(cui_frame_events(ui, NULL)[1].ime_composing);
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    cui_focus(ui, 0);
+    cui_focus(ui, 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    assert(!cui_frame_events(ui, NULL)[0].ime_composing);
+    assert(control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_COMPOSITION_COMMIT,
+                                           .composition_target = 99,
+                                           .text_data = "stale",
+                                           .text_length = 5}));
+    assert(cui_begin_frame(ui, 300, 200, 0));
+    assert(cui_event_consumed(ui, 0) && cui_event_target(ui, 0) == 0);
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+static void test_ime_payload_ownership(void) {
+    cui_context *ui = cui_create((cui_config){.event_text_bytes = 512});
+    assert(ui);
+    char text[300];
+    memset(text, 'x', sizeof(text));
+    cui_event event = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                       .text_data = text,
+                       .text_length = 300,
+                       .composition_anchor = 200,
+                       .composition_cursor = 300};
+    assert(cui_queue_event(ui, event));
+    text[0] = 'y';
+    assert(!cui_queue_event(ui, event));
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    assert(count == 1 && events[0].text_length == 300 && events[0].text_data[0] == 'x');
+    assert(events[0].composition_anchor == 200 && events[0].composition_cursor == 300);
+    const char *frame = events[0].text_data;
+    cui_end_frame(ui);
+    event.text_length = 100;
+    assert(cui_queue_event(ui, event));
+    assert(frame[0] == 'x'); /* Queuing next frame does not invalidate current storage. */
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    events = cui_frame_events(ui, &count);
+    assert(count == 1 && events[0].text_length == 100 && events[0].text_data[0] == 'y');
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_ime_core_shortcuts();
+    test_ime_payload_ownership();
     test_mesh_contract();
     test_metrics_revision();
     test_pointer_click_metadata();

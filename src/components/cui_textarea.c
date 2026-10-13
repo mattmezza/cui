@@ -113,10 +113,21 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
                             .fixed_width = true,
                             .height = state->count * metrics.line_height,
                             .fixed_height = true});
-    cui_str text = cui_edit_get_text(edit);
-    cui_edit_state selection = cui_edit_get_state(edit);
+    cui_str text = cui_edit_composition_view(edit, state->composition);
+    cui_edit_state selection = cui_edit_composition_selection(edit, state->composition);
     size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
     size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    if (focused && state->count) {
+        cui_textarea_line caret_row = state->lines[state->caret_line];
+        float cx = cui_textarea_prefix(ui, text, caret_row, selection.cursor, metrics.font_size,
+                                       options.text_style);
+        cui_set_text_input_rect(ui, id,
+                                (cui_rect){state->viewport.x + cx - state->scroll_x,
+                                           state->viewport.y +
+                                               state->caret_line * metrics.line_height -
+                                               state->scroll_y,
+                                           1, metrics.line_height});
+    }
     size_t begin = (size_t)floorf(state->scroll_y / metrics.line_height);
     if (begin >= state->count)
         begin = state->count - 1;
@@ -153,6 +164,19 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         else if (line.end > line.start)
             cui_text_line(ui, (cui_str){text.data + line.start, line.end - line.start},
                           metrics.font_size, foreground, metrics.line_height, options.text_style);
+        if (state->composition && state->composition->active) {
+            cui_edit_composition *c = state->composition;
+            size_t a = c->start > line.start ? c->start : line.start;
+            size_t b = c->start + c->length < line.end ? c->start + c->length : line.end;
+            if (a < b) {
+                float left =
+                    cui_textarea_prefix(ui, text, line, a, metrics.font_size, options.text_style);
+                float right =
+                    cui_textarea_prefix(ui, text, line, b, metrics.font_size, options.text_style);
+                cui_set_underlay(ui, (cui_rect){left, metrics.line_height - 1, right - left, 1},
+                                 theme->caret, (cui_corner_radii){0});
+            }
+        }
         if (caret && row == state->caret_line) {
             float x = cui_textarea_prefix(ui, text, line, selection.cursor, metrics.font_size,
                                           options.text_style);

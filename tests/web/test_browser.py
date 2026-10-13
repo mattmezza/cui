@@ -1009,7 +1009,8 @@ def main():
             page.keyboard.press('Shift+Tab')
             page.wait_for_function('(length)=>cuiGallery.exports.gallery_textarea_stats(0)===length+5', arg=length)
             assert page.evaluate('()=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_textarea_text(),cuiGallery.exports.gallery_textarea_stats(0))).endsWith(String.fromCharCode(10)+"more")')
-            assert page.locator('canvas').evaluate('(node)=>document.activeElement===node')
+            assert page.locator('canvas').evaluate('(node)=>document.activeElement===node||document.activeElement.id==="cui-ime-input"')
+            assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_semantic(i,0)===6&&cuiGallery.exports.gallery_semantic(i,7))')
             control_change('textarea-readonly', True)
             page.keyboard.type('X')
             assert page.evaluate('cuiGallery.exports.gallery_textarea_stats(0)') == length+5
@@ -1763,7 +1764,7 @@ def main():
             # Passive addon focus is applied by the C reducer on its next frame.
             # Await that focus before sending keyboard events, including on slow CI hosts.
             group_index = semantic_index('Workspace address', 6)
-            page.wait_for_function('(i)=>document.activeElement===document.querySelector("canvas") && cuiGallery.exports.gallery_semantic(i,7)===1', arg=group_index)
+            page.wait_for_function('(i)=>(document.activeElement===document.querySelector("canvas")||document.activeElement.id==="cui-ime-input") && cuiGallery.exports.gallery_semantic(i,0)===6 && cuiGallery.exports.gallery_semantic(i,7)===1', arg=group_index)
             page.keyboard.press('Control+a')
             page.keyboard.type('studio')
             page.wait_for_function('document.querySelector("#accessible [role=status]")?.getAttribute("aria-label")?.includes("https://studio.example.com")')
@@ -2839,6 +2840,7 @@ def main():
             wait_semantic('Your note', 6)
             click_semantic('Your note', 6)
             page.wait_for_function('(index)=>cuiGallery.exports.gallery_semantic(index,7)===1', arg=semantic_index('Your note', 6))
+            page.evaluate('document.querySelector("canvas").dispatchEvent(new CompositionEvent("compositionstart",{bubbles:true}))')
             before_composition = page.evaluate('cuiGallery.frame')
             page.evaluate('document.querySelector("canvas").dispatchEvent(new KeyboardEvent("keydown",{key:"e",isComposing:true,bubbles:true}))')
             page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before_composition)

@@ -25,7 +25,8 @@ struct cui_sdl3 {
     SDL_Renderer *renderer;
     cui_font *font;
     cui_color ink;
-    bool quit, glyph_ok, ime_composing;
+    bool quit, glyph_ok, ime_composing, ime_commit_pending, input_suspended;
+    cui_id ime_focus;
     glyph_entry glyphs[GLYPH_CACHE_SLOTS];
     bitmap_entry bitmaps[BITMAP_SLOTS];
     size_t bitmap_bytes;
@@ -131,10 +132,29 @@ bool cui_sdl3_set_cursor(cui_sdl3 *s, cui_cursor cursor) {
         s->cursors[cursor] = SDL_CreateSystemCursor(kinds[cursor]);
     return s->cursors[cursor] && SDL_SetCursor(s->cursors[cursor]);
 }
+/* SDL normalizes preedit selection to Unicode scalar counts (Cocoa UTF32,
+ * Wayland SDL_utf8strnlen); public CUI offsets are UTF-8 bytes. */
+static size_t cui_sdl3_scalar_byte(const char *text, size_t scalar) {
+    size_t byte = 0;
+    if (!text)
+        return 0;
+    while (text[byte] && scalar) {
+        byte++;
+        while (text[byte] && ((unsigned char)text[byte] & 0xc0) == 0x80)
+            byte++;
+        scalar--;
+    }
+    return byte;
+}
 bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
     if (!s || !ui)
         return false;
     (void)cui_sdl3_set_cursor(s, cui_pointer_cursor(ui));
+    cui_rect caret;
+    if (cui_text_input_rect(ui, &caret)) {
+        SDL_Rect area = {(int)caret.x, (int)caret.y, (int)ceilf(caret.w), (int)ceilf(caret.h)};
+        (void)SDL_SetTextInputArea(s->window, &area, 0);
+    }
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
         cui_event v = {0};
@@ -210,16 +230,51 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
                           ((e.key.mod & SDL_KMOD_GUI) ? CUI_MOD_META : 0);
             break;
         case SDL_EVENT_TEXT_EDITING:
+            if (s->input_suspended) {
+                send = false;
+                break;
+            }
+            if (!s->ime_composing && !s->ime_commit_pending)
+                s->ime_focus = cui_focused(ui);
+            v.composition_target = s->ime_focus;
+            v.type = e.edit.text && e.edit.text[0] ? CUI_EVENT_COMPOSITION_UPDATE
+                                                   : CUI_EVENT_COMPOSITION_CANCEL;
+            s->ime_commit_pending |= s->ime_composing;
             s->ime_composing = e.edit.text && e.edit.text[0];
-            send = false;
+            v.text_data = e.edit.text;
+            v.text_length = e.edit.text ? SDL_strlen(e.edit.text) : 0;
+            v.composition_anchor = e.edit.start >= 0
+                                       ? cui_sdl3_scalar_byte(e.edit.text, (size_t)e.edit.start)
+                                       : v.text_length;
+            int64_t end = e.edit.start;
+            if (e.edit.length != -1)
+                end += e.edit.length;
+            v.composition_cursor =
+                e.edit.start >= 0 ? cui_sdl3_scalar_byte(e.edit.text, end > 0 ? (size_t)end : 0)
+                                  : v.text_length;
             break;
         case SDL_EVENT_TEXT_INPUT:
-            s->ime_composing = false;
-            v.type = CUI_EVENT_TEXT;
-            SDL_strlcpy(v.text, e.text.text, sizeof(v.text));
+            if (s->input_suspended) {
+                send = false;
+                break;
+            }
+            if (s->ime_composing || s->ime_commit_pending)
+                v.composition_target = s->ime_focus;
+            v.type = s->ime_composing || s->ime_commit_pending ? CUI_EVENT_COMPOSITION_COMMIT
+                                                               : CUI_EVENT_TEXT;
+            s->ime_composing = s->ime_commit_pending = false;
+            v.text_data = e.text.text;
+            v.text_length = e.text.text ? SDL_strlen(e.text.text) : 0;
+            if (v.text_length < sizeof(v.text) && v.text_length)
+                memcpy(v.text, v.text_data, v.text_length);
+            break;
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            s->input_suspended = false;
+            send = false;
             break;
         case SDL_EVENT_WINDOW_FOCUS_LOST:
-            s->ime_composing = false;
+            s->input_suspended = true;
+            s->ime_composing = s->ime_commit_pending = false;
             v.type = CUI_EVENT_CANCEL;
             break;
         case SDL_EVENT_WINDOW_RESIZED:

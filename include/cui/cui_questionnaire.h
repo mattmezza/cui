@@ -192,6 +192,8 @@ void cui_questionnaire_part_end(cui_context *);
 typedef struct {
     bool dragging;
     float scroll_x;
+    cui_edit_composition *composition;
+    bool composition_owned;
 } cui_questionnaire_input_state;
 /* Keep one input state per item. Text editing updates the retained answer and
  * emits AnswerChanged; a capacity error leaves the previous semantic answer. */

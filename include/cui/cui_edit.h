@@ -22,12 +22,34 @@ typedef struct {
     bool multiline;
     size_t history_bytes, max_history_steps;
 } cui_edit_config;
+/* Caller-owned reusable IME session, one primary selection only. Both preedit
+ * and view buffers are required, disjoint, and remain alive for the session;
+ * capacities include the trailing NUL. Zero-initialize the remaining fields. */
+typedef struct {
+    char *buffer;
+    size_t capacity, length, start, end, anchor, cursor;
+    size_t document_anchor, document_cursor;
+    uint64_t revision;
+    char *view_buffer;
+    size_t view_capacity;
+    bool active;
+} cui_edit_composition;
+/* Disabled/read-only/unfocused callers pass editable=false to cancel. Update
+ * never changes document/history. Commit is exactly one undo transaction. */
+cui_edit_result cui_edit_composition_event(cui_edit *, cui_edit_composition *, cui_event,
+                                           bool editable);
+/* Compose a renderable document snapshot into caller storage, without mutation.
+ * Active preedit replaces [start,end); anchor/cursor are relative preedit bytes. */
+cui_str cui_edit_composition_view(const cui_edit *, const cui_edit_composition *);
+cui_edit_result cui_edit_composition_text(const cui_edit *, const cui_edit_composition *, char *,
+                                          size_t, cui_str *);
 typedef struct {
     size_t length, cursor, anchor;
     bool can_undo, can_redo;
     uint64_t revision;
     bool multiline;
 } cui_edit_state;
+cui_edit_state cui_edit_composition_selection(const cui_edit *, const cui_edit_composition *);
 /* Earliest byte that may differ after the most recent document revision.
  * Valid only for that revision; a consumer that skips revisions must rebuild.
  * Undo/Redo and complex indentation conservatively report byte zero. */

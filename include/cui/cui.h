@@ -39,7 +39,11 @@ typedef enum {
     CUI_EVENT_TEXT,
     CUI_EVENT_SCROLL,
     CUI_EVENT_CANCEL,
-    CUI_EVENT_GESTURE /* Opt-in viewport pan/pinch; scale is relative to previous event. */
+    CUI_EVENT_GESTURE, /* Opt-in viewport pan/pinch; scale is relative to previous event. */
+    CUI_EVENT_COMPOSITION_START,
+    CUI_EVENT_COMPOSITION_UPDATE,
+    CUI_EVENT_COMPOSITION_COMMIT,
+    CUI_EVENT_COMPOSITION_CANCEL
 } cui_event_type;
 typedef enum {
     CUI_KEY_NONE,
@@ -119,6 +123,11 @@ typedef struct {
     bool repeat;
     cui_pointer_button pointer_button; /* Zero preserves primary-button initializers. */
     char text[64];
+    /* Optional UTF-8 payload. Queue copies bytes; dispatched storage lives until
+     * next begin_frame. Selection offsets are UTF-8 bytes in preedit. */
+    const char *text_data;
+    size_t text_length, composition_anchor, composition_cursor;
+    cui_id composition_target; /* Optional originating focus; stale host updates are dropped. */
     /* Optional host gesture metadata. Zero preserves legacy wheel steps.
      * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
     bool scroll_precise;
@@ -393,6 +402,7 @@ typedef struct {
     /* Context resources: zero selects 128 slots and 1 MiB of payload storage.
      * Nested allocations owned by payloads require their own explicit limits. */
     size_t max_resources, resource_bytes;
+    size_t event_text_bytes;          /* Aggregate queued payload bound; zero = 65536. */
     cui_font_metrics_fn font_metrics; /* Optional; shares measure_user. */
 } cui_config;
 cui_str cui_string(const char *s);
@@ -556,6 +566,9 @@ void *cui_resource_get(cui_context *, cui_id owner, cui_id namespace_id, size_t 
                        cui_resource_fn collect, cui_resource_fn destroy);
 float cui_frame_delta(cui_context *);
 double cui_frame_time(cui_context *);
+/* Host candidate-window rectangle, logical pixels, last painted focused caret. */
+void cui_set_text_input_rect(cui_context *, cui_id, cui_rect);
+bool cui_text_input_rect(const cui_context *, cui_rect *);
 bool cui_reduced_motion(cui_context *);
 void cui_set_reduced_motion(cui_context *, bool);
 #ifdef __cplusplus

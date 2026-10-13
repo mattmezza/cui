@@ -5006,7 +5006,9 @@ cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
     if (v.type == CUI_EVENT_KEY_DOWN && (v.ime_composing || v.prefer_character_input))
         return CUI_EDIT_OK;
     cui_edit_result r = CUI_EDIT_OK;
-    if (v.type == CUI_EVENT_TEXT) {
+    if (v.type == CUI_EVENT_TEXT && v.text_data) {
+        r = cui_edit_type(e, (cui_str){v.text_data, v.text_length});
+    } else if (v.type == CUI_EVENT_TEXT) {
         size_t n = 0;
         while (n < sizeof(v.text) && v.text[n])
             n++;
@@ -5110,4 +5112,131 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
             first = r;
     }
     return first;
+}
+
+cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c, cui_event v,
+                                           bool editable) {
+    if (!e || !c || !c->buffer || !c->capacity || !c->view_buffer || !c->view_capacity)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_storage_overlap(c->buffer, c->capacity, e->config.buffer,
+                                         e->config.capacity) ||
+        cui_edit_private_storage_overlap(c->buffer, c->capacity, c, sizeof(*c)) ||
+        (c->view_buffer &&
+         (cui_edit_private_storage_overlap(c->view_buffer, c->view_capacity, e->config.buffer,
+                                           e->config.capacity) ||
+          cui_edit_private_storage_overlap(c->buffer, c->capacity, c->view_buffer,
+                                           c->view_capacity))))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_state state = cui_edit_get_state(e);
+    if (!editable || v.type == CUI_EVENT_CANCEL || v.type == CUI_EVENT_COMPOSITION_CANCEL ||
+        (c->active && (c->revision != state.revision || c->document_anchor != state.anchor ||
+                       c->document_cursor != state.cursor))) {
+        c->active = false;
+        c->length = 0;
+        c->buffer[0] = 0;
+        return CUI_EDIT_OK;
+    }
+    if (v.type != CUI_EVENT_COMPOSITION_START && v.type != CUI_EVENT_COMPOSITION_UPDATE &&
+        v.type != CUI_EVENT_COMPOSITION_COMMIT)
+        return c->active ? CUI_EDIT_OK : cui_edit_apply_event(e, v);
+    size_t count = 0;
+    (void)cui_edit_get_selections(e, &count);
+    if (count > 1)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str text = {v.text_data, v.text_length};
+    if (!v.text_data) {
+        text.data = v.text;
+        text.length = 0;
+        while (text.length < sizeof(v.text) && v.text[text.length])
+            text.length++;
+        if (text.length == sizeof(v.text))
+            return CUI_EDIT_INVALID_ARGUMENT;
+    }
+    if (!cui_edit_valid_utf8(text))
+        return CUI_EDIT_INVALID_UTF8;
+    if (!state.multiline)
+        for (size_t i = 0; i < text.length; i++)
+            if (text.data[i] == '\n' || text.data[i] == '\r')
+                return CUI_EDIT_LINE_BREAK;
+    if (v.composition_anchor > text.length || v.composition_cursor > text.length ||
+        (v.composition_anchor < text.length &&
+         ((unsigned char)text.data[v.composition_anchor] & 0xc0) == 0x80) ||
+        (v.composition_cursor < text.length &&
+         ((unsigned char)text.data[v.composition_cursor] & 0xc0) == 0x80))
+        return CUI_EDIT_BOUNDARY;
+    if (text.length >= c->capacity)
+        return CUI_EDIT_CAPACITY;
+    size_t start =
+        c->active ? c->start : (state.anchor < state.cursor ? state.anchor : state.cursor);
+    size_t end = c->active ? c->end : (state.anchor > state.cursor ? state.anchor : state.cursor);
+    size_t remaining = state.length - (end - start);
+    if (v.type != CUI_EVENT_COMPOSITION_COMMIT && c->view_buffer &&
+        (remaining > SIZE_MAX - text.length || remaining + text.length >= c->view_capacity))
+        return CUI_EDIT_CAPACITY;
+    if (v.type == CUI_EVENT_COMPOSITION_COMMIT) {
+        cui_edit_break_coalescing(e);
+        cui_edit_result r = cui_edit_replace_range(e, start, end, text);
+        if (r == CUI_EDIT_OK) {
+            c->active = false;
+            c->length = 0;
+            c->buffer[0] = 0;
+        }
+        return r;
+    }
+    if (!c->active)
+        cui_edit_break_coalescing(e);
+    if (text.length)
+        memmove(c->buffer, text.data, text.length);
+    c->buffer[text.length] = 0;
+    c->length = text.length;
+    c->start = start;
+    c->end = end;
+    c->anchor = v.composition_anchor;
+    c->cursor = v.composition_cursor;
+    c->revision = state.revision;
+    c->active = true;
+    c->document_anchor = state.anchor;
+    c->document_cursor = state.cursor;
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_composition_text(const cui_edit *e, const cui_edit_composition *c,
+                                          char *buffer, size_t capacity, cui_str *out) {
+    if (!e || !c || !buffer || !out)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_storage_overlap(buffer, capacity, e->config.buffer, e->config.capacity) ||
+        cui_edit_private_storage_overlap(buffer, capacity, c->buffer, c->capacity) ||
+        cui_edit_private_storage_overlap(buffer, capacity, c, sizeof(*c)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str text = cui_edit_get_text(e);
+    bool active = c->active && c->revision == cui_edit_get_state(e).revision;
+    size_t start = active ? c->start : text.length;
+    size_t end = active ? c->end : text.length;
+    size_t added = active ? c->length : 0;
+    if (start > end || end > text.length || added > SIZE_MAX - (text.length - (end - start)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t length = text.length - (end - start) + added;
+    if (length >= capacity)
+        return CUI_EDIT_CAPACITY;
+    memcpy(buffer, text.data, start);
+    if (added)
+        memcpy(buffer + start, c->buffer, added);
+    memcpy(buffer + start + added, text.data + end, text.length - end);
+    buffer[length] = 0;
+    *out = (cui_str){buffer, length};
+    return CUI_EDIT_OK;
+}
+
+cui_str cui_edit_composition_view(const cui_edit *e, const cui_edit_composition *c) {
+    cui_str out = cui_edit_get_text(e);
+    if (c && c->active && c->view_buffer)
+        (void)cui_edit_composition_text(e, c, c->view_buffer, c->view_capacity, &out);
+    return out;
+}
+cui_edit_state cui_edit_composition_selection(const cui_edit *e, const cui_edit_composition *c) {
+    cui_edit_state s = cui_edit_get_state(e);
+    if (c && c->active && c->revision == s.revision) {
+        s.cursor = c->start + c->cursor;
+        s.anchor = c->start + c->anchor;
+    }
+    return s;
 }

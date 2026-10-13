@@ -329,6 +329,7 @@ function render(){
   }
  }
  while(clips-- >0)ctx.restore();
+ syncImeTarget();
  canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed','crosshair','grab','grabbing','zoom-in','zoom-out','wait','help'][wasm.gallery_cursor()]||'default';
  syncSemantics();
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
@@ -500,7 +501,7 @@ function selectComponent(){
  $('component-guides').replaceChildren();for(const path of usage?.docs||[]){const doc=documents.find(d=>d.source.endsWith('/'+path));if(doc){const a=document.createElement('a');a.href='#docs/'+doc.slug;a.textContent=doc.title;$('component-guides').append(a,document.createTextNode(' '));}}
 
  $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
- $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental. IME composition and a complete platform accessibility bridge remain pending.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
+ $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental; native IME candidate UI and a complete platform accessibility bridge vary by host.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
  $('table-pin').hidden=selected.name!=='DataTable';$('table-pin').value='0';
  $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
  $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
@@ -574,6 +575,58 @@ function selectComponent(){
  $('selection-mode').hidden=!['List','Select','Combobox','DataTable'].includes(selected.name);$('selection-mode').value='0';
  $('disabled').checked=false;document.body.classList.remove('menu-open');navigation();requestFrame();
 }
+const imeTarget=document.createElement('textarea');
+imeTarget.id='cui-ime-input';imeTarget.tabIndex=-1;imeTarget.setAttribute('aria-label','Canvas text input');
+Object.assign(imeTarget.style,{position:'fixed',opacity:'0',width:'1px',height:'1px',padding:'0',border:'0',pointerEvents:'none'});
+document.body.append(imeTarget);
+let composing=false,preeditText='';
+function compositionEvent(phase,text='',anchor=0,cursor=anchor){
+ if(!wasm?.gallery_composition)return;
+ const bytes=encoder.encode(text),pointer=bytes.length?wasm.malloc(bytes.length):0;
+ if(bytes.length)new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);
+ wasm.gallery_composition(phase,pointer,bytes.length,anchor,cursor);
+ if(pointer)wasm.free(pointer);requestFrame();
+}
+function syncImeTarget(){
+ if(!wasm?.gallery_ime_rect)return;
+ const focused=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>wasm.gallery_semantic(i,0)===6&&wasm.gallery_semantic(i,7)&&!wasm.gallery_semantic(i,5));
+ if(focused&&(document.activeElement===canvas||document.activeElement===imeTarget)){
+  const rect=canvas.getBoundingClientRect(),x=wasm.gallery_ime_rect(0),y=wasm.gallery_ime_rect(1);
+  if(x>=0){imeTarget.style.left=`${rect.left+x}px`;imeTarget.style.top=`${rect.top+y}px`;}
+  if(document.activeElement!==imeTarget)imeTarget.focus({preventScroll:true});
+ }else if(document.activeElement===imeTarget){compositionEvent(3);composing=false;canvas.focus({preventScroll:true});}
+}
+for(const target of [canvas,imeTarget]){
+ target.addEventListener('compositionstart',()=>{composing=true;preeditText='';compositionEvent(0);});
+ target.addEventListener('compositionupdate',e=>{
+  preeditText=e.data;compositionEvent(1,e.data,imeTarget.selectionStart,imeTarget.selectionEnd);
+ });
+ target.addEventListener('compositionend',e=>{
+  compositionEvent(e.data?2:3,e.data||'');composing=false;imeTarget.value='';
+ });
+}
+// Native selection is updated after compositionupdate. Read the resulting
+// UTF-16 range on input/selectionchange rather than relying on event ordering.
+imeTarget.addEventListener('input',()=>{
+ if(composing)compositionEvent(1,preeditText,imeTarget.selectionStart,imeTarget.selectionEnd);
+ else imeTarget.value='';
+});
+document.addEventListener('selectionchange',()=>{
+ if(composing&&document.activeElement===imeTarget)
+  compositionEvent(1,preeditText,imeTarget.selectionStart,imeTarget.selectionEnd);
+});
+imeTarget.addEventListener('beforeinput',e=>{
+ if(e.isComposing||composing||e.inputType==='insertCompositionText')return;
+ if(e.inputType==='insertFromComposition'){e.preventDefault();return;}
+ if(e.inputType==='insertText'&&e.data){
+  e.preventDefault();const bytes=encoder.encode(e.data),pointer=wasm.malloc(bytes.length);
+  new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);requestFrame();
+ }
+});
+imeTarget.addEventListener('blur',e=>{
+ if(e.relatedTarget===canvas)return;
+ compositionEvent(3);composing=false;wasm?.gallery_focus(0xffffffff);requestFrame();
+});
 const keys={Tab:1,Enter:2,' ':3,Escape:4,ArrowLeft:5,ArrowRight:6,ArrowUp:7,ArrowDown:8,Home:9,End:10,Backspace:11,Delete:12,PageUp:19,PageDown:20};
 function keyIdentity(key){return keys[key]||(key.length===1?wasm.gallery_key_identity(key.charCodeAt(0)):0);}
 function plainCharacterInput(e){return e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.isComposing;}
@@ -605,25 +658,19 @@ canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('click',()=>{suppressCompatibilityMouse=false;});
 canvas.style.touchAction='none';
 canvas.addEventListener('pointercancel',e=>{wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
-canvas.addEventListener('blur',()=>{wasm?.gallery_event(7,0,0,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
-for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>{
+canvas.addEventListener('blur',e=>{if(e.relatedTarget===imeTarget)return;wasm?.gallery_event(7,0,0,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
+for(const target of [canvas,imeTarget])for(const [event,type] of [['keydown',3],['keyup',4]])target.addEventListener(event,e=>{
  if(!wasm)return;const key=keyIdentity(e.key);
- if(e.key==='Tab'){
+ if(e.key==='Tab'&&!composing&&!e.isComposing){
   const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&wasm.gallery_semantic(i,9)===0&&(interactiveRoles.includes(wasm.gallery_semantic(i,0))||wasm.gallery_semantic(i,33)));
   const focused=enabled.findIndex(i=>wasm.gallery_semantic(i,7));
   const focusedHandlesTab=focused>=0&&wasm.gallery_semantic(enabled[focused],35);
   if(!focusedHandlesTab&&!wasm.gallery_modal()&&(!enabled.length||(e.shiftKey&&focused===0)||(!e.shiftKey&&focused===enabled.length-1&&focused>=0)))return;
  }
- if(key){e.preventDefault();wasm.gallery_keyboard_event(type,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(prefersCharacterInput(e)));}
- if(type===3 && e.key.length===1 && !e.isComposing && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Input Group'||selected.name==='OtpInput'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||selected.name==='Toolbar'||selected.name==='Textarea'||selected.name==='Settings'||selected.name==='Command'||selected.name==='Questionnaire'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){
+ if(key){if(!composing&&!e.isComposing)e.preventDefault();wasm.gallery_keyboard_event(type,key,mods(e),Number(e.repeat),Number(e.isComposing||composing),Number(prefersCharacterInput(e)));}
+ if(type===3 && e.key.length===1 && !composing && !e.isComposing && !e.ctrlKey&&!e.metaKey&&!e.altKey && (selected.name==='Input'||selected.name==='Form'||selected.name==='Input Group'||selected.name==='OtpInput'||selected.name==='Editor'||selected.name==='NumberInput'||selected.name==='Combobox'||selected.name==='TimeField'||selected.name==='Toolbar'||selected.name==='Textarea'||selected.name==='Settings'||selected.name==='Command'||selected.name==='Questionnaire'||['Tree','List','Select','Menu','ContextMenu','DropdownButton'].includes(selected.name))){
   e.preventDefault();const bytes=encoder.encode(e.key),pointer=wasm.malloc(bytes.length);new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);
  }requestFrame();
-});
-canvas.addEventListener('compositionend',e=>{
- if(!wasm||!e.data||selected.name!=='Questionnaire')return;
- const bytes=encoder.encode(e.data),pointer=wasm.malloc(bytes.length);
- new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);
- wasm.gallery_text(pointer,bytes.length);wasm.free(pointer);requestFrame();
 });
 reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if(themeChoice==='system')syncTheme();});

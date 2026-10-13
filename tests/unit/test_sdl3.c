@@ -210,7 +210,9 @@ int main(int argc, char **argv) {
     assert(shortcut_index == strlen(shortcut_chars));
     cui_end_frame(ui);
     SDL_Event composition = {.type = SDL_EVENT_TEXT_EDITING};
-    composition.edit.text = "preedit";
+    composition.edit.text = "\xf0\x9f\x98\x80\xc3\xa9";
+    composition.edit.start = 1;
+    composition.edit.length = 1;
     assert(SDL_PushEvent(&composition));
     SDL_Event composing_key = {.type = SDL_EVENT_KEY_DOWN};
     composing_key.key.key = SDLK_B;
@@ -222,9 +224,43 @@ int main(int argc, char **argv) {
     assert(cui_begin_frame(ui, 320, 160, .016f));
     size_t composition_count;
     const cui_event *composition_events = cui_frame_events(ui, &composition_count);
-    assert(composition_count == 2);
-    assert(composition_events[0].key == CUI_KEY_B && composition_events[0].ime_composing);
-    assert(composition_events[1].key == CUI_KEY_B && !composition_events[1].ime_composing);
+    assert(composition_count == 4);
+    assert(composition_events[0].type == CUI_EVENT_COMPOSITION_UPDATE);
+    assert(composition_events[0].composition_anchor == 4 &&
+           composition_events[0].composition_cursor == 6);
+    assert(composition_events[0].text_length == 6 &&
+           !memcmp(composition_events[0].text_data, "\xf0\x9f\x98\x80\xc3\xa9", 6));
+    assert(composition_events[1].key == CUI_KEY_B && composition_events[1].ime_composing);
+    assert(composition_events[2].type == CUI_EVENT_COMPOSITION_CANCEL);
+    assert(composition_events[3].key == CUI_KEY_B && !composition_events[3].ime_composing);
+    cui_end_frame(ui);
+    char long_commit[301];
+    memset(long_commit, 'x', 300);
+    long_commit[300] = 0;
+    SDL_Event ime_commit = {.type = SDL_EVENT_TEXT_INPUT};
+    ime_commit.text.text = long_commit;
+    assert(SDL_PushEvent(&ime_commit));
+    assert(cui_sdl3_poll(s, ui));
+    long_commit[0] = 'y';
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    const cui_event *committed = cui_frame_events(ui, &composition_count);
+    assert(composition_count == 1 && committed[0].type == CUI_EVENT_COMPOSITION_COMMIT &&
+           committed[0].text_length == 300 && committed[0].text_data[0] == 'x');
+    cui_end_frame(ui);
+    SDL_Event lost = {.type = SDL_EVENT_WINDOW_FOCUS_LOST};
+    assert(SDL_PushEvent(&lost) && SDL_PushEvent(&ime_commit));
+    assert(cui_sdl3_poll(s, ui));
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    committed = cui_frame_events(ui, &composition_count);
+    assert(composition_count == 1 && committed[0].type == CUI_EVENT_CANCEL);
+    cui_end_frame(ui);
+    SDL_Event gained = {.type = SDL_EVENT_WINDOW_FOCUS_GAINED};
+    assert(SDL_PushEvent(&gained) && SDL_PushEvent(&ime_commit));
+    assert(cui_sdl3_poll(s, ui));
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    committed = cui_frame_events(ui, &composition_count);
+    assert(composition_count == 1 && committed[0].type == CUI_EVENT_TEXT &&
+           committed[0].text_length == 300);
     cui_end_frame(ui);
     SDL_Event event = {0};
     event.type = SDL_EVENT_KEY_DOWN;

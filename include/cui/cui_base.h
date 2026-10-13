@@ -71,7 +71,12 @@ size_t cui_base_input_hit_test(void *geometry, cui_str, float x, float y);
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;
+    cui_edit_composition *composition; /* Optional caller-owned session and view buffers. */
+    bool composition_owned;            /* Internal default resource flag; initialize false. */
 } cui_input_behavior_state;
+/* Lazy bounded default session (4095 preedit / 65535 rendered bytes). */
+cui_edit_composition *cui_base_composition(cui_context *, cui_id, cui_edit_composition *,
+                                           bool *owned);
 typedef struct {
     bool disabled, readonly, required, invalid;
     const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */

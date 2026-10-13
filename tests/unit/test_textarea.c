@@ -1053,7 +1053,60 @@ static void test_large_document_viewport(void) {
     free(lines);
     free(buffer);
 }
+static void test_ime_virtual_rows(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    char document[256] = "original", preedit[64], view[320];
+    cui_edit *edit = editor(document, sizeof(document));
+    cui_textarea_line rows[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, rows, 32));
+    cui_edit_composition composition = {.buffer = preedit,
+                                        .capacity = sizeof(preedit),
+                                        .view_buffer = view,
+                                        .view_capacity = sizeof(view)};
+    state.composition = &composition;
+    cui_textarea_options options = {.width = 180, .rows = 3};
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    cui_focus(ui, 10);
+    assert(cui_edit_select(edit, 0, 8) == CUI_EDIT_OK);
+    cui_event update = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                        .text_data = "a\n\xf0\x9f\x98\x80",
+                        .text_length = 6,
+                        .composition_anchor = 2,
+                        .composition_cursor = 6};
+    assert(cui_queue_event(ui, update));
+    cui_textarea_result result = frame(ui, edit, &state, options);
+    assert(result.error == CUI_TEXTAREA_OK && !result.changed && composition.active);
+    assert(!strcmp(document, "original") && state.count == 2 && rows[1].end == 6);
+    assert(state.cursor == 6 && state.anchor == 2 && state.caret_line == 1);
+    cui_rect caret;
+    assert(cui_text_input_rect(ui, &caret) && caret.w == 1 && caret.h > 0);
+    bool drawn = false;
+    for (size_t i = 0; i < drawing.count; i++)
+        if (drawing.commands[i].type == CUI_DRAW_TEXT && drawing.commands[i].text.length == 4 &&
+            !memcmp(drawing.commands[i].text.data, "\xf0\x9f\x98\x80", 4))
+            drawn = true;
+    assert(drawn);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK && state.count == 2);
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    assert(!frame(ui, edit, &state, options).changed && composition.active);
+    options.readonly = true;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK && !composition.active);
+    assert(state.count == 1 && !strcmp(document, "original"));
+    options.readonly = false;
+    assert(cui_queue_event(ui, update));
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    update.type = CUI_EVENT_COMPOSITION_COMMIT;
+    assert(cui_queue_event(ui, update));
+    result = frame(ui, edit, &state, options);
+    assert(result.changed && !composition.active && strlen(document) == 6);
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    assert(frame(ui, edit, &state, options).changed && !strcmp(document, "original"));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_ime_virtual_rows();
     test_incremental_wrap_reflow();
     test_large_document_viewport();
     test_atomic_inline_tokens();

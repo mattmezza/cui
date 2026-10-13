@@ -1789,8 +1789,11 @@ int gallery_init(void) {
                                .close = gallery_speech_close_input},
             gallery_speech_event, NULL))
         return 0;
-    questionnaire_edit = cui_edit_create((cui_edit_config){
-        .buffer = questionnaire_input_buffer, .capacity = sizeof(questionnaire_input_buffer)});
+    questionnaire_edit =
+        cui_edit_create((cui_edit_config){.buffer = questionnaire_input_buffer,
+                                          .capacity = sizeof(questionnaire_input_buffer),
+                                          .history_bytes = 8192,
+                                          .max_history_steps = 32});
     if (!questionnaire_edit)
         return 0;
     questionnaire_items[0] =
@@ -2130,11 +2133,56 @@ void gallery_scroll(float x, float y, float dx, float dy) {
                         (cui_event){.type = CUI_EVENT_SCROLL, .x = x, .y = y, .dx = dx, .dy = dy});
 }
 void gallery_text(const char *text, size_t length) {
-    cui_event event = {.type = CUI_EVENT_TEXT};
-    if (length > 63 || !text)
+    cui_event event = {.type = CUI_EVENT_TEXT, .text_data = text, .text_length = length};
+    if (!text)
         return;
-    memcpy(event.text, text, length);
+    if (length < sizeof(event.text))
+        memcpy(event.text, text, length);
     cui_queue_event(ui, event);
+}
+/* UTF-16 host offsets in preedit, translated to public UTF-8 byte offsets. */
+static size_t gallery_utf16_byte(const char *text, size_t length, unsigned units) {
+    size_t byte = 0;
+    while (byte < length && units) {
+        unsigned char lead = (unsigned char)text[byte];
+        size_t width = lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
+        unsigned count = width == 4 ? 2 : 1;
+        if (units < count || width > length - byte)
+            break;
+        units -= count;
+        byte += width;
+    }
+    return byte;
+}
+static cui_id gallery_ime_owner;
+static bool gallery_ime_active;
+void gallery_composition(int phase, const char *text, size_t length, unsigned anchor,
+                         unsigned cursor) {
+    if (!ui || phase < 0 || phase > 3 || (!text && length))
+        return;
+    if (phase == 0 || (phase == 1 && !gallery_ime_active)) {
+        gallery_ime_owner = cui_focused(ui);
+        gallery_ime_active = true;
+    }
+    if (phase == 2 && !gallery_ime_active)
+        return;
+    cui_event event = {.type = (cui_event_type)(CUI_EVENT_COMPOSITION_START + phase),
+                       .composition_target = gallery_ime_owner,
+                       .text_data = text,
+                       .text_length = length,
+                       .composition_anchor = gallery_utf16_byte(text, length, anchor),
+                       .composition_cursor = gallery_utf16_byte(text, length, cursor)};
+    (void)cui_queue_event(ui, event);
+    if (phase >= 2) {
+        gallery_ime_active = false;
+        gallery_ime_owner = 0;
+    }
+}
+float gallery_ime_rect(unsigned field) {
+    cui_rect rect;
+    if (!cui_text_input_rect(ui, &rect))
+        return -1;
+    return field == 0 ? rect.x : field == 1 ? rect.y : field == 2 ? rect.w : rect.h;
 }
 void gallery_focus(unsigned index) {
     if (index < semantic_count)

@@ -1264,12 +1264,121 @@ static void test_multi_typing_change_limit(void) {
     assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "a\nb"));
     cui_edit_destroy(edit);
 }
+static void test_ime_session(void) {
+    char document[1024] = "before AFTER", preedit[512], view[1536];
+    cui_edit *e = make(document, sizeof(document), false, 10);
+    assert(cui_edit_select(e, 7, 12) == CUI_EDIT_OK);
+    cui_edit_composition c = {.buffer = preedit,
+                              .capacity = sizeof(preedit),
+                              .view_buffer = view,
+                              .view_capacity = sizeof(view)};
+    const char *emoji = "\xf0\x9f\x98\x80\xc3\xa9";
+    cui_event update = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                        .text_data = emoji,
+                        .text_length = 6,
+                        .composition_anchor = 4,
+                        .composition_cursor = 6};
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    assert(c.active && c.start == 7 && c.end == 12);
+    assert(!strcmp(document, "before AFTER") && !cui_edit_get_state(e).can_undo);
+    cui_str rendered = cui_edit_composition_view(e, &c);
+    assert(rendered.length == 13 && !memcmp(rendered.data + 7, emoji, 6));
+    assert(cui_edit_composition_selection(e, &c).cursor == 13);
+    update.composition_cursor = 1;
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_BOUNDARY);
+    assert(c.cursor == 6);
+    update.composition_cursor = 6;
+    update.text_length = sizeof(preedit);
+    assert(cui_edit_composition_event(e, &c,
+                                      (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                                                  .text_data = "\xff",
+                                                  .text_length = 1},
+                                      true) == CUI_EDIT_INVALID_UTF8);
+    char large[600];
+    memset(large, 'x', sizeof(large));
+    assert(cui_edit_composition_event(e, &c,
+                                      (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                                                  .text_data = large,
+                                                  .text_length = sizeof(large)},
+                                      true) == CUI_EDIT_CAPACITY);
+    assert(c.length == 6);
+    assert(
+        cui_edit_composition_event(
+            e, &c,
+            (cui_event){.type = CUI_EVENT_COMPOSITION_COMMIT, .text_data = emoji, .text_length = 6},
+            true) == CUI_EDIT_OK);
+    assert(!c.active && !strcmp(document, "before \xf0\x9f\x98\x80\xc3\xa9"));
+    assert(cui_edit_undo(e) == CUI_EDIT_OK && !strcmp(document, "before AFTER"));
+    assert(cui_edit_get_state(e).anchor == 7 && cui_edit_get_state(e).cursor == 12);
+    assert(cui_edit_composition_event(e, &c,
+                                      (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                                                  .text_data = large,
+                                                  .text_length = 300},
+                                      true) == CUI_EDIT_OK);
+    assert(c.length == 300 && !strcmp(document, "before AFTER"));
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_CANCEL}, true) ==
+           CUI_EDIT_OK);
+    assert(!c.active && !strcmp(document, "before AFTER"));
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_START},
+                                      true) == CUI_EDIT_OK);
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE},
+                                      false) == CUI_EDIT_OK);
+    assert(!c.active);
+    c.view_capacity = 8;
+    assert(
+        cui_edit_composition_event(
+            e, &c,
+            (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE, .text_data = "new", .text_length = 3},
+            true) == CUI_EDIT_CAPACITY);
+    assert(!c.active && !strcmp(document, "before AFTER"));
+    c.view_capacity = sizeof(view);
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_START},
+                                      true) == CUI_EDIT_OK);
+    assert(cui_edit_select(e, 0, 0) == CUI_EDIT_OK);
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE},
+                                      true) == CUI_EDIT_OK);
+    assert(!c.active); /* External selection drift invalidates old replacement range. */
+    cui_edit_destroy(e);
+    char large_document[2048] = "", large_preedit[2048], large_view[6144], payload[1024];
+    memset(payload, 'x', sizeof(payload));
+    e = make(large_document, sizeof(large_document), false, 10);
+    cui_edit_composition large_c = {.buffer = large_preedit,
+                                    .capacity = sizeof(large_preedit),
+                                    .view_buffer = large_view,
+                                    .view_capacity = sizeof(large_view)};
+    cui_event big = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                     .text_data = payload,
+                     .text_length = sizeof(payload),
+                     .composition_anchor = sizeof(payload),
+                     .composition_cursor = sizeof(payload)};
+    assert(cui_edit_composition_event(e, &large_c, big, true) == CUI_EDIT_OK);
+    payload[0] = 'y';
+    assert(cui_edit_composition_view(e, &large_c).length == 1024 && large_preedit[0] == 'x');
+    assert(large_document[0] == 0);
+    big.type = CUI_EVENT_COMPOSITION_COMMIT;
+    assert(cui_edit_composition_event(e, &large_c, big, true) == CUI_EDIT_OK);
+    assert(strlen(large_document) == 1024 && large_document[0] == 'y');
+    assert(cui_edit_undo(e) == CUI_EDIT_OK && large_document[0] == 0);
+    cui_edit_destroy(e);
+    char multiline[64] = "abcdef";
+    e = make(multiline, sizeof(multiline), true, 10);
+    cui_edit_selection selections[4];
+    cui_edit_selection_snapshot history[32];
+    assert(cui_edit_attach_selections(e, selections, 4, history, 32) == CUI_EDIT_OK);
+    cui_edit_selection two[] = {{1, 0, 0}, {2, 4, 4}};
+    assert(cui_edit_select_many(e, two, 2) == CUI_EDIT_OK);
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_START},
+                                      true) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(!c.active && !strcmp(multiline, "abcdef"));
+    cui_edit_destroy(e);
+}
 int main(void) {
     test_multi_typing_change_limit();
     test_directional_delete_history();
     test_multi_delete_history();
     test_column_anchor_history();
     test_typing_history_batch_limit();
+    test_ime_session();
     test_multicursor_typing_history();
     test_typing_history_coalescing();
     test_change_span_metadata();

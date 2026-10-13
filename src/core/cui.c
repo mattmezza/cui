@@ -98,6 +98,8 @@ struct cui_context {
     size_t id_count, activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_DISPATCH_MAX];
     size_t queued_count, event_count;
+    char *queued_text[CUI_CORE_EVENT_MAX], *frame_text[CUI_CORE_EVENT_MAX];
+    size_t queued_text_bytes;
     bool event_consumed[CUI_CORE_DISPATCH_MAX];
     cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
@@ -117,6 +119,8 @@ struct cui_context {
         bool active, primary, dragging, blocked;
     } contacts[16];
     double frame_time;
+    cui_id text_input_owner, composition_owner;
+    cui_rect text_input_bounds;
     bool reduced_motion;
     cui_core_resource *resources;
     size_t resource_bytes;
@@ -292,6 +296,8 @@ cui_context *cui_create(cui_config config) {
         free(ui);
         return NULL;
     }
+    if (!config.event_text_bytes)
+        config.event_text_bytes = 65536;
     ui->config = config;
     ui->text_metrics_revision = 1;
     ui->dirty = true;
@@ -365,6 +371,10 @@ void cui_destroy(cui_context *ui) {
                 r->destroy(r->payload);
             free(r->payload);
         }
+    for (size_t i = 0; i < CUI_CORE_EVENT_MAX; i++) {
+        free(ui->queued_text[i]);
+        free(ui->frame_text[i]);
+    }
     free(ui->scroll_gestures);
     free(ui->previous_scroll_gestures);
     free(ui->resources);
@@ -770,6 +780,24 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
         return false;
     }
+    char *copy = NULL;
+    if (e.text_data || e.text_length) {
+        if (!e.text_data || e.text_length > ui->config.event_text_bytes - ui->queued_text_bytes) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            return false;
+        }
+        if (e.text_length) {
+            copy = malloc(e.text_length);
+            if (!copy) {
+                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                return false;
+            }
+            memcpy(copy, e.text_data, e.text_length);
+        }
+        e.text_data = copy;
+        ui->queued_text_bytes += e.text_length;
+    }
+    ui->queued_text[ui->queued_count] = copy;
     ui->queued[ui->queued_count++] = e;
     ui->dirty = true;
     return true;
@@ -819,6 +847,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
     }
     memset(ui->event_consumed, 0, sizeof ui->event_consumed);
+    for (size_t i = 0; i < CUI_CORE_EVENT_MAX; i++) {
+        free(ui->frame_text[i]);
+        ui->frame_text[i] = ui->queued_text[i];
+        ui->queued_text[i] = NULL;
+    }
+    ui->queued_text_bytes = 0;
     ui->event_count = ui->queued_count;
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
@@ -895,6 +929,22 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                     }
             ui->events[i] = e;
             ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false, touch_owner);
+        }
+        if (e.type >= CUI_EVENT_COMPOSITION_START && e.type <= CUI_EVENT_COMPOSITION_CANCEL &&
+            e.composition_target && e.composition_target != ui->focus) {
+            ui->event_consumed[i] = true;
+            ui->event_targets[i] = 0;
+            continue;
+        }
+        if (e.type == CUI_EVENT_COMPOSITION_START || e.type == CUI_EVENT_COMPOSITION_UPDATE)
+            ui->composition_owner = ui->focus;
+        else if (e.type == CUI_EVENT_COMPOSITION_COMMIT || e.type == CUI_EVENT_COMPOSITION_CANCEL ||
+                 e.type == CUI_EVENT_CANCEL || e.type == CUI_EVENT_POINTER_DOWN)
+            ui->composition_owner = 0;
+        if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) && ui->composition_owner &&
+            ui->composition_owner == ui->focus) {
+            e.ime_composing = true;
+            ui->events[i] = e;
         }
         if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) &&
             (e.ime_composing || e.prefer_character_input)) {
@@ -1865,6 +1915,8 @@ cui_core_commands_done:
            ui->semantic_count * sizeof(*ui->scroll_gestures));
     memcpy(ui->previous, ui->semantics, ui->semantic_count * sizeof(*ui->previous));
     ui->previous_count = ui->semantic_count;
+    if (ui->composition_owner != ui->focus)
+        ui->composition_owner = 0;
     ui->in_frame = false;
     return (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
 }
@@ -1906,6 +1958,8 @@ void cui_focus(cui_context *ui, cui_id id) {
                     if (ui->previous[i].id == id && ui->previous[i].details.no_focus)
                         return;
         }
+        if (ui->focus != id)
+            ui->composition_owner = 0;
         ui->focus = id;
         ui->focus_visible = true;
         ui->dirty = true;
@@ -2459,5 +2513,19 @@ bool cui_pointer_position(const cui_context *ui, float *x, float *y) {
         return false;
     *x = ui->pointer_x;
     *y = ui->pointer_y;
+    return true;
+}
+
+void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
+    if (!ui || !owner || !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) ||
+        !isfinite(bounds.h) || bounds.w < 0 || bounds.h < 0)
+        return;
+    ui->text_input_owner = owner;
+    ui->text_input_bounds = bounds;
+}
+bool cui_text_input_rect(const cui_context *ui, cui_rect *out) {
+    if (!ui || !out || !ui->focus || ui->focus != ui->text_input_owner)
+        return false;
+    *out = ui->text_input_bounds;
     return true;
 }

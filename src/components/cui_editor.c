@@ -351,6 +351,46 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                                 .fixed_width = true,
                                 .height = metrics.line_height,
                                 .fixed_height = true});
+        if (config.search && config.search->active && config.search->count) {
+            cui_editor_matcher *matcher = config.search;
+            size_t low = 0, high = matcher->count;
+            while (low < high) {
+                size_t middle = low + (high - low) / 2;
+                if (matcher->matches[middle].end <= line.start)
+                    low = middle + 1;
+                else
+                    high = middle;
+            }
+            for (size_t match = low;
+                 match < matcher->count && matcher->matches[match].start < line.next; ++match) {
+                cui_editor_match range = matcher->matches[match];
+                float left = cui_editor_prefix(ui, text, line, range.start, metrics.font_size,
+                                               options.text_style);
+                float right = cui_editor_prefix(ui, text, line, range.end, metrics.font_size,
+                                                options.text_style);
+                if (line.hard_break && range.end > line.end)
+                    right += cui_measure_text_ex(ui, cui_string(" "), metrics.font_size,
+                                                 options.text_style)
+                                 .width;
+                if (right > left) {
+                    cui_color color = theme->selection;
+                    if (config.custom_search_colors)
+                        color = match == matcher->current ? config.search_current_color
+                                                          : config.search_color;
+                    else if (match != matcher->current) {
+                        unsigned gray = ((unsigned)color.r + color.g + color.b) / 3;
+                        color.r = (uint8_t)((color.r + gray) / 2);
+                        color.g = (uint8_t)((color.g + gray) / 2);
+                        color.b = (uint8_t)((color.b + gray) / 2);
+                    }
+                    cui_begin_absolute_box(
+                        ui, cui_editor_child(cui_editor_child(id, row, 70), range.start, 72),
+                        (cui_box){.background = color},
+                        (cui_rect){left, 0, right - left, metrics.line_height});
+                    cui_end_box(ui);
+                }
+            }
+        }
         if (first < line.next && last > line.start) {
             float left =
                 cui_editor_prefix(ui, text, line, first, metrics.font_size, options.text_style);
@@ -360,9 +400,12 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                 right +=
                     cui_measure_text_ex(ui, cui_string(" "), metrics.font_size, options.text_style)
                         .width;
-            if (right > left)
-                cui_set_underlay(ui, (cui_rect){left, 0, right - left, metrics.line_height},
-                                 theme->selection, (cui_corner_radii){0});
+            if (right > left) {
+                cui_begin_absolute_box(ui, cui_editor_child(id, row, 71),
+                                       (cui_box){.background = theme->selection},
+                                       (cui_rect){left, 0, right - left, metrics.line_height});
+                cui_end_box(ui);
+            }
         }
         if (!text.length && options.placeholder.length)
             cui_text_line(ui, options.placeholder, metrics.font_size, theme->muted,
@@ -473,8 +516,11 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
              (e.key == CUI_KEY_F && (e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))) &&
             (target == editor_id ||
              (state->open && (target == field || target == replacement_field)))) {
-            state->replace_mode = replacement_shortcut;
-            state->open = true;
+            cui_edit_result opened = cui_editor_search_open(editor, state, replacement_shortcut);
+            if (opened != CUI_EDIT_OK) {
+                result.error = opened;
+                return result;
+            }
             cui_edit_select(state->query, 0, cui_edit_get_text(state->query).length);
             cui_focus(ui, field);
             cui_consume_event(ui, i);

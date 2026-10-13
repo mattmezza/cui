@@ -753,6 +753,28 @@ static void replacement_panel(void) {
     assert(result.replaced == 2 && !strcmp(buffer, "bar bar bar") && !matcher.count);
     assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "bar FOO foo"));
     search_frame(ui, &editor, &search, false);
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 400, 400, .016f));
+    assert(cui_editor_find_bar(ui, 20, 10, &theme, &editor, &search, 330, false).error ==
+           CUI_EDIT_OK);
+    cui_editor_options narrow = cui_editor_default();
+    narrow.textarea.width = 330;
+    narrow.search = &matcher;
+    assert(cui_editor(ui, 10, &theme, cui_string("Code"), &editor, narrow).error ==
+           CUI_TEXTAREA_OK);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_rect panel = cui_bounds(ui, 20);
+    uint64_t controls[] = {
+        UINT64_C(0x790a4100f05b190d), UINT64_C(0x1b4a6c72d005ab81), UINT64_C(0x391cfd020af58d20),
+        UINT64_C(0x73bbf8e9cae70b45), UINT64_C(0x0092b880a17f63dd), UINT64_C(0x51a814631c060f34),
+        UINT64_C(0x43b926eab194d100), UINT64_C(0x311b89208297ba14), UINT64_C(0x4891147fe2443891)};
+    for (size_t i = 0; i < sizeof controls / sizeof controls[0]; ++i) {
+        cui_rect bounds = cui_bounds(ui, 20 ^ controls[i]);
+        assert(bounds.w > 0 && bounds.h > 0 && bounds.x >= panel.x - .01f &&
+               bounds.x + bounds.w <= panel.x + 330.01f);
+    }
+    assert(cui_bounds(ui, 20 ^ controls[0]).w >= 20);
     cui_focus(ui, field);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
     result = search_frame(ui, &editor, &search, false);
@@ -762,7 +784,132 @@ static void replacement_panel(void) {
     cui_edit_destroy(q);
     cui_edit_destroy(edit);
 }
+static cui_size search_measure(void *user, cui_str text, float size, cui_text_style style) {
+    (void)user;
+    return (cui_size){text.length * (style.family == 7 ? 9.0f : 5.0f), size};
+}
+static void search_activation_and_paint(void) {
+    char buffer[128] = "foo\nfoo\nfoo\nfoo", query[32] = "old";
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    cui_edit *q = cui_edit_create((cui_edit_config){.buffer = query, .capacity = sizeof query});
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_search_state search;
+    cui_editor_match ranges[16];
+    cui_editor_matcher matcher;
+    assert(edit && q && cui_editor_state_init(&editor, edit, lines, 32));
+    assert(cui_editor_search_init(&search, q) && cui_editor_matcher_init(&matcher, ranges, 16));
+    search.matcher = &matcher;
+    cui_context *ui =
+        cui_create((cui_config){.width = 400, .height = 300, .measure_styled = search_measure});
+    cui_editor_options options = cui_editor_default();
+    options.textarea.width = 200;
+    options.textarea.height = 100;
+    options.textarea.text_style.family = 7;
+    options.textarea.readonly = true;
+    cui_draw_list commands;
+    assert(draw(ui, &editor, options, &commands).error == CUI_TEXTAREA_OK);
+    editor.view.scroll_y = editor.view.line_height * 2;
+    cui_edit_select(edit, 0, 3);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_editor_search_open(&editor, &search, false) == CUI_EDIT_OK);
+    assert(!strcmp(query, "foo") && matcher.current == 2 && matcher.count == 4 &&
+           search.activation_revision == 1);
+    /* Offset8 is the first visible row start, matching source anchor lookup. */
+    assert(cui_edit_get_state(edit).anchor == 0 && cui_edit_get_state(edit).cursor == 3 &&
+           cui_edit_get_state(edit).revision == revision);
+    matcher.current = 3;
+    assert(cui_editor_search_open(&editor, &search, false) == CUI_EDIT_OK && matcher.current == 3 &&
+           search.activation_revision == 2);
+    cui_edit_select(edit, 0, 0);
+    options.search = &matcher;
+    options.custom_search_colors = true;
+    options.search_color = (cui_color){11, 22, 33, 255};
+    options.search_current_color = (cui_color){44, 55, 66, 255};
+    editor.view.scroll_y = 0;
+    for (unsigned frame = 0; frame < 2; ++frame) {
+        assert(draw(ui, &editor, options, &commands).error == CUI_TEXTAREA_OK);
+        size_t ordinary = 0, current = 0;
+        for (size_t i = 0; i < commands.count; ++i) {
+            cui_draw_command c = commands.commands[i];
+            if (c.type == CUI_DRAW_RECT && c.color.r == 11 && c.color.g == 22) {
+                ++ordinary;
+                assert(fabsf(c.bounds.w - 27) < .01f &&
+                       fabsf(c.bounds.h - editor.view.line_height) < .01f);
+            }
+            if (c.type == CUI_DRAW_RECT && c.color.r == 44 && c.color.g == 55)
+                ++current;
+        }
+        assert(ordinary == 3 && current == 1);
+    }
+    assert(cui_editor_matcher_set_query(&editor, &matcher, cui_string("foo\nfoo"), false) ==
+           CUI_EDIT_OK);
+    assert(draw(ui, &editor, options, &commands).error ==
+           CUI_TEXTAREA_OK); /* split match IDs stay unique */
+    cui_editor_matcher_close(&matcher);
+    assert(draw(ui, &editor, options, &commands).error == CUI_TEXTAREA_OK);
+    for (size_t i = 0; i < commands.count; ++i)
+        assert(commands.commands[i].color.r != 11 || commands.commands[i].color.g != 22);
+    cui_editor_fold fold = {0, 3, true};
+    assert(cui_editor_set_folds(&editor, &fold, 1));
+    assert(draw(ui, &editor, options, &commands).error == CUI_TEXTAREA_OK &&
+           editor.view.count == 2);
+    assert(cui_edit_replace_range(q, 0, cui_edit_get_text(q).length, cui_string("old")) ==
+           CUI_EDIT_OK);
+    editor.view.scroll_y = editor.view.line_height;
+    cui_edit_select(edit, 0, 3);
+    assert(cui_editor_search_open(&editor, &search, false) == CUI_EDIT_OK && matcher.current == 3);
+    assert(draw(ui, &editor, options, &commands).error == CUI_TEXTAREA_OK);
+    size_t ordinary = 0, current = 0, first_match = SIZE_MAX, selection = SIZE_MAX;
+    cui_theme theme = cui_theme_light();
+    for (size_t i = 0; i < commands.count; ++i) {
+        cui_draw_command c = commands.commands[i];
+        if (c.type == CUI_DRAW_RECT && c.color.r == 11 && c.color.g == 22) {
+            ++ordinary;
+            if (first_match == SIZE_MAX)
+                first_match = i;
+        }
+        if (c.type == CUI_DRAW_RECT && c.color.r == 44 && c.color.g == 55)
+            ++current;
+        if (c.type == CUI_DRAW_RECT && c.color.r == theme.selection.r &&
+            c.color.g == theme.selection.g && c.color.b == theme.selection.b &&
+            selection == SIZE_MAX)
+            selection = i;
+    }
+    assert(ordinary == 1 && current == 1 &&
+           first_match < selection); /* hidden rows have no paint */
+    /* Selected query capacity rejection preserves both models and activation. */
+    cui_edit_select(edit, 0, cui_edit_get_text(edit).length);
+    size_t activation = search.activation_revision;
+    char saved[32];
+    strcpy(saved, query);
+    assert(cui_editor_search_open(&editor, &search, false) == CUI_EDIT_LINE_BREAK);
+    assert(!strcmp(query, saved) && search.activation_revision == activation);
+    char tiny_buffer[3] = "x";
+    cui_edit *tiny =
+        cui_edit_create((cui_edit_config){.buffer = tiny_buffer, .capacity = sizeof tiny_buffer});
+    assert(tiny);
+    search.query = tiny;
+    cui_edit_select(edit, 0, 3);
+    cui_editor_matcher old_matcher = matcher;
+    assert(cui_editor_search_open(&editor, &search, false) == CUI_EDIT_CAPACITY);
+    assert(!strcmp(tiny_buffer, "x") && search.activation_revision == activation &&
+           !memcmp(&old_matcher, &matcher, sizeof matcher));
+    search.query = q;
+    cui_edit_destroy(tiny);
+    cui_editor_match small_ranges[1];
+    cui_editor_matcher small;
+    assert(cui_editor_matcher_init(&small, small_ranges, 1));
+    search.matcher = &small;
+    assert(cui_editor_search_open(&editor, &search, false) == CUI_EDIT_CAPACITY &&
+           search.activation_revision == activation && !strcmp(query, saved));
+    cui_destroy(ui);
+    cui_edit_destroy(q);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    search_activation_and_paint();
     replacement_panel();
     retained_matcher();
     replace_workflow();

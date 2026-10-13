@@ -128,6 +128,11 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
         o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||
         (o.language.length && !o.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
+    if (o.search && o.search->active) {
+        cui_edit_result synced = cui_editor_matcher_sync(s, o.search);
+        if (synced != CUI_EDIT_OK)
+            return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID, .edit_error = synced};
+    }
     cui_textarea_state probe = s->view;
     float width = probe.viewport.w > 0 ? probe.viewport.w : probe.wrap_width;
     cui_textarea_error layout_error = cui_textarea_layout_ex(
@@ -146,6 +151,13 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     if (s->completion.open &&
         (s->completion.revision != after.revision || result.selection_changed))
         cui_editor_cancel_completion(s);
+    if (o.search && o.search->active) {
+        cui_edit_result synced = cui_editor_matcher_sync(s, o.search);
+        if (synced != CUI_EDIT_OK) {
+            result.error = CUI_TEXTAREA_INVALID;
+            result.edit_error = synced;
+        }
+    }
     return result;
 }
 
@@ -535,6 +547,65 @@ bool cui_editor_search_enable_replace(cui_editor_search_state *state, cui_editor
     state->scratch_capacity = capacity;
     state->replace_mode = false;
     return true;
+}
+
+cui_edit_result cui_editor_search_open(cui_editor_state *editor, cui_editor_search_state *search,
+                                       bool replace_mode) {
+    if (!editor || !editor->edit || !search || !search->query || search->query == editor->edit ||
+        cui_edit_get_state(search->query).multiline ||
+        cui_edit_get_content(search->query).token_count)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!search->matcher) {
+        search->open = true;
+        search->replace_mode = false;
+        search->activation_revision++;
+        return CUI_EDIT_OK;
+    }
+    cui_editor_matcher *matcher = search->matcher;
+    cui_str text = cui_edit_get_text(editor->edit), query = cui_edit_get_text(search->query);
+    cui_edit_state selected = cui_edit_get_state(editor->edit);
+    size_t start = selected.anchor < selected.cursor ? selected.anchor : selected.cursor;
+    size_t end = selected.anchor > selected.cursor ? selected.anchor : selected.cursor;
+    cui_str candidate = start == end ? query : (cui_str){text.data + start, end - start};
+    size_t ignored;
+    cui_edit_result result = cui_editor_matcher_preflight(editor, matcher, (cui_str){0}, text,
+                                                          matcher->case_insensitive, &ignored);
+    if (result != CUI_EDIT_OK)
+        return result;
+    size_t bytes = matcher->capacity * sizeof(*matcher->matches);
+    size_t query_bytes = (candidate.length > query.length ? candidate.length : query.length) + 1;
+    if (cui_editor_storage_overlap(matcher->matches, bytes, query.data, query_bytes) ||
+        cui_editor_storage_overlap(query.data, query_bytes, text.data, text.length + 1))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t count = cui_editor_scan_matches(text, candidate, matcher->case_insensitive, NULL);
+    if (count > matcher->capacity)
+        return CUI_EDIT_CAPACITY;
+    bool changed = candidate.length != query.length ||
+                   (candidate.length && memcmp(candidate.data, query.data, candidate.length));
+    if (start != end) {
+        result = cui_edit_replace_range(search->query, 0, query.length, candidate);
+        if (result != CUI_EDIT_OK)
+            return result;
+    }
+    result = cui_editor_matcher_set_query(editor, matcher, cui_edit_get_text(search->query),
+                                          matcher->case_insensitive);
+    if (result != CUI_EDIT_OK)
+        return result;
+    if (changed && matcher->count && editor->view.initialized && editor->view.count &&
+        isfinite(editor->view.scroll_y) && editor->view.scroll_y >= 0 &&
+        isfinite(editor->view.line_height) && editor->view.line_height > 0) {
+        size_t row = (size_t)fminf(floorf(editor->view.scroll_y / editor->view.line_height),
+                                   (float)(editor->view.count - 1));
+        size_t offset = editor->view.lines[row].start;
+        size_t current = 0;
+        while (current + 1 < matcher->count && matcher->matches[current].end < offset)
+            ++current;
+        matcher->current = current;
+    }
+    search->open = true;
+    search->replace_mode = replace_mode && search->replacement && !search->replace_disabled;
+    search->activation_revision++;
+    return CUI_EDIT_OK;
 }
 
 bool cui_editor_set_folds(cui_editor_state *state, cui_editor_fold *folds, size_t count) {

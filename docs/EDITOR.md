@@ -374,5 +374,25 @@ Replace, and Replace all; Escape from either field closes and returns editor foc
 `replace_disabled` lets the host enforce readonly policy while keeping find
 navigation available. Replace-all respects ASCII-insensitive matching and remains
 one Undo step. Existing find-only callers retain their original behavior. Search
-matches are retained for navigation/status, but non-current match highlighting and
-viewport-based activation anchoring from the frozen implementation remain absent.
+matches are retained for navigation/status. Attach the matcher through the editor
+options `search` field to paint visible active and non-current matches.
+
+Retained search activation (`cui_editor_search_open`) seeds a nonempty document
+selection into the query model, without changing document selection or history.
+Only a changed query anchors its current index at the first visible projected row;
+reopening an unchanged query preserves the current index. Every successful opening
+increments `activation_revision`; the built-in bar reselects/refocuses its query.
+Single-line query restrictions and capacity rejection are transactional. The
+projected row anchor respects folding. Existing no-matcher find-only callers retain
+their original query-retention behavior.
+
+The editor options `search` pointer borrows the matcher. Active match rectangles
+use measured prefixes with the complete code font style, including family. Hidden
+fold interiors do not paint matches; viewport clipping applies to long lines.
+Current matches use the selection color; other matches use a subdued selection
+color. Hosts may supply exact colors with `custom_search_colors`. Document selection
+paints after search backgrounds, and syntax callbacks remain read-only and paint
+text afterward. Closing the matcher suppresses all search highlights. Revision
+synchronization uses caller range capacity; capacity errors are surfaced rather
+than drawing stale ranges. Match arrays and public matcher fields must remain
+unchanged by callers while attached (except through matcher APIs).

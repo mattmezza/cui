@@ -2350,9 +2350,29 @@ int main(void) {
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
     options.kind = CUI_CHART_LINE;
     assert(cui_chart_render(&state, &options) == CUI_PLOT_OK);
+    /* Large geometry must not require an extended long-double exponent range. */
+    flow_links[0].value = 1;
+    flow_links[1].value = 1;
+    flow_links[2].value = 0;
+    cui_chart_sankey_node unit_nodes[4];
+    cui_chart_sankey_link_geometry unit_links[3], extreme_links[3];
+    assert(cui_chart_sankey_layout(&flow_options, unit_nodes, 4) == CUI_PLOT_OK);
+    assert(cui_chart_sankey_link_bounds(&flow_options, unit_nodes, unit_links, 3) == CUI_PLOT_OK);
     flow_links[0].value = DBL_MAX;
     flow_links[1].value = DBL_MAX;
     flow_links[2].value = 0;
     assert(cui_chart_sankey_layout(&flow_options, nodes, 4) == CUI_PLOT_OK);
+    assert(cui_chart_sankey_link_bounds(&flow_options, nodes, extreme_links, 3) == CUI_PLOT_OK);
+    for (size_t i = 0; i < 4; ++i) {
+        assert(nodes[i].x0 == unit_nodes[i].x0 && nodes[i].x1 == unit_nodes[i].x1);
+        assert(nodes[i].y0 == unit_nodes[i].y0 && nodes[i].y1 == unit_nodes[i].y1);
+        assert(nodes[i].throughput == (i == 3 ? 0 : DBL_MAX));
+    }
+    for (size_t i = 0; i < 3; ++i) {
+        assert(extreme_links[i].source_y == unit_links[i].source_y);
+        assert(extreme_links[i].target_y == unit_links[i].target_y);
+        assert(extreme_links[i].source_width == unit_links[i].source_width);
+        assert(extreme_links[i].target_width == unit_links[i].target_width);
+    }
     return 0;
 }

@@ -2,6 +2,8 @@
 
 Audit baseline: release `65da7b2`. The final run passed 41 of 42 assertions across 36 families; Carousel failed its swipe assertion. All 78 stories rendered without page errors. This inventory covers all 78 manifest families. Rendering a story is an inventory check, not touch verification. “Verified” means only the named representative assertions passed using actual Chromium CDP `Input.dispatchTouchEvent` contacts. It does not mean every variant, platform or interaction in that family passed.
 
+The next16 integration fixes Carousel contact lifetime/cancellation ordering and text-area caret reveal overriding a pan. Its local Chromium rerun passes all 42 representative assertions; the historical baseline failure above remains recorded. Additional control and clipboard coverage is recorded in [the follow-up audit](TOUCH_FOLLOWUP.md). These checks do not establish physical-device or complete per-family acceptance.
+
 Run from the repository root after building the WASI gallery:
 
 ```sh

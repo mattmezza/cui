@@ -1127,6 +1127,13 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
                                  items[i].tooltip_state, child);
     }
     cui_end_box(ui);
+    if (changed && o.on_change) {
+        /* A controlled callback may replace siblings that were already painted.
+           Publish the owner's final state now and repaint the completed group. */
+        for (size_t i = 0; i < count; i++)
+            cui_update_semantic(ui, items[i].id, values[i], values[i] ? 1 : 0);
+        cui_invalidate(ui);
+    }
     return changed;
 }
 

@@ -33,6 +33,8 @@ jobs:
         run: uv run tests/web/test_ime.py
       - name: Audit representative touch behavior across the catalog
         run: uv run tests/web/test_touch_components.py
+      - name: Verify additional touch controls and actual clipboard
+        run: uv run tests/web/test_touch_more.py
       - name: Verify interaction guides design controls and composed app
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions

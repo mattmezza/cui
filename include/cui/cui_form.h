@@ -33,6 +33,7 @@ typedef struct {
     cui_str name;
     cui_form_content_fn render_footer;
     void *footer_user;
+    cui_design_size design_size; /* INHERIT preserves legacy size; styled APIs only. */
 } cui_form_options;
 typedef struct {
     size_t row, column, span;
@@ -91,6 +92,7 @@ typedef struct {
     cui_form_size size;
     cui_str name, placeholder;
     cui_base_input_options input;
+    cui_design_size design_size; /* INHERIT preserves legacy size; styled APIs only. */
 } cui_input_group_options;
 typedef struct {
     cui_input_result input;

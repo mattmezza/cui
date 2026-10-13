@@ -543,8 +543,65 @@ static void rating_star_graphics(void) {
 }
 #endif
 
+#ifndef CUI_NUMERIC_BASE_ONLY
+static void design_number_sizes(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme = 0; theme < 4; ++theme)
+        for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+            cui_context *ui = cui_create((cui_config){.width = 1400, .height = 800});
+            char buffer[128] = "";
+            cui_edit *edit =
+                cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+            assert(ui && edit);
+            cui_number_state state = {.edit = edit};
+            double value = 3;
+            cui_number_options o = {.width = 700, .step = 2, .design_size = (cui_design_size)size};
+            cui_number_metrics m;
+            cui_design_metrics d;
+            assert(cui_design_measure(o.design_size, themes[theme].font_size / 16, &d));
+            assert(cui_number_measure(o, themes[theme].font_size, &m));
+            assert(m.height == d.control_height && m.font_size == d.font_size &&
+                   m.step_width == d.control_height && m.icon_size == d.indicator_size);
+            cui_draw_list draw = sized_number_frame(ui, &themes[theme], &state, &value, o);
+            cui_rect frame = cui_bounds(ui, cui_numeric_part_id(2, 0));
+            cui_rect plus = cui_bounds(ui, cui_numeric_part_id(2, 2));
+            assert(frame.w == 700 && fabsf(frame.h - d.control_height) < .01f);
+            assert(fabsf(plus.w - d.control_height) < .01f && plus.x + plus.w <= frame.x + frame.w);
+            unsigned icons = 0, labels = 0;
+            for (size_t i = 0; i < draw.count; ++i) {
+                if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+                    ++icons;
+                    assert(fabsf(draw.commands[i].bounds.w - ceilf(d.indicator_size)) < .01f);
+                }
+                if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                    ++labels;
+                    assert(draw.commands[i].font_size == d.font_size);
+                }
+            }
+            assert(icons == 2 && labels > 0);
+            cui_focus(ui, 2);
+            key(ui, CUI_KEY_UP, 0);
+            assert(number_scene(ui, &themes[theme], &state, &value, o).changed && value == 5);
+            key(ui, CUI_KEY_DOWN, 0);
+            assert(number_scene(ui, &themes[theme], &state, &value, o).changed && value == 3);
+            key(ui, CUI_KEY_UP, 0);
+            cui_number_state saved = state;
+            o.design_size = (cui_design_size)99;
+            assert(number_scene(ui, &themes[theme], &state, &value, o).error ==
+                   CUI_EDIT_INVALID_ARGUMENT);
+            assert(value == 3 && !strcmp(buffer, "3") && !memcmp(&state, &saved, sizeof(state)));
+            cui_number_metrics unchanged = m;
+            assert(!cui_number_measure(o, themes[theme].font_size, &m) &&
+                   !memcmp(&m, &unchanged, sizeof(m)));
+            cui_destroy(ui);
+            cui_edit_destroy(edit);
+        }
+}
+#endif
 int main(void) {
 #ifndef CUI_NUMERIC_BASE_ONLY
+    design_number_sizes();
     number_sizes_and_icons();
     rating_star_graphics();
     stepper_visible_selection();

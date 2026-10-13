@@ -154,10 +154,74 @@ static void styled(void) {
         }
 }
 #endif
+#ifndef CUI_OTP_BASE_ONLY
+static void design_sizes(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme = 0; theme < 4; ++theme)
+        for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+            char buffer[32] = "12";
+            cui_otp_state state;
+            assert(cui_otp_init(&state, buffer, sizeof(buffer), 4) == CUI_EDIT_OK);
+            cui_context *ui = cui_create((cui_config){.width = 2000, .height = 600});
+            assert(ui);
+            cui_otp_options o = cui_otp_options_default();
+            o.design_size = (cui_design_size)size;
+            cui_design_metrics d;
+            assert(cui_design_measure(o.design_size, themes[theme].font_size / 16, &d));
+            assert(cui_begin_frame(ui, 2000, 600, .016f));
+            assert(cui_otp(ui, 10, &themes[theme], &state, o).error == CUI_EDIT_OK);
+            cui_draw_list draw = cui_end_frame(ui);
+            cui_rect a = cui_bounds(ui, cui_otp_cell_id(10, 0)),
+                     b = cui_bounds(ui, cui_otp_cell_id(10, 1)),
+                     c = cui_bounds(ui, cui_otp_cell_id(10, 2));
+            assert(fabsf(a.w - d.control_height) < .01f && a.w == a.h);
+            assert(fabsf(b.x - a.x - a.w - floorf(d.gap)) < .01f &&
+                   fabsf(c.x - b.x - b.w - floorf(d.gap * 3)) < .01f);
+            unsigned labels = 0;
+            for (size_t i = 0; i < draw.count; ++i)
+                if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                    ++labels;
+                    assert(draw.commands[i].font_size == d.font_size);
+                }
+            assert(labels == 2 && cui_last_error(ui) == CUI_OK);
+            cui_focus(ui, 10);
+            text(ui, "3");
+            assert(cui_begin_frame(ui, 2000, 600, .016f));
+            assert(cui_otp(ui, 10, &themes[theme], &state, o).changed);
+            cui_end_frame(ui);
+            assert(!strcmp(buffer, "123"));
+            cui_otp_state saved = state;
+            text(ui, "4");
+            o.design_size = (cui_design_size)-1;
+            assert(cui_begin_frame(ui, 2000, 600, .016f));
+            assert(cui_otp(ui, 10, &themes[theme], &state, o).error == CUI_EDIT_INVALID_ARGUMENT);
+            assert(cui_end_frame(ui).count == 0 && !strcmp(buffer, "123") &&
+                   !memcmp(&state, &saved, sizeof(state)));
+            o.design_size = (cui_design_size)size;
+            o.cell_size = 40;
+            o.font_size = 18;
+            o.gap = 7;
+            o.group_gap = 11;
+            assert(cui_begin_frame(ui, 2000, 600, .016f));
+            assert(cui_otp(ui, 10, &themes[theme], &state, o).error == CUI_EDIT_OK);
+            draw = cui_end_frame(ui);
+            a = cui_bounds(ui, cui_otp_cell_id(10, 0));
+            b = cui_bounds(ui, cui_otp_cell_id(10, 1));
+            c = cui_bounds(ui, cui_otp_cell_id(10, 2));
+            assert(a.w == 40 && b.x - a.x - a.w == 7 && c.x - b.x - b.w == 11);
+            for (size_t i = 0; i < draw.count; ++i)
+                if (draw.commands[i].type == CUI_DRAW_TEXT)
+                    assert(draw.commands[i].font_size == 18);
+            cui_destroy(ui);
+        }
+}
+#endif
 int main(void) {
     models();
     editing();
 #ifndef CUI_OTP_BASE_ONLY
+    design_sizes();
     styled();
 #endif
     return 0;

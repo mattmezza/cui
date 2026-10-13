@@ -32,6 +32,7 @@ typedef struct {
     float custom_size, density;
     bool no_appearance, hide_focus_ring;
     cui_str placeholder;
+    cui_design_size design_size; /* INHERIT preserves legacy size; styled APIs only. */
 } cui_number_options;
 bool cui_number_measure(cui_number_options, float root_font_size, cui_number_metrics *);
 typedef struct {

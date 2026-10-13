@@ -21,6 +21,7 @@ typedef struct {
     float cell_size, font_size, gap, group_gap;
     bool disabled, hide_focus_ring;
     double now_seconds, blink_interval; /* Host monotonic time; interval defaults to .5s. */
+    cui_design_size design_size;        /* INHERIT preserves legacy size; styled APIs only. */
 } cui_otp_options;
 typedef struct {
     bool changed, complete, focused, blurred;

@@ -2,6 +2,7 @@
 #include "cui/cui_form.h"
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 #ifndef CUI_FORM_BASE_ONLY
 #include "cui/cui_components.h"
 #endif
@@ -381,8 +382,184 @@ static void loading_addon_artwork(void) {
     cui_edit_destroy(edit);
 }
 #endif
+#ifndef CUI_FORM_BASE_ONLY
+typedef struct {
+    cui_id id;
+    cui_design_metrics expected;
+    unsigned calls;
+} design_content;
+static void design_control(cui_context *ui, const cui_theme *t, void *user, float width) {
+    design_content *c = user;
+    assert(t->font_size == c->expected.font_size &&
+           t->control_height == c->expected.control_height && t->padding == c->expected.padding_x &&
+           t->gap == c->expected.gap);
+    ++c->calls;
+    cui_begin_box(ui, c->id, (cui_box){.width = width, .height = t->control_height});
+    cui_end_box(ui);
+}
+static void design_forms(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme = 0; theme < 4; ++theme)
+        for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+            cui_context *ui = cui_create((cui_config){.width = 2500, .height = 1200});
+            assert(ui);
+            cui_design_metrics d;
+            assert(cui_design_measure((cui_design_size)size, themes[theme].font_size / 16, &d));
+            design_content data[] = {{11, d, 0}, {21, d, 0}, {31, d, 0}};
+            cui_form_field fields[] = {
+                {.id = 10,
+                 .label = {"One", 3},
+                 .required = true,
+                 .render_control = design_control,
+                 .user = &data[0]},
+                {.id = 20, .label = {"Two", 3}, .render_control = design_control, .user = &data[1]},
+                {.id = 30,
+                 .label = {"Three", 5},
+                 .render_control = design_control,
+                 .user = &data[2]}};
+            cui_form_options o = {
+                .width = 2400, .columns = 2, .design_size = (cui_design_size)size};
+            assert(cui_begin_frame(ui, 2500, 1200, .016f));
+            assert(cui_form(ui, 1, &themes[theme], fields, 3, o) == CUI_FORM_OK);
+            cui_draw_list draw = cui_end_frame(ui);
+            cui_rect a = cui_bounds(ui, 11), b = cui_bounds(ui, 21), c = cui_bounds(ui, 31);
+            cui_rect field = cui_bounds(ui, 10), next = cui_bounds(ui, 30);
+            assert(fabsf(a.h - d.control_height) < .01f && a.y == b.y && c.y > a.y + a.h);
+            assert(fabsf(b.x - a.x - a.w - d.gap * 3) < .01f);
+            assert(fabsf(next.y - field.y - field.h - floorf(d.gap)) < .01f);
+            unsigned labels = 0;
+            for (size_t i = 0; i < draw.count; ++i)
+                if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                    ++labels;
+                    assert(draw.commands[i].font_size == d.font_size * .875f);
+                }
+            assert(labels == 4 && data[0].calls == 1 && data[1].calls == 1 && data[2].calls == 1);
+            o.gap_x = 20;
+            o.gap_y = 30;
+            o.label_text_size = 18;
+            o.horizontal_labels = true;
+            o.label_width = 90;
+            assert(cui_begin_frame(ui, 2500, 1200, .016f));
+            assert(cui_form(ui, 1, &themes[theme], fields, 3, o) == CUI_FORM_OK);
+            draw = cui_end_frame(ui);
+            cui_rect label = cui_bounds(ui, cui_form_label_id(10));
+            assert(label.w == 90);
+            field = cui_bounds(ui, 10);
+            next = cui_bounds(ui, 30);
+            assert(fabsf(next.y - field.y - field.h - 30) < .01f);
+            for (size_t i = 0; i < draw.count; ++i)
+                if (draw.commands[i].type == CUI_DRAW_TEXT)
+                    assert(draw.commands[i].font_size == 18);
+            o.design_size = (cui_design_size)99;
+            assert(cui_begin_frame(ui, 2500, 1200, .016f));
+            assert(cui_form(ui, 1, &themes[theme], fields, 3, o) == CUI_FORM_INVALID);
+            assert(cui_end_frame(ui).count == 0 && data[0].calls == 2);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_destroy(ui);
+        }
+}
+static void design_input_groups(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme = 0; theme < 4; ++theme)
+        for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+            cui_context *ui = cui_create((cui_config){.width = 800, .height = 600});
+            char buffer[64] = "abc";
+            cui_edit *edit =
+                cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+            assert(ui && edit);
+            cui_input_group_state state = {0};
+            cui_input_group_addon addons[] = {{.id = 110,
+                                               .alignment = CUI_INPUT_GROUP_INLINE_START,
+                                               .kind = CUI_INPUT_GROUP_TEXT,
+                                               .label = {"Very long currency prefix", 25}},
+                                              {.id = 111,
+                                               .alignment = CUI_INPUT_GROUP_INLINE_END,
+                                               .kind = CUI_INPUT_GROUP_BUTTON,
+                                               .label = {"Go", 2},
+                                               .width = 80}};
+            cui_input_group_options o = {.width = 600, .design_size = (cui_design_size)size};
+            cui_design_metrics d;
+            assert(cui_design_measure(o.design_size, themes[theme].font_size / 16, &d));
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(
+                cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o).error ==
+                CUI_FORM_OK);
+            cui_draw_list draw = cui_end_frame(ui);
+            cui_rect root = cui_bounds(ui, 100), field = cui_bounds(ui, 101),
+                     a = cui_bounds(ui, 110), b = cui_bounds(ui, 111);
+            assert(root.w == 600 && fabsf(root.h - d.control_height) < .01f);
+            assert(b.w == 80 && a.w > 0 && field.w > 0 && field.x >= a.x + a.w &&
+                   b.x >= field.x + field.w && b.x + b.w <= root.x + root.w);
+            for (size_t i = 0; i < draw.count; ++i)
+                if (draw.commands[i].type == CUI_DRAW_TEXT)
+                    assert(draw.commands[i].font_size == d.font_size);
+            click(ui, 111);
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o)
+                       .activated_addon == 111);
+            cui_end_frame(ui);
+            cui_focus(ui, 101);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o)
+                       .input.changed);
+            cui_end_frame(ui);
+            assert(strchr(buffer, 'z'));
+            char saved[64];
+            memcpy(saved, buffer, sizeof(buffer));
+            cui_input_group_state before = state;
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "x"}));
+            o.design_size = (cui_design_size)-1;
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(
+                cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o).error ==
+                CUI_FORM_INVALID);
+            assert(cui_end_frame(ui).count == 0 && !memcmp(saved, buffer, sizeof(buffer)) &&
+                   !memcmp(&before, &state, sizeof(state)));
+            o.design_size = (cui_design_size)size;
+            addons[1].width = 700;
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(
+                cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o).error ==
+                CUI_FORM_INVALID);
+            assert(cui_end_frame(ui).count == 0 && !memcmp(saved, buffer, sizeof(buffer)));
+            addons[1].width = 80;
+            o.font_size = 18;
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(
+                cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o).error ==
+                CUI_FORM_OK);
+            draw = cui_end_frame(ui);
+            root = cui_bounds(ui, 100);
+            assert(fabsf(root.h - d.control_height) < .01f);
+            for (size_t i = 0; i < draw.count; ++i)
+                if (draw.commands[i].type == CUI_DRAW_TEXT)
+                    assert(fabsf(draw.commands[i].font_size - 18) < .001f);
+            o.width = 280;
+            o.font_size = 0;
+            assert(cui_begin_frame(ui, 800, 600, .016f));
+            assert(
+                cui_input_group(ui, 100, 101, &themes[theme], edit, &state, addons, 2, o).error ==
+                CUI_FORM_OK);
+            cui_end_frame(ui);
+            root = cui_bounds(ui, 100);
+            field = cui_bounds(ui, 101);
+            b = cui_bounds(ui, 111);
+            cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(101));
+            assert(root.w == 280 && b.w == 80 && field.w > 0 &&
+                   b.x + b.w <= root.x + root.w + .01f && viewport.w > 0);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_destroy(ui);
+            cui_edit_destroy(edit);
+        }
+}
+#endif
 int main(void) {
 #ifndef CUI_FORM_BASE_ONLY
+    design_forms();
+    design_input_groups();
     loading_addon_artwork();
     inline_group_geometry();
 #endif

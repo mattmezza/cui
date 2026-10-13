@@ -9,22 +9,25 @@ static float cui_form_private_form_gap(cui_form_options o) {
 }
 static void cui_form_private_label(cui_context *ui, const cui_theme *t, const cui_form_field *f,
                                    cui_form_options o, float width) {
-    cui_begin_box(
-        ui, cui_form_label_id(f->id),
-        (cui_box){
-            .width = width, .row = true, .gap = 4, .align_y = CUI_ALIGN_CENTER, .clip = true});
+    cui_begin_box(ui, cui_form_label_id(f->id),
+                  (cui_box){.width = width,
+                            .row = true,
+                            .gap = o.design_size == CUI_DESIGN_INHERIT ? 4 : t->gap / 2,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .clip = true});
     if (f->render_label)
         f->render_label(ui, t, f->user, width);
     else if (f->label.length)
         cui_text(ui, f->label, o.label_text_size > 0 ? o.label_text_size : t->font_size * .875f,
                  t->text);
     if (f->required && (f->label.length || f->render_label))
-        cui_text(ui, cui_string("*"), t->font_size * .875f, t->danger);
+        cui_text(ui, cui_string("*"),
+                 o.label_text_size > 0 ? o.label_text_size : t->font_size * .875f, t->danger);
     cui_end_box(ui);
 }
 static void cui_form_private_field(cui_context *ui, const cui_theme *t, const cui_form_field *f,
                                    cui_form_cell cell, cui_form_options o) {
-    float gap = o.size == CUI_FORM_LARGE ? 8 : 4;
+    float gap = o.design_size == CUI_DESIGN_INHERIT ? (o.size == CUI_FORM_LARGE ? 8 : 4) : t->gap;
     float inner_gap = o.horizontal_labels ? gap : gap / 2;
     float lw = o.label_width > 0 ? o.label_width : 140;
     lw = fminf(lw, fmaxf(0, cell.width - inner_gap - 1));
@@ -63,8 +66,24 @@ static void cui_form_private_field(cui_context *ui, const cui_theme *t, const cu
 }
 cui_form_error cui_form(cui_context *ui, cui_id id, const cui_theme *t, const cui_form_field *f,
                         size_t count, cui_form_options o) {
-    if (!ui || !id || !t)
+    if (!ui || !id || !t || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return CUI_FORM_INVALID;
+    cui_theme scaled;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics design;
+        if (!cui_design_measure(o.design_size, t->font_size / 16, &design))
+            return CUI_FORM_INVALID;
+        scaled = *t;
+        scaled.font_size = design.font_size;
+        scaled.control_height = design.control_height;
+        scaled.padding = design.padding_x;
+        scaled.gap = design.gap;
+        t = &scaled;
+        if (o.gap_x == 0)
+            o.gap_x = design.gap * 3;
+        if (o.gap_y == 0)
+            o.gap_y = design.gap;
+    }
     cui_form_cell cells[256];
     size_t rows;
     cui_form_error e = cui_form_plan(f, count, o, cells, 256, &rows);
@@ -111,7 +130,9 @@ static void cui_form_private_addon(cui_context *ui, const cui_theme *t,
                                    float height, float rem_size) {
     bool disabled = o.input.disabled || a->disabled || a->loading;
     cui_box box = {.width = a->width,
+                   .fixed_width = o.design_size != CUI_DESIGN_INHERIT,
                    .height = height,
+                   .clip = o.design_size != CUI_DESIGN_INHERIT,
                    .row = true,
                    .align_y = CUI_ALIGN_CENTER,
                    .align_x = CUI_ALIGN_CENTER};
@@ -142,11 +163,13 @@ static void cui_form_private_addon(cui_context *ui, const cui_theme *t,
         (void)cui_icon_spinner(
             ui, a->id ^ UINT64_C(0x9cd0876164b3fe2a), t,
             (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                               .custom_size = (o.size == CUI_FORM_XSMALL  ? 12
-                                               : o.size == CUI_FORM_SMALL ? 14
-                                               : o.size == CUI_FORM_LARGE ? 24
-                                                                          : 16) *
-                                              rem_size / 16,
+                               .custom_size = o.design_size != CUI_DESIGN_INHERIT
+                                                  ? t->font_size
+                                                  : (o.size == CUI_FORM_XSMALL  ? 12
+                                                     : o.size == CUI_FORM_SMALL ? 14
+                                                     : o.size == CUI_FORM_LARGE ? 24
+                                                                                : 16) *
+                                                        rem_size / 16,
                                .custom_color = true,
                                .color = a->kind == CUI_INPUT_GROUP_TEXT ? t->muted : ink});
     else
@@ -165,7 +188,7 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
                                        const cui_theme *theme, cui_edit *edit,
                                        cui_input_group_state *state, const cui_input_group_addon *a,
                                        size_t count, cui_input_group_options o) {
-    if (!theme)
+    if (!theme || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_input_group_result){.error = CUI_FORM_INVALID,
                                         .input.error = CUI_EDIT_INVALID_ARGUMENT};
     cui_input_size input_size = o.size == CUI_FORM_XSMALL  ? CUI_INPUT_XSMALL
@@ -175,6 +198,7 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
     float nominal_font = o.size == CUI_FORM_XSMALL ? 12 : o.size == CUI_FORM_LARGE ? 16 : 14;
     cui_input_options paint_options = {.width = -1,
                                        .size = input_size,
+                                       .design_size = o.design_size,
                                        .density = o.font_size > 0 ? o.font_size / nominal_font
                                                                   : theme->font_size / 16,
                                        .no_appearance = true,
@@ -182,6 +206,22 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
                                        .readonly = o.input.readonly,
                                        .required = o.input.required,
                                        .placeholder = o.placeholder};
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics design;
+        if (!isfinite(o.font_size) || o.font_size < 0 ||
+            !cui_design_measure(o.design_size, theme->font_size / 16, &design))
+            return (cui_input_group_result){.error = CUI_FORM_INVALID,
+                                            .input.error = CUI_EDIT_INVALID_ARGUMENT};
+        paint_options.density = theme->font_size / 16;
+        if (o.font_size > 0) {
+            paint_options.density *= o.font_size / design.font_size;
+            paint_options.custom_height = true;
+            paint_options.height = design.control_height;
+            paint_options.custom_padding = true;
+            paint_options.padding_x = design.padding_x;
+            paint_options.padding_y = design.padding_y;
+        }
+    }
     cui_input_metrics metrics;
     if (!cui_input_measure(paint_options, theme->font_size, &metrics))
         return (cui_input_group_result){.error = CUI_FORM_INVALID,
@@ -191,6 +231,72 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
     t.font_size = metrics.font_size;
     t.padding = metrics.padding_x;
     o.font_size = t.font_size;
+    cui_input_group_addon bounded[64];
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        if (!ui || !edit || !state || count > 64 || (count && !a) || !isfinite(o.width) ||
+            o.width < 0)
+            return (cui_input_group_result){.error = CUI_FORM_INVALID,
+                                            .input.error = CUI_EDIT_INVALID_ARGUMENT};
+        float group_width = o.width > 0 ? o.width : 280;
+        float available = group_width - 2;
+        if (available <= 0)
+            return (cui_input_group_result){.error = CUI_FORM_INVALID,
+                                            .input.error = CUI_EDIT_INVALID_ARGUMENT};
+        for (size_t i = 0; i < count; ++i) {
+            if ((a[i].label.length && !a[i].label.data) || !isfinite(a[i].width) ||
+                a[i].width < 0 || a[i].alignment < CUI_INPUT_GROUP_INLINE_START ||
+                a[i].alignment > CUI_INPUT_GROUP_BLOCK_END)
+                return (cui_input_group_result){.error = CUI_FORM_INVALID,
+                                                .input.error = CUI_EDIT_INVALID_ARGUMENT};
+            bounded[i] = a[i];
+            if (!a[i].width) {
+                float content = a[i].loading
+                                    ? metrics.font_size
+                                    : cui_measure_text(ui, a[i].label, metrics.font_size).width;
+                bounded[i].width = fminf(available, content + metrics.padding_x * 2);
+            }
+        }
+        /* Inline addons share one row; block-start/end each have their own row.
+         * Preserve explicit widths, fit inferred widths, reserve usable editor space. */
+        for (unsigned row = 0; row < 3; ++row) {
+            float explicit_width = 0, inferred_width = 0;
+            for (size_t i = 0; i < count; ++i) {
+                unsigned addon_row = a[i].alignment <= CUI_INPUT_GROUP_INLINE_END    ? 0
+                                     : a[i].alignment == CUI_INPUT_GROUP_BLOCK_START ? 1
+                                                                                     : 2;
+                if (addon_row == row) {
+                    if (a[i].width > 0)
+                        explicit_width += a[i].width;
+                    else
+                        inferred_width += bounded[i].width;
+                }
+            }
+            float budget = row == 0 ? available - fminf(available / 2, metrics.height) : available;
+            if (explicit_width > budget)
+                return (cui_input_group_result){.error = CUI_FORM_INVALID,
+                                                .input.error = CUI_EDIT_INVALID_ARGUMENT};
+            float factor =
+                inferred_width > 0 ? fminf(1, (budget - explicit_width) / inferred_width) : 1;
+            for (size_t i = 0; i < count; ++i) {
+                unsigned addon_row = a[i].alignment <= CUI_INPUT_GROUP_INLINE_END    ? 0
+                                     : a[i].alignment == CUI_INPUT_GROUP_BLOCK_START ? 1
+                                                                                     : 2;
+                if (addon_row == row && !a[i].width)
+                    bounded[i].width *= factor;
+            }
+        }
+        float inline_width = 0;
+        for (size_t i = 0; i < count; ++i)
+            if (bounded[i].alignment <= CUI_INPUT_GROUP_INLINE_END)
+                inline_width += bounded[i].width;
+        paint_options.width = group_width - inline_width;
+        if (paint_options.width <= metrics.padding_x * 2 + 1) {
+            paint_options.custom_padding = true;
+            paint_options.padding_x = fmaxf(0, (paint_options.width - 1) / 2);
+            paint_options.padding_y = metrics.padding_y;
+        }
+        a = bounded;
+    }
     cui_input_group_result result =
         cui_base_input_group(ui, group, input, edit, state, a, count, o);
     if (result.error != CUI_FORM_OK)

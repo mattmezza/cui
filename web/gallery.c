@@ -1026,7 +1026,7 @@ static void gallery_attachment_actions(cui_context *context, cui_id id, void *us
     (void)height;
     if (cui_button_ex(context, id, &current_theme, cui_string("Open"),
                       (cui_button_options){
-                          .size = CUI_CONTROL_XSMALL, .width = 64, .design_size = design_size}))
+                          .size = CUI_CONTROL_XSMALL, .width = width, .design_size = design_size}))
         attachment_actions++;
 }
 static void gallery_attachment_cards(cui_context *context, cui_id id, void *user, float width,
@@ -1049,7 +1049,12 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
             index ? CUI_ATTACHMENT_COMPLETE : (cui_attachment_status)attachment_status;
         options.model.size = (cui_media_size)gallery_xsmall_second_size();
         options.model.design_size = design_size;
-        options.model.width = 260;
+        cui_design_metrics attachment_design;
+        float attachment_font = current_theme.font_size;
+        if (design_size &&
+            cui_design_measure(design_size, current_theme.font_size / 16, &attachment_design))
+            attachment_font = attachment_design.font_size;
+        options.model.width = fmaxf(260, 16.25f * attachment_font);
         options.model.vertical = attachment_vertical != 0;
         options.model.identified = true;
         options.model.progress_known = true;
@@ -1061,7 +1066,9 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
             .kind = CUI_IMAGE_ASSET, .name = cui_string(name), .identity = 10 + index};
         options.image_loader = gallery_image_loader;
         options.actions = gallery_attachment_actions;
-        options.actions_width = 64;
+        options.actions_width =
+            fmaxf(64, cui_measure_text(context, cui_string("Open"), attachment_font).width +
+                          (design_size ? 2 * attachment_design.padding_x : 16));
         options.on_click = gallery_attachment_click;
         options.on_remove = gallery_attachment_remove;
         options.on_retry = gallery_attachment_retry;
@@ -3265,7 +3272,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_attachment_group_options options = cui_attachment_group_options_default();
         options.scrollbar_theme = &t;
         options.width = width - 48;
-        options.height = 220;
+        options.height = 0;
         options.gap = 12;
         options.edge_fade = true;
         options.now_seconds = host_seconds;

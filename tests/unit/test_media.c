@@ -490,9 +490,139 @@ static void group_events(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_MEDIA_BASE_ONLY
+static void attachment_size_containment(void) {
+    cui_context *ui = cui_create((cui_config){.width = 2000, .height = 2000});
+    assert(ui);
+    for (unsigned density = 0; density < 2; density++)
+        for (int size = 0; size < 18; size++)
+            for (unsigned vertical = 0; vertical < 2; vertical++)
+                for (unsigned status = 0; status <= CUI_ATTACHMENT_COMPLETE; status++) {
+                    cui_theme t = cui_theme_light();
+                    t.font_size = density ? 14 : 16;
+                    cui_attachment_state state = {0};
+                    cui_image_state image = {0};
+                    cui_image_frame image_frame = {pixels, 4, 4, 16, 9, .1};
+                    loader l = {.load = {CUI_IMAGE_READY, &image_frame, 1}};
+                    commands actions_state = {0};
+                    cui_attachment_child children[] = {
+                        {.kind = CUI_ATTACHMENT_TITLE, .text = {"Report release notes.pdf", 24}},
+                        {.kind = CUI_ATTACHMENT_DESCRIPTION,
+                         .text = {"Workspace file for review", 25}}};
+                    cui_attachment_options o = cui_attachment_options_default();
+                    o.model.width = 0;
+                    o.model.media = true;
+                    o.model.vertical = vertical != 0;
+                    o.model.size = size < 4 ? (cui_media_size)size : CUI_MEDIA_MEDIUM;
+                    o.model.design_size =
+                        size < 4 ? CUI_DESIGN_INHERIT : (cui_design_size)(size - 3);
+                    o.model.custom_density = density ? 14 : 16;
+                    o.children = children;
+                    o.child_count = 2;
+                    o.image_state = &image;
+                    o.image_loader = poll;
+                    o.image_user = &l;
+                    o.image_source = (cui_image_source){.kind = CUI_IMAGE_ASSET, .identity = 1};
+                    o.actions = actions;
+                    o.actions_user = &actions_state;
+                    o.actions_width = 24;
+                    o.model.progress_known = true;
+                    o.model.progress = 45;
+                    o.model.status = (cui_attachment_status)status;
+                    o.reduced_motion = true;
+                    for (unsigned pass = 0; pass < 2; pass++) {
+                        assert(cui_begin_frame(ui, 2000, 2000, .016f));
+                        cui_attachment_result result = cui_attachment(ui, 20, &t, &state, o);
+                        assert(result.valid);
+                        cui_draw_list draw = cui_end_frame(ui);
+                        assert(cui_last_error(ui) == CUI_OK);
+                        unsigned texts = 0;
+                        for (size_t i = 0; i < draw.count; i++) {
+                            const cui_draw_command *d = &draw.commands[i];
+                            if (d->type == CUI_DRAW_TEXT) {
+                                assert(d->bounds.y >= state.card.y - .01f);
+                                assert(d->bounds.y + d->bounds.h <=
+                                       state.card.y + state.card.h + .01f);
+                                texts++;
+                            }
+                        }
+                        assert(texts >= 3);
+                    }
+                }
+    cui_destroy(ui);
+}
+typedef struct {
+    cui_theme theme;
+    cui_attachment_options options;
+    cui_attachment_state cards[2];
+} size_group;
+static void size_group_children(cui_context *ui, cui_id id, void *user, float width, float height) {
+    (void)width;
+    (void)height;
+    size_group *g = user;
+    for (unsigned i = 0; i < 2; i++)
+        assert(cui_attachment(ui, id + i, &g->theme, &g->cards[i], g->options).valid);
+}
+static void attachment_group_size_fit(void) {
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 2000});
+    assert(ui);
+    cui_attachment_group_state state = {0};
+    cui_attachment_child children[] = {
+        {.kind = CUI_ATTACHMENT_TITLE, .text = {"Report release notes.pdf", 24}},
+        {.kind = CUI_ATTACHMENT_DESCRIPTION, .text = {"Workspace file for review", 25}}};
+    size_group g = {.theme = cui_theme_light(), .options = cui_attachment_options_default()};
+    g.options.model.width = 260;
+    g.options.model.media = true;
+    g.options.children = children;
+    g.options.child_count = 2;
+    cui_attachment_group_options o = cui_attachment_group_options_default();
+    o.width = 300;
+    o.children = size_group_children;
+    o.user = &g;
+    o.reduced_motion = true;
+    for (int design = CUI_DESIGN_XS; design <= CUI_DESIGN_9XL; design++) {
+        g.options.model.design_size = (cui_design_size)design;
+        for (unsigned pass = 0; pass < 3; pass++) {
+            assert(cui_begin_frame(ui, 500, 2000, .016f));
+            assert(cui_attachment_group(ui, 30, &state, o).valid);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            assert(state.viewport.h >= g.cards[0].card.h + 8 - .01f);
+        }
+    }
+    g.options.model.design_size = CUI_DESIGN_BASE;
+    for (unsigned pass = 0; pass < 3; pass++) {
+        assert(cui_begin_frame(ui, 500, 2000, .016f));
+        cui_attachment_group(ui, 30, &state, o);
+        cui_end_frame(ui);
+    }
+    double before = state.scroll.x;
+    cui_event e = {.type = CUI_EVENT_POINTER_DOWN,
+                   .pointer_type = CUI_POINTER_TOUCH,
+                   .pointer_id = 10,
+                   .x = 120,
+                   .y = 20};
+    assert(cui_queue_event(ui, e));
+    e.type = CUI_EVENT_POINTER_MOVE;
+    e.x = 90;
+    assert(cui_queue_event(ui, e));
+    e.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, e));
+    assert(cui_begin_frame(ui, 500, 2000, .016f));
+    cui_attachment_group(ui, 30, &state, o);
+    cui_end_frame(ui);
+    assert(state.scroll.x == before + 30);
+    cui_destroy(ui);
+}
+
+#endif
 int main(void) {
     images();
     attachments();
+#ifndef CUI_MEDIA_BASE_ONLY
+    attachment_size_containment();
+    attachment_group_size_fit();
+#endif
 #ifndef CUI_MEDIA_BASE_ONLY
     image_drawing();
     attachment_events();

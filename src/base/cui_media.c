@@ -233,6 +233,8 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
     p.dashed = m.status == CUI_ATTACHMENT_PENDING;
     if (!m.vertical) {
         p.height = p.metrics.height;
+        if (m.design_size && m.content)
+            p.height = fmaxf(p.height, 1.25f * (p.metrics.text + p.metrics.description) + 2);
         p.width = m.content ? p.metrics.chip_width
                             : (m.media ? p.metrics.media + p.metrics.padding_start
                                        : p.metrics.padding_end) +

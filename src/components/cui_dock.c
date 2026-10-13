@@ -817,6 +817,13 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
                                                           ? &cache->drag
                                                           : NULL},
                            NULL, NULL);
+    if (!hidden_title) {
+        bool touch_drag =
+            group_drag && s->options.allow_reorder && !s->options.disabled && !s->options.collapsed;
+        for (size_t i = 0; i < visible_count; ++i)
+            cui_set_touch_drag_priority(s->ui, s->view->items[i].id,
+                                        touch_drag && !s->view->items[i].disabled);
+    }
     if (changed) {
         for (size_t i = 0; i < visible_count; ++i)
             if (s->view->items[i].id == selected) {

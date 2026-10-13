@@ -27,6 +27,8 @@ jobs:
         run: python tests/test_sharing.py
       - name: Exercise component behavior in Chromium
         run: uv run tests/web/test_browser.py
+      - name: Verify real touch contacts scrolling and opt-in pinch
+        run: uv run tests/web/test_touch.py
       - name: Verify interaction guides design controls and composed app
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions

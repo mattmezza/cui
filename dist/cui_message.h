@@ -484,7 +484,8 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
         if (cui_event_target(ui, i) == id) {
             cui_event e = events[i];
             if (e.type == CUI_EVENT_SCROLL && fabsf(e.dy) >= fabsf(e.dx) && isfinite(e.dy))
-                cui_message_scroller_scroll(s, s->scroll - e.dy * o.wheel_step);
+                cui_message_scroller_scroll(s, s->scroll -
+                                                   e.dy * (e.scroll_precise ? 1 : o.wheel_step));
             else if (e.type == CUI_EVENT_KEY_DOWN && cui_focused(ui) == id) {
                 double target = s->scroll;
                 switch (e.key) {

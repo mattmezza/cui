@@ -482,7 +482,7 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
         if (events[e].type == CUI_EVENT_SCROLL) {
             bool inside = cui_event_target(ui, e) == id;
             if (inside && isfinite(events[e].dy))
-                s->scroll -= events[e].dy * row;
+                s->scroll -= events[e].dy * (events[e].scroll_precise ? 1 : row);
         }
     cui_tree_view view = cui_tree_viewport(m, s->scroll, height, row, o.overscan);
     s->scroll = view.scroll;

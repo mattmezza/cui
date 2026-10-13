@@ -2704,6 +2704,42 @@ static void test_area_aggregate(void) {
     cui_dock_area_destroy(area);
 }
 
+static void test_touch_dock_drag(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    cui_dock_view_reset(view);
+    options = cui_dock_view_options_default();
+    options.reduced_motion = true;
+    for (unsigned i = 0; i < 5; ++i)
+        panels[i] =
+            (cui_dock_panel){.key = i, .title = cui_string("Touch panel"), .render = content};
+    cui_dock_node left = cui_dock_root(model), right, found;
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, left, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &right) ==
+           CUI_DOCK_OK);
+    frame();
+    frame();
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    cui_rect group = cui_bounds(ui, cui_dock_group_id(workspace, right));
+    cui_event e = {.type = CUI_EVENT_POINTER_DOWN,
+                   .pointer_type = CUI_POINTER_TOUCH,
+                   .pointer_id = 70,
+                   .x = tab.x + 8,
+                   .y = tab.y + tab.h / 2};
+    assert(cui_queue_event(ui, e));
+    frame();
+    e.type = CUI_EVENT_POINTER_MOVE;
+    e.x = group.x + group.w / 2;
+    e.y = group.y + group.h / 2;
+    assert(cui_queue_event(ui, e));
+    frame();
+    e.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, e));
+    frame();
+    assert(result.moved && cui_dock_panel_find(model, 1, &found, NULL) && found == right);
+    assert(cui_dock_panel_find(model, 0, &found, NULL) && found == left);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -2864,6 +2900,7 @@ int main(void) {
     model = cui_dock_create((cui_dock_config){0});
     assert(model);
     frame(); /* Empty root renders a workspace without panel callbacks. */
+    test_touch_dock_drag();
     cui_dock_view_destroy(view);
     cui_dock_destroy(model);
     cui_destroy(ui);

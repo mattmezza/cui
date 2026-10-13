@@ -567,6 +567,33 @@ typedef struct {
 cui_plot_result cui_plot_fill_mesh(const cui_plot_point *contour, size_t count,
                                    cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
                                    cui_plot_rect *bounds);
+/* Multi-contour polygon fill, implicit closure, total 3..256 points. Supports
+ * holes, overlap, coincident edges and self crossings. No curve commands: flatten
+ * curves first. Finite coordinates within +/-16384. Contours need >=3 points;
+ * duplicate/collinear points are accepted. Scan bands split at edge crossings,
+ * using long-double predicates; topology is not guaranteed for nearly coincident
+ * geometry and does not reproduce Lyon triangle topology or analytic curve ST.
+ * Workspace is scratch (may change on any result), and all buffers must be
+ * disjoint. events_capacity must be >=n+n*(n-1)/2, order_capacity >=n where n
+ * is total point count. Smaller workspace returns CAPACITY without publishing
+ * required. Output CAPACITY publishes exact vertex count and preserves mesh/
+ * bounds. Other errors preserve output/count/bounds. Empty fill succeeds with
+ * required=0 and zero bounds. Each emitted triangle has ST=(0,1). */
+typedef enum { CUI_PLOT_FILL_EVEN_ODD, CUI_PLOT_FILL_NON_ZERO } cui_plot_fill_rule;
+typedef struct {
+    const cui_plot_point *points;
+    size_t count;
+} cui_plot_contour;
+typedef struct {
+    long double *events;
+    size_t events_capacity;
+    size_t *order;
+    size_t order_capacity;
+} cui_plot_fill_workspace;
+cui_plot_result cui_plot_fill_mesh_contours(const cui_plot_contour *, size_t contour_count,
+                                            cui_plot_fill_rule, cui_plot_fill_workspace *,
+                                            cui_plot_mesh_vertex *, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds);
 /* Adaptive cubic polyline (includes start/end), original conservative
  * de Casteljau subdivision, max4097 points/depth24. Coordinates+controls within
  * +/-16384, finite tolerance1e-6..16384. Every accepted chord is within tolerance
@@ -587,6 +614,54 @@ cui_plot_result cui_plot_cubic_flatten(cui_plot_point start, cui_plot_point cont
 cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *, size_t count, double width,
                                      double miter_limit, cui_plot_mesh_vertex *, size_t capacity,
                                      size_t *required, cui_plot_rect *bounds);
+/* Extended strokes are a non-overlapping union of segment, join and cap
+ * polygons, tessellated by fill_mesh_contours. 2..64 points (closed >=3);
+ * repeated closing endpoint accepted. Width0: EMPTY/count0/bounds0. Default
+ * Butt/Miter retains the old width/miter policy; the old API remains unchanged.
+ * Round circles use round_segments_per_turn (4..64) inscribed chords. Closed
+ * strokes ignore caps. MiterClip uses pinned Lyon's clipping distance policy.
+ * Generated polygon vertices are bounded to256; exceeding that internal budget
+ * returns CAPACITY with required unchanged. Workspace follows fill_mesh_contours
+ * (reserve32896 events/256 indices to cover any accepted generated stroke).
+ * Output capacity errors publish exact required and preserve mesh/bounds.
+ * All other errors preserve output/count/bounds. Inputs/output/workspace must
+ * be disjoint. Coordinates within +/-16384, width0..1024, miter_limit1..64;
+ * generated coordinates outside range return OVERFLOW. No automatic curve or
+ * dash flattening; no exact Lyon topology/variable-width attributes. */
+typedef enum { CUI_PLOT_CAP_BUTT, CUI_PLOT_CAP_SQUARE, CUI_PLOT_CAP_ROUND } cui_plot_line_cap;
+typedef enum {
+    CUI_PLOT_JOIN_MITER,
+    CUI_PLOT_JOIN_BEVEL,
+    CUI_PLOT_JOIN_ROUND,
+    CUI_PLOT_JOIN_MITER_CLIP
+} cui_plot_line_join;
+typedef struct {
+    double width, miter_limit;
+    cui_plot_line_cap start_cap, end_cap;
+    cui_plot_line_join join;
+    size_t round_segments_per_turn;
+    bool closed;
+} cui_plot_stroke_options;
+cui_plot_stroke_options cui_plot_stroke_defaults(void);
+cui_plot_result cui_plot_stroke_mesh_ex(const cui_plot_point *, size_t count,
+                                        cui_plot_stroke_options, cui_plot_fill_workspace *,
+                                        cui_plot_mesh_vertex *, size_t capacity, size_t *required,
+                                        cui_plot_rect *bounds);
+/* Pinned GPUI dash-array policy for already flattened polylines: alternating
+ * draw/gap distances, odd arrays repeated twice, no phase offset. Closed paths
+ * include their closing segment; each drawn run has the selected start/end
+ * caps, including runs at the closed seam (no automatic seam merge). Patterns
+ * have1..64 finite strictly positive entries; zero/negative entries are rejected
+ * to prevent the source's nonadvancing measurement loop. Maximum1024 splitting
+ * steps/64 points per run/256 generated primitive vertices; internal CAPACITY
+ * preserves required. Nonadvancing positive distances return DEGENERATE.
+ * Other contracts match stroke_mesh_ex. Lengths are exact linear-segment lengths,
+ * not source curved-path measurements at tolerance0.01. */
+cui_plot_result cui_plot_stroke_mesh_dashed(const cui_plot_point *, size_t count,
+                                            cui_plot_stroke_options, const double *dashes,
+                                            size_t dash_count, cui_plot_fill_workspace *,
+                                            cui_plot_mesh_vertex *, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds);
 /* Pinned path fragment coverage: ST and its screen-space derivatives; output
  * preserved on invalid/overflow. Constant S derivatives (<.001 norm) are solid.
  * This is analytic quadratic coverage, not generic triangle-edge antialiasing. */
@@ -3221,6 +3296,412 @@ cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *p, size_t n, double w
         if (!mesh_point_valid(contour[i]))
             return CUI_PLOT_OVERFLOW;
     return cui_plot_fill_mesh(contour, count, out, capacity, required, bounds);
+}
+
+/* A horizontal arrangement decomposition: every endpoint and proper crossing
+ * is a band boundary. Edge order is constant inside each open band. */
+typedef struct {
+    cui_plot_point a, b;
+} plot_fill_edge;
+/* In-place heapsort: unlike libc qsort, scratch allocation is never hidden. */
+static void plot_fill_event_sift(long double *events, size_t root, size_t count) {
+    while (root < count / 2) {
+        size_t child = root * 2 + 1;
+        if (child + 1 < count && events[child] < events[child + 1])
+            ++child;
+        if (events[root] >= events[child])
+            return;
+        long double value = events[root];
+        events[root] = events[child];
+        events[child] = value;
+        root = child;
+    }
+}
+static void plot_fill_event_sort(long double *events, size_t count) {
+    for (size_t root = count / 2; root;)
+        plot_fill_event_sift(events, --root, count);
+    for (size_t end = count; end > 1;) {
+        long double value = events[0];
+        events[0] = events[--end];
+        events[end] = value;
+        plot_fill_event_sift(events, 0, end);
+    }
+}
+static long double plot_fill_x(plot_fill_edge e, long double y) {
+    return e.a.x + (y - e.a.y) * ((long double)e.b.x - e.a.x) / ((long double)e.b.y - e.a.y);
+}
+static void plot_fill_triangle(cui_plot_point a, cui_plot_point b, cui_plot_point c,
+                               cui_plot_mesh_vertex *out, size_t *used, cui_plot_rect *box) {
+    long double cross = ((long double)b.x - a.x) * ((long double)c.y - a.y) -
+                        ((long double)b.y - a.y) * ((long double)c.x - a.x);
+    if (cross == 0)
+        return;
+    cui_plot_point p[3] = {a, b, c};
+    for (size_t i = 0; i < 3; i++) {
+        if (*used == 0)
+            *box = (cui_plot_rect){p[i].x, p[i].y, p[i].x, p[i].y};
+        box->x_min = fmin(box->x_min, p[i].x);
+        box->x_max = fmax(box->x_max, p[i].x);
+        box->y_min = fmin(box->y_min, p[i].y);
+        box->y_max = fmax(box->y_max, p[i].y);
+        if (out)
+            out[*used] = (cui_plot_mesh_vertex){p[i], {0, 1}};
+        ++*used;
+    }
+}
+cui_plot_result cui_plot_fill_mesh_contours(const cui_plot_contour *contours, size_t count,
+                                            cui_plot_fill_rule rule,
+                                            cui_plot_fill_workspace *workspace,
+                                            cui_plot_mesh_vertex *out, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds) {
+    if (!contours || !count || count > 85 || !workspace || !required || !bounds ||
+        (capacity && !out) || (rule != CUI_PLOT_FILL_EVEN_ODD && rule != CUI_PLOT_FILL_NON_ZERO))
+        return CUI_PLOT_INVALID;
+    plot_fill_edge edges[256];
+    size_t n = 0;
+    for (size_t c = 0; c < count; c++) {
+        if (!contours[c].points || contours[c].count < 3 || contours[c].count > 256 - n)
+            return CUI_PLOT_INVALID;
+        for (size_t i = 0; i < contours[c].count; i++) {
+            cui_plot_point a = contours[c].points[i];
+            if (!mesh_point_valid(a))
+                return CUI_PLOT_INVALID;
+            edges[n++] = (plot_fill_edge){a, contours[c].points[(i + 1) % contours[c].count]};
+        }
+    }
+    if (!workspace->events || !workspace->order ||
+        workspace->events_capacity < n + n * (n - 1) / 2 || workspace->order_capacity < n)
+        return CUI_PLOT_CAPACITY;
+    long double *events = workspace->events;
+    size_t events_count = 0;
+    for (size_t i = 0; i < n; i++)
+        events[events_count++] = edges[i].a.y;
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = i + 1; j < n; j++) {
+            plot_fill_edge a = edges[i], b = edges[j];
+            long double ax = (long double)a.b.x - a.a.x, ay = (long double)a.b.y - a.a.y;
+            long double bx = (long double)b.b.x - b.a.x, by = (long double)b.b.y - b.a.y;
+            long double dx = (long double)b.a.x - a.a.x, dy = (long double)b.a.y - a.a.y;
+            long double det = ax * by - ay * bx;
+            if (det == 0)
+                continue;
+            long double t = (dx * by - dy * bx) / det, u = (dx * ay - dy * ax) / det;
+            if (t > 0 && t < 1 && u > 0 && u < 1)
+                events[events_count++] = (double)(a.a.y + t * ay);
+        }
+    plot_fill_event_sort(events, events_count);
+    size_t unique = 0;
+    for (size_t i = 0; i < events_count; i++)
+        if (!unique || events[i] != events[unique - 1])
+            events[unique++] = events[i];
+    size_t needed = 0;
+    cui_plot_rect box = {0};
+    for (unsigned pass = 0; pass < 2; pass++) {
+        size_t used = 0;
+        box = (cui_plot_rect){0};
+        for (size_t band = 1; band < unique; band++) {
+            long double lo = events[band - 1], hi = events[band], mid = lo + (hi - lo) / 2;
+            size_t active = 0;
+            for (size_t e = 0; e < n; e++) {
+                if (edges[e].a.y == edges[e].b.y || lo < fmin(edges[e].a.y, edges[e].b.y) ||
+                    hi > fmax(edges[e].a.y, edges[e].b.y))
+                    continue;
+                long double x = plot_fill_x(edges[e], mid);
+                size_t j = active;
+                while (j && plot_fill_x(edges[workspace->order[j - 1]], mid) > x) {
+                    workspace->order[j] = workspace->order[j - 1];
+                    --j;
+                }
+                workspace->order[j] = e;
+                ++active;
+            }
+            int winding = 0;
+            for (size_t i = 0; i + 1 < active; i++) {
+                plot_fill_edge left = edges[workspace->order[i]],
+                               right = edges[workspace->order[i + 1]];
+                winding += left.b.y > left.a.y ? 1 : -1;
+                if (!(rule == CUI_PLOT_FILL_NON_ZERO ? winding != 0 : winding % 2 != 0))
+                    continue;
+                cui_plot_point a = {(double)plot_fill_x(left, lo), (double)lo};
+                cui_plot_point b = {(double)plot_fill_x(right, lo), (double)lo};
+                cui_plot_point c = {(double)plot_fill_x(right, hi), (double)hi};
+                cui_plot_point d = {(double)plot_fill_x(left, hi), (double)hi};
+                plot_fill_triangle(a, b, c, pass ? out : NULL, &used, &box);
+                plot_fill_triangle(a, c, d, pass ? out : NULL, &used, &box);
+            }
+        }
+        if (!pass) {
+            needed = used;
+            if (needed && (!out || capacity < needed)) {
+                *required = needed;
+                return CUI_PLOT_CAPACITY;
+            }
+        }
+    }
+    *required = needed;
+    *bounds = box;
+    return CUI_PLOT_OK;
+}
+
+cui_plot_stroke_options cui_plot_stroke_defaults(void) {
+    return (cui_plot_stroke_options){
+        1, 4, CUI_PLOT_CAP_BUTT, CUI_PLOT_CAP_BUTT, CUI_PLOT_JOIN_MITER, 32, false};
+}
+typedef struct {
+    cui_plot_point points[256];
+    cui_plot_contour contours[85];
+    size_t point_count, contour_count;
+} plot_stroke_polygons;
+static cui_plot_result plot_stroke_polygon(plot_stroke_polygons *polygons,
+                                           const cui_plot_point *points, size_t count) {
+    if (count > 256 - polygons->point_count || polygons->contour_count == 85)
+        return CUI_PLOT_CAPACITY;
+    long double area = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!mesh_point_valid(points[i]))
+            return CUI_PLOT_OVERFLOW;
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        area += (long double)a.x * b.y - (long double)b.x * a.y;
+    }
+    if (area == 0)
+        return CUI_PLOT_OK;
+    cui_plot_point *out = polygons->points + polygons->point_count;
+    for (size_t i = 0; i < count; i++)
+        out[i] = points[area > 0 ? i : count - 1 - i];
+    polygons->contours[polygons->contour_count++] = (cui_plot_contour){out, count};
+    polygons->point_count += count;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result plot_stroke_disk(plot_stroke_polygons *polygons, cui_plot_point center,
+                                        double radius, size_t segments) {
+    cui_plot_point circle[64];
+    for (size_t i = 0; i < segments; i++) {
+        double angle = 6.28318530717958647692 * (double)i / (double)segments;
+        circle[i] =
+            (cui_plot_point){center.x + radius * cos(angle), center.y + radius * sin(angle)};
+    }
+    return plot_stroke_polygon(polygons, circle, segments);
+}
+static cui_plot_result plot_stroke_add(const cui_plot_point *points, size_t count,
+                                       cui_plot_stroke_options options,
+                                       plot_stroke_polygons *polygons) {
+    size_t segments = options.closed ? count : count - 1;
+    cui_plot_point direction[64];
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        double dx = b.x - a.x, dy = b.y - a.y, length = hypot(dx, dy);
+        if (length == 0)
+            return CUI_PLOT_DEGENERATE;
+        direction[i] = (cui_plot_point){dx / length, dy / length};
+    }
+    double half = options.width / 2;
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count], d = direction[i];
+        if (!options.closed && i == 0 && options.start_cap == CUI_PLOT_CAP_SQUARE) {
+            a.x -= half * d.x;
+            a.y -= half * d.y;
+        }
+        if (!options.closed && i + 1 == segments && options.end_cap == CUI_PLOT_CAP_SQUARE) {
+            b.x += half * d.x;
+            b.y += half * d.y;
+        }
+        cui_plot_point quad[4] = {{a.x - half * d.y, a.y + half * d.x},
+                                  {a.x + half * d.y, a.y - half * d.x},
+                                  {b.x + half * d.y, b.y - half * d.x},
+                                  {b.x - half * d.y, b.y + half * d.x}};
+        cui_plot_result result = plot_stroke_polygon(polygons, quad, 4);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    size_t first = options.closed ? 0 : 1, last = options.closed ? count : count - 1;
+    for (size_t i = first; i < last; i++) {
+        cui_plot_point p = points[i], prev = direction[(i + segments - 1) % segments],
+                       next = direction[i % segments];
+        double cross = prev.x * next.y - prev.y * next.x, dot = prev.x * next.x + prev.y * next.y;
+        if (cross == 0 && dot > 0)
+            continue;
+        if (options.join == CUI_PLOT_JOIN_ROUND) {
+            cui_plot_result result =
+                plot_stroke_disk(polygons, p, half, options.round_segments_per_turn);
+            if (result != CUI_PLOT_OK)
+                return result;
+            continue;
+        }
+        if (cross == 0)
+            continue; /* Reversal: segment union supplies the bevel/butt seam. */
+        double sign = cross > 0 ? -1 : 1;
+        cui_plot_point n0 = {-sign * prev.y, sign * prev.x}, n1 = {-sign * next.y, sign * next.x};
+        cui_plot_point join[5] = {p, {p.x + half * n0.x, p.y + half * n0.y}};
+        size_t join_count = 2;
+        double denominator = 1 + dot;
+        cui_plot_point m = {denominator > 0 ? (n0.x + n1.x) / denominator : 0,
+                            denominator > 0 ? (n0.y + n1.y) / denominator : 0};
+        double length = denominator > 0 ? hypot(m.x, m.y) : INFINITY;
+        if (options.join != CUI_PLOT_JOIN_BEVEL && length <= 2 * options.miter_limit) {
+            join[join_count++] = (cui_plot_point){p.x + half * m.x, p.y + half * m.y};
+        } else if (options.join == CUI_PLOT_JOIN_MITER_CLIP && denominator > 0 &&
+                   isfinite(length)) {
+            cui_plot_point unit = {m.x / length, m.y / length};
+            double projection = unit.x * n0.x + unit.y * n0.y;
+            /* Clip against a line normal to the bisector at limit*half_width,
+             * reproducing pinned Lyon's clip-distance convention. */
+            double target = options.miter_limit;
+            double t0 = (target - projection) / (unit.x * prev.x + unit.y * prev.y);
+            double t1 = (target - projection) / (unit.x * next.x + unit.y * next.y);
+            join[join_count++] = (cui_plot_point){p.x + half * (n0.x + t0 * prev.x),
+                                                  p.y + half * (n0.y + t0 * prev.y)};
+            join[join_count++] = (cui_plot_point){p.x + half * (n1.x + t1 * next.x),
+                                                  p.y + half * (n1.y + t1 * next.y)};
+        }
+        join[join_count++] = (cui_plot_point){p.x + half * n1.x, p.y + half * n1.y};
+        cui_plot_result result = plot_stroke_polygon(polygons, join, join_count);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (!options.closed) {
+        for (size_t end = 0; end < 2; end++) {
+            cui_plot_line_cap cap = end ? options.end_cap : options.start_cap;
+            if (cap != CUI_PLOT_CAP_ROUND)
+                continue;
+            cui_plot_result result = plot_stroke_disk(polygons, points[end ? count - 1 : 0], half,
+                                                      options.round_segments_per_turn);
+            if (result != CUI_PLOT_OK)
+                return result;
+        }
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_stroke_mesh_ex(const cui_plot_point *points, size_t count,
+                                        cui_plot_stroke_options options,
+                                        cui_plot_fill_workspace *workspace,
+                                        cui_plot_mesh_vertex *out, size_t capacity,
+                                        size_t *required, cui_plot_rect *bounds) {
+    if (!points || !workspace || !required || !bounds || count < 2 || count > 64 ||
+        (capacity && !out) || !isfinite(options.width) || options.width < 0 ||
+        options.width > 1024 || !isfinite(options.miter_limit) || options.miter_limit < 1 ||
+        options.miter_limit > 64 || options.start_cap < CUI_PLOT_CAP_BUTT ||
+        options.start_cap > CUI_PLOT_CAP_ROUND || options.end_cap < CUI_PLOT_CAP_BUTT ||
+        options.end_cap > CUI_PLOT_CAP_ROUND || options.join < CUI_PLOT_JOIN_MITER ||
+        options.join > CUI_PLOT_JOIN_MITER_CLIP || options.round_segments_per_turn < 4 ||
+        options.round_segments_per_turn > 64)
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < count; i++)
+        if (!mesh_point_valid(points[i]))
+            return CUI_PLOT_INVALID;
+    if (options.closed && points[0].x == points[count - 1].x && points[0].y == points[count - 1].y)
+        --count;
+    if (options.closed && count < 3)
+        return CUI_PLOT_INVALID;
+    size_t segments = options.closed ? count : count - 1;
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        double dx = b.x - a.x, dy = b.y - a.y, length = hypot(dx, dy);
+        if (length == 0)
+            return CUI_PLOT_DEGENERATE;
+    }
+    if (options.width == 0) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    plot_stroke_polygons polygons = {0};
+    cui_plot_result result = plot_stroke_add(points, count, options, &polygons);
+    if (result != CUI_PLOT_OK)
+        return result;
+    if (!polygons.contour_count) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    return cui_plot_fill_mesh_contours(polygons.contours, polygons.contour_count,
+                                       CUI_PLOT_FILL_NON_ZERO, workspace, out, capacity, required,
+                                       bounds);
+}
+
+cui_plot_result cui_plot_stroke_mesh_dashed(const cui_plot_point *points, size_t count,
+                                            cui_plot_stroke_options options, const double *dashes,
+                                            size_t dash_count, cui_plot_fill_workspace *workspace,
+                                            cui_plot_mesh_vertex *out, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds) {
+    if (!isfinite(options.width) || options.width < 0 || options.width > 1024 || !dashes ||
+        !dash_count || dash_count > 64 || !required || !bounds || (capacity && !out))
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < dash_count; i++)
+        if (!isfinite(dashes[i]) || dashes[i] <= 0)
+            return CUI_PLOT_INVALID;
+    cui_plot_stroke_options check = options;
+    check.width = 0;
+    size_t ignored;
+    cui_plot_rect ignored_bounds;
+    cui_plot_result result = cui_plot_stroke_mesh_ex(points, count, check, workspace, NULL, 0,
+                                                     &ignored, &ignored_bounds);
+    if (result != CUI_PLOT_EMPTY)
+        return result;
+    if (options.width == 0) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    if (options.closed && points[0].x == points[count - 1].x && points[0].y == points[count - 1].y)
+        --count;
+    size_t segments = options.closed ? count : count - 1,
+           pattern_count = dash_count * (dash_count % 2 ? 2 : 1);
+    size_t dash_index = 0, run_count = 0, steps = 0;
+    double remaining = dashes[0];
+    cui_plot_point run[64];
+    plot_stroke_polygons polygons = {0};
+    cui_plot_stroke_options run_options = options;
+    run_options.closed = false;
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        double dx = b.x - a.x, dy = b.y - a.y, length = hypot(dx, dy), position = 0;
+        while (position < length) {
+            if (++steps > 1024)
+                return CUI_PLOT_CAPACITY;
+            double distance = fmin(remaining, length - position), next = position + distance;
+            if (!(next > position))
+                return CUI_PLOT_DEGENERATE;
+            bool drawing = dash_index % 2 == 0;
+            cui_plot_point start = position == 0 ? a
+                                                 : (cui_plot_point){a.x + dx * (position / length),
+                                                                    a.y + dy * (position / length)};
+            cui_plot_point end = next == length ? b
+                                                : (cui_plot_point){a.x + dx * (next / length),
+                                                                   a.y + dy * (next / length)};
+            if (drawing) {
+                if (!run_count)
+                    run[run_count++] = start;
+                if (run_count == 64)
+                    return CUI_PLOT_CAPACITY;
+                run[run_count++] = end;
+            }
+            position = next;
+            remaining -= distance;
+            if (remaining == 0) {
+                if (drawing) {
+                    result = plot_stroke_add(run, run_count, run_options, &polygons);
+                    if (result != CUI_PLOT_OK)
+                        return result;
+                    run_count = 0;
+                }
+                dash_index = (dash_index + 1) % pattern_count;
+                remaining = dashes[dash_index % dash_count];
+            }
+        }
+    }
+    if (run_count) {
+        result = plot_stroke_add(run, run_count, run_options, &polygons);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (!polygons.contour_count) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    return cui_plot_fill_mesh_contours(polygons.contours, polygons.contour_count,
+                                       CUI_PLOT_FILL_NON_ZERO, workspace, out, capacity, required,
+                                       bounds);
 }
 
 #endif

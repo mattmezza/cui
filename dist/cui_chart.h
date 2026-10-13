@@ -233,6 +233,8 @@ typedef struct {
     cui_color primary_fill;                         /* area/radar fill for the first series */
     cui_chart_region_fill_fn area_radar_fill_pixel; /* chart-space gradients/patterns */
     void *area_radar_fill_user;
+    /* Distinguishes source explicit x_tick_count(0) from default stride selection. */
+    bool custom_x_tick_count;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */
@@ -319,6 +321,12 @@ cui_plot_result cui_chart_pie_labels(const cui_chart_options *, cui_chart_pie_la
                                      size_t capacity);
 /* Read-only hit geometry over a successfully rendered chart. */
 cui_chart_hit cui_chart_hit_test(const cui_chart_options *, float x, float y);
+/* Update caller-owned hover selection from chart-local logical coordinates.
+ * Invalid/outside coordinates dismiss the active selection but retain visual fade
+ * state; noninteractive options also clear the pointer anchor. No raster is needed.
+ * Use validated options (the same geometry passed to render/hit_test). */
+cui_chart_hit cui_chart_update_hover(cui_chart_state *, const cui_chart_options *, float x,
+                                     float y);
 /* Renders and draws the caller-owned bitmap, labels and a named image semantic. */
 bool cui_chart(cui_context *, cui_id, cui_chart_state *, const cui_chart_options *, cui_str name);
 /* Colors from the active theme; caller options override individual fields. */
@@ -372,8 +380,8 @@ static bool cui_chart_pie_radii(const cui_chart_options *o, size_t i, double *in
         arc.datum = &o->data[i];
         arc.index = i;
         arc.value = o->data[i].value;
-        arc.start_angle = (double)(2 * CUI_CHART_PI * before / total);
-        arc.end_angle = (double)(2 * CUI_CHART_PI * (before + arc.value) / total);
+        arc.start_angle = 2 * CUI_CHART_PI * (double)(before / total);
+        arc.end_angle = 2 * CUI_CHART_PI * (double)((before + arc.value) / total);
         arc.pad_angle = o->pad_angle;
     }
     *inner = o->pie_inner_arc_radius_fn
@@ -1707,6 +1715,7 @@ static uint64_t cui_chart_cache_key(const cui_chart_options *o, const cui_chart_
     h = cui_chart_mix(h, cui_chart_bits(o->sankey_min_link_width));
     h = cui_chart_mix(h, o->hide_grid);
     h = cui_chart_mix(h, o->hide_axes);
+    h = cui_chart_mix(h, o->custom_x_tick_count);
     h = cui_chart_mix(h, o->hide_x_axis);
     h = cui_chart_mix(h, o->show_y_axis);
     h = cui_chart_mix(h, o->show_bar_values);
@@ -1945,20 +1954,18 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
             a += 2 * CUI_CHART_PI;
         double cumulative = 0;
         for (index = 0; index < o->count; index++) {
-            double start = cumulative;
-            cumulative += 2 * CUI_CHART_PI * o->data[index].value / sum;
-            if (a < cumulative) {
-                if (a < start + o->pad_angle / 2 || a >= cumulative - o->pad_angle / 2)
-                    return hit;
+            cumulative += 2 * CUI_CHART_PI * (o->data[index].value / sum);
+            /* Source Arc::contains selects the original angular interval,
+             * including the padded painted gap at its edges. */
+            if (a < cumulative)
                 break;
-            }
         }
         if (index == o->count)
             return hit;
         double slice_inner, slice_outer;
-        if (!cui_chart_pie_radii(o, index, &slice_inner, &slice_outer) ||
-            dx * dx + dy * dy < slice_inner * slice_inner ||
-            dx * dx + dy * dy > slice_outer * slice_outer)
+        double radius = hypot(dx, dy);
+        if (!cui_chart_pie_radii(o, index, &slice_inner, &slice_outer) || radius < slice_inner ||
+            radius > slice_outer)
             return hit;
     } else if (o->kind == CUI_CHART_RADAR) {
         double dx = x - o->width / 2.0, dy = y - o->height / 2.0;
@@ -2017,6 +2024,24 @@ cui_chart_hit cui_chart_hit_test(const cui_chart_options *o, float x, float y) {
     hit.hovered = index;
     hit.label = o->data[index].label;
     hit.value = o->kind == CUI_CHART_CANDLESTICK ? o->data[index].close : o->data[index].value;
+    return hit;
+}
+
+cui_chart_hit cui_chart_update_hover(cui_chart_state *state, const cui_chart_options *options,
+                                     float x, float y) {
+    cui_chart_hit hit = {0};
+    if (!state)
+        return hit;
+    hit = cui_chart_hit_test(options, x, y);
+    state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
+    state->hovered_value = hit.valid ? hit.value : 0;
+    if (hit.valid) {
+        state->tooltip_cursor_x = x;
+        state->tooltip_cursor_y = y;
+        state->tooltip_cursor_valid = true;
+    } else if (!options || options->noninteractive)
+        state->tooltip_cursor_valid = false;
+    /* Retain the visual index/cursor on ordinary exit for the styled fade. */
     return hit;
 }
 
@@ -2176,7 +2201,7 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
         count = 2;
     if (count > 1000)
         return 0;
-    unsigned visible = count < 32 ? count : 32;
+    unsigned visible = count;
     float gutter = 32;
     bool point_chart = o->kind == CUI_CHART_LINE || o->kind == CUI_CHART_AREA;
     double top = point_chart ? (o->custom_y_padding ? o->y_padding_top : 10) : 0;
@@ -2185,8 +2210,11 @@ float cui_chart_measure_value_axis_gutter(cui_context *ui, const cui_chart_optio
                                 : 0;
     cui_plot_scale scale = {CUI_PLOT_LINEAR, lo, hi, bottom, top, true};
     for (unsigned i = 0; i < visible; i++) {
-        unsigned tick = (count - 1) * i / (visible - 1);
-        double value = hi - (hi - lo) * tick / (count - 1);
+        unsigned tick = i;
+        double value = 0;
+        cui_plot_scale tick_scale = {CUI_PLOT_LINEAR, lo, hi, 1, 0, true};
+        if (cui_plot_inverse(&tick_scale, (double)tick / (count - 1), &value) != CUI_PLOT_OK)
+            return 0;
         if (point_chart) {
             double pixel_y = (o->height - (o->hide_x_axis ? 0 : 20)) * tick / (count - 1);
             if (cui_plot_inverse(&scale, pixel_y, &value) != CUI_PLOT_OK)
@@ -2320,10 +2348,12 @@ cui_plot_result cui_chart_measure_sankey_margins(cui_context *ui, const cui_char
 }
 static bool cui_chart_x_label_visible(const cui_chart_options *o, size_t index) {
     size_t slots = o->point_count > o->count ? o->point_count : o->count;
-    if (!o->x_tick_count) {
+    if (!o->x_tick_count && !o->custom_x_tick_count) {
         size_t margin = o->x_tick_margin ? o->x_tick_margin : 1;
         return (index + 1) % margin == 0;
     }
+    if (!o->x_tick_count)
+        return false;
     if (o->x_tick_count >= slots)
         return true;
     if (o->x_tick_count == 1)
@@ -2473,24 +2503,22 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.pointer_activatable = !o->noninteractive, .no_focus = true});
-    if (!o->noninteractive) {
+    if (o->noninteractive)
+        (void)cui_chart_update_hover(state, o, NAN, NAN);
+    else {
+        if (state->hovered < o->count && state->tooltip_cursor_valid)
+            (void)cui_chart_update_hover(state, o, state->tooltip_cursor_x,
+                                         state->tooltip_cursor_y);
         size_t count = 0;
         const cui_event *events = cui_frame_events(ui, &count);
         for (size_t i = 0; i < count; i++) {
             if (events[i].type == CUI_EVENT_POINTER_MOVE) {
                 if (cui_event_target(ui, i) != id && !cui_hovered(ui, id)) {
-                    state->hovered = SIZE_MAX;
+                    (void)cui_chart_update_hover(state, o, NAN, NAN);
                     continue;
                 }
-                cui_chart_hit hit = cui_chart_hit_test(o, events[i].x - state->bounds.x,
-                                                       events[i].y - state->bounds.y);
-                state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
-                state->hovered_value = hit.valid ? hit.value : 0;
-                if (hit.valid) {
-                    state->tooltip_cursor_x = events[i].x - state->bounds.x;
-                    state->tooltip_cursor_y = events[i].y - state->bounds.y;
-                    state->tooltip_cursor_valid = true;
-                }
+                (void)cui_chart_update_hover(state, o, events[i].x - state->bounds.x,
+                                             events[i].y - state->bounds.y);
             }
         }
     }
@@ -2829,6 +2857,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             float box_width = fmaxf(1, measured.width);
             float box_height = fmaxf(12, measured.height);
             float box_x = x - box_width / 2;
+            if (point_chart && slots > 1) {
+                if (i == 0)
+                    box_x = x;
+                else if (i == slots - 1)
+                    box_x = x - box_width;
+            }
             if (o->kind == CUI_CHART_CANDLESTICK) {
                 cui_chart_candle_geometry candle;
                 if (cui_chart_candle_bounds(o, i, &candle) == CUI_PLOT_OK) {
@@ -2842,7 +2876,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     double lo, hi;
                     if (!cui_chart_value_domain(o, &lo, &hi))
                         continue;
-                    float fraction = (float)((0 - lo) / (hi - lo));
+                    double zero_fraction;
+                    cui_plot_scale zero_scale = {CUI_PLOT_LINEAR, lo, hi, 0, 1, true};
+                    if (cui_plot_map(&zero_scale, 0, &zero_fraction) != CUI_PLOT_OK)
+                        continue;
+                    float fraction = (float)zero_fraction;
                     if (o->bar_alignment == CUI_CHART_BAR_LEFT ||
                         o->bar_alignment == CUI_CHART_BAR_RIGHT) {
                         float bar_left, bar_right;
@@ -2884,14 +2922,14 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_end_box(ui);
         }
     }
-    if (o->show_y_axis && o->kind != CUI_CHART_PIE && o->kind != CUI_CHART_RADAR &&
+    if (!o->hide_axes && o->show_y_axis && o->kind != CUI_CHART_PIE && o->kind != CUI_CHART_RADAR &&
         o->kind != CUI_CHART_SANKEY && w >= 60 && h >= 40 && o->width >= 60 && o->height >= 40) {
         double lo, hi;
         if (cui_chart_value_domain(o, &lo, &hi)) {
             unsigned count = o->tick_count ? o->tick_count : 5;
             if (count < 2)
                 count = 2;
-            unsigned visible = count < 32 ? count : 32;
+            unsigned visible = count;
             bool horizontal_bar =
                 o->kind == CUI_CHART_BAR &&
                 (o->bar_alignment == CUI_CHART_BAR_LEFT || o->bar_alignment == CUI_CHART_BAR_RIGHT);
@@ -2914,21 +2952,30 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                     top_bar ? bottom : top, true};
             for (unsigned i = 0; i < visible; i++) {
                 char text[48];
-                unsigned tick = visible > 1 ? (count - 1) * i / (visible - 1) : 0;
+                unsigned tick = i;
                 double pixel_y = point_chart ? (o->height - (o->hide_x_axis ? 0 : 20)) *
                                                    (double)tick / (count - 1)
                                              : top + (bottom - top) * (double)tick / (count - 1);
                 double value = lo;
-                if (horizontal_bar)
-                    value = lo + (hi - lo) * tick / (count - 1);
-                else
+                if (horizontal_bar) {
+                    cui_plot_scale tick_scale = {CUI_PLOT_LINEAR, lo, hi, 0, 1, true};
+                    if (cui_plot_inverse(&tick_scale, (double)tick / (count - 1), &value) !=
+                        CUI_PLOT_OK)
+                        continue;
+                } else
                     (void)cui_plot_inverse(&scale, pixel_y, &value);
                 cui_str label = cui_chart_tick_number(text, sizeof text, value, o->y_tick_format,
                                                       o->format_user);
                 float y = (float)(pixel_y * h / o->height);
                 float gutter = o->value_axis_gutter > 0 ? o->value_axis_gutter : 32;
-                float x = o->y_axis_inside ? 26 * w / o->width : 0;
-                float label_width = o->y_axis_inside ? 48 : gutter - 4;
+                cui_size measured = cui_measure_text(ui, label, 10);
+                float label_width = fmaxf(1, measured.width);
+                float x = o->y_axis_inside ? 2 : gutter * w / o->width - 4 - label_width;
+                float label_y = o->y_axis_inside ? (y < 12 ? y + 2 : y - 12) : y - 5;
+                if (point_chart && !o->y_axis_inside)
+                    label_y = fmaxf(
+                        0, fminf(label_y,
+                                 (o->height - (o->hide_x_axis ? 0 : 20)) * h / o->height - 10));
                 if (horizontal_bar) {
                     float bar_left, bar_right;
                     cui_chart_horizontal_bar_extent(o, &bar_left, &bar_right);
@@ -2938,16 +2985,15 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     x = (o->bar_alignment == CUI_CHART_BAR_LEFT
                              ? left + (right - left) * fraction
                              : right - (right - left) * fraction) -
-                        24;
-                    y = o->y_axis_inside ? h - 14 : h - 28;
-                    label_width = 48;
+                        label_width / 2;
+                    label_y = o->y_axis_inside ? h - 12 : h - 26;
                 }
                 cui_begin_absolute_box(ui, id ^ (UINT64_C(0x9120416c66313b00) + i),
                                        (cui_box){.width = label_width,
                                                  .height = 12,
                                                  .fixed_width = true,
                                                  .fixed_height = true},
-                                       (cui_rect){x, y - 6, label_width, 12});
+                                       (cui_rect){x, label_y, label_width, 12});
                 cui_text(ui, label, 10, o->foreground);
                 cui_end_box(ui);
             }
@@ -3212,7 +3258,10 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     formatted =
                         (cui_str){value, written < sizeof value ? written : sizeof value - 1};
                 } else if (o->kind == CUI_CHART_PIE && !o->tooltip_format) {
-                    int written = snprintf(value, sizeof value, "%.3g (%.1f%%)", number, pie_share);
+                    char raw_value[32];
+                    cui_str raw = cui_chart_number(raw_value, sizeof raw_value, number, NULL, NULL);
+                    int written = snprintf(value, sizeof value, "%.*s (%.1f%%)", (int)raw.length,
+                                           raw.data, pie_share);
                     formatted =
                         (cui_str){value, written <= 0                     ? 0
                                          : (size_t)written < sizeof value ? (size_t)written
@@ -3224,8 +3273,6 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                          : o->kind == CUI_CHART_SANKEY ? o->sankey_value_format
                                                                        : NULL,
                                          o->format_user);
-                if (!formatted.length)
-                    continue;
                 memcpy(row_text[row_count], formatted.data, formatted.length);
                 row_length[row_count] = formatted.length;
                 if (o->kind == CUI_CHART_CANDLESTICK) {
@@ -3235,9 +3282,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                     row_swatch[row_count] = datum->close > datum->open ? o->bullish : o->bearish;
                 } else if (o->kind == CUI_CHART_PIE) {
                     row_label[row_count] = name;
-                    row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
+                    row_swatch[row_count] =
+                        datum->color.a ? datum->color : o->series[tooltip_index % 8];
                 } else if (o->kind == CUI_CHART_SANKEY) {
-                    row_swatch[row_count] = datum->color.a ? datum->color : o->series[series % 8];
+                    row_swatch[row_count] =
+                        datum->color.a ? datum->color : o->series[tooltip_index % 8];
                 } else if (o->kind == CUI_CHART_BAR) {
                     row_label[row_count] = name;
                     row_swatch[row_count] = o->bar_gradient_start.a ? o->bar_gradient_start
@@ -3297,9 +3346,16 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                          (cui_rect){state->bounds.x + tooltip_x, state->bounds.y + tooltip_y,
                                     tooltip_width, tooltip_height},
                          120);
-        if (o->tooltip_content)
+        if (o->tooltip_content) {
+            cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b669),
+                                   (cui_box){.width = tooltip_width - 16,
+                                             .height = tooltip_height - 16,
+                                             .fixed_width = true,
+                                             .fixed_height = true},
+                                   (cui_rect){8, 8, tooltip_width - 16, tooltip_height - 16});
             o->tooltip_content(ui, id, tooltip_index, datum, o->tooltip_user);
-        else {
+            cui_end_box(ui);
+        } else {
             float row_y = 8;
             if (title.length && title.data) {
                 cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b668),

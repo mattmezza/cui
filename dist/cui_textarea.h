@@ -662,9 +662,13 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
         bool primary = event.pointer_button == CUI_POINTER_PRIMARY;
         if (event.type == CUI_EVENT_SCROLL && isfinite(event.dx) && isfinite(event.dy)) {
             state->scroll_x =
-                fminf(state->maximum_x, fmaxf(0, state->scroll_x - event.dx * metrics.line_height));
+                fminf(state->maximum_x,
+                      fmaxf(0, state->scroll_x -
+                                   event.dx * (event.scroll_precise ? 1 : metrics.line_height)));
             state->scroll_y =
-                fminf(state->maximum_y, fmaxf(0, state->scroll_y - event.dy * metrics.line_height));
+                fminf(state->maximum_y,
+                      fmaxf(0, state->scroll_y -
+                                   event.dy * (event.scroll_precise ? 1 : metrics.line_height)));
             handled = state->scroll_x != old_x || state->scroll_y != old_y;
         } else if (primary && (event.type == CUI_EVENT_POINTER_DOWN ||
                                ((state->dragging || interaction.pressed) &&

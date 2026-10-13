@@ -4789,7 +4789,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Auto-measured/grow sizing, inertia/touch, auto-hide and native system behavior remain pending."
+        "Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Shared contact-aware precise touch scrolling, threshold/cancel handling, nested ancestor handoff and drag-priority controls have headless and Chromium touch tests. Auto-measured/grow sizing, inertial fling, auto-hide, physical-device/native-system behavior and complete family touch coverage remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5966,7 +5966,7 @@
       "limitations": [
         "Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.",
         "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.",
-        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Complex fills/holes, closed/dashed/round stroke variants, broader scale/legend/selection behavior, automatic prepaint and native mesh integration remain incomplete in this release."
+        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Bounded multi-contour fills now support holes, even-odd/nonzero rules and crossings; extended strokes cover closed paths, caps, joins and dash splitting with native/sanitizer/WASI geometry tests. Exact Lyon topology, unbounded geometry, variable-width/automatic curved routing, broader scale/legend/selection behavior, automatic prepaint and styled native mesh integration remain incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

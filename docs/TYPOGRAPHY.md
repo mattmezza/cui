@@ -28,18 +28,102 @@ if (ready) {
 
 Registration is per call, so a successful regular registration remains if the
 following bold registration fails. For an atomic application font switch, prepare
-a separate font object and its registrations before switching measurement and
-renderer references. Fonts and paths are explicit resources; these APIs do not
+a separate font object and its registrations, then update the wrapper host
+and renderer references together between frames and invalidate affected contexts.
+If the context uses the font directly as its fixed `measure_user`, recreate that
+context to bind another font, or change registrations on the existing font.
+Keep the old font alive until its outstanding draw lists have been consumed. Fonts and paths are explicit resources; these APIs do not
 fetch fonts, discover installed families, or synthesize bold or italic faces.
 An unset named-family variant uses that family's regular face. Unknown families
 fall back to the default family's requested style and then its regular face.
 
-Set `cui_config.measure_styled = cui_font_measure_styled`,
-`cui_config.font_metrics = cui_font_get_metrics`, and `measure_user = font` for
-native FreeType/HarfBuzz text. A custom host provides equivalent callbacks and
-maps the complete style, including family, when drawing. Measurement and drawing
-must agree on their selected face. Reuse stable family IDs, and invalidate text
-metrics in every affected context when registered faces change.
+The native `cui_font_measure`, `cui_font_measure_styled`, and
+`cui_font_get_metrics` functions already accept `void *` as their first
+parameter and match the corresponding `cui_config` callback types. Direct
+assignment is valid when `measure_user` is the font itself. No function-pointer
+cast is needed. If your user pointer contains application state instead, use
+wrappers that extract its font, as in this complete C11 program:
+
+```c
+#include "cui/cui_text.h"
+
+typedef struct {
+    cui_font *font;
+} text_host;
+
+static cui_size text_measure(void *user, cui_str text, float size) {
+    text_host *host = user;
+    return cui_font_measure(host->font, text, size);
+}
+static cui_size text_measure_styled(void *user, cui_str text, float size,
+                                    cui_text_style style) {
+    text_host *host = user;
+    return cui_font_measure_styled(host->font, text, size, style);
+}
+static bool text_metrics(void *user, float size, cui_text_style style,
+                         cui_font_metrics *out) {
+    text_host *host = user;
+    return cui_font_get_metrics(host->font, size, style, out);
+}
+
+int main(int argc, char **argv) {
+    /* Paths: default regular face, editorial regular face, editorial bold face. */
+    if (argc != 4)
+        return 1;
+    text_host host = {.font = cui_font_open(argv[1])};
+    if (!host.font)
+        return 1;
+    cui_text_style body = {.family = 7};
+    cui_text_style title = {.family = 7, .weight = CUI_TEXT_WEIGHT_BOLD};
+    if (!cui_font_register_style(host.font, body, argv[2]) ||
+        !cui_font_register_style(host.font, title, argv[3])) {
+        cui_font_close(host.font);
+        return 1;
+    }
+    cui_context *ui = cui_create((cui_config){
+        .measure = text_measure,
+        .measure_styled = text_measure_styled,
+        .font_metrics = text_metrics,
+        .measure_user = &host
+    });
+    if (!ui) {
+        cui_font_close(host.font);
+        return 1;
+    }
+    if (!cui_begin_frame(ui, 600, 300, .016f)) {
+        cui_destroy(ui);
+        cui_font_close(host.font);
+        return 1;
+    }
+    cui_text_ex(ui, cui_string("Editorial heading"), 30,
+                (cui_color){20, 20, 20, 255}, 36, title);
+    cui_text_ex(ui, cui_string("Body copy"), 16,
+                (cui_color){20, 20, 20, 255}, 24, body);
+    cui_draw_list draws = cui_end_frame(ui);
+    int status = draws.count && cui_last_error(ui) == CUI_OK ? 0 : 1;
+    /* A real host paints draws with host.font before ending its lifetime. */
+    cui_destroy(ui);
+    cui_font_close(host.font);
+    return status;
+}
+```
+
+Save the complete program as `typography.c`. With the default native library
+build and existing FreeType/HarfBuzz development packages, compile it with:
+
+```sh
+cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude typography.c build/libcui_text.a build/libcui.a $(pkg-config --cflags --libs freetype2 harfbuzz) -lm -o typography
+./typography /path/default-regular.ttf /path/editorial-regular.ttf /path/editorial-bold.ttf
+```
+
+Link the optional native `cui_text` adapter and Core; its FreeType/HarfBuzz
+requirements are described in [TEXT.md](TEXT.md). This example submits a draw
+list; the application supplies its renderer and window/event loop. The host
+struct and font must outlive the context's measurement callbacks and every draw
+that uses them. A custom renderer maps the complete style, including family,
+to the same faces used for measurement. Reuse stable family IDs, and call
+`cui_text_metrics_changed` between frames in every affected context after
+changing registrations.
 
 See [TEXT.md](TEXT.md) for ownership, fallback ordering, native registration,
 thread confinement, and headless test fixture details. These controls are text

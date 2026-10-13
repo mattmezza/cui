@@ -5,6 +5,27 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+typedef struct {
+    cui_font *font;
+    unsigned styled_calls, metrics_calls;
+    uint32_t family;
+} text_host;
+static cui_size text_measure(void *user, cui_str text, float size) {
+    text_host *host = user;
+    return cui_font_measure(host->font, text, size);
+}
+static cui_size text_measure_styled(void *user, cui_str text, float size, cui_text_style style) {
+    text_host *host = user;
+    ++host->styled_calls;
+    host->family = style.family;
+    return cui_font_measure_styled(host->font, text, size, style);
+}
+static bool text_metrics(void *user, float size, cui_text_style style, cui_font_metrics *out) {
+    text_host *host = user;
+    ++host->metrics_calls;
+    host->family = style.family;
+    return cui_font_get_metrics(host->font, size, style, out);
+}
 static const char *font_path(const char *env, const char *const *paths, size_t count) {
     const char *requested = getenv(env);
     if (requested) {
@@ -118,14 +139,23 @@ int main(void) {
     assert(!cui_font_set_style(root, (cui_text_style){0}, mono));
     assert(!cui_font_set_style(root, (cui_text_style){.weight = (cui_text_weight)99, .family = 31},
                                mono));
+    text_host host = {.font = root};
     cui_context *ui = cui_create((cui_config){.width = 600,
                                               .height = 300,
-                                              .measure = cui_font_measure,
-                                              .measure_styled = cui_font_measure_styled,
-                                              .font_metrics = cui_font_get_metrics,
-                                              .measure_user = root});
+                                              .measure = text_measure,
+                                              .measure_styled = text_measure_styled,
+                                              .font_metrics = text_metrics,
+                                              .measure_user = &host});
     assert(ui);
+    cui_font_metrics actual_metrics, wrapped_metrics;
+    assert(cui_font_get_metrics(mono, 24, (cui_text_style){0}, &actual_metrics));
+    assert(cui_measure_font_metrics(ui, 24, normal, &wrapped_metrics));
+    assert(host.metrics_calls == 1 && host.family == normal.family);
+    assert(wrapped_metrics.ascent == actual_metrics.ascent &&
+           wrapped_metrics.descent == actual_metrics.descent &&
+           wrapped_metrics.line_height == actual_metrics.line_height);
     layout(ui, root, mono, other);
+    assert(host.styled_calls > 0 && (host.family == 31 || host.family == 32));
     assert(!cui_font_register_style(root, normal, "/cui-test/missing-family.ttf"));
     matches(root, normal, mono);
     for (unsigned i = 0; i < 8; ++i)

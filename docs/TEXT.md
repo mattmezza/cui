@@ -2,7 +2,7 @@
 
 `cui_text_ex` and `cui_measure_text_ex` take `cui_text_style`: Normal, Medium, Semibold or Bold weight, plus independent italic and monospace flags and an application-defined `uint32_t family` ID. Family zero selects the default; nonzero IDs identify separately registered families. `cui_text_ex` also accepts an optional logical line height. The older `cui_text`, `cui_text_with_line_height` and `cui_measure_text` APIs use regular text. The style travels through Clay measurement and the draw list to the software, SDL3, SDL_GPU and Sokol renderers.
 
-Set `cui_config.measure_styled = cui_font_measure_styled` and `measure_user = font` when creating a context with a native `cui_font`. The renderer must use the same font object. The legacy `measure` callback remains available; if `measure_styled` is absent, layout uses that callback for every style. Native selection uses the exact family/style registration first, then that named family's registered regular face, then the default family's matching style, then the opened regular face. Measurement, font metrics, and drawing use the same selection. CUI does not synthesize bold, italic or monospace glyphs from a regular face.
+Set `cui_config.measure_styled = cui_font_measure_styled` and `measure_user = font` when creating a context with a native `cui_font`. These native callbacks take `void *` and match the Core callback signatures directly; do not cast function pointers. If `measure_user` points to an application host struct, extract its font inside correctly typed wrappers; see the complete [typography example](TYPOGRAPHY.md). The renderer must use the same font object. The legacy `measure` callback remains available; if `measure_styled` is absent, layout uses that callback for every style. Native selection uses the exact family/style registration first, then that named family's registered regular face, then the default family's matching style, then the opened regular face. Measurement, font metrics, and drawing use the same selection. CUI does not synthesize bold, italic or monospace glyphs from a regular face.
 
 Use `cui_font_register_style(font, style, path)` to open an actual family or variant face owned by the regular font. Registrations are keyed by family, weight, italic, and monospace. A nonzero family can register its regular style; the default family's regular face remains the one opened by `cui_font_open`. A failed path leaves the previous registration intact; replacing a variant or closing the regular font releases the owned face. `cui_font_set_style(font, style, variant)` borrows a face opened by the caller. Keep borrowed faces alive through every frame that uses them, then close them separately. Call `cui_text_metrics_changed(ui)` between frames after changing registrations so Clay remeasures cached text.
 
@@ -46,3 +46,11 @@ across measurement, font metrics, glyph raster coverage, core layout, fallback,
 registration failure, replacement, aliases, and owned/borrowed close lifetimes.
 Set `CUI_TEST_FONT` and `CUI_TEST_FAMILY_FONT` to distinct font files when system
 fixtures are unavailable. The test returns 77 when no fixture pair is found.
+
+
+The native integration test also configures Core through wrappers whose shared
+user pointer is a host struct containing the font. It checks styled family
+forwarding against actual layout/raster output and routes the Core font-metrics
+query through that same host. A wrapper's first parameter must remain `void *`;
+a function taking `cui_font *` directly is a different C function-pointer type,
+even though object pointers can be converted inside the wrapper.

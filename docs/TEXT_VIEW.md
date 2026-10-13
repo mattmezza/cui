@@ -394,23 +394,83 @@ cubic are also supported; arbitrary user-defined easing functions are not.
 Configure state **before** applying an appended document update. Initial document
 loading normally precedes enabling streaming so existing text appears immediately:
 
+This complete headless C11 program needs Core and the TextView components, with
+no browser or native font adapter. Its assertions verify stagger timing and
+reduced motion; a real host adds event delivery and draw-list painting:
+
 ```c
-cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN);
-cui_text_view_set_text(&state, cui_string("Existing reply"));
-state.stream_fade = true;
-cui_text_view_motion motion = cui_text_view_motion_default();
-motion.duration = .6f;
-motion.stagger = .08f;
-cui_text_view_set_motion(&state, motion);
-/* A later model update appends text; preserve state/workspace between frames. */
-cui_text_view_set_text(&state, cui_string("Existing reply with new words"));
-cui_text_view_options options = cui_text_view_default();
-options.stream_fade = true;
-options.custom_motion = true;
-options.motion = motion;
-/* Inside an active frame; dt is elapsed host time. */
-options.dt = dt;
-cui_text_view(ui, id, theme, &state, options);
+#include "cui/cui_text_view.h"
+/* Keep this executable verification example active in release builds too. */
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <assert.h>
+#include <math.h>
+
+int main(void) {
+    static char source[1024], rendered[1024];
+    static cui_text_view_mapping mapping[1024];
+    static cui_text_view_span spans[256];
+    static cui_text_view_block blocks[128];
+    static cui_text_view_glyph glyphs[1024];
+    cui_text_view_workspace workspace = {
+        .source = source, .source_capacity = sizeof source,
+        .rendered = rendered, .rendered_capacity = sizeof rendered,
+        .mapping = mapping, .mapping_capacity = 1024,
+        .spans = spans, .span_capacity = 256,
+        .blocks = blocks, .block_capacity = 128,
+        .glyphs = glyphs, .glyph_capacity = 1024
+    };
+    cui_text_view_state state;
+    assert(cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN));
+    assert(cui_text_view_set_text(&state, cui_string("Before")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){0});
+    assert(ui);
+    cui_text_view_motion motion = {
+        .duration = 1, .stagger = .2f, .easing = CUI_TEXT_VIEW_FADE_LINEAR
+    };
+    assert(cui_text_view_set_motion(&state, motion));
+    state.stream_fade = true;
+    /* A real host sets the context preference from its platform settings. */
+    state.reduced_motion = cui_reduced_motion(ui);
+    assert(cui_text_view_set_text(&state, cui_string("Before one two")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_stream_opacity(&state, 7) == 0);
+    assert(cui_text_view_stream_opacity(&state, 11) == 0);
+    cui_text_view_options options = cui_text_view_default();
+    options.width = 300;
+    options.stream_fade = true;
+    options.custom_motion = true;
+    options.motion = motion;
+    options.reduced_motion = state.reduced_motion;
+    options.dt = .3f;
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 400, 240, .3f));
+    assert(cui_text_view(ui, 77, &theme, &state, options));
+    cui_draw_list draws = cui_end_frame(ui);
+    assert(draws.count && cui_last_error(ui) == CUI_OK);
+    /* The component paints first, then advances its clock for the next frame. */
+    assert(fabsf(cui_text_view_stream_opacity(&state, 7) - .3f) < .00001f);
+    assert(fabsf(cui_text_view_stream_opacity(&state, 11) - .1f) < .00001f);
+    cui_set_reduced_motion(ui, true);
+    state.reduced_motion = cui_reduced_motion(ui); /* Before the next text update. */
+    options.reduced_motion = state.reduced_motion; /* Also forward every frame. */
+    assert(cui_text_view_set_text(&state, cui_string("Before one two three")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_stream_opacity(&state, 7) == 1);
+    assert(cui_text_view_stream_opacity(&state, 15) == 1);
+    assert(!cui_text_view_advance(&state, 0));
+    assert(cui_begin_frame(ui, 400, 240, .3f));
+    assert(cui_text_view(ui, 77, &theme, &state, options));
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    return 0;
+}
+```
+
+Save the complete program as `textview_motion.c`, build the library, then run:
+
+```sh
+cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude textview_motion.c build/libcui.a -lm -o textview_motion
+./textview_motion
 ```
 
 Each changed contiguous run within a paragraph/code/table-cell leaf starts its
@@ -433,7 +493,20 @@ in unchanged prefixes too. Invalid negative/nonfinite durations or stagger and
 unknown easing values fail without changing the state. A zero duration clears
 pending fades; other policy changes update durations/easing of active fades but
 do not reschedule already recorded stagger birth times. Set a policy before
-`set_text` for deterministic new-chunk timing. The styled custom policy is
+`set_text` for deterministic new-chunk timing. TextView's state clock is advanced
+by `options.dt` at the end of component submission, after painting. Supply the
+elapsed interval once per frame; do not also call `cui_text_view_advance` for that
+same interval. The pure model API may instead advance explicitly when used
+without the styled component. `cui_begin_frame`'s dt alone does not advance this
+model clock.
+
+TextView does not implicitly copy `cui_reduced_motion(ui)` into its state/options.
+Forward the host preference to `state.reduced_motion` before a text update and to
+`options.reduced_motion` on each submission. This prevents new fade birth times
+while reduced motion is active and immediately suppresses existing fades. A
+zero-duration motion clears pending birth times; merely suppressing a fade does
+not clear them, so unfinished text may resume fading if the preference is turned
+off before its stored deadline. The styled custom policy is
 validated before image, link, or composition callbacks run.
 
 Headless tests exercise overlapping word timing, delayed animation completion,

@@ -716,6 +716,7 @@ typedef struct {
     size_t used, resolves, tooltips, activations;
     cui_plot_point resolved;
     bool fail;
+    cui_plot_appear_value appearance;
 } element_probe;
 static double element_linear(double progress, void *user) {
     (void)user;
@@ -898,7 +899,165 @@ static void plot_elements(void) {
     cui_software_destroy(renderer);
     cui_destroy(ui);
 }
+static void appear_notify(cui_id id, const cui_plot_appear_value *value, void *user) {
+    assert(id);
+    element_probe *probe = user;
+    probe->order[probe->used++] = 0;
+    probe->appearance = *value;
+}
+static void appear_marks(cui_context *ui, cui_id id, const cui_theme *theme,
+                         const cui_plot_hover_memory *hover, cui_plot_rect bounds, void *user) {
+    (void)theme;
+    (void)hover;
+    (void)bounds;
+    element_probe *probe = user;
+    probe->order[probe->used++] = 2;
+    cui_begin_absolute_box(ui, id + 1, (cui_box){.background = green},
+                           (cui_rect){0, 0, (float)(32 * probe->appearance.progress), 3});
+    cui_end_box(ui);
+}
+static void empty_host_frame(cui_context *ui, float dt) {
+    assert(cui_begin_frame(ui, 100, 100, dt));
+    (void)cui_end_frame(ui);
+}
+static void styled_appearance(void) {
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100, .measure = measure});
+    assert(ui);
+    unsigned char bitmap[64 * 64 * 4] = {0};
+    element_probe probe = {0};
+    cui_plot_view_options view = {.bitmap = {bitmap, 64, 64, 256, 1}, .interactive = true};
+    cui_plot_element_state state = {0};
+    cui_plot_element_options o = {.bounds = {10, 15, 74, 79},
+                                  .pointer = {30, 35},
+                                  .hovered = true,
+                                  .resolve = element_resolve,
+                                  .marks = appear_marks,
+                                  .children = element_children,
+                                  .tooltip = element_tooltip,
+                                  .user = &probe,
+                                  .has_appearance = true,
+                                  .appear = {.duration = 1},
+                                  .on_appear = appear_notify,
+                                  .frame_serial = 1};
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0 && state.request_frame && probe.resolves == 0);
+    assert(probe.used == 3 && probe.order[0] == 0 && probe.order[1] == 2 && probe.order[2] == 3);
+    o.frame_serial = 2;
+    cui_draw_list draw = element_frame(ui, &state, &o, &view, &probe, .5f);
+    assert(state.appearance.time == .5 && state.appearance.progress == .875 && probe.resolves == 0);
+    assert(cui_bounds(ui, 445).w == 28); /* eased marks are actual layout */
+    cui_software *renderer = cui_software_create(100, 100, NULL);
+    assert(renderer && cui_software_render(renderer, &draw, (cui_color){0}));
+    const unsigned char *pixels = cui_software_pixels(renderer, NULL, NULL);
+    assert(pixels[(16 * 100 + 20) * 4 + 1] == 255);
+    o.frame_serial = 3;
+    (void)element_frame(ui, &state, &o, &view, &probe, .5f);
+    assert(state.appearance.time == 1 && !state.request_frame && state.hover.has_state);
+    assert(probe.used == 5 && probe.order[0] == 0 && probe.order[1] == 1);
+    empty_host_frame(ui, 0); /* omitted serial4: unscoped completed plot replays */
+    o.frame_serial = 5;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0 && !state.hover.has_state);
+    o.generation = 1;
+    o.frame_serial = 6;
+    (void)element_frame(ui, &state, &o, &view, &probe, .5f);
+    assert(state.appearance.time == 0);
+    cui_set_reduced_motion(ui, true);
+    o.frame_serial = 7;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 1 && !state.request_frame);
+    cui_set_reduced_motion(ui, false);
+    /* Reusing caller storage under another owner resets the appearance channel. */
+    o.frame_serial = 8;
+    probe.used = 0;
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    cui_theme theme = cui_theme_light();
+    cui_begin_box(
+        ui, 9900,
+        (cui_box){.width = 100, .height = 100, .fixed_width = true, .fixed_height = true});
+    cui_begin_absolute_box(ui, 9901, (cui_box){0}, (cui_rect){10, 15, 64, 64});
+    assert(cui_plot_element(ui, 544, &theme, &view, &state, &o) == CUI_PLOT_OK);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    (void)cui_end_frame(ui);
+    assert(state.owner == 544 && state.appearance.time == 0);
+    /* Passive/disabled plots still run appearance and retain ordinary children. */
+    view.interactive = false;
+    view.disabled = true;
+    o.frame_serial = 9;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0 && probe.used == 3);
+    o.frame_serial = 10;
+    (void)element_frame(ui, &state, &o, &view, &probe, .5f);
+    assert(state.appearance.time == .5 && state.request_frame && probe.used == 3);
+    cui_plot_appear_scope storage[2];
+    cui_plot_appear_registry scope;
+    assert(cui_plot_appear_registry_init(&scope, storage, 2) == CUI_PLOT_OK);
+    o.appear_scope = &scope;
+    o.generation = 42;
+    o.frame_serial = 11;
+    assert(cui_plot_appear_registry_begin(&scope, 88, 11) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0 && scope.count == 0);
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    o.frame_serial = 12;
+    assert(cui_plot_appear_registry_begin(&scope, 88, 12) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, 1);
+    assert(state.appearance.time == 1 && scope.count == 1 && storage[0].completed_generation == 42);
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&scope, 88, 13) == CUI_PLOT_OK);
+    empty_host_frame(ui, 0);
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    o.frame_serial = 14;
+    assert(cui_plot_appear_registry_begin(&scope, 88, 14) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 1 && !state.request_frame); /* completed scoped remount */
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    o.generation = 43;
+    o.frame_serial = 15;
+    assert(cui_plot_appear_registry_begin(&scope, 88, 15) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0 && storage[0].completed_generation == 42);
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&scope, 88, 16) == CUI_PLOT_OK);
+    empty_host_frame(ui, .5f);
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    o.frame_serial = 17;
+    assert(cui_plot_appear_registry_begin(&scope, 88, 17) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0); /* unfinished omission restarts */
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    o.frame_serial = 18;
+    assert(cui_plot_appear_registry_begin(&scope, 99, 18) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, .5f);
+    assert(state.appearance.time == 0 && scope.count == 0); /* scope rekey resets */
+    assert(cui_plot_appear_registry_end(&scope) == CUI_PLOT_OK);
+    o.appear_scope = NULL;
+    o.frame_serial = 19;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 0); /* removing scope restarts local channel */
+    o.has_appearance = false;
+    o.frame_serial = 20;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.appearance.time == 1 && !state.request_frame); /* no generation means complete */
+    cui_plot_appear_registry full;
+    assert(cui_plot_appear_registry_init(&full, NULL, 0) == CUI_PLOT_OK);
+    assert(cui_plot_appear_registry_begin(&full, 1, 21) == CUI_PLOT_OK);
+    o.has_appearance = true;
+    o.appear_scope = &full;
+    o.appear.duration = 0;
+    o.frame_serial = 21;
+    cui_plot_element_state before = state;
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    assert(cui_plot_element(ui, 444, &theme, &view, &state, &o) == CUI_PLOT_CAPACITY);
+    assert(memcmp(&state, &before, sizeof state) == 0 && full.count == 0);
+    assert(cui_end_frame(ui).count == 0);
+    assert(cui_plot_appear_registry_end(&full) == CUI_PLOT_OK);
+    cui_software_destroy(renderer);
+    cui_destroy(ui);
+}
 int main(void) {
+    styled_appearance();
     plot_elements();
     path_caches();
     test_sankey_raster();

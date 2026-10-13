@@ -1353,7 +1353,55 @@ static void shape_keys(void) {
     assert(a.value == same.value);
     assert(cui_plot_shape_key_float(NULL, 0) == CUI_PLOT_INVALID);
 }
+static void first_paint_clocks(void) {
+    cui_plot_transition_clock clock = {0};
+    cui_plot_transition_policy policy = {.duration = 2};
+    cui_plot_appear_value value;
+    assert(cui_plot_appear_step(&clock, 10, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.time == 0 && value.progress == 0 && value.appearing && value.request_frame);
+    assert(cui_plot_appear_step(&clock, 11, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.time == .5 && close(value.progress, .875));
+    double stagger;
+    assert(cui_plot_appear_value_stagger(&value, 0, 3, .5, &stagger) == CUI_PLOT_OK &&
+           stagger == 1);
+    assert(cui_plot_appear_value_stagger(&value, 2, 3, .5, &stagger) == CUI_PLOT_OK &&
+           stagger == 0);
+    assert(cui_plot_appear_value_stagger(&value, 0, 1, .5, &stagger) == CUI_PLOT_OK &&
+           close(stagger, .875));
+    assert(cui_plot_appear_step(&clock, 11.5, policy, false, &value) == CUI_PLOT_OK);
+    assert(cui_plot_appear_value_stagger(&value, 2, 3, .5, &stagger) == CUI_PLOT_OK &&
+           close(stagger, .875));
+    assert(cui_plot_appear_step(&clock, 12, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.time == 1 && value.progress == 1 && !value.appearing && !value.request_frame);
+    value.easing = clock_invalid; /* finished samples bypass easing entirely */
+    assert(cui_plot_appear_value_stagger(&value, 2, 3, .5, &stagger) == CUI_PLOT_OK &&
+           stagger == 1);
+    clock = (cui_plot_transition_clock){0};
+    policy.delay = -1;
+    assert(cui_plot_appear_step(&clock, 0, policy, false, &value) == CUI_PLOT_OK &&
+           value.time == .5);
+    clock = (cui_plot_transition_clock){0};
+    policy.delay = 1;
+    assert(cui_plot_appear_step(&clock, 0, policy, false, &value) == CUI_PLOT_OK &&
+           value.time == 0 && value.request_frame);
+    assert(cui_plot_appear_step(&clock, 1, policy, true, &value) == CUI_PLOT_OK && value.time == 1);
+    clock = (cui_plot_transition_clock){0};
+    policy.duration = 0;
+    assert(cui_plot_appear_step(&clock, 0, policy, false, &value) == CUI_PLOT_OK &&
+           value.time == 1);
+    clock = (cui_plot_transition_clock){0};
+    policy.duration = 2;
+    policy.delay = 0;
+    policy.easing = clock_invalid;
+    cui_plot_transition_clock saved = clock;
+    cui_plot_appear_value before = value;
+    assert(cui_plot_appear_step(&clock, 0, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(memcmp(&clock, &saved, sizeof clock) == 0 && memcmp(&value, &before, sizeof value) == 0);
+    assert(cui_plot_appear_step(NULL, 0, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(cui_plot_appear_value_stagger(NULL, 0, 1, 0, &stagger) == CUI_PLOT_INVALID);
+}
 int main(void) {
+    first_paint_clocks();
     shape_keys();
     pointer_springs();
     transition_clocks();

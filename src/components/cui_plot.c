@@ -289,6 +289,55 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
     }
     return CUI_PLOT_OK;
 }
+static cui_plot_result element_appearance(cui_context *ui, cui_id id, cui_plot_element_state *next,
+                                          const cui_plot_element_options *o) {
+    next->appearance = (cui_plot_appear_value){.time = 1, .progress = 1};
+    if (!o->has_appearance) {
+        next->has_generation = next->has_frame = false;
+        next->scope = NULL;
+        next->appear_clock = (cui_plot_transition_clock){0};
+        return CUI_PLOT_OK;
+    }
+    if (next->has_frame && next->last_frame != o->frame_serial &&
+        (next->last_frame == UINT64_MAX || next->last_frame + 1 != o->frame_serial))
+        *next = (cui_plot_element_state){.owner = id};
+    next->last_frame = o->frame_serial;
+    next->has_frame = true;
+    uint64_t scope_identity = o->appear_scope ? o->appear_scope->identity : 0;
+    if (!next->has_generation || next->generation != o->generation ||
+        next->scope != o->appear_scope || next->scope_identity != scope_identity)
+        next->appear_clock = (cui_plot_transition_clock){0};
+    next->generation = o->generation;
+    next->has_generation = true;
+    next->scope = o->appear_scope;
+    next->scope_identity = scope_identity;
+    bool complete = false;
+    if (o->appear_scope) {
+        cui_plot_result result =
+            cui_plot_appear_registry_complete(o->appear_scope, id, o->generation, &complete);
+        if (result != CUI_PLOT_OK)
+            return result;
+        if (o->appear_scope->last_frame != o->frame_serial)
+            return CUI_PLOT_INVALID;
+    }
+    if (complete)
+        next->appearance = (cui_plot_appear_value){.time = 1, .progress = 1};
+    else {
+        cui_plot_result result =
+            cui_plot_appear_step(&next->appear_clock, cui_frame_time(ui), o->appear,
+                                 cui_reduced_motion(ui), &next->appearance);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (o->appear_scope && next->appearance.time == 1 && !complete) {
+        size_t index = 0;
+        while (index < o->appear_scope->count && o->appear_scope->entries[index].identity != id)
+            ++index;
+        if (index == o->appear_scope->count && index == o->appear_scope->capacity)
+            return CUI_PLOT_CAPACITY;
+    }
+    return CUI_PLOT_OK;
+}
 static cui_plot_result element_prepare(cui_context *ui, cui_id id,
                                        const cui_plot_view_options *view,
                                        cui_plot_element_state *next,
@@ -301,11 +350,18 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
         return CUI_PLOT_INVALID;
     if (next->owner != id)
         *next = (cui_plot_element_state){.owner = id};
+    cui_plot_result result = element_appearance(ui, id, next, o);
+    if (result != CUI_PLOT_OK)
+        return result;
+    if (o->on_appear)
+        o->on_appear(id, &next->appearance, o->user);
+    next->request_frame = next->appearance.request_frame;
     if (!view->interactive || view->disabled) {
-        *next = (cui_plot_element_state){.owner = id};
+        next->cursor = (cui_plot_cursor_memory){0};
+        next->hover = (cui_plot_hover_memory){0};
+        next->transition = (cui_plot_transition_clock){0};
         return CUI_PLOT_OK;
     }
-    cui_plot_result result;
     if (!o->touch) {
         cui_plot_cursor_update update;
         result = cui_plot_cursor_mouse(&next->cursor, o->bounds, o->pointer, o->hovered, &update);
@@ -314,8 +370,9 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
     }
     cui_plot_point relative = {0};
     bool resolved = false;
-    result = cui_plot_cursor_resolve(&next->cursor, o->bounds, o->pointer, o->appearing, &relative,
-                                     &resolved);
+    result =
+        cui_plot_cursor_resolve(&next->cursor, o->bounds, o->pointer,
+                                o->appearing || next->appearance.appearing, &relative, &resolved);
     if (result != CUI_PLOT_OK)
         return result;
     cui_plot_tooltip_state live = {0};
@@ -332,7 +389,7 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
                                  has_live ? o->enter : o->exit, cui_reduced_motion(ui), &motion);
     if (result != CUI_PLOT_OK)
         return result;
-    next->request_frame = motion.request_frame;
+    next->request_frame |= motion.request_frame;
     result = cui_plot_hover_track(&next->hover, has_live ? &live : NULL,
                                   has_live ? &relative : NULL, motion.value);
     return result;
@@ -383,6 +440,9 @@ static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_them
         axis_paint(ui, id, theme, o->axis, geometry, labels);
     if (painted && element) {
         *state = next;
+        if (element->has_appearance && element->appear_scope && state->appearance.time == 1)
+            (void)cui_plot_appear_registry_record(element->appear_scope, id, element->generation,
+                                                  1);
         const cui_plot_hover_memory *hover = state->hover.has_state ? &state->hover : NULL;
         if (element->marks)
             element->marks(ui, id, theme, hover, element->bounds, element->user);

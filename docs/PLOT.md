@@ -536,3 +536,26 @@ int main(void) {
     return 0;
 }
 ```
+
+## First-paint appearance
+
+Set `element.has_appearance=true`, supply `generation`, `frame_serial` and the
+`appear` transition policy, and retain the same `cui_plot_element_state` across
+frames. Increment the serial for every host frame, including omitted plots.
+The first paint starts at linear time zero; zero duration/reduced motion is
+complete immediately. `on_appear` runs before datum resolution and drawing,
+allowing caller-owned marks or bitmap data to use its eased progress. The driver
+does not choose a reveal style. Use `cui_plot_appear_value_stagger` on the sample
+for staggered marks: local linear time is eased independently for each mark.
+The callback sample pointer is borrowed for that call; payloads obey the normal
+renderer lifetimes and bitmap revision rules.
+
+Owner rekey, a frame gap or a new generation restarts the appearance. Pass an
+active innermost `appear_scope` registry begun with the same frame serial to
+remember completed generations across omitted plots. Begin/end that scope even
+on frames without the plot. Unfinished appearances replay after omission, and
+scope rekey/gaps forget completions. Appearance still runs for passive/disabled
+plots and keeps ordinary children composed; hover is suppressed until linear
+time reaches one. Default policy is Base's zero duration, with product timing
+supplied by the host. See [channel binding](PLOT_MODEL.md#first-paint-appearance-channel-binding)
+for capacity failures and exact lifetime rules.

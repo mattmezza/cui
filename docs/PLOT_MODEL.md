@@ -596,10 +596,10 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults and explicit-color paint covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
 | `Text`, `PlotLabel`, text width/truncation helpers | Caller-owned PlotLabel collection/layout/paint and measured UTF-8 ellipsis helper | No automatic tooltip content/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
 | `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned flattened-segment cache, translated raster and shape-key helper | Cache hits skip builder/cubic flattening; empty builds are warm; opaque FNV keys preserve f32 bit sensitivity, not Rust hash values; no renderer-native stroke triangles or implicit keyed slot bank |
-| `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clocks and scalar pointer glide available; no automatic theme projection, keyed renderer clock or appearance first-paint driver |
-| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot/registry and linear stagger clock | Bounded multi-plot completed map with explicit consecutive-frame lifetime; no implicit frame/scope tree, first-paint clock or scheduler; easing/reduced motion remain explicit |
+| `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clocks and scalar pointer glide available; explicit host policies and first-paint generation binding; no automatic theme projection/keyed renderer clock |
+| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot/registry and linear stagger clock | Bounded multi-plot completed map with explicit consecutive-frame lifetime; styled driver binds first-paint generation/linear time/easing/reduced motion via explicit host frame serial and active registry; no implicit scope tree |
 | `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | Scalar pointer glide and styled resolver/content driver available; no implicit scope lookup or automatic OS/event-to-datum routing |
-| `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | Bitmap view plus optional `cui_plot_element` resolver/marks/children/tooltip driver | Caller-owned hover clocks and inert portal composition; current bounds/pointer/occlusion supplied by host; no trait-equivalent renderer prepaint, automatic appearance/cache binding |
+| `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | Bitmap view plus optional `cui_plot_element` resolver/marks/children/tooltip driver | Caller-owned hover clocks and inert portal composition; current bounds/pointer/occlusion supplied by host; first-paint appearance binding available; no trait-equivalent renderer prepaint or automatic cache binding |
 | `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent with styled tooltip composition/exit clocks and explicit redraw requests; no full-size auto layout, current-frame Core hitbox/prepaint query, OS gesture detector or implicit scope state |
 | `origin_point` translation utility | Caller adds relative offsets before raster; Core offsets styled children | No separate named pure translation helper; ordinary finite coordinate addition remains caller responsibility |
 
@@ -1004,8 +1004,8 @@ than source f32 renderer values. Invalid parameters/state preserve state/output;
 nonfinite propagation reports OVERFLOW without mutation. Very small responses,
 extreme magnitudes/damping or elapsed oscillation angles may exceed representable
 math. The host must schedule requested frames and project its theme policy.
-Renderer keyed clocks, automatic first-paint appearance timing, implicit PathCaches
-slot lifetime and renderer prepaint tooltip layout remain absent; styled immediate
+Renderer keyed clocks, implicit PathCaches slot lifetime and renderer prepaint
+tooltip layout remain absent; host-serial first-paint appearance and styled immediate
 portal composition is available through the host-bound PlotElement seam.
 
 ### Shape keys and cached tessellation
@@ -1075,9 +1075,50 @@ focus or activation. This display-overlay policy is a bounded CUI choice; source
 Touch hosts run the existing long-press reducer on `state.cursor` before this
 call and set `touch=true`; desktop mouse visibility is then not synthesized.
 Long-press default prevention and host OS gesture detection stay explicit. On a
-passive/disabled plot the driver clears hover/clock state, skips resolver/tooltip,
+passive/disabled plot the driver clears hover/exit-clock state while preserving
+appearance, skips resolver/tooltip,
 and still composes ordinary children. Owner changes reset state. Callback box
 stacks must balance, and text/bitmap payloads remain live through renderer
 completion. Preflight errors preserve state and submit no plot; general Core
 composition capacity is subject to the existing partial-submission contract.
 There is no separate callback measurement/prepaint pass or retained Element tree.
+
+### First-paint appearance channel binding
+
+`cui_plot_appear_step` implements frozen Presence's first-frame 0→1 clock,
+separate from transition's first-target adoption. It stores linear time, applies
+projected easing only to `progress`, and supplies `cui_plot_appear_value_stagger`
+to sample each mark's clamped local time before easing. Default NULL easing is
+cubic-out; zero duration or reduced motion completes immediately. Completed
+samples return one without invoking easing. Signed delay and checked clock
+arithmetic follow the existing transition seam. Policy callback/user data remain
+borrowed while a sample is used; invalid callback results preserve state/output.
+
+Enable `cui_plot_element_options.has_appearance`, choose generation and policy,
+and increment host `frame_serial` every frame, including omitted plots. The
+styled driver owns the first-paint clock in its caller state, restarts after a
+serial gap/backward serial, owner rekey or generation change, and notifies
+`on_appear` before datum resolution and bitmap composition. This callback may
+prepare caller-owned bitmap/mark geometry, but must not submit UI or mutate
+options/driver/scope storage; its sample pointer lives only for that call.
+The driver does not choose a reveal/fade style for a bitmap: the source Plot
+also decides what appearance looks like. Geometry callbacks can use the sampled
+progress or stagger values; changed bitmap payloads require the normal Core
+bitmap revision/lifetime contract.
+
+Appearance runs even for disabled/passive plots and ordinary children still
+compose. Hover is suppressed while linear time is below one, even if easing
+already returned one, and appearance/hover frame requests are combined. Existing
+manual `appearing` suppression remains an additional gate. No generation means
+a complete sample. Defaults are Base's zero-duration policy; product timing is
+explicitly projected by the host, not inferred from a generic theme field.
+
+Pass an active innermost `appear_scope` registry begun with the same serial.
+Only a completed generation is recorded. A finished plot omitted then remounted
+under that still-painted scope is complete immediately; an unfinished one
+restarts. Changing/removing the scope resets the local appearance channel. Scope
+rekey/gaps clear remembered completions through its existing begin/end contract.
+Registry capacity errors are preflight failures: no plot/state/completion entry
+is submitted or changed. Explicit caller frames, registry storage and unique
+owner IDs substitute for window keyed element state; they do not add an implicit
+retained scope tree or a renderer layout/prepaint scheduler.

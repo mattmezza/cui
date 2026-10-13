@@ -460,6 +460,20 @@ typedef struct {
 cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *, double target, double now,
                                          cui_plot_transition_policy, bool reduced_motion,
                                          cui_plot_motion_value *);
+/* First-paint Presence clock: unlike transition_step, initializes 0->1.
+ * Linear time is kept independently of easing, so stagger samples local time
+ * before easing. Complete samples bypass easing. Policy/user are borrowed. */
+typedef struct {
+    double time, progress;
+    cui_plot_easing_fn easing;
+    void *user;
+    bool appearing, request_frame;
+} cui_plot_appear_value;
+cui_plot_result cui_plot_appear_step(cui_plot_transition_clock *, double now,
+                                     cui_plot_transition_policy, bool reduced_motion,
+                                     cui_plot_appear_value *);
+cui_plot_result cui_plot_appear_value_stagger(const cui_plot_appear_value *, size_t index,
+                                              size_t count, double spread, double *out);
 /* Scalar pointer glide: source PlotHover.glide targets one Pixels channel.
  * The host owns one zero-initialized state per channel and supplies seconds.
  * Elapsed time advances toward the PREVIOUS target before retargeting. */

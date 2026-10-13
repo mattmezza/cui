@@ -214,6 +214,11 @@ typedef struct {
     cui_plot_hover_memory hover;
     cui_plot_transition_clock transition;
     bool request_frame;
+    cui_plot_transition_clock appear_clock;
+    cui_plot_appear_value appearance;
+    uint64_t generation, last_frame, scope_identity;
+    cui_plot_appear_registry *scope;
+    bool has_frame, has_generation;
 } cui_plot_element_state;
 typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
                                                cui_plot_rect current_bounds,
@@ -221,6 +226,7 @@ typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
 typedef void (*cui_plot_compose_fn)(cui_context *, cui_id owner, const cui_theme *,
                                     const cui_plot_hover_memory *hover,
                                     cui_plot_rect current_bounds, void *user);
+typedef void (*cui_plot_appear_fn)(cui_id owner, const cui_plot_appear_value *, void *user);
 typedef struct {
     cui_plot_rect bounds;
     cui_plot_point pointer;
@@ -230,6 +236,14 @@ typedef struct {
     cui_plot_compose_fn marks, children, tooltip;
     void *user;
     int16_t tooltip_layer; /* zero selects1, otherwise must be positive */
+    /* Optional first-paint appearance. Host increments serial every frame,
+     * including frames omitting this plot. Pass active innermost registry
+     * begun with the same frame serial. */
+    bool has_appearance;
+    uint64_t generation, frame_serial;
+    cui_plot_transition_policy appear;
+    cui_plot_appear_registry *appear_scope;
+    cui_plot_appear_fn on_appear; /* synchronous, no UI; may prepare bitmap/marks */
 } cui_plot_element_options;
 /* Zero-init state. Owner change resets it. Resolver is synchronous preflight:
  * OK supplies relative datum/dots, EMPTY supplies none; it must not compose UI
@@ -243,6 +257,11 @@ typedef struct {
  * through cursor_long_press before composition; touch=true preserves that gate.
  * Driver requests redraw for clocks; host advances frames. Disabled/passive
  * plots reset hover, suppress resolver/tooltip and still compose children.
+ * Appearance runs even disabled/passive, notifies on_appear during preflight
+ * before resolver/bitmap paint (sample pointer lives only for that callback),
+ * suppresses datum resolution while its LINEAR time<1 and combines redraw flags.
+ * Generation/rekey/frame gap restarts; active scope remembers only completed
+ * generations. Default appear duration0/reduced motion complete immediately.
  * No implicit prepaint/layout pass, native mesh cache or OS long-press detector. */
 cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
                                  const cui_plot_view_options *, cui_plot_element_state *,

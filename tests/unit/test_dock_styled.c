@@ -2641,6 +2641,29 @@ static void test_area_aggregate(void) {
     assert(lifecycle_count == 1);
     lifecycle_expect(0, 'R', 3);
     cui_dock_area_destroy(area);
+
+    area = cui_dock_area_create((cui_dock_config){0}, 1, 1);
+    assert(area);
+    assert(cui_dock_area_register(area, (cui_dock_area_panel){.panel = {
+        .key = 7, .zoomable = true, .user = &lifecycle_count, .set_zoomed = lifecycle_zoom}}) ==
+        CUI_DOCK_OK);
+    left = cui_dock_area_model(area, CUI_DOCK_LEFT);
+    assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, cui_dock_root(left), 7, 0) == CUI_DOCK_OK);
+    assert(cui_dock_workspace_set_edge(cui_dock_area_workspace(area), CUI_DOCK_LEFT, true, 120));
+    assert(cui_dock_area_reconcile(area) == CUI_DOCK_OK);
+    assert(cui_dock_area_set_zoom(area, 7, true) == CUI_DOCK_OK);
+    assert(cui_dock_area_set_zoom(area, 7, false) == CUI_DOCK_CAPACITY);
+    uint64_t zoom_key = 0;
+    assert(cui_dock_view_zoomed(cui_dock_area_view(area, CUI_DOCK_LEFT), &zoom_key));
+    assert(zoom_key == 7);
+    lifecycle_count = 0;
+    assert(cui_dock_area_tick(area) && lifecycle_count == 1);
+    lifecycle_expect(0, 'Z', 7);
+    assert(cui_dock_area_set_zoom(area, 7, false) == CUI_DOCK_OK);
+    assert(!cui_dock_view_zoomed(cui_dock_area_view(area, CUI_DOCK_LEFT), NULL));
+    assert(cui_dock_area_tick(area) && lifecycle_count == 2);
+    lifecycle_expect(1, 'z', 7);
+    cui_dock_area_destroy(area);
 }
 
 int main(void) {

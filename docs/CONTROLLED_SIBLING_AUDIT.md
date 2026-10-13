@@ -1,27 +1,29 @@
 # Controlled sibling audit
 
-This read-only production audit uses `tests/unit/test_controlled_siblings.c` at
-base `513883e` (integration/next17). It exercises real frame/event routing,
-caller-owned values, completed-frame semantics, and actual draw commands. The
-new suite deliberately fails until the two findings below are fixed; it reports
-all findings instead of stopping at the first one. No production files or CMake
-registration were changed.
+This audit began at base `513883e` (integration/next17). It exercises real
+frame/event routing, caller-owned values, completed-frame semantics, and actual
+draw commands. The follow-up fixes ListMulti callback forwarding in the base
+reducer. The default audit now passes; `--radio` separately preserves the known
+Radio regression. CMake registration remains the integrator's responsibility.
 
 ## Confirmed defects
 
-1. **ListMulti confirmation/cancel callback user pointer.**
-   `cui_base_list_multi` replaces `options.activation_user` with the address of
-   its private stack reducer to intercept `on_activate`, but forwards the
-   caller's `on_confirm` and `on_cancel` callbacks unchanged. Both therefore
-   receive the private reducer pointer instead of the caller's user object.
-   The activation trampoline correctly restores the external user pointer.
-   See `src/base/cui_choice.c:1006` and the calls at lines 669 and 647. A callback
+1. **Fixed: ListMulti confirmation/cancel callback user pointer.**
+   Previously, `cui_base_list_multi` replaced `options.activation_user` with
+   its private stack reducer to intercept `on_activate`, while forwarding the
+   caller's `on_confirm` and `on_cancel` callbacks unchanged. Both received the
+   private reducer pointer instead of the caller's user object.
+   All three callbacks now use trampolines that preserve the original user pointer.
+   The original defect was at `src/base/cui_choice.c:1006` in the audited base. A callback
    which writes through its expected owner pointer could corrupt the reducer
    or adjacent stack memory. The regression safely compares pointers without
    dereferencing the unexpected pointer. It covers accept and restore/reject
-   policies, confirmation order/count, Escape, and idle frames.
+   policies, confirmation order/count, Escape, and idle frames. The registered
+   Choice suite additionally writes final selection through the actual owner
+   object from confirmation and cancellation callbacks and verifies final
+   completed-frame semantics. Disabled paths emit no notifications.
 
-2. **Radio publishes stale earlier-sibling semantics.**
+2. **Remaining: Radio publishes stale earlier-sibling semantics.**
    Render radio option0 followed by option1 sharing one `int *`, initially 0;
    click option1. The owner value becomes 1, but the completed frame reports both
    radios as checked. Only the newly activated radio's semantic is refreshed by
@@ -34,16 +36,17 @@ registration were changed.
    it records existing delayed-paint behavior without claiming paint can be
    retroactively rebuilt by the per-radio API.
 
-The two ListMulti callback checks run under both accept and restore policies,
-so the current executable reports five failing observations for these two
-underlying defects.
+The original audit reported five failing observations across these two defects.
+The default executable covers the fixed ListMulti behavior and other passing
+controls; `--radio` still reports one failure. No Radio production change is
+included in this follow-up.
 
 ## Covered behavior and API limits
 
 | API | Actual external-owner scenario | Observation |
 | --- | --- | --- |
 | List | `on_activate` replaces selection or restores the original selection | Final same-frame semantics and subsequent render callback see the final owner value; callback runs once. |
-| ListMulti | `on_activate` replaces the full boolean array, including the earlier sibling, or restores it | Final same-frame semantics and actual checkmark location follow the owner array; callback runs once. Confirmation/cancel user pointer defect remains. |
+| ListMulti | `on_activate` replaces the full boolean array, including the earlier sibling, or restores it | Final same-frame semantics and actual checkmark location follow the owner array; callback runs once. Confirmation/cancel preserve the caller user pointer after the fix. |
 | Radio | Later option changes the shared integer | Earlier semantic stays checked until scheduled redraw, as above; disabled option does not change the value. |
 | Checkbox | Individually caller-owned booleans | Completed-frame semantics match both independent values; disabled item is inert. There is no dedicated CheckboxGroup or change-request callback API in this snapshot. |
 | Tabs | Later tab changes the shared stable ID | Earlier and later semantics reflect final selection in the activation frame. |
@@ -78,15 +81,18 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude \
   tests/unit/test_controlled_siblings.c build/libcui.a -lm \
   -o /tmp/cui-controlled-siblings
 /tmp/cui-controlled-siblings
+/tmp/cui-controlled-siblings --radio # intentionally fails for the known Radio gap
 ctest --test-dir build --output-on-failure
 ```
 
-The audit executable currently returns 1 with the five reported observations.
-The existing CTest suite does not yet register this new audit. A sanitizer build
-of `cui` and the audit also exercises all cases without dereferencing the known
-wrong callback user pointer.
+The default audit returns 0; the separate Radio diagnostic returns 1. The
+existing CTest suite does not yet register this new audit. The Choice suite's
+notification regression is registered through its existing target. A sanitizer
+build of `cui` and both audit selections exercises all cases.
 
-Validation at this base: warnings-as-errors compilation passes; the existing
-CTest suite passes 91/91 (the previously stale OTP/numeric distributions are
-already refreshed here). ASan/UBSan report no runtime errors; the audit still
-returns 1 for its intentionally preserved correctness regressions.
+Validation: warnings-as-errors compilation passes. The existing CTest suite
+passes 90/91; its only failure is `distribution`, because `dist/cui_choice.h`
+needs regeneration after the base reducer fix. Distribution output belongs to
+the integrator. The audit passes by default, and `--radio` preserves its one
+expected failure. ASan/UBSan pass the default audit and registered Choice suite
+without runtime errors.

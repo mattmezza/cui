@@ -3,6 +3,7 @@
 #define CUI_CHART_H
 #include "cui.h"
 #include "cui_plot.h"
+#include "cui_plot_motion.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -234,6 +235,8 @@ typedef struct {
     void *area_radar_fill_user;
     /* Distinguishes source explicit x_tick_count(0) from default stride selection. */
     bool custom_x_tick_count;
+    bool custom_motion; /* false preserves legacy defaults; true uses value policy */
+    cui_plot_motion_policy motion; /* positive legacy durations override policy durations */
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */
@@ -274,6 +277,14 @@ typedef struct {
     double tooltip_visual_value;
     cui_rect bounds;           /* retained logical bounds for pointer interaction */
     bool appear_hover_pending; /* private valid cursor deferred until reveal completes */
+    cui_plot_transition_clock motion_tooltip; /* private opt-in hover channel */
+    cui_plot_spring_clock motion_line[9], motion_mark, motion_pie[256];
+    bool motion_active; /* private opt-in channel initialization */
+    const cui_chart_datum *motion_data;
+    size_t motion_count;
+    cui_chart_kind motion_kind;
+    bool animated_custom_motion;
+    cui_plot_motion_policy animated_motion; /* private value-only same-frame snapshot */
 } cui_chart_state;
 typedef struct {
     bool valid;

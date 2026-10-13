@@ -6,6 +6,50 @@
 #include <stdlib.h>
 #include <string.h>
 uint64_t cui_chart_frame_key(const cui_chart_options *, const cui_chart_state *);
+static double chart_appear_duration(const cui_chart_options *o) {
+    return o->appear_duration > 0 ? o->appear_duration
+           : o->custom_motion     ? o->motion.appear.duration
+                                  : 1;
+}
+static bool chart_motion_valid(const cui_chart_options *o) {
+    return !o->custom_motion || cui_plot_motion_valid(&o->motion);
+}
+static bool chart_motion_transition_equal(cui_plot_motion_transition a,
+                                          cui_plot_motion_transition b) {
+    return a.duration == b.duration && a.delay == b.delay && a.easing == b.easing &&
+           a.bezier.x1 == b.bezier.x1 && a.bezier.y1 == b.bezier.y1 && a.bezier.x2 == b.bezier.x2 &&
+           a.bezier.y2 == b.bezier.y2;
+}
+static bool chart_motion_equal(cui_plot_motion_policy a, cui_plot_motion_policy b) {
+    return chart_motion_transition_equal(a.enter, b.enter) &&
+           chart_motion_transition_equal(a.exit, b.exit) &&
+           chart_motion_transition_equal(a.appear, b.appear) &&
+           a.pointer.response == b.pointer.response && a.pointer.damping == b.pointer.damping &&
+           a.pointer.epsilon == b.pointer.epsilon && a.pointer.travel == b.pointer.travel;
+}
+static void chart_motion_reset(cui_chart_state *s) {
+    s->motion_tooltip = (cui_plot_transition_clock){0};
+    memset(s->motion_line, 0, sizeof s->motion_line);
+    s->motion_mark = (cui_plot_spring_clock){0};
+    memset(s->motion_pie, 0, sizeof s->motion_pie);
+}
+static bool chart_motion_pointer(cui_context *ui, const cui_chart_options *o,
+                                 cui_plot_spring_clock *clock, float target, bool entering,
+                                 float *position, float *velocity) {
+    cui_plot_spring_policy policy = o->motion.pointer;
+    if (o->hover_duration > 0)
+        policy.response = o->hover_duration;
+    cui_plot_spring_value value;
+    if (cui_plot_spring_step(clock, target, cui_frame_time(ui), policy,
+                             o->reduced_motion || cui_reduced_motion(ui), entering,
+                             &value) != CUI_PLOT_OK)
+        return false;
+    *position = (float)value.value;
+    *velocity = (float)value.velocity;
+    if (value.request_frame)
+        cui_invalidate(ui);
+    return true;
+}
 static cui_str cui_chart_number(char *buffer, size_t capacity, double value,
                                 cui_chart_format_fn formatter, void *user) {
     size_t length;
@@ -342,8 +386,9 @@ cui_chart_options cui_chart_theme(cui_chart_options o, const cui_theme *theme) {
 }
 cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *state,
                                           const cui_chart_options *options) {
-    if (!ui || !state || !options || !isfinite(options->appear_duration) ||
-        options->appear_duration < 0)
+    if (!ui || !state || !options || !chart_motion_valid(options) ||
+        !isfinite(options->appear_duration) || options->appear_duration < 0 ||
+        !isfinite(options->hover_duration) || options->hover_duration < 0)
         return CUI_PLOT_INVALID;
     cui_chart_options frame = *options;
     if (frame.kind == CUI_CHART_SANKEY && !frame.custom_sankey_margins &&
@@ -375,15 +420,20 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     bool restart = !state->appear_started || state->active_appear_key != options->appear_key;
     double now = cui_frame_time(ui);
     double started = restart ? now : state->appear_started_at;
-    double duration = options->appear_duration > 0 ? options->appear_duration : 1;
+    double duration = chart_appear_duration(options);
     frame.reveal_enabled = true;
     frame.reduced_motion = options->reduced_motion || cui_reduced_motion(ui);
     if (options->disable_appear || frame.reduced_motion)
         frame.reveal_progress = 1;
     else {
-        double elapsed = fmax(0, now - started);
-        double t = fmax(0, fmin(1, elapsed / duration));
-        frame.reveal_progress = (float)(1 - pow(1 - t, 4));
+        double delay = options->custom_motion ? options->motion.appear.delay : 0;
+        double elapsed = fmax(0, now - started - delay);
+        double t = duration == 0 ? 1 : fmax(0, fmin(1, elapsed / duration));
+        double sampled = 1 - pow(1 - t, 4);
+        if (options->custom_motion &&
+            cui_plot_motion_sample(&options->motion.appear, t, &sampled) != CUI_PLOT_OK)
+            return CUI_PLOT_INVALID;
+        frame.reveal_progress = (float)fmax(0, fmin(1, sampled));
     }
     cui_plot_result result = cui_chart_render(state, &frame);
     if (result != CUI_PLOT_OK)
@@ -393,6 +443,9 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
     state->active_appear_key = options->appear_key;
     state->animated_at_time = now;
     state->animated_at_valid = true;
+    state->animated_custom_motion = options->custom_motion;
+    if (options->custom_motion)
+        state->animated_motion = options->motion;
     state->animated_request_key = cui_chart_frame_key(&request, state);
     if (frame.reveal_progress < 1)
         cui_invalidate(ui);
@@ -400,13 +453,24 @@ cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *stat
 }
 bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_chart_options *o,
                cui_str name) {
-    if (!ui || !id || !state || !o || !name.data || !name.length || !state->pixels || !o->data ||
-        !o->count || o->count > 4096 || o->extra_series_count > 7 ||
-        (o->extra_series_count && !o->extra_series) || !isfinite(o->logical_width) ||
-        (!!o->sankey_label_measure != !!o->sankey_label_paint) || !isfinite(o->logical_height) ||
-        o->width > 4096 || o->height > 4096 || !o->width || !o->height ||
-        o->point_count > 1000000 || state->byte_capacity < (size_t)o->width * o->height * 4)
+    if (!ui || !id || !state || !o || !chart_motion_valid(o) || !isfinite(o->appear_duration) ||
+        o->appear_duration < 0 || !isfinite(o->hover_duration) || o->hover_duration < 0 ||
+        !name.data || !name.length || !state->pixels || !o->data || !o->count || o->count > 4096 ||
+        o->extra_series_count > 7 || (o->extra_series_count && !o->extra_series) ||
+        !isfinite(o->logical_width) || (!!o->sankey_label_measure != !!o->sankey_label_paint) ||
+        !isfinite(o->logical_height) || o->width > 4096 || o->height > 4096 || !o->width ||
+        !o->height || o->point_count > 1000000 ||
+        state->byte_capacity < (size_t)o->width * o->height * 4)
         return false;
+    if (state->motion_active != o->custom_motion ||
+        (o->custom_motion && (state->motion_data != o->data || state->motion_count != o->count ||
+                              state->motion_kind != o->kind))) {
+        chart_motion_reset(state);
+        state->motion_active = o->custom_motion;
+        state->motion_data = o->data;
+        state->motion_count = o->count;
+        state->motion_kind = o->kind;
+    }
     cui_chart_options measured_options = *o;
     if (o->kind == CUI_CHART_SANKEY && !o->custom_sankey_margins && o->sankey_margins.left == 0 &&
         o->sankey_margins.right == 0 && o->sankey_margins.top == 0 &&
@@ -440,6 +504,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     }
     bool animation_current =
         state->animated_at_valid && state->animated_at_time == cui_frame_time(ui) &&
+        state->animated_custom_motion == o->custom_motion &&
+        (!o->custom_motion || chart_motion_equal(state->animated_motion, o->motion)) &&
         state->active_appear_key == o->appear_key && state->animated_request_key != 0 &&
         state->animated_request_key == cui_chart_frame_key(o, state) &&
         (!(o->disable_appear || o->reduced_motion || cui_reduced_motion(ui)) ||
@@ -484,9 +550,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     bool appearing = state->rendered_reveal_progress < 1;
     if (!o->reveal_enabled && state->appear_started && !o->disable_appear && !o->reduced_motion &&
         !cui_reduced_motion(ui)) {
-        double duration = o->appear_duration > 0 ? o->appear_duration : 1;
+        double duration = chart_appear_duration(o);
         /* Gate by linear time: quartic float progress may round to1 early. */
-        appearing = fmax(0, cui_frame_time(ui) - state->appear_started_at) < duration;
+        double delay = o->custom_motion ? o->motion.appear.delay : 0;
+        appearing = duration > 0 &&
+                    fmax(0, cui_frame_time(ui) - state->appear_started_at - delay) < duration;
     }
     state->appear_hover_pending = appearing && !o->noninteractive && state->hovered < o->count;
     if (appearing) {
@@ -512,7 +580,20 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             state->tooltip_active = active;
             state->tooltip_started = true;
         }
-        if (instant) {
+        if (o->custom_motion) {
+            cui_plot_motion_transition policy = active ? o->motion.enter : o->motion.exit;
+            if (o->hover_duration > 0)
+                policy.duration = o->hover_duration;
+            cui_plot_motion_value value;
+            if (cui_plot_transition_step(&state->motion_tooltip, active ? 1 : 0, cui_frame_time(ui),
+                                         cui_plot_motion_transition_adapter(&policy), instant,
+                                         &value) != CUI_PLOT_OK)
+                return false;
+            state->tooltip_focus = (float)fmax(0, fmin(1, value.value));
+            state->tooltip_phase = value.request_frame ? 0 : 1;
+            if (value.request_frame)
+                cui_invalidate(ui);
+        } else if (instant) {
             state->tooltip_phase = 1;
             state->tooltip_focus = active ? 1 : 0;
         } else {
@@ -544,7 +625,13 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (o->kind == CUI_CHART_BAR && active) {
             float target;
             if (cui_chart_bar_band_center(o, state->hovered, &target) == CUI_PLOT_OK) {
-                if (!state->emphasis_started || instant) {
+                if (o->custom_motion) {
+                    if (!chart_motion_pointer(ui, o, &state->motion_mark, target,
+                                              !state->emphasis_started, &state->emphasis_center,
+                                              &state->emphasis_velocity))
+                        return false;
+                    state->emphasis_started = true;
+                } else if (!state->emphasis_started || instant) {
                     state->emphasis_center = target;
                     state->emphasis_velocity = 0;
                     state->emphasis_started = true;
@@ -559,7 +646,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             cui_chart_candle_geometry candle;
             if (cui_chart_candle_bounds(o, state->hovered, &candle) == CUI_PLOT_OK) {
                 float target = (float)candle.wick.x_min;
-                if (!state->emphasis_started || instant) {
+                if (o->custom_motion) {
+                    if (!chart_motion_pointer(ui, o, &state->motion_mark, target,
+                        !state->emphasis_started, &state->emphasis_center, &state->emphasis_velocity))
+                        return false;
+                    state->emphasis_started = true;
+                } else if (!state->emphasis_started || instant) {
                     state->emphasis_center = target;
                     state->emphasis_velocity = 0;
                     state->emphasis_started = true;
@@ -573,7 +665,11 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         if (o->kind == CUI_CHART_PIE)
             for (size_t i = 0; i < o->count && i < 256; i++) {
                 float target = active && state->hovered == i ? 1 : 0;
-                if (instant) {
+                if (o->custom_motion) {
+                    if (!chart_motion_pointer(ui, o, &state->motion_pie[i], target,
+                        false, &state->pie_lift[i], &state->pie_lift_velocity[i]))
+                        return false;
+                } else if (instant) {
                     state->pie_lift[i] = target;
                     state->pie_lift_velocity[i] = 0;
                 } else
@@ -705,28 +801,43 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 dt = 1.f / 60;
             dt = fminf(dt, .25f);
             state->hover_progress =
-                instant
+                o->custom_motion ? state->tooltip_focus
+                : instant
                     ? (active ? 1 : 0)
                     : fmaxf(0, fminf(1, state->hover_progress + (active ? dt : -dt) / duration));
             if (active) {
-                if (instant) {
+                if (o->custom_motion) {
+                    if (!chart_motion_pointer(ui, o, &state->motion_line[0], target_x,
+                                              !state->motion_line[0].initialized, &state->hover_x,
+                                              &state->hover_vx))
+                        return false;
+                } else if (instant) {
                     state->hover_x = target_x;
                     state->hover_vx = 0;
                 } else
                     cui_chart_hover_spring(&state->hover_x, &state->hover_vx, target_x, dt,
                                            duration);
                 for (size_t series = 0; series <= o->extra_series_count; series++)
-                    if (instant) {
+                    if (o->custom_motion) {
+                        if (!chart_motion_pointer(
+                                ui, o, &state->motion_line[series + 1], target_y[series],
+                                !state->motion_line[series + 1].initialized,
+                                &state->hover_y[series], &state->hover_vy[series]))
+                            return false;
+                    } else if (instant) {
                         state->hover_y[series] = target_y[series];
                         state->hover_vy[series] = 0;
                     } else
                         cui_chart_hover_spring(&state->hover_y[series], &state->hover_vy[series],
                                                target_y[series], dt, duration);
             }
-            if (state->hover_progress > 0 && !instant)
+            if (state->hover_progress > 0 && !instant && !o->custom_motion)
                 cui_invalidate(ui);
-            if (state->hover_progress == 0)
+            if (state->hover_progress == 0) {
                 state->hover_visual_started = false;
+                if (o->custom_motion)
+                    memset(state->motion_line, 0, sizeof state->motion_line);
+            }
         }
         if (state->hover_visual_started && state->hover_progress > 0) {
             float opacity = state->tooltip_focus;

@@ -3,6 +3,7 @@
 #define CUI_PLOT_VIEW_H
 #include "cui.h"
 #include "cui_plot.h"
+#include "cui_plot_motion.h"
 #include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
@@ -340,6 +341,10 @@ typedef struct {
     cui_plot_transition_policy appear;
     cui_plot_appear_registry *appear_scope;
     cui_plot_appear_fn on_appear; /* synchronous, no UI; may prepare bitmap/marks */
+    /* Opt-in replaces enter/exit/appear. Published appearance clears temporary
+     * sampler pointers; use motion_appear_stagger with explicit policy later. */
+    bool custom_motion;
+    cui_plot_motion_policy motion; /* pointer policy is used by host marks via follow */
 } cui_plot_element_options;
 /* Zero-init state. Owner change resets it. Resolver is synchronous preflight:
  * OK supplies relative datum/dots, EMPTY supplies none; it must not compose UI

@@ -1204,10 +1204,10 @@ static void multicursor_column_history(void) {
 static void multicursor_delete_history(void) {
     char buffer[128] = "abc\nxyz";
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-                                                      .capacity = sizeof buffer,
-                                                      .multiline = true,
-                                                      .history_bytes = 1024,
-                                                      .max_history_steps = 7});
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 1024,
+                                                       .max_history_steps = 7});
     cui_edit_selection live[4];
     cui_edit_selection_snapshot history[8];
     assert(edit && cui_edit_attach_selections(edit, live, 4, history, 8) == CUI_EDIT_OK);

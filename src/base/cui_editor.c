@@ -514,8 +514,7 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
             continue;
         if (event.type != CUI_EVENT_TEXT &&
             !(event.type == CUI_EVENT_KEY_DOWN &&
-              (event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE) &&
-              !command && !alt))
+              (event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE) && !command && !alt))
             cui_edit_break_coalescing(editor->edit);
         if (event.key == CUI_KEY_ESCAPE && count == 1)
             continue;

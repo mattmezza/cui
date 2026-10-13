@@ -97,8 +97,8 @@ cui_edit_result cui_edit_select_disjoint(cui_edit *, const cui_edit_selection *,
  * Inline-token content is excluded while selection storage is attached. */
 cui_edit_result cui_edit_replace_selections(cui_edit *, cui_str text);
 /* Interactive text input. Adjacent batches with unchanged cursor collection
- * coalesce into one bounded Undo entry (at most 1000 batches). Other edits
- * remain atomic. Navigation/selection breaks the typing group. */
+ * coalesce into one bounded Undo entry (at most 1000 cursor changes). Newlines,
+ * other edits, navigation and selection break the typing group. */
 cui_edit_result cui_edit_type_selections(cui_edit *, cui_str text);
 typedef enum {
     CUI_EDIT_PREVIOUS,
@@ -142,6 +142,10 @@ cui_edit_result cui_edit_selection_motion(const cui_edit *, cui_edit_selection, 
 /* Expand collapsed cursors over one grapheme/Unicode word, merge overlaps, and
  * delete atomically. Undo restores original cursors rather than expanded ranges. */
 cui_edit_result cui_edit_erase_selections(cui_edit *, bool backwards, bool by_word);
+/* Interactive grapheme erasure; adjacent batches of the same direction and
+ * cursor shape share a bounded Undo step. Word and selected-range deletion
+ * remain atomic. */
+cui_edit_result cui_edit_erase_selections_interactive(cui_edit *, bool backwards, bool by_word);
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
 cui_edit *cui_edit_create(cui_edit_config config);
@@ -3200,6 +3204,12 @@ cui_edit_private_word_ranges[] = {
 typedef struct {
     size_t length, cursor, anchor;
 } cui_edit_private_snapshot;
+typedef enum {
+    CUI_EDIT_INTENT_NONE,
+    CUI_EDIT_INTENT_TYPING,
+    CUI_EDIT_INTENT_BACKSPACE,
+    CUI_EDIT_INTENT_DELETE_FORWARD
+} cui_edit_private_intent;
 struct cui_edit {
     cui_edit_config config;
     size_t length, cursor, anchor, preferred_column;
@@ -3211,10 +3221,11 @@ struct cui_edit {
     size_t change_start;
     uint64_t change_revision;
     bool change_valid;
-    bool typing_active, typing_pending, typing_can_merge;
-    unsigned typing_batches;
-    size_t typing_after_count, typing_after_anchor, typing_after_cursor;
-    cui_edit_selection typing_after[CUI_EDIT_MAX_SELECTIONS];
+    bool coalesce_active, coalesce_pending, coalesce_can_merge;
+    cui_edit_private_intent coalesce_intent, coalesce_pending_intent;
+    unsigned coalesce_changes;
+    size_t coalesce_after_count, coalesce_after_anchor, coalesce_after_cursor;
+    cui_edit_selection coalesce_after[CUI_EDIT_MAX_SELECTIONS];
     const cui_edit_token_span *tokens;
     size_t token_count;
     cui_edit_selection *selections;
@@ -3798,12 +3809,13 @@ static void cui_edit_private_save_state(cui_edit *e) {
 static void cui_edit_private_record(cui_edit *e) {
     if (!e->slots)
         return;
-    bool merge = e->typing_pending && e->typing_can_merge && e->typing_batches < 1000 &&
-                 e->index + 1 == e->count;
+    unsigned batch_changes = e->selections ? (unsigned)e->selection_count : 1;
+    bool merge = e->coalesce_pending && e->coalesce_can_merge &&
+                 e->coalesce_changes <= 1000 - batch_changes && e->index + 1 == e->count;
     if (merge) {
         memcpy(e->history + e->index * e->config.capacity, e->config.buffer, e->length + 1);
         cui_edit_private_save_state(e);
-        e->typing_batches++;
+        e->coalesce_changes += batch_changes;
     } else {
         if (!e->count) {
             e->count = 1;
@@ -3820,45 +3832,52 @@ static void cui_edit_private_record(cui_edit *e) {
             if (e->selection_history)
                 memmove(e->selection_history, e->selection_history + 1,
                         (e->slots - 1) * sizeof(*e->selection_history));
+            if (e->column_history)
+                memmove(e->column_history, e->column_history + 1,
+                        (e->slots - 1) * sizeof(*e->column_history));
             e->count--;
         }
         e->index = e->count++;
         memcpy(e->history + e->index * e->config.capacity, e->config.buffer, e->length + 1);
         cui_edit_private_save_state(e);
     }
-    e->typing_active = e->typing_pending;
-    if (e->typing_active) {
+    e->coalesce_active = e->coalesce_pending;
+    if (e->coalesce_active) {
         if (!merge)
-            e->typing_batches = 1;
-        e->typing_after_anchor = e->anchor;
-        e->typing_after_cursor = e->cursor;
-        e->typing_after_count = e->selections ? e->selection_count : 0;
+            e->coalesce_changes = batch_changes;
+        e->coalesce_intent = e->coalesce_pending_intent;
+        e->coalesce_after_anchor = e->anchor;
+        e->coalesce_after_cursor = e->cursor;
+        e->coalesce_after_count = e->selections ? e->selection_count : 0;
         if (e->selections)
-            memcpy(e->typing_after, e->selections, e->selection_count * sizeof(*e->typing_after));
+            memcpy(e->coalesce_after, e->selections,
+                   e->selection_count * sizeof(*e->coalesce_after));
     } else
-        e->typing_batches = 0;
+        e->coalesce_changes = 0;
 }
 void cui_edit_break_coalescing(cui_edit *e) {
     if (e) {
-        e->typing_active = false;
-        e->typing_pending = false;
-        e->typing_can_merge = false;
-        e->typing_batches = 0;
+        e->coalesce_active = false;
+        e->coalesce_pending = false;
+        e->coalesce_can_merge = false;
+        e->coalesce_intent = e->coalesce_pending_intent = CUI_EDIT_INTENT_NONE;
+        e->coalesce_changes = 0;
     }
 }
-static void cui_edit_private_typing_begin(cui_edit *e) {
-    e->typing_can_merge =
-        e->typing_active && e->slots && e->typing_after_anchor == e->anchor &&
-        e->typing_after_cursor == e->cursor &&
-        e->typing_after_count == (e->selections ? e->selection_count : 0) &&
-        (!e->selections ||
-         !memcmp(e->typing_after, e->selections, e->selection_count * sizeof(*e->typing_after)));
-    e->typing_pending = true;
+static void cui_edit_private_coalesce_begin(cui_edit *e, cui_edit_private_intent intent) {
+    e->coalesce_can_merge =
+        e->coalesce_active && e->coalesce_intent == intent && e->slots &&
+        e->coalesce_after_anchor == e->anchor && e->coalesce_after_cursor == e->cursor &&
+        e->coalesce_after_count == (e->selections ? e->selection_count : 0) &&
+        (!e->selections || !memcmp(e->coalesce_after, e->selections,
+                                   e->selection_count * sizeof(*e->coalesce_after)));
+    e->coalesce_pending = true;
+    e->coalesce_pending_intent = intent;
 }
-static void cui_edit_private_typing_end(cui_edit *e, cui_edit_result result,
-                                        uint64_t before_revision) {
-    e->typing_pending = false;
-    e->typing_can_merge = false;
+static void cui_edit_private_coalesce_end(cui_edit *e, cui_edit_result result,
+                                          uint64_t before_revision) {
+    e->coalesce_pending = false;
+    e->coalesce_can_merge = false;
     if (result != CUI_EDIT_OK || e->revision == before_revision)
         cui_edit_break_coalescing(e);
 }
@@ -4520,7 +4539,7 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
 cui_edit_result cui_edit_replace_selections(cui_edit *edit, cui_str text) {
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (!edit->typing_pending)
+    if (!edit->coalesce_pending)
         cui_edit_break_coalescing(edit);
     return cui_edit_private_replace_collection(edit, text, edit->selections, edit->selection_count,
                                                false, NULL, true);
@@ -4528,14 +4547,15 @@ cui_edit_result cui_edit_replace_selections(cui_edit *edit, cui_str text) {
 cui_edit_result cui_edit_type_selections(cui_edit *edit, cui_str text) {
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (!text.length) {
+    if (!text.length || (text.data && memchr(text.data, '\n', text.length)) ||
+        (text.data && memchr(text.data, '\r', text.length))) {
         cui_edit_break_coalescing(edit);
         return cui_edit_replace_selections(edit, text);
     }
     uint64_t before = edit->revision;
-    cui_edit_private_typing_begin(edit);
+    cui_edit_private_coalesce_begin(edit, CUI_EDIT_INTENT_TYPING);
     cui_edit_result result = cui_edit_replace_selections(edit, text);
-    cui_edit_private_typing_end(edit, result, before);
+    cui_edit_private_coalesce_end(edit, result, before);
     return result;
 }
 cui_edit_result cui_edit_can_replace_selections(cui_edit *edit, cui_str text) {
@@ -4729,6 +4749,24 @@ cui_edit_result cui_edit_erase_selections(cui_edit *edit, bool backwards, bool b
     return cui_edit_private_replace_collection(edit, (cui_str){0}, ranges, edit->selection_count,
                                                true, NULL, true);
 }
+cui_edit_result cui_edit_erase_selections_interactive(cui_edit *edit, bool backwards,
+                                                      bool by_word) {
+    if (!edit || !edit->selections)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    bool collapsed = !by_word;
+    for (size_t i = 0; i < edit->selection_count; ++i)
+        collapsed &= edit->selections[i].anchor == edit->selections[i].cursor;
+    if (!collapsed) {
+        cui_edit_break_coalescing(edit);
+        return cui_edit_erase_selections(edit, backwards, by_word);
+    }
+    uint64_t before = edit->revision;
+    cui_edit_private_coalesce_begin(edit, backwards ? CUI_EDIT_INTENT_BACKSPACE
+                                                    : CUI_EDIT_INTENT_DELETE_FORWARD);
+    cui_edit_result result = cui_edit_erase_selections(edit, backwards, false);
+    cui_edit_private_coalesce_end(edit, result, before);
+    return result;
+}
 static bool cui_edit_private_string_equal(cui_str a, cui_str b) {
     return a.length == b.length && (!a.length || !memcmp(a.data, b.data, a.length));
 }
@@ -4873,7 +4911,7 @@ cui_edit_result cui_edit_set_content(cui_edit *edit, cui_edit_content content) {
 cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (!e->typing_pending)
+    if (!e->coalesce_pending)
         cui_edit_break_coalescing(e);
     return cui_edit_private_replace(e, text, e->cursor < e->anchor ? e->cursor : e->anchor,
                                     e->cursor > e->anchor ? e->cursor : e->anchor);
@@ -4881,14 +4919,15 @@ cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
 cui_edit_result cui_edit_type(cui_edit *edit, cui_str text) {
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (!text.length) {
+    if (!text.length || (text.data && memchr(text.data, '\n', text.length)) ||
+        (text.data && memchr(text.data, '\r', text.length))) {
         cui_edit_break_coalescing(edit);
         return cui_edit_insert(edit, text);
     }
     uint64_t before = edit->revision;
-    cui_edit_private_typing_begin(edit);
+    cui_edit_private_coalesce_begin(edit, CUI_EDIT_INTENT_TYPING);
     cui_edit_result result = cui_edit_insert(edit, text);
-    cui_edit_private_typing_end(edit, result, before);
+    cui_edit_private_coalesce_end(edit, result, before);
     return result;
 }
 static bool cui_edit_private_indent_match(const cui_edit *e, size_t at, size_t width,
@@ -5079,10 +5118,30 @@ static cui_edit_result cui_edit_private_erase(cui_edit *e, bool backwards) {
     return cui_edit_private_replace(e, (cui_str){0}, start, end);
 }
 cui_edit_result cui_edit_backspace(cui_edit *e) {
-    return cui_edit_private_erase(e, true);
+    if (!e)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (e->anchor != e->cursor) {
+        cui_edit_break_coalescing(e);
+        return cui_edit_private_erase(e, true);
+    }
+    uint64_t before = e->revision;
+    cui_edit_private_coalesce_begin(e, CUI_EDIT_INTENT_BACKSPACE);
+    cui_edit_result result = cui_edit_private_erase(e, true);
+    cui_edit_private_coalesce_end(e, result, before);
+    return result;
 }
 cui_edit_result cui_edit_delete(cui_edit *e) {
-    return cui_edit_private_erase(e, false);
+    if (!e)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (e->anchor != e->cursor) {
+        cui_edit_break_coalescing(e);
+        return cui_edit_private_erase(e, false);
+    }
+    uint64_t before = e->revision;
+    cui_edit_private_coalesce_begin(e, CUI_EDIT_INTENT_DELETE_FORWARD);
+    cui_edit_result result = cui_edit_private_erase(e, false);
+    cui_edit_private_coalesce_end(e, result, before);
+    return result;
 }
 /* Edit buffers are already valid UTF-8. Two adjacent ASCII scalars have a
  * grapheme boundary except CR/LF, so common editing never scans the prefix. */
@@ -5126,10 +5185,30 @@ static cui_edit_result cui_edit_private_erase_grapheme(cui_edit *e, bool backwar
     return cui_edit_private_replace(e, (cui_str){0}, start, end);
 }
 cui_edit_result cui_edit_backspace_grapheme(cui_edit *e) {
-    return cui_edit_private_erase_grapheme(e, true);
+    if (!e)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (e->anchor != e->cursor) {
+        cui_edit_break_coalescing(e);
+        return cui_edit_private_erase_grapheme(e, true);
+    }
+    uint64_t before = e->revision;
+    cui_edit_private_coalesce_begin(e, CUI_EDIT_INTENT_BACKSPACE);
+    cui_edit_result result = cui_edit_private_erase_grapheme(e, true);
+    cui_edit_private_coalesce_end(e, result, before);
+    return result;
 }
 cui_edit_result cui_edit_delete_grapheme(cui_edit *e) {
-    return cui_edit_private_erase_grapheme(e, false);
+    if (!e)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (e->anchor != e->cursor) {
+        cui_edit_break_coalescing(e);
+        return cui_edit_private_erase_grapheme(e, false);
+    }
+    uint64_t before = e->revision;
+    cui_edit_private_coalesce_begin(e, CUI_EDIT_INTENT_DELETE_FORWARD);
+    cui_edit_result result = cui_edit_private_erase_grapheme(e, false);
+    cui_edit_private_coalesce_end(e, result, before);
+    return result;
 }
 static cui_edit_result cui_edit_private_erase_word(cui_edit *edit, bool backwards) {
     if (!edit)
@@ -5222,7 +5301,9 @@ cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
         r = n == sizeof(v.text) ? CUI_EDIT_INVALID_ARGUMENT
                                 : cui_edit_type(e, (cui_str){v.text, n});
     } else if (v.type == CUI_EVENT_KEY_DOWN) {
-        cui_edit_break_coalescing(e);
+        if ((v.key != CUI_KEY_BACKSPACE && v.key != CUI_KEY_DELETE) ||
+            (v.modifiers & (CUI_MOD_CTRL | CUI_MOD_ALT)))
+            cui_edit_break_coalescing(e);
         bool shift = (v.modifiers & CUI_MOD_SHIFT) != 0;
         switch (v.key) {
         case CUI_KEY_LEFT:

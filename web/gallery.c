@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "../examples/composed_apps/app.h"
+#include "touch_page_host.h"
+static cui_touch_page_host page_touch_host;
+static unsigned page_touch_cancels;
 #include "cui/cui_carousel.h"
 #include "cui/cui_chart.h"
 #include "cui/cui_choice.h"
@@ -2099,7 +2102,15 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
                                         .pointer_button = (cui_pointer_button)button,
                                         .click_count = click_count});
 }
+unsigned gallery_touch_page_cancels(void) { return page_touch_cancels; }
+int gallery_touch_page_available(unsigned pointer_id) {
+    return cui_touch_page_available(&page_touch_host, pointer_id);
+}
 void gallery_touch(int type, float x, float y, unsigned pointer_id, int pointer_type) {
+    if (type == CUI_EVENT_CANCEL) {
+        page_touch_cancels++;
+        cui_touch_page_end(&page_touch_host, pointer_id);
+    }
     if (type == CUI_EVENT_POINTER_DOWN) {
         gallery_last_pointer_down_clicks = 1;
         gallery_pointer_down_count++;
@@ -4361,7 +4372,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     if (story != 75 && story != 80)
         cui_end_box(ui);
+    cui_touch_page_dispatch(&page_touch_host, ui);
     draw = cui_end_frame(ui);
+    cui_touch_page_finish(&page_touch_host, ui);
     if (notification_clear) {
         cui_notification_clear(&notification_state, host_seconds);
         notification_clear = false;

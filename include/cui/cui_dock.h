@@ -488,6 +488,38 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *, cui_id, const
                                                     cui_dock_workspace *,
                                                     const cui_dock_region_content regions[4],
                                                     cui_dock_workspace_options);
+/* Optional owned DockArea-style coordinator. Register descriptors before insertion.
+ * It owns four models/views and a workspace; panel callback user data is retained
+ * through release when hooks are provided. Model access is low-level: call
+ * reconcile after direct edits; aggregate edit operations reconcile themselves. */
+typedef struct cui_dock_area cui_dock_area;
+typedef struct {
+    cui_dock_panel panel;
+    void (*retain)(void *user);
+    void (*release)(void *user);
+} cui_dock_area_panel;
+cui_dock_area *cui_dock_area_create(cui_dock_config, size_t panel_capacity,
+                                    size_t zoom_event_capacity);
+void cui_dock_area_destroy(cui_dock_area *);
+cui_dock *cui_dock_area_model(cui_dock_area *, cui_dock_region);
+cui_dock_view *cui_dock_area_view(cui_dock_area *, cui_dock_region);
+cui_dock_workspace *cui_dock_area_workspace(cui_dock_area *);
+bool cui_dock_area_regions(cui_dock_area *, cui_dock_region_content out[4]);
+cui_dock_result cui_dock_area_register(cui_dock_area *, cui_dock_area_panel);
+cui_dock_result cui_dock_area_reconcile(cui_dock_area *);
+cui_dock_result cui_dock_area_insert(cui_dock_area *, cui_dock_region, cui_dock_node tab,
+                                      uint64_t key, size_t index);
+cui_dock_result cui_dock_area_remove(cui_dock_area *, uint64_t key);
+cui_dock_result cui_dock_area_move(cui_dock_area *, uint64_t key,
+                                    cui_dock_region destination, cui_dock_node target,
+                                    size_t index, cui_dock_kind axis, double ratio, bool before,
+                                    cui_dock_node *new_tab);
+cui_dock_result cui_dock_area_activate(cui_dock_area *, uint64_t key);
+cui_dock_result cui_dock_area_set_zoom(cui_dock_area *, uint64_t key, bool zoomed);
+cui_dock_result cui_dock_area_schema_import(cui_dock_area *, const cui_dock_schema_area *,
+                                             cui_dock_schema_key_fn, void *);
+/* Delivers source-style next-tick active net edges, then every queued zoom edge. */
+bool cui_dock_area_tick(cui_dock_area *);
 #ifdef __cplusplus
 }
 #endif

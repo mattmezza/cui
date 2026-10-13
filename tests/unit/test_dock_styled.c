@@ -2575,6 +2575,74 @@ static void test_nary_styled(void) {
     cui_dock_view_destroy(v);
     cui_dock_destroy(m);
 }
+static void test_area_aggregate(void) {
+    cui_dock_area *area = cui_dock_area_create((cui_dock_config){0}, 3, 4);
+    assert(area);
+    lifecycle_count = 0;
+    for (uint64_t key = 1; key <= 3; key++) {
+        cui_dock_area_panel descriptor = {.panel = {.key = key,
+            .user = &lifecycle_count, .zoomable = true,
+            .on_added = lifecycle_added, .on_removed = lifecycle_removed,
+            .set_active = lifecycle_active, .set_zoomed = lifecycle_zoom}};
+        assert(cui_dock_area_register(area, descriptor) == CUI_DOCK_OK);
+    }
+    cui_dock *left = cui_dock_area_model(area, CUI_DOCK_LEFT);
+    cui_dock_node tab = cui_dock_root(left);
+    assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, tab, 1, 0) == CUI_DOCK_OK);
+    assert(cui_dock_panel_find(left, 1, &tab, NULL));
+    assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, tab, 2, SIZE_MAX) == CUI_DOCK_OK);
+    assert(lifecycle_count == 2);
+    lifecycle_expect(0, 'A', 1);
+    lifecycle_expect(1, 'A', 2);
+    assert(cui_dock_workspace_set_edge(cui_dock_area_workspace(area), CUI_DOCK_LEFT, true, 150));
+    assert(cui_dock_area_reconcile(area) == CUI_DOCK_OK);
+    assert(cui_dock_area_tick(area) && lifecycle_count == 3);
+    lifecycle_expect(2, 'T', 1);
+    lifecycle_count = 0;
+    assert(cui_dock_area_activate(area, 2) == CUI_DOCK_OK);
+    assert(cui_dock_area_activate(area, 1) == CUI_DOCK_OK);
+    assert(cui_dock_area_tick(area) && lifecycle_count == 0);
+    assert(cui_dock_area_activate(area, 2) == CUI_DOCK_OK);
+    assert(cui_dock_area_tick(area) && lifecycle_count == 2);
+    lifecycle_expect(0, 'F', 1);
+    lifecycle_expect(1, 'T', 2);
+    lifecycle_count = 0;
+    assert(cui_dock_area_set_zoom(area, 2, true) == CUI_DOCK_OK);
+    assert(cui_dock_area_set_zoom(area, 2, false) == CUI_DOCK_OK);
+    assert(cui_dock_area_tick(area) && lifecycle_count == 2);
+    lifecycle_expect(0, 'Z', 2);
+    lifecycle_expect(1, 'z', 2);
+    lifecycle_count = 0;
+    cui_dock *right = cui_dock_area_model(area, CUI_DOCK_RIGHT);
+    assert(cui_dock_area_move(area, 2, CUI_DOCK_RIGHT, cui_dock_root(right), 0,
+                              CUI_DOCK_TABS, .5, false, NULL) == CUI_DOCK_OK);
+    assert(lifecycle_count == 1);
+    lifecycle_expect(0, 'A', 2);
+    assert(cui_dock_area_tick(area));
+    lifecycle_count = 0;
+    assert(cui_dock_area_remove(area, 2) == CUI_DOCK_OK);
+    assert(lifecycle_count == 1);
+    lifecycle_expect(0, 'R', 2);
+    assert(cui_dock_area_tick(area));
+    lifecycle_count = 0;
+    assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, tab, 3, SIZE_MAX) == CUI_DOCK_OK);
+    assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, tab, 3, SIZE_MAX) == CUI_DOCK_DUPLICATE_PANEL);
+    assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, tab, 99, SIZE_MAX) == CUI_DOCK_INVALID);
+    assert(lifecycle_count == 1);
+    lifecycle_expect(0, 'A', 3);
+    lifecycle_count = 0;
+    assert(cui_dock_move_split(left, 3, tab, CUI_DOCK_SPLIT_VERTICAL, .5, false, NULL) == CUI_DOCK_OK);
+    assert(cui_dock_area_reconcile(area) == CUI_DOCK_OK);
+    assert(lifecycle_count == 1);
+    lifecycle_expect(0, 'A', 3);
+    lifecycle_count = 0;
+    assert(cui_dock_remove(left, 3) == CUI_DOCK_OK);
+    assert(cui_dock_area_reconcile(area) == CUI_DOCK_OK);
+    assert(lifecycle_count == 1);
+    lifecycle_expect(0, 'R', 3);
+    cui_dock_area_destroy(area);
+}
+
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -2582,6 +2650,7 @@ int main(void) {
     test_factory_reconstruction();
     test_factory_typed();
     test_lifecycle();
+    test_area_aggregate();
     test_hidden_styled_geometry();
     test_nary_styled();
     memset(rendered, 0, sizeof rendered);

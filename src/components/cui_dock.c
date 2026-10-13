@@ -2817,3 +2817,353 @@ bool cui_dock_lifecycle_dispatch(cui_dock_lifecycle *state) {
     state->dispatching = false;
     return true;
 }
+
+typedef struct {
+    uint64_t key;
+    cui_dock_region region;
+    cui_dock_node tab;
+    size_t descriptor;
+    bool active;
+} dock_area_location;
+typedef struct {
+    size_t descriptor;
+    bool zoomed;
+} dock_area_zoom_event;
+struct cui_dock_area {
+    cui_dock *models[4];
+    cui_dock_view *views[4];
+    cui_dock_workspace *workspace;
+    cui_dock_area_panel *descriptors;
+    cui_dock_panel *panels;
+    dock_area_location *current, *scratch;
+    dock_area_zoom_event *zoom_events;
+    bool *notified, *notified_active;
+    size_t capacity, descriptor_count, current_count, zoom_capacity, zoom_count;
+    bool delivering;
+};
+static size_t dock_area_descriptor(const cui_dock_area *area, uint64_t key) {
+    for (size_t i = 0; i < area->descriptor_count; i++)
+        if (area->panels[i].key == key)
+            return i;
+    return SIZE_MAX;
+}
+static const dock_area_location *dock_area_find(const dock_area_location *items, size_t count,
+                                                uint64_t key) {
+    for (size_t i = 0; i < count; i++)
+        if (items[i].key == key)
+            return &items[i];
+    return NULL;
+}
+static cui_dock_result dock_area_fill(cui_dock_area *area, size_t region, cui_dock_node node,
+                                      dock_area_location *out, size_t *count, bool open) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(area->models[region], node, &info))
+        return CUI_DOCK_INVALID;
+    if (info.kind != CUI_DOCK_TABS) {
+        for (size_t i = 0; i < info.child_count; i++) {
+            cui_dock_node child;
+            if (!cui_dock_child_at(area->models[region], node, i, &child, NULL))
+                return CUI_DOCK_INVALID;
+            cui_dock_result result = dock_area_fill(area, region, child, out, count, open);
+            if (result != CUI_DOCK_OK)
+                return result;
+        }
+        return CUI_DOCK_OK;
+    }
+    for (size_t i = 0; i < info.panel_count; i++) {
+        uint64_t key;
+        if (!cui_dock_panel_at(area->models[region], node, i, &key))
+            return CUI_DOCK_INVALID;
+        if (*count == area->capacity)
+            return CUI_DOCK_CAPACITY;
+        if (dock_area_find(out, *count, key))
+            return CUI_DOCK_DUPLICATE_PANEL;
+        size_t descriptor = dock_area_descriptor(area, key);
+        if (descriptor == SIZE_MAX)
+            return CUI_DOCK_NOT_FOUND;
+        out[(*count)++] = (dock_area_location){key, (cui_dock_region)region, node, descriptor,
+                                               open && info.has_active && info.active_panel == key};
+    }
+    return CUI_DOCK_OK;
+}
+cui_dock_area *cui_dock_area_create(cui_dock_config config, size_t panel_capacity,
+                                    size_t zoom_event_capacity) {
+    if (!panel_capacity)
+        panel_capacity = 256;
+    if (!zoom_event_capacity)
+        zoom_event_capacity = panel_capacity;
+    if (panel_capacity > CUI_DOCK_PANEL_LIMIT || zoom_event_capacity > CUI_DOCK_PANEL_LIMIT)
+        return NULL;
+    cui_dock_area *area = calloc(1, sizeof(*area));
+    if (!area)
+        return NULL;
+    area->capacity = panel_capacity;
+    area->zoom_capacity = zoom_event_capacity;
+    area->descriptors = calloc(panel_capacity, sizeof(*area->descriptors));
+    area->panels = calloc(panel_capacity, sizeof(*area->panels));
+    area->current = calloc(panel_capacity, sizeof(*area->current));
+    area->scratch = calloc(panel_capacity, sizeof(*area->scratch));
+    area->zoom_events = calloc(zoom_event_capacity, sizeof(*area->zoom_events));
+    area->notified = calloc(panel_capacity, sizeof(*area->notified));
+    area->notified_active = calloc(panel_capacity, sizeof(*area->notified_active));
+    area->workspace = cui_dock_workspace_create();
+    for (size_t i = 0; i < 4; i++) {
+        area->models[i] = cui_dock_create_with_root(
+            config, i ? CUI_DOCK_ROOT_ANY : CUI_DOCK_ROOT_SPLIT);
+        area->views[i] = cui_dock_view_create(config.node_capacity, panel_capacity);
+    }
+    if (!area->descriptors || !area->panels || !area->current || !area->scratch ||
+        !area->zoom_events || !area->notified || !area->notified_active || !area->workspace ||
+        !area->models[0] || !area->models[1] ||
+        !area->models[2] || !area->models[3] || !area->views[0] || !area->views[1] ||
+        !area->views[2] || !area->views[3]) {
+        cui_dock_area_destroy(area);
+        return NULL;
+    }
+    return area;
+}
+void cui_dock_area_destroy(cui_dock_area *area) {
+    if (!area)
+        return;
+    for (size_t i = 0; i < area->descriptor_count; i++)
+        if (area->descriptors[i].release)
+            area->descriptors[i].release(area->panels[i].user);
+    for (size_t i = 0; i < 4; i++) {
+        cui_dock_view_destroy(area->views[i]);
+        cui_dock_destroy(area->models[i]);
+    }
+    cui_dock_workspace_destroy(area->workspace);
+    free(area->descriptors);
+    free(area->panels);
+    free(area->current);
+    free(area->scratch);
+    free(area->zoom_events);
+    free(area->notified);
+    free(area->notified_active);
+    free(area);
+}
+cui_dock *cui_dock_area_model(cui_dock_area *area, cui_dock_region region) {
+    return area && region >= CUI_DOCK_CENTER && region <= CUI_DOCK_BOTTOM
+               ? area->models[region]
+               : NULL;
+}
+cui_dock_view *cui_dock_area_view(cui_dock_area *area, cui_dock_region region) {
+    return area && region >= CUI_DOCK_CENTER && region <= CUI_DOCK_BOTTOM
+               ? area->views[region]
+               : NULL;
+}
+cui_dock_workspace *cui_dock_area_workspace(cui_dock_area *area) {
+    return area ? area->workspace : NULL;
+}
+bool cui_dock_area_regions(cui_dock_area *area, cui_dock_region_content out[4]) {
+    if (!area || !out)
+        return false;
+    for (size_t i = 0; i < 4; i++)
+        out[i] = (cui_dock_region_content){.model = area->models[i],
+                                           .view = area->views[i],
+                                           .panels = area->panels,
+                                           .panel_count = area->descriptor_count};
+    return true;
+}
+cui_dock_result cui_dock_area_register(cui_dock_area *area, cui_dock_area_panel descriptor) {
+    if (!area || area->delivering ||
+        (descriptor.retain == NULL) != (descriptor.release == NULL) ||
+        dock_area_descriptor(area, descriptor.panel.key) != SIZE_MAX)
+        return CUI_DOCK_INVALID;
+    if (area->descriptor_count == area->capacity)
+        return CUI_DOCK_CAPACITY;
+    size_t slot = area->descriptor_count++;
+    area->descriptors[slot] = descriptor;
+    area->panels[slot] = descriptor.panel;
+    if (descriptor.retain)
+        descriptor.retain(descriptor.panel.user);
+    return CUI_DOCK_OK;
+}
+cui_dock_result cui_dock_area_reconcile(cui_dock_area *area) {
+    if (!area || area->delivering)
+        return CUI_DOCK_INVALID;
+    cui_dock_workspace_snapshot workspace;
+    if (!cui_dock_workspace_save(area->workspace, &workspace))
+        return CUI_DOCK_INVALID;
+    size_t count = 0;
+    for (size_t i = 0; i < 4; i++) {
+        cui_dock_result result = dock_area_fill(area, i, cui_dock_root(area->models[i]),
+                                                area->scratch, &count, i == 0 || workspace.open[i - 1]);
+        if (result != CUI_DOCK_OK)
+            return result;
+    }
+    dock_area_location *old = area->current;
+    size_t old_count = area->current_count;
+    area->current = area->scratch;
+    area->scratch = old;
+    area->current_count = count;
+    area->delivering = true;
+    for (size_t i = 0; i < count; i++) {
+        dock_area_location now = area->current[i];
+        const dock_area_location *was = dock_area_find(old, old_count, now.key);
+        cui_dock_panel *panel = &area->panels[now.descriptor];
+        if ((!was || was->region != now.region || was->tab != now.tab) && panel->on_added)
+            panel->on_added(panel->user, now.key, area->models[now.region], now.tab);
+    }
+    for (size_t i = 0; i < old_count; i++) {
+        dock_area_location was = old[i];
+        if (dock_area_find(area->current, count, was.key))
+            continue;
+        cui_dock_panel *panel = &area->panels[was.descriptor];
+        if (panel->on_removed)
+            panel->on_removed(panel->user, was.key);
+        area->notified[was.descriptor] = false;
+    }
+    area->delivering = false;
+    return CUI_DOCK_OK;
+}
+static bool dock_area_region_of(const cui_dock_area *area, uint64_t key, size_t *region) {
+    for (size_t i = 0; i < 4; i++)
+        if (cui_dock_panel_find(area->models[i], key, NULL, NULL)) {
+            *region = i;
+            return true;
+        }
+    return false;
+}
+cui_dock_result cui_dock_area_insert(cui_dock_area *area, cui_dock_region region,
+                                      cui_dock_node tab, uint64_t key, size_t index) {
+    if (!area || area->delivering || region < CUI_DOCK_CENTER || region > CUI_DOCK_BOTTOM ||
+        dock_area_descriptor(area, key) == SIZE_MAX)
+        return CUI_DOCK_INVALID;
+    size_t existing;
+    if (dock_area_region_of(area, key, &existing))
+        return CUI_DOCK_DUPLICATE_PANEL;
+    if (area->current_count == area->capacity)
+        return CUI_DOCK_CAPACITY;
+    cui_dock_result result = cui_dock_insert(area->models[region], tab, key, index);
+    return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
+}
+cui_dock_result cui_dock_area_remove(cui_dock_area *area, uint64_t key) {
+    if (!area || area->delivering)
+        return CUI_DOCK_INVALID;
+    size_t region;
+    if (!dock_area_region_of(area, key, &region))
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock_result result = cui_dock_remove(area->models[region], key);
+    return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
+}
+cui_dock_result cui_dock_area_move(cui_dock_area *area, uint64_t key,
+                                    cui_dock_region destination, cui_dock_node target,
+                                    size_t index, cui_dock_kind axis, double ratio, bool before,
+                                    cui_dock_node *new_tab) {
+    if (!area || area->delivering || destination < CUI_DOCK_CENTER ||
+        destination > CUI_DOCK_BOTTOM)
+        return CUI_DOCK_INVALID;
+    size_t source;
+    if (!dock_area_region_of(area, key, &source))
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock_result result;
+    if (source != (size_t)destination)
+        result = cui_dock_transfer(area->models[source], key, area->models[destination], target,
+                                   index, axis, ratio, before, new_tab);
+    else if (axis == CUI_DOCK_TABS)
+        result = cui_dock_move(area->models[source], key, target, index);
+    else
+        result = cui_dock_move_split(area->models[source], key, target, axis, ratio, before,
+                                     new_tab);
+    return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
+}
+cui_dock_result cui_dock_area_activate(cui_dock_area *area, uint64_t key) {
+    if (!area || area->delivering)
+        return CUI_DOCK_INVALID;
+    size_t region;
+    if (!dock_area_region_of(area, key, &region))
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock_result result = cui_dock_activate(area->models[region], key);
+    return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
+}
+cui_dock_result cui_dock_area_set_zoom(cui_dock_area *area, uint64_t key, bool zoomed) {
+    if (!area || area->delivering)
+        return CUI_DOCK_INVALID;
+    size_t region;
+    if (!dock_area_region_of(area, key, &region))
+        return CUI_DOCK_NOT_FOUND;
+    const dock_area_location *location = dock_area_find(area->current, area->current_count, key);
+    if (!location || (zoomed && (!location->active ||
+                                  !area->panels[location->descriptor].zoomable)))
+        return CUI_DOCK_INVALID;
+    size_t previous_region = SIZE_MAX;
+    uint64_t previous_key = 0;
+    for (size_t i = 0; i < 4; i++)
+        if (cui_dock_view_zoomed(area->views[i], &previous_key)) {
+            previous_region = i;
+            break;
+        }
+    if ((!zoomed && previous_region == SIZE_MAX) ||
+        (zoomed && previous_region == region && previous_key == key))
+        return CUI_DOCK_OK;
+    size_t needed = (previous_region != SIZE_MAX) + (zoomed ? 1u : 0u);
+    if (needed > area->zoom_capacity - area->zoom_count)
+        return CUI_DOCK_CAPACITY;
+    if (previous_region != SIZE_MAX) {
+        size_t previous_descriptor = dock_area_descriptor(area, previous_key);
+        cui_dock_view_set_zoom(area->views[previous_region], area->models[previous_region],
+                               previous_key, false);
+        if (previous_descriptor != SIZE_MAX)
+            area->zoom_events[area->zoom_count++] =
+                (dock_area_zoom_event){previous_descriptor, false};
+    }
+    if (zoomed) {
+        if (!cui_dock_view_set_zoom(area->views[region], area->models[region], key, true))
+            return CUI_DOCK_INVALID;
+        area->zoom_events[area->zoom_count++] =
+            (dock_area_zoom_event){location->descriptor, true};
+    }
+    return cui_dock_area_reconcile(area);
+}
+typedef struct {
+    cui_dock_area *area;
+    cui_dock_schema_key_fn key;
+    void *user;
+} dock_area_import_key;
+static bool dock_area_schema_key(void *user, const cui_dock_schema_node *source, uint64_t *key) {
+    dock_area_import_key *context = user;
+    return context->key && context->key(context->user, source, key) &&
+           dock_area_descriptor(context->area, *key) != SIZE_MAX;
+}
+cui_dock_result cui_dock_area_schema_import(cui_dock_area *area,
+                                             const cui_dock_schema_area *schema,
+                                             cui_dock_schema_key_fn key, void *user) {
+    if (!area || area->delivering || !schema || !key)
+        return CUI_DOCK_INVALID;
+    cui_dock_region_content regions[4];
+    cui_dock_area_regions(area, regions);
+    dock_area_import_key context = {area, key, user};
+    cui_dock_result result = cui_dock_workspace_schema_import(
+        area->workspace, regions, schema, dock_area_schema_key, &context);
+    return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
+}
+bool cui_dock_area_tick(cui_dock_area *area) {
+    if (!area || area->delivering)
+        return false;
+    area->delivering = true;
+    for (unsigned phase = 0; phase < 2; phase++)
+        for (size_t i = 0; i < area->current_count; i++) {
+            dock_area_location location = area->current[i];
+            size_t descriptor = location.descriptor;
+            if (location.active != (phase != 0))
+                continue;
+            if (area->notified[descriptor] && area->notified_active[descriptor] == location.active)
+                continue;
+            bool was_active = area->notified[descriptor] && area->notified_active[descriptor];
+            area->notified[descriptor] = true;
+            area->notified_active[descriptor] = location.active;
+            cui_dock_panel *panel = &area->panels[descriptor];
+            if ((location.active || was_active) && panel->set_active)
+                panel->set_active(panel->user, location.key, location.active);
+        }
+    for (size_t i = 0; i < area->zoom_count; i++) {
+        dock_area_zoom_event event = area->zoom_events[i];
+        cui_dock_panel *panel = &area->panels[event.descriptor];
+        if (panel->set_zoomed)
+            panel->set_zoomed(panel->user, panel->key, event.zoomed);
+    }
+    area->zoom_count = 0;
+    area->delivering = false;
+    return true;
+}

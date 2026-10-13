@@ -1690,10 +1690,12 @@ static void form_footer(cui_context *context, const cui_theme *theme, void *user
     }
 }
 static cui_scroll_state scroll_state;
+static cui_scroll_state table_composition_scroll;
 static cui_table_model *table;
 static cui_table_state table_state;
 static cui_table_selection table_selection[64];
-static bool table_pinned;
+static bool table_pinned, table_actions, table_selection_locked, table_source_sort = true;
+static bool table_story_disabled;
 static int table_mode, table_row_hooks, table_inspections;
 static cui_table_selection_mode table_selection_mode = CUI_TABLE_SELECT_CELL;
 static cui_table_row table_rows[1000];
@@ -1752,6 +1754,32 @@ static void table_trailing(cui_context *context, const cui_theme *theme, void *u
                  context, cui_id_from(context, "inspect-row") + row, theme, cui_string("Inspect"),
                  (cui_button_options){.size = CUI_CONTROL_SMALL, .variant = CUI_BUTTON_GHOST}))
         table_inspections++;
+}
+static void table_action_cell(cui_context *context, const cui_theme *theme, void *user, size_t row,
+                              cui_id column) {
+    (void)user;
+    if (column != 102) {
+        bool selected = cui_table_is_selected(
+            &table_state,
+            (cui_table_options){.selection_mode = table_selection_mode,
+                                .multiple_selection = multiple_mode,
+                                .row_selection_disabled = table_selection_locked,
+                                .column_selection_disabled = table_selection_locked,
+                                .cell_selection_disabled = table_selection_locked},
+            table_rows[row].key, column);
+        cui_text(context, table_label(NULL, row, column), theme->font_size,
+                 selected ? theme->on_primary : theme->text);
+        return;
+    }
+    cui_id action =
+        cui_table_cell_id(cui_id_from(context, "data-table-action"), table_rows[row].key, column);
+    if (cui_button_ex(context, action, theme, cui_string("Inspect"),
+                      (cui_button_options){.size = CUI_CONTROL_XSMALL,
+                                           .width = -1,
+                                           .disabled = table_story_disabled})) {
+        table_inspections++;
+        cui_invalidate(context);
+    }
 }
 static void table_empty(cui_context *context, const cui_theme *theme, void *user) {
     (void)user;
@@ -4405,6 +4433,32 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 45: {
+        table_story_disabled = disabled != 0;
+        cui_begin_box(ui, cui_id_from(ui, "table-contract-controls"),
+                      (cui_box){.row = true, .width = width - 48, .gap = 4});
+        const cui_button_options toggle_options = {
+            .width = (width - 56) / 3, .size = CUI_CONTROL_SMALL, .disabled = disabled != 0};
+        if (cui_button_ex(ui, cui_id_from(ui, "table-selection-policy"), &t,
+                          cui_string(table_selection_locked ? "Select off" : "Select on"),
+                          toggle_options)) {
+            table_selection_locked = !table_selection_locked;
+            cui_invalidate(ui);
+        }
+        if (cui_button_ex(ui, cui_id_from(ui, "table-action-policy"), &t,
+                          cui_string(table_actions ? "Actions on" : "Actions off"),
+                          toggle_options)) {
+            table_actions = !table_actions;
+            cui_invalidate(ui);
+            for (size_t c = 0; c < 3; c++)
+                table_columns[c].nonselectable = table_actions && table_columns[c].key == 102;
+        }
+        if (cui_button_ex(ui, cui_id_from(ui, "table-sort-policy"), &t,
+                          cui_string(table_source_sort ? "Source sort" : "Legacy sort"),
+                          toggle_options)) {
+            table_source_sort = !table_source_sort;
+            cui_invalidate(ui);
+        }
+        cui_end_box(ui);
         const cui_table_column_group groups[] = {{cui_string("File details"), 2},
                                                  {cui_string("Storage"), 1}};
         const cui_table_group_row group_row = {groups, 2};
@@ -4430,8 +4484,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                 .trailing_width = 80,
                                 .loading = table_mode == 2,
                                 .render_loading = table_loading,
-                                .render_empty = table_empty},
-            table_label, NULL, NULL);
+                                .render_empty = table_empty,
+                                .row_selection_disabled = table_selection_locked,
+                                .column_selection_disabled = table_selection_locked,
+                                .cell_selection_disabled = table_selection_locked,
+                                .sort_cycle = table_source_sort ? CUI_TABLE_SORT_CYCLE_SOURCE
+                                                                : CUI_TABLE_SORT_CYCLE_LEGACY,
+                                .accessible_name = cui_string("Workspace files")},
+            table_label, table_actions ? table_action_cell : NULL, NULL);
         if (result.selection_mode_requested) {
             table_selection_mode = result.requested_selection_mode;
             redraw = true;
@@ -4444,7 +4504,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         snprintf(text, sizeof(text), "%zu rows / visible %zu-%zu / sort %d", cui_table_rows(table),
                  result.rows.end > result.rows.begin ? result.rows.begin + 1 : 0, result.rows.end,
                  (int)table_state.sort);
-        if (table_mode == 1) {
+        if (table_mode == 1 || table_actions) {
             snprintf(text, sizeof(text), "Visible row hooks: %d / inspections: %d", table_row_hooks,
                      table_inspections);
         }
@@ -4453,8 +4513,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 46: {
         float cell_width = (width - 48) / 3;
+        cui_design_metrics metrics;
+        bool scaled = design_size != CUI_DESIGN_INHERIT &&
+                      cui_design_measure(design_size, t.font_size / 16, &metrics);
+        float cell_height = scaled ? metrics.control_height : 40;
+        if (scaled)
+            cell_width = fmaxf(
+                cell_width, cui_measure_text(ui, cui_string("File 1000"), metrics.font_size).width +
+                                2 * metrics.padding_y + 2);
+        cui_scroll_options table_scroll = {.width = width - 48,
+                                           .height = 4 * cell_height + 12,
+                                           .content_width = 3 * cell_width,
+                                           .content_height = 4 * cell_height,
+                                           .horizontal = true,
+                                           .disabled = disabled != 0};
+        cui_id scroll_id = cui_id_from(ui, "table-composition-scroll");
+        if (!cui_scrollable_begin(ui, scroll_id, &t, &table_composition_scroll, table_scroll))
+            break;
         cui_id table_id = cui_id_from(ui, "composition-table");
-        cui_table_begin(ui, table_id, &t, width - 48);
+        if (!cui_table_begin_ex(
+                ui, table_id, &t,
+                (cui_table_basic_options){.width = 3 * cell_width,
+                                          .accessible_name = cui_string("Recent workspace files"),
+                                          .row_count = 4,
+                                          .column_count = 3})) {
+            cui_scrollable_end(ui, scroll_id, &t, &table_composition_scroll, table_scroll);
+            break;
+        }
         cui_id section_id = table_id + 50;
         cui_table_begin_section(ui, section_id, &t, CUI_TABLE_SECTION_HEADER);
         cui_set_semantic_details(ui, section_id, (cui_semantic_details){.parent = table_id});
@@ -4467,36 +4552,45 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          (cui_semantic_details){.parent = table_id});
             }
             cui_id row_id = table_id + r + 1;
-            cui_table_begin_row_ex(ui, row_id, &t,
-                                   (cui_table_row_options){.height = 40,
-                                                           .header = r == 0,
-                                                           .custom_background = true,
-                                                           .background = r == 0  ? t.accent
-                                                                         : r % 2 ? t.surface
-                                                                                 : t.background});
-            cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = section_id});
+            if (!cui_table_begin_row_checked(
+                    ui, row_id, &t,
+                    (cui_table_row_options){.height = cell_height,
+                                            .header = r == 0,
+                                            .parent = section_id,
+                                            .row_index = (unsigned)r + 1,
+                                            .custom_background = true,
+                                            .background = r == 0  ? t.accent
+                                                          : r % 2 ? t.surface
+                                                                  : t.background}))
+                continue;
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;
                 const char *headers[] = {"Name", "Status", "Size"};
                 cui_str label = r == 0 ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
-                if (r == 0)
-                    cui_table_begin_head_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT,
-                                              label);
-                else
-                    cui_table_begin_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT);
-                cui_set_semantic_details(ui, cell_id,
-                                         (cui_semantic_details){.parent = row_id,
-                                                                .row_index = (unsigned)r,
-                                                                .column_index = (unsigned)c + 1,
-                                                                .readonly = r == 0,
-                                                                .description = label});
-                cui_label(ui, &t, label);
-                cui_table_end(ui);
+                if (cui_table_begin_cell_ex(
+                        ui, cell_id, &t,
+                        (cui_table_cell_options){.width = cell_width,
+                                                 .height = cell_height,
+                                                 .align = CUI_TABLE_ALIGN_LEFT,
+                                                 .name = label,
+                                                 .parent = row_id,
+                                                 .row_index = (unsigned)r + 1,
+                                                 .column_index = (unsigned)c + 1,
+                                                 .header = r == 0,
+                                                 .design_size = design_size})) {
+                    if (scaled)
+                        cui_text_with_line_height(ui, label, metrics.font_size, t.text,
+                                                  metrics.line_height);
+                    else
+                        cui_label(ui, &t, label);
+                    cui_table_end(ui);
+                }
             }
             cui_table_end(ui);
         }
         cui_table_end(ui);
         cui_table_end(ui);
+        cui_scrollable_end(ui, scroll_id, &t, &table_composition_scroll, table_scroll);
         break;
     }
     case 48: {

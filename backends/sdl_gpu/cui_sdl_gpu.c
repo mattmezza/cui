@@ -236,7 +236,7 @@ static SDL_GPUTexture *bitmap_texture(cui_sdl_gpu *r, const cui_draw_command *c)
     size_t bytes = (size_t)key.width * key.height * 4;
     if (bytes > BITMAP_BUDGET)
         return NULL;
-    bool shadow = c->type == CUI_DRAW_DROP_SHADOW;
+    bool shadow = cui_shadow_type(c->type);
     gpu_bitmap *entry = NULL;
     for (size_t i = 0; i < BITMAPS; i++)
         if (r->bitmaps[i].texture && cui_bitmap_key_equal(&key, &r->bitmaps[i].key)) {
@@ -434,6 +434,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
             }
             break;
         }
+        case CUI_DRAW_INSET_SHADOW:
         case CUI_DRAW_DROP_SHADOW:
         case CUI_DRAW_IMAGE: {
             if (c->bounds.w <= 0 || c->bounds.h <= 0)
@@ -446,7 +447,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
                        (cui_color){255, 255, 255, (uint8_t)lroundf(c->bitmap.opacity * 255)}, 0, 0);
             if (d) {
                 d->texture = texture;
-                d->shadow = c->type == CUI_DRAW_DROP_SHADOW;
+                d->shadow = cui_shadow_type(c->type);
                 d->params.shape[2] = -1;
             }
             break;
@@ -738,6 +739,6 @@ cui_renderer cui_sdl_gpu_interface(cui_sdl_gpu *r) {
     return (cui_renderer){r, cui_sdl_gpu_driver(r),
                           (r && r->font ? CUI_RENDER_TEXT : 0) | CUI_RENDER_ROUNDED |
                               CUI_RENDER_CLIP | CUI_RENDER_IMAGE | CUI_RENDER_MESH |
-                              CUI_RENDER_DROP_SHADOW,
+                              CUI_RENDER_DROP_SHADOW | CUI_RENDER_INSET_SHADOW,
                           render, destroy};
 }

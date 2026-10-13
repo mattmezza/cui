@@ -4,6 +4,7 @@
 #include <stdlib.h>
 static float values[16];
 static cui_drop_shadow_raster raster;
+static cui_rect covered_element;
 static unsigned char *pixels;
 static size_t capacity;
 float *cui_canvas_shadow_values(void) {
@@ -70,4 +71,43 @@ int cui_canvas_shadow_prepare(float scale, float ox, float oy) {
         return 0;
     raster = next;
     return 1;
+}
+
+float cui_canvas_inset_shadow_element_bound(unsigned i) {
+    const float b[] = {covered_element.x, covered_element.y, covered_element.w, covered_element.h};
+    return i < 4 ? b[i] : 0;
+}
+static int bridge_inset(float scale, float ox, float oy, bool draw) {
+    cui_inset_shadow_paint p;
+    cui_inset_shadow_raster next;
+    if (!bridge_paint(&p) || !cui_effect_inset_shadow_query(p, scale, ox, oy, &next) ||
+        (draw && next.bytes > 32u * 1024u * 1024u))
+        return 0;
+    if (draw) {
+        if (next.bytes > capacity) {
+            void *updated = realloc(pixels, next.bytes);
+            if (!updated)
+                return 0;
+            pixels = updated;
+            capacity = next.bytes;
+        }
+        if (!cui_effect_inset_shadow_raster(p, scale, ox, oy,
+                                            (cui_effect_buffer){pixels, next.width, next.height,
+                                                                (size_t)next.width * 4,
+                                                                next.bytes}))
+            return 0;
+    }
+    raster = (cui_drop_shadow_raster){.bounds = next.bounds,
+                                      .covered_layer = next.covered_hole,
+                                      .width = next.width,
+                                      .height = next.height,
+                                      .bytes = next.bytes};
+    covered_element = next.covered_element;
+    return 1;
+}
+int cui_canvas_inset_shadow_query(float scale, float ox, float oy) {
+    return bridge_inset(scale, ox, oy, false);
+}
+int cui_canvas_inset_shadow_prepare(float scale, float ox, float oy) {
+    return bridge_inset(scale, ox, oy, true);
 }

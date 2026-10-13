@@ -1,0 +1,62 @@
+{
+  "upstream": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "dependencies": {
+    "gpui-pre": {
+      "version": "0.3.8",
+      "archive_sha256": "d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/style.rs": "b4a0e838fc7050cef25f71aae623cf86010c2ec361600479d24ce1aaff91bdc1",
+        "src/window.rs": "2fe230dc311a9dc9b0475e2b5bbe3fbd6b4f54251e38c2b1a977d806fa3ae3e0",
+        "src/geometry.rs": "900fc506a964cda44ed0cf1f97c01ff28d7268c87c9eeadbf7a4f1bb50e33edd",
+        "src/scene.rs": "c48da8a1e703faca710eda4e7ab4247b709af29fc1a072832945aac5ffa0595e",
+        "src/elements/div.rs": "f320948b8f90e36b7100ac3e0e061235d1e9422aeb323918e313f7d69980cfa9"
+      },
+      "verified_in_this_audit": true
+    },
+    "gpui-pre-macros": {
+      "version": "0.3.8",
+      "archive_sha256": "d2ad26ca759364694cb55487bebff4c1b7dd6accab49990ff3cda6f7a818a9f4",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/styles.rs": "5fbd5dac9b7cdc954860a018f6b6925e49c82b4dcfe29424ecea828d47a3ff40"
+      },
+      "verified_in_this_audit": true
+    },
+    "gpui-pre-wgpu": {
+      "version": "0.3.8",
+      "archive_sha256": "439c5421cafe1a7cf68d0c0ae5cc82b26fad6b0e6345ac98d20acaf1f2463914",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/shaders.wgsl": "1d91f2c8a1958a241f1b659a4137c160592c8076b9be09049db4c9fb9a344529",
+        "src/wgpu_renderer.rs": "8dd047382c133f1d2caa08c711a12998ffb7386638aa74d8d0b3a580d078074a"
+      },
+      "verified_in_this_audit": true
+    },
+    "gpui-pre-apple": {
+      "version": "0.3.8",
+      "archive_sha256": "bfdd914311cd12894367c8b9908947bb0c27fd42f8b9a5ff7a0730551a83fa4c",
+      "extracted_files_match_archive": true,
+      "files": {
+        "src/shaders.metal": "436647169d914d26092fcf3bfd4020a6638a97d1ea3b39466fd2d4641d1c219e",
+        "src/metal_renderer.rs": "72928305adc4671f3b8f4d97e2344738980e4c3e662926d840f4b69fc674f227"
+      },
+      "verified_in_this_audit": true
+    }
+  },
+  "contract": {
+    "public": "style.rs:349-393 BoxShadow inset bool; no implicit layer",
+    "phase": "style.rs:706-740 DROP -> background -> INSET -> continuation -> border",
+    "opacity_clip": "elements/div.rs:2543-2553 ancestor opacity; own clip only continuation",
+    "geometry": "window.rs:4460-4501; geometry.rs:1067-1073,1323; window.rs:3196-3205",
+    "culling": "scene.rs:88-94,235-238 covered HOLE intersects current mask",
+    "shader": "shaders.wgsl:320-342,360-379,391-395,976-1045; shaders.metal:462-555",
+    "formula": "(1 - raw four-midpoint blurred hole coverage) * element SDF coverage",
+    "hole_radii": "max(original_clamped_radius - spread,0)*scale; no derived-size clamp",
+    "raster_domain": "covered element; no tail expansion",
+    "empty": "physical covering then hole/element emptiness, not logical collapse",
+    "zero_sigma": "source unrounded SDF max(qx,qy) fast path",
+    "gaussian": "no drop rectangular support cutoff; raw source endpoint integrals before complement"
+  },
+  "fixture_boundary": "Actual CUI model/pixels and independently derived source expectations, no native GPUI executions"
+}

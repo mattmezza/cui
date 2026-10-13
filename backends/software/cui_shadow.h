@@ -11,6 +11,7 @@
 #define CUI_SHADOW_CACHE_SLOTS 64
 typedef struct {
     cui_drop_shadow_paint key;
+    cui_draw_type kind;
     float scale, origin_x, origin_y;
     unsigned char *pixels;
     cui_drop_shadow_raster raster;
@@ -29,9 +30,31 @@ static inline void cui_shadow_destroy(cui_shadow_cache *cache) {
     free(cache->commands);
     memset(cache, 0, sizeof(*cache));
 }
+static inline bool cui_shadow_type(cui_draw_type type) {
+    return type == CUI_DRAW_DROP_SHADOW || type == CUI_DRAW_INSET_SHADOW;
+}
+static inline bool cui_shadow_query(cui_draw_type kind, cui_drop_shadow_paint p, float s, float x,
+                                    float y, cui_drop_shadow_raster *out) {
+    if (kind == CUI_DRAW_DROP_SHADOW)
+        return cui_effect_drop_shadow_query(p, s, x, y, out);
+    cui_inset_shadow_raster q;
+    if (!cui_effect_inset_shadow_query(p, s, x, y, &q))
+        return false;
+    *out = (cui_drop_shadow_raster){.bounds = q.bounds,
+                                    .covered_layer = q.covered_hole,
+                                    .width = q.width,
+                                    .height = q.height,
+                                    .bytes = q.bytes};
+    return true;
+}
+static inline bool cui_shadow_raster(cui_draw_type kind, cui_drop_shadow_paint p, float s, float x,
+                                     float y, cui_effect_buffer b) {
+    return kind == CUI_DRAW_DROP_SHADOW ? cui_effect_drop_shadow_raster(p, s, x, y, b)
+                                        : cui_effect_inset_shadow_raster(p, s, x, y, b);
+}
 static inline bool cui_shadow_present(const cui_draw_list *list) {
     for (size_t i = 0; i < list->count; i++)
-        if (list->commands[i].type == CUI_DRAW_DROP_SHADOW)
+        if (cui_shadow_type(list->commands[i].type))
             return true;
     return false;
 }
@@ -97,9 +120,9 @@ static inline bool cui_shadow_prepare(cui_shadow_cache *cache, const cui_draw_li
                 return false;
             clip = stack[--depth];
         }
-        if (c.type == CUI_DRAW_DROP_SHADOW) {
+        if (cui_shadow_type(c.type)) {
             cui_drop_shadow_raster q;
-            if (!cui_effect_drop_shadow_query(c.shadow, sx, ox, oy, &q))
+            if (!cui_shadow_query(c.type, c.shadow, sx, ox, oy, &q))
                 return false;
             /* Exact query covering avoids recomputing offset/spread with a
              * different precision (notably JS doubles and high f32 origins). */
@@ -118,11 +141,16 @@ static inline bool cui_shadow_prepare(cui_shadow_cache *cache, const cui_draw_li
                 key.layer.color.a = 255;
                 float cache_ox = 0, cache_oy = 0;
                 cui_drop_shadow_raster normalized;
-                if (!cui_effect_drop_shadow_query(key, sx, 0, 0, &normalized))
-                    return false;
+                bool normalized_valid = cui_shadow_query(c.type, key, sx, 0, 0, &normalized);
                 /* Large f32 origins can lose fractions before source covering.
                  * Reuse translation only when the actual covered geometry agrees. */
-                if (normalized.width != q.width || normalized.height != q.height ||
+                if (!normalized_valid || normalized.width != q.width ||
+                    normalized.height != q.height ||
+                    (c.type == CUI_DRAW_INSET_SHADOW &&
+                     (normalized.covered_layer.w != q.covered_layer.w ||
+                      normalized.covered_layer.h != q.covered_layer.h ||
+                      normalized.covered_layer.x + dx != q.covered_layer.x ||
+                      normalized.covered_layer.y + dy != q.covered_layer.y)) ||
                     roundf(normalized.bounds.x * sx) + dx != roundf(q.bounds.x * sx + ox) ||
                     roundf(normalized.bounds.y * sx) + dy != roundf(q.bounds.y * sx + oy)) {
                     key = c.shadow;
@@ -133,8 +161,8 @@ static inline bool cui_shadow_prepare(cui_shadow_cache *cache, const cui_draw_li
                 }
                 cui_shadow_entry *entry = NULL;
                 for (size_t j = 0; j < CUI_SHADOW_CACHE_SLOTS; j++)
-                    if (cache->entries[j].pixels && cache->entries[j].scale == sx &&
-                        cache->entries[j].origin_x == cache_ox &&
+                    if (cache->entries[j].pixels && cache->entries[j].kind == c.type &&
+                        cache->entries[j].scale == sx && cache->entries[j].origin_x == cache_ox &&
                         cache->entries[j].origin_y == cache_oy &&
                         cui_shadow_key_equal(cache->entries[j].key, key)) {
                         entry = &cache->entries[j];
@@ -166,14 +194,15 @@ static inline bool cui_shadow_prepare(cui_shadow_cache *cache, const cui_draw_li
                     unsigned char *pixels = malloc(normalized.bytes);
                     if (!pixels)
                         return false;
-                    if (!cui_effect_drop_shadow_raster(
-                            key, sx, cache_ox, cache_oy,
+                    if (!cui_shadow_raster(
+                            c.type, key, sx, cache_ox, cache_oy,
                             (cui_effect_buffer){pixels, normalized.width, normalized.height,
                                                 (size_t)normalized.width * 4, normalized.bytes})) {
                         free(pixels);
                         return false;
                     }
                     *entry = (cui_shadow_entry){.key = key,
+                                                .kind = c.type,
                                                 .scale = sx,
                                                 .origin_x = cache_ox,
                                                 .origin_y = cache_oy,

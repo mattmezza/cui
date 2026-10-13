@@ -26,6 +26,22 @@ typedef struct {
 } cui_effect_buffer;
 bool cui_effect_drop_shadow_raster(cui_drop_shadow_paint, float scale, float origin_x,
                                    float origin_y, cui_effect_buffer output);
+/* Same checked transform/finite domain and caller-owned buffer contract as DROP.
+ * Empty physical hole/element yields an empty raster. Consumers cull against
+ * covered_hole but paint/crop covered_element; pure calls have no ancestor mask.
+ * Invalid query/sample/raster calls preserve output. */
+typedef struct {
+    cui_rect bounds;                        /* Logical placement of covered-element raster. */
+    cui_rect covered_hole, covered_element; /* Physical integer geometry. */
+    unsigned width, height;
+    size_t bytes;
+} cui_inset_shadow_raster;
+bool cui_effect_inset_shadow_query(cui_inset_shadow_paint, float scale, float origin_x,
+                                   float origin_y, cui_inset_shadow_raster *out);
+bool cui_effect_inset_shadow_sample(cui_inset_shadow_paint, float scale, float origin_x,
+                                    float origin_y, float x, float y, float *out);
+bool cui_effect_inset_shadow_raster(cui_inset_shadow_paint, float scale, float origin_x,
+                                    float origin_y, cui_effect_buffer output);
 /* Checked point sample in physical pixels, source f32 four-midpoint kernel. */
 bool cui_effect_drop_shadow_sample(cui_drop_shadow_paint, float scale, float origin_x,
                                    float origin_y, float x, float y, float *out);

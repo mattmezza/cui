@@ -301,6 +301,79 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+#define CUI_PLOT_SANKEY_NODE_LIMIT 256u
+#define CUI_PLOT_SANKEY_LINK_LIMIT 1024u
+typedef enum {
+    CUI_PLOT_SANKEY_JUSTIFY,
+    CUI_PLOT_SANKEY_LEFT,
+    CUI_PLOT_SANKEY_RIGHT,
+    CUI_PLOT_SANKEY_CENTER
+} cui_plot_sankey_align;
+typedef enum { CUI_PLOT_SANKEY_LINEAR, CUI_PLOT_SANKEY_SQRT } cui_plot_sankey_value_scale;
+typedef struct {
+    size_t source, target;
+    double value;
+} cui_plot_sankey_link;
+typedef struct {
+    size_t index, depth, height, layer, source_count, target_count;
+    double value, x0, y0, x1, y1;
+} cui_plot_sankey_node;
+typedef struct {
+    size_t index, source, target;
+    double value, y0, y1, width, source_width, target_width;
+} cui_plot_sankey_link_layout;
+typedef struct {
+    cui_plot_sankey_node *nodes;
+    cui_plot_sankey_link_layout *links;
+    size_t node_count, link_count, node_capacity, link_capacity;
+} cui_plot_sankey_graph;
+typedef struct {
+    cui_plot_rect extent;
+    double node_width, node_padding;
+    unsigned iterations;
+    cui_plot_sankey_align align;
+    cui_plot_sankey_value_scale value_scale;
+} cui_plot_sankey_options;
+typedef enum {
+    CUI_PLOT_SANKEY_NO_ERROR,
+    CUI_PLOT_SANKEY_MISSING_NODE,
+    CUI_PLOT_SANKEY_CIRCULAR_LINK
+} cui_plot_sankey_error_kind;
+typedef struct {
+    cui_plot_sankey_error_kind kind;
+    size_t node;
+} cui_plot_sankey_error;
+/* Source defaults24px width,8px padding,Justify,6 iterations,Linear,[0,0,1,1].
+ * Explicit zero width/padding/iterations are honored. Bounds finite with positive
+ * height/nonnegative width, coordinates<=16384; iterations<=100. */
+cui_plot_sankey_options cui_plot_sankey_defaults(void);
+/* Caller supplies output arrays/capacities; count metadata set only on success.
+ * No borrowed input after topology. Values finite/nonnegative; topology scales
+ * once, preserving scaled values in graph. Missing/cycle errors populate detail;
+ * every failure preserves graph and arrays. CAPACITY when bounded counts or
+ * caller storage insufficient. Empty graphs supported. */
+cui_plot_result cui_plot_sankey_topology(cui_plot_sankey_graph *, size_t node_count,
+                                         const cui_plot_sankey_link *, size_t link_count,
+                                         const cui_plot_sankey_options *, cui_plot_sankey_error *);
+/* Complete geometry from unmodified topology, reusing ranks/scaled values.
+ * value_scale is ignored here, as source layout_from does not rescale graph.
+ * Relayout may change extent/alignment/width/padding/iterations. Transactional. */
+cui_plot_result cui_plot_sankey_layout_from(cui_plot_sankey_graph *,
+                                            const cui_plot_sankey_options *);
+cui_plot_result cui_plot_sankey_layout(cui_plot_sankey_graph *, size_t node_count,
+                                       const cui_plot_sankey_link *, size_t link_count,
+                                       const cui_plot_sankey_options *, cui_plot_sankey_error *);
+/* Shared end-breadth calculation for adapters with caller-positioned nodes.
+ * Updates link y0/y1/source_width/target_width from current node y0/y1 and
+ * scaled values; nominal width and topology remain unchanged. Transactional.
+ * Models source compute_link_breadths, not an additional frozen public export. */
+cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *);
+size_t cui_plot_sankey_layer_count(const cui_plot_sankey_graph *);
+/* Query adjacency in opposite-node y0 order with input-index ties, matching
+ * layout link ordering; topology coordinates y0=0 preserve input order. */
+cui_plot_result cui_plot_sankey_node_links(const cui_plot_sankey_graph *, size_t node,
+                                           bool outgoing, size_t *, size_t capacity,
+                                           size_t *required);
 /* Geometry consumed by the frozen sankey_link_path function. source_x is the
  * source node's right edge, target_x the target node's left edge. End widths
  * are independent (tapered ribbons); y coordinates are their centerlines. */
@@ -1803,6 +1876,666 @@ cui_plot_result cui_plot_sankey_link_path(const cui_plot_sankey_ribbon *link, do
     if (capacity < 5)
         return CUI_PLOT_CAPACITY;
     memcpy(out, path, sizeof path);
+    return CUI_PLOT_OK;
+}
+
+/* Shared Base extraction of the original CUI Chart Sankey solver, audited
+ * against frozen Plot Sankey. Chart adapter migration is coordinated separately.
+ * Source defaults/zero policies/scaled values/topology reuse are explicit here. */
+typedef struct {
+    size_t count, link_count;
+    const cui_plot_sankey_link_layout *links;
+    double width, height, node_width, node_padding;
+    struct {
+        double left, right, top, bottom;
+    } sankey_margins;
+    cui_plot_sankey_align sankey_align;
+    cui_plot_sankey_value_scale sankey_value_scale;
+    unsigned sankey_iterations;
+} plot_sankey_work;
+static double plot_sankey_scaled(const plot_sankey_work *o, double value) {
+    (void)o;
+    return value; /* graph values were scaled during topology */
+}
+static void plot_sankey_relax(const plot_sankey_work *o, cui_plot_sankey_node *nodes, size_t layers,
+                              double padding, double ky);
+static void plot_sankey_center_and_stagger(const plot_sankey_work *o, cui_plot_sankey_node *nodes,
+                                           size_t layers);
+static cui_plot_result plot_sankey_prepare(const plot_sankey_work *o, cui_plot_sankey_node *out,
+                                           bool topology_only, bool reuse) {
+    cui_plot_sankey_node nodes[256] = {{0}};
+    if (reuse)
+        memcpy(nodes, out, o->count * sizeof(*out));
+    size_t indegree[256] = {0}, order[256] = {0}, order_count = 0;
+    long double incoming[256] = {0}, outgoing[256] = {0};
+    long double scaled_in[256] = {0}, scaled_out[256] = {0};
+    for (size_t i = 0; i < o->count; ++i) {
+        nodes[i].index = i;
+        nodes[i].source_count = 0;
+        nodes[i].target_count = 0;
+    }
+    for (size_t i = 0; i < o->link_count; i++) {
+        const cui_plot_sankey_link_layout *link = &o->links[i];
+        if (link->source >= o->count || link->target >= o->count || link->source == link->target ||
+            !isfinite(link->value) || link->value < 0)
+            return CUI_PLOT_INVALID;
+        indegree[link->target]++;
+        nodes[link->source].source_count++;
+        nodes[link->target].target_count++;
+        outgoing[link->source] += link->value;
+        incoming[link->target] += link->value;
+        double scaled = plot_sankey_scaled(o, link->value);
+        scaled_out[link->source] += scaled;
+        scaled_in[link->target] += scaled;
+    }
+    for (size_t i = 0; i < o->count; i++) {
+        if (!isfinite(incoming[i]) || !isfinite(outgoing[i]) || incoming[i] > DBL_MAX ||
+            outgoing[i] > DBL_MAX)
+            return CUI_PLOT_OVERFLOW;
+        nodes[i].value = (double)fmaxl(incoming[i], outgoing[i]);
+        if (!indegree[i])
+            order[order_count++] = i;
+    }
+    if (!reuse) {
+        for (size_t pos = 0; pos < order_count; pos++) {
+            size_t source = order[pos];
+            for (size_t i = 0; i < o->link_count; i++)
+                if (o->links[i].source == source) {
+                    size_t target = o->links[i].target;
+                    if (nodes[target].depth < nodes[source].depth + 1)
+                        nodes[target].depth = nodes[source].depth + 1;
+                    if (!--indegree[target])
+                        order[order_count++] = target;
+                }
+        }
+        if (order_count != o->count)
+            return CUI_PLOT_INVALID; /* cyclic */
+        for (size_t pos = order_count; pos > 0; pos--) {
+            size_t source = order[pos - 1];
+            for (size_t i = 0; i < o->link_count; i++)
+                if (o->links[i].source == source) {
+                    size_t target = o->links[i].target;
+                    if (nodes[source].height < nodes[target].height + 1)
+                        nodes[source].height = nodes[target].height + 1;
+                }
+        }
+    }
+    size_t layers = 1;
+    for (size_t i = 0; i < o->count; i++)
+        if (layers < nodes[i].depth + 1)
+            layers = nodes[i].depth + 1;
+    size_t counts[256] = {0};
+    long double sums[256] = {0};
+    for (size_t i = 0; i < o->count; i++) {
+        size_t layer = nodes[i].depth;
+        if (o->sankey_align == CUI_PLOT_SANKEY_RIGHT)
+            layer = layers - 1 - nodes[i].height;
+        else if (o->sankey_align == CUI_PLOT_SANKEY_JUSTIFY && !nodes[i].source_count)
+            layer = layers - 1;
+        else if (o->sankey_align == CUI_PLOT_SANKEY_CENTER && !nodes[i].target_count &&
+                 nodes[i].source_count) {
+            size_t nearest = layers;
+            for (size_t j = 0; j < o->link_count; j++)
+                if (o->links[j].source == i && nodes[o->links[j].target].depth < nearest)
+                    nearest = nodes[o->links[j].target].depth;
+            layer = nearest ? nearest - 1 : 0;
+        }
+        nodes[i].layer = layer;
+        counts[layer]++;
+        sums[layer] += fmaxl(scaled_in[i], scaled_out[i]);
+    }
+    double width = o->node_width;
+    double padding = o->node_padding;
+    double plot_left = o->sankey_margins.left;
+    double plot_right = o->width - o->sankey_margins.right;
+    double plot_top = o->sankey_margins.top;
+    double plot_bottom = o->height - o->sankey_margins.bottom;
+    double plot_height = plot_bottom - plot_top;
+    for (size_t i = 0; i < o->count; ++i) {
+        nodes[i].x0 =
+            plot_left +
+            (layers > 1 ? (plot_right - plot_left - width) * nodes[i].layer / (layers - 1) : 0);
+        nodes[i].x1 = nodes[i].x0 + width;
+    }
+    if (topology_only) {
+        memcpy(out, nodes, o->count * sizeof(*out));
+        return CUI_PLOT_OK;
+    }
+    size_t max_count = 1;
+    for (size_t l = 0; l < layers; l++)
+        if (counts[l] > max_count)
+            max_count = counts[l];
+    padding = fmin(padding, plot_height / (max_count > 1 ? max_count - 1 : 1));
+    long double ky = LDBL_MAX;
+    for (size_t l = 0; l < layers; l++)
+        if (sums[l] > 0) {
+            long double available = plot_height - padding * (counts[l] - 1);
+            long double candidate = available / sums[l];
+            if (candidate < ky)
+                ky = candidate;
+        }
+    if (ky == LDBL_MAX)
+        ky = 0;
+    if (!isfinite(ky) || ky < 0)
+        return CUI_PLOT_OVERFLOW;
+    for (size_t l = 0; l < layers; l++) {
+        long double y = plot_top;
+        if (!isfinite(y) || fabsl(y) > 32768)
+            return CUI_PLOT_OVERFLOW;
+        for (size_t i = 0; i < o->count; i++)
+            if (nodes[i].layer == l) {
+                double x = plot_left +
+                           (layers > 1 ? (plot_right - plot_left - width) * l / (layers - 1) : 0);
+                nodes[i].x0 = x;
+                nodes[i].x1 = (x + width);
+                nodes[i].y0 = y;
+                y += fmaxl(scaled_in[i], scaled_out[i]) * ky;
+                if (!isfinite(y) || fabsl(y) > 32768)
+                    return CUI_PLOT_OVERFLOW;
+                nodes[i].y1 = y;
+                y += padding;
+            }
+        long double leftover = (plot_bottom - y + padding) / (counts[l] + 1);
+        size_t ordinal = 0;
+        for (size_t i = 0; i < o->count; i++)
+            if (nodes[i].layer == l) {
+                double shift = (double)(leftover * ++ordinal);
+                nodes[i].y0 += shift;
+                nodes[i].y1 += shift;
+            }
+    }
+    plot_sankey_relax(o, nodes, layers, padding, (double)ky);
+    plot_sankey_center_and_stagger(o, nodes, layers);
+    memcpy(out, nodes, o->count * sizeof(*out));
+    return CUI_PLOT_OK;
+}
+static void plot_sankey_center_and_stagger(const plot_sankey_work *o, cui_plot_sankey_node *nodes,
+                                           size_t layers) {
+    double top = o->sankey_margins.top;
+    double bottom = o->height - o->sankey_margins.bottom;
+    double lo[256], hi[256], height[256] = {0};
+    size_t count[256] = {0}, single[256] = {0};
+    for (size_t layer = 0; layer < layers; layer++) {
+        lo[layer] = DBL_MAX;
+        hi[layer] = -DBL_MAX;
+    }
+    for (size_t i = 0; i < o->count; i++) {
+        size_t layer = nodes[i].layer;
+        lo[layer] = fmin(lo[layer], nodes[i].y0);
+        hi[layer] = fmax(hi[layer], nodes[i].y1);
+        count[layer]++;
+        single[layer] = i;
+    }
+    for (size_t layer = 0; layer < layers; layer++) {
+        double shift = hi[layer] > lo[layer] ? (top + bottom - lo[layer] - hi[layer]) / 2 : 0;
+        for (size_t i = 0; i < o->count; i++)
+            if (nodes[i].layer == layer) {
+                nodes[i].y0 += shift;
+                nodes[i].y1 += shift;
+            }
+        if (count[layer] == 1)
+            height[layer] = nodes[single[layer]].y1 - nodes[single[layer]].y0;
+    }
+    size_t run = 0;
+    for (size_t layer = 1; layer < layers; layer++) {
+        if (count[layer] == 1 && count[layer - 1] == 1 &&
+            fabs(height[layer] - height[layer - 1]) < 1e-3) {
+            run++;
+            if (run % 2) {
+                double slack = fmax(0, bottom - top - height[layer]);
+                double shift = fmin(height[layer] * .15, slack / 2);
+                nodes[single[layer]].y0 += shift;
+                nodes[single[layer]].y1 += shift;
+            }
+        } else
+            run = 0;
+    }
+}
+static void plot_sankey_resolve(cui_plot_sankey_node *nodes, size_t count, size_t layer,
+                                double padding, double top, double bottom, double beta) {
+    size_t indices[256], n = 0;
+    for (size_t i = 0; i < count; i++)
+        if (nodes[i].layer == layer)
+            indices[n++] = i;
+    for (size_t i = 1; i < n; i++) {
+        size_t item = indices[i], j = i;
+        while (j && nodes[indices[j - 1]].y0 > nodes[item].y0) {
+            indices[j] = indices[j - 1];
+            j--;
+        }
+        indices[j] = item;
+    }
+    if (!n)
+        return;
+    size_t middle = n / 2;
+    double cursor = nodes[indices[middle]].y0 - padding;
+    for (size_t i = middle; i > 0; i--) {
+        cui_plot_sankey_node *node = &nodes[indices[i - 1]];
+        double shift = fmax(0, node->y1 - cursor) * beta;
+        node->y0 -= shift;
+        node->y1 -= shift;
+        cursor = node->y0 - padding;
+    }
+    cursor = nodes[indices[middle]].y1 + padding;
+    for (size_t i = middle + 1; i < n; i++) {
+        cui_plot_sankey_node *node = &nodes[indices[i]];
+        double shift = fmax(0, cursor - node->y0) * beta;
+        node->y0 += shift;
+        node->y1 += shift;
+        cursor = node->y1 + padding;
+    }
+    cursor = bottom;
+    for (size_t i = n; i > 0; i--) {
+        cui_plot_sankey_node *node = &nodes[indices[i - 1]];
+        double shift = fmax(0, node->y1 - cursor) * beta;
+        node->y0 -= shift;
+        node->y1 -= shift;
+        cursor = node->y0 - padding;
+    }
+    cursor = top;
+    for (size_t i = 0; i < n; i++) {
+        cui_plot_sankey_node *node = &nodes[indices[i]];
+        double shift = fmax(0, cursor - node->y0) * beta;
+        node->y0 += shift;
+        node->y1 += shift;
+        cursor = node->y1 + padding;
+    }
+}
+static void plot_sankey_sort_adj(const plot_sankey_work *o, const cui_plot_sankey_node *nodes,
+                                 size_t *order, size_t first, size_t end, bool sources) {
+    for (size_t i = first + 1; i < end; i++) {
+        size_t item = order[i], j = i;
+        size_t other = sources ? o->links[item].target : o->links[item].source;
+        while (j > first) {
+            size_t previous = order[j - 1];
+            size_t previous_other = sources ? o->links[previous].target : o->links[previous].source;
+            if (nodes[previous_other].y0 < nodes[other].y0 ||
+                (nodes[previous_other].y0 == nodes[other].y0 && previous < item))
+                break;
+            order[j] = previous;
+            j--;
+        }
+        order[j] = item;
+    }
+}
+static double plot_sankey_link_width(const plot_sankey_work *o, size_t link, double ky) {
+    return plot_sankey_scaled(o, o->links[link].value) * ky;
+}
+static double plot_sankey_target_top(const plot_sankey_work *o, const cui_plot_sankey_node *nodes,
+                                     const size_t *out_order, const size_t *out_offsets,
+                                     const size_t *in_order, const size_t *in_offsets,
+                                     size_t source, size_t target, double padding, double ky) {
+    size_t outgoing = out_offsets[source + 1] - out_offsets[source];
+    double y = nodes[source].y0 - (outgoing ? outgoing - 1 : 0) * padding / 2;
+    for (size_t pos = out_offsets[source]; pos < out_offsets[source + 1]; pos++) {
+        size_t link = out_order[pos];
+        if (o->links[link].target == target)
+            break;
+        y += plot_sankey_link_width(o, link, ky) + padding;
+    }
+    for (size_t pos = in_offsets[target]; pos < in_offsets[target + 1]; pos++) {
+        size_t link = in_order[pos];
+        if (o->links[link].source == source)
+            break;
+        y -= plot_sankey_link_width(o, link, ky);
+    }
+    return y;
+}
+static double plot_sankey_source_top(const plot_sankey_work *o, const cui_plot_sankey_node *nodes,
+                                     const size_t *out_order, const size_t *out_offsets,
+                                     const size_t *in_order, const size_t *in_offsets,
+                                     size_t source, size_t target, double padding, double ky) {
+    size_t incoming = in_offsets[target + 1] - in_offsets[target];
+    double y = nodes[target].y0 - (incoming ? incoming - 1 : 0) * padding / 2;
+    for (size_t pos = in_offsets[target]; pos < in_offsets[target + 1]; pos++) {
+        size_t link = in_order[pos];
+        if (o->links[link].source == source)
+            break;
+        y += plot_sankey_link_width(o, link, ky) + padding;
+    }
+    for (size_t pos = out_offsets[source]; pos < out_offsets[source + 1]; pos++) {
+        size_t link = out_order[pos];
+        if (o->links[link].target == target)
+            break;
+        y -= plot_sankey_link_width(o, link, ky);
+    }
+    return y;
+}
+static void plot_sankey_relax(const plot_sankey_work *o, cui_plot_sankey_node *nodes, size_t layers,
+                              double padding, double ky) {
+    size_t out_offsets[257] = {0}, in_offsets[257] = {0};
+    size_t out_order[1024], in_order[1024];
+    for (size_t link = 0; link < o->link_count; link++) {
+        out_offsets[o->links[link].source + 1]++;
+        in_offsets[o->links[link].target + 1]++;
+    }
+    for (size_t node = 1; node <= o->count; node++) {
+        out_offsets[node] += out_offsets[node - 1];
+        in_offsets[node] += in_offsets[node - 1];
+    }
+    size_t out_next[256], in_next[256];
+    for (size_t node = 0; node < o->count; node++) {
+        out_next[node] = out_offsets[node];
+        in_next[node] = in_offsets[node];
+    }
+    for (size_t link = 0; link < o->link_count; link++) {
+        out_order[out_next[o->links[link].source]++] = link;
+        in_order[in_next[o->links[link].target]++] = link;
+    }
+    for (size_t node = 0; node < o->count; node++) {
+        plot_sankey_sort_adj(o, nodes, out_order, out_offsets[node], out_offsets[node + 1], true);
+        plot_sankey_sort_adj(o, nodes, in_order, in_offsets[node], in_offsets[node + 1], false);
+    }
+    unsigned iterations = o->sankey_iterations;
+    for (unsigned pass = 0; pass < iterations; pass++) {
+        double alpha = pow(.99, pass);
+        double beta = fmax(1 - alpha, (pass + 1.0) / iterations);
+        for (int direction = 0; direction < 2; direction++)
+            for (size_t step = 1; step < layers; step++) {
+                size_t layer = direction == 0 ? layers - 1 - step : step;
+                size_t column[256], count = 0;
+                for (size_t node = 0; node < o->count; node++)
+                    if (nodes[node].layer == layer)
+                        column[count++] = node;
+                for (size_t i = 1; i < count; i++) {
+                    size_t item = column[i], j = i;
+                    while (j && nodes[column[j - 1]].y0 > nodes[item].y0) {
+                        column[j] = column[j - 1];
+                        j--;
+                    }
+                    column[j] = item;
+                }
+                for (size_t item = 0; item < count; item++) {
+                    size_t node = column[item];
+                    long double weighted = 0, total = 0;
+                    size_t *order = direction == 0 ? out_order : in_order;
+                    size_t *offsets = direction == 0 ? out_offsets : in_offsets;
+                    for (size_t pos = offsets[node]; pos < offsets[node + 1]; pos++) {
+                        size_t link = order[pos];
+                        size_t source = o->links[link].source;
+                        size_t target = o->links[link].target;
+                        size_t other = direction == 0 ? target : source;
+                        size_t distance = nodes[other].layer > layer ? nodes[other].layer - layer
+                                                                     : layer - nodes[other].layer;
+                        long double weight = plot_sankey_scaled(o, o->links[link].value) * distance;
+                        double ideal =
+                            direction == 0
+                                ? plot_sankey_source_top(o, nodes, out_order, out_offsets, in_order,
+                                                         in_offsets, source, target, padding, ky)
+                                : plot_sankey_target_top(o, nodes, out_order, out_offsets, in_order,
+                                                         in_offsets, source, target, padding, ky);
+                        weighted += weight * ideal;
+                        total += weight;
+                    }
+                    if (total > 0) {
+                        double delta = ((double)(weighted / total) - nodes[node].y0) * alpha;
+                        nodes[node].y0 += delta;
+                        nodes[node].y1 += delta;
+                        for (size_t pos = in_offsets[node]; pos < in_offsets[node + 1]; pos++) {
+                            size_t source = o->links[in_order[pos]].source;
+                            plot_sankey_sort_adj(o, nodes, out_order, out_offsets[source],
+                                                 out_offsets[source + 1], true);
+                        }
+                        for (size_t pos = out_offsets[node]; pos < out_offsets[node + 1]; pos++) {
+                            size_t target = o->links[out_order[pos]].target;
+                            plot_sankey_sort_adj(o, nodes, in_order, in_offsets[target],
+                                                 in_offsets[target + 1], false);
+                        }
+                    }
+                }
+                plot_sankey_resolve(nodes, o->count, layer, padding, o->sankey_margins.top,
+                                    o->height - o->sankey_margins.bottom, beta);
+            }
+    }
+}
+
+cui_plot_sankey_options cui_plot_sankey_defaults(void) {
+    return (cui_plot_sankey_options){.extent = {0, 0, 1, 1},
+                                     .node_width = 24,
+                                     .node_padding = 8,
+                                     .iterations = 6,
+                                     .align = CUI_PLOT_SANKEY_JUSTIFY};
+}
+static bool plot_sankey_options_valid(const cui_plot_sankey_options *o) {
+    return o && isfinite(o->extent.x_min) && isfinite(o->extent.x_max) &&
+           isfinite(o->extent.y_min) && isfinite(o->extent.y_max) &&
+           fabs(o->extent.x_min) <= 16384 && fabs(o->extent.x_max) <= 16384 &&
+           fabs(o->extent.y_min) <= 16384 && fabs(o->extent.y_max) <= 16384 &&
+           o->extent.x_min <= o->extent.x_max && o->extent.y_min < o->extent.y_max &&
+           isfinite(o->node_width) && o->node_width >= 0 && o->node_width <= 16384 &&
+           isfinite(o->node_padding) && o->node_padding >= 0 && o->node_padding <= 16384 &&
+           o->iterations <= 100 && o->align >= CUI_PLOT_SANKEY_JUSTIFY &&
+           o->align <= CUI_PLOT_SANKEY_CENTER && o->value_scale >= CUI_PLOT_SANKEY_LINEAR &&
+           o->value_scale <= CUI_PLOT_SANKEY_SQRT;
+}
+static bool plot_sankey_storage_valid(const cui_plot_sankey_graph *g) {
+    return g && (!g->node_capacity || g->nodes) && (!g->link_capacity || g->links);
+}
+static plot_sankey_work plot_sankey_work_options(const cui_plot_sankey_graph *g,
+                                                 const cui_plot_sankey_options *o) {
+    return (plot_sankey_work){.count = g->node_count,
+                              .link_count = g->link_count,
+                              .links = g->links,
+                              .width = o->extent.x_max,
+                              .height = o->extent.y_max,
+                              .node_width = o->node_width,
+                              .node_padding = o->node_padding,
+                              .sankey_iterations = o->iterations,
+                              .sankey_align = o->align,
+                              .sankey_margins = {o->extent.x_min, 0, o->extent.y_min, 0}};
+}
+static bool plot_sankey_graph_valid(const cui_plot_sankey_graph *g) {
+    if (!plot_sankey_storage_valid(g) || g->node_count > 256 || g->link_count > 1024 ||
+        g->node_count > g->node_capacity || g->link_count > g->link_capacity)
+        return false;
+    for (size_t i = 0; i < g->node_count; ++i)
+        if (g->nodes[i].index != i || g->nodes[i].depth >= g->node_count ||
+            g->nodes[i].height >= g->node_count || g->nodes[i].layer >= g->node_count ||
+            !isfinite(g->nodes[i].x0) || !isfinite(g->nodes[i].x1) || !isfinite(g->nodes[i].y0) ||
+            !isfinite(g->nodes[i].y1) || !isfinite(g->nodes[i].value) || g->nodes[i].value < 0)
+            return false;
+    for (size_t i = 0; i < g->link_count; ++i) {
+        const cui_plot_sankey_link_layout *l = g->links + i;
+        if (l->index != i || l->source >= g->node_count || l->target >= g->node_count ||
+            !isfinite(l->value) || l->value < 0 ||
+            g->nodes[l->source].depth >= g->nodes[l->target].depth ||
+            g->nodes[l->source].height <= g->nodes[l->target].height)
+            return false;
+    }
+    return true;
+}
+cui_plot_result cui_plot_sankey_topology(cui_plot_sankey_graph *g, size_t nodes,
+                                         const cui_plot_sankey_link *input, size_t links,
+                                         const cui_plot_sankey_options *o,
+                                         cui_plot_sankey_error *error) {
+    if (error)
+        *error = (cui_plot_sankey_error){0};
+    if (!plot_sankey_storage_valid(g) || !plot_sankey_options_valid(o) || (links && !input))
+        return CUI_PLOT_INVALID;
+    if (nodes > 256 || links > 1024 || nodes > g->node_capacity || links > g->link_capacity)
+        return CUI_PLOT_CAPACITY;
+    cui_plot_sankey_node ns[256];
+    cui_plot_sankey_link_layout ls[1024];
+    for (size_t i = 0; i < links; ++i) {
+        if (input[i].source >= nodes || input[i].target >= nodes) {
+            if (error)
+                *error = (cui_plot_sankey_error){CUI_PLOT_SANKEY_MISSING_NODE,
+                                                 input[i].source >= nodes ? input[i].source
+                                                                          : input[i].target};
+            return CUI_PLOT_INVALID;
+        }
+        if (!isfinite(input[i].value) || input[i].value < 0)
+            return CUI_PLOT_INVALID;
+        ls[i] = (cui_plot_sankey_link_layout){.index = i,
+                                              .source = input[i].source,
+                                              .target = input[i].target,
+                                              .value = o->value_scale == CUI_PLOT_SANKEY_SQRT
+                                                           ? sqrt(input[i].value)
+                                                           : input[i].value};
+    }
+    cui_plot_sankey_graph temporary = {ns, ls, nodes, links, 256, 1024};
+    plot_sankey_work work = plot_sankey_work_options(&temporary, o);
+    cui_plot_result result = plot_sankey_prepare(&work, ns, true, false);
+    if (result != CUI_PLOT_OK) {
+        if (result == CUI_PLOT_INVALID && error)
+            *error = (cui_plot_sankey_error){CUI_PLOT_SANKEY_CIRCULAR_LINK, 0};
+        return result;
+    }
+    if (nodes)
+        memcpy(g->nodes, ns, nodes * sizeof(*ns));
+    if (links)
+        memcpy(g->links, ls, links * sizeof(*ls));
+    g->node_count = nodes;
+    g->link_count = links;
+    return CUI_PLOT_OK;
+}
+size_t cui_plot_sankey_layer_count(const cui_plot_sankey_graph *g) {
+    if (!plot_sankey_graph_valid(g))
+        return 0;
+    size_t layers = 0;
+    for (size_t i = 0; i < g->node_count; ++i)
+        if (layers < g->nodes[i].layer + 1)
+            layers = g->nodes[i].layer + 1;
+    return layers;
+}
+cui_plot_result cui_plot_sankey_node_links(const cui_plot_sankey_graph *g, size_t node,
+                                           bool outgoing, size_t *out, size_t capacity,
+                                           size_t *required) {
+    if (!required || (!out && capacity) || !plot_sankey_graph_valid(g) || node >= g->node_count)
+        return CUI_PLOT_INVALID;
+    size_t order[1024], count = 0;
+    for (size_t i = 0; i < g->link_count; ++i)
+        if ((outgoing ? g->links[i].source : g->links[i].target) == node) {
+            size_t j = count, other = outgoing ? g->links[i].target : g->links[i].source;
+            while (j) {
+                size_t previous = order[j - 1];
+                size_t po = outgoing ? g->links[previous].target : g->links[previous].source;
+                if (g->nodes[po].y0 <= g->nodes[other].y0)
+                    break;
+                order[j] = previous;
+                --j;
+            }
+            order[j] = i;
+            ++count;
+        }
+    *required = count;
+    if (capacity < count)
+        return CUI_PLOT_CAPACITY;
+    if (count)
+        memcpy(out, order, count * sizeof(*out));
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_sankey_layout_from(cui_plot_sankey_graph *g,
+                                            const cui_plot_sankey_options *o) {
+    if (!plot_sankey_graph_valid(g) || !plot_sankey_options_valid(o))
+        return CUI_PLOT_INVALID;
+    cui_plot_sankey_node ns[256];
+    cui_plot_sankey_link_layout ls[1024];
+    if (g->node_count)
+        memcpy(ns, g->nodes, g->node_count * sizeof(*ns));
+    if (g->link_count)
+        memcpy(ls, g->links, g->link_count * sizeof(*ls));
+    cui_plot_sankey_graph temporary = {ns, ls, g->node_count, g->link_count, 256, 1024};
+    plot_sankey_work work = plot_sankey_work_options(&temporary, o);
+    cui_plot_result result = plot_sankey_prepare(&work, ns, false, true);
+    if (result != CUI_PLOT_OK)
+        return result;
+    for (size_t i = 0; i < g->link_count; ++i) {
+        const cui_plot_sankey_link_layout *l = ls + i;
+        const cui_plot_sankey_node *source = ns + l->source;
+        ls[i].width = source->value > 0 ? l->value / source->value * (source->y1 - source->y0) : 0;
+    }
+    result = cui_plot_sankey_link_breadths(&temporary);
+    if (result != CUI_PLOT_OK)
+        return result;
+    for (size_t i = 0; i < g->node_count; ++i)
+        if (!isfinite(ns[i].x0) || !isfinite(ns[i].x1) || !isfinite(ns[i].y0) ||
+            !isfinite(ns[i].y1))
+            return CUI_PLOT_OVERFLOW;
+    for (size_t i = 0; i < g->link_count; ++i)
+        if (!isfinite(ls[i].width) || !isfinite(ls[i].source_width) ||
+            !isfinite(ls[i].target_width) || !isfinite(ls[i].y0) || !isfinite(ls[i].y1))
+            return CUI_PLOT_OVERFLOW;
+    if (g->node_count)
+        memcpy(g->nodes, ns, g->node_count * sizeof(*ns));
+    if (g->link_count)
+        memcpy(g->links, ls, g->link_count * sizeof(*ls));
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_sankey_layout(cui_plot_sankey_graph *g, size_t nodes,
+                                       const cui_plot_sankey_link *input, size_t links,
+                                       const cui_plot_sankey_options *o,
+                                       cui_plot_sankey_error *error) {
+    if (error)
+        *error = (cui_plot_sankey_error){0};
+    if (!plot_sankey_storage_valid(g))
+        return CUI_PLOT_INVALID;
+    if (nodes > 256 || links > 1024 || nodes > g->node_capacity || links > g->link_capacity)
+        return CUI_PLOT_CAPACITY;
+    cui_plot_sankey_node ns[256];
+    cui_plot_sankey_link_layout ls[1024];
+    cui_plot_sankey_graph temporary = {ns, ls, 0, 0, 256, 1024};
+    cui_plot_result result = cui_plot_sankey_topology(&temporary, nodes, input, links, o, error);
+    if (result != CUI_PLOT_OK)
+        return result;
+    result = cui_plot_sankey_layout_from(&temporary, o);
+    if (result != CUI_PLOT_OK)
+        return result;
+    if (nodes)
+        memcpy(g->nodes, ns, nodes * sizeof(*ns));
+    if (links)
+        memcpy(g->links, ls, links * sizeof(*ls));
+    g->node_count = nodes;
+    g->link_count = links;
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *g) {
+    if (!plot_sankey_graph_valid(g))
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < g->node_count; ++i)
+        if (g->nodes[i].y0 > g->nodes[i].y1)
+            return CUI_PLOT_INVALID;
+    cui_plot_sankey_link_layout ls[1024];
+    if (g->link_count)
+        memcpy(ls, g->links, g->link_count * sizeof(*ls));
+    cui_plot_sankey_graph temporary = *g;
+    temporary.links = ls;
+    temporary.link_capacity = 1024;
+    cui_plot_result result;
+    for (size_t node = 0; node < g->node_count; ++node)
+        for (size_t side = 0; side < 2; ++side) {
+            size_t order[1024], count;
+            result = cui_plot_sankey_node_links(&temporary, node, side == 0, order, 1024, &count);
+            if (result != CUI_PLOT_OK)
+                return result;
+            long double total = 0;
+            double used = 0;
+            for (size_t i = 0; i < count; ++i)
+                total += ls[order[i]].value;
+            for (size_t i = 0; i < count; ++i) {
+                cui_plot_sankey_link_layout *l = ls + order[i];
+                double width =
+                    total > 0 ? (double)(l->value / total) * (g->nodes[node].y1 - g->nodes[node].y0)
+                              : 0;
+                double y = g->nodes[node].y0 + used + width / 2;
+                if (side == 0) {
+                    l->source_width = width;
+                    l->y0 = y;
+                } else {
+                    l->target_width = width;
+                    l->y1 = y;
+                }
+                used += width;
+            }
+        }
+
+    for (size_t i = 0; i < g->link_count; ++i)
+        if (!isfinite(ls[i].source_width) || !isfinite(ls[i].target_width) || !isfinite(ls[i].y0) ||
+            !isfinite(ls[i].y1))
+            return CUI_PLOT_OVERFLOW;
+    if (g->link_count)
+        memcpy(g->links, ls, g->link_count * sizeof(*ls));
     return CUI_PLOT_OK;
 }
 

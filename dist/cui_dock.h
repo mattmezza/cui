@@ -96,6 +96,18 @@ typedef struct {
 } cui_dock_split_geometry;
 cui_dock_result cui_dock_split_layout(const cui_dock *, cui_dock_node split, cui_rect, float gap,
                                       cui_dock_split_geometry *);
+/* Filtered geometry omits all-hidden leaves/subtrees and their gaps/minima.
+ * Durable ratios/IDs are unchanged. Geometry metadata describes visible panels. */
+cui_dock_result cui_dock_layout_visible(const cui_dock *, cui_rect, float gap,
+                                        cui_dock_visibility_fn, void *, cui_dock_geometry *,
+                                        size_t capacity, size_t *count, bool *fit_minimum);
+typedef struct {
+    cui_dock_split_geometry geometry;
+    bool first_visible, second_visible;
+} cui_dock_visible_split_geometry;
+cui_dock_result cui_dock_split_layout_visible(const cui_dock *, cui_dock_node, cui_rect, float gap,
+                                              cui_dock_visibility_fn, void *,
+                                              cui_dock_visible_split_geometry *);
 /* Required serialized length excludes NUL. Insufficient output is untouched.
    Restore is bounded and transactional; successful restore invalidates IDs. */
 cui_dock_result cui_dock_serialize(const cui_dock *dock, char *output, size_t capacity,
@@ -989,6 +1001,133 @@ cui_dock_result cui_dock_layout(const cui_dock *d, cui_rect r, float gap, cui_do
         return CUI_DOCK_CAPACITY;
     size_t at = 0;
     cui_dock_private_geometry(&d->state, d->state.root, r, gap, out, &at);
+    return CUI_DOCK_OK;
+}
+static cui_dock_private_minimum cui_dock_private_visible_min(const cui_dock *d, size_t i,
+                                                             double gap,
+                                                             cui_dock_visibility_fn visible,
+                                                             void *user) {
+    const cui_dock_private_node *n = &d->state.nodes[i];
+    if (n->kind == CUI_DOCK_TABS) {
+        if (!cui_dock_visible_count(d, cui_dock_private_id(&d->state, i), visible, user))
+            return (cui_dock_private_minimum){0};
+        return (cui_dock_private_minimum){n->minw, n->minh, 1};
+    }
+    cui_dock_private_minimum a = cui_dock_private_visible_min(d, n->a, gap, visible, user),
+                             b = cui_dock_private_visible_min(d, n->b, gap, visible, user);
+    if (!a.tabs && !b.tabs)
+        return (cui_dock_private_minimum){0};
+    if (!a.tabs || !b.tabs) {
+        cui_dock_private_minimum survivor = a.tabs ? a : b;
+        survivor.w = fmax(survivor.w, n->minw);
+        survivor.h = fmax(survivor.h, n->minh);
+        return survivor;
+    }
+    return (cui_dock_private_minimum){
+        fmax(n->minw, n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? a.w + b.w + gap : fmax(a.w, b.w)),
+        fmax(n->minh, n->kind == CUI_DOCK_SPLIT_VERTICAL ? a.h + b.h + gap : fmax(a.h, b.h)),
+        a.tabs + b.tabs};
+}
+static cui_dock_visible_split_geometry
+cui_dock_private_visible_split(const cui_dock *d, size_t i, cui_rect r, double gap,
+                               cui_dock_visibility_fn visible, void *user) {
+    const cui_dock_private_node *n = &d->state.nodes[i];
+    cui_dock_private_minimum a = cui_dock_private_visible_min(d, n->a, gap, visible, user),
+                             b = cui_dock_private_visible_min(d, n->b, gap, visible, user);
+    cui_dock_visible_split_geometry result = {
+        .first_visible = a.tabs != 0,
+        .second_visible = b.tabs != 0,
+        .geometry = {.first_minimum = {(float)a.w, (float)a.h},
+                     .second_minimum = {(float)b.w, (float)b.h},
+                     .fit_minimum = true}};
+    if (!a.tabs || !b.tabs) {
+        if (a.tabs)
+            result.geometry.first = r;
+        if (b.tabs)
+            result.geometry.second = r;
+        cui_dock_private_minimum min = cui_dock_private_visible_min(d, i, gap, visible, user);
+        result.geometry.fit_minimum = r.w >= min.w && r.h >= min.h;
+        return result;
+    }
+    bool horizontal = n->kind == CUI_DOCK_SPLIT_HORIZONTAL;
+    double span = horizontal ? r.w : r.h, g = fmin(gap, span), available = fmax(0, span - g),
+           ma = horizontal ? a.w : a.h, mb = horizontal ? b.w : b.h, first = available * n->ratio;
+    if (ma + mb <= available)
+        first = fmin(fmax(first, ma), available - mb);
+    else if (ma + mb > 0)
+        first = available * ma / (ma + mb);
+    cui_rect ra = r, rb = r;
+    if (horizontal) {
+        ra.w = (float)first;
+        rb.x += (float)(first + g);
+        rb.w = (float)(available - first);
+    } else {
+        ra.h = (float)first;
+        rb.y += (float)(first + g);
+        rb.h = (float)(available - first);
+    }
+    result.geometry.first = ra;
+    result.geometry.second = rb;
+    result.geometry.fit_minimum = ma + mb <= available;
+    return result;
+}
+static bool cui_dock_private_bounds(cui_rect r, float gap) {
+    return isfinite(r.x) && isfinite(r.y) && isfinite(r.w) && isfinite(r.h) && r.w >= 0 &&
+           r.h >= 0 && isfinite(gap) && gap >= 0 && fabs((double)r.x + r.w) <= FLT_MAX &&
+           fabs((double)r.y + r.h) <= FLT_MAX;
+}
+cui_dock_result cui_dock_split_layout_visible(const cui_dock *d, cui_dock_node id, cui_rect r,
+                                              float gap, cui_dock_visibility_fn visible, void *user,
+                                              cui_dock_visible_split_geometry *out) {
+    if (!d || !out || !cui_dock_private_bounds(r, gap))
+        return CUI_DOCK_INVALID;
+    size_t node = cui_dock_private_node_index(d, id);
+    if (node == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    if (d->state.nodes[node].kind == CUI_DOCK_TABS)
+        return CUI_DOCK_INVALID;
+    *out = cui_dock_private_visible_split(d, node, r, gap, visible, user);
+    return CUI_DOCK_OK;
+}
+static void cui_dock_private_visible_geometry(const cui_dock *d, size_t i, cui_rect r, float gap,
+                                              cui_dock_visibility_fn visible, void *user,
+                                              cui_dock_geometry *out, size_t *at) {
+    const cui_dock_private_node *n = &d->state.nodes[i];
+    if (n->kind == CUI_DOCK_TABS) {
+        uint64_t displayed;
+        cui_dock_node id = cui_dock_private_id(&d->state, i);
+        if (cui_dock_displayed_panel(d, id, visible, user, &displayed))
+            out[(*at)++] = (cui_dock_geometry){id, r, cui_dock_visible_count(d, id, visible, user),
+                                               true, displayed};
+        return;
+    }
+    cui_dock_visible_split_geometry split =
+        cui_dock_private_visible_split(d, i, r, gap, visible, user);
+    if (split.first_visible)
+        cui_dock_private_visible_geometry(d, n->a, split.geometry.first, gap, visible, user, out,
+                                          at);
+    if (split.second_visible)
+        cui_dock_private_visible_geometry(d, n->b, split.geometry.second, gap, visible, user, out,
+                                          at);
+}
+cui_dock_result cui_dock_layout_visible(const cui_dock *d, cui_rect r, float gap,
+                                        cui_dock_visibility_fn visible, void *user,
+                                        cui_dock_geometry *out, size_t capacity, size_t *count,
+                                        bool *fit) {
+    if (!d || !cui_dock_private_bounds(r, gap))
+        return CUI_DOCK_INVALID;
+    cui_dock_private_minimum min =
+        cui_dock_private_visible_min(d, d->state.root, gap, visible, user);
+    if (count)
+        *count = min.tabs;
+    if (fit)
+        *fit = r.w >= min.w && r.h >= min.h;
+    if (!out)
+        return CUI_DOCK_OK;
+    if (capacity < min.tabs)
+        return CUI_DOCK_CAPACITY;
+    size_t at = 0;
+    cui_dock_private_visible_geometry(d, d->state.root, r, gap, visible, user, out, &at);
     return CUI_DOCK_OK;
 }
 typedef struct {
@@ -2267,14 +2406,24 @@ static void dock_render_node(dock_scene *s, cui_dock_node node, float w, float h
     }
     bool horizontal = info.kind == CUI_DOCK_SPLIT_HORIZONTAL;
     float extent = horizontal ? w : h, cross = horizontal ? h : w;
-    cui_dock_split_geometry geometry;
-    cui_dock_result error =
-        cui_dock_split_layout(s->dock, node, (cui_rect){0, 0, w, h}, 0, &geometry);
+    cui_dock_visible_split_geometry filtered;
+    cui_dock_result error = cui_dock_split_layout_visible(s->dock, node, (cui_rect){0, 0, w, h}, 0,
+                                                          s->options.panel_visible,
+                                                          s->options.visibility_user, &filtered);
     if (error != CUI_DOCK_OK) {
         s->result.error = error;
         return;
     }
+    cui_dock_split_geometry geometry = filtered.geometry;
     s->result.fit_minimum &= geometry.fit_minimum;
+    if (!filtered.first_visible || !filtered.second_visible) {
+        cui_resizable_clear(&cache->resize);
+        if (filtered.first_visible)
+            dock_render_node(s, info.first, w, h);
+        if (filtered.second_visible)
+            dock_render_node(s, info.second, w, h);
+        return;
+    }
     float first = horizontal ? geometry.first.w : geometry.first.h;
     if (cache->resize.count == 2 && !cache->resize.dragging) {
         cache->slots[0].size = first;
@@ -2418,8 +2567,9 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
     dock_drag_events(&scene);
     size_t leaves = 0;
     bool fit = true;
-    error = cui_dock_layout(model, (cui_rect){0, 0, options.width, options.height}, 0, NULL, 0,
-                            &leaves, &fit);
+    error = cui_dock_layout_visible(model, (cui_rect){0, 0, options.width, options.height}, 0,
+                                    options.panel_visible, options.visibility_user, NULL, 0,
+                                    &leaves, &fit);
     if (error != CUI_DOCK_OK && error != CUI_DOCK_CAPACITY)
         return (cui_dock_view_result){.error = error};
     scene.result.fit_minimum = fit;
@@ -3015,21 +3165,41 @@ static void dock_workspace_render_child(cui_context *ui, void *user) {
     else
         dock_workspace_layer(child->scene, child->level + 1, width, height);
 }
-static cui_size dock_model_minimum(const cui_dock *model, cui_dock_node node) {
+static bool dock_node_visible(const cui_dock *model, cui_dock_node node,
+                              cui_dock_view_options options) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
+        return false;
+    if (info.kind == CUI_DOCK_TABS)
+        return cui_dock_visible_count(model, node, options.panel_visible,
+                                      options.visibility_user) != 0;
+    return dock_node_visible(model, info.first, options) ||
+           dock_node_visible(model, info.second, options);
+}
+static bool dock_workspace_visible(dock_workspace_scene *s, unsigned region) {
+    return dock_node_visible(s->regions[region].model, cui_dock_root(s->regions[region].model),
+                             s->options.view);
+}
+static cui_size dock_model_minimum(const cui_dock *model, cui_dock_node node,
+                                   cui_dock_view_options options) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(model, node, &info) || !dock_node_visible(model, node, options))
         return (cui_size){0};
     if (info.kind == CUI_DOCK_TABS)
         return (cui_size){(float)info.min_width, (float)info.min_height};
-    cui_size a = dock_model_minimum(model, info.first), b = dock_model_minimum(model, info.second);
-    return info.kind == CUI_DOCK_SPLIT_HORIZONTAL
-               ? (cui_size){a.width + b.width, fmaxf(a.height, b.height)}
-               : (cui_size){fmaxf(a.width, b.width), a.height + b.height};
+    cui_size a = dock_model_minimum(model, info.first, options),
+             b = dock_model_minimum(model, info.second, options);
+    cui_size min = info.kind == CUI_DOCK_SPLIT_HORIZONTAL
+                       ? (cui_size){a.width + b.width, fmaxf(a.height, b.height)}
+                       : (cui_size){fmaxf(a.width, b.width), a.height + b.height};
+    min.width = fmaxf(min.width, (float)info.min_width);
+    min.height = fmaxf(min.height, (float)info.min_height);
+    return min;
 }
 static float dock_region_minimum(dock_workspace_scene *s, unsigned region, bool horizontal) {
     float value = horizontal ? s->regions[region].minimum.width : s->regions[region].minimum.height;
-    cui_size minimum =
-        dock_model_minimum(s->regions[region].model, cui_dock_root(s->regions[region].model));
+    cui_size minimum = dock_model_minimum(s->regions[region].model,
+                                          cui_dock_root(s->regions[region].model), s->options.view);
     return fmaxf(value > 0     ? value
                  : region == 0 ? 64
                                : 48,
@@ -3039,6 +3209,13 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
                                  float height) {
     if (level == 3) {
         dock_workspace_region(s, CUI_DOCK_CENTER, width, height);
+        return;
+    }
+    if (!dock_workspace_visible(s, level + 1)) {
+        cui_resizable_clear(&s->state->resize[level]);
+        if (level == 2)
+            s->state->bottom_gesture = false;
+        dock_workspace_layer(s, level + 1, width, height);
         return;
     }
     bool collapse = level == 2 && s->options.collapsible_bottom &&
@@ -3061,7 +3238,7 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
     float remaining_min = dock_region_minimum(s, 0, horizontal);
     if (horizontal && s->state->snapshot.open[2])
         remaining_min = fmaxf(remaining_min, dock_region_minimum(s, 3, true));
-    if (level == 0 && s->state->snapshot.open[1])
+    if (level == 0 && s->state->snapshot.open[1] && dock_workspace_visible(s, 2))
         remaining_min += dock_region_minimum(s, 2, true);
     bool fit = edge_min + remaining_min <= extent;
     s->result.fit_minimum &= fit && cross >= dock_region_minimum(s, level + 1, !horizontal);

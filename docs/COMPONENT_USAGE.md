@@ -585,13 +585,13 @@ API: `cui_date_picker_init`, `cui_date_picker`. [Public header](../include/cui/c
 
 **Composition:** application model + frame composition. **Scope:** styled frame adapter + retained base model.
 
-**State:** Application retains cui_edit, its text buffer, cui_editor_state and the visual-row workspace; the state borrows the edit model.
+**State:** Application retains the multiline edit, visual-row workspace, editor/search state, matcher ranges, query/replacement edit models and optional replacement scratch; adapters borrow this storage.
 
-**Interaction:** cui_editor returns edit, selection and scroll results; cui_editor_find selects literal UTF-8 matches; cui_editor_highlight_fn supplies language-aware token colors.
+**Interaction:** cui_editor returns edit, selection and scroll results; retained search supports ASCII-insensitive navigation and atomic replacement; cui_editor_highlight_fn supplies syntax colors.
 
-**Usage:** Initialize a multiline edit and editor workspace once, submit cui_editor each frame, and handle results or invoke find between interaction frames.
+**Usage:** Initialize editor and optional search resources once, call cui_editor_find_bar every frame, and pass the same matcher in cui_editor_options.search for visible match highlights. Keep replacement scratch disjoint from model storage.
 
-API: `cui_editor_state_init`, `cui_editor`, `cui_editor_find`. [Public header](../include/cui/cui_editor.h); [guide](EDITOR.md), [guide](EDITING.md).
+API: `cui_editor_state_init`, `cui_editor_matcher_init`, `cui_editor_search_enable_replace`, `cui_editor_find_bar`, `cui_editor_search_open`, `cui_editor`. [Public header](../include/cui/cui_editor.h); [guide](EDITOR.md).
 
 ## Form
 

@@ -1,0 +1,14 @@
+Published commit:4fa4dadada50376d30826c663082ed0419df5fa4
+Library CI38348439424:success.
+Pages CI/deployment38348439421:success.
+Actual HTTPS https://matteo.merola.co/cui/:
+195/195 files byte-match downloaded Pages artifact, including160 shareable routes,
+actual WASM/JS/CSS, catalogs/docs/agent exports/notices/media and Progress guide.
+Full Chromium HTTPS test_browser.py:pass, all78 actual C/WASM stories and78
+compiled displayed excerpts.
+Full Chromium HTTPS test_site_extensions.py:pass, usage78/design pixel checks,
+typography/scales/motion and composed-app interactions/mobile.
+Full-family parity remains unfinished:3implemented/75tested/0verified.
+ProgressCircle and later queued Editor/Dock/Plot changes are not in this release.
+The next integration fixes a Slider track inheriting Progress semantics; this
+release's older busy-Progress browser assertion did not detect that extra child.

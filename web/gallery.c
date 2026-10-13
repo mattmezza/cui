@@ -73,7 +73,10 @@ static char editor_buffer[8192] =
     "draw_profile(cui_context *ui, const cui_theme *theme) {\n    cui_label(ui, theme, "
     "cui_string(\"Welcome, Ada\"));\n    if (cui_button(ui, cui_id_from(ui, \"save\"), theme,\n    "
     "               cui_string(\"Save profile\"), false)) {\n        save_profile();\n    }\n}\n";
-static char editor_query_buffer[128];
+static char editor_query_buffer[128], editor_replacement_buffer[128], editor_replace_scratch[8192];
+static cui_edit *editor_replacement;
+static cui_editor_match editor_matches[512];
+static cui_editor_matcher editor_matcher;
 static cui_edit *editor_edit, *editor_query;
 static cui_editor_state editor_state;
 static cui_editor_search_state editor_search;
@@ -94,7 +97,7 @@ double gallery_editor_stat(int field) {
     case 2:
         return (double)state.length;
     case 3:
-        return (double)cui_editor_match_count(&editor_state, cui_edit_get_text(editor_query));
+        return (double)editor_matcher.count;
     case 4:
         return editor_search.open;
     case 5:
@@ -107,6 +110,12 @@ double gallery_editor_stat(int field) {
         return (double)editor_state.completion.selected;
     case 9:
         return (double)editor_state.completion.count;
+    case 10:
+        return editor_search.replace_mode;
+    case 11:
+        return editor_matcher.case_insensitive;
+    case 12:
+        return (double)editor_matcher.current;
     default:
         return -1;
     }
@@ -1797,9 +1806,14 @@ int gallery_init(void) {
                                                     .max_history_steps = 64});
     editor_query = cui_edit_create(
         (cui_edit_config){.buffer = editor_query_buffer, .capacity = sizeof(editor_query_buffer)});
-    if (!editor_edit || !editor_query ||
+    editor_replacement = cui_edit_create((cui_edit_config){
+        .buffer = editor_replacement_buffer, .capacity = sizeof editor_replacement_buffer});
+    if (!editor_edit || !editor_query || !editor_replacement ||
         !cui_editor_state_init(&editor_state, editor_edit, editor_lines, 512) ||
-        !cui_editor_search_init(&editor_search, editor_query))
+        !cui_editor_search_init(&editor_search, editor_query) ||
+        !cui_editor_matcher_init(&editor_matcher, editor_matches, 512) ||
+        !cui_editor_search_enable_replace(&editor_search, &editor_matcher, editor_replacement,
+                                          editor_replace_scratch, sizeof editor_replace_scratch))
         return 0;
     if (!cui_editor_set_folds(&editor_state, editor_folds, 1))
         return 0;
@@ -3435,7 +3449,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_begin_box(ui, cui_id_from(ui, "edit-actions"),
                       (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});
         if (cui_button(ui, cui_id_from(ui, "editor-find-open"), &t, cui_string("Find"), disabled))
-            editor_search.open = true;
+            cui_editor_search_open(&editor_state, &editor_search, false);
         if (cui_button(ui, cui_id_from(ui, "undo"), &t, cui_string("Undo"), disabled))
             cui_edit_undo(editor_edit);
         if (cui_button(ui, cui_id_from(ui, "redo"), &t, cui_string("Redo"), disabled))
@@ -3454,6 +3468,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.textarea.height = 280;
         options.textarea.disabled = disabled != 0;
         options.language = cui_string("c");
+        options.search = &editor_matcher;
         options.highlight = gallery_editor_token;
         cui_editor(ui, editor_id, &t, cui_string("C code editor"), &editor_state, options);
         if (show_completions) {

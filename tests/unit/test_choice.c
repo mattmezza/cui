@@ -4326,7 +4326,43 @@ static void test_design_scale_rows_and_triggers(void) {
         }
     }
 }
+static void test_select_trigger_center(void) {
+    for (unsigned density = 0; density < 2; density++) {
+        for (int scale = CUI_DESIGN_XS; scale <= CUI_DESIGN_4XL; scale++) {
+            for (unsigned chosen = 0; chosen < 2; chosen++) {
+                cui_context *ui = cui_create((cui_config){.width = 900, .height = 900});
+                assert(ui);
+                cui_theme theme = cui_theme_light();
+                theme.font_size *= density ? .875f : 1;
+                cui_choice_popup popup;
+                cui_choice_popup_init(&popup, 850);
+                cui_id value = chosen ? 10 : 0;
+                cui_str text = chosen ? items[0].label : cui_string("Select a service");
+                assert(cui_begin_frame(ui, 900, 900, .016f));
+                cui_select(ui, 810, &theme, cui_string("Delivery"), cui_string("Select a service"),
+                           items, 3, &value, &popup,
+                           (cui_choice_popup_options){.viewport = {0, 0, 900, 900},
+                                                      .design_size = (cui_design_size)scale});
+                cui_draw_list draw = cui_end_frame(ui);
+                cui_rect bounds = cui_bounds(ui, 810);
+                bool found = false;
+                for (size_t i = 0; i < draw.count; i++) {
+                    cui_draw_command command = draw.commands[i];
+                    if (command.type == CUI_DRAW_TEXT && command.text.length == text.length &&
+                        !memcmp(command.text.data, text.data, text.length)) {
+                        assert(fabsf(command.bounds.y + command.bounds.h / 2 - bounds.y -
+                                     bounds.h / 2) < .01f);
+                        found = true;
+                    }
+                }
+                assert(found && cui_last_error(ui) == CUI_OK);
+                cui_destroy(ui);
+            }
+        }
+    }
+}
 int main(void) {
+    test_select_trigger_center();
     test_design_scale_rows_and_triggers();
     test_menu_popup_paint_composition();
     test_dropdown_real_artwork();

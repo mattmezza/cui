@@ -157,6 +157,7 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
     float padding = metrics ? metrics->padding_x : theme->padding;
     float part_gap = metrics ? metrics->part_gap : theme->gap;
     bool composed = metrics || (parts && (parts->prefix || parts->suffix || parts->icon));
+    bool centered_trigger = !composed && variant == CUI_TAB_DEFAULT;
     cui_choice_item effective = *item;
     effective.disabled = disabled;
     bool structured = parts && (parts->prefix || parts->suffix || parts->icon);
@@ -208,6 +209,11 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
     else if (structured && !render && !icon && (!parts->prefix || prefix > 0) &&
              (!parts->suffix || suffix > 0))
         box.width = text_width + 2 * padding + prefix + suffix + gaps;
+    if (centered_trigger) {
+        box.padding = 0;
+        box.row = true;
+        box.align_y = CUI_ALIGN_CENTER;
+    }
     cui_color tab_foreground = theme->text;
     if (metrics) {
         box.align_y = CUI_ALIGN_CENTER;
@@ -223,6 +229,10 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
             box.border = (cui_color){0};
     }
     cui_begin_box(ui, item->id, box);
+    if (centered_trigger && padding > 0) {
+        cui_begin_box(ui, 0, (cui_box){.width = padding, .height = 1});
+        cui_end_box(ui);
+    }
     if (variant == CUI_TAB_UNDERLINE) {
         cui_begin_box(ui, item->id ^ UINT64_C(0x9ae71a843e64b150),
                       (cui_box){.height = metrics ? metrics->inner_height + metrics->margin_top +
@@ -308,6 +318,10 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
             cui_begin_box(ui, 0, (cui_box){.width = padding});
             cui_end_box(ui);
         }
+        cui_end_box(ui);
+    }
+    if (centered_trigger && padding > 0) {
+        cui_begin_box(ui, 0, (cui_box){.width = padding, .height = 1});
         cui_end_box(ui);
     }
     if (variant == CUI_TAB_UNDERLINE) {

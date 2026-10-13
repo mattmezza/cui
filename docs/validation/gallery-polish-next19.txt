@@ -1,0 +1,22 @@
+Compiled source freeze: 3bd96c1 (integration/next19).
+Native warnings and CTest: 96/96 passed.
+ASAN/UBSAN with leak detection disabled: 96/96 passed.
+Portable WASI suites with finite 40-billion-instruction budget: 80/80 passed.
+Full Chromium gallery: 78 real stories and 78 displayed usage excerpts compile;
+interaction, theme, mobile 390px and /cui/ hosting checks passed.
+Site extensions: usage guides, native starter, effects, typography, motion and
+composed-app interactions passed.
+Actual Resizable pane geometry: 24/24 cases across 390/1280/1920px widths,
+horizontal/vertical axes, comfortable/compact density and mouse/CDP touch.
+New visual tests: Pagination counter alignment; Select placeholder/value across
+nine design sizes; actual Shift-wheel horizontal Tabs; exact DataTable pixel
+wheel delta; component navigation retains page scroll; Command modal content
+fills its available width. These tests passed.
+Meaningful native Pagination and Select alignment regressions failed against
+the prior library and passed with the fixes.
+Initial WASI and full sanitizer builds exhausted /tmp quota. Evidence retained;
+reruns used home-backed TMPDIR/build output and passed the complete suites.
+No user files or validation records were deleted.
+Scope: targeted gallery defects, not complete 78-family parity. Date locales,
+Sidebar clipping, broader design sizes and remaining feedback are separate
+unreleased work.

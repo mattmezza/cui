@@ -2313,13 +2313,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         panels[1] = cui_resizable_panel_default(cui_id_from(ui, "resizable-editor"));
         panels[0].accessibility_label = cui_string("Explorer panel");
         panels[1].accessibility_label = cui_string("Editor panel");
-        panels[0].initial_size = 140;
+        panels[0].initial_size = resizable_vertical ? 105 : 140;
         panels[0].has_initial_size = true;
         panels[0].minimum = 80;
         panels[0].maximum = 300;
         panels[0].custom_range = true;
         panels[1].minimum = 80;
-        panels[1].maximum = 600;
+        /* The flexible editor must fit the responsive container. A fixed 600 px
+         * cap plus the explorer cap made wide layouts infeasible and locked both panes. */
+        panels[1].maximum = resizable_vertical ? 210 : width - 48;
         panels[1].custom_range = true;
         panels[0].content = resizable_content;
         panels[1].content = resizable_content;
@@ -2612,6 +2614,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                         .margin = 16,
                                                         .no_escape_dismiss = true,
                                                         .hide_close = true})) {
+                options.width = -1;
                 cui_command(ui, cui_id_from(ui, "command-preview"), &t, &command_state, entries,
                             sizeof(entries) / sizeof(entries[0]), options);
                 if (command_focus_pending) {
@@ -4479,6 +4482,8 @@ void gallery_status_options(int right, int custom) {
     status_custom = custom != 0;
 }
 void gallery_resizable_options(int vertical, int disabled) {
+    if (resizable_vertical != (vertical != 0))
+        cui_resizable_clear(&resizable_state);
     resizable_vertical = vertical != 0;
     resizable_disabled = disabled != 0;
 }

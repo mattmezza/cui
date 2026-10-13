@@ -59,7 +59,9 @@ cui_resizable_panel cui_resizable_panel_default(cui_id);
 bool cui_resizable_panel_valid(cui_resizable_panel);
 bool cui_resizable_state_init(cui_resizable_state *, cui_resizable_slot *, size_t capacity);
 /* Sync stable IDs, initial preferences, constraints, visibility and container extent.
- * INFEASIBLE still yields minimum-preserving overflow or maximum-limited unused space. */
+ * INFEASIBLE still yields minimum-preserving overflow or maximum-limited unused space.
+ * A responsive split needs enough combined maximum capacity for its extent;
+ * capping every panel can leave no room to transfer during a drag. */
 cui_resizable_error cui_resizable_sync(cui_resizable_state *, const cui_resizable_panel *, size_t,
                                        cui_resizable_axis, float extent);
 bool cui_resizable_resize_panel(cui_resizable_state *, size_t index, float size);

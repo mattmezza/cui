@@ -22,7 +22,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Next18 native app starter, targeted accessibility action prerequisite and native text cluster geometry pass native96/96, sanitizer96/96 and WASI80/80. Installed-prefix CMake/Make/direct compiler builds and native SDL3/Xvfb window pass; website guide links/screenshots/copy recipes and full78 browser stories pass. Next18 is awaiting publication. Published44819c1 passes six CI jobs/Pages and292 exact HTTPS files, public78 browser stories, page-touch19/19 and additionalIME. Full family verification remains0/78; native OS accessibility, international editing/wrapping, physicaldevices, remaining control feedback and full ecosystem acceptance remain active. See [next18 proof](validation/native-starter-actions-next18.txt) and [publication](validation/published-44819c1.txt).
+Next19 gallery polish passes native96, sanitizer96, WASI80, browser78, actual Resizable24, touch42+16, page-touch19 and IME checks. Select/Pagination alignment, Shift-wheel Tabs, pixel DataTable wheel, Command width and retained page scroll have targeted browser regressions. Publication pending. Native starter release ddd0ae3 is deployed: six CI jobs and Pages pass,301 exact HTTPS artifact files and actual public guide screenshots/clipboard checked. Full family verification remains0/78; remaining user feedback and full ecosystem acceptance stay active. See [next19 checks](validation/gallery-polish-next19.txt) and [public starter verification](validation/published-ddd0ae3.txt).
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 

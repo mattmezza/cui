@@ -43,6 +43,19 @@ cui_size cui_font_measure_styled(void *font, cui_str text, float size, cui_text_
 /* Optional owned visual session factory for cui_config.text_geometry; shares font user. */
 cui_text_layout_status cui_font_text_geometry(void *font, cui_str text, float size,
                                               cui_text_style style, cui_text_geometry *out);
+/* Contextual factory queries use original paragraph-relative byte offsets. */
+cui_text_layout_status cui_font_text_geometry_line(void *, cui_text_line_source, float,
+                                                   cui_text_style, cui_text_geometry *);
+/* Zero source retains legacy drawing; contextual ranges retain bidi paragraph analysis. */
+bool cui_font_draw_context_line(cui_font *, cui_str, cui_text_line_source, float, cui_text_style,
+                                float, float, cui_glyph_fn, void *);
+typedef void (*cui_color_glyph_fn)(void *, int, int, int, int, int, const unsigned char *,
+                                   cui_color);
+/* Colors change glyph coverage only after full-line shaping; cluster-start wins.
+ * Requires native bidi support; disabled builds return false without emission. */
+bool cui_font_draw_context_line_colored(cui_font *, cui_text_line_source, float, cui_text_style,
+                                        float, float, cui_color, const cui_text_color_span *,
+                                        size_t, cui_color_glyph_fn, void *);
 bool cui_font_draw(cui_font *font, cui_str text, float size, float x, float y, cui_glyph_fn emit,
                    void *user);
 bool cui_font_draw_styled(cui_font *font, cui_str text, float size, cui_text_style style, float x,

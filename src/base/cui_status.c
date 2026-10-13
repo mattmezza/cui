@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_status.h"
+#include "cui/cui_content.h"
 #include <math.h>
 cui_tag_options cui_tag_options_default(void) {
     return (cui_tag_options){.variant = CUI_TAG_SECONDARY, .size = CUI_STATUS_MEDIUM};
@@ -327,4 +328,42 @@ bool cui_notification_system_click(cui_notification_state *s, cui_notification_i
             return true;
         }
     return false;
+}
+
+/* Loading primitives deliberately expose scheduling instead of a perpetual
+ * invalidation loop. The host owns the clock and the next frame deadline. */
+cui_spinner_options cui_spinner_options_default(void) {
+    return (cui_spinner_options){.size = 16, .duration = .8f};
+}
+cui_skeleton_options cui_skeleton_options_default(void) {
+    return (cui_skeleton_options){.width = 160, .height = 16, .duration = 2};
+}
+bool cui_loading_motion_sample(cui_loading_motion *state, double now, float period, bool reduced,
+                               bool skeleton, cui_loading_ease_fn ease, void *user,
+                               cui_loading_motion_result *out) {
+    if (!state || !out || !isfinite(now) || now < 0 || now > 1e12 || !isfinite(period) ||
+        period <= 0 || period > 60 ||
+        (state->ready &&
+         (!isfinite(state->started) || !isfinite(state->last_time) || state->started < 0 ||
+          state->last_time < state->started || state->last_time > 1e12)))
+        return false;
+    cui_loading_motion next = *state;
+    if (!next.ready)
+        next = (cui_loading_motion){true, now, now};
+    now = fmax(now, next.last_time);
+    next.last_time = now;
+    float phase = reduced ? 0 : (float)(fmod(now - next.started, period) / period);
+    float input = skeleton ? (phase < .5f ? phase * 2 : (1 - phase) * 2) : phase;
+    float eased = reduced       ? 0
+                  : ease        ? ease(input, user)
+                  : input < .5f ? 2 * input * input
+                                : 1 - 2 * (1 - input) * (1 - input);
+    if (!isfinite(eased) || eased < 0 || eased > 1)
+        return false;
+    *out = (cui_loading_motion_result){.phase = eased,
+                                       .opacity = skeleton ? 1 - eased * .5f : 1,
+                                       .active = !reduced,
+                                       .next_wake_seconds = reduced ? 0 : now + 1.0 / 60};
+    *state = next;
+    return true;
 }

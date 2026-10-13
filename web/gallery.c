@@ -190,6 +190,7 @@ static unsigned char progress_circle_pixels[1056 * 1056 * 4];
 static cui_progress_circle_state progress_circle_state = {progress_circle_pixels,
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
+static cui_loading_motion spinner_motion, skeleton_motion;
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
 static const cui_semantic *semantics;
@@ -922,7 +923,18 @@ static void gallery_carousel_pagination(cui_context *context, const cui_theme *t
     cui_carousel_pagination_end(context);
 }
 static cui_check_state check_state;
+static cui_checkbox_state checkbox_motion;
+static cui_scroll_state checkbox_scroll;
+
 static cui_design_size design_size;
+static void gallery_checkbox_detail(cui_context *ui, void *user) {
+    const cui_theme *theme = user;
+    cui_design_metrics metrics;
+    float font = theme->font_size * .875f;
+    if (design_size && cui_design_measure(design_size, theme->font_size / 16, &metrics))
+        font = metrics.font_size * .875f;
+    cui_text(ui, cui_string("Email alerts for releases and replies."), font, theme->muted);
+}
 static int design_radius = -1;
 static float design_spacing = -1;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
@@ -1086,6 +1098,15 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
     }
 }
 static int clicks;
+static cui_button_state gallery_button_label;
+static void gallery_button_action(void *user) {
+    (void)user;
+    clicks++;
+}
+static void gallery_button_badge(cui_context *context, void *user) {
+    const cui_theme *theme = user;
+    cui_text(context, cui_string("NEW"), theme->font_size * .75f, theme->text);
+}
 static cui_id radio_selected;
 static cui_radio_group_state radio_group_state;
 static unsigned radio_requests;
@@ -1096,6 +1117,24 @@ static void gallery_radio_change(void *user, cui_id selected) {
 }
 unsigned gallery_radio_stat(unsigned field) {
     return field == 0 ? radio_requests : 0;
+}
+static cui_bubble_state gallery_bubble_states[4];
+typedef struct {
+    const char *key;
+    bool liked, disabled;
+} gallery_bubble_reaction_data;
+static gallery_bubble_reaction_data gallery_bubble_reactions[4];
+static void gallery_bubble_reaction(cui_context *context, const cui_theme *theme,
+                                    cui_color foreground, void *user) {
+    gallery_bubble_reaction_data *data = user;
+    cui_push_id(context, data->key);
+    if (cui_button(context, cui_id_from(context, "reaction"), theme,
+                   cui_string(data->liked ? "Liked · 3" : "Liked · 2"), data->disabled)) {
+        data->liked = !data->liked;
+        cui_invalidate(context);
+    }
+    cui_pop_id(context);
+    (void)foreground;
 }
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
@@ -1651,10 +1690,12 @@ static void form_footer(cui_context *context, const cui_theme *theme, void *user
     }
 }
 static cui_scroll_state scroll_state;
+static cui_scroll_state table_composition_scroll;
 static cui_table_model *table;
 static cui_table_state table_state;
 static cui_table_selection table_selection[64];
-static bool table_pinned;
+static bool table_pinned, table_actions, table_selection_locked, table_source_sort = true;
+static bool table_story_disabled;
 static int table_mode, table_row_hooks, table_inspections;
 static cui_table_selection_mode table_selection_mode = CUI_TABLE_SELECT_CELL;
 static cui_table_row table_rows[1000];
@@ -1713,6 +1754,32 @@ static void table_trailing(cui_context *context, const cui_theme *theme, void *u
                  context, cui_id_from(context, "inspect-row") + row, theme, cui_string("Inspect"),
                  (cui_button_options){.size = CUI_CONTROL_SMALL, .variant = CUI_BUTTON_GHOST}))
         table_inspections++;
+}
+static void table_action_cell(cui_context *context, const cui_theme *theme, void *user, size_t row,
+                              cui_id column) {
+    (void)user;
+    if (column != 102) {
+        bool selected = cui_table_is_selected(
+            &table_state,
+            (cui_table_options){.selection_mode = table_selection_mode,
+                                .multiple_selection = multiple_mode,
+                                .row_selection_disabled = table_selection_locked,
+                                .column_selection_disabled = table_selection_locked,
+                                .cell_selection_disabled = table_selection_locked},
+            table_rows[row].key, column);
+        cui_text(context, table_label(NULL, row, column), theme->font_size,
+                 selected ? theme->on_primary : theme->text);
+        return;
+    }
+    cui_id action =
+        cui_table_cell_id(cui_id_from(context, "data-table-action"), table_rows[row].key, column);
+    if (cui_button_ex(context, action, theme, cui_string("Inspect"),
+                      (cui_button_options){.size = CUI_CONTROL_XSMALL,
+                                           .width = -1,
+                                           .disabled = table_story_disabled})) {
+        table_inspections++;
+        cui_invalidate(context);
+    }
 }
 static void table_empty(cui_context *context, const cui_theme *theme, void *user) {
     (void)user;
@@ -3125,46 +3192,105 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 0: {
         char label[64];
-        if (cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
-                          (cui_button_options){.size = (cui_control_size)control_size,
-                                               .design_size = design_size,
-                                               .disabled = disabled}))
-            clicks++;
+        cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                      (cui_button_options){.size = (cui_control_size)control_size,
+                                           .design_size = design_size,
+                                           .disabled = disabled,
+                                           .on_click = gallery_button_action,
+                                           .prevent_pointer_focus = true,
+                                           .custom_cursor = true,
+                                           .cursor = CUI_CURSOR_POINTER});
         snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
         int columns = design_size == CUI_DESIGN_INHERIT ? 3 : width < 600 ? 1 : 2;
-        for (int row = 0; row < (6 + columns - 1) / columns; row++) {
+        for (int row = 0; row < (12 + columns - 1) / columns; row++) {
             cui_begin_box(ui, cui_id_from(ui, "variant-row") ^ (cui_id)(row + 1),
                           (cui_box){.row = true, .gap = design_spacing >= 0 ? t.gap : 8});
-            const char *names[6] = {"Secondary", "Outline", "Ghost", "Danger", "Link", "Loading"};
-            cui_button_variant variants[6] = {CUI_BUTTON_SECONDARY, CUI_BUTTON_OUTLINE,
-                                              CUI_BUTTON_GHOST,     CUI_BUTTON_DANGER,
-                                              CUI_BUTTON_LINK,      CUI_BUTTON_PRIMARY};
+            const char *names[12] = {"Secondary", "Outline", "Ghost",   "Danger", "Link", "Loading",
+                                     "Default",   "Warning", "Success", "Info",   "Text", "Custom"};
+            cui_button_variant variants[12] = {
+                CUI_BUTTON_SECONDARY, CUI_BUTTON_OUTLINE, CUI_BUTTON_GHOST,   CUI_BUTTON_DANGER,
+                CUI_BUTTON_LINK,      CUI_BUTTON_PRIMARY, CUI_BUTTON_DEFAULT, CUI_BUTTON_WARNING,
+                CUI_BUTTON_SUCCESS,   CUI_BUTTON_INFO,    CUI_BUTTON_TEXT,    CUI_BUTTON_CUSTOM};
             for (int column = 0; column < columns; column++) {
                 int v = row * columns + column;
-                if (v >= 6)
+                if (v >= 12)
                     break;
                 cui_button_ex(ui, cui_id_from(ui, names[v]), &t, cui_string(names[v]),
                               (cui_button_options){.variant = variants[v],
                                                    .size = CUI_CONTROL_SMALL,
                                                    .design_size = design_size,
                                                    .disabled = disabled || v == 2,
-                                                   .loading = v == 5});
+                                                   .loading = v == 5,
+                                                   .custom_colors = v == 11,
+                                                   .colors = t.buttons[CUI_THEME_BUTTON_INFO]});
             }
             cui_end_box(ui);
         }
+        cui_button_options extra = {.size = (cui_control_size)control_size,
+                                    .design_size = design_size,
+                                    .disabled = disabled};
+        extra.icon = cui_string("check");
+        extra.trailing_icon = cui_string("arrow-right");
+        extra.dropdown_caret = true;
+        cui_button_ex(ui, cui_id_from(ui, "button-icons"), &t, cui_string("With icon"), extra);
+        extra.icon = (cui_str){0};
+        extra.trailing_icon = (cui_str){0};
+        extra.dropdown_caret = false;
+        extra.children = gallery_button_badge;
+        extra.children_user = &t;
+        cui_button_ex(ui, cui_id_from(ui, "button-children"), &t, cui_string("Custom content"),
+                      extra);
+        extra.children = NULL;
+        extra.width = fminf(width - 48, 340);
+        extra.label_width = fmaxf(1, extra.width - 48);
+        extra.state = &gallery_button_label;
+        cui_button_ex(ui, cui_id_from(ui, "button-truncated"), &t,
+                      cui_string("A long accessible action label with bounded ellipsis"), extra);
         break;
     }
-    case 1:
-        cui_checkbox_ex(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"),
-                        &check_state,
-                        (cui_checkbox_options){.size = (cui_control_size)control_size,
-                                               .design_size = design_size,
-                                               .disabled = disabled,
-                                               .required = choice_required != 0,
-                                               .invalid = choice_invalid != 0,
-                                               .skip_tab = choice_skip_tab != 0});
+    case 1: {
+        cui_design_metrics metrics;
+        float font = t.font_size * .875f, indicator = t.font_size;
+        if (design_size && cui_design_measure(design_size, t.font_size / 16, &metrics)) {
+            font = metrics.font_size;
+            indicator = metrics.indicator_size;
+        }
+        float control_width = fmaxf(width - 48, indicator + 8 * t.font_size / 16 + 8 * font);
+        cui_id owner = cui_id_from(ui, "checkbox-label-scroll");
+        cui_scroll_options scroll = {.width = width - 48,
+                                     .height = height - 48,
+                                     .content_width = control_width,
+                                     .horizontal = true,
+                                     .hide_scrollbars = true};
+        bool began = cui_scrollable_begin(ui, owner, &t, &checkbox_scroll, scroll);
+        cui_checkbox_ex(
+            ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"), &check_state,
+            (cui_checkbox_options){.size = (cui_control_size)control_size,
+                                   .design_size = design_size,
+                                   .disabled = disabled,
+                                   .required = choice_required != 0,
+                                   .invalid = choice_invalid != 0,
+                                   .skip_tab = choice_skip_tab != 0,
+                                   .state = &checkbox_motion,
+                                   .width = control_width,
+                                   .content = gallery_checkbox_detail,
+                                   .content_user = &t,
+                                   .tooltip = cui_string("Change email notification preferences"),
+                                   .tooltip_options = {.viewport = {0, 0, width, height},
+                                                       .width = fminf(300, width - 48),
+                                                       .height = 80,
+                                                       .open_delay = .2f,
+                                                       .close_delay = .1f},
+                                   .reduced_motion = reduced_motion});
+        if (began)
+            cui_scrollable_end_ex(ui, owner, &t, &checkbox_scroll, scroll);
+        next_wake =
+            checkbox_motion.next_wake_seconds > 0
+                ? host_seconds + fmax(0, checkbox_motion.next_wake_seconds - cui_frame_time(ui))
+                : 0;
         break;
+    }
     case 2: {
         cui_switch_options options = cui_switch_options_default();
         options.size = (cui_control_size)control_size;
@@ -3760,10 +3886,21 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             "Info: a new version is available.", "Success: your changes are saved.",
             "Warning: storage is almost full.", "Error: upload failed. Please retry."};
         for (unsigned kind = 0; kind < 4; kind++) {
-            cui_begin_bubble(ui, cui_id_from(ui, messages[kind]), &t,
-                             (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), width - 48);
-            cui_label(ui, &t, cui_string(messages[kind]));
-            cui_end_bubble(ui);
+            gallery_bubble_reactions[kind].key = messages[kind];
+            gallery_bubble_reactions[kind].disabled = disabled != 0;
+            cui_bubble(
+                ui, cui_id_from(ui, messages[kind]), &t,
+                (cui_bubble_options){
+                    .variant = (cui_bubble_variant)(CUI_BUBBLE_INFO + kind),
+                    .alignment = kind % 2 ? CUI_BUBBLE_OUTGOING : CUI_BUBBLE_INCOMING,
+                    .reaction_alignment = kind % 2 ? CUI_BUBBLE_OUTGOING : CUI_BUBBLE_INCOMING,
+                    .reaction_side =
+                        kind == 0 ? CUI_BUBBLE_REACTIONS_TOP : CUI_BUBBLE_REACTIONS_BOTTOM,
+                    .width = width - 48,
+                    .message = cui_string(messages[kind]),
+                    .reactions = gallery_bubble_reaction,
+                    .state = &gallery_bubble_states[kind],
+                    .user = &gallery_bubble_reactions[kind]});
         }
         break;
     }
@@ -3781,16 +3918,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 17:
         cui_kbd(ui, cui_id_from(ui, "kbd"), &t, cui_string("Ctrl + K"));
         break;
-    case 18:
-        cui_skeleton(ui, cui_id_from(ui, "skeleton"), &t, width - 48, 36, 6,
-                     cui_loading_phase(host_seconds, 1.4f), false, reduced_motion);
-        redraw = !reduced_motion;
+    case 18: {
+        cui_skeleton_options options = cui_skeleton_options_default();
+        options.width = width - 48;
+        options.height = 36;
+        options.radius = 6;
+        options.now_seconds = cui_frame_time(ui);
+        options.reduced_motion = reduced_motion;
+        cui_loading_motion_result motion;
+        if (cui_skeleton_ex(ui, cui_id_from(ui, "skeleton"), &t, &skeleton_motion, options,
+                            &motion))
+            next_wake = motion.next_wake_seconds > 0
+                            ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui))
+                            : 0;
         break;
-    case 19:
-        cui_spinner(ui, cui_id_from(ui, "spinner"), &t, 32, cui_loading_phase(host_seconds, 1.0f),
-                    reduced_motion);
-        redraw = !reduced_motion;
+    }
+    case 19: {
+        cui_spinner_options options = cui_spinner_options_default();
+        options.size = 32;
+        options.now_seconds = cui_frame_time(ui);
+        options.reduced_motion = reduced_motion;
+        cui_loading_motion_result motion;
+        if (cui_spinner_ex(ui, cui_id_from(ui, "spinner"), &t, &spinner_motion, options, &motion))
+            next_wake = motion.next_wake_seconds > 0
+                            ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui))
+                            : 0;
         break;
+    }
     case 20: {
         cui_disclosure_item items[3] = {
             {cui_id_from(ui, "a1"), cui_string("Getting started"), false},
@@ -4279,6 +4433,32 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 45: {
+        table_story_disabled = disabled != 0;
+        cui_begin_box(ui, cui_id_from(ui, "table-contract-controls"),
+                      (cui_box){.row = true, .width = width - 48, .gap = 4});
+        const cui_button_options toggle_options = {
+            .width = (width - 56) / 3, .size = CUI_CONTROL_SMALL, .disabled = disabled != 0};
+        if (cui_button_ex(ui, cui_id_from(ui, "table-selection-policy"), &t,
+                          cui_string(table_selection_locked ? "Select off" : "Select on"),
+                          toggle_options)) {
+            table_selection_locked = !table_selection_locked;
+            cui_invalidate(ui);
+        }
+        if (cui_button_ex(ui, cui_id_from(ui, "table-action-policy"), &t,
+                          cui_string(table_actions ? "Actions on" : "Actions off"),
+                          toggle_options)) {
+            table_actions = !table_actions;
+            cui_invalidate(ui);
+            for (size_t c = 0; c < 3; c++)
+                table_columns[c].nonselectable = table_actions && table_columns[c].key == 102;
+        }
+        if (cui_button_ex(ui, cui_id_from(ui, "table-sort-policy"), &t,
+                          cui_string(table_source_sort ? "Source sort" : "Legacy sort"),
+                          toggle_options)) {
+            table_source_sort = !table_source_sort;
+            cui_invalidate(ui);
+        }
+        cui_end_box(ui);
         const cui_table_column_group groups[] = {{cui_string("File details"), 2},
                                                  {cui_string("Storage"), 1}};
         const cui_table_group_row group_row = {groups, 2};
@@ -4304,8 +4484,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                 .trailing_width = 80,
                                 .loading = table_mode == 2,
                                 .render_loading = table_loading,
-                                .render_empty = table_empty},
-            table_label, NULL, NULL);
+                                .render_empty = table_empty,
+                                .row_selection_disabled = table_selection_locked,
+                                .column_selection_disabled = table_selection_locked,
+                                .cell_selection_disabled = table_selection_locked,
+                                .sort_cycle = table_source_sort ? CUI_TABLE_SORT_CYCLE_SOURCE
+                                                                : CUI_TABLE_SORT_CYCLE_LEGACY,
+                                .accessible_name = cui_string("Workspace files")},
+            table_label, table_actions ? table_action_cell : NULL, NULL);
         if (result.selection_mode_requested) {
             table_selection_mode = result.requested_selection_mode;
             redraw = true;
@@ -4318,7 +4504,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         snprintf(text, sizeof(text), "%zu rows / visible %zu-%zu / sort %d", cui_table_rows(table),
                  result.rows.end > result.rows.begin ? result.rows.begin + 1 : 0, result.rows.end,
                  (int)table_state.sort);
-        if (table_mode == 1) {
+        if (table_mode == 1 || table_actions) {
             snprintf(text, sizeof(text), "Visible row hooks: %d / inspections: %d", table_row_hooks,
                      table_inspections);
         }
@@ -4327,8 +4513,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 46: {
         float cell_width = (width - 48) / 3;
+        cui_design_metrics metrics;
+        bool scaled = design_size != CUI_DESIGN_INHERIT &&
+                      cui_design_measure(design_size, t.font_size / 16, &metrics);
+        float cell_height = scaled ? metrics.control_height : 40;
+        if (scaled)
+            cell_width = fmaxf(
+                cell_width, cui_measure_text(ui, cui_string("File 1000"), metrics.font_size).width +
+                                2 * metrics.padding_y + 2);
+        cui_scroll_options table_scroll = {.width = width - 48,
+                                           .height = 4 * cell_height + 12,
+                                           .content_width = 3 * cell_width,
+                                           .content_height = 4 * cell_height,
+                                           .horizontal = true,
+                                           .disabled = disabled != 0};
+        cui_id scroll_id = cui_id_from(ui, "table-composition-scroll");
+        if (!cui_scrollable_begin(ui, scroll_id, &t, &table_composition_scroll, table_scroll))
+            break;
         cui_id table_id = cui_id_from(ui, "composition-table");
-        cui_table_begin(ui, table_id, &t, width - 48);
+        if (!cui_table_begin_ex(
+                ui, table_id, &t,
+                (cui_table_basic_options){.width = 3 * cell_width,
+                                          .accessible_name = cui_string("Recent workspace files"),
+                                          .row_count = 4,
+                                          .column_count = 3})) {
+            cui_scrollable_end(ui, scroll_id, &t, &table_composition_scroll, table_scroll);
+            break;
+        }
         cui_id section_id = table_id + 50;
         cui_table_begin_section(ui, section_id, &t, CUI_TABLE_SECTION_HEADER);
         cui_set_semantic_details(ui, section_id, (cui_semantic_details){.parent = table_id});
@@ -4341,36 +4552,45 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          (cui_semantic_details){.parent = table_id});
             }
             cui_id row_id = table_id + r + 1;
-            cui_table_begin_row_ex(ui, row_id, &t,
-                                   (cui_table_row_options){.height = 40,
-                                                           .header = r == 0,
-                                                           .custom_background = true,
-                                                           .background = r == 0  ? t.accent
-                                                                         : r % 2 ? t.surface
-                                                                                 : t.background});
-            cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = section_id});
+            if (!cui_table_begin_row_checked(
+                    ui, row_id, &t,
+                    (cui_table_row_options){.height = cell_height,
+                                            .header = r == 0,
+                                            .parent = section_id,
+                                            .row_index = (unsigned)r + 1,
+                                            .custom_background = true,
+                                            .background = r == 0  ? t.accent
+                                                          : r % 2 ? t.surface
+                                                                  : t.background}))
+                continue;
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;
                 const char *headers[] = {"Name", "Status", "Size"};
                 cui_str label = r == 0 ? cui_string(headers[c]) : table_label(NULL, r - 1, 101 + c);
-                if (r == 0)
-                    cui_table_begin_head_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT,
-                                              label);
-                else
-                    cui_table_begin_cell(ui, cell_id, cell_width, 40, CUI_TABLE_ALIGN_LEFT);
-                cui_set_semantic_details(ui, cell_id,
-                                         (cui_semantic_details){.parent = row_id,
-                                                                .row_index = (unsigned)r,
-                                                                .column_index = (unsigned)c + 1,
-                                                                .readonly = r == 0,
-                                                                .description = label});
-                cui_label(ui, &t, label);
-                cui_table_end(ui);
+                if (cui_table_begin_cell_ex(
+                        ui, cell_id, &t,
+                        (cui_table_cell_options){.width = cell_width,
+                                                 .height = cell_height,
+                                                 .align = CUI_TABLE_ALIGN_LEFT,
+                                                 .name = label,
+                                                 .parent = row_id,
+                                                 .row_index = (unsigned)r + 1,
+                                                 .column_index = (unsigned)c + 1,
+                                                 .header = r == 0,
+                                                 .design_size = design_size})) {
+                    if (scaled)
+                        cui_text_with_line_height(ui, label, metrics.font_size, t.text,
+                                                  metrics.line_height);
+                    else
+                        cui_label(ui, &t, label);
+                    cui_table_end(ui);
+                }
             }
             cui_table_end(ui);
         }
         cui_table_end(ui);
         cui_table_end(ui);
+        cui_scrollable_end(ui, scroll_id, &t, &table_composition_scroll, table_scroll);
         break;
     }
     case 48: {

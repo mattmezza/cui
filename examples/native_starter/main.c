@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
                                               .measure = cui_font_measure,
                                               .measure_styled = cui_font_measure_styled,
                                               .text_geometry = cui_font_text_geometry,
+                                              .text_geometry_line = cui_font_text_geometry_line,
                                               .font_metrics = cui_font_get_metrics,
                                               .measure_user = font});
     starter_app app;

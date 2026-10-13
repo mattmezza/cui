@@ -15,13 +15,14 @@ from playwright.sync_api import sync_playwright
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--chromium')
+    parser.add_argument('--directory', type=Path, default=Path('build/web'))
     args = parser.parse_args()
     class Handler(SimpleHTTPRequestHandler):
         def translate_path(self, path):
             return super().translate_path(path[4:] if path.startswith('/cui/') else path)
         def log_message(self, *args):
             pass
-    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Handler, directory=str(Path('build/web').resolve())))
+    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Handler, directory=str(args.directory.resolve())))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
         with sync_playwright() as p:

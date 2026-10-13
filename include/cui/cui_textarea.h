@@ -17,9 +17,11 @@ typedef enum {
     CUI_TEXTAREA_CUSTOM
 } cui_textarea_size;
 typedef struct {
-    size_t start, end, next; /* UTF-8 byte range; next skips a hard newline. */
+    size_t start, end, next; /* UTF-8 byte range; next skips CR/LF or U+2028. */
     float width;
     bool hard_break;
+    size_t paragraph_start, paragraph_end;
+    size_t logical_line; /* Zero-based hard-line index; shared by wrapped rows. */
 } cui_textarea_line;
 /* Zero-based logical lines. Collapsing hides only interior lines, retaining
  * the opening and closing lines. Caller owns this mutable array. */
@@ -51,6 +53,13 @@ typedef struct {
     uint64_t fold_revision;
     cui_edit_composition *composition;
     bool composition_owned, layout_composing;
+    /* Visual pointer affinity; model identity is compared only, never retained/dereferenced. */
+    const cui_edit *layout_model; /* Identity only; rebind invalidates cached rows. */
+    const cui_edit *visual_model;
+    uint64_t visual_revision;
+    size_t visual_caret_byte;
+    cui_text_affinity visual_affinity;
+    bool visual_affinity_valid;
 } cui_textarea_state;
 typedef struct {
     cui_textarea_size size;
@@ -78,8 +87,12 @@ typedef struct {
     bool pressed_enter, enter_secondary, enter_shift; /* Last Enter in this frame. */
     cui_edit_result edit_error;
     cui_textarea_error error;
+    /* First visible-line host geometry failure; legacy fallback remains painted.
+     * UNAVAILABLE also means no factory. Independent from model/row errors. */
+    cui_text_layout_status visual_error;
 } cui_textarea_result;
-/* Caller owns workspace and editor. No allocation; state must not be shared by widgets. */
+/* Caller owns workspace/editor. Initialization allocates nothing; optional host
+ * geometry and idle-preedit snapshots are UI-resource owned. Do not share state. */
 bool cui_textarea_state_init(cui_textarea_state *, cui_textarea_line *, size_t capacity);
 /* Sorted unique starts, in-document bounds, at least one interior line.
  * Invalid attachment preserves state. Text revisions detach stale ranges;
@@ -98,6 +111,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *, cui_edit *, cui_textare
 size_t cui_textarea_hit_test(cui_context *, cui_edit *, cui_textarea_state *, float x, float y);
 /* Read-only measured row geometry for retained multi-cursor adapters. Invalid
  * row/state/offset returns SIZE_MAX or NAN; no pointer/selection mutation. */
+/* Borrowed descriptor; source bytes need only survive synchronous submission/query. */
+cui_text_line_source cui_textarea_line_source(cui_str, cui_textarea_line);
 size_t cui_textarea_row_for_offset(const cui_textarea_state *, size_t offset, bool upstream);
 size_t cui_textarea_project_offset(const cui_textarea_state *, size_t offset, bool upwards);
 size_t cui_textarea_row_offset(cui_context *, cui_edit *, const cui_textarea_state *, size_t row,

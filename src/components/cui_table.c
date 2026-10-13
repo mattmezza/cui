@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_table.h"
 #include "cui/cui_icon.h"
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 static cui_id style_id(cui_id id, unsigned part) {
@@ -10,6 +11,66 @@ static cui_align align(cui_table_align a) {
     return a == CUI_TABLE_ALIGN_RIGHT    ? CUI_ALIGN_END
            : a == CUI_TABLE_ALIGN_CENTER ? CUI_ALIGN_CENTER
                                          : CUI_ALIGN_START;
+}
+static bool table_dimension_valid(float value) {
+    return isfinite(value) && value >= 0 && value <= 65536;
+}
+static bool table_name_valid(cui_str name) {
+    return !name.length || name.data;
+}
+bool cui_table_begin_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_table_basic_options o) {
+    if (!ui || !t || !id || !table_dimension_valid(o.width) ||
+        !table_name_valid(o.accessible_name) || o.row_count > INT_MAX || o.column_count > INT_MAX)
+        return false;
+    cui_interact(ui, id, CUI_ROLE_TABLE,
+                 o.accessible_name.length ? o.accessible_name : cui_string("Table"), false, false,
+                 0);
+    cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.row_count = o.row_count, .column_count = o.column_count});
+    cui_begin_box(ui, id,
+                  (cui_box){.width = o.width,
+                            .background = t->surface,
+                            .border = t->border,
+                            .border_width = 1,
+                            .radius = t->radius});
+    return true;
+}
+bool cui_table_begin_cell_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                             cui_table_cell_options o) {
+    if (!ui || !t || !id || !table_dimension_valid(o.width) || !table_dimension_valid(o.height) ||
+        !isfinite(o.padding) || o.padding < 0 || o.padding > 4096 || !table_name_valid(o.name) ||
+        o.align < CUI_TABLE_ALIGN_LEFT || o.align > CUI_TABLE_ALIGN_RIGHT ||
+        o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL ||
+        o.row_index > INT_MAX || o.column_index > INT_MAX || o.parent == id)
+        return false;
+    float padding = o.custom_padding ? o.padding : 4;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics metrics;
+        if (!cui_design_measure(o.design_size, t->font_size / 16, &metrics))
+            return false;
+        if (!o.height)
+            o.height = metrics.control_height;
+        if (!o.custom_padding)
+            padding = metrics.padding_y;
+    }
+    cui_interact(ui, id, o.header ? CUI_ROLE_COLUMNHEADER : CUI_ROLE_CELL,
+                 o.name.length ? o.name : cui_string(o.header ? "Column" : "Cell"), false, false,
+                 0);
+    cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.parent = o.parent,
+                                                    .row_index = o.row_index,
+                                                    .column_index = o.column_index,
+                                                    .readonly = o.header});
+    cui_begin_box(ui, id,
+                  (cui_box){.width = o.width,
+                            .height = o.height,
+                            .padding = padding,
+                            .clip = true,
+                            .align_x = align(o.align),
+                            .align_y = CUI_ALIGN_CENTER});
+    return true;
 }
 void cui_table_begin(cui_context *ui, cui_id id, const cui_theme *t, float width) {
     if (!ui || !t)
@@ -31,14 +92,39 @@ void cui_table_begin_row_ex(cui_context *ui, cui_id id, const cui_theme *t,
                             cui_table_row_options o) {
     if (!ui || !t)
         return;
-    cui_interact(ui, id, CUI_ROLE_ROW, cui_string(o.header ? "Header" : "Row"), false, false, 0);
+    cui_interact(ui, id, CUI_ROLE_ROW,
+                 o.name.length && o.name.data ? o.name : cui_string(o.header ? "Header" : "Row"),
+                 false, false, 0);
     cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.parent = o.parent,
+                               .row_index = o.row_index <= INT_MAX ? o.row_index : 0});
+    if (!o.height && o.design_size > CUI_DESIGN_INHERIT && o.design_size <= CUI_DESIGN_9XL) {
+        cui_design_metrics metrics;
+        if (cui_design_measure(o.design_size, t->font_size / 16, &metrics))
+            o.height = metrics.control_height;
+    }
     cui_begin_box(ui, id,
                   (cui_box){.height = o.height,
                             .row = true,
                             .background = o.custom_background ? o.background
                                           : o.header          ? t->background
                                                               : t->surface});
+}
+bool cui_table_begin_row_checked(cui_context *ui, cui_id id, const cui_theme *t,
+                                 cui_table_row_options o) {
+    if (!ui || !t || !id || !table_dimension_valid(o.height) || !table_name_valid(o.name) ||
+        o.row_index > INT_MAX || o.design_size < CUI_DESIGN_INHERIT ||
+        o.design_size > CUI_DESIGN_9XL || o.parent == id)
+        return false;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics metrics;
+        if (!cui_design_measure(o.design_size, t->font_size / 16, &metrics))
+            return false;
+    }
+    cui_table_begin_row_ex(ui, id, t, o);
+    return true;
 }
 void cui_table_begin_cell(cui_context *ui, cui_id id, float width, float height,
                           cui_table_align a) {
@@ -161,6 +247,11 @@ static void header_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_tabl
     }
     cui_end_box(ui);
 }
+static cui_str cached_cell_label(void *user, size_t row, cui_id column) {
+    (void)row;
+    (void)column;
+    return *(const cui_str *)user;
+}
 static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
                       cui_table_state *s, cui_table_options o, size_t r, size_t c, float row,
                       cui_table_label_fn label, cui_table_cell_fn render, void *data) {
@@ -169,7 +260,8 @@ static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_
     cui_table_get_row(m, r, &rr);
     cui_table_get_column(m, c, &col);
     cui_id cid = cui_table_cell_id(id, rr.key, col.key);
-    bool selected = cui_table_is_selected(s, o, rr.key, col.key);
+    bool selected = (o.selection_mode == CUI_TABLE_SELECT_ROW || !col.nonselectable) &&
+                    cui_table_is_selected(s, o, rr.key, col.key);
     cui_begin_box(ui, cid,
                   (cui_box){.width = col.width,
                             .height = row,
@@ -184,11 +276,12 @@ static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_
                             .border_width = cui_focused(ui) == cid ? 2
                                             : o.bordered           ? 1
                                                                    : 0});
-    cui_table_submit_cell(ui, id, m, s, o, r, c, label, data);
+    cui_str name = label ? label(data, r, col.key) : rr.label;
+    cui_table_submit_cell(ui, id, m, s, o, r, c, cached_cell_label, &name);
     if (render)
         render(ui, t, data, r, col.key);
     else
-        cui_text(ui, label ? label(data, r, col.key) : rr.label, t->font_size,
+        cui_text(ui, name, t->font_size,
                  o.disabled || rr.disabled || col.disabled ? t->muted
                  : selected                                ? t->on_primary
                                                            : t->text);

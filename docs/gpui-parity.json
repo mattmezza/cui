@@ -184,7 +184,9 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_alert_bubble_slots.c",
+        "tests/web/test_alert_bubble_slots.py"
       ],
       "status": "tested",
       "platforms": {
@@ -192,7 +194,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Severity text, title/message, banner sizing and controlled dismissal tested. Independent success/warning theme colors, rich content/action slots and native accessibility announcement pending."
+        "Semantic default/info/success/warning/error colors, optional title and borderless banner, rich title/content/action slots and bounded announcement request semantics tested. Native OS announcement delivery remains a platform integration gap."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -206,8 +208,11 @@
         },
         {
           "name": "title/content/action slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_alert_bubble_slots.c",
+            "tests/web/test_alert_bubble_slots.py"
+          ]
         },
         {
           "name": "accessible announcement",
@@ -492,7 +497,9 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_alert_bubble_slots.c",
+        "tests/web/test_alert_bubble_slots.py"
       ],
       "status": "tested",
       "platforms": {
@@ -500,20 +507,26 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Seven themed composable surface variants tested. Parent owns alignment/wrapping; built-in reactions, footer and complete message slot API pending."
+        "Seven themed surfaces, start/end alignment, custom content and measured top/bottom reaction slots tested in native and actual WASM. Parent still owns message composition; complete inherited styling audit remains pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "incoming/outgoing alignment",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_alert_bubble_slots.c",
+            "tests/web/test_alert_bubble_slots.py"
+          ]
         },
         {
           "name": "message/reaction slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_alert_bubble_slots.c",
+            "tests/web/test_alert_bubble_slots.py"
+          ]
         },
         {
           "name": "theme variants",
@@ -555,7 +568,9 @@
       "public_header": "include/cui/cui_components.h",
       "sample": "gallery/main.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_button_behavior.c",
+        "tests/web/test_button_behavior.py"
       ],
       "status": "tested",
       "platforms": {
@@ -563,7 +578,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Nine variants and source XS/S/M/L metrics, centered labels, SVG icon slots and icon-only buttons, controlled selected/loading/disabled states, text adornments and presentation callbacks are tested. Theme SVG providers can replace bundled artwork. Compact/custom variants, all upstream styling/tooltip interactions, exact loading presentation and native accessibility remain partial."
+        "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -589,8 +604,11 @@
         },
         {
           "name": "variants/sizes/icons/slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_behavior.c",
+            "tests/web/test_button_behavior.py"
+          ]
         },
         {
           "name": "nine themed variants, four source sizes and loading suppression",
@@ -653,7 +671,9 @@
       "public_header": "include/cui/cui_components.h",
       "sample": "gallery/main.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_checkbox_motion.c",
+        "tests/web/test_checkbox_motion.py"
       ],
       "status": "tested",
       "platforms": {
@@ -661,7 +681,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Styled checked/unchecked geometry, four sizes, disabled colors, labels, custom content, and keyboard activation tested. Checkbox also exposes mixed state. Spring mark animation, wrapped inherited text styling, tooltip integration and exact pointer focus behavior remain pending; not full parity."
+        "Checked/unchecked/mixed state, caller-owned reversible springs, finite wake deadlines, reduced-motion snaps, wrapped labels/custom children and BaseTooltip keyboard/pointer lifecycle tested across all14 design sizes and densities. NULL state retains legacy immediate rendering. Radio alias ignores Checkbox-specific added fields. Complete inherited styling and native accessibility delivery remain partial."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2242,7 +2262,9 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_status_motion.c",
+        "tests/web/test_status_motion.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2250,7 +2272,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Placeholder dimensions/radii, secondary opacity, phase pulse and reduced motion tested. Loading owner semantics and richer placeholder layouts pending."
+        "Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2309,7 +2331,9 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_status_motion.c",
+        "tests/web/test_status_motion.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2317,15 +2341,18 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Themed eight-dot ring, explicit clock phase, redraw invalidation, reduced motion and status snapshot tested. Scheduler deadlines and alternative icon geometry pending."
+        "Source-audited default SVG Loader, custom content, caller-clocked duration/easing, bounded finite wake deadlines, idle quiescence and reduced-motion snaps tested in native/software and real WASM. Spinner is decorative; the application owns loading announcements. Complete inherited styling remains pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "animation scheduling",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_status_motion.c",
+            "tests/web/test_status_motion.py"
+          ]
         },
         {
           "name": "sizes and theme",
@@ -5441,8 +5468,11 @@
         },
         {
           "name": "per-component overrides/density",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_advanced_family_audit.c:owner_theme_isolation",
+            "tests/unit/test_components.c"
+          ]
         },
         {
           "name": "system preference/high contrast/reduced motion",
@@ -5984,14 +6014,17 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_table.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_table_selection_contracts.c",
+        "tests/web/test_table_selection_contracts.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling, multi-level group headers, whole-row/trailing callbacks and actual scrollbars tested. Complete reference-default, remote adapter and behavior audit remains in progress."
+        "Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling, multi-level group headers, whole-row/trailing callbacks and actual scrollbars tested. Complete reference-default, remote adapter and behavior audit remains in progress.",
+        "Append-only named/indexed checked Table parts and all14 design row/cell sizes tested; child typography remains host-owned. DataTable source Desc/Asc/Default cycle is opt-in with legacy Asc-first preserved; selection-only opt-outs retain sort/resize/custom action activation and controlled stable keys. Exact edge padding, span metadata, dedicated source palette and axis-specific scrollbar projection remain incomplete. See TABLE_BEHAVIOR.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6192,14 +6225,17 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_table.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_table_selection_contracts.c",
+        "tests/web/test_table_selection_contracts.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Real themed rows/cells, static header/body/footer sections, captions and validated spans plus associated data-table behavior tested. Exhaustive alignment/sizing/style composition and complete upstream scope remain pending."
+        "Real themed rows/cells, static header/body/footer sections, captions and validated spans plus associated data-table behavior tested. Exhaustive alignment/sizing/style composition and complete upstream scope remain pending.",
+        "Append-only named/indexed checked Table parts and all14 design row/cell sizes tested; child typography remains host-owned. DataTable source Desc/Asc/Default cycle is opt-in with legacy Asc-first preserved; selection-only opt-outs retain sort/resize/custom action activation and controlled stable keys. Exact edge padding, span metadata, dedicated source palette and axis-specific scrollbar projection remain incomplete. See TABLE_BEHAVIOR.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

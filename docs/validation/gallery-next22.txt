@@ -1,0 +1,14 @@
+Integration base af933d8, with urgent published-message test fix fa26032.
+Published remainsfbbc40b; next22 source is not yet deployed.
+Native warning-enabled complete112/112: Table4579dd4 + regenerated distribution/test registration.
+Actual combined Chromium1208 Button11/11; Table all14sizes×both densities plus source sort cycle, action opt-out and mobile9XL touchpan PASS.
+Actual Checkbox34/34 and semantic Alert/Bubble proof passed at preceding combined source.
+Spinner/Skeleton finite wake, actual moving pixels and reduced-motion idle quiescence + Progress semantics browser PASS.
+WASI90/90 at67afbff; SHA256897d6cd86368cd88c7948f8228fde26de1a453468b02b53a7af30a4aeab80318. Fresh exact3f4e108 portable verification passes91/91; SHA2562261cee25e77353757e125d1bf2298a25246667c1f4381ae1b0257f4cae843ad.
+Sanitizers110/111 at67afbff: oneGPU LeakSanitizer failure also reproduced targeted. Diagnostic Xlib dynamic locale/input-method global allocation, before CUI renderer creation; do not suppress or claim whole suite passes. Investigation continues.
+Manifest78 preserved;271 tested feature subsets,4 implemented,46 not_started;0 fullyverified families.
+Native language examples rebuilt: headlessPython/Go/Rust/Node/TypeScript PASS; actualXvfbPython/Node/TypeScript pointercallbacks eachcount1 +nonemptyBMP.
+Current sanitizer112:111pass and rawGPUXlibmodulelifetimefailure; actualGPU with Xlib retained passes with leakchecking enabled. See native-xlib-sanitizer-next22.txt.
+Complete combined Chromium gallery78/78 + all78 displayed snippets compile. Tests target visible Button geometry, keyboard focus explicitly, descending-first storycycle and Checkbox semantic identity across tooltip/scroll changes. Assertions remain strict.
+Final real Chromium checks: catalog touch42/42; touch/pinch host suite exit0; browser IME Input/Textarea/Editor/Questionnaire PASS; additional IME has empty failures; site guides/design/composed app proof PASS.
+Additional actual contact sweeps: touchfollowup16/16, page-navigation19/19 PASS.

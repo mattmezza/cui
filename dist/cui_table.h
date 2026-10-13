@@ -25,6 +25,7 @@ typedef struct {
     float width, minimum, maximum;
     bool sortable, resizable, movable, disabled, fixed_left;
     cui_table_align align;
+    bool nonselectable; /* Selection-only opt-out; sorting/resizing/children stay enabled. */
 } cui_table_column;
 /* Reference defaults; zero-initialized structs remain supported. */
 cui_table_column cui_table_column_default(cui_id key, cui_str label);
@@ -33,6 +34,7 @@ typedef enum {
     CUI_TABLE_SORT_ASCENDING,
     CUI_TABLE_SORT_DESCENDING
 } cui_table_sort;
+typedef enum { CUI_TABLE_SORT_CYCLE_LEGACY, CUI_TABLE_SORT_CYCLE_SOURCE } cui_table_sort_cycle;
 typedef enum {
     CUI_TABLE_SELECT_ROW,
     CUI_TABLE_SELECT_COLUMN,
@@ -120,6 +122,9 @@ typedef struct {
     void *render_userdata;
     cui_table_selection_mode selection_mode;
     const cui_scrollbar_style *scrollbar_style;
+    bool row_selection_disabled, column_selection_disabled, cell_selection_disabled;
+    cui_table_sort_cycle sort_cycle; /* Zero preserves ascending-first legacy behavior. */
+    cui_str accessible_name;
 } cui_table_options;
 cui_table_options cui_table_options_default(void);
 typedef struct {
@@ -191,11 +196,38 @@ typedef struct {
     float height;
     bool header, custom_background;
     cui_color background;
+    cui_str name;
+    cui_id parent;
+    unsigned row_index;          /* One based; zero means unspecified. */
+    cui_design_size design_size; /* Height zero uses selected design control height. */
 } cui_table_row_options;
 /* Set the background independently for each header/body row. Alternating rows
  * are application-controlled: use the model row index, not the visible index. */
 void cui_table_begin_row_ex(cui_context *, cui_id, const cui_theme *, cui_table_row_options);
 void cui_table_begin_cell(cui_context *, cui_id, float width, float height, cui_table_align);
+typedef struct {
+    float width;
+    cui_str accessible_name;
+    unsigned row_count, column_count;
+} cui_table_basic_options;
+typedef struct {
+    float width, height, padding;
+    bool custom_padding, header;
+    cui_table_align align;
+    cui_str name;
+    cui_id parent;
+    unsigned row_index, column_index; /* One based; zero means unspecified. */
+    cui_design_size design_size;
+} cui_table_cell_options;
+/* Names are copied synchronously into Core frame storage. Invalid inputs create no box or
+ * semantic node. End only after a true return; zero size retains legacy FIT/4px
+ * padding. Explicit dimensions/padding override the selected design metrics.
+ * Metadata must fit INT_MAX. Design padding uses vertical control padding; child
+ * typography stays host-owned (use cui_design_measure for font/line height). */
+bool cui_table_begin_ex(cui_context *, cui_id, const cui_theme *, cui_table_basic_options);
+bool cui_table_begin_cell_ex(cui_context *, cui_id, const cui_theme *, cui_table_cell_options);
+/* Checked row submission; legacy void row_ex retains its normalization contract. */
+bool cui_table_begin_row_checked(cui_context *, cui_id, const cui_theme *, cui_table_row_options);
 void cui_table_end(cui_context *);
 #ifdef __cplusplus
 }
@@ -556,8 +588,22 @@ cui_table_view cui_table_column_viewport(const cui_table_model *m, float scroll,
     }
     return v;
 }
+static bool selection_mode_enabled(cui_table_options o) {
+    return o.selection_mode == CUI_TABLE_SELECT_ROW ? !o.row_selection_disabled
+           : o.selection_mode == CUI_TABLE_SELECT_COLUMN
+               ? !o.column_selection_disabled
+               : o.selection_mode == CUI_TABLE_SELECT_CELL && !o.cell_selection_disabled;
+}
+static bool selection_allowed(const cui_table_model *m, cui_table_options o, cui_id col) {
+    if (!selection_mode_enabled(o))
+        return false;
+    if (o.selection_mode == CUI_TABLE_SELECT_ROW)
+        return true;
+    size_t c = column(m, col);
+    return c != SIZE_MAX && !m->cols[c].nonselectable;
+}
 bool cui_table_is_selected(const cui_table_state *s, cui_table_options o, cui_id row, cui_id col) {
-    if (!s)
+    if (!s || !selection_mode_enabled(o))
         return false;
     row = o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : row;
     col = o.selection_mode == CUI_TABLE_SELECT_ROW ? 0 : col;
@@ -604,7 +650,8 @@ static cui_table_error select(cui_table_model *m, cui_table_state *s, cui_table_
         for (size_t ri = r0; ri <= r1; ri++)
             for (size_t ci = c0; ci <= c1; ci++) {
                 if ((o.selection_mode != CUI_TABLE_SELECT_COLUMN && m->rows[ri].disabled) ||
-                    (o.selection_mode != CUI_TABLE_SELECT_ROW && m->cols[ci].disabled))
+                    (o.selection_mode != CUI_TABLE_SELECT_ROW &&
+                     (m->cols[ci].disabled || m->cols[ci].nonselectable)))
                     continue;
                 if (++needed > s->selection_capacity)
                     return CUI_TABLE_CAPACITY;
@@ -613,7 +660,8 @@ static cui_table_error select(cui_table_model *m, cui_table_state *s, cui_table_
         for (size_t ri = r0; ri <= r1; ri++)
             for (size_t ci = c0; ci <= c1; ci++) {
                 if ((o.selection_mode != CUI_TABLE_SELECT_COLUMN && m->rows[ri].disabled) ||
-                    (o.selection_mode != CUI_TABLE_SELECT_ROW && m->cols[ci].disabled))
+                    (o.selection_mode != CUI_TABLE_SELECT_ROW &&
+                     (m->cols[ci].disabled || m->cols[ci].nonselectable)))
                     continue;
                 s->selection[s->selection_count++] = (cui_table_selection){
                     o.selection_mode == CUI_TABLE_SELECT_COLUMN ? 0 : m->rows[ri].key,
@@ -652,6 +700,8 @@ static cui_table_error select(cui_table_model *m, cui_table_state *s, cui_table_
 }
 static void apply_selection(cui_table_model *m, cui_table_state *s, cui_table_options o, cui_id row,
                             cui_id col, unsigned mods, cui_table_result *out) {
+    if (!selection_allowed(m, o, col))
+        return;
     cui_table_error error = select(m, s, o, row, col, mods);
     if (error != CUI_TABLE_OK)
         out->error = error;
@@ -762,7 +812,7 @@ static bool row_header_event(cui_context *ui, cui_id id, cui_table_model *m, cui
     if (activation == target) {
         apply_selection(m, s, row_options, s->cursor_row, s->cursor_column, mods, out);
         out->activated_row = s->cursor_row;
-        out->selection_mode_requested = true;
+        out->selection_mode_requested = !o.row_selection_disabled;
         out->requested_selection_mode = CUI_TABLE_SELECT_ROW;
         *reveal = true;
     }
@@ -784,7 +834,7 @@ static bool row_header_event(cui_context *ui, cui_id id, cui_table_model *m, cui
         }
         if (next != SIZE_MAX) {
             s->cursor_row = m->rows[next].key;
-            if (!o.manual_selection) {
+            if (!o.manual_selection && !o.row_selection_disabled) {
                 apply_selection(m, s, row_options, s->cursor_row, s->cursor_column, mods, out);
                 out->selection_mode_requested = true;
                 out->requested_selection_mode = CUI_TABLE_SELECT_ROW;
@@ -801,6 +851,9 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
     if (!ui || !m || !s || !m->columns ||
         (o.selection_mode != CUI_TABLE_SELECT_ROW && o.selection_mode != CUI_TABLE_SELECT_COLUMN &&
          o.selection_mode != CUI_TABLE_SELECT_CELL) ||
+        (o.sort_cycle != CUI_TABLE_SORT_CYCLE_LEGACY &&
+         o.sort_cycle != CUI_TABLE_SORT_CYCLE_SOURCE) ||
+        (o.accessible_name.length && !o.accessible_name.data) ||
         (s->sort != CUI_TABLE_SORT_DEFAULT && s->sort != CUI_TABLE_SORT_ASCENDING &&
          s->sort != CUI_TABLE_SORT_DESCENDING)) {
         out.error = CUI_TABLE_INVALID;
@@ -988,9 +1041,16 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
                 if (activation == target && o.selection_mode == CUI_TABLE_SELECT_COLUMN)
                     apply_selection(m, s, o, 0, m->cols[hc].key, ev[e].modifiers, &out);
                 if (activation == target && m->cols[hc].sortable) {
-                    s->sort = s->sort_column == m->cols[hc].key
-                                  ? (cui_table_sort)((s->sort + 1) % 3)
-                                  : CUI_TABLE_SORT_ASCENDING;
+                    if (o.sort_cycle == CUI_TABLE_SORT_CYCLE_SOURCE) {
+                        cui_table_sort current =
+                            s->sort_column == m->cols[hc].key ? s->sort : CUI_TABLE_SORT_DEFAULT;
+                        s->sort = current == CUI_TABLE_SORT_DEFAULT      ? CUI_TABLE_SORT_DESCENDING
+                                  : current == CUI_TABLE_SORT_DESCENDING ? CUI_TABLE_SORT_ASCENDING
+                                                                         : CUI_TABLE_SORT_DEFAULT;
+                    } else
+                        s->sort = s->sort_column == m->cols[hc].key
+                                      ? (cui_table_sort)((s->sort + 1) % 3)
+                                      : CUI_TABLE_SORT_ASCENDING;
                     s->sort_column = m->cols[hc].key;
                     out.sort_changed = true;
                 }
@@ -1168,8 +1228,9 @@ void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_t
         return;
     cui_table_view columns = cui_table_column_viewport(m, s->scroll_x, viewport_width(o), 0);
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480;
-    cui_interact(ui, id, CUI_ROLE_GRID, cui_string("Data table"), o.disabled || o.loading, false,
-                 0);
+    cui_interact(ui, id, CUI_ROLE_GRID,
+                 o.accessible_name.length ? o.accessible_name : cui_string("Data table"),
+                 o.disabled || o.loading, false, 0);
     cui_set_tab_stop(ui, id, false);
     cui_set_semantic_details(
         ui, id,
@@ -1213,7 +1274,8 @@ void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model 
         (cui_semantic_details){.parent = id,
                                .column_index = (unsigned)c + 1,
                                .cursor = disabled ? CUI_CURSOR_NOT_ALLOWED : CUI_CURSOR_POINTER,
-                               .selected = o.selection_mode == CUI_TABLE_SELECT_COLUMN &&
+                               .selected = !m->cols[c].nonselectable &&
+                                           o.selection_mode == CUI_TABLE_SELECT_COLUMN &&
                                            cui_table_is_selected(s, o, 0, m->cols[c].key)});
     if (m->cols[c].resizable) {
         cui_id grip = cui_table_resize_id(id, m->cols[c].key);
@@ -1288,6 +1350,7 @@ void cui_table_submit_row(cui_context *ui, cui_id id, cui_table_model *m, cui_ta
         cui_set_semantic_details(
             ui, header,
             (cui_semantic_details){.parent = rid,
+                                   .readonly = o.row_selection_disabled,
                                    .row_index = (unsigned)r + 1,
                                    .selected = o.selection_mode == CUI_TABLE_SELECT_ROW &&
                                                cui_table_is_selected(s, o, m->rows[r].key, 0)});
@@ -1301,17 +1364,20 @@ void cui_table_submit_cell(cui_context *ui, cui_id id, cui_table_model *m, cui_t
         return;
     cui_id rid = cui_table_row_id(id, m->rows[r].key);
     cui_id cid = cui_table_cell_id(id, m->rows[r].key, m->cols[c].key);
-    bool selected = cui_table_is_selected(s, o, m->rows[r].key, m->cols[c].key);
+    bool selected = selection_allowed(m, o, m->cols[c].key) &&
+                    cui_table_is_selected(s, o, m->rows[r].key, m->cols[c].key);
     cui_interact(ui, cid, CUI_ROLE_GRIDCELL,
                  label ? label(data, r, m->cols[c].key) : m->rows[r].label,
                  o.disabled || m->rows[r].disabled || m->cols[c].disabled, false, 0);
     cui_set_tab_stop(ui, cid,
                      s->cursor_row == m->rows[r].key && s->cursor_column == m->cols[c].key);
-    cui_set_semantic_details(ui, cid,
-                             (cui_semantic_details){.parent = rid,
-                                                    .selected = selected,
-                                                    .row_index = (unsigned)r + 1,
-                                                    .column_index = (unsigned)c + 1});
+    cui_set_semantic_details(
+        ui, cid,
+        (cui_semantic_details){.parent = rid,
+                               .selected = selected,
+                               .readonly = !selection_allowed(m, o, m->cols[c].key),
+                               .row_index = (unsigned)r + 1,
+                               .column_index = (unsigned)c + 1});
 }
 void cui_table_submit_body(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                            cui_table_options o, cui_table_label_fn label, void *data) {
@@ -1369,6 +1435,7 @@ bool cui_table_span_width(const float *widths, size_t count, size_t start, size_
 /* SPDX-License-Identifier: MIT */
 
 
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 static cui_id style_id(cui_id id, unsigned part) {
@@ -1378,6 +1445,66 @@ static cui_align align(cui_table_align a) {
     return a == CUI_TABLE_ALIGN_RIGHT    ? CUI_ALIGN_END
            : a == CUI_TABLE_ALIGN_CENTER ? CUI_ALIGN_CENTER
                                          : CUI_ALIGN_START;
+}
+static bool table_dimension_valid(float value) {
+    return isfinite(value) && value >= 0 && value <= 65536;
+}
+static bool table_name_valid(cui_str name) {
+    return !name.length || name.data;
+}
+bool cui_table_begin_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_table_basic_options o) {
+    if (!ui || !t || !id || !table_dimension_valid(o.width) ||
+        !table_name_valid(o.accessible_name) || o.row_count > INT_MAX || o.column_count > INT_MAX)
+        return false;
+    cui_interact(ui, id, CUI_ROLE_TABLE,
+                 o.accessible_name.length ? o.accessible_name : cui_string("Table"), false, false,
+                 0);
+    cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(
+        ui, id, (cui_semantic_details){.row_count = o.row_count, .column_count = o.column_count});
+    cui_begin_box(ui, id,
+                  (cui_box){.width = o.width,
+                            .background = t->surface,
+                            .border = t->border,
+                            .border_width = 1,
+                            .radius = t->radius});
+    return true;
+}
+bool cui_table_begin_cell_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                             cui_table_cell_options o) {
+    if (!ui || !t || !id || !table_dimension_valid(o.width) || !table_dimension_valid(o.height) ||
+        !isfinite(o.padding) || o.padding < 0 || o.padding > 4096 || !table_name_valid(o.name) ||
+        o.align < CUI_TABLE_ALIGN_LEFT || o.align > CUI_TABLE_ALIGN_RIGHT ||
+        o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL ||
+        o.row_index > INT_MAX || o.column_index > INT_MAX || o.parent == id)
+        return false;
+    float padding = o.custom_padding ? o.padding : 4;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics metrics;
+        if (!cui_design_measure(o.design_size, t->font_size / 16, &metrics))
+            return false;
+        if (!o.height)
+            o.height = metrics.control_height;
+        if (!o.custom_padding)
+            padding = metrics.padding_y;
+    }
+    cui_interact(ui, id, o.header ? CUI_ROLE_COLUMNHEADER : CUI_ROLE_CELL,
+                 o.name.length ? o.name : cui_string(o.header ? "Column" : "Cell"), false, false,
+                 0);
+    cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.parent = o.parent,
+                                                    .row_index = o.row_index,
+                                                    .column_index = o.column_index,
+                                                    .readonly = o.header});
+    cui_begin_box(ui, id,
+                  (cui_box){.width = o.width,
+                            .height = o.height,
+                            .padding = padding,
+                            .clip = true,
+                            .align_x = align(o.align),
+                            .align_y = CUI_ALIGN_CENTER});
+    return true;
 }
 void cui_table_begin(cui_context *ui, cui_id id, const cui_theme *t, float width) {
     if (!ui || !t)
@@ -1399,14 +1526,39 @@ void cui_table_begin_row_ex(cui_context *ui, cui_id id, const cui_theme *t,
                             cui_table_row_options o) {
     if (!ui || !t)
         return;
-    cui_interact(ui, id, CUI_ROLE_ROW, cui_string(o.header ? "Header" : "Row"), false, false, 0);
+    cui_interact(ui, id, CUI_ROLE_ROW,
+                 o.name.length && o.name.data ? o.name : cui_string(o.header ? "Header" : "Row"),
+                 false, false, 0);
     cui_set_tab_stop(ui, id, false);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.parent = o.parent,
+                               .row_index = o.row_index <= INT_MAX ? o.row_index : 0});
+    if (!o.height && o.design_size > CUI_DESIGN_INHERIT && o.design_size <= CUI_DESIGN_9XL) {
+        cui_design_metrics metrics;
+        if (cui_design_measure(o.design_size, t->font_size / 16, &metrics))
+            o.height = metrics.control_height;
+    }
     cui_begin_box(ui, id,
                   (cui_box){.height = o.height,
                             .row = true,
                             .background = o.custom_background ? o.background
                                           : o.header          ? t->background
                                                               : t->surface});
+}
+bool cui_table_begin_row_checked(cui_context *ui, cui_id id, const cui_theme *t,
+                                 cui_table_row_options o) {
+    if (!ui || !t || !id || !table_dimension_valid(o.height) || !table_name_valid(o.name) ||
+        o.row_index > INT_MAX || o.design_size < CUI_DESIGN_INHERIT ||
+        o.design_size > CUI_DESIGN_9XL || o.parent == id)
+        return false;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics metrics;
+        if (!cui_design_measure(o.design_size, t->font_size / 16, &metrics))
+            return false;
+    }
+    cui_table_begin_row_ex(ui, id, t, o);
+    return true;
 }
 void cui_table_begin_cell(cui_context *ui, cui_id id, float width, float height,
                           cui_table_align a) {
@@ -1529,6 +1681,11 @@ static void header_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_tabl
     }
     cui_end_box(ui);
 }
+static cui_str cached_cell_label(void *user, size_t row, cui_id column) {
+    (void)row;
+    (void)column;
+    return *(const cui_str *)user;
+}
 static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
                       cui_table_state *s, cui_table_options o, size_t r, size_t c, float row,
                       cui_table_label_fn label, cui_table_cell_fn render, void *data) {
@@ -1537,7 +1694,8 @@ static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_
     cui_table_get_row(m, r, &rr);
     cui_table_get_column(m, c, &col);
     cui_id cid = cui_table_cell_id(id, rr.key, col.key);
-    bool selected = cui_table_is_selected(s, o, rr.key, col.key);
+    bool selected = (o.selection_mode == CUI_TABLE_SELECT_ROW || !col.nonselectable) &&
+                    cui_table_is_selected(s, o, rr.key, col.key);
     cui_begin_box(ui, cid,
                   (cui_box){.width = col.width,
                             .height = row,
@@ -1552,11 +1710,12 @@ static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_
                             .border_width = cui_focused(ui) == cid ? 2
                                             : o.bordered           ? 1
                                                                    : 0});
-    cui_table_submit_cell(ui, id, m, s, o, r, c, label, data);
+    cui_str name = label ? label(data, r, col.key) : rr.label;
+    cui_table_submit_cell(ui, id, m, s, o, r, c, cached_cell_label, &name);
     if (render)
         render(ui, t, data, r, col.key);
     else
-        cui_text(ui, label ? label(data, r, col.key) : rr.label, t->font_size,
+        cui_text(ui, name, t->font_size,
                  o.disabled || rr.disabled || col.disabled ? t->muted
                  : selected                                ? t->on_primary
                                                            : t->text);

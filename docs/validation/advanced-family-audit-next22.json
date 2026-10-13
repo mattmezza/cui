@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "audit": "advanced-family-audit-next22",
+  "date": "2026-10-13",
+  "cui_base": "45c1c92",
+  "upstream": {
+    "version": "0.7.1",
+    "commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+    "url": "https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34"
+  },
+  "whole_family_parity_claimed": false,
+  "features": [
+    {
+      "family": "Theme",
+      "feature": "palettes_tokens_owner_overrides",
+      "status": "implemented_headless",
+      "source": "crates/component/src/theme/mod.rs",
+      "evidence": [
+        "include/cui/cui_theme.h",
+        "tests/unit/test_components.c",
+        "tests/unit/test_advanced_family_audit.c:owner_theme_isolation"
+      ]
+    },
+    {
+      "family": "Theme",
+      "feature": "registry_config_system_appearance",
+      "status": "missing_component_contract",
+      "source": "crates/component/src/theme/registry.rs",
+      "evidence": [
+        "include/cui/cui_theme.h"
+      ],
+      "gap": "No registry/watch/config loader or automatic platform observer; switching uses explicit caller theme assignment.",
+      "proposed_next_fix": "Optional bounded semantic config loader and host appearance callback contract."
+    },
+    {
+      "family": "Theme",
+      "feature": "semantic_motion_projection",
+      "status": "partial",
+      "source": "crates/component/src/theme/motion.rs",
+      "evidence": [
+        "include/cui/cui_theme.h",
+        "include/cui/cui_plot_view.h"
+      ],
+      "gap": "Two springs/scrollbar skin exist; full durations/easings/distances and automatic styled Plot projection absent.",
+      "proposed_next_fix": "Theme motion struct and opt-in compatibility defaults; 120ms hover and 1s quartic appearance."
+    },
+    {
+      "family": "Table",
+      "feature": "compound_structure_span_alignment",
+      "status": "implemented_headless",
+      "source": "crates/component/src/table/table.rs",
+      "evidence": [
+        "tests/unit/test_table.c:static_tables",
+        "tests/unit/test_table.c:custom_row_backgrounds"
+      ]
+    },
+    {
+      "family": "Table",
+      "feature": "explicit_name_size_semantic_metadata",
+      "status": "partial",
+      "source": "crates/component/src/table/table.rs",
+      "evidence": [
+        "tests/unit/test_advanced_family_audit.c:owner_theme_isolation"
+      ],
+      "gap": "Generic root Table/cell names; no accessible-name/sizing options or automatic indices/spans.",
+      "proposed_next_fix": "Append-only begin_ex/cell_ex contracts with explicit names and metadata."
+    },
+    {
+      "family": "DataTable",
+      "feature": "virtualization_selection_fixed_left_slots",
+      "status": "implemented_headless",
+      "source": "crates/component/src/table/state.rs",
+      "evidence": [
+        "tests/unit/test_table.c",
+        "tests/unit/test_advanced_family_audit.c:controlled_sort_and_selection"
+      ]
+    },
+    {
+      "family": "DataTable",
+      "feature": "sort_cycle",
+      "status": "source_mismatch",
+      "source": "crates/component/src/table/state.rs:perform_sort",
+      "evidence": [
+        "tests/unit/test_table.c:events",
+        "tests/unit/test_advanced_family_audit.c:controlled_sort_and_selection"
+      ],
+      "gap": "Source default\u2192descending\u2192ascending; local default\u2192ascending\u2192descending. Borrowed application rows remain unchanged until rebind.",
+      "proposed_next_fix": "Explicit source-compatible cycle option with legacy compatibility."
+    },
+    {
+      "family": "DataTable",
+      "feature": "selectable_column_padding_axis_scrollbar_styles",
+      "status": "partial",
+      "source": "crates/component/src/table/column.rs",
+      "evidence": [
+        "include/cui/cui_table.h"
+      ],
+      "gap": "No distinct selectable flag/edge padding; single scrollbar visibility; no dedicated table token family.",
+      "proposed_next_fix": "Append-only selectable policy, sizing/padding and axis visibility options; scoped table token overrides."
+    },
+    {
+      "family": "DataTable",
+      "feature": "pinned_rows",
+      "status": "not_source_requirement",
+      "source": "crates/component/src/table/column.rs",
+      "evidence": [
+        "include/cui/cui_table.h",
+        "tests/unit/test_table.c:pinned_geometry"
+      ],
+      "gap": "Source pinning is fixed-left columns; neither source nor CUI exposes pinned rows."
+    },
+    {
+      "family": "Plot",
+      "feature": "scales_shapes_axes_pixels_caches_lifecycle",
+      "status": "implemented_headless",
+      "source": "crates/base/src/plot/mod.rs",
+      "evidence": [
+        "tests/unit/test_plot.c",
+        "tests/unit/test_plot_styled.c"
+      ]
+    },
+    {
+      "family": "Plot",
+      "feature": "axis_navigation_configuration",
+      "status": "implemented_extension",
+      "source": "crates/base/src/plot/mod.rs",
+      "evidence": [
+        "tests/unit/test_plot.c:viewport_inputs",
+        "tests/unit/test_advanced_family_audit.c:axis_opt_in"
+      ],
+      "gap": "Local pan/zoom is explicit extension, not automatic source Plot behavior."
+    },
+    {
+      "family": "Plot",
+      "feature": "appearance_reduced_motion_owner_isolation",
+      "status": "implemented_headless",
+      "source": "crates/base/src/plot/appear.rs",
+      "evidence": [
+        "tests/unit/test_plot_styled.c:styled_appearance",
+        "tests/unit/test_advanced_family_audit.c:reduced_motion_appearance"
+      ]
+    },
+    {
+      "family": "Plot",
+      "feature": "prepaint_tooltip_default_motion_datum_accessibility",
+      "status": "partial",
+      "source": "crates/base/src/plot/element.rs",
+      "evidence": [
+        "include/cui/cui_plot_view.h"
+      ],
+      "gap": "Host supplies current bounds/pointer/hover; no typed styled tooltip parts, automatic theme motion, keyboard or per-datum actions.",
+      "proposed_next_fix": "Typed tooltip parts and theme default policy first; review Core current-frame prepaint separately."
+    }
+  ],
+  "validation": {
+    "strict_build": "passed C11 Wall Wextra Wpedantic Werror",
+    "scoped_headless": "passed",
+    "ctest": {
+      "passed": 103,
+      "total": 103,
+      "failed": 0
+    },
+    "sanitizers": "passed ASan UBSan detect_leaks=1",
+    "new_test_registration": "integrator_required",
+    "platform_claims": "headless only; native/browser/GPU/screen-reader/system appearance not newly validated",
+    "commands": [
+      "cmake -S . -B build -G Ninja",
+      "cmake --build build",
+      "ctest --test-dir build --output-on-failure",
+      "cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/unit/test_advanced_family_audit.c build/libcui.a -lm -o build/test_advanced_family_audit",
+      "build/test_advanced_family_audit",
+      "cmake -S . -B build-san -G Ninja -DCUI_SANITIZE=ON -DCUI_BUILD_NATIVE=OFF",
+      "cmake --build build-san --target cui",
+      "cc -std=c11 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude tests/unit/test_advanced_family_audit.c build-san/libcui.a -lm -o build-san/test_advanced_family_audit",
+      "ASAN_OPTIONS=detect_leaks=1 build-san/test_advanced_family_audit"
+    ]
+  }
+}

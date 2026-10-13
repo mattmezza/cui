@@ -30,53 +30,156 @@ static void cui_components_focus(cui_context *ui, cui_id id, const cui_theme *t,
         b->border_width = 2;
     }
 }
+static bool cui_button_dimension(float value) {
+    return isfinite(value) && value > 0 && value <= 4096;
+}
+static cui_str cui_button_label(cui_context *ui, cui_button_state *state, cui_str name, float font,
+                                float width) {
+    if (!state || !cui_button_dimension(width) || !name.length || !name.data ||
+        cui_measure_text(ui, name, font).width <= width)
+        return name;
+    cui_str ellipsis = cui_string("…");
+    state->label[0] = 0;
+    float tail = cui_measure_text(ui, ellipsis, font).width;
+    if (tail > width)
+        return (cui_str){state->label, 0};
+    size_t prefix = 0;
+    while (prefix < name.length) {
+        size_t next = cui_grapheme_next(name, prefix);
+        if (next <= prefix || next > sizeof(state->label) - 4 ||
+            cui_measure_text(ui, (cui_str){name.data, next}, font).width + tail > width)
+            break;
+        prefix = next;
+    }
+    memcpy(state->label, name.data, prefix);
+    memcpy(state->label + prefix, ellipsis.data, ellipsis.length);
+    state->label[prefix + ellipsis.length] = 0;
+    return (cui_str){state->label, prefix + ellipsis.length};
+}
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                                   cui_button_options options, cui_interaction state) {
+                                   cui_button_options o, cui_interaction state) {
     cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, options.design_size, &design))
+    if (!ui || !t || !cui_components_design(t, o.design_size, &design))
         return;
-    bool disabled = options.disabled || options.loading;
+    bool disabled = o.disabled;
     cui_box b = cui_components_control(t, disabled, false);
     float density = isfinite(t->font_size) && t->font_size > 0 ? t->font_size / 16 : 1;
-    float font = (options.size == CUI_CONTROL_XSMALL  ? 12
-                  : options.size == CUI_CONTROL_LARGE ? 16
-                                                      : 14) *
+    float font = (o.size == CUI_CONTROL_XSMALL  ? 12
+                  : o.size == CUI_CONTROL_LARGE ? 16
+                                                : 14) *
                  density;
-    float horizontal_padding = (options.size == CUI_CONTROL_XSMALL  ? 4
-                                : options.size == CUI_CONTROL_SMALL ? 8
-                                : options.size == CUI_CONTROL_LARGE ? 12
-                                                                    : 10) *
-                               density;
-    b.height = (options.size == CUI_CONTROL_XSMALL  ? 20
-                : options.size == CUI_CONTROL_SMALL ? 24
-                                                    : 32) *
+    float padding = (o.size == CUI_CONTROL_XSMALL  ? 4
+                     : o.size == CUI_CONTROL_SMALL ? 8
+                     : o.size == CUI_CONTROL_LARGE ? 12
+                                                   : 10) *
+                    density;
+    float gap = (o.size == CUI_CONTROL_XSMALL || o.size == CUI_CONTROL_SMALL ? 4 : 8) * density;
+    float icon = (o.size == CUI_CONTROL_XSMALL  ? 12
+                  : o.size == CUI_CONTROL_SMALL ? 14
+                  : o.size == CUI_CONTROL_LARGE ? 24
+                                                : 16) *
+                 density;
+    b.height = (o.size == CUI_CONTROL_XSMALL  ? 20
+                : o.size == CUI_CONTROL_SMALL ? 24
+                                              : 32) *
                density;
-    if (options.design_size != CUI_DESIGN_INHERIT) {
+    if (o.design_size != CUI_DESIGN_INHERIT) {
         font = design.font_size;
-        horizontal_padding = design.padding_x;
+        padding = design.padding_x;
         b.height = design.control_height;
+        gap = design.gap;
+        icon = design.indicator_size;
     }
+    if (cui_button_dimension(o.height))
+        b.height = o.height;
+    if (cui_button_dimension(o.font_size))
+        font = o.font_size;
+    if (cui_button_dimension(o.icon_size))
+        icon = o.icon_size;
+    if (o.compact) {
+        if (o.design_size != CUI_DESIGN_INHERIT)
+            padding *= .8f;
+        else
+            padding = (o.size == CUI_CONTROL_XSMALL  ? 4
+                       : o.size == CUI_CONTROL_SMALL ? 6
+                                                     : 8) *
+                      density;
+    }
+    bool text = o.variant == CUI_BUTTON_TEXT;
+    if (o.variant == CUI_BUTTON_LINK || text)
+        padding = 0;
+    if (text && !cui_button_dimension(o.height))
+        b.height = 0;
     b.padding = 0;
     b.gap = 0;
-    b.width = isfinite(options.width) ? options.width : 0;
-    if (options.icon_only) {
-        horizontal_padding = 0;
-        if (!b.width)
+    b.width = isfinite(o.width) ? o.width : 0;
+    b.fixed_width = b.width > 0;
+    if (o.icon_only) {
+        padding = 0;
+        if (text && !b.height)
+            b.height = icon;
+        if (!b.width) {
             b.width = b.height;
+            b.fixed_width = true;
+        }
+    }
+    if (o.compact && !b.width && !o.icon_only && !o.content && !o.children && !o.leading_content &&
+        !o.trailing_content) {
+        float measured = 0;
+        unsigned parts = 0;
+        if (name.length) {
+            measured += cui_measure_text(ui, name, font).width;
+            parts++;
+        }
+        if (o.loading || o.icon.length) {
+            measured += icon;
+            parts++;
+        } else if (o.leading.length) {
+            measured += cui_measure_text(ui, o.leading, font).width;
+            parts++;
+        }
+        if (o.trailing_icon.length) {
+            measured += icon;
+            parts++;
+        } else if (o.trailing.length) {
+            measured += cui_measure_text(ui, o.trailing, font).width;
+            parts++;
+        }
+        if (o.dropdown_caret) {
+            measured += icon;
+            parts++;
+        }
+        measured += padding * 2 + (parts ? parts - 1 : 0) * gap;
+        if (isfinite(measured)) {
+            b.width = fmaxf(b.height, measured);
+            b.fixed_width = true;
+        }
     }
     b.align_x = CUI_ALIGN_CENTER;
     b.align_y = CUI_ALIGN_CENTER;
-    cui_theme_button_kind kind = options.variant == CUI_BUTTON_SECONDARY
-                                     ? CUI_THEME_BUTTON_SECONDARY
-                                 : options.variant == CUI_BUTTON_DANGER  ? CUI_THEME_BUTTON_DANGER
-                                 : options.variant == CUI_BUTTON_WARNING ? CUI_THEME_BUTTON_WARNING
-                                 : options.variant == CUI_BUTTON_SUCCESS ? CUI_THEME_BUTTON_SUCCESS
-                                 : options.variant == CUI_BUTTON_INFO    ? CUI_THEME_BUTTON_INFO
-                                 : options.variant == CUI_BUTTON_OUTLINE ? CUI_THEME_BUTTON_DEFAULT
-                                                                         : CUI_THEME_BUTTON_PRIMARY;
-    cui_theme_button_colors palette = t->buttons[kind];
-    bool outlined = options.outline || options.variant == CUI_BUTTON_OUTLINE;
-    bool active = state.pressed || options.selected;
+    b.clip = b.width > 0;
+    if (o.rounding == CUI_BUTTON_ROUNDED_NONE)
+        b.radius = 0;
+    else if (o.rounding == CUI_BUTTON_ROUNDED_SMALL)
+        b.radius = t->radius * .5f;
+    else if (o.rounding == CUI_BUTTON_ROUNDED_LARGE)
+        b.radius = t->radius * 2;
+    else if (o.rounding == CUI_BUTTON_ROUNDED_CUSTOM && isfinite(o.radius) && o.radius >= 0)
+        b.radius = o.radius;
+    cui_theme_button_kind kind =
+        o.variant == CUI_BUTTON_SECONDARY ? CUI_THEME_BUTTON_SECONDARY
+        : o.variant == CUI_BUTTON_DANGER  ? CUI_THEME_BUTTON_DANGER
+        : o.variant == CUI_BUTTON_WARNING ? CUI_THEME_BUTTON_WARNING
+        : o.variant == CUI_BUTTON_SUCCESS ? CUI_THEME_BUTTON_SUCCESS
+        : o.variant == CUI_BUTTON_INFO    ? CUI_THEME_BUTTON_INFO
+        : o.variant == CUI_BUTTON_OUTLINE || o.variant == CUI_BUTTON_DEFAULT
+            ? CUI_THEME_BUTTON_DEFAULT
+            : CUI_THEME_BUTTON_PRIMARY;
+    cui_theme_button_colors palette = o.custom_colors ? o.colors : t->buttons[kind];
+    if (o.variant == CUI_BUTTON_CUSTOM && !o.custom_colors)
+        palette = (cui_theme_button_colors){.foreground = t->text, .outline_foreground = t->text};
+    bool outlined = o.outline || o.variant == CUI_BUTTON_OUTLINE;
+    bool active = state.pressed || o.selected;
     cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
     b.background = outlined ? (active          ? palette.outline_active
                                : state.hovered ? palette.outline_hover
@@ -85,103 +188,195 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
                                : state.hovered ? palette.hover
                                                : palette.normal);
     b.border = outlined ? palette.outline_border : palette.border;
-    if (options.variant == CUI_BUTTON_GHOST) {
+    if (o.variant == CUI_BUTTON_GHOST && !o.custom_colors) {
         b.background = active          ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
                        : state.hovered ? t->accent
                                        : (cui_color){0};
         foreground = state.hovered ? t->accent_foreground : t->secondary_foreground;
-        b.border_width = 0;
         if (state.pressed)
             b.background = t->buttons[CUI_THEME_BUTTON_DEFAULT].active;
-    } else if (options.variant == CUI_BUTTON_LINK) {
+    } else if (o.variant == CUI_BUTTON_LINK && !o.custom_colors) {
         b.background = (cui_color){0};
-        b.border_width = 0;
         foreground = active ? t->link_active : state.hovered ? t->link_hover : t->link;
+    } else if (text && !o.custom_colors) {
+        b.background = (cui_color){0};
+        foreground = t->text;
+        foreground.a = (uint8_t)(foreground.a * (active ? .7f : state.hovered ? 1 : .9f));
     }
+    if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
+        b.border_width = 0;
     if (disabled) {
         b.background = outlined ? palette.outline_normal : palette.normal;
         float opacity = outlined ? .5f : kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
         b.background.a = (uint8_t)fminf(255, b.background.a * opacity);
         b.border.a = (uint8_t)(b.border.a * .5f);
-        if (options.variant == CUI_BUTTON_GHOST || options.variant == CUI_BUTTON_LINK)
+        if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
             b.background.a = 0;
+        if (o.variant == CUI_BUTTON_DEFAULT && !o.custom_colors && !outlined) {
+            b.background = t->input_background;
+            b.background.a /= 2;
+            b.border = t->input;
+            b.border.a /= 2;
+        }
+        foreground = t->muted;
+        foreground.a /= 2;
+    } else if (o.loading) {
+        b.custom_opacity = true;
+        b.opacity = .8f;
     }
-    cui_components_focus(ui, id, t, &b);
+    if (!o.hide_focus_ring && state.focus_visible) {
+        b.border = t->focus;
+        b.border_width = 2;
+    }
     cui_begin_box(ui, id, b);
-    cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
+    cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
     cui_begin_box(ui, 0,
-                  (cui_box){.row = true,
+                  (cui_box){.width = b.width ? -1 : 0,
+                            .row = true,
+                            .clip = b.width > 0,
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER,
-                            .gap = options.design_size != CUI_DESIGN_INHERIT
-                                       ? design.gap
-                                       : (options.size == CUI_CONTROL_XSMALL ||
-                                                  options.size == CUI_CONTROL_SMALL
-                                              ? 4
-                                              : 8) *
-                                             density});
-    foreground = disabled ? t->muted : foreground;
-    if (options.loading)
-        (void)cui_icon_spinner(
-            ui, id ^ UINT64_C(0x7185e28e9fb974db), t,
-            (cui_icon_options){.custom_size = design.indicator_size,
-                               .size = options.design_size != CUI_DESIGN_INHERIT ? CUI_ICON_CUSTOM
-                                       : options.size == CUI_CONTROL_XSMALL      ? CUI_ICON_XSMALL
-                                       : options.size == CUI_CONTROL_SMALL       ? CUI_ICON_SMALL
-                                       : options.size == CUI_CONTROL_LARGE       ? CUI_ICON_LARGE
-                                                                                 : CUI_ICON_MEDIUM,
-                               .custom_color = true,
-                               .color = foreground});
-    else if (options.icon.length)
-        (void)cui_icon_named(
-            ui, id ^ UINT64_C(0x7185e28e9fb974db), t, options.icon,
-            (cui_icon_options){.custom_size = design.indicator_size,
-                               .size = options.design_size != CUI_DESIGN_INHERIT ? CUI_ICON_CUSTOM
-                                       : options.size == CUI_CONTROL_XSMALL      ? CUI_ICON_XSMALL
-                                       : options.size == CUI_CONTROL_SMALL       ? CUI_ICON_SMALL
-                                       : options.size == CUI_CONTROL_LARGE       ? CUI_ICON_LARGE
-                                                                                 : CUI_ICON_MEDIUM,
-                               .custom_color = true,
-                               .color = foreground});
-    else if (options.leading.length)
-        cui_text_with_line_height(ui, options.leading, font, foreground, font * 1.25f);
-    if (options.content)
-        options.content(ui, options.content_user);
-    else if (!options.icon_only)
-        cui_text_with_line_height(ui, name, font, foreground, font * 1.25f);
-    if (options.trailing.length)
-        cui_text_with_line_height(ui, options.trailing, font, foreground, font * 1.25f);
+                            .gap = gap});
+    if (text && !o.icon_only && !o.content) {
+        float minimum = fmaxf(font * 1.25f, cui_measure_text(ui, name, font).height);
+        cui_begin_box(
+            ui, 0,
+            (cui_box){.width = 0, .fixed_width = true, .height = minimum, .fixed_height = true});
+        cui_end_box(ui);
+    }
+    cui_icon_options artwork = {
+        .size = CUI_ICON_CUSTOM, .custom_size = icon, .custom_color = true, .color = foreground};
+    if (o.leading_content)
+        o.leading_content(ui, o.leading_user);
+    else if (o.loading) {
+        if (o.loading_icon.length) {
+            if (!cui_reduced_motion(ui)) {
+                double phase = fmod(cui_frame_time(ui), .8) / .8;
+                double eased =
+                    phase < .5 ? 2 * phase * phase : 1 - (-2 * phase + 2) * (-2 * phase + 2) / 2;
+                artwork.custom_transform = true;
+                artwork.transform = cui_icon_rotation((float)(eased * 6.2831853071795864769));
+            }
+            if (cui_icon_named(ui, id ^ UINT64_C(0x7185e28e9fb974db), t, o.loading_icon, artwork) ==
+                    CUI_ICON_OK &&
+                !cui_reduced_motion(ui))
+                cui_invalidate(ui);
+        } else
+            (void)cui_icon_spinner(ui, id ^ UINT64_C(0x7185e28e9fb974db), t, artwork);
+    } else if (o.icon.length)
+        (void)cui_icon_named(ui, id ^ UINT64_C(0x7185e28e9fb974db), t, o.icon, artwork);
+    else if (o.leading.length)
+        cui_text_with_line_height(ui, o.leading, font, foreground, font * 1.25f);
+    if (o.content)
+        o.content(ui, o.content_user);
+    else if (!o.icon_only) {
+        cui_str visible = cui_button_label(ui, o.state, name, font, o.label_width);
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = cui_button_dimension(o.label_width) ? o.label_width : 0,
+                                .fixed_width = cui_button_dimension(o.label_width),
+                                .clip = cui_button_dimension(o.label_width),
+                                .align_x = CUI_ALIGN_CENTER});
+        if (cui_button_dimension(o.label_width))
+            cui_text_line(ui, visible, font, foreground, font * 1.25f, (cui_text_style){0});
+        else
+            cui_text_with_line_height(ui, visible, font, foreground, font * 1.25f);
+        if (o.variant == CUI_BUTTON_LINK && visible.length) {
+            float underline = cui_measure_text(ui, visible, font).width;
+            if (cui_button_dimension(o.label_width))
+                underline = fminf(underline, o.label_width);
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = underline, .height = 1, .background = foreground});
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    if (o.children)
+        o.children(ui, o.children_user);
+    if (o.trailing_content)
+        o.trailing_content(ui, o.trailing_user);
+    else if (o.trailing_icon.length)
+        (void)cui_icon_named(ui, id ^ UINT64_C(0x52a4e31), t, o.trailing_icon, artwork);
+    else if (o.trailing.length)
+        cui_text_with_line_height(ui, o.trailing, font, foreground, font * 1.25f);
+    if (o.dropdown_caret) {
+        if (b.width) {
+            cui_begin_box(ui, 0, (cui_box){.width = -1});
+            cui_end_box(ui);
+        }
+        (void)cui_icon_named(ui, id ^ UINT64_C(0x7e51d), t, cui_string("chevron-down"),
+                             (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                                .custom_size = icon,
+                                                .custom_color = true,
+                                                .color = foreground});
+    }
     cui_end_box(ui);
-    cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
+    cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
     cui_end_box(ui);
 }
 void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                      cui_button_options options) {
-    bool disabled = options.disabled || options.loading;
-    cui_interaction state = {0};
-    if (!disabled) {
-        state.hovered = cui_hovered(ui, id);
-        state.pressed = cui_pressed(ui, id);
-    }
-    cui_button_paint_state(ui, id, t, name, options, state);
+                      cui_button_options o) {
+    cui_interaction state = cui_interaction_state(ui, id);
+    if (o.disabled || o.loading)
+        state.hovered = state.pressed = false;
+    cui_button_paint_state(ui, id, t, name, o, state);
 }
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_button_options options) {
+                   cui_button_options o) {
     cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, options.design_size, &design))
+    if (!ui || !t || !cui_components_design(t, o.design_size, &design))
         return false;
-    cui_interaction state = cui_base_button(ui, id, name, options.disabled || options.loading);
-    if (options.variant == CUI_BUTTON_LINK)
+    bool inert = o.disabled || o.loading;
+    cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
+    cui_interaction interaction = cui_base_button(ui, id, accessible, inert);
+    if (o.variant == CUI_BUTTON_LINK)
         (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
-    /* Selected paint is distinct from an accessibility toggle state. */
-    cui_update_semantic(ui, id, false, 0);
-    if (options.loading)
-        cui_set_semantic_details(
-            ui, id, (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
-    cui_button_paint_state(ui, id, t, name, options, state);
-    return state.activated;
+    cui_update_semantic(ui, id, o.toggle_semantics && o.toggled,
+                        o.toggle_semantics && o.toggled ? 1 : 0);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.description = o.loading ? cui_string("Loading") : (cui_str){0},
+                               .busy = o.loading,
+                               .no_pointer_focus = o.prevent_pointer_focus,
+                               .pointer_activatable = o.prevent_pointer_focus});
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    if (o.custom_cursor)
+        (void)cui_set_cursor(ui, id, o.cursor);
+    else if (!inert && (o.variant == CUI_BUTTON_LINK || o.variant == CUI_BUTTON_TEXT))
+        (void)cui_set_cursor(ui, id, CUI_CURSOR_POINTER);
+    if (o.state) {
+        if (o.state->id != id)
+            *o.state = (cui_button_state){.id = id};
+        bool hovered = !inert && interaction.hovered;
+        if (!inert && o.on_hover &&
+            ((o.state->initialized && o.state->hovered != hovered) ||
+             (!o.state->initialized && hovered)))
+            o.on_hover(o.action_user, hovered);
+        o.state->hovered = hovered;
+        o.state->initialized = true;
+        o.state->next_wake_seconds = 0;
+    }
+    if (interaction.activated && o.on_click)
+        o.on_click(o.action_user);
+    cui_button_paint_state(ui, id, t, name, o, interaction);
+    if (o.state && o.tooltip.length) {
+        cui_hover_options hover = o.tooltip_options;
+        hover.trigger = id;
+        hover.dt = cui_frame_delta(ui);
+        hover.disabled = inert;
+        size_t count = 0;
+        const cui_event *events = cui_frame_events(ui, &count);
+        for (size_t i = 0; i < count; i++)
+            if (events[i].type == CUI_EVENT_CANCEL && cui_event_target(ui, i) == id)
+                o.state->tooltip = (cui_hover_state){.suppressed = true};
+        cui_tooltip(ui, id ^ UINT64_C(0x83a46d), t, &o.state->tooltip, o.tooltip, hover);
+        double now = cui_frame_time(ui);
+        if (o.state->tooltip.pending && isfinite(now) && now <= 1e12)
+            o.state->next_wake_seconds = now + 1.0 / 60;
+    } else if (o.state)
+        o.state->tooltip = (cui_hover_state){0};
+    return interaction.activated;
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
     return cui_button_ex(ui, id, t, name, (cui_button_options){.disabled = disabled});
@@ -252,6 +447,11 @@ void cui_checkmark(cui_context *ui, float size, cui_color color) {
                                         .tint = color},
                      (cui_box){.width = size, .height = size});
 }
+static cui_color cui_checkbox_mix(cui_color from, cui_color to, float amount) {
+    return (cui_color){
+        (uint8_t)(from.r + (to.r - from.r) * amount), (uint8_t)(from.g + (to.g - from.g) * amount),
+        (uint8_t)(from.b + (to.b - from.b) * amount), (uint8_t)(from.a + (to.a - from.a) * amount)};
+}
 bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
                      cui_check_state *value, cui_checkbox_options options) {
     cui_design_metrics design;
@@ -276,23 +476,65 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
         size = design.indicator_size;
         font = design.font_size;
     }
+    float checked = *value == CUI_CHECK_CHECKED ? 1 : 0;
+    float mixed = *value == CUI_CHECK_MIXED ? 1 : 0;
+    if (options.state) {
+        cui_checkbox_state *state = options.state;
+        if (state->id != id) {
+            *state = (cui_checkbox_state){.id = id};
+        }
+        bool reduced = options.reduced_motion || cui_reduced_motion(ui);
+        cui_disclosure_motion_step_ex(&state->checked, checked != 0, cui_frame_delta(ui),
+                                      t->spring_control, reduced);
+        cui_disclosure_motion_step_ex(&state->mixed, mixed != 0, cui_frame_delta(ui),
+                                      t->spring_control, reduced);
+        /* Extreme finite spring settings can exceed float storage after integration. */
+        if (!isfinite(state->checked.progress) || !isfinite(state->checked.velocity)) {
+            state->checked.progress = checked;
+            state->checked.velocity = 0;
+        }
+        if (!isfinite(state->mixed.progress) || !isfinite(state->mixed.velocity)) {
+            state->mixed.progress = mixed;
+            state->mixed.velocity = 0;
+        }
+        bool active = state->checked.progress != checked || state->checked.velocity != 0 ||
+                      state->mixed.progress != mixed || state->mixed.velocity != 0;
+        double now = cui_frame_time(ui);
+        state->next_wake_seconds = active && isfinite(now) && now <= 1e12 ? now + 1.0 / 60 : 0;
+        if (state->next_wake_seconds)
+            cui_invalidate(ui);
+        checked = fminf(1, fmaxf(0, state->checked.progress));
+        mixed = fminf(1, fmaxf(0, state->mixed.progress));
+    }
     bool selected = *value != CUI_CHECK_UNCHECKED;
     cui_color border = options.invalid ? t->danger : selected ? t->primary : t->input;
     cui_color background = selected ? t->primary : t->input_background;
     cui_color foreground = t->on_primary;
+    if (options.state) {
+        float visible = fminf(1, checked + mixed);
+        background = cui_checkbox_mix(t->input_background, t->primary, visible);
+        if (!options.invalid)
+            border = cui_checkbox_mix(t->input, t->primary, visible);
+    }
     if (options.disabled) {
         border.a /= 2;
         if (selected)
             background.a /= 2;
         foreground.a /= 2;
     }
-    cui_box outer = {.row = true, .gap = 8 * density, .radius = t->radius * .5f};
+    bool bounded = isfinite(options.width) && options.width > 0;
+    float width = bounded ? fmaxf(size + 8 * density, options.width) : 0;
+    cui_box outer = {.width = width,
+                     .fixed_width = bounded,
+                     .row = true,
+                     .gap = 8 * density,
+                     .radius = t->radius * .5f};
     if (!options.hide_focus_ring && cui_focused(ui) == id) {
         outer.border = t->focus;
         outer.border_width = 2;
     }
     cui_begin_box(ui, id, outer);
-    cui_begin_box(ui, 0, (cui_box){.width = size, .gap = 0});
+    cui_begin_box(ui, 0, (cui_box){.width = size, .fixed_width = true, .gap = 0});
     if (label.length || options.content) {
         cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
         cui_end_box(ui);
@@ -306,7 +548,27 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
                             .radius = fminf(t->radius, 4 * density),
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER});
-    if (*value == CUI_CHECK_CHECKED) {
+    if (options.state) {
+        float glyph = fmaxf(0, size - 4 * density);
+        if (checked > 0) {
+            cui_color color = foreground;
+            color.a = (uint8_t)(color.a * checked);
+            cui_begin_absolute_box(
+                ui, 0, (cui_box){0},
+                (cui_rect){(size - glyph) / 2, (size - glyph) / 2, glyph, glyph});
+            cui_checkmark(ui, glyph, color);
+            cui_end_box(ui);
+        }
+        if (mixed > 0) {
+            cui_color color = foreground;
+            color.a = (uint8_t)(color.a * mixed);
+            float bar = fmaxf(0, size - 6 * density);
+            cui_begin_absolute_box(
+                ui, 0, (cui_box){.background = color, .radius = density},
+                (cui_rect){(size - bar) / 2, (size - 2 * density) / 2, bar, 2 * density});
+            cui_end_box(ui);
+        }
+    } else if (*value == CUI_CHECK_CHECKED) {
         cui_checkmark(ui, size - 4 * density, foreground);
     } else if (*value == CUI_CHECK_MIXED) {
         cui_begin_box(ui, 0,
@@ -319,7 +581,10 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
     cui_end_box(ui);
     cui_end_box(ui);
     if (label.length || options.content) {
-        cui_begin_box(ui, 0, (cui_box){.gap = 4 * density});
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = bounded ? width - size - 8 * density : 0,
+                                .fixed_width = bounded,
+                                .gap = 4 * density});
         if (label.length)
             cui_text(ui, label, font, options.disabled ? t->muted : t->text);
         if (options.content)
@@ -327,6 +592,26 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    if (options.state && options.tooltip.length) {
+        cui_hover_options hover = options.tooltip_options;
+        hover.trigger = id;
+        hover.dt = cui_frame_delta(ui);
+        hover.disabled = options.disabled;
+        size_t count = 0;
+        const cui_event *events = cui_frame_events(ui, &count);
+        for (size_t i = 0; i < count; i++)
+            if (events[i].type == CUI_EVENT_CANCEL && cui_event_target(ui, i) == id)
+                options.state->tooltip = (cui_hover_state){.suppressed = true};
+        cui_tooltip(ui, id ^ UINT64_C(0x43c19b7), t, &options.state->tooltip, options.tooltip,
+                    hover);
+        if (options.state->tooltip.pending) {
+            double now = cui_frame_time(ui);
+            if (isfinite(now) && now <= 1e12)
+                options.state->next_wake_seconds = now + 1.0 / 60;
+        }
+    } else if (options.state) {
+        options.state->tooltip = (cui_hover_state){0};
+    }
     return changed;
 }
 bool cui_checkbox(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool *value,

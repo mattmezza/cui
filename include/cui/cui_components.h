@@ -42,7 +42,10 @@ typedef enum {
     CUI_BUTTON_LINK,
     CUI_BUTTON_WARNING,
     CUI_BUTTON_SUCCESS,
-    CUI_BUTTON_INFO
+    CUI_BUTTON_INFO,
+    CUI_BUTTON_DEFAULT,
+    CUI_BUTTON_TEXT,
+    CUI_BUTTON_CUSTOM
 } cui_button_variant;
 typedef enum {
     CUI_CONTROL_MEDIUM,
@@ -51,6 +54,24 @@ typedef enum {
     CUI_CONTROL_XSMALL
 } cui_control_size;
 typedef void (*cui_button_content_fn)(cui_context *, void *user);
+typedef enum {
+    CUI_BUTTON_ROUNDED_THEME,
+    CUI_BUTTON_ROUNDED_NONE,
+    CUI_BUTTON_ROUNDED_SMALL,
+    CUI_BUTTON_ROUNDED_LARGE,
+    CUI_BUTTON_ROUNDED_CUSTOM
+} cui_button_rounding;
+typedef void (*cui_button_click_fn)(void *user);
+typedef void (*cui_button_hover_fn)(void *user, bool hovered);
+/* Optional bounded storage, one state per stable Button ID; retain through end_frame.
+ * No allocation/cleanup. Hover callbacks and tooltip require this state. */
+typedef struct {
+    cui_id id;
+    bool initialized, hovered;
+    cui_hover_state tooltip;
+    char label[256]; /* Bounded grapheme-safe visible ellipsis; full name stays semantic. */
+    double next_wake_seconds; /* Absolute Core frame time, zero when idle. */
+} cui_button_state;
 typedef struct {
     cui_button_variant variant;
     cui_control_size size;
@@ -63,6 +84,28 @@ typedef struct {
     void *content_user;
     bool outline;                /* Orthogonal colored outline; selected is presentation only. */
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
+    bool compact;
+    float height, font_size, icon_size; /* Positive finite overrides; zero derives metrics. */
+    cui_button_rounding rounding;
+    float radius; /* ROUND_CUSTOM: nonnegative finite logical pixels. */
+    bool custom_colors;
+    cui_theme_button_colors colors; /* Resolved normal/hover/active + outlined palette. */
+    cui_str trailing_icon, loading_icon;
+    bool dropdown_caret;
+    cui_button_content_fn leading_content, trailing_content, children;
+    void *leading_user, *trailing_user, *children_user;
+    float label_width; /* Positive maximum; state enables bounded ellipsis. */
+    cui_button_state *state;
+    cui_button_click_fn on_click; /* Called once on activation; bool result still reports it. */
+    cui_button_hover_fn on_hover; /* Interactive hover edges, requires state. */
+    void *action_user;
+    cui_str accessibility_label, tooltip;
+    cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled supplied. */
+    bool skip_tab, hide_focus_ring, prevent_pointer_focus;
+    bool toggle_semantics,
+        toggled; /* Explicit checked/value metadata; selected remains paint-only. */
+    bool custom_cursor;
+    cui_cursor cursor; /* Applied with Core cursor-only setter; zero defaults unchanged. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
@@ -70,6 +113,14 @@ bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_b
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 /* Paint-only antialiased check glyph for composed selection indicators. */
 void cui_checkmark(cui_context *, float size, cui_color);
+/* Caller-owned, one stable state per Checkbox ID; no allocation or cleanup.
+ * Zero initialization snaps to the initial logical value. Retain through end_frame. */
+typedef struct {
+    cui_id id;
+    cui_disclosure_motion checked, mixed;
+    cui_hover_state tooltip;
+    double next_wake_seconds; /* Absolute Core frame time; zero when quiescent. */
+} cui_checkbox_state;
 typedef struct {
     cui_control_size size;
     bool disabled, required, invalid, skip_tab, hide_focus_ring;
@@ -77,6 +128,12 @@ typedef struct {
     cui_button_content_fn content;
     void *content_user;
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
+    /* Checkbox-only extensions; cui_radio_options aliases this struct but ignores these fields. */
+    cui_checkbox_state *state; /* Optional spring mark/tooltip storage; NULL keeps legacy paint. */
+    float width; /* Checkbox: positive bounds wrapped labels/custom content; zero fits. */
+    cui_str tooltip;
+    cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled are supplied. */
+    bool reduced_motion;
 } cui_checkbox_options;
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);

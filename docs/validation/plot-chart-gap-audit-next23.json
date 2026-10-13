@@ -1,0 +1,62 @@
+{
+  "base": "67afbff",
+  "upstream_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "audit_only": true,
+  "source_verified": true,
+  "production_changes": false,
+  "gaps": [
+    {
+      "id": "owner_plot_motion_projection",
+      "status": "missing",
+      "priority": 1,
+      "scope": "Theme projection + actual Chart/Plot channel consumption; zero legacy compatibility"
+    },
+    {
+      "id": "automatic_current_frame_bounds",
+      "status": "missing_core_contract",
+      "priority": 2,
+      "scope": "current layout, live global pointer, occlusion/clipping before hover/paint"
+    },
+    {
+      "id": "chart_current_frame_host_seam",
+      "status": "proposal_only",
+      "scope": "checked additive current frame input; does not certify automatic source integration"
+    },
+    {
+      "id": "typed_plot_tooltip_parts",
+      "status": "missing_convenience_api",
+      "priority": 3
+    },
+    {
+      "id": "chart_reveal_hover_gate",
+      "status": "inferred_source_mismatch_not_runtime_reproduced",
+      "evidence": "cui_chart pointer update and tooltip emission have no reveal completion gate; source prepaint suppresses datum resolution while appearing"
+    },
+    {
+      "id": "chart_scoped_remount",
+      "status": "unverified_equivalence"
+    }
+  ],
+  "existing": [
+    "seven Chart kinds",
+    "Chart source-default appearance1s quartic-out and hover120ms",
+    "explicit Plot motion/appearance registry/current-bounds seam",
+    "geometry/raster/mesh/cache",
+    "named image semantics"
+  ],
+  "extensions": [
+    "viewport pan/zoom/pinch",
+    "host callback composition",
+    "bounded portable numeric/raster implementation"
+  ],
+  "evidence": {
+    "headless": "Strict -Wall -Wextra -Wpedantic -Werror build passed; CTest106/106 passed, including chart, plot and plot_styled. No new production behavior tested.",
+    "browser": "existing viewport test source inspected; no new browser execution",
+    "native_accessibility": "unverified"
+  },
+  "api_proposals_approved": false,
+  "validation_logs": [
+    "/home/matteo/.cache/cui-validation/plot-chart-audit-next23-build.log",
+    "/home/matteo/.cache/cui-validation/plot-chart-audit-next23-ctest.log"
+  ]
+}

@@ -222,13 +222,19 @@ def main():
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == 0
             assert page.locator('#accessible [aria-busy=true]').count() == 1
             canvas = page.locator('canvas')
-            box = canvas.bounding_box()
             bounds = page.evaluate('Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(0,i+1))')
+            # The richer Button story can exceed the viewport. Target the real
+            # first control rather than assuming the entire canvas fits.
+            page.evaluate('(bounds)=>{const c=document.querySelector("canvas"),r=c.getBoundingClientRect();window.scrollBy({top:r.top+bounds[1]+bounds[3]/2-innerHeight/2,behavior:"instant"});}', bounds)
+            box = canvas.bounding_box()
+            assert page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x':box['x']+bounds[0]+bounds[2]/2,'y':box['y']+bounds[1]+bounds[3]/2}), 'Button point covered or outside viewport'
             page.mouse.click(box['x'] + bounds[0] + bounds[2]/2, box['y'] + bounds[1] + bounds[3]/2, button='right')
             page.wait_for_timeout(50)
             assert page.evaluate('cuiGallery.exports.gallery_clicks()') == 0
             page.mouse.click(box['x'] + bounds[0] + bounds[2]/2, box['y'] + bounds[1] + bounds[3]/2)
             page.wait_for_function('cuiGallery.exports.gallery_clicks() === 1')
+            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,7)') == 0
+            page.keyboard.press('Tab')
             page.keyboard.press('Enter')
             page.wait_for_function('cuiGallery.exports.gallery_clicks() === 2')
             control_change('disabled', True)
@@ -2220,8 +2226,9 @@ def main():
             page.wait_for_function('!document.querySelector("#accessible [aria-selected=true]")')
             control_change('table-selection', '2')
             click_semantic('Name')
-            page.wait_for_function('document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")==="ascending"')
-            for expected_sort, first_file in [('descending','File 1000'), ('none','File 0001'), ('ascending','File 0001')]:
+            page.wait_for_function('document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")==="descending"')
+            page.wait_for_function('document.querySelector(`#accessible [role=gridcell][aria-colindex="1"]`)?.textContent==="File 1000"')
+            for expected_sort, first_file in [('ascending','File 0001'), ('none','File 0001'), ('descending','File 1000'), ('ascending','File 0001')]:
                 click_semantic('Name')
                 page.wait_for_function('(sort)=>document.querySelector("#accessible [role=columnheader]")?.getAttribute("aria-sort")===sort', arg=expected_sort)
                 page.wait_for_function('(label)=>document.querySelector(`#accessible [role=gridcell][aria-colindex="1"]`)?.textContent===label', arg=first_file)
@@ -2232,7 +2239,7 @@ def main():
                         e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))))); }''')
             page.keyboard.press('ArrowRight')
             page.keyboard.press('Enter')
-            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).some(e=>e.getAttribute("aria-label")==="Status"&&e.getAttribute("aria-sort")==="ascending")')
+            page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).some(e=>e.getAttribute("aria-label")==="Status"&&e.getAttribute("aria-sort")==="descending")')
             # Native column movement preserves the key while changing visible order.
             page.keyboard.press('Control+ArrowRight')
             page.wait_for_function('Array.from(document.querySelectorAll("#accessible [role=columnheader]")).map(e=>e.getAttribute("aria-label")).join(",")==="Name,Size,Status"')
@@ -2598,15 +2605,24 @@ def main():
             page.wait_for_function(texts + '.every(s=>!s.includes("Alex Morgan"))')
             page.evaluate('location.hash="Checkbox"')
             page.wait_for_function('document.querySelector("#name").textContent==="Checkbox" && cuiGallery.renderedComponent==="Checkbox"')
+            checkbox_index = lambda: semantic_index('Receive updates', 2)
+            assert checkbox_index() is not None
             canvas.focus()
-            page.keyboard.press('Tab')
+            # A keyboard-scrollable owner may precede the checkbox in tab order.
+            for _ in range(3):
+                before_tab = page.evaluate('cuiGallery.frame')
+                page.keyboard.press('Tab')
+                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before_tab)
+                if page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', checkbox_index()):
+                    break
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', checkbox_index()) == 1
             page.keyboard.press('Space')
-            page.wait_for_function('cuiGallery.exports.gallery_semantic(0,6) === 1')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,6) === 1', arg=checkbox_index())
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>cuiGallery.exports.gallery_command(i,0)).includes(5)')
             assert page.locator('#accessible [role=checkbox]').get_attribute('aria-checked') == 'true'
             control_change('checkbox-state', '2')
             page.wait_for_function('document.querySelector(`#accessible [role=checkbox]`).getAttribute("aria-checked")==="mixed"')
-            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,8)') == 2
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', checkbox_index()) == 2
             page.keyboard.press('Space')
             page.wait_for_function('document.querySelector(`#accessible [role=checkbox]`).getAttribute("aria-checked")==="true"')
             assert page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>cuiGallery.exports.gallery_command(i,0)===2).every(i=>!/[x✓]/.test(new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))))')
@@ -2621,12 +2637,12 @@ def main():
             assert page.locator('#accessible [role=checkbox]').get_attribute('aria-required') == 'true'
             assert page.locator('#accessible [role=checkbox]').get_attribute('aria-invalid') == 'true'
             control_change('choice-skip-tab', True)
-            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,9)') == -1
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,9)', checkbox_index()) == -1
             control_change('choice-skip-tab', False)
             control_change('disabled', True)
-            before = page.evaluate('cuiGallery.exports.gallery_semantic(0,8)')
+            before = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', checkbox_index())
             click_semantic('Receive updates', 2)
-            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,8)') == before
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,8)', checkbox_index()) == before
             control_change('disabled', False)
             page.evaluate('location.hash="Radio"')
             page.wait_for_function('cuiGallery.renderedComponent==="Radio"')

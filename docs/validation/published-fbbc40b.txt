@@ -1,0 +1,7 @@
+Published source: fbbc40b4be6c86be1fce1ddd827279b9c80183cf
+Gallery: https://matteo.merola.co/cui/
+Framework CI: https://github.com/mattmezza/cui/actions/runs/38423548633 (all6 jobs successful)
+Pages: https://github.com/mattmezza/cui/actions/runs/38423548663 (build/deploy successful)
+Actual HTTPS artifact comparison:339/339 files matched SHA256.
+Actual published Chromium1208 Attachment:62/62 checks, all14 sizes×both densities×both orientations; actual subtitle pixels;390px Small/Base containment; CDP touch horizontal pan and offscreen9XL Open exactly once.
+No physical mobile-device coverage claimed. Full78-family parity remains incomplete.

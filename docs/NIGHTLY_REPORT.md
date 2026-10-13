@@ -1,6 +1,12 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Published `main` source `0b667d07b258cbcb74cc8c279328027c1b69f71c`; all six framework CI jobs and Pages succeed, and all325 deployed files match the artifact. Active integration branch `integration/next21`, checkpoint `27063af`, passes warning native101/101. Avatar stacks, compact Message and optional accessibility packaging are integrated there; scrollbar appearance and RadioGroup remain isolated pending handoff. See [publication evidence](validation/published-0b667d0.txt) and the machine-readable checkpoint. No full family certification is claimed.
+Repository: https://github.com/mattmezza/cui. Published `main` source `fbbc40b4be6c86be1fce1ddd827279b9c80183cf` passes all six framework CI jobs and Pages; all 339 deployed files match the artifact. Actual public Attachment checks pass 62/62, including all design sizes, subtitle pixels and real touch access to actions. See [publication evidence](validation/published-fbbc40b.txt).
+
+Active branch `integration/next22` has source checkpoint `3f4e108` and later audit documents. Warning-enabled native CTest passes 112/112 and WASI passes 91/91. Combined Checkbox34, Button11, Table sizing/selection, Alert/Bubble and Spinner/Skeleton browser proofs pass. Attachment62 and responsive content checks also pass on this combined build. The broad gallery test passes all 78 stories after targeting visible controls and looking up changing semantic snapshots by name. It verifies the Button pointer-focus demonstration and descending-first DataTable story; headless tests retain the legacy default. All 78 usage excerpts compile.
+
+The raw sanitizer sweep passes 111/112; the GPU test hits an SDL/Xlib module-unloading leak also reproduced without CUI. The GPU test passes with default leak checking when Xlib stays loaded. See [host diagnostic](validation/native-xlib-sanitizer-next22.txt). Python, Node JavaScript and TypeScript native examples each receive a real pointer callback and produce a BMP capture; all five language headless examples pass. This is an example host ABI, not full component language bindings.
+
+Theme registry/configuration/motion and a source-correct Chart hover gate are the next isolated work items; automatic current-frame Plot/Chart prepaint remains an architectural gap. The ledger has 271 tested feature subsets, four implemented and 46 not started, with **0 fully verified families**. No dependency installation is required from the user. Work continues toward the full scope.
 
 ## Working architecture
 
@@ -22,7 +28,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Published source `0b667d0` passes all six framework CI jobs and Pages, with all 325 HTTPS artifact files matching. Next21 source `13c851f` passes strict native 103/103 and sanitizer 103/103, Attachment browser 62/62, catalog touch 42/42, responsive content containment, Avatar/Message 9/9, RadioGroup 5/5 and shared scrollbar appearance checks. The combined browser suite passes all 78 stories and WASI passes 83/83; public deployment verification is pending. The feature ledger records 265 tested subsets, four implemented subsets and 52 not started features; no full family is verified.
+Published source `fbbc40b` succeeds in framework CI and Pages, with all 339 HTTPS files matching. It includes the Next21 integration: native/sanitizer103, WASI83, browser78, Attachment62, touch42, responsive containment, Avatar/Message9, RadioGroup5 and shared scrollbar appearance proofs. Current Next22 checks are recorded above and in [gallery-next22.txt](validation/gallery-next22.txt); remaining checks stay explicit rather than inheriting older passes.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 

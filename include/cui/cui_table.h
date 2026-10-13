@@ -24,6 +24,7 @@ typedef struct {
     float width, minimum, maximum;
     bool sortable, resizable, movable, disabled, fixed_left;
     cui_table_align align;
+    bool nonselectable; /* Selection-only opt-out; sorting/resizing/children stay enabled. */
 } cui_table_column;
 /* Reference defaults; zero-initialized structs remain supported. */
 cui_table_column cui_table_column_default(cui_id key, cui_str label);
@@ -32,6 +33,7 @@ typedef enum {
     CUI_TABLE_SORT_ASCENDING,
     CUI_TABLE_SORT_DESCENDING
 } cui_table_sort;
+typedef enum { CUI_TABLE_SORT_CYCLE_LEGACY, CUI_TABLE_SORT_CYCLE_SOURCE } cui_table_sort_cycle;
 typedef enum {
     CUI_TABLE_SELECT_ROW,
     CUI_TABLE_SELECT_COLUMN,
@@ -119,6 +121,9 @@ typedef struct {
     void *render_userdata;
     cui_table_selection_mode selection_mode;
     const cui_scrollbar_style *scrollbar_style;
+    bool row_selection_disabled, column_selection_disabled, cell_selection_disabled;
+    cui_table_sort_cycle sort_cycle; /* Zero preserves ascending-first legacy behavior. */
+    cui_str accessible_name;
 } cui_table_options;
 cui_table_options cui_table_options_default(void);
 typedef struct {
@@ -190,11 +195,38 @@ typedef struct {
     float height;
     bool header, custom_background;
     cui_color background;
+    cui_str name;
+    cui_id parent;
+    unsigned row_index;          /* One based; zero means unspecified. */
+    cui_design_size design_size; /* Height zero uses selected design control height. */
 } cui_table_row_options;
 /* Set the background independently for each header/body row. Alternating rows
  * are application-controlled: use the model row index, not the visible index. */
 void cui_table_begin_row_ex(cui_context *, cui_id, const cui_theme *, cui_table_row_options);
 void cui_table_begin_cell(cui_context *, cui_id, float width, float height, cui_table_align);
+typedef struct {
+    float width;
+    cui_str accessible_name;
+    unsigned row_count, column_count;
+} cui_table_basic_options;
+typedef struct {
+    float width, height, padding;
+    bool custom_padding, header;
+    cui_table_align align;
+    cui_str name;
+    cui_id parent;
+    unsigned row_index, column_index; /* One based; zero means unspecified. */
+    cui_design_size design_size;
+} cui_table_cell_options;
+/* Names are copied synchronously into Core frame storage. Invalid inputs create no box or
+ * semantic node. End only after a true return; zero size retains legacy FIT/4px
+ * padding. Explicit dimensions/padding override the selected design metrics.
+ * Metadata must fit INT_MAX. Design padding uses vertical control padding; child
+ * typography stays host-owned (use cui_design_measure for font/line height). */
+bool cui_table_begin_ex(cui_context *, cui_id, const cui_theme *, cui_table_basic_options);
+bool cui_table_begin_cell_ex(cui_context *, cui_id, const cui_theme *, cui_table_cell_options);
+/* Checked row submission; legacy void row_ex retains its normalization contract. */
+bool cui_table_begin_row_checked(cui_context *, cui_id, const cui_theme *, cui_table_row_options);
 void cui_table_end(cui_context *);
 #ifdef __cplusplus
 }

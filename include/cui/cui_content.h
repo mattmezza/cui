@@ -10,8 +10,11 @@ typedef enum {
     CUI_ALERT_INFO,
     CUI_ALERT_SUCCESS,
     CUI_ALERT_WARNING,
-    CUI_ALERT_ERROR
+    CUI_ALERT_ERROR,
+    CUI_ALERT_DEFAULT
 } cui_alert_kind;
+typedef void (*cui_content_slot_fn)(cui_context *, const cui_theme *, cui_color foreground,
+                                    void *user);
 typedef struct {
     cui_alert_kind kind;
     cui_str title, message, icon;
@@ -22,6 +25,9 @@ typedef struct {
     bool dismissible;
     /* Named SVG; empty selects the kind's default. Legacy icon text overrides it. */
     cui_str icon_name;
+    cui_content_slot_fn title_content, content, action;
+    void *user;
+    cui_str accessible_name; /* Required for custom content without message text. */
 } cui_alert_options;
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options);
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
@@ -84,6 +90,38 @@ typedef enum {
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *theme,
                       cui_bubble_variant variant, float width);
 void cui_end_bubble(cui_context *ui);
+/* Slot foreground is semantic; custom children choose their own paint explicitly. */
+cui_color cui_bubble_foreground(const cui_theme *, cui_bubble_variant);
+typedef enum { CUI_BUBBLE_INCOMING, CUI_BUBBLE_OUTGOING } cui_bubble_alignment;
+typedef enum { CUI_BUBBLE_REACTIONS_BOTTOM, CUI_BUBBLE_REACTIONS_TOP } cui_bubble_reaction_side;
+typedef enum {
+    CUI_BUBBLE_ANNOUNCE_NONE,
+    CUI_BUBBLE_ANNOUNCE_POLITE,
+    CUI_BUBBLE_ANNOUNCE_ASSERTIVE
+} cui_bubble_announcement;
+/* Optional caller-owned measurement cache; zero initialize, never share between IDs. */
+typedef struct {
+    cui_rect surface, reactions, row;
+    bool measured;
+    uint64_t revision;
+    float width, font_size, padding;
+    unsigned configuration;
+} cui_bubble_state;
+typedef struct {
+    cui_bubble_variant variant;
+    cui_bubble_alignment alignment;
+    cui_bubble_reaction_side reaction_side;
+    cui_bubble_alignment reaction_alignment;
+    cui_bubble_announcement announcement;
+    float width; /* Row width; surface is capped at 80%, ghost at 100%. */
+    cui_str message, accessible_name;
+    cui_content_slot_fn content, reactions;
+    void *user;
+    cui_bubble_state *state;   /* NULL retains normal-flow reactions. */
+    uint64_t content_revision; /* Increment when custom slot geometry changes. */
+} cui_bubble_options;
+/* Synchronous borrowed slots. Reaction controls retain their base button semantics. */
+void cui_bubble(cui_context *, cui_id, const cui_theme *, cui_bubble_options);
 void cui_empty(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,
                cui_str description, float width);
 void cui_begin_group_box(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,
@@ -99,6 +137,54 @@ void cui_spinner(cui_context *ui, cui_id id, const cui_theme *theme, float size,
                  bool reduced_motion);
 void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *theme, float width, float height,
                   float radius, float phase, bool secondary, bool reduced_motion);
+/* Opt-in, caller-clocked loading motion. State is caller-owned, contains no
+ * allocation, and must not be shared by independent animations. Zero duration
+ * selects the source period (.8 seconds Spinner, 2 seconds Skeleton). */
+typedef struct {
+    bool ready;
+    double started, last_time;
+} cui_loading_motion;
+typedef float (*cui_loading_ease_fn)(float phase, void *user);
+typedef struct {
+    float phase, opacity;
+    bool active;
+    double next_wake_seconds; /* Absolute caller-clock deadline; zero when static. */
+} cui_loading_motion_result;
+/* Pure, atomic sampling; period in (0,60], now in [0,1e12]. Skeleton uses
+ * a triangular bounce of the easing curve. Invalid callback output rejects. */
+bool cui_loading_motion_sample(cui_loading_motion *, double now_seconds, float period,
+                               bool reduced_motion, bool skeleton, cui_loading_ease_fn,
+                               void *ease_user, cui_loading_motion_result *);
+/* Callback paints one icon; radians are center-relative rotation. No callback
+ * userdata is retained. A failing callback must leave its own paint unchanged. */
+typedef bool (*cui_spinner_paint_fn)(cui_context *, cui_id, const cui_theme *, float size,
+                                     cui_color, float radians, void *user);
+typedef struct {
+    float size, duration;
+    double now_seconds;
+    bool reduced_motion, custom_color;
+    cui_color color;
+    cui_loading_ease_fn ease;
+    void *ease_user;
+    cui_spinner_paint_fn paint;
+    void *paint_user;
+} cui_spinner_options;
+typedef struct {
+    float width, height, radius, duration;
+    double now_seconds;
+    bool secondary, reduced_motion;
+    cui_loading_ease_fn ease;
+    void *ease_user;
+} cui_skeleton_options;
+cui_spinner_options cui_spinner_options_default(void);
+cui_skeleton_options cui_skeleton_options_default(void);
+/* Paint-only, source-compatible semantics: neither adds a focus stop or busy
+ * status. On success caller schedules result.next_wake_seconds; these APIs do
+ * not invalidate perpetually. Legacy phase APIs above retain their behavior. */
+bool cui_spinner_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
+                    cui_spinner_options, cui_loading_motion_result *);
+bool cui_skeleton_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
+                     cui_skeleton_options, cui_loading_motion_result *);
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *theme, float length, bool vertical);
 /* Shared delayed lifecycle for hover cards/tooltips, independent of styling. */
 typedef struct {

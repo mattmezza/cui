@@ -598,9 +598,9 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned flattened-segment cache, translated raster and shape-key helper | Cache hits skip builder/cubic flattening; empty builds are warm; opaque FNV keys preserve f32 bit sensitivity, not Rust hash values; no renderer-native stroke triangles or implicit keyed slot bank |
 | `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clocks and scalar pointer glide available; no automatic theme projection, keyed renderer clock or appearance first-paint driver |
 | `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot/registry and linear stagger clock | Bounded multi-plot completed map with explicit consecutive-frame lifetime; no implicit frame/scope tree, first-paint clock or scheduler; easing/reduced motion remain explicit |
-| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | Explicit caller-owned scalar pointer glide available; no implicit scope lookup, tooltip rendering or event-to-datum routing |
-| `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | `cui_plot_view` fixed bitmap+axes and activation | No generic prepaint children/tooltip overlay driver, identity-driven motion/cache contract or custom trait-equivalent lifecycle |
-| `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; explicit caller-owned desktop/long-press cursor gate now covers visibility/coordinate transitions; no automatic OS gesture routing, occlusion hitbox or animation scheduling |
+| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | Scalar pointer glide and styled resolver/content driver available; no implicit scope lookup or automatic OS/event-to-datum routing |
+| `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | Bitmap view plus optional `cui_plot_element` resolver/marks/children/tooltip driver | Caller-owned hover clocks and inert portal composition; current bounds/pointer/occlusion supplied by host; no trait-equivalent renderer prepaint, automatic appearance/cache binding |
+| `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent with styled tooltip composition/exit clocks and explicit redraw requests; no full-size auto layout, current-frame Core hitbox/prepaint query, OS gesture detector or implicit scope state |
 | `origin_point` translation utility | Caller adds relative offsets before raster; Core offsets styled children | No separate named pure translation helper; ordinary finite coordinate addition remains caller responsibility |
 
 Missing renderer/lifecycle rows are real remaining Plot scope. Similar Chart,
@@ -1005,7 +1005,8 @@ nonfinite propagation reports OVERFLOW without mutation. Very small responses,
 extreme magnitudes/damping or elapsed oscillation angles may exceed representable
 math. The host must schedule requested frames and project its theme policy.
 Renderer keyed clocks, automatic first-paint appearance timing, implicit PathCaches
-slot lifetime and paint/prepaint tooltip overlay composition remain absent.
+slot lifetime and renderer prepaint tooltip layout remain absent; styled immediate
+portal composition is available through the host-bound PlotElement seam.
 
 ### Shape keys and cached tessellation
 
@@ -1043,3 +1044,40 @@ must be stable/disjoint from cache metadata, output and pixels. The host owns on
 cache per stable shape slot, or two independent caches for Area fill/stroke; no
 window/element keyed `PathCaches::for_paint` lifecycle or slot auto-growth exists.
 The Core renderer still has no native cached path command/triangle seam.
+
+### Styled PlotElement composition
+
+`cui_plot_element` layers a portable driver onto the existing bitmap/axis view.
+The host supplies **current** global bounds, live pointer position, and an
+occlusion-aware `hovered` decision; those bounds must match actual frame layout
+and bitmap extent. Core's `cui_bounds` is previous-frame data and must not be
+passed as current bounds during scrolling/relayout. A real Core prepaint hook and
+current hitbox query are still required for automatic source renderer behavior.
+
+One zero-initialized state is retained per stable owner. Resolver preflight uses
+live pointer minus current bounds every frame, including a stationary pointer
+while layout moves; appearance suppresses the live datum. The synchronous
+resolver returns OK with relative datum geometry or EMPTY. It may not compose UI
+or mutate driver storage. Enter/exit transition policies use Core frame time and
+reduced-motion, must produce normalized progress, and request redraw through
+`cui_invalidate`. Borrowed dot arrays must survive replacement or completed exit.
+The last datum and relative cursor remain during exit, then are dropped at zero.
+
+Bitmap/axes compose first, then marks and ordinary-child callbacks. The primary
+activation callback uses existing validated Core release routing with current
+host bounds. Tooltip content composes last in a plot-sized global portal at
+layer1 (or a supplied positive layer), with inherited hover opacity. The callback
+positions its body relative to that portal; un-clipped content may extend outside
+plot bounds. Tooltip descendants are inert: they paint, but cannot take semantics,
+focus or activation. This display-overlay policy is a bounded CUI choice; source
+`AnyElement` tooltips can contain arbitrary interactive content.
+
+Touch hosts run the existing long-press reducer on `state.cursor` before this
+call and set `touch=true`; desktop mouse visibility is then not synthesized.
+Long-press default prevention and host OS gesture detection stay explicit. On a
+passive/disabled plot the driver clears hover/clock state, skips resolver/tooltip,
+and still composes ordinary children. Owner changes reset state. Callback box
+stacks must balance, and text/bitmap payloads remain live through renderer
+completion. Preflight errors preserve state and submit no plot; general Core
+composition capacity is subject to the existing partial-submission contract.
+There is no separate callback measurement/prepaint pass or retained Element tree.

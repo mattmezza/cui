@@ -211,9 +211,10 @@ the bounded rasterizer intentionally fills only explicitly closed runs.
 
 The [complete frozen export audit](PLOT_MODEL.md#complete-frozen-plot-export-audit)
 lists exact supported routes and remaining differences. In particular this
-styled layer does not yet implement arbitrary gradient backgrounds or label-content callbacks,
-tessellation caches, hover/tooltip automatic event routing and exit motion clocks, implicit appear scope tracking, or the PlotElement
-prepaint lifecycle. Chart-specific versions of some features do not automatically
+styled layer does not yet implement arbitrary gradient backgrounds, renderer-native
+mesh caches, implicit appear scope tracking or the PlotElement renderer prepaint
+lifecycle. Caller-owned software segment caches, exit clocks and tooltip content
+composition are available; current bounds/pointer/occlusion remain host supplied. Chart-specific versions of some features do not automatically
 satisfy standalone Plot parity. Axis default positions and centered strokes are
 covered, while nondefault font scaling and theme fallback are deliberate CUI
 policies rather than byte-for-byte source behavior.
@@ -354,8 +355,8 @@ Arrays are bounded to 256 labels, text to 4096 bytes each, font size to 1024px,
 origins/extents/label dimensions to 16384px. Layout errors preserve the output
 rectangles; insufficient capacity reports the count. Drawing preflights the
 whole collection before submitting any boxes. Keep label text alive through
-renderer completion. There is no retained collection, tooltip content callback,
-automatic gutter allocation or semantic chart model.
+renderer completion. The label collection does not add retained state, automatic gutter allocation
+or a semantic chart model; tooltip content composition is a separate driver.
 
 `cui_plot_truncate_text` copies into caller-owned NUL-terminated storage and
 reports required bytes including that terminator. It follows the source's
@@ -477,3 +478,61 @@ paths are cached. Pixel rasterization still runs; this does not add a Core nativ
 mesh cache or implicit element cache lifetime. See
 [cached tessellation](PLOT_MODEL.md#shape-keys-and-cached-tessellation) for bounds,
 key composition and view lifetimes.
+
+## Styled tooltip composition
+
+`cui_plot_element` composes the existing view plus datum resolution, marks,
+ordinary children and tooltip content. It uses caller-owned hover/transition
+state and Core frame time/reduced motion. Supply current global layout bounds,
+live pointer position and an occlusion-aware hover flag; previous `cui_bounds`
+cannot provide those current bounds automatically. Tooltip content runs last
+inside an inert plot-sized portal with inherited hover opacity and may position
+its own body relative to that portal. The selected datum/cursor survives exit
+until progress reaches zero. The driver invalidates while its clock requests
+frames. See [the exact host seam](PLOT_MODEL.md#styled-plotelement-composition)
+for touch gates, callback ordering, ownership and renderer limitations.
+
+This complete example intentionally knows its absolute plot placement. A host
+with flowing/scrolling layout must provide that frame's actual placement instead.
+
+```c
+#include "cui/cui_plot_view.h"
+#include <assert.h>
+static cui_plot_result datum_at(cui_plot_point p, cui_plot_rect bounds,
+                                cui_plot_tooltip_state *out, void *user) {
+    (void)bounds; (void)user;
+    *out = (cui_plot_tooltip_state){.index = p.x < 32 ? 0 : 1, .cross_line = p};
+    return CUI_PLOT_OK;
+}
+static void tooltip_body(cui_context *ui, cui_id id, const cui_theme *theme,
+                          const cui_plot_hover_memory *hover,
+                          cui_plot_rect bounds, void *user) {
+    (void)bounds; (void)user;
+    cui_begin_absolute_box(ui, id + 10, (cui_box){.background = theme->surface},
+        (cui_rect){(float)hover->cursor.x + 4, (float)hover->cursor.y + 4, 40, 20});
+    cui_text(ui, cui_string("datum"), 10, theme->text);
+    cui_end_box(ui);
+}
+int main(void) {
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
+    assert(ui);
+    static unsigned char pixels[64 * 64 * 4];
+    cui_plot_view_options view = {.bitmap = {pixels, 64, 64, 256, 1}, .interactive = true};
+    cui_plot_element_state state = {0};
+    cui_plot_element_options element = {
+        .bounds = {10, 15, 74, 79}, .pointer = {30, 35}, .hovered = true,
+        .enter = {.duration = .12}, .exit = {.duration = .16},
+        .resolve = datum_at, .tooltip = tooltip_body
+    };
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 100, .height = 100,
+                                 .fixed_width = true, .fixed_height = true});
+    cui_begin_absolute_box(ui, 2, (cui_box){0}, (cui_rect){10, 15, 64, 64});
+    assert(cui_plot_element(ui, 3, &theme, &view, &state, &element) == CUI_PLOT_OK);
+    cui_end_box(ui); cui_end_box(ui);
+    (void)cui_end_frame(ui); /* render this list before the next begin_frame */
+    cui_destroy(ui);
+    return 0;
+}
+```

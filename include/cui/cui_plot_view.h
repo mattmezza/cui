@@ -205,6 +205,48 @@ typedef struct {
  * implicit zoom/pan or per-shape hit testing. */
 cui_plot_result cui_plot_view(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_view_options *);
+/* Portable PlotElement composition seam. Host supplies CURRENT global bounds,
+ * live pointer and occlusion-aware hover; Core has no prepaint/current-hitbox
+ * query. Bounds must match this frame's plot layout and bitmap extent. */
+typedef struct {
+    cui_id owner;
+    cui_plot_cursor_memory cursor;
+    cui_plot_hover_memory hover;
+    cui_plot_transition_clock transition;
+    bool request_frame;
+} cui_plot_element_state;
+typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
+                                               cui_plot_rect current_bounds,
+                                               cui_plot_tooltip_state *out, void *user);
+typedef void (*cui_plot_compose_fn)(cui_context *, cui_id owner, const cui_theme *,
+                                    const cui_plot_hover_memory *hover,
+                                    cui_plot_rect current_bounds, void *user);
+typedef struct {
+    cui_plot_rect bounds;
+    cui_plot_point pointer;
+    bool hovered, appearing, touch;
+    cui_plot_transition_policy enter, exit;
+    cui_plot_resolve_fn resolve;
+    cui_plot_compose_fn marks, children, tooltip;
+    void *user;
+    int16_t tooltip_layer; /* zero selects1, otherwise must be positive */
+} cui_plot_element_options;
+/* Zero-init state. Owner change resets it. Resolver is synchronous preflight:
+ * OK supplies relative datum/dots, EMPTY supplies none; it must not compose UI
+ * or mutate state/options. Dots stay borrowed until replacement/exit completes.
+ * Uses Core frame time/reduced-motion; marks then ordinary children are composed
+ * inside the plot after bitmap/axes, tooltip last in an inert global portal with
+ * plot extent and hover opacity. Tooltip callback places its body relative to
+ * that portal and may extend outside it. Text/bitmap payloads stay live through
+ * renderer completion. Callbacks balance boxes and must not mutate driver state.
+ * Primary activation uses existing view routing. Touch hosts update state.cursor
+ * through cursor_long_press before composition; touch=true preserves that gate.
+ * Driver requests redraw for clocks; host advances frames. Disabled/passive
+ * plots reset hover, suppress resolver/tooltip and still compose children.
+ * No implicit prepaint/layout pass, native mesh cache or OS long-press detector. */
+cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
+                                 const cui_plot_view_options *, cui_plot_element_state *,
+                                 const cui_plot_element_options *);
 #ifdef __cplusplus
 }
 #endif

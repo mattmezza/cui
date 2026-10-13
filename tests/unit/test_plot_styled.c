@@ -711,7 +711,195 @@ static void path_caches(void) {
     assert(cui_plot_path_cache_get(&cache, 3, (cui_plot_point){NAN, 0}, NULL, NULL, &path) ==
            CUI_PLOT_INVALID);
 }
+typedef struct {
+    int order[8];
+    size_t used, resolves, tooltips, activations;
+    cui_plot_point resolved;
+    bool fail;
+} element_probe;
+static double element_linear(double progress, void *user) {
+    (void)user;
+    return progress;
+}
+static cui_plot_result element_resolve(cui_plot_point point, cui_plot_rect bounds,
+                                       cui_plot_tooltip_state *out, void *user) {
+    element_probe *probe = user;
+    ++probe->resolves;
+    probe->order[probe->used++] = 1;
+    probe->resolved = point;
+    assert(bounds.x_max - bounds.x_min == 64);
+    if (probe->fail)
+        return CUI_PLOT_INVALID;
+    *out = (cui_plot_tooltip_state){.index = point.x < 32 ? 1 : 2, .cross_line = point};
+    return CUI_PLOT_OK;
+}
+static void element_marks(cui_context *ui, cui_id id, const cui_theme *theme,
+                          const cui_plot_hover_memory *hover, cui_plot_rect bounds, void *user) {
+    (void)theme;
+    (void)bounds;
+    element_probe *probe = user;
+    probe->order[probe->used++] = 2;
+    if (hover) {
+        cui_begin_absolute_box(
+            ui, id + 1, (cui_box){.background = green},
+            (cui_rect){(float)hover->state.cross_line.x, (float)hover->state.cross_line.y, 3, 3});
+        cui_end_box(ui);
+    }
+}
+static void element_children(cui_context *ui, cui_id id, const cui_theme *theme,
+                             const cui_plot_hover_memory *hover, cui_plot_rect bounds, void *user) {
+    (void)theme;
+    (void)hover;
+    (void)bounds;
+    element_probe *probe = user;
+    probe->order[probe->used++] = 3;
+    cui_begin_absolute_box(ui, id + 2, (cui_box){.background = red}, (cui_rect){22, 22, 10, 6});
+    cui_end_box(ui);
+}
+static void element_tooltip(cui_context *ui, cui_id id, const cui_theme *theme,
+                            const cui_plot_hover_memory *hover, cui_plot_rect bounds, void *user) {
+    (void)theme;
+    (void)bounds;
+    element_probe *probe = user;
+    probe->order[probe->used++] = 4;
+    ++probe->tooltips;
+    assert(hover && hover->has_state);
+    cui_begin_absolute_box(
+        ui, id + 3, (cui_box){.background = blue},
+        (cui_rect){(float)hover->cursor.x + 2, (float)hover->cursor.y + 2, 10, 6});
+    (void)cui_interact(ui, id + 3, CUI_ROLE_BUTTON, cui_string("tooltip"), false, false, 0);
+    cui_end_box(ui);
+}
+static void element_activate(cui_context *ui, cui_id id, cui_plot_point point, void *user) {
+    (void)ui;
+    assert(id == 444);
+    assert(point.x == 24 && point.y == 24);
+    ++((element_probe *)user)->activations;
+}
+static cui_draw_list element_frame(cui_context *ui, cui_plot_element_state *state,
+                                   cui_plot_element_options *o, cui_plot_view_options *view,
+                                   element_probe *probe, float dt) {
+    probe->used = 0;
+    assert(cui_begin_frame(ui, 100, 100, dt));
+    cui_theme theme = cui_theme_light();
+    cui_begin_box(
+        ui, 9990,
+        (cui_box){.width = 100, .height = 100, .fixed_width = true, .fixed_height = true});
+    cui_begin_absolute_box(ui, 9991, (cui_box){0},
+                           (cui_rect){(float)o->bounds.x_min, (float)o->bounds.y_min, 64, 64});
+    assert(cui_plot_element(ui, 444, &theme, view, state, o) == CUI_PLOT_OK);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void plot_elements(void) {
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100, .measure = measure});
+    assert(ui);
+    unsigned char bitmap[64 * 64 * 4] = {0};
+    element_probe probe = {0};
+    cui_plot_view_options view = {.bitmap = {bitmap, 64, 64, 256, 1},
+                                  .interactive = true,
+                                  .on_activate = element_activate,
+                                  .user = &probe};
+    cui_plot_element_state state = {0};
+    cui_plot_element_options o = {.bounds = {10, 15, 74, 79},
+                                  .pointer = {30, 35},
+                                  .enter = {1, 0, element_linear, NULL},
+                                  .exit = {1, 0, element_linear, NULL},
+                                  .resolve = element_resolve,
+                                  .marks = element_marks,
+                                  .children = element_children,
+                                  .tooltip = element_tooltip,
+                                  .user = &probe};
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(!state.hover.has_state && probe.resolves == 0 && probe.used == 2);
+    o.hovered = true;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.hover.entering && state.request_frame && probe.used == 4);
+    for (size_t i = 0; i < 4; ++i)
+        assert(probe.order[i] == (int)i + 1);
+    cui_draw_list draw = element_frame(ui, &state, &o, &view, &probe, 1);
+    assert(state.hover.progress == 1 && !state.request_frame);
+    cui_rect tooltip = cui_bounds(ui, 447);
+    assert(tooltip.x == 32 && tooltip.y == 37 && tooltip.w == 10 && tooltip.h == 6);
+    size_t semantics_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantics_count);
+    for (size_t i = 0; i < semantics_count; ++i)
+        assert(semantics[i].id != 447);
+    cui_software *renderer = cui_software_create(100, 100, NULL);
+    assert(renderer && cui_software_render(renderer, &draw, (cui_color){0}));
+    unsigned width, height;
+    size_t stride = 100 * 4;
+    const unsigned char *pixels = cui_software_pixels(renderer, &width, &height);
+    assert(pixels[38 * stride + 33 * 4 + 2] == 255); /* tooltip overlays ordinary child */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 34, .y = 39}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 34, .y = 39}));
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(probe.activations == 1); /* inert tooltip does not capture the plot's click */
+    /* Stationary pointer, current bounds move: datum is recomputed this frame. */
+    o.bounds = (cui_plot_rect){20, 20, 84, 84};
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(probe.resolved.x == 10 && probe.resolved.y == 15);
+    size_t resolves = probe.resolves;
+    o.hovered = false; /* host says popup/modal occludes plot */
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(probe.resolves == resolves && state.hover.has_state && !state.hover.hovered);
+    (void)element_frame(ui, &state, &o, &view, &probe, .25f);
+    assert(closef((float)state.hover.progress, .75f) && state.hover.cursor.x == 10);
+    (void)element_frame(ui, &state, &o, &view, &probe, .75f);
+    assert(!state.hover.has_state && probe.used == 2);
+    o.hovered = true;
+    o.appearing = true;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(probe.resolves == resolves && !state.hover.has_state);
+    o.appearing = false;
+    cui_set_reduced_motion(ui, true);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.hover.progress == 1 && state.hover.has_state && !state.request_frame);
+    view.disabled = true;
+    resolves = probe.resolves;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(!state.hover.has_state && probe.resolves == resolves && probe.used == 2);
+    /* Touch requires an explicitly accepted long press, not desktop hover. */
+    view.disabled = false;
+    o.touch = true;
+    o.hovered = false;
+    cui_plot_cursor_update update;
+    assert(cui_plot_cursor_long_press(&state.cursor, o.bounds, o.pointer,
+                                      CUI_PLOT_LONG_PRESS_STARTED, true, false,
+                                      &update) == CUI_PLOT_OK);
+    assert(update.prevent_default);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(state.hover.has_state);
+    o.pointer.x = 90;
+    assert(cui_plot_cursor_long_press(&state.cursor, o.bounds, o.pointer, CUI_PLOT_LONG_PRESS_MOVED,
+                                      false, false, &update) == CUI_PLOT_OK);
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(!state.hover.has_state); /* live outside current bounds */
+    assert(cui_plot_cursor_long_press(&state.cursor, o.bounds, o.pointer, CUI_PLOT_LONG_PRESS_ENDED,
+                                      false, false, &update) == CUI_PLOT_OK);
+    o.pointer.x = 30;
+    o.hovered = true;
+    resolves = probe.resolves;
+    (void)element_frame(ui, &state, &o, &view, &probe, 0);
+    assert(probe.resolves == resolves && !state.hover.has_state);
+    o.touch = false;
+    /* Resolver preflight error submits no layout and preserves caller state. */
+    view.disabled = false;
+    probe.fail = true;
+    cui_plot_element_state before = state;
+    assert(cui_begin_frame(ui, 100, 100, 0));
+    cui_theme theme = cui_theme_light();
+    assert(cui_plot_element(ui, 444, &theme, &view, &state, &o) == CUI_PLOT_INVALID);
+    assert(memcmp(&state, &before, sizeof state) == 0);
+    assert(cui_end_frame(ui).count == 0);
+    cui_software_destroy(renderer);
+    cui_destroy(ui);
+}
 int main(void) {
+    plot_elements();
     path_caches();
     test_sankey_raster();
     test_rounded_bar_raster();

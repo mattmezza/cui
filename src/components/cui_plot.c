@@ -289,8 +289,57 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
     }
     return CUI_PLOT_OK;
 }
-cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme,
-                              const cui_plot_view_options *o) {
+static cui_plot_result element_prepare(cui_context *ui, cui_id id,
+                                       const cui_plot_view_options *view,
+                                       cui_plot_element_state *next,
+                                       const cui_plot_element_options *o) {
+    if (!o || !next || !point_valid(o->pointer) ||
+        !point_valid((cui_plot_point){o->bounds.x_min, o->bounds.y_min}) ||
+        !point_valid((cui_plot_point){o->bounds.x_max, o->bounds.y_max}) ||
+        o->bounds.x_max - o->bounds.x_min != view->bitmap.width ||
+        o->bounds.y_max - o->bounds.y_min != view->bitmap.height || o->tooltip_layer < 0)
+        return CUI_PLOT_INVALID;
+    if (next->owner != id)
+        *next = (cui_plot_element_state){.owner = id};
+    if (!view->interactive || view->disabled) {
+        *next = (cui_plot_element_state){.owner = id};
+        return CUI_PLOT_OK;
+    }
+    cui_plot_result result;
+    if (!o->touch) {
+        cui_plot_cursor_update update;
+        result = cui_plot_cursor_mouse(&next->cursor, o->bounds, o->pointer, o->hovered, &update);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    cui_plot_point relative = {0};
+    bool resolved = false;
+    result = cui_plot_cursor_resolve(&next->cursor, o->bounds, o->pointer, o->appearing, &relative,
+                                     &resolved);
+    if (result != CUI_PLOT_OK)
+        return result;
+    cui_plot_tooltip_state live = {0};
+    bool has_live = false;
+    if (resolved && o->resolve) {
+        result = o->resolve(relative, o->bounds, &live, o->user);
+        if (result != CUI_PLOT_OK && result != CUI_PLOT_EMPTY)
+            return result;
+        has_live = result == CUI_PLOT_OK;
+    }
+    cui_plot_motion_value motion;
+    result =
+        cui_plot_transition_step(&next->transition, has_live ? 1 : 0, cui_frame_time(ui),
+                                 has_live ? o->enter : o->exit, cui_reduced_motion(ui), &motion);
+    if (result != CUI_PLOT_OK)
+        return result;
+    next->request_frame = motion.request_frame;
+    result = cui_plot_hover_track(&next->hover, has_live ? &live : NULL,
+                                  has_live ? &relative : NULL, motion.value);
+    return result;
+}
+static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_theme *theme,
+                                      const cui_plot_view_options *o, cui_plot_element_state *state,
+                                      const cui_plot_element_options *element) {
     if (!ui || !id || !theme || !o || (!o->name.data && o->name.length) ||
         !cui_bitmap_valid(o->bitmap) || o->bitmap.width > 16384 || o->bitmap.height > 16384)
         return CUI_PLOT_INVALID;
@@ -303,7 +352,19 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
         if (result != CUI_PLOT_OK)
             return result;
     }
+    cui_plot_element_state next = {0};
+    if (element) {
+        if (!state)
+            return CUI_PLOT_INVALID;
+        next = *state;
+        cui_plot_result result = element_prepare(ui, id, o, &next, element);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
     cui_rect bounds = cui_bounds(ui, id);
+    if (element)
+        bounds = (cui_rect){(float)element->bounds.x_min, (float)element->bounds.y_min,
+                            (float)o->bitmap.width, (float)o->bitmap.height};
     cui_begin_box(ui, id,
                   (cui_box){.width = (float)o->bitmap.width,
                             .height = (float)o->bitmap.height,
@@ -320,6 +381,14 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
                                               .fixed_height = true});
     if (o->axis)
         axis_paint(ui, id, theme, o->axis, geometry, labels);
+    if (painted && element) {
+        *state = next;
+        const cui_plot_hover_memory *hover = state->hover.has_state ? &state->hover : NULL;
+        if (element->marks)
+            element->marks(ui, id, theme, hover, element->bounds, element->user);
+        if (element->children)
+            element->children(ui, id, theme, hover, element->bounds, element->user);
+    }
     cui_end_box(ui);
     if (painted) {
         size_t count;
@@ -334,7 +403,31 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
                 (void)cui_consume_event(ui, i);
             }
     }
+    if (painted && element) {
+        if (next.request_frame)
+            cui_invalidate(ui);
+        if (state->hover.has_state && element->tooltip) {
+            cui_begin_portal(ui, id ^ UINT64_C(0xad79e25c10000400),
+                             (cui_box){.inert = true,
+                                       .opacity = (float)state->hover.progress,
+                                       .custom_opacity = true},
+                             bounds, element->tooltip_layer ? element->tooltip_layer : 1);
+            element->tooltip(ui, id, theme, &state->hover, element->bounds, element->user);
+            cui_end_box(ui);
+        }
+    }
     return painted ? CUI_PLOT_OK : CUI_PLOT_CAPACITY;
+}
+cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme,
+                              const cui_plot_view_options *o) {
+    return plot_view_impl(ui, id, theme, o, NULL, NULL);
+}
+cui_plot_result cui_plot_element(cui_context *ui, cui_id id, const cui_theme *theme,
+                                 const cui_plot_view_options *view, cui_plot_element_state *state,
+                                 const cui_plot_element_options *element) {
+    if (!state || !element)
+        return CUI_PLOT_INVALID;
+    return plot_view_impl(ui, id, theme, view, state, element);
 }
 
 cui_plot_result cui_plot_grid_ex(cui_context *ui, cui_id id, const cui_theme *theme,

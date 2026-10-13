@@ -1,0 +1,13 @@
+Native-language example recheck, source900e8f9, Linux X11/Xvfb,2026-10-13.
+Compiled shared example host and Node N-API addon with strict C11 warning errors.
+Python stdlibctypes delivered actual headless CUI click counts[1,2], preserved
+callback exception identity after returning through C, and passed a fresh rerun.
+Node JS headless callback, missing callback, thrown callback and rerun passed.
+Node TypeScript type stripping delivered[1,2].
+Sequential actual native SDL3 window checks used xdotool pointer clicks;
+Python, Node and TypeScript each delivered count1 and nonempty BMP captures.
+Evidence: next21-foreign-{config,build,headless,native}.log under
+/home/matteo/.cache/cui-validation.
+These use a small example C-host ABI, not complete78-family language bindings.
+Optional final Attachment/Settings geometry patches do not alter this host ABI;
+compiled-source provenance is kept explicit.

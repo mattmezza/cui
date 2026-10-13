@@ -1,0 +1,10 @@
+Combined source checkpoint: 917f17d
+Native CTest (GPU adapter enabled): 77/77 PASS.
+ASan/UBSan CTest: 75/75 PASS.
+WASI runtime suites: 67/67 PASS.
+Strict WASM gallery build: PASS.
+Complete Chromium gallery interactions and compiled usage excerpts: 78/78 PASS.
+Browsable documentation tests: 3/3 PASS.
+Lint, format and distribution consistency: PASS.
+Includes textarea viewport painting and sidebar scrolling/browser wheel precision fixes.
+This is validation of this checkpoint, not full GPUI Kit parity certification.

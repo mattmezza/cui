@@ -1,10 +1,10 @@
 # Current report — 13 October 2026
 
-The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Verified release `a136c07` passes library CI, Pages, actual HTTPS78 and thirty-two artifact file comparisons. See [published-a136c07.txt](validation/published-a136c07.txt). Full parity remains incomplete: 78 entries, 5 implemented, 73 tested and 0 verified.
+The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Verified release `1dc98a9` passes library CI, Pages, actual HTTPS78 and 164 artifact file comparisons. See [published-1dc98a9.txt](validation/published-1dc98a9.txt). Full parity remains incomplete: 78 entries, 5 implemented, 73 tested and 0 verified.
 
 Published fixes cover alignment and SVG choices/icons, real image media, input navigation, Stepper, choice widths, InputGroup, alerts, table sorting, animated Progress, composed Resizable/Dock, scrolling VirtualList, Plot pan/zoom, chart strokes, textarea viewport painting, moving sidebar content and precise browser wheels. Browser screen picking now has explicit availability/cancellation; native adapters still require an application-supplied picker. Theme tokens are explained and TextView code is visible initially.
 
-Integrated Sheet motion `8777cc4` passes native77, sanitizer75, WASI67, Chromium78 and quality. It animates all four edges, reverses an exit and respects reduced motion; focus/results/close callbacks wait for exit. The website sharing/media work is in an isolated branch and is not yet published.
+Integrated Sheet motion `8777cc4` passes native77, sanitizer75, WASI67, Chromium78 and quality. It animates all four edges, reverses an exit and respects reduced motion; focus/results/close callbacks wait for exit. Sharing/media is now public:147 static pages, complete crawler-visible metadata and original product captures.
 
 The remaining feedback is tracked in [website-feedback.md](website-feedback.md). Design-system expansion, composed apps, bindings, deeper docs and full family parity remain unfinished. No dependency installation is needed from the user. Preserved worker work and the Questionnaire event-order experiment remain intact.
 

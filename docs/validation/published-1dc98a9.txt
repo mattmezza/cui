@@ -1,0 +1,9 @@
+Verified public source 1dc98a937cab05f860951d965f0d00870191687d
+Library CI 38330275369 and Pages 38330275378: SUCCESS.
+Actual HTTPS Chromium78, direct component/doc visits and reloads, JS-disabled fallback: PASS.
+164/164 HTTPS files byte-match Pages artifact, including all147 HTML pages, three
+original PNG images, binary/scripts/catalog/docs/themes/llms aliases/routes/sitemap.
+This includes Sheet enter/exit/reduced-motion interactions and earlier component fixes.
+First HTTPS runner lost f-string interpolation in dynamic URLs; corrected runner passes.
+Required share metadata is crawler-visible. External sharing-service caches are not asserted.
+Full GPUI Kit parity and remaining design/docs/bindings scope remain unfinished.

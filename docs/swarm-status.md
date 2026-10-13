@@ -2,9 +2,9 @@
 
 ## Current priorities — 13 October
 
-Verified public release `a136c07` passes library CI, Pages, actual HTTPS78 and thirty-two artifact file comparisons. See [published-a136c07.txt](validation/published-a136c07.txt). All 78 manifest entries remain: 5 implemented, 73 tested, 0 verified. Full GPUI Kit parity is unfinished.
+Verified public release `1dc98a9` passes library CI, Pages, actual HTTPS78 and 164 artifact file comparisons. See [published-1dc98a9.txt](validation/published-1dc98a9.txt). All 78 manifest entries remain: 5 implemented, 73 tested, 0 verified. Full GPUI Kit parity is unfinished.
 
-[website-feedback.md](website-feedback.md) records published component repairs, controlled browser screen picking, clearer themes and visible Markdown code. Integrated Sheet motion `8777cc4` passes native77, ASan75, WASI67, Chromium78 and quality. The isolated website sharing branch generates canonical component/docs pages and original product media; it is still under validation.
+[website-feedback.md](website-feedback.md) records published component repairs, controlled browser screen picking, clearer themes and visible Markdown code. Integrated Sheet motion `8777cc4` passes native77, ASan75, WASI67, Chromium78 and quality. The sharing release is public:147 canonical component/docs/home pages with metadata and original product media.
 
 Only root integrates. Earlier workers reached model usage limits, so root continues independently. Their branches and the Questionnaire event-order experiment remain preserved. No user dependency installation is required. Impeccable metadata is removed.
 

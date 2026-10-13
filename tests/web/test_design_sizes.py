@@ -28,6 +28,15 @@ def main():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
             page = browser.new_page(viewport={'width': 1600, 'height': 1200})
+            def choose(selector, value):
+                # Dispatch and snapshot in one browser turn: no animation frame can
+                # publish old dimensions between reading the counter and this change.
+                frame = page.evaluate("""({selector,value})=>{const node=document.querySelector(selector);
+                  const before=cuiGallery.frame;node.value=String(value);
+                  node.dispatchEvent(new Event('change',{bubbles:true}));return before;}""",
+                  {'selector':selector,'value':value})
+                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=frame)
+
             observations = {}
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -43,7 +52,7 @@ def main():
                 assert page.locator('#'+legacy[family]).is_hidden(), family
                 rows = []
                 for size in range(1,15):
-                    page.locator('#design-size').select_option(str(size))
+                    choose('#design-size', str(size))
                     page.wait_for_timeout(100)
                     data = page.evaluate("""()=>{const e=cuiGallery.exports,d=new TextDecoder();
                       return {text:Array.from({length:e.gallery_count()},(_,i)=>({type:e.gallery_command(i,0),
@@ -56,8 +65,9 @@ def main():
 
                     font = [0,12,14,16,16,18,20,24,30,36,48,60,72,96,128][size]
                     height = [0,20,24,32,32,40,48,56,64,80,104,128,152,200,264][size]
-                    def semantic(name):
-                        return next(x for x in data['semantics'] if x['name'] == name)
+                    def semantic(name, role=None):
+                        return next(x for x in data['semantics'] if x['name'] == name
+                                    and (role is None or x['role'] == role))
                     def text_font(prefix, expected):
                         assert any(x['text'].startswith(prefix) and abs(x['font'] - expected) < .02
                                    for x in data['text']), (family, size, prefix, expected, data['text'])
@@ -73,7 +83,7 @@ def main():
                         text_font('Attachment 1', font)
                         assert semantic('Attachment 1')['h'] >= height
                     elif family == 'Progress':
-                        assert semantic('Progress')['h'] == height * .25
+                        assert semantic('Progress', 21)['h'] == height * .25, (family, size, semantic('Progress', 21), height * .25)
                     elif family == 'Settings':
                         text_font('Preferences', font)
                         assert semantic('Search settings')['h'] == height
@@ -100,14 +110,14 @@ def main():
             page.goto(f'http://127.0.0.1:{server.server_port}/#Progress')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="Progress"')
             for shape in ['1','2']:
-                page.locator('#progress-shape').select_option(shape)
+                choose('#progress-shape', shape)
                 for size in range(1,15):
-                    page.locator('#design-size').select_option(str(size))
+                    choose('#design-size', str(size))
                     page.wait_for_timeout(100)
                     height = [0,20,24,32,32,40,48,56,64,80,104,128,152,200,264][size]
                     diameter = height * (2 if shape == '2' else 1)
                     bounds = page.evaluate("""()=>{const e=cuiGallery.exports;for(let i=0;i<e.gallery_semantic_count();i++)
-                        if(new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==="Progress")return {w:e.gallery_semantic(i,3),h:e.gallery_semantic(i,4)};}""")
+                        if(new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==="Progress"&&e.gallery_semantic(i,0)===21)return {w:e.gallery_semantic(i,3),h:e.gallery_semantic(i,4)};}""")
                     assert bounds and bounds['w'] == diameter and bounds['h'] == diameter, (shape,size,bounds,diameter)
                     painted = page.evaluate('''diameter=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i)
                       .some(i=>e.gallery_command(i,0)===5&&e.gallery_command(i,3)===diameter&&e.gallery_command(i,4)===diameter
@@ -118,8 +128,8 @@ def main():
                                   ('Tabs','Overview'),('Speech','Start dictation')]:
                 page.goto(f'http://127.0.0.1:{server.server_port}/#{family}')
                 page.wait_for_function('(s)=>window.cuiGallery?.renderedComponent===s', arg=family)
-                page.locator('#design-size').select_option('7')
-                page.locator('#density').select_option('1')
+                choose('#design-size', '7')
+                choose('#density', '1')
                 page.wait_for_timeout(120)
                 actual = page.evaluate("""name=>{const e=cuiGallery.exports,d=new TextDecoder();
                   for(let i=0;i<e.gallery_semantic_count();i++)
@@ -131,8 +141,8 @@ def main():
             page.goto(f'http://127.0.0.1:{server.server_port}/#Tabs')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="Tabs"')
             for mode in ['1','2']:
-                page.locator('#tabs-mode').select_option(mode)
-                page.locator('#design-size').select_option('1')
+                choose('#tabs-mode', mode)
+                choose('#design-size', '1')
                 page.wait_for_timeout(120)
                 button = page.evaluate("""()=>{const e=cuiGallery.exports,d=new TextDecoder();
                   for(let i=0;i<e.gallery_semantic_count();i++)if(d.decode(new Uint8Array(e.memory.buffer,

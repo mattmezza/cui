@@ -523,3 +523,219 @@ cui_plot_result cui_plot_ordinal_map(const cui_plot_ordinal_scale *s, uint64_t k
     memmove(output, value, s->element_size);
     return CUI_PLOT_OK;
 }
+
+static cui_plot_result cui_plot_path_emit(cui_plot_path_command *out, size_t *used,
+                                          cui_plot_path_command command) {
+    if (out)
+        out[*used] = command;
+    ++*used;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_path_run(const cui_plot_sample *samples, const size_t *indices,
+                                         size_t count, cui_plot_curve curve, bool area,
+                                         cui_plot_path_command *out, size_t *used) {
+    cui_plot_path_command command = {0};
+    command.kind = CUI_PLOT_PATH_MOVE;
+    command.point = (cui_plot_point){samples[indices[0]].x, samples[indices[0]].y1};
+    cui_plot_path_emit(out, used, command);
+    for (size_t i = 0; i + 1 < count; ++i) {
+        cui_plot_sample p1 = samples[indices[i]], p2 = samples[indices[i + 1]];
+        command = (cui_plot_path_command){0};
+        command.kind = CUI_PLOT_PATH_LINE;
+        command.point = (cui_plot_point){p2.x, p2.y1};
+        if (curve == CUI_PLOT_CURVE_NATURAL) {
+            cui_plot_sample p0 = samples[indices[i ? i - 1 : 0]];
+            cui_plot_sample p3 = samples[indices[i + 2 < count ? i + 2 : count - 1]];
+            command.kind = CUI_PLOT_PATH_CUBIC;
+            /* Divide operands before subtracting: portable even when long
+             * double has the same range as double (e.g. wasm32). */
+            cui_plot_result result =
+                cui_plot_number((long double)p1.x + (p2.x / 6.L - p0.x / 6.L), &command.control1.x);
+            if (result == CUI_PLOT_OK)
+                result = cui_plot_number((long double)p1.y1 + (p2.y1 / 6.L - p0.y1 / 6.L),
+                                         &command.control1.y);
+            if (result == CUI_PLOT_OK)
+                result = cui_plot_number((long double)p2.x - (p3.x / 6.L - p1.x / 6.L),
+                                         &command.control2.x);
+            if (result == CUI_PLOT_OK)
+                result = cui_plot_number((long double)p2.y1 - (p3.y1 / 6.L - p1.y1 / 6.L),
+                                         &command.control2.y);
+            if (result != CUI_PLOT_OK)
+                return result;
+        } else if (curve == CUI_PLOT_CURVE_STEP_AFTER) {
+            command.point.y = p1.y1;
+            cui_plot_path_emit(out, used, command);
+            if (i + 2 == count)
+                continue;
+            command.point.y = p2.y1;
+        }
+        cui_plot_path_emit(out, used, command);
+    }
+    if (area) {
+        for (size_t i = count; i > 0; --i) {
+            cui_plot_sample sample = samples[indices[i - 1]];
+            command = (cui_plot_path_command){0};
+            command.kind = CUI_PLOT_PATH_LINE;
+            command.point = (cui_plot_point){sample.x, sample.y0};
+            cui_plot_path_emit(out, used, command);
+        }
+        command = (cui_plot_path_command){0};
+        command.kind = CUI_PLOT_PATH_CLOSE;
+        cui_plot_path_emit(out, used, command);
+    }
+    return CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_path_pass(const cui_plot_sample *samples, size_t count,
+                                          cui_plot_curve curve, cui_plot_gap_policy gaps, bool area,
+                                          cui_plot_path_command *out, size_t *used) {
+    size_t indices[CUI_PLOT_CATEGORY_LIMIT], run = 0;
+    *used = 0;
+    for (size_t i = 0; i <= count; ++i) {
+        if (i < count && samples[i].defined) {
+            indices[run++] = i;
+        } else if (run && (i == count || gaps == CUI_PLOT_GAPS_SPLIT)) {
+            cui_plot_result result =
+                cui_plot_path_run(samples, indices, run, curve, area, out, used);
+            if (result != CUI_PLOT_OK)
+                return result;
+            run = 0;
+        }
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_path(const cui_plot_sample *samples, size_t count, cui_plot_curve curve,
+                              cui_plot_gap_policy gaps, bool area, cui_plot_path_command *out,
+                              size_t capacity, size_t *required) {
+    if (!required || count > CUI_PLOT_CATEGORY_LIMIT || (count && !samples) || (!out && capacity) ||
+        curve < CUI_PLOT_CURVE_LINEAR || curve > CUI_PLOT_CURVE_STEP_AFTER ||
+        gaps < CUI_PLOT_GAPS_SKIP || gaps > CUI_PLOT_GAPS_SPLIT)
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].defined && (!isfinite(samples[i].x) || !isfinite(samples[i].y1) ||
+                                   (area && !isfinite(samples[i].y0))))
+            return CUI_PLOT_INVALID;
+    size_t needed;
+    cui_plot_result result = cui_plot_path_pass(samples, count, curve, gaps, area, NULL, &needed);
+    if (result != CUI_PLOT_OK)
+        return result;
+    *required = needed;
+    if (capacity < needed)
+        return CUI_PLOT_CAPACITY;
+    return cui_plot_path_pass(samples, count, curve, gaps, area, out, &needed);
+}
+cui_plot_result cui_plot_stack(const cui_plot_value *values, size_t series_count,
+                               size_t point_count, cui_plot_stack_point *out, size_t capacity,
+                               size_t *required) {
+    if (!required || series_count > CUI_PLOT_CATEGORY_LIMIT ||
+        point_count > CUI_PLOT_CATEGORY_LIMIT ||
+        (point_count && series_count > CUI_PLOT_CATEGORY_LIMIT / point_count) || (!out && capacity))
+        return CUI_PLOT_INVALID;
+    size_t cells = series_count * point_count;
+    if (cells && !values)
+        return CUI_PLOT_INVALID;
+    /* Preflight all columns before writing any output. */
+    for (size_t j = 0; j < point_count; ++j) {
+        double baseline = 0;
+        for (size_t i = 0; i < series_count; ++i) {
+            cui_plot_value value = values[i * point_count + j];
+            if (value.defined && !isfinite(value.value))
+                return CUI_PLOT_INVALID;
+            if (cui_plot_number((long double)baseline + (value.defined ? value.value : 0),
+                                &baseline) != CUI_PLOT_OK)
+                return CUI_PLOT_OVERFLOW;
+        }
+    }
+    *required = cells;
+    if (capacity < cells)
+        return CUI_PLOT_CAPACITY;
+    for (size_t j = 0; j < point_count; ++j) {
+        double baseline = 0;
+        for (size_t i = 0; i < series_count; ++i) {
+            size_t index = i * point_count + j;
+            out[index].y0 = baseline;
+            cui_plot_number((long double)baseline +
+                                (values[index].defined ? values[index].value : 0),
+                            &baseline);
+            out[index].y1 = baseline;
+        }
+    }
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_pie(const cui_plot_value *values, size_t count, double start_angle,
+                             double end_angle, double pad_angle, cui_plot_arc *out, size_t capacity,
+                             size_t *required) {
+    if (!required || count > CUI_PLOT_CATEGORY_LIMIT || (count && !values) || (!out && capacity) ||
+        !isfinite(start_angle) || !isfinite(end_angle) || !isfinite(pad_angle) || pad_angle < 0)
+        return CUI_PLOT_INVALID;
+    double largest = 0;
+    size_t needed = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!values[i].defined)
+            continue;
+        if (!isfinite(values[i].value))
+            return CUI_PLOT_INVALID;
+        if (values[i].value > 0) {
+            ++needed;
+            largest = fmax(largest, values[i].value);
+        }
+    }
+    /* Normalize before summation so large finite values do not overflow on
+     * targets whose long double has only double's exponent range. */
+    long double total = 0;
+    for (size_t i = 0; i < count; ++i)
+        if (values[i].defined && values[i].value > 0)
+            total += (long double)values[i].value / largest;
+    *required = needed;
+    if (capacity < needed)
+        return CUI_PLOT_CAPACITY;
+    long double cumulative = 0;
+    double angle = start_angle;
+    size_t emitted = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!values[i].defined || values[i].value <= 0)
+            continue;
+        cumulative += (long double)values[i].value / largest;
+        double next = (double)cui_plot_lerp(start_angle, end_angle, cumulative / total);
+        /* Force the final endpoint to avoid a visible seam from sum rounding. */
+        if (emitted + 1 == needed)
+            next = end_angle;
+        out[emitted++] = (cui_plot_arc){i, values[i].value, angle, next, pad_angle};
+        angle = next;
+    }
+    return CUI_PLOT_OK;
+}
+static bool cui_plot_arc_valid(const cui_plot_arc *arc, double inner, double outer) {
+    return arc && isfinite(arc->start_angle) && isfinite(arc->end_angle) &&
+           isfinite(arc->pad_angle) && arc->pad_angle >= 0 && isfinite(inner) && isfinite(outer) &&
+           inner >= 0 && outer >= inner;
+}
+cui_plot_result cui_plot_arc_centroid(const cui_plot_arc *arc, double inner, double outer,
+                                      cui_plot_point *out) {
+    if (!out || !cui_plot_arc_valid(arc, inner, outer))
+        return CUI_PLOT_INVALID;
+    long double angle = cui_plot_lerp(arc->start_angle, arc->end_angle, .5L);
+    long double radius = cui_plot_lerp(inner, outer, .5L);
+    const long double half_pi = acosl(-1.L) / 2;
+    cui_plot_point point;
+    cui_plot_result result = cui_plot_number(radius * cosl(angle - half_pi), &point.x);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number(radius * sinl(angle - half_pi), &point.y);
+    if (result == CUI_PLOT_OK)
+        *out = point;
+    return result;
+}
+cui_plot_result cui_plot_arc_contains(const cui_plot_arc *arc, double inner, double outer,
+                                      cui_plot_point position, bool *out) {
+    if (!out || !cui_plot_arc_valid(arc, inner, outer) || !isfinite(position.x) ||
+        !isfinite(position.y))
+        return CUI_PLOT_INVALID;
+    long double radius = hypotl(position.x, position.y);
+    const long double pi = acosl(-1.L);
+    long double angle = fmodl(atan2l(position.y, position.x) + pi / 2, 2 * pi);
+    if (angle < 0)
+        angle += 2 * pi;
+    *out =
+        radius >= inner && radius <= outer && angle >= arc->start_angle && angle < arc->end_angle;
+    return CUI_PLOT_OK;
+}

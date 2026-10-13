@@ -94,6 +94,68 @@ cui_plot_result cui_plot_ordinal_init(cui_plot_ordinal_scale *, const uint64_t *
  * capacity queries required element capacity for a resolvable key. */
 cui_plot_result cui_plot_ordinal_map(const cui_plot_ordinal_scale *, uint64_t key, void *output,
                                      size_t output_capacity);
+/* Pure geometry: coordinates are already projected by the application.
+ * Output/input/count pointers must not overlap. Two-pass builders never write
+ * partial output on error; required is published only for OK/CAPACITY.
+ * At most CUI_PLOT_CATEGORY_LIMIT samples/stack cells are accepted. */
+typedef struct {
+    double x, y0, y1;
+    bool defined;
+} cui_plot_sample;
+typedef enum {
+    CUI_PLOT_CURVE_LINEAR,
+    CUI_PLOT_CURVE_NATURAL,
+    CUI_PLOT_CURVE_STEP_AFTER
+} cui_plot_curve;
+typedef enum { CUI_PLOT_GAPS_SKIP, CUI_PLOT_GAPS_SPLIT } cui_plot_gap_policy;
+typedef enum {
+    CUI_PLOT_PATH_MOVE,
+    CUI_PLOT_PATH_LINE,
+    CUI_PLOT_PATH_CUBIC,
+    CUI_PLOT_PATH_CLOSE
+} cui_plot_path_kind;
+typedef struct {
+    cui_plot_path_kind kind;
+    cui_plot_point point, control1, control2;
+} cui_plot_path_command;
+/* Line uses y1. Area follows y1 then reverses y0 and closes each run.
+ * Undefined samples' numbers are ignored. SKIP bridges them (frozen GPUI
+ * behavior); SPLIT starts a new run. StepAfter omits the final vertical leg,
+ * matching the source line. Area always closes even single-point runs. */
+cui_plot_result cui_plot_path(const cui_plot_sample *, size_t count, cui_plot_curve,
+                              cui_plot_gap_policy, bool area, cui_plot_path_command *,
+                              size_t capacity, size_t *required);
+typedef struct {
+    double value;
+    bool defined;
+} cui_plot_value;
+typedef struct {
+    double y0, y1;
+} cui_plot_stack_point;
+/* Series-major cells: [series * point_count + point]. Natural series order,
+ * shared signed cumulative baseline; missing values are zero (not divergent).
+ * cells = series_count * point_count, with no data copies or allocations. */
+cui_plot_result cui_plot_stack(const cui_plot_value *, size_t series_count, size_t point_count,
+                               cui_plot_stack_point *, size_t capacity, size_t *required);
+typedef struct {
+    size_t index;
+    double value, start_angle, end_angle, pad_angle;
+} cui_plot_arc;
+/* Positive defined values only, original indices retained; no sorting or pad
+ * redistribution. Angles may reverse; finite nonnegative pad is metadata.
+ * radians: zero at 12 o'clock, clockwise positive. */
+cui_plot_result cui_plot_pie(const cui_plot_value *, size_t count, double start_angle,
+                             double end_angle, double pad_angle, cui_plot_arc *, size_t capacity,
+                             size_t *required);
+/* Radii must be finite, 0 <= inner <= outer. Centroid is relative to center.
+ * contains uses normalized [0, 2pi) screen angle and the source half-open
+ * [start_angle,end_angle) test, deliberately ignoring pad_angle. Consequently
+ * reversed and unnormalized angle intervals do not wrap automatically. */
+cui_plot_result cui_plot_arc_centroid(const cui_plot_arc *, double inner_radius,
+                                      double outer_radius, cui_plot_point *);
+cui_plot_result cui_plot_arc_contains(const cui_plot_arc *, double inner_radius,
+                                      double outer_radius, cui_plot_point relative_position,
+                                      bool *contains);
 /* Domain must ascend; pixel ranges may reverse. All endpoints finite. */
 cui_plot_result cui_plot_validate(const cui_plot_scale *);
 cui_plot_result cui_plot_map(const cui_plot_scale *, double value, double *pixel);

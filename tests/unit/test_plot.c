@@ -212,7 +212,161 @@ static void ordinal_scales(void) {
     assert(!memcmp(&scale, &saved, sizeof scale));
     assert(cui_plot_ordinal_map(NULL, 1, &color, sizeof color) == CUI_PLOT_INVALID);
 }
+static void shape_geometry(void) {
+    cui_plot_sample samples[] = {
+        {0, 0, 2, true}, {1, 1, 4, true}, {NAN, NAN, NAN, false}, {3, 2, 8, true}};
+    cui_plot_path_command path[32], saved[32];
+    memset(path, 0x5a, sizeof path);
+    memcpy(saved, path, sizeof path);
+    size_t needed = 99;
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SKIP, false, NULL, 0,
+                         &needed) == CUI_PLOT_CAPACITY &&
+           needed == 3);
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SKIP, false, path, 2,
+                         &needed) == CUI_PLOT_CAPACITY);
+    assert(memcmp(path, saved, sizeof path) == 0);
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SPLIT, false, path, 32,
+                         &needed) == CUI_PLOT_OK &&
+           needed == 3);
+    assert(path[0].kind == CUI_PLOT_PATH_MOVE && path[1].kind == CUI_PLOT_PATH_LINE &&
+           path[2].kind == CUI_PLOT_PATH_MOVE && path[2].point.x == 3);
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SPLIT, true, path, 32,
+                         &needed) == CUI_PLOT_OK &&
+           needed == 8);
+    assert(path[2].point.x == 1 && path[2].point.y == 1 && path[3].point.x == 0);
+    assert(path[4].kind == CUI_PLOT_PATH_CLOSE && path[5].kind == CUI_PLOT_PATH_MOVE &&
+           path[6].point.y == 2 && path[7].kind == CUI_PLOT_PATH_CLOSE);
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_NATURAL, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_OK &&
+           needed == 3);
+    assert(path[1].kind == CUI_PLOT_PATH_CUBIC && close(path[1].control1.x, 1. / 6) &&
+           close(path[1].control1.y, 2 + 2. / 6) && close(path[1].control2.x, .5) &&
+           close(path[1].control2.y, 3));
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_STEP_AFTER, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_OK &&
+           needed == 4);
+    assert(path[1].point.x == 1 && path[1].point.y == 2 && path[2].point.y == 4 &&
+           path[3].point.x == 3 && path[3].point.y == 4);
+    samples[0].y0 = NAN; /* Line ignores baseline. */
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_OK);
+    memcpy(saved, path, sizeof path);
+    needed = 99;
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SKIP, true, path, 32,
+                         &needed) == CUI_PLOT_INVALID &&
+           needed == 99);
+    assert(memcmp(saved, path, sizeof path) == 0);
+    samples[0].y0 = 0;
+    samples[3].y1 = INFINITY;
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_INVALID);
+    samples[3].y1 = 8;
+    assert(cui_plot_path(samples, 4, (cui_plot_curve)99, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_path(samples, 4, CUI_PLOT_CURVE_LINEAR, (cui_plot_gap_policy)99, false, path,
+                         32, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_path(NULL, 1, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_path(NULL, 0, CUI_PLOT_CURVE_LINEAR, CUI_PLOT_GAPS_SPLIT, true, NULL, 0,
+                         &needed) == CUI_PLOT_OK &&
+           needed == 0);
+    cui_plot_sample extremes[] = {
+        {-DBL_MAX, 0, 0, true}, {DBL_MAX, 0, 0, true}, {DBL_MAX, 0, 0, true}};
+    needed = 99;
+    assert(cui_plot_path(extremes, 3, CUI_PLOT_CURVE_NATURAL, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_OVERFLOW &&
+           needed == 99);
+    assert(memcmp(saved, path, sizeof path) == 0);
+    extremes[0].x = DBL_MAX;
+    extremes[1].x = -DBL_MAX;
+    assert(cui_plot_path(extremes, 3, CUI_PLOT_CURVE_NATURAL, CUI_PLOT_GAPS_SKIP, false, path, 32,
+                         &needed) == CUI_PLOT_OK);
+    assert(isfinite(path[1].control1.x) && path[1].control2.x == -DBL_MAX);
+    cui_plot_value values[] = {{2, true},    {-3, true}, {4, true},
+                               {NAN, false}, {-1, true}, {5, true}};
+    cui_plot_stack_point stack[6], original[6];
+    memset(stack, 0x5a, sizeof stack);
+    memcpy(original, stack, sizeof stack);
+    assert(cui_plot_stack(values, 3, 2, stack, 5, &needed) == CUI_PLOT_CAPACITY && needed == 6);
+    assert(memcmp(stack, original, sizeof stack) == 0);
+    assert(cui_plot_stack(values, 3, 2, stack, 6, &needed) == CUI_PLOT_OK);
+    assert(stack[0].y0 == 0 && stack[0].y1 == 2 && stack[2].y0 == 2 && stack[2].y1 == 6 &&
+           stack[4].y0 == 6 && stack[4].y1 == 5);
+    assert(stack[1].y1 == -3 && stack[3].y0 == -3 && stack[3].y1 == -3 && stack[5].y1 == 2);
+    memcpy(original, stack, sizeof stack);
+    needed = 99;
+    values[0].value = DBL_MAX;
+    values[2].value = DBL_MAX;
+    assert(cui_plot_stack(values, 3, 2, stack, 6, &needed) == CUI_PLOT_OVERFLOW && needed == 99);
+    assert(memcmp(stack, original, sizeof stack) == 0);
+    values[0].value = NAN;
+    assert(cui_plot_stack(values, 3, 2, stack, 6, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_stack(NULL, 4096, 4096, stack, 6, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_stack(NULL, 0, 0, NULL, 0, &needed) == CUI_PLOT_OK && needed == 0);
+}
+static void pie_geometry(void) {
+    const double pi = acos(-1.);
+    cui_plot_value values[] = {{0, true}, {1, true}, {NAN, false}, {-1, true}, {3, true}};
+    cui_plot_arc arcs[4], saved[4];
+    memset(arcs, 0x5a, sizeof arcs);
+    memcpy(saved, arcs, sizeof arcs);
+    size_t required = 99;
+    assert(cui_plot_pie(values, 5, 0, 2 * pi, .2, NULL, 0, &required) == CUI_PLOT_CAPACITY &&
+           required == 2);
+    assert(cui_plot_pie(values, 5, 0, 2 * pi, .2, arcs, 1, &required) == CUI_PLOT_CAPACITY);
+    assert(memcmp(arcs, saved, sizeof arcs) == 0);
+    assert(cui_plot_pie(values, 5, 0, 2 * pi, .2, arcs, 4, &required) == CUI_PLOT_OK);
+    assert(arcs[0].index == 1 && arcs[1].index == 4 && arcs[0].value == 1 &&
+           arcs[0].start_angle == 0 && close(arcs[0].end_angle, pi / 2) &&
+           arcs[1].start_angle == arcs[0].end_angle && arcs[1].end_angle == 2 * pi &&
+           arcs[1].pad_angle == .2);
+    assert(cui_plot_pie(values, 5, 2 * pi, 0, 0, arcs, 4, &required) == CUI_PLOT_OK &&
+           close(arcs[0].end_angle, 1.5 * pi) && arcs[1].end_angle == 0);
+    values[1].value = DBL_MAX;
+    values[4].value = DBL_MAX;
+    assert(cui_plot_pie(values, 5, -DBL_MAX, DBL_MAX, 0, arcs, 4, &required) == CUI_PLOT_OK);
+    assert(arcs[0].end_angle == 0 && arcs[1].end_angle == DBL_MAX);
+    memcpy(saved, arcs, sizeof arcs);
+    required = 99;
+    values[4].value = INFINITY;
+    assert(cui_plot_pie(values, 5, 0, pi, 0, arcs, 4, &required) == CUI_PLOT_INVALID &&
+           required == 99);
+    assert(memcmp(arcs, saved, sizeof arcs) == 0);
+    assert(cui_plot_pie(NULL, 0, 0, pi, -1, NULL, 0, &required) == CUI_PLOT_INVALID);
+    assert(cui_plot_pie(NULL, 0, 0, pi, 0, NULL, 0, &required) == CUI_PLOT_OK && required == 0);
+    cui_plot_arc half = {0, 1, 0, pi, .8};
+    cui_plot_point centroid = {99, 99};
+    bool inside = true;
+    assert(cui_plot_arc_centroid(&half, 10, 40, &centroid) == CUI_PLOT_OK &&
+           close(centroid.x, 25) && close(centroid.y, 0));
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){30, 0}, &inside) == CUI_PLOT_OK &&
+           inside);
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){0, -30}, &inside) == CUI_PLOT_OK &&
+           inside);
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){0, 30}, &inside) == CUI_PLOT_OK &&
+           !inside);
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){-30, 0}, &inside) == CUI_PLOT_OK &&
+           !inside);
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){5, 0}, &inside) == CUI_PLOT_OK &&
+           !inside);
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){40, 0}, &inside) == CUI_PLOT_OK &&
+           inside);
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){41, 0}, &inside) == CUI_PLOT_OK &&
+           !inside);
+    inside = true;
+    assert(cui_plot_arc_contains(&half, 40, 10, (cui_plot_point){30, 0}, &inside) ==
+               CUI_PLOT_INVALID &&
+           inside);
+    centroid = (cui_plot_point){99, 99};
+    assert(cui_plot_arc_centroid(&half, -1, 40, &centroid) == CUI_PLOT_INVALID && centroid.x == 99);
+    half.start_angle = pi;
+    half.end_angle = 0;
+    assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){30, 0}, &inside) == CUI_PLOT_OK &&
+           !inside);
+}
 int main(void) {
+    shape_geometry();
+    pie_geometry();
     band_scales();
     point_scales();
     ordinal_scales();

@@ -65,9 +65,9 @@ segments or zero-area clipped bars return `CUI_PLOT_EMPTY` without changing
 output. Scale clamping applies before geometry clipping; use unclamped scales
 when off-domain geometry should intersect the viewport naturally.
 
-No axis labels, retained series storage, missing-data
-segmentation, stacked bars, paths, hit testing, hover, legends, accessibility
-chart description, animated transitions, or rendering adapters are supplied.
+Pure path commands, stacking and pie/arc queries are described below. No axis
+labels, retained series storage, hover composition, legends, accessibility chart
+description, animated transitions, or rendering adapters are supplied.
 
 `test_plot` checks 1500 deterministic forward/inverse and zoom-anchor cases,
 linear/log ticks, reversed ranges, transactional failures, subnormal domains,
@@ -222,6 +222,128 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror -UNDEBUG -Iinclude plot_example.c s
 Headless tests exercise the source's categorical cases plus transactional errors,
 capacity queries, duplicate handling, generic struct palettes, extreme finite
 Point ranges, overlapping Band storage, and 500 randomized forward/nearest
-round trips in both range directions. Axis/grid labels, shape builders, stacking,
-radial/pie/Sankey primitives, hover composition and complete styled Plot rendering
-remain separate work; these scales do not establish full Plot parity.
+round trips in both range directions. These scales do not establish full Plot parity.
+
+
+## Allocation-free shape geometry
+
+`cui_plot_path`, `cui_plot_stack`, and `cui_plot_pie` accept caller arrays and
+write caller storage. Pass `NULL, 0` for output to query capacity. They return
+`CUI_PLOT_CAPACITY` and the required element count when storage is too small;
+empty input succeeds with count zero. Invalid inputs and numerical overflow
+leave both output and required count unchanged. No error writes partial output.
+Inputs, outputs and required-count pointers must be disjoint; buffers must
+remain stable for the whole call. The builders do not retain pointers or invoke
+callbacks. Sample/arc counts and total stack cells are bounded by
+`CUI_PLOT_CATEGORY_LIMIT` (4096). Path building uses a fixed index scratch array
+of approximately 32 KiB on 64-bit hosts; output can exceed 4096 commands.
+
+These contracts were audited against frozen `shape/line.rs`, `area.rs`,
+`stack.rs`, `pie.rs`, `arc.rs`, and `bar.rs` at the reference commit above.
+They expose portable geometry rather than GPUI paint, path-cache, style,
+callback or label objects.
+
+### Lines and areas
+
+Each `cui_plot_sample` contains already projected `x`, lower `y0`, upper `y1`,
+and `defined`. Line building ignores `y0`. Undefined samples' numeric fields
+are ignored, including NaN; defined coordinates must be finite. The caller
+maps data through linear/log/category scales before building commands.
+
+`CUI_PLOT_GAPS_SKIP` drops undefined samples and connects their neighbors,
+matching frozen GPUI. `CUI_PLOT_GAPS_SPLIT` is an explicit extension: it starts
+a new path at each contiguous defined run. Leading, trailing and consecutive
+missing samples create no commands. Every singleton run emits a Move command.
+
+The upper path supports Linear, Natural (the source's Catmull-Rom-to-cubic
+formula with duplicated end neighbors), and StepAfter. StepAfter intentionally
+omits the final vertical leg, matching frozen GPUI rather than assuming a D3
+step curve. Cubic controls that exceed finite double range return OVERFLOW.
+Control differences divide their operands before subtracting to avoid
+intermediate overflow on targets where `long double` has double's range.
+Floating-point rounding still applies near the representable limits.
+
+With `area=true`, each run follows its upper curve, then visits all lower
+`y0` points in reverse with straight Line commands and emits Close. This allows
+stacked per-point lower baselines, an extension to frozen GPUI's optional
+constant `y0`. Single-point areas are closed degenerate polygons. Areas always
+close at defined endpoints; they do not reproduce the frozen area behavior
+that could leave the fill open when the first/last original sample was missing.
+The lower boundary is linear even when the upper boundary is Natural or
+StepAfter. Commands contain points and two controls for Cubic; unused members
+are zero. A renderer interprets Move/Line/Cubic/Close, applies origin/clipping,
+and chooses fill/stroke/dot styles. No tessellation is performed here.
+
+### Natural-order stacking
+
+`cui_plot_stack` consumes a series-major `cui_plot_value` matrix. Cell
+`series * point_count + point` produces the corresponding `cui_plot_stack_point`
+with lower `y0` and upper `y1`. Each column starts at zero and sums series in
+input order; undefined values contribute zero. Negative values share this
+signed cumulative baseline, matching frozen GPUI; positive/negative divergent
+stacks, normalization, key sorting and alternate offsets are not implemented.
+Finite cumulative overflow fails transactionally. Original datum identity
+remains the caller's series/point index rather than a cloned payload.
+
+This complete example stacks two series, projects their boundaries through
+an inverted vertical scale, then produces closed area commands:
+
+```c
+#include <assert.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    const cui_plot_value data[] = {{2,true},{3,true},{4,true},{1,true}};
+    cui_plot_stack_point stacked[4];
+    size_t required = 0;
+    assert(cui_plot_stack(data, 2, 2, stacked, 4, &required) == CUI_PLOT_OK);
+    const cui_plot_scale y = {CUI_PLOT_LINEAR,0,8,80,0,false};
+    cui_plot_sample samples[2];
+    cui_plot_path_command commands[8];
+    for (size_t series = 0; series < 2; ++series) {
+        for (size_t point = 0; point < 2; ++point) {
+            const cui_plot_stack_point cell = stacked[series * 2 + point];
+            samples[point] = (cui_plot_sample){(double)point * 100,0,0,true};
+            assert(cui_plot_map(&y, cell.y0, &samples[point].y0) == CUI_PLOT_OK);
+            assert(cui_plot_map(&y, cell.y1, &samples[point].y1) == CUI_PLOT_OK);
+        }
+        assert(cui_plot_path(samples, 2, CUI_PLOT_CURVE_LINEAR,
+               CUI_PLOT_GAPS_SPLIT, true, commands, 8, &required) == CUI_PLOT_OK);
+        assert(required == 5 && commands[4].kind == CUI_PLOT_PATH_CLOSE);
+        /* Submit commands to the application's path renderer here. */
+    }
+    return 0;
+}
+```
+
+Compile with the same standalone C11 command shown above, using `-UNDEBUG`
+for this assertion-based example.
+
+### Pie angles and arc queries
+
+`cui_plot_pie` keeps only defined positive finite values, preserving original
+indices and input order. Zero and negative values are skipped; missing numeric
+fields are ignored. It distributes the configured angular interval in
+proportion to values without sorting. Padding is finite nonnegative metadata,
+not subtracted from angles; start/end may reverse or coincide. Normalized
+summation avoids overflow when finite values have an enormous total. The last
+arc ends exactly at the configured endpoint. This differs from the source's
+unchecked f32 accumulator by retaining meaningful proportions for extreme
+finite inputs; very small proportions may still round to zero width.
+
+Angles are radians, zero at 12 o'clock and positive clockwise.
+`cui_plot_arc_centroid` computes the midpoint angle at the average radius,
+relative to an application-selected center. `cui_plot_arc_contains` takes a
+position relative to that center, includes both radius boundaries, and uses a
+normalized screen angle in `[0, 2pi)` with a half-open
+`[start_angle, end_angle)` interval. It ignores padding, exactly as frozen
+GPUI's hit test does. Reversed or unnormalized intervals do not automatically
+wrap; applications must split wrapped intervals themselves. Radii must be
+finite with `0 <= inner <= outer` (stricter than source radius clamping).
+Query errors preserve output. Arc `value` and `index` are payload metadata,
+not inputs to centroid/hit arithmetic.
+
+Arc tessellation, padded arc paths, annular rendering, rounded corners, radial
+lines, Sankey, bar orientations/labels, path caches, axis/grid labels and full
+styled Plot composition remain separate work. Existing projected vertical bars
+still use explicit pixel width, clipping and baseline. Pure commands and math
+queries do not establish complete GPUI Plot parity.

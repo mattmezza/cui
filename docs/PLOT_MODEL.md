@@ -584,7 +584,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `Curve::{Natural,Linear,StepAfter}` | Cartesian path and source Area builders | Source Catmull-Rom controls and omitted final StepAfter vertical reproduced; no additional upstream StepBefore/Step scale exists |
 | `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | Dot geometry/themed drivers now available; no accessor callbacks, arbitrary Background/gradient, or source path cache; numeric bounds/precision differ |
 | `Area` data/X/Y1, optional Y0, fill plus separate 1px upper stroke, curves, paint/cache | `cui_plot_area_paths` separate contours; two raster shapes | Source accessor callbacks/cache/backgrounds absent; open/singleton GPUI tessellator result not reproduced; extended per-point closed areas remain separate |
-| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; no generic label callback, arbitrary gradient renderer or pure rounded-bar path primitive; negative width is rejected |
+| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; pure independently rounded-bar paths available; no generic label callback or arbitrary gradient renderer; negative width is rejected |
 | `Pie` positive-value arcs/index/padding and angular limits | `cui_plot_pie` | No accessor callback/borrowed arbitrary datum payload; stable normalized double summation replaces unchecked f32 sums; pad is metadata |
 | `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; full-turn seam removed; user pad retained above pi rather than source0.0001 override; tiny values accepted; spans above one turn rejected; no cache/Background |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
@@ -620,7 +620,7 @@ and half-size rounding follow C double arithmetic, not the frozen f32 bit patter
 The optional styled layer supplies Cartesian/radial marker and rounded-bar
 composition in `cui_plot_view.h`, described in [PLOT.md](PLOT.md). These reuse
 Core's existing rounded-quad renderer; they do not turn the bounded path rasterizer
-into a gradient renderer or implement per-corner rounded-bar command geometry.
+into a gradient renderer. The pure `cui_plot_bar_path` also represents per-corner rounding as bounded cubic path commands.
 The frozen dot stroke fallback is reproduced for supported solid colors: explicit
 stroke overrides fill, otherwise the 1px border uses the resolved fill color.
 Theme defaults are a deliberate styled-layer policy, while frozen base dots
@@ -689,3 +689,25 @@ int main(void) {
     return 0;
 }
 ```
+
+## Rounded Bar paths for custom renderers
+
+The frozen Bar paints a normalized rectangle with independent corner radii.
+`cui_plot_bar_path` reuses `cui_plot_bar_layout` for all four orientations and
+values on either side of the baseline. Radii are ordered top-left, top-right,
+bottom-right, bottom-left in physical coordinates; they do not rotate when
+alignment changes. Each finite nonnegative radius clamps to half the shorter
+frame side, matching CUI's styled adapter policy. The source delegates rounded
+quad tessellation to GPUI; this helper is a portable path representation of
+that style, not a claim of identical renderer output.
+
+A nondegenerate bar emits ten commands: Move, four alternating edge Lines and
+corner Cubics, then Close. The quarter-circle cubics use kappa
+`0.5522847498307934`; zero-radius corners still emit degenerate cubics. Existing
+`cui_plot_raster` flattens these cubics to sixteen chords each and samples pixel
+centers without antialiasing. Degenerate width/height returns `CUI_PLOT_EMPTY`
+and required zero. A zero-capacity query returns `CUI_PLOT_CAPACITY` and required
+ten; insufficient capacity preserves every output command. Invalid geometry or
+radii preserve both commands and required count. Caller radii may alias output:
+they are copied before any command is written. No gradient, labels, clipping,
+retained shape or renderer cache is introduced.

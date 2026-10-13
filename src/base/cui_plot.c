@@ -1215,3 +1215,55 @@ cui_plot_result cui_plot_linear_extent_tick(const cui_plot_linear_extent *s, dou
                                          cui_plot_fraction(value, s->domain_min, s->domain_max)),
                            pixel);
 }
+
+cui_plot_result cui_plot_bar_path(cui_plot_bar_alignment alignment, double cross, double width,
+                                  double baseline, double value, const double radii[4],
+                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+    if (!required || !radii || (!out && capacity))
+        return CUI_PLOT_INVALID;
+    cui_plot_bar_geometry g;
+    cui_plot_result result = cui_plot_bar_layout(alignment, cross, width, baseline, value, &g);
+    if (result != CUI_PLOT_OK)
+        return result;
+    double r[4];
+    double limit =
+        fmin(g.frame.x_max / 2 - g.frame.x_min / 2, g.frame.y_max / 2 - g.frame.y_min / 2);
+    for (size_t i = 0; i < 4; ++i) {
+        if (!isfinite(radii[i]) || radii[i] < 0)
+            return CUI_PLOT_INVALID;
+        r[i] = fmin(radii[i], limit);
+    }
+    if (g.frame.x_min == g.frame.x_max || g.frame.y_min == g.frame.y_max) {
+        *required = 0;
+        return CUI_PLOT_EMPTY;
+    }
+    *required = 10;
+    if (capacity < 10)
+        return CUI_PLOT_CAPACITY;
+    const double k = .5522847498307933984;
+    double l = g.frame.x_min, t = g.frame.y_min, h = g.frame.x_max, b = g.frame.y_max;
+    cui_plot_path_command path[10] = {{.kind = CUI_PLOT_PATH_MOVE, .point = {l + r[0], t}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {h - r[1], t}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {h, t + r[1]},
+                                       .control1 = {h - r[1] + k * r[1], t},
+                                       .control2 = {h, t + r[1] - k * r[1]}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {h, b - r[2]}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {h - r[2], b},
+                                       .control1 = {h, b - r[2] + k * r[2]},
+                                       .control2 = {h - r[2] + k * r[2], b}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {l + r[3], b}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {l, b - r[3]},
+                                       .control1 = {l + r[3] - k * r[3], b},
+                                       .control2 = {l, b - r[3] + k * r[3]}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {l, t + r[0]}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {l + r[0], t},
+                                       .control1 = {l, t + r[0] - k * r[0]},
+                                       .control2 = {l + r[0] - k * r[0], t}},
+                                      {.kind = CUI_PLOT_PATH_CLOSE}};
+    memcpy(out, path, sizeof path);
+    return CUI_PLOT_OK;
+}

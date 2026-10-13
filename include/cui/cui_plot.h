@@ -241,6 +241,16 @@ typedef struct {
  * All orientations support values on either side of baseline. */
 cui_plot_result cui_plot_bar_layout(cui_plot_bar_alignment, double cross, double band_width,
                                     double baseline, double value, cui_plot_bar_geometry *);
+/* Pure path representation of source Bar's independently rounded quad.
+ * Radii are top-left/top-right/bottom-right/bottom-left, finite and nonnegative;
+ * each clamps to half the shorter frame side, matching CUI styled adapters.
+ * Quarter circles use one cubic (kappa approximation), not renderer tessellation.
+ * Always 10 commands for a nondegenerate frame, including zero-radius cubics.
+ * Degenerate bars return EMPTY/required=0. Errors preserve commands; CAPACITY
+ * reports required=10. NULL output/zero capacity queries storage. */
+cui_plot_result cui_plot_bar_path(cui_plot_bar_alignment, double cross, double band_width,
+                                  double baseline, double value, const double radii[4],
+                                  cui_plot_path_command *, size_t capacity, size_t *required);
 typedef struct {
     double width, height;
     const double *x, *y, *dashes;

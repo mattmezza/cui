@@ -323,3 +323,10 @@ to the target, and suppress hover overlays while appearance is incomplete if
 you want the source PlotElement ordering. Completed appearance generations and
 linear stagger timing are reusable independently of drawing; the application
 owns scope disposal, easing, pointer springs, and the tooltip's content/layout.
+
+For a bitmap or custom path renderer, use `cui_plot_bar_path` instead of submitting
+the styled quad. It emits a closed cubic path with independent physical corner
+radii, consumed directly by `cui_plot_raster`. See
+[PLOT_MODEL.md](PLOT_MODEL.md#rounded-bar-paths-for-custom-renderers) for its
+capacity contract and explicit cubic approximation limits. The styled driver
+continues to use Core rounded quads; it does not route through this rasterizer.

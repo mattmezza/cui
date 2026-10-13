@@ -688,6 +688,45 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_rounded_bar_path(void) {
+    double radii[] = {4, 0, 2, 99};
+    cui_plot_path_command path[10], old[10];
+    memset(path, 0x5a, sizeof path);
+    memcpy(old, path, sizeof path);
+    size_t required = 99;
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, 2, 8, 20, 4, radii, NULL, 0, &required) ==
+               CUI_PLOT_CAPACITY &&
+           required == 10);
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, 2, 8, 20, 4, radii, path, 9, &required) ==
+           CUI_PLOT_CAPACITY);
+    assert(memcmp(path, old, sizeof path) == 0);
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, 2, 8, 20, 4, radii, path, 10, &required) ==
+           CUI_PLOT_OK);
+    assert(path[0].point.x == 6 && path[0].point.y == 4);
+    assert(path[2].point.x == 10 && path[2].point.y == 4);
+    assert(path[4].point.x == 8 && path[4].point.y == 20);
+    assert(path[6].point.x == 2 && path[6].point.y == 16);
+    assert(path[8].point.x == 6 && path[8].point.y == 4);
+    assert(path[9].kind == CUI_PLOT_PATH_CLOSE);
+    memcpy(old, path, sizeof path);
+    radii[3] = -1;
+    required = 99;
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, 2, 8, 20, 4, radii, path, 10, &required) ==
+               CUI_PLOT_INVALID &&
+           required == 99);
+    assert(memcmp(path, old, sizeof path) == 0);
+    radii[3] = 4;
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_LEFT, 2, 8, 20, 4, radii, path, 10, &required) ==
+           CUI_PLOT_OK);
+    assert(path[0].point.x == 8 && path[0].point.y == 2);
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_RIGHT, 2, 0, 20, 4, radii, path, 10, &required) ==
+               CUI_PLOT_EMPTY &&
+           required == 0);
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_TOP, 2, 8, 4, 4, radii, path, 10, &required) ==
+           CUI_PLOT_EMPTY);
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_TOP, NAN, 8, 4, 4, radii, path, 10, &required) ==
+           CUI_PLOT_INVALID);
+}
 static void test_linear_extent(void) {
     const double domain[] = {3, 1, 2, 1};
     cui_plot_linear_extent s;
@@ -765,6 +804,7 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
 int main(void) {
+    test_rounded_bar_path();
     test_linear_extent();
     test_lifecycle();
     shape_geometry();

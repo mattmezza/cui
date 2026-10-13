@@ -408,7 +408,23 @@ static void native_labels(void) {
     cui_font_close(font);
 }
 #endif
+static void test_rounded_bar_raster(void) {
+    cui_plot_path_command path[10];
+    double radii[] = {4, 0, 0, 0};
+    size_t required;
+    assert(cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, 2, 8, 12, 2, radii, path, 10, &required) ==
+           CUI_PLOT_OK);
+    uint8_t pixels[16 * 16 * 4];
+    cui_plot_shape shape = {.commands = path, .count = required, .fill = {200, 50, 10, 255}};
+    assert(cui_plot_raster(pixels, 16, 16, 64, sizeof pixels, &shape, 1, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(pixels[(2 * 16 + 2) * 4 + 3] == 0);
+    assert(pixels[(2 * 16 + 9) * 4 + 3] == 255);
+    assert(pixels[(11 * 16 + 2) * 4 + 3] == 255);
+    assert(pixels[(6 * 16 + 6) * 4] == 200);
+}
 int main(void) {
+    test_rounded_bar_raster();
 #ifdef CUI_HAS_TEXT
     native_labels();
 #endif

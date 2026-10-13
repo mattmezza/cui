@@ -1,0 +1,9 @@
+Publication receipt: a3ea0c1dff758774922d157d8196fac8b2f84816
+Framework run38482914994: all6 jobsSUCCESS.
+Pages run38482915005: buildSUCCESS, deploySUCCESS.
+Public URL:https://matteo.merola.co/cui/
+Downloaded github-pages artifact contains435 regular files. All435 public HTTPS responses match their artifact SHA256, including WASM, host scripts, docs and usage excerpts. Cache-busting source query used; no artifact files excluded.
+Actual public Attachment matrix:62/62 PASS across design sizes, density, orientation,390px mobile containment and real touch pan/tap to offscreen Open.
+Main strict native158/158 CTest PASS. Optional AccessKit checks absent in this Main configuration; isolated Next31 native162/162, sanitizer154/154 and WASI129/129 are separately documented in gallery-next31.txt.
+Private evidence:/home/matteo/.cache/cui-validation/published-a3ea0c1-{files.log,attachment.log,attachment.json}; release-a3ea0c1-artifact/artifact.tar.
+All78 manifest families remain; no complete-family/full-parity claim. Receipt added after actual public verification.

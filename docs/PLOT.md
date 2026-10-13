@@ -621,3 +621,32 @@ measured in RGBA pixels. The encoded byte rasterizer remains a separate route;
 choose a display transfer/format explicitly when consuming the float output.
 See the [source color contract](PLOT_MODEL.md#source-hsla-and-premultiplied-path-output)
 for transparent colors, checked bounds and compositing semantics.
+
+## Adaptive curves and default stroke geometry
+
+`cui_plot_cubic_flatten` adaptively produces a cubic contour at an explicit pixel
+tolerance (the pinned Lyon default is0.1). `cui_plot_stroke_mesh` accepts an open
+polyline and produces centered stroke triangles with Butt caps and Miter joins,
+including source miter-limit bevel fallback. These are reusable caller-owned
+geometry APIs; they do not change the legacy software raster sampling.
+
+```c
+cui_plot_point contour[64];
+cui_plot_mesh_vertex vertices[750];
+size_t count = 0, vertex_count = 0;
+cui_plot_rect bounds;
+cui_plot_result result = cui_plot_cubic_flatten(
+    (cui_plot_point){0, 0}, (cui_plot_point){0, 8},
+    (cui_plot_point){8, 8}, (cui_plot_point){8, 0},
+    .1, contour, 64, &count);
+if (result == CUI_PLOT_OK)
+    result = cui_plot_stroke_mesh(contour, count, 1, 4,
+                                 vertices, 750, &vertex_count, &bounds);
+/* On success, retain vertices; translate XY/bounds at native submission.
+ * ST remains unchanged. Check result before using output geometry. */
+```
+
+The stroke route is bounded to64 points and rejects reversals/self-overlapping
+outlines. Closed strokes, holes, dashes and alternative cap/join styles remain
+gaps. See the [adaptive geometry contract](PLOT_MODEL.md#adaptive-cubic-contours-and-default-stroke-meshes)
+for error preservation, source miter semantics and exact limits.

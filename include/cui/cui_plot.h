@@ -566,6 +566,26 @@ typedef struct {
 cui_plot_result cui_plot_fill_mesh(const cui_plot_point *contour, size_t count,
                                    cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
                                    cui_plot_rect *bounds);
+/* Adaptive cubic polyline (includes start/end), original conservative
+ * de Casteljau subdivision, max4097 points/depth24. Coordinates+controls within
+ * +/-16384, finite tolerance1e-6..16384. Every accepted chord is within tolerance
+ * of its control hull. Source Lyon default tolerance is0.1; sample positions
+ * differ from Lyon's quadratic approximation. Query NULL/0 sets exact required;
+ * caller CAPACITY preserves points, internal budget CAPACITY preserves required
+ * too. Other errors preserve outputs. Input/output must be disjoint. */
+cui_plot_result cui_plot_cubic_flatten(cui_plot_point start, cui_plot_point control1,
+                                       cui_plot_point control2, cui_plot_point end,
+                                       double tolerance, cui_plot_point *out, size_t capacity,
+                                       size_t *required);
+/* Open-polyline stroke, source default Butt caps/Miter joins. Width0 returns
+ * EMPTY with required0/bounds0; width>0..1024, miter_limit1..64 (source default4).
+ * 2..64 points, offset length/width beyond miter limit bevels the outer edge. Self-overlap,
+ * reversal and touching outlines are rejected; closed/dashed/round strokes are
+ * not supplied. Successful mesh has ST=(0,1). Same transaction/query contract
+ * as fill_mesh; computed coordinates beyond +/-16384 return OVERFLOW. */
+cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *, size_t count, double width,
+                                     double miter_limit, cui_plot_mesh_vertex *, size_t capacity,
+                                     size_t *required, cui_plot_rect *bounds);
 /* Pinned path fragment coverage: ST and its screen-space derivatives; output
  * preserved on invalid/overflow. Constant S derivatives (<.001 norm) are solid.
  * This is analytic quadratic coverage, not generic triangle-edge antialiasing. */

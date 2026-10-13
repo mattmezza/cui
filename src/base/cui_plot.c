@@ -2512,3 +2512,111 @@ cui_plot_result cui_plot_mesh_coverage(cui_plot_point st, cui_plot_point dx, cui
     *coverage = alpha;
     return CUI_PLOT_OK;
 }
+
+static bool mesh_point_valid(cui_plot_point p) {
+    return isfinite(p.x) && isfinite(p.y) && fabs(p.x) <= 16384 && fabs(p.y) <= 16384;
+}
+static double mesh_chord_distance(cui_plot_point p, cui_plot_point a, cui_plot_point b) {
+    double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+    double t = length ? fmax(0, fmin(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length)) : 0;
+    return hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+static cui_plot_point mesh_midpoint(cui_plot_point a, cui_plot_point b) {
+    return (cui_plot_point){a.x / 2 + b.x / 2, a.y / 2 + b.y / 2};
+}
+cui_plot_result cui_plot_cubic_flatten(cui_plot_point start, cui_plot_point c1, cui_plot_point c2,
+                                       cui_plot_point end, double tolerance, cui_plot_point *out,
+                                       size_t capacity, size_t *required) {
+    if (!required || (capacity && !out) || !mesh_point_valid(start) || !mesh_point_valid(c1) ||
+        !mesh_point_valid(c2) || !mesh_point_valid(end) || !isfinite(tolerance) ||
+        tolerance < 1e-6 || tolerance > 16384)
+        return CUI_PLOT_INVALID;
+    typedef struct {
+        cui_plot_point p[4];
+        unsigned depth;
+    } cubic_piece;
+    cubic_piece stack[25] = {{{start, c1, c2, end}, 0}};
+    size_t pending = 1, used = 1;
+    cui_plot_point points[4097];
+    points[0] = start;
+    while (pending) {
+        cubic_piece piece = stack[--pending];
+        if (fmax(mesh_chord_distance(piece.p[1], piece.p[0], piece.p[3]),
+                 mesh_chord_distance(piece.p[2], piece.p[0], piece.p[3])) <= tolerance) {
+            if (used == 4097)
+                return CUI_PLOT_CAPACITY;
+            points[used++] = piece.p[3];
+            continue;
+        }
+        if (piece.depth == 24 || pending + 2 > 25)
+            return CUI_PLOT_CAPACITY;
+        cui_plot_point a = mesh_midpoint(piece.p[0], piece.p[1]);
+        cui_plot_point b = mesh_midpoint(piece.p[1], piece.p[2]);
+        cui_plot_point c = mesh_midpoint(piece.p[2], piece.p[3]);
+        cui_plot_point d = mesh_midpoint(a, b), e = mesh_midpoint(b, c), m = mesh_midpoint(d, e);
+        stack[pending++] = (cubic_piece){{m, e, c, piece.p[3]}, piece.depth + 1};
+        stack[pending++] = (cubic_piece){{piece.p[0], a, d, m}, piece.depth + 1};
+    }
+    *required = used;
+    if (!out || capacity < used)
+        return CUI_PLOT_CAPACITY;
+    memcpy(out, points, used * sizeof *out);
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *p, size_t n, double width, double limit,
+                                     cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
+                                     cui_plot_rect *bounds) {
+    if (!p || !required || !bounds || n < 2 || n > 64 || (capacity && !out) || !isfinite(width) ||
+        width < 0 || width > 1024 || !isfinite(limit) || limit < 1 || limit > 64)
+        return CUI_PLOT_INVALID;
+    cui_plot_point direction[63];
+    for (size_t i = 0; i < n; i++) {
+        if (!mesh_point_valid(p[i]))
+            return CUI_PLOT_INVALID;
+        if (i) {
+            double dx = p[i].x - p[i - 1].x, dy = p[i].y - p[i - 1].y, length = hypot(dx, dy);
+            if (length == 0)
+                return CUI_PLOT_DEGENERATE;
+            direction[i - 1] = (cui_plot_point){dx / length, dy / length};
+        }
+    }
+    if (width == 0) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    cui_plot_point side[2][128], contour[256];
+    size_t used[2] = {0, 0};
+    double half = width / 2;
+    for (size_t k = 0; k < 2; k++) {
+        double sign = k == 0 ? 1 : -1;
+        for (size_t i = 0; i < n; i++) {
+            cui_plot_point prev = direction[i ? i - 1 : 0], next = direction[i + 1 < n ? i : n - 2];
+            double cross = prev.x * next.y - prev.y * next.x,
+                   dot = prev.x * next.x + prev.y * next.y;
+            if (i && i + 1 < n && cross == 0 && dot > 0)
+                continue;
+            double denominator = 1 + dot;
+            if (denominator <= 0)
+                return CUI_PLOT_DEGENERATE;
+            cui_plot_point m = {-(prev.y + next.y) / denominator, (prev.x + next.x) / denominator};
+            if (sign * cross < 0 && hypot(m.x, m.y) > 2 * limit) {
+                side[k][used[k]++] =
+                    (cui_plot_point){p[i].x - sign * half * prev.y, p[i].y + sign * half * prev.x};
+                side[k][used[k]++] =
+                    (cui_plot_point){p[i].x - sign * half * next.y, p[i].y + sign * half * next.x};
+            } else
+                side[k][used[k]++] =
+                    (cui_plot_point){p[i].x + sign * half * m.x, p[i].y + sign * half * m.y};
+        }
+    }
+    size_t count = 0;
+    for (size_t i = 0; i < used[0]; i++)
+        contour[count++] = side[0][i];
+    for (size_t i = used[1]; i; i--)
+        contour[count++] = side[1][i - 1];
+    for (size_t i = 0; i < count; i++)
+        if (!mesh_point_valid(contour[i]))
+            return CUI_PLOT_OVERFLOW;
+    return cui_plot_fill_mesh(contour, count, out, capacity, required, bounds);
+}

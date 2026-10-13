@@ -1490,7 +1490,109 @@ static void fill_meshes(void) {
                                   (cui_plot_point){0}, &alpha) == CUI_PLOT_DEGENERATE &&
            alpha == .7);
 }
+static void adaptive_strokes(void) {
+    cui_plot_point points[4097], saved[4097];
+    size_t required = 99;
+    assert(cui_plot_cubic_flatten((cui_plot_point){0, 0}, (cui_plot_point){2, 0},
+                                  (cui_plot_point){6, 0}, (cui_plot_point){8, 0}, .1, points, 4097,
+                                  &required) == CUI_PLOT_OK &&
+           required == 2);
+    assert(points[0].x == 0 && points[1].x == 8);
+    cui_plot_point a = {0, 0}, b = {0, 8}, c = {8, 8}, d = {8, 0};
+    assert(cui_plot_cubic_flatten(a, b, c, d, .1, points, 4097, &required) == CUI_PLOT_OK);
+    size_t coarse = required;
+    assert(coarse > 2 && coarse < 64 && points[0].x == 0 && points[required - 1].x == 8);
+    for (size_t i = 0; i <= 2000; i++) {
+        double t = (double)i / 2000, u = 1 - t;
+        cui_plot_point q = {8 * (3 * u * t * t + t * t * t), 24 * u * t};
+        double distance = DBL_MAX;
+        for (size_t j = 1; j < required; j++) {
+            double dx = points[j].x - points[j - 1].x, dy = points[j].y - points[j - 1].y;
+            double length = dx * dx + dy * dy;
+            double v = length ? fmax(0, fmin(1, ((q.x - points[j - 1].x) * dx +
+                                                 (q.y - points[j - 1].y) * dy) /
+                                                    length))
+                              : 0;
+            distance = fmin(distance,
+                            hypot(q.x - points[j - 1].x - v * dx, q.y - points[j - 1].y - v * dy));
+        }
+        assert(distance <= .1 + 1e-12);
+    }
+    assert(cui_plot_cubic_flatten(a, b, c, d, .01, points, 4097, &required) == CUI_PLOT_OK &&
+           required > coarse);
+    memcpy(saved, points, sizeof points);
+    size_t prior = required;
+    assert(cui_plot_cubic_flatten(a, b, c, d, .01, NULL, 0, &required) == CUI_PLOT_CAPACITY &&
+           required == prior);
+    assert(cui_plot_cubic_flatten(a, b, c, d, .01, points, 1, &required) == CUI_PLOT_CAPACITY);
+    assert(memcmp(saved, points, sizeof points) == 0);
+    assert(cui_plot_cubic_flatten(a, b, c, d, 0, points, 4097, &required) == CUI_PLOT_INVALID &&
+           required == prior);
+    assert(cui_plot_cubic_flatten(a, (cui_plot_point){NAN, 0}, c, d, .1, points, 4097, &required) ==
+           CUI_PLOT_INVALID);
+    assert(cui_plot_cubic_flatten((cui_plot_point){-16384, -16384}, (cui_plot_point){-16384, 16384},
+                                  (cui_plot_point){16384, 16384}, (cui_plot_point){16384, -16384},
+                                  1e-6, points, 4097, &required) == CUI_PLOT_CAPACITY);
+    assert(required == prior && memcmp(saved, points, sizeof points) == 0);
+    assert(cui_plot_cubic_flatten((cui_plot_point){0, 0}, (cui_plot_point){20, 0},
+                                  (cui_plot_point){-12, 0}, (cui_plot_point){8, 0}, .01, points,
+                                  4097, &required) == CUI_PLOT_OK &&
+           required > 2);
+    const cui_plot_point line[] = {{0, 0}, {8, 0}}, corner[] = {{0, 0}, {8, 0}, {8, 8}},
+                         straight[] = {{0, 0}, {4, 0}, {8, 0}};
+    cui_plot_mesh_vertex mesh[768], before[768];
+    cui_plot_rect bounds = {0}, old;
+    assert(cui_plot_stroke_mesh(line, 2, 2, 4, mesh, 768, &required, &bounds) == CUI_PLOT_OK &&
+           required == 6);
+    assert(bounds.x_min == 0 && bounds.x_max == 8 && bounds.y_min == -1 &&
+           bounds.y_max == 1); /* Butt, no cap extension */
+    assert(cui_plot_stroke_mesh(straight, 3, 2, 4, mesh, 768, &required, &bounds) == CUI_PLOT_OK &&
+           required == 6);
+    assert(cui_plot_stroke_mesh(corner, 3, 2, 4, mesh, 768, &required, &bounds) == CUI_PLOT_OK &&
+           required == 12);
+    double area = 0;
+    for (size_t i = 0; i < required; i += 3) {
+        cui_plot_point x = mesh[i].xy, y = mesh[i + 1].xy, z = mesh[i + 2].xy;
+        area += fabs((y.x - x.x) * (z.y - x.y) - (y.y - x.y) * (z.x - x.x)) / 2;
+    }
+    assert(close(area, 32) && bounds.x_max == 9 && bounds.y_min == -1);
+    assert(cui_plot_stroke_mesh(corner, 3, 2, 1, mesh, 768, &required, &bounds) == CUI_PLOT_OK &&
+           required == 12);
+    const cui_plot_point sharp[] = {{0, 0}, {8, 0}, {8 - 4 * sqrt(3), 4}};
+    assert(cui_plot_stroke_mesh(sharp, 3, 2, 1, mesh, 768, &required, &bounds) == CUI_PLOT_OK &&
+           required == 15);
+    area = 0;
+    for (size_t i = 0; i < required; i += 3) {
+        cui_plot_point x = mesh[i].xy, y = mesh[i + 1].xy, z = mesh[i + 2].xy;
+        area += fabs((y.x - x.x) * (z.y - x.y) - (y.y - x.y) * (z.x - x.x)) / 2;
+    }
+    assert(close(area, 30.25 - sqrt(3))); /* Lyon limit uses miter length/full width. */
+    memcpy(before, mesh, sizeof mesh);
+    old = bounds;
+    prior = required;
+    assert(cui_plot_stroke_mesh(sharp, 3, 2, 1, mesh, 1, &required, &bounds) == CUI_PLOT_CAPACITY &&
+           required == prior);
+    assert(memcmp(before, mesh, sizeof mesh) == 0 && memcmp(&bounds, &old, sizeof bounds) == 0);
+    const cui_plot_point reverse[] = {{0, 0}, {8, 0}, {0, 0}}, duplicate[] = {{0, 0}, {0, 0}};
+    assert(cui_plot_stroke_mesh(reverse, 3, 2, 4, mesh, 768, &required, &bounds) ==
+           CUI_PLOT_DEGENERATE);
+    assert(cui_plot_stroke_mesh(duplicate, 2, 2, 4, mesh, 768, &required, &bounds) ==
+           CUI_PLOT_DEGENERATE);
+    assert(cui_plot_stroke_mesh(line, 2, 2, .5, mesh, 768, &required, &bounds) == CUI_PLOT_INVALID);
+    const cui_plot_point edge[] = {{16383, 0}, {16384, 0}};
+    assert(cui_plot_stroke_mesh(edge, 2, 1024, 4, mesh, 768, &required, &bounds) == CUI_PLOT_OK);
+    const cui_plot_point top[] = {{0, 16384}, {8, 16384}};
+    assert(cui_plot_stroke_mesh(top, 2, 2, 4, mesh, 768, &required, &bounds) == CUI_PLOT_OVERFLOW);
+    assert(cui_plot_stroke_mesh(line, 2, 0, 4, mesh, 768, &required, &bounds) == CUI_PLOT_EMPTY &&
+           required == 0 && bounds.x_max == 0);
+    assert(cui_plot_cubic_flatten(a, b, c, d, .1, points, 4097, &required) == CUI_PLOT_OK);
+    size_t point_count = required;
+    assert(cui_plot_stroke_mesh(points, point_count, .5, 4, mesh, 768, &required, &bounds) ==
+           CUI_PLOT_OK);
+    assert(required > 6 && bounds.x_min < 0 && bounds.x_max > 8 && bounds.y_max > 6);
+}
 int main(void) {
+    adaptive_strokes();
     fill_meshes();
     first_paint_clocks();
     shape_keys();

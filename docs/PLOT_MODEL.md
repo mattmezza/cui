@@ -1279,3 +1279,50 @@ This float route is usable preparation/reference output for native adapters,
 not a display buffer or automatic native Background command. Consumers choose
 their target transfer/format. It does not add Lyon curve tolerance, stroke
 joins/dashes, triangle-edge antialiasing or renderer resource caches.
+
+### Adaptive cubic contours and default stroke meshes
+
+The frozen GPUI PathBuilder delegates curves to Lyon. The lock pins
+`lyon_geom1.0.19` (checksum4336502e29e32af93cf2dad2214ed6003c17ceb5bd499df77b1de663b9042b92)
+and `lyon_tessellation1.0.21`
+(checksumdabea159dc6eea9171a541b458134b70ca95e3162d068132b2b3b9bc01aad06e).
+Its default fill/stroke tolerance is0.1 pixels; stroke defaults are width1,
+Butt caps, Miter joins and miter limit4. The pinned `stroke.rs` compares squared
+normal length against `4*limit*limit`: its limit is miter offset length divided
+by **full stroke width**, not half-width. This source detail is preserved.
+
+`cui_plot_cubic_flatten` supplies an original adaptive de Casteljau route from
+four explicit cubic control points to a caller-owned polyline including start
+and end. Each accepted subcurve's control hull is within the caller's tolerance
+of its chord segment. Checking distance to the finite chord also preserves
+collinear overshoot/backtracking; checking only an infinite supporting line
+would incorrectly collapse such a curve. Use0.1 for the pinned default tolerance.
+Smaller tolerances add subdivisions. Finite controls/positions must be within
++/-16384 and tolerance1e-6..16384. The route is bounded to4097 output points and
+24 subdivision levels, without allocation. The algorithm differs from Lyon's
+cubic-to-quadratic approximation and does not claim identical sample positions.
+
+`cui_plot_stroke_mesh` converts a single open polyline into nonoverlapping
+triangles for its stroke outline. It uses Butt caps (no extension past endpoints)
+and centered Miter joins. Corners exceeding the pinned full-width miter test
+bevel the outer edge; the inner intersection remains a miter. Straight forward
+runs omit redundant corners. Width0 yields EMPTY with required0/bounds0;
+positive width<=1024 and miter limit1..64 are accepted. A90-degree corner remains
+mitered at limit1; a150-degree corner exceeds that limit. Its triangle vertices
+have source tessellator ST=(0,1), reusable by the native mesh seam.
+
+The caller may pass adaptive cubic points directly to the stroke route when the
+polyline has2..64 points. Geometry outside +/-16384 returns OVERFLOW. Exact
+reversals, repeated adjacent points and touching/self-overlapping outlines fail
+rather than producing ambiguous overdraw. This route has no holes, closed-path
+joins, dash splitting, variable widths or Round/Square caps; it does not replace
+all Lyon stroke options. Source complex stroking remains a gap. The existing
+software raster's16-chord/round-segment behavior is unchanged.
+
+Both functions support caller-capacity queries and preserve geometry on errors.
+Cubic caller CAPACITY sets the exact required count; an internal subdivision or
+point-budget CAPACITY preserves required too because no complete answer exists.
+Stroke uses the fill mesh transaction contract, with at most252 outline points
+and750 expanded vertices. Input/output buffers must remain stable and disjoint.
+Retaining meshes, moving XY/bounds, clipping, triangle edge coverage and paint
+submission belong to the host/Core integration.

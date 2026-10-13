@@ -1,0 +1,3 @@
+Source: 8e4e15b
+Scope: combined sorting, Progress animation, Resizable, VirtualList, Dock, thicker Chart and the alert overflow repair.
+PASS: Marker line, Pagination/Stepper text centering, graphical Rating, real Image pixels

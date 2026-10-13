@@ -4,22 +4,22 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 
 ## Rendering and behavior
 
-- [x] AlertDialog: center content within the dialog. — 593bbb1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks centered content, overflow start/end scrolling and recovery in four themes; browser checks visible title/action centering. Publication pending.
+- [x] AlertDialog: center content within the dialog. — 593bbb1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks centered content, overflow start/end scrolling and recovery in four themes; browser checks visible title/action centering. Published in f6c8cf8; HTTPS78 and twenty artifact files verified. The width fix c965b3d also passes all four gates and reproduces/fixes the CI-only wide-text confirmation miss.
 - [x] Attachment and Image: show a real image, replacing the tiny blue fixture. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Avatar: center initials. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Marker: keep “Synchronizing 3 tasks” on the intended horizontal line. — first polish batch; native/browser geometry and interaction evidence below.
-- [x] Message: remove the stray renderer test bitmap from the normal body layout. — 0e4ee4a passes Chromium78 and retains the explicit crop/tint/clip pixel fixture checks. Native Message interactions and remaining family limitations are unchanged. Publication pending.
+- [x] Message: remove the stray renderer test bitmap from the normal body layout. — 0e4ee4a passes Chromium78 and retains the explicit crop/tint/clip pixel fixture checks. Native Message interactions and remaining family limitations are unchanged. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] Pagination: center button text vertically. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Progress: indeterminate host-clock animation and reduced-motion fallback. — 18e1ec4 passes native75, sanitizers75, WASI67 and Chromium78. Determinate progress remains application-owned; indeterminate semantics are busy with no numeric current value in the browser. Publication pending.
 - [x] Radio: one click clears the previous selection visually and semantically. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Rating: proper empty, filled and partially filled star graphics. — first polish batch; native/browser geometry and interaction evidence below.
-- [x] Stepper: make navigation and its current status visibly work. — 9741448 passes native75, sanitizers75, WASI67 and Chromium78; rendered-selection regression fails old code. Publication pending.
+- [x] Stepper: make navigation and its current status visibly work. — 9741448 passes native75, sanitizers75, WASI67 and Chromium78; rendered-selection regression fails old code. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] Tooltip: center text in the panel. — first polish batch; native/browser geometry and interaction evidence below.
-- [x] Calendar and DatePicker: use SVG navigation icons; center popup content. — d55aeb7 passes native75, sanitizers75, WASI67 and Chromium78. Day cells are checked at three sizes; DatePicker trigger/opened icons are checked headlessly. Publication pending.
+- [x] Calendar and DatePicker: use SVG navigation icons; center popup content. — d55aeb7 passes native75, sanitizers75, WASI67 and Chromium78. Day cells are checked at three sizes; DatePicker trigger/opened icons are checked headlessly. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [ ] ColorPicker: screen eyedropper through an explicit host capability.
-- [x] Combobox and Select: options span the field width. — 76c36ba passes native75, sanitizers75, WASI67 and Chromium78; popup-width regression fails old code. Publication pending.
+- [x] Combobox and Select: options span the field width. — 76c36ba passes native75, sanitizers75, WASI67 and Chromium78; popup-width regression fails old code. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.
-- [x] Input Group: constrain the field so addons stay on the same row. — 87721c1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks all four sizes; browser checks 390px/1280px inline layout and block-mode opt-in. Publication pending.
+- [x] Input Group: constrain the field so addons stay on the same row. — 87721c1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks all four sizes; browser checks 390px/1280px inline layout and block-mode opt-in. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [ ] Textarea: word/vertical navigation is implemented/tested in the navigation batch; repeated Down/content visibility remains under investigation.
 - [x] Dock: visible composed panes, tab selection, split and reset controls with instructions. — 1f4dd88 passes Chromium78 with physical interactions and pane geometry checks. The public styled Dock and tab/divider dragging remain incomplete. Publication pending.
 - [x] Resizable: a composed workspace visibly resizes Explorer/editor panes and switches example files. — 1ceb567 passes Chromium78 with physical drag and visible geometry assertions; portable code is unchanged from validated 41de104. Publication pending.
@@ -28,9 +28,9 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] Theme: understandable, functional token demonstration.
 - [x] VirtualList: wheel/scrollbar/Home/End scroll real task rows from the 100,000-key model. — 85531a4 passes Chromium78 and submits at most nine rows; native model75 passes. Offscreen focus, asynchronous measurement and a public styled widget remain incomplete. Publication pending.
 - [x] Chart: configurable 2px default strokes with smooth edges. — d564c70 passes native75, sanitizers75, WASI67 and Chromium78. Coverage regression fails the old raster; width/cache/clamping checks pass. Publication pending.
-- [x] Command: content spans panel width. — 76c36ba checks full scroll/row width at two panel sizes, passes the same gates and fails old code. Publication pending.
+- [x] Command: content spans panel width. — 76c36ba checks full scroll/row width at two panel sizes, passes the same gates and fails old code. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] DataTable: headers sort actual gallery rows and use themed SVG indicators. — 41de104 passes native75, sanitizers75, WASI67 and Chromium78; the graphic regression fails old code. Application-owned model sorting is documented. Publication pending.
-- [ ] Plot: visible, interactive plot with clear instructions.
+- [x] Plot: visible projected sine wave with zoom/pan/reset and domain readout. — 8f1497a passes Chromium78 with changed/restored bitmap signatures. This composes the numerical model with Chart; a separate public Plot widget remains incomplete. Publication pending.
 - [ ] TextView: Markdown fenced-code example.
 
 ## Design system

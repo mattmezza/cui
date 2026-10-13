@@ -1,16 +1,14 @@
 # Live development checkpoint
 
-## Current priorities (12 October, late evening)
+## Current priorities — 13 October
 
-All 78 gallery stories are published. The current verified public release is `49d4bfe`; [published-49d4bfe.txt](validation/published-49d4bfe.txt) records the complete HTTPS78 browser run and byte-for-byte artifact matching for seven deployment assets plus the landscape JPEG. CI and Pages succeeded. Main retains 78 entries: 5 implemented, 73 tested, 0 verified. Full GPUI Kit feature parity is unfinished.
+The verified public release is `f6c8cf8`: library CI, Pages, the full actual HTTPS78 browser suite and twenty artifact byte comparisons pass. See [published-f6c8cf8.txt](validation/published-f6c8cf8.txt). All 78 entries remain: 5 implemented, 73 tested, 0 verified; full GPUI Kit feature parity is unfinished.
 
-The user's complete visual, interaction, design-system and documentation feedback is tracked in [website-feedback.md](website-feedback.md). Root is prioritizing shared defects before expanding the website. The isolated `fix/gallery-polish` branch contains Radio redraw, graphical full/half/empty Rating stars, Avatar/Tooltip centering, numeric-button centering, measured Marker content width and an original generated image for Image/Attachment. Native75, sanitizer75, WASI67, full Chromium78, targeted visual regressions and quality checks pass locally. The Radio regression also fails against the previous base implementation. This batch is now published and directly verified.
+The complete user feedback is tracked in [website-feedback.md](website-feedback.md). Published component fixes cover alignment, real media, graphical choices, input navigation, Stepper, calendar icons, choice/Command widths, InputGroup, Message cleanup and alerts. A real CI overflow was reproduced with wide headless text metrics and repaired so both alert confirmation clicks stay inside the body clip.
 
-The public website includes system-default themes, all 38 named palettes, slash search, copyable C snippets and browsable repository documentation. Those existing facilities are being improved under the new audit; their presence does not mean every interaction is correct. No dependency installation is needed from the user. Impeccable metadata is removed. Questionnaire batched edit/confirm ordering remains a separate uncommitted experiment in an isolated worktree.
+The next combined batch `8e4e15b` passes native77, sanitizer75, WASI67, Chromium78, visual and quality checks. It includes sorting/SVG headers, animated Progress, visible Resizable/Dock examples, scrolling VirtualList and thicker chart strokes. Plot zoom/pan is integrated; its final combined browser run is in progress. Public library source matches the verified batch. Publication remains pending for these changes.
 
-Only root integrates. Worker worktrees remain preserved; workers reached model usage limits, so root continues the implementation and validation independently. No full-parity completion is claimed.
-
-The next keyboard batch `a679582` adds word movement, logical-line scalar-column movement, single-line Up/Down start/end and explicit popup key delegation. Native77, sanitizer75, WASI67 and Chromium78 pass; it awaits publication. The new Start building/state/callback/agent guides and downloadable agent-doc exports are being validated in a separate website branch.
+Only root integrates; workers reached their model usage limits, so root continues independently. Isolated worker branches and the uncommitted Questionnaire event-order experiment remain preserved. No dependency installation is needed from the user. Impeccable metadata is removed.
 
 ## Historical checkpoints
 

@@ -65,8 +65,7 @@ int main(void) {
     sample("edit-tail", ui, edit, &view, &probe);
     assert(buffer[bytes - 2] == 'z');
     sample("steady-after-edit", ui, edit, &view, &probe);
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
-                                           .key = CUI_KEY_BACKSPACE}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_BACKSPACE}));
     sample("remove-tail", ui, edit, &view, &probe);
     assert(buffer[bytes - 2] == 'a');
     assert(cui_edit_select(edit, bytes / 2, bytes / 2) == CUI_EDIT_OK);

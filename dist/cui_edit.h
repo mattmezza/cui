@@ -29,6 +29,15 @@ typedef struct {
     uint64_t revision;
     bool multiline;
 } cui_edit_state;
+/* Earliest byte that may differ after the most recent document revision.
+ * Valid only for that revision; a consumer that skips revisions must rebuild.
+ * Undo/Redo and complex indentation conservatively report byte zero. */
+typedef struct {
+    uint64_t revision;
+    size_t first_byte;
+    bool valid;
+} cui_edit_change;
+cui_edit_change cui_edit_get_change(const cui_edit *);
 #define CUI_EDIT_MAX_SELECTIONS 64
 /* Active selection is index0. IDs are caller-defined and must be unique.
  * Anchor/cursor preserve orientation; offsets remain UTF-8 bytes. */
@@ -41,6 +50,19 @@ typedef struct {
     size_t count;
     cui_edit_selection items[CUI_EDIT_MAX_SELECTIONS];
 } cui_edit_selection_snapshot;
+/* Optional per-ID vertical-motion anchor. x is in the current text metrics;
+ * column is the logical grapheme column for metrics changes. */
+typedef struct {
+    uint64_t id;
+    size_t cursor, column;
+    float x, font_size;
+    cui_text_style style;
+    bool valid, upstream;
+} cui_edit_column_anchor;
+typedef struct {
+    size_t count;
+    cui_edit_column_anchor items[CUI_EDIT_MAX_SELECTIONS];
+} cui_edit_column_snapshot;
 /* Existing document slot count; attach does not allocate or resize history. */
 size_t cui_edit_selection_history_slots(const cui_edit *);
 /* Opt-in multiline selection storage. Arrays must be disjoint from each other
@@ -52,6 +74,14 @@ cui_edit_result cui_edit_attach_selections(cui_edit *, cui_edit_selection *stora
                                            cui_edit_selection_snapshot *history,
                                            size_t history_slots);
 void cui_edit_detach_selections(cui_edit *);
+/* Optional caller-owned vertical anchors and parallel Undo storage. Attach
+ * after selections; history needs one entry per document-history slot. */
+cui_edit_result cui_edit_attach_columns(cui_edit *, cui_edit_column_anchor *storage,
+                                        size_t capacity, cui_edit_column_snapshot *history,
+                                        size_t history_slots);
+void cui_edit_detach_columns(cui_edit *);
+const cui_edit_column_anchor *cui_edit_get_columns(const cui_edit *, size_t *count);
+cui_edit_result cui_edit_set_columns(cui_edit *, const cui_edit_column_anchor *, size_t count);
 const cui_edit_selection *cui_edit_get_selections(const cui_edit *, size_t *count);
 /* Validates grapheme endpoints, merges overlapping/adjacent ranges, and preserves
  * active ID/orientation. Failure preserves model and attached arrays. */
@@ -66,6 +96,10 @@ cui_edit_result cui_edit_select_disjoint(cui_edit *, const cui_edit_selection *,
  * all selections with attached history. Single-selection APIs collapse extras.
  * Inline-token content is excluded while selection storage is attached. */
 cui_edit_result cui_edit_replace_selections(cui_edit *, cui_str text);
+/* Interactive text input. Adjacent batches with unchanged cursor collection
+ * coalesce into one bounded Undo entry (at most 1000 batches). Other edits
+ * remain atomic. Navigation/selection breaks the typing group. */
+cui_edit_result cui_edit_type_selections(cui_edit *, cui_str text);
 typedef enum {
     CUI_EDIT_PREVIOUS,
     CUI_EDIT_NEXT,
@@ -201,6 +235,8 @@ cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
  * visual wrapping and pixel-column movement belong to the styled textarea. */
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
 cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
+cui_edit_result cui_edit_type(cui_edit *edit, cui_str text);
+void cui_edit_break_coalescing(cui_edit *edit);
 /* Replace a UTF-8 byte range as one history step without first changing the
  * selection. Attached atomic spans expand overlapping ranges outward; collapsed
  * insertion snaps right. Undo restores the original selection; success collapses
@@ -248,6 +284,7 @@ cui_edit_result cui_edit_apply_events(cui_edit *edit, cui_context *ui, cui_id id
 /* src/base/cui_edit.c */
 /* SPDX-License-Identifier: MIT */
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 /* BEGIN GENERATED UNICODE GRAPHEME TABLE */
@@ -3171,11 +3208,21 @@ struct cui_edit {
     cui_edit_private_snapshot *states;
     size_t slots, count, index;
     uint64_t revision;
+    size_t change_start;
+    uint64_t change_revision;
+    bool change_valid;
+    bool typing_active, typing_pending, typing_can_merge;
+    unsigned typing_batches;
+    size_t typing_after_count, typing_after_anchor, typing_after_cursor;
+    cui_edit_selection typing_after[CUI_EDIT_MAX_SELECTIONS];
     const cui_edit_token_span *tokens;
     size_t token_count;
     cui_edit_selection *selections;
     size_t selection_capacity, selection_count;
     cui_edit_selection_snapshot *selection_history;
+    cui_edit_column_anchor *columns;
+    size_t column_capacity, column_count;
+    cui_edit_column_snapshot *column_history;
 };
 static bool cui_edit_private_decode(const unsigned char *s, size_t n, size_t *width) {
     if (!n)
@@ -3726,31 +3773,94 @@ static void cui_edit_private_save_state(cui_edit *e) {
             memcpy(snapshot->items, e->selections, e->selection_count * sizeof(*e->selections));
         }
     }
+    if (e->columns && e->selections) {
+        cui_edit_column_anchor next[CUI_EDIT_MAX_SELECTIONS];
+        for (size_t i = 0; i < e->selection_count; ++i) {
+            next[i] = (cui_edit_column_anchor){.id = e->selections[i].id,
+                                               .cursor = e->selections[i].cursor};
+            for (size_t j = 0; j < e->column_count; ++j)
+                if (e->columns[j].id == next[i].id && e->columns[j].cursor == next[i].cursor) {
+                    next[i] = e->columns[j];
+                    break;
+                }
+        }
+        memcpy(e->columns, next, e->selection_count * sizeof(*next));
+        e->column_count = e->selection_count;
+        if (e->slots) {
+            cui_edit_column_snapshot *snapshot = &e->column_history[e->index];
+            snapshot->count = e->column_count;
+            memcpy(snapshot->items, e->columns, e->column_count * sizeof(*e->columns));
+        }
+    }
     if (e->slots)
         e->states[e->index] = (cui_edit_private_snapshot){e->length, e->cursor, e->anchor};
 }
 static void cui_edit_private_record(cui_edit *e) {
     if (!e->slots)
         return;
-    if (!e->count) {
-        e->count = 1;
-        e->index = 0;
-        memcpy(e->history, e->config.buffer, e->length + 1);
+    bool merge = e->typing_pending && e->typing_can_merge && e->typing_batches < 1000 &&
+                 e->index + 1 == e->count;
+    if (merge) {
+        memcpy(e->history + e->index * e->config.capacity, e->config.buffer, e->length + 1);
         cui_edit_private_save_state(e);
-        return;
+        e->typing_batches++;
+    } else {
+        if (!e->count) {
+            e->count = 1;
+            e->index = 0;
+            memcpy(e->history, e->config.buffer, e->length + 1);
+            cui_edit_private_save_state(e);
+            return;
+        }
+        e->count = e->index + 1;
+        if (e->count == e->slots) {
+            memmove(e->history, e->history + e->config.capacity,
+                    (e->slots - 1) * e->config.capacity);
+            memmove(e->states, e->states + 1, (e->slots - 1) * sizeof(*e->states));
+            if (e->selection_history)
+                memmove(e->selection_history, e->selection_history + 1,
+                        (e->slots - 1) * sizeof(*e->selection_history));
+            e->count--;
+        }
+        e->index = e->count++;
+        memcpy(e->history + e->index * e->config.capacity, e->config.buffer, e->length + 1);
+        cui_edit_private_save_state(e);
     }
-    e->count = e->index + 1;
-    if (e->count == e->slots) {
-        memmove(e->history, e->history + e->config.capacity, (e->slots - 1) * e->config.capacity);
-        memmove(e->states, e->states + 1, (e->slots - 1) * sizeof(*e->states));
-        if (e->selection_history)
-            memmove(e->selection_history, e->selection_history + 1,
-                    (e->slots - 1) * sizeof(*e->selection_history));
-        e->count--;
+    e->typing_active = e->typing_pending;
+    if (e->typing_active) {
+        if (!merge)
+            e->typing_batches = 1;
+        e->typing_after_anchor = e->anchor;
+        e->typing_after_cursor = e->cursor;
+        e->typing_after_count = e->selections ? e->selection_count : 0;
+        if (e->selections)
+            memcpy(e->typing_after, e->selections, e->selection_count * sizeof(*e->typing_after));
+    } else
+        e->typing_batches = 0;
+}
+void cui_edit_break_coalescing(cui_edit *e) {
+    if (e) {
+        e->typing_active = false;
+        e->typing_pending = false;
+        e->typing_can_merge = false;
+        e->typing_batches = 0;
     }
-    e->index = e->count++;
-    memcpy(e->history + e->index * e->config.capacity, e->config.buffer, e->length + 1);
-    cui_edit_private_save_state(e);
+}
+static void cui_edit_private_typing_begin(cui_edit *e) {
+    e->typing_can_merge =
+        e->typing_active && e->slots && e->typing_after_anchor == e->anchor &&
+        e->typing_after_cursor == e->cursor &&
+        e->typing_after_count == (e->selections ? e->selection_count : 0) &&
+        (!e->selections ||
+         !memcmp(e->typing_after, e->selections, e->selection_count * sizeof(*e->typing_after)));
+    e->typing_pending = true;
+}
+static void cui_edit_private_typing_end(cui_edit *e, cui_edit_result result,
+                                        uint64_t before_revision) {
+    e->typing_pending = false;
+    e->typing_can_merge = false;
+    if (result != CUI_EDIT_OK || e->revision == before_revision)
+        cui_edit_break_coalescing(e);
 }
 cui_edit *cui_edit_create(cui_edit_config c) {
     if (!c.buffer || !c.capacity)
@@ -3812,6 +3922,10 @@ cui_edit_state cui_edit_get_state(const cui_edit *e) {
                                 e->config.multiline}
              : (cui_edit_state){0};
 }
+cui_edit_change cui_edit_get_change(const cui_edit *e) {
+    return e ? (cui_edit_change){e->change_revision, e->change_start, e->change_valid}
+             : (cui_edit_change){0};
+}
 cui_str cui_edit_get_text(const cui_edit *e) {
     return e ? (cui_str){e->config.buffer, e->length} : (cui_str){0};
 }
@@ -3820,6 +3934,7 @@ cui_edit_result cui_edit_select(cui_edit *e, size_t a, size_t p) {
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!cui_edit_private_boundary(e, a) || !cui_edit_private_boundary(e, p))
         return CUI_EDIT_BOUNDARY;
+    cui_edit_break_coalescing(e);
     cui_edit_private_collapse_selections(e);
     e->preferred_column_valid = false;
     e->anchor = a;
@@ -3898,6 +4013,7 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
         return CUI_EDIT_INVALID_ARGUMENT;
     if (e->token_count && !cui_edit_content_valid(cui_edit_get_content(e)))
         return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_break_coalescing(e);
     size_t p = e->cursor;
     bool vertical = m == CUI_EDIT_LINE_PREVIOUS || m == CUI_EDIT_LINE_NEXT;
     size_t column = e->preferred_column;
@@ -4047,6 +4163,9 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     cui_edit_private_collapse_selections(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = start;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     cui_edit_private_record(e);
     return CUI_EDIT_OK;
 }
@@ -4076,8 +4195,8 @@ size_t cui_edit_selection_history_slots(const cui_edit *edit) {
 cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *storage,
                                            size_t capacity, cui_edit_selection_snapshot *history,
                                            size_t history_slots) {
-    if (!edit || !edit->config.multiline || edit->token_count || !storage || !capacity ||
-        capacity > CUI_EDIT_MAX_SELECTIONS || history_slots < edit->slots ||
+    if (!edit || !edit->config.multiline || edit->token_count || edit->columns || !storage ||
+        !capacity || capacity > CUI_EDIT_MAX_SELECTIONS || history_slots < edit->slots ||
         (edit->slots && !history) || history_slots > SIZE_MAX / sizeof(*history))
         return CUI_EDIT_INVALID_ARGUMENT;
     size_t bytes = capacity * sizeof(*storage), history_bytes = history_slots * sizeof(*history);
@@ -4089,6 +4208,7 @@ cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *s
         cui_edit_private_storage_overlap(storage, bytes, edit, sizeof(*edit)) ||
         cui_edit_private_storage_overlap(history, history_bytes, edit, sizeof(*edit)))
         return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_break_coalescing(edit);
     edit->selections = storage;
     edit->selection_capacity = capacity;
     edit->selection_count = 1;
@@ -4102,9 +4222,72 @@ cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *s
 void cui_edit_detach_selections(cui_edit *edit) {
     if (!edit)
         return;
+    cui_edit_detach_columns(edit);
+    cui_edit_break_coalescing(edit);
     edit->selections = NULL;
     edit->selection_history = NULL;
     edit->selection_count = edit->selection_capacity = 0;
+}
+void cui_edit_detach_columns(cui_edit *edit) {
+    if (!edit)
+        return;
+    edit->columns = NULL;
+    edit->column_history = NULL;
+    edit->column_capacity = edit->column_count = 0;
+}
+const cui_edit_column_anchor *cui_edit_get_columns(const cui_edit *edit, size_t *count) {
+    if (count)
+        *count = edit ? edit->column_count : 0;
+    return edit ? edit->columns : NULL;
+}
+cui_edit_result cui_edit_attach_columns(cui_edit *edit, cui_edit_column_anchor *storage,
+                                        size_t capacity, cui_edit_column_snapshot *history,
+                                        size_t history_slots) {
+    if (!edit || !edit->selections || edit->columns || !storage ||
+        capacity < edit->selection_capacity || capacity > CUI_EDIT_MAX_SELECTIONS ||
+        history_slots < edit->slots || (edit->slots && !history) ||
+        history_slots > SIZE_MAX / sizeof(*history))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t bytes = capacity * sizeof(*storage), history_bytes = history_slots * sizeof(*history);
+    if (cui_edit_private_storage_overlap(storage, bytes, history, history_bytes) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit->selections,
+                                         edit->selection_capacity * sizeof(*edit->selections)) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit->selection_history,
+                                         edit->slots * sizeof(*edit->selection_history)) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit->config.buffer,
+                                         edit->config.capacity) ||
+        cui_edit_private_storage_overlap(storage, bytes, edit, sizeof(*edit)) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit->selections,
+                                         edit->selection_capacity * sizeof(*edit->selections)) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit->selection_history,
+                                         edit->slots * sizeof(*edit->selection_history)) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit->config.buffer,
+                                         edit->config.capacity) ||
+        cui_edit_private_storage_overlap(history, history_bytes, edit, sizeof(*edit)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    edit->columns = storage;
+    edit->column_capacity = capacity;
+    edit->column_history = history;
+    edit->column_count = 0;
+    for (size_t i = 0; i < edit->slots; ++i)
+        history[i].count = 0;
+    cui_edit_private_save_state(edit);
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_set_columns(cui_edit *edit, const cui_edit_column_anchor *input,
+                                     size_t count) {
+    if (!edit || !edit->columns || !input || count != edit->selection_count ||
+        count > edit->column_capacity)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    for (size_t i = 0; i < count; ++i)
+        if (input[i].id != edit->selections[i].id ||
+            input[i].cursor != edit->selections[i].cursor ||
+            (input[i].valid && (!isfinite(input[i].x) || input[i].x < 0)))
+            return CUI_EDIT_INVALID_ARGUMENT;
+    memcpy(edit->columns, input, count * sizeof(*input));
+    edit->column_count = count;
+    cui_edit_private_save_state(edit);
+    return CUI_EDIT_OK;
 }
 const cui_edit_selection *cui_edit_get_selections(const cui_edit *edit, size_t *count) {
     if (count)
@@ -4193,6 +4376,7 @@ cui_edit_result cui_edit_select_many(cui_edit *edit, const cui_edit_selection *i
         cui_edit_get_text(edit), input, count, next, edit->selection_capacity, &merged);
     if (result != CUI_EDIT_OK)
         return result;
+    cui_edit_break_coalescing(edit);
     memcpy(edit->selections, next, merged * sizeof(*next));
     edit->selection_count = merged;
     edit->anchor = next[0].anchor;
@@ -4222,6 +4406,7 @@ cui_edit_result cui_edit_select_disjoint(cui_edit *edit, const cui_edit_selectio
             if (next[i].id == next[j].id)
                 return CUI_EDIT_INVALID_ARGUMENT;
     }
+    cui_edit_break_coalescing(edit);
     memcpy(edit->selections, next, count * sizeof(*next));
     edit->selection_count = count;
     edit->anchor = next[0].anchor;
@@ -4251,6 +4436,8 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
     } else
         memcpy(sorted, input, count * sizeof(*sorted));
     cui_edit_private_sort_selections(sorted, count);
+    size_t dirty_start =
+        count ? (sorted[0].anchor < sorted[0].cursor ? sorted[0].anchor : sorted[0].cursor) : 0;
     size_t removed = 0;
     cui_str original = cui_edit_get_text(edit);
     for (size_t i = 0; i < count; ++i) {
@@ -4322,6 +4509,9 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
     edit->preferred_column_valid = false;
     if (changes) {
         edit->revision++;
+        edit->change_start = dirty_start;
+        edit->change_revision = edit->revision;
+        edit->change_valid = true;
         cui_edit_private_record(edit);
     } else
         cui_edit_private_save_state(edit);
@@ -4330,8 +4520,23 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
 cui_edit_result cui_edit_replace_selections(cui_edit *edit, cui_str text) {
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
+    if (!edit->typing_pending)
+        cui_edit_break_coalescing(edit);
     return cui_edit_private_replace_collection(edit, text, edit->selections, edit->selection_count,
                                                false, NULL, true);
+}
+cui_edit_result cui_edit_type_selections(cui_edit *edit, cui_str text) {
+    if (!edit)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!text.length) {
+        cui_edit_break_coalescing(edit);
+        return cui_edit_replace_selections(edit, text);
+    }
+    uint64_t before = edit->revision;
+    cui_edit_private_typing_begin(edit);
+    cui_edit_result result = cui_edit_replace_selections(edit, text);
+    cui_edit_private_typing_end(edit, result, before);
+    return result;
 }
 cui_edit_result cui_edit_can_replace_selections(cui_edit *edit, cui_str text) {
     if (!edit)
@@ -4453,6 +4658,7 @@ cui_edit_result cui_edit_add_cursors(cui_edit *edit, const cui_edit_selection *i
         next[used++] = input[i];
     }
     if (used != edit->selection_count) {
+        cui_edit_break_coalescing(edit);
         memcpy(edit->selections, next, used * sizeof(*next));
         edit->selection_count = used;
         cui_edit_private_save_state(edit);
@@ -4667,8 +4873,23 @@ cui_edit_result cui_edit_set_content(cui_edit *edit, cui_edit_content content) {
 cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
+    if (!e->typing_pending)
+        cui_edit_break_coalescing(e);
     return cui_edit_private_replace(e, text, e->cursor < e->anchor ? e->cursor : e->anchor,
                                     e->cursor > e->anchor ? e->cursor : e->anchor);
+}
+cui_edit_result cui_edit_type(cui_edit *edit, cui_str text) {
+    if (!edit)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!text.length) {
+        cui_edit_break_coalescing(edit);
+        return cui_edit_insert(edit, text);
+    }
+    uint64_t before = edit->revision;
+    cui_edit_private_typing_begin(edit);
+    cui_edit_result result = cui_edit_insert(edit, text);
+    cui_edit_private_typing_end(edit, result, before);
+    return result;
 }
 static bool cui_edit_private_indent_match(const cui_edit *e, size_t at, size_t width,
                                           bool hard_tabs) {
@@ -4695,6 +4916,9 @@ static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t an
     cui_edit_private_collapse_selections(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = 0;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     cui_edit_private_record(e);
 }
 cui_edit_result cui_edit_indent_selections(cui_edit *e, bool outdent, bool block, size_t tab_size,
@@ -4860,22 +5084,44 @@ cui_edit_result cui_edit_backspace(cui_edit *e) {
 cui_edit_result cui_edit_delete(cui_edit *e) {
     return cui_edit_private_erase(e, false);
 }
+/* Edit buffers are already valid UTF-8. Two adjacent ASCII scalars have a
+ * grapheme boundary except CR/LF, so common editing never scans the prefix. */
+static bool cui_edit_private_boundary_valid(cui_str text, size_t at) {
+    if (!at || at == text.length)
+        return true;
+    const unsigned char *bytes = (const unsigned char *)text.data;
+    if (bytes[at - 1] < 0x80 && bytes[at] < 0x80)
+        return bytes[at - 1] != '\r' || bytes[at] != '\n';
+    return cui_grapheme_boundary(text, at);
+}
+static size_t cui_edit_private_previous_valid(cui_str text, size_t at) {
+    const unsigned char *bytes = (const unsigned char *)text.data;
+    if (at && bytes[at - 1] < 0x80 && (at == 1 || bytes[at - 2] < 0x80))
+        return at >= 2 && bytes[at - 2] == '\r' && bytes[at - 1] == '\n' ? at - 2 : at - 1;
+    return cui_grapheme_previous(text, at);
+}
+static size_t cui_edit_private_next_valid(cui_str text, size_t at) {
+    const unsigned char *bytes = (const unsigned char *)text.data;
+    if (at < text.length && bytes[at] < 0x80 && (at + 1 == text.length || bytes[at + 1] < 0x80))
+        return at + (bytes[at] == '\r' && at + 1 < text.length && bytes[at + 1] == '\n' ? 2 : 1);
+    return cui_grapheme_next(text, at);
+}
 static cui_edit_result cui_edit_private_erase_grapheme(cui_edit *e, bool backwards) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     cui_str text = cui_edit_get_text(e);
     size_t start = e->anchor < e->cursor ? e->anchor : e->cursor;
     size_t end = e->anchor > e->cursor ? e->anchor : e->cursor;
-    if (start == end && cui_grapheme_boundary(text, start)) {
+    if (start == end && cui_edit_private_boundary_valid(text, start)) {
         if (backwards)
-            start = cui_grapheme_previous(text, start);
+            start = cui_edit_private_previous_valid(text, start);
         else
-            end = cui_grapheme_next(text, end);
+            end = cui_edit_private_next_valid(text, end);
     } else {
-        if (!cui_grapheme_boundary(text, start))
-            start = cui_grapheme_previous(text, start);
-        if (!cui_grapheme_boundary(text, end))
-            end = cui_grapheme_next(text, end);
+        if (!cui_edit_private_boundary_valid(text, start))
+            start = cui_edit_private_previous_valid(text, start);
+        if (!cui_edit_private_boundary_valid(text, end))
+            end = cui_edit_private_next_valid(text, end);
     }
     return cui_edit_private_replace(e, (cui_str){0}, start, end);
 }
@@ -4923,17 +5169,28 @@ static void cui_edit_private_restore(cui_edit *e) {
             e->selections[0] = (cui_edit_selection){0, e->anchor, e->cursor};
         }
     }
+    if (e->columns) {
+        const cui_edit_column_snapshot *snapshot = &e->column_history[e->index];
+        e->column_count = snapshot->count;
+        if (e->column_count)
+            memcpy(e->columns, snapshot->items, e->column_count * sizeof(*e->columns));
+        cui_edit_private_save_state(e);
+    }
 }
 cui_edit_result cui_edit_undo(cui_edit *e) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!e->slots || !e->index)
         return CUI_EDIT_NO_HISTORY;
+    cui_edit_break_coalescing(e);
     cui_edit_private_save_state(e);
     e->index--;
     cui_edit_private_restore(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = 0;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_redo(cui_edit *e) {
@@ -4941,11 +5198,15 @@ cui_edit_result cui_edit_redo(cui_edit *e) {
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!e->slots || e->index + 1 >= e->count)
         return CUI_EDIT_NO_HISTORY;
+    cui_edit_break_coalescing(e);
     cui_edit_private_save_state(e);
     e->index++;
     cui_edit_private_restore(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = 0;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
@@ -4959,8 +5220,9 @@ cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
         while (n < sizeof(v.text) && v.text[n])
             n++;
         r = n == sizeof(v.text) ? CUI_EDIT_INVALID_ARGUMENT
-                                : cui_edit_insert(e, (cui_str){v.text, n});
+                                : cui_edit_type(e, (cui_str){v.text, n});
     } else if (v.type == CUI_EVENT_KEY_DOWN) {
+        cui_edit_break_coalescing(e);
         bool shift = (v.modifiers & CUI_MOD_SHIFT) != 0;
         switch (v.key) {
         case CUI_KEY_LEFT:

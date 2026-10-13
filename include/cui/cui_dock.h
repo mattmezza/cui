@@ -516,16 +516,15 @@ cui_dock_result cui_dock_area_remove_dock(cui_dock_area *, cui_dock_region);
 cui_dock_result cui_dock_area_register(cui_dock_area *, cui_dock_area_panel);
 cui_dock_result cui_dock_area_reconcile(cui_dock_area *);
 cui_dock_result cui_dock_area_insert(cui_dock_area *, cui_dock_region, cui_dock_node tab,
-                                      uint64_t key, size_t index);
+                                     uint64_t key, size_t index);
 cui_dock_result cui_dock_area_remove(cui_dock_area *, uint64_t key);
-cui_dock_result cui_dock_area_move(cui_dock_area *, uint64_t key,
-                                    cui_dock_region destination, cui_dock_node target,
-                                    size_t index, cui_dock_kind axis, double ratio, bool before,
-                                    cui_dock_node *new_tab);
+cui_dock_result cui_dock_area_move(cui_dock_area *, uint64_t key, cui_dock_region destination,
+                                   cui_dock_node target, size_t index, cui_dock_kind axis,
+                                   double ratio, bool before, cui_dock_node *new_tab);
 cui_dock_result cui_dock_area_activate(cui_dock_area *, uint64_t key);
 cui_dock_result cui_dock_area_set_zoom(cui_dock_area *, uint64_t key, bool zoomed);
 cui_dock_result cui_dock_area_schema_import(cui_dock_area *, const cui_dock_schema_area *,
-                                             cui_dock_schema_key_fn, void *);
+                                            cui_dock_schema_key_fn, void *);
 /* Delivers source-style next-tick active net edges, then every queued zoom edge. */
 bool cui_dock_area_tick(cui_dock_area *);
 #ifdef __cplusplus

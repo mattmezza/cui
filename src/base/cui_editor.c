@@ -142,8 +142,8 @@ static bool cui_editor_style_equal(cui_text_style a, cui_text_style b) {
     return a.family == b.family && a.weight == b.weight && a.italic == b.italic &&
            a.monospace == b.monospace;
 }
-static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor,
-                                   cui_text_style style, float font) {
+static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor, cui_text_style style,
+                                   float font) {
     size_t count;
     const cui_edit_selection *selections = cui_edit_get_selections(editor->edit, &count);
     size_t column_count = 0;
@@ -168,9 +168,8 @@ static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor,
                     next[i].x = columns[j].x;
                     if (ui && (columns[j].font_size != font ||
                                !cui_editor_style_equal(columns[j].style, style))) {
-                        size_t row = cui_textarea_row_for_offset(&editor->view,
-                                                                  selections[i].cursor,
-                                                                  columns[j].upstream);
+                        size_t row = cui_textarea_row_for_offset(
+                            &editor->view, selections[i].cursor, columns[j].upstream);
                         if (row != SIZE_MAX) {
                             cui_str text = cui_edit_get_text(editor->edit);
                             size_t at = editor->view.lines[row].start;
@@ -181,13 +180,15 @@ static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor,
                                 position++;
                             }
                             next[i].x = cui_measure_text_ex(
-                                ui, (cui_str){text.data + editor->view.lines[row].start,
-                                              at - editor->view.lines[row].start},
-                                font, style).width;
+                                            ui,
+                                            (cui_str){text.data + editor->view.lines[row].start,
+                                                      at - editor->view.lines[row].start},
+                                            font, style)
+                                            .width;
                             if (position < columns[j].column)
-                                next[i].x += (columns[j].column - position) *
-                                             cui_measure_text_ex(ui, cui_string(" "), font,
-                                                                 style).width;
+                                next[i].x +=
+                                    (columns[j].column - position) *
+                                    cui_measure_text_ex(ui, cui_string(" "), font, style).width;
                             if (!isfinite(next[i].x))
                                 next[i].x = columns[j].x;
                         }
@@ -204,8 +205,7 @@ static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor,
     editor->cursor_anchor_font_size = font;
 }
 static void cui_editor_save_columns(cui_editor_state *editor,
-                                    const cui_edit_column_anchor *previous,
-                                    size_t previous_count,
+                                    const cui_edit_column_anchor *previous, size_t previous_count,
                                     const cui_edit_selection *before, size_t before_count,
                                     bool vertical) {
     size_t count;
@@ -691,10 +691,10 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                     size_t length = 0;
                     while (length < sizeof event.text && event.text[length])
                         ++length;
-                    error = length == sizeof event.text
-                                ? CUI_EDIT_INVALID_UTF8
-                                : cui_edit_type_selections(editor->edit,
-                                                           (cui_str){event.text, length});
+                    error =
+                        length == sizeof event.text
+                            ? CUI_EDIT_INVALID_UTF8
+                            : cui_edit_type_selections(editor->edit, (cui_str){event.text, length});
                 }
             }
         } else if (event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE) {

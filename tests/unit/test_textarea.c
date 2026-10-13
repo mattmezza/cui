@@ -924,16 +924,14 @@ static void compare_incremental_rows(cui_context *ui, cui_edit *edit, cui_textar
 }
 static void test_incremental_wrap_reflow(void) {
     styled_probe probe = {.width = 5};
-    cui_context *ui = cui_create((cui_config){.width = 400,
-                                               .height = 300,
-                                               .measure_styled = styled_measure,
-                                               .measure_user = &probe});
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
     char buffer[256] = "one two three four five\nabcde fg hij\nZ";
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-                                                      .capacity = sizeof buffer,
-                                                      .multiline = true,
-                                                      .history_bytes = 1024,
-                                                      .max_history_steps = 4});
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 1024,
+                                                       .max_history_steps = 4});
     cui_textarea_line lines[128];
     cui_textarea_state cached;
     assert(ui && edit && cui_textarea_state_init(&cached, lines, 128));
@@ -966,17 +964,15 @@ static void test_large_document_viewport(void) {
     }
     buffer[bytes] = 0;
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-                                                      .capacity = bytes + 64,
-                                                      .multiline = true,
-                                                      .history_bytes = 4 * (bytes + 64),
-                                                      .max_history_steps = 4});
+                                                       .capacity = bytes + 64,
+                                                       .multiline = true,
+                                                       .history_bytes = 4 * (bytes + 64),
+                                                       .max_history_steps = 4});
     assert(edit);
     cui_textarea_state state;
     assert(cui_textarea_state_init(&state, lines, rows + 4));
-    cui_context *ui = cui_create((cui_config){.width = 400,
-                                               .height = 300,
-                                               .measure_styled = styled_measure,
-                                               .measure_user = &probe});
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
     assert(ui);
     cui_focus(ui, 10);
     cui_textarea_options options = {.width = 180, .height = 80};
@@ -1005,8 +1001,7 @@ static void test_large_document_viewport(void) {
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(buffer[bytes - 2] == 'z' && buffer[bytes - 1] == 'a');
     assert(probe.calls - initial_calls < 1000);
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
-                                           .key = CUI_KEY_BACKSPACE}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_BACKSPACE}));
     initial_calls = probe.calls;
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(buffer[bytes - 2] == 'a' && probe.calls - initial_calls < 1000);

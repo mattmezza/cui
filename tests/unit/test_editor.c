@@ -1128,10 +1128,10 @@ static cui_textarea_result multi_key(cui_context *ui, cui_editor_state *editor,
 static void multicursor_column_history(void) {
     char buffer[128] = "abcd\nx\nabcdef";
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-                                                      .capacity = sizeof buffer,
-                                                      .multiline = true,
-                                                      .history_bytes = 512,
-                                                      .max_history_steps = 3});
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 512,
+                                                       .max_history_steps = 3});
     cui_edit_selection live[4];
     cui_edit_selection_snapshot history[4];
     cui_edit_column_anchor columns[4];

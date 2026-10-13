@@ -2581,9 +2581,12 @@ static void test_area_aggregate(void) {
     lifecycle_count = 0;
     for (uint64_t key = 1; key <= 3; key++) {
         cui_dock_area_panel descriptor = {.panel = {.key = key,
-            .user = &lifecycle_count, .zoomable = true,
-            .on_added = lifecycle_added, .on_removed = lifecycle_removed,
-            .set_active = lifecycle_active, .set_zoomed = lifecycle_zoom}};
+                                                    .user = &lifecycle_count,
+                                                    .zoomable = true,
+                                                    .on_added = lifecycle_added,
+                                                    .on_removed = lifecycle_removed,
+                                                    .set_active = lifecycle_active,
+                                                    .set_zoomed = lifecycle_zoom}};
         assert(cui_dock_area_register(area, descriptor) == CUI_DOCK_OK);
     }
     cui_dock *left = cui_dock_area_model(area, CUI_DOCK_LEFT);
@@ -2638,8 +2641,8 @@ static void test_area_aggregate(void) {
     lifecycle_expect(1, 'z', 2);
     lifecycle_count = 0;
     cui_dock *right = cui_dock_area_model(area, CUI_DOCK_RIGHT);
-    assert(cui_dock_area_move(area, 2, CUI_DOCK_RIGHT, cui_dock_root(right), 0,
-                              CUI_DOCK_TABS, .5, false, NULL) == CUI_DOCK_OK);
+    assert(cui_dock_area_move(area, 2, CUI_DOCK_RIGHT, cui_dock_root(right), 0, CUI_DOCK_TABS, .5,
+                              false, NULL) == CUI_DOCK_OK);
     assert(lifecycle_count == 1);
     lifecycle_expect(0, 'A', 2);
     assert(cui_dock_area_tick(area));
@@ -2655,7 +2658,8 @@ static void test_area_aggregate(void) {
     assert(lifecycle_count == 1);
     lifecycle_expect(0, 'A', 3);
     lifecycle_count = 0;
-    assert(cui_dock_move_split(left, 3, tab, CUI_DOCK_SPLIT_VERTICAL, .5, false, NULL) == CUI_DOCK_OK);
+    assert(cui_dock_move_split(left, 3, tab, CUI_DOCK_SPLIT_VERTICAL, .5, false, NULL) ==
+           CUI_DOCK_OK);
     assert(cui_dock_area_reconcile(area) == CUI_DOCK_OK);
     assert(lifecycle_count == 1);
     lifecycle_expect(0, 'A', 3);
@@ -2675,9 +2679,12 @@ static void test_area_aggregate(void) {
 
     area = cui_dock_area_create((cui_dock_config){0}, 1, 1);
     assert(area);
-    assert(cui_dock_area_register(area, (cui_dock_area_panel){.panel = {
-        .key = 7, .zoomable = true, .user = &lifecycle_count, .set_zoomed = lifecycle_zoom}}) ==
-        CUI_DOCK_OK);
+    assert(cui_dock_area_register(area,
+                                  (cui_dock_area_panel){.panel = {.key = 7,
+                                                                  .zoomable = true,
+                                                                  .user = &lifecycle_count,
+                                                                  .set_zoomed = lifecycle_zoom}}) ==
+           CUI_DOCK_OK);
     left = cui_dock_area_model(area, CUI_DOCK_LEFT);
     assert(cui_dock_area_insert(area, CUI_DOCK_LEFT, cui_dock_root(left), 7, 0) == CUI_DOCK_OK);
     assert(cui_dock_workspace_set_edge(cui_dock_area_workspace(area), CUI_DOCK_LEFT, true, 120));

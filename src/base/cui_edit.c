@@ -3550,8 +3550,7 @@ static void cui_edit_private_record(cui_edit *e) {
         e->typing_after_cursor = e->cursor;
         e->typing_after_count = e->selections ? e->selection_count : 0;
         if (e->selections)
-            memcpy(e->typing_after, e->selections,
-                   e->selection_count * sizeof(*e->typing_after));
+            memcpy(e->typing_after, e->selections, e->selection_count * sizeof(*e->typing_after));
     } else
         e->typing_batches = 0;
 }
@@ -3564,13 +3563,12 @@ void cui_edit_break_coalescing(cui_edit *e) {
     }
 }
 static void cui_edit_private_typing_begin(cui_edit *e) {
-    e->typing_can_merge = e->typing_active && e->slots &&
-                          e->typing_after_anchor == e->anchor &&
-                          e->typing_after_cursor == e->cursor &&
-                          e->typing_after_count == (e->selections ? e->selection_count : 0) &&
-                          (!e->selections ||
-                           !memcmp(e->typing_after, e->selections,
-                                   e->selection_count * sizeof(*e->typing_after)));
+    e->typing_can_merge =
+        e->typing_active && e->slots && e->typing_after_anchor == e->anchor &&
+        e->typing_after_cursor == e->cursor &&
+        e->typing_after_count == (e->selections ? e->selection_count : 0) &&
+        (!e->selections ||
+         !memcmp(e->typing_after, e->selections, e->selection_count * sizeof(*e->typing_after)));
     e->typing_pending = true;
 }
 static void cui_edit_private_typing_end(cui_edit *e, cui_edit_result result,
@@ -3913,8 +3911,8 @@ size_t cui_edit_selection_history_slots(const cui_edit *edit) {
 cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *storage,
                                            size_t capacity, cui_edit_selection_snapshot *history,
                                            size_t history_slots) {
-    if (!edit || !edit->config.multiline || edit->token_count || edit->columns || !storage || !capacity ||
-        capacity > CUI_EDIT_MAX_SELECTIONS || history_slots < edit->slots ||
+    if (!edit || !edit->config.multiline || edit->token_count || edit->columns || !storage ||
+        !capacity || capacity > CUI_EDIT_MAX_SELECTIONS || history_slots < edit->slots ||
         (edit->slots && !history) || history_slots > SIZE_MAX / sizeof(*history))
         return CUI_EDIT_INVALID_ARGUMENT;
     size_t bytes = capacity * sizeof(*storage), history_bytes = history_slots * sizeof(*history);
@@ -4154,9 +4152,8 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
     } else
         memcpy(sorted, input, count * sizeof(*sorted));
     cui_edit_private_sort_selections(sorted, count);
-    size_t dirty_start = count ? (sorted[0].anchor < sorted[0].cursor ? sorted[0].anchor
-                                                                      : sorted[0].cursor)
-                               : 0;
+    size_t dirty_start =
+        count ? (sorted[0].anchor < sorted[0].cursor ? sorted[0].anchor : sorted[0].cursor) : 0;
     size_t removed = 0;
     cui_str original = cui_edit_get_text(edit);
     for (size_t i = 0; i < count; ++i) {
@@ -4821,10 +4818,8 @@ static size_t cui_edit_private_previous_valid(cui_str text, size_t at) {
 }
 static size_t cui_edit_private_next_valid(cui_str text, size_t at) {
     const unsigned char *bytes = (const unsigned char *)text.data;
-    if (at < text.length && bytes[at] < 0x80 &&
-        (at + 1 == text.length || bytes[at + 1] < 0x80))
-        return at + (bytes[at] == '\r' && at + 1 < text.length && bytes[at + 1] == '\n' ? 2
-                                                                                           : 1);
+    if (at < text.length && bytes[at] < 0x80 && (at + 1 == text.length || bytes[at + 1] < 0x80))
+        return at + (bytes[at] == '\r' && at + 1 < text.length && bytes[at + 1] == '\n' ? 2 : 1);
     return cui_grapheme_next(text, at);
 }
 static cui_edit_result cui_edit_private_erase_grapheme(cui_edit *e, bool backwards) {

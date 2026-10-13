@@ -553,6 +553,45 @@ cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *, uint
  * Spread clamps to [0,.95], index clamps to count-1. count<=1 is unstaggered. */
 cui_plot_result cui_plot_appear_stagger(double linear_progress, size_t index, size_t count,
                                         double spread, double *local_progress);
+/* Native path preparation: non-indexed triangle list, relative XY and unscaled
+ * shader ST coordinates. Host owns clip/background/origin and mesh retention. */
+typedef struct {
+    cui_plot_point xy, st;
+} cui_plot_mesh_vertex;
+/* Single simple implicitly closed contour, 3..256 distinct points within
+ * +/-16384. Concave contours and either winding are supported; collinear
+ * vertices, holes, touching/self-crossing edges are rejected. Original bounded
+ * ear clipping, not the source Lyon tessellator. Each triangle has ST=(0,1).
+ * Query with out=NULL/capacity=0; CAPACITY sets required, preserves vertices and
+ * bounds. Other errors preserve all outputs. Output must not alias inputs. */
+cui_plot_result cui_plot_fill_mesh(const cui_plot_point *contour, size_t count,
+                                   cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
+                                   cui_plot_rect *bounds);
+/* Adaptive cubic polyline (includes start/end), original conservative
+ * de Casteljau subdivision, max4097 points/depth24. Coordinates+controls within
+ * +/-16384, finite tolerance1e-6..16384. Every accepted chord is within tolerance
+ * of its control hull. Source Lyon default tolerance is0.1; sample positions
+ * differ from Lyon's quadratic approximation. Query NULL/0 sets exact required;
+ * caller CAPACITY preserves points, internal budget CAPACITY preserves required
+ * too. Other errors preserve outputs. Input/output must be disjoint. */
+cui_plot_result cui_plot_cubic_flatten(cui_plot_point start, cui_plot_point control1,
+                                       cui_plot_point control2, cui_plot_point end,
+                                       double tolerance, cui_plot_point *out, size_t capacity,
+                                       size_t *required);
+/* Open-polyline stroke, source default Butt caps/Miter joins. Width0 returns
+ * EMPTY with required0/bounds0; width>0..1024, miter_limit1..64 (source default4).
+ * 2..64 points, offset length/width beyond miter limit bevels the outer edge. Self-overlap,
+ * reversal and touching outlines are rejected; closed/dashed/round strokes are
+ * not supplied. Successful mesh has ST=(0,1). Same transaction/query contract
+ * as fill_mesh; computed coordinates beyond +/-16384 return OVERFLOW. */
+cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *, size_t count, double width,
+                                     double miter_limit, cui_plot_mesh_vertex *, size_t capacity,
+                                     size_t *required, cui_plot_rect *bounds);
+/* Pinned path fragment coverage: ST and its screen-space derivatives; output
+ * preserved on invalid/overflow. Constant S derivatives (<.001 norm) are solid.
+ * This is analytic quadratic coverage, not generic triangle-edge antialiasing. */
+cui_plot_result cui_plot_mesh_coverage(cui_plot_point st, cui_plot_point dstdx,
+                                       cui_plot_point dstdy, double *coverage);
 #ifdef __cplusplus
 }
 #endif
@@ -2962,6 +3001,226 @@ cui_plot_result cui_plot_appear_value_stagger(const cui_plot_appear_value *value
         return CUI_PLOT_INVALID;
     *out = progress;
     return CUI_PLOT_OK;
+}
+
+static double mesh_cross(cui_plot_point a, cui_plot_point b, cui_plot_point c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+static bool mesh_between(double a, double b, double x) {
+    return x >= fmin(a, b) && x <= fmax(a, b);
+}
+static bool mesh_edges_touch(cui_plot_point a, cui_plot_point b, cui_plot_point c,
+                             cui_plot_point d) {
+    double ab_c = mesh_cross(a, b, c), ab_d = mesh_cross(a, b, d);
+    double cd_a = mesh_cross(c, d, a), cd_b = mesh_cross(c, d, b);
+    if (((ab_c < 0 && ab_d > 0) || (ab_c > 0 && ab_d < 0)) &&
+        ((cd_a < 0 && cd_b > 0) || (cd_a > 0 && cd_b < 0)))
+        return true;
+    return (ab_c == 0 && mesh_between(a.x, b.x, c.x) && mesh_between(a.y, b.y, c.y)) ||
+           (ab_d == 0 && mesh_between(a.x, b.x, d.x) && mesh_between(a.y, b.y, d.y)) ||
+           (cd_a == 0 && mesh_between(c.x, d.x, a.x) && mesh_between(c.y, d.y, a.y)) ||
+           (cd_b == 0 && mesh_between(c.x, d.x, b.x) && mesh_between(c.y, d.y, b.y));
+}
+cui_plot_result cui_plot_fill_mesh(const cui_plot_point *p, size_t n, cui_plot_mesh_vertex *out,
+                                   size_t capacity, size_t *required, cui_plot_rect *bounds) {
+    if (!p || !required || !bounds || n < 3 || n > 256 || (capacity && !out))
+        return CUI_PLOT_INVALID;
+    cui_plot_rect box = {p[0].x, p[0].y, p[0].x, p[0].y};
+    double area = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (!isfinite(p[i].x) || !isfinite(p[i].y) || fabs(p[i].x) > 16384 || fabs(p[i].y) > 16384)
+            return CUI_PLOT_INVALID;
+        size_t j = (i + 1) % n;
+        if (p[i].x == p[j].x && p[i].y == p[j].y)
+            return CUI_PLOT_DEGENERATE;
+        if (mesh_cross(p[(i + n - 1) % n], p[i], p[j]) == 0)
+            return CUI_PLOT_DEGENERATE;
+        area += p[i].x * p[j].y - p[j].x * p[i].y;
+        box.x_min = fmin(box.x_min, p[i].x);
+        box.x_max = fmax(box.x_max, p[i].x);
+        box.y_min = fmin(box.y_min, p[i].y);
+        box.y_max = fmax(box.y_max, p[i].y);
+    }
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = i + 1; j < n; j++) {
+            if (j == i + 1 || (i == 0 && j == n - 1))
+                continue;
+            if (mesh_edges_touch(p[i], p[(i + 1) % n], p[j], p[(j + 1) % n]))
+                return CUI_PLOT_INVALID;
+        }
+    if (area == 0)
+        return CUI_PLOT_DEGENERATE;
+    size_t indices[256], triangles[254 * 3], used = 0, left = n;
+    for (size_t i = 0; i < n; i++)
+        indices[i] = i;
+    double sign = area > 0 ? 1 : -1;
+    while (left > 3) {
+        bool found = false;
+        for (size_t i = 0; i < left; i++) {
+            size_t a = indices[(i + left - 1) % left], b = indices[i], c = indices[(i + 1) % left];
+            if (sign * mesh_cross(p[a], p[b], p[c]) <= 0)
+                continue;
+            bool blocked = false;
+            for (size_t j = 0; j < left; j++) {
+                size_t v = indices[j];
+                if (v == a || v == b || v == c)
+                    continue;
+                if (sign * mesh_cross(p[a], p[b], p[v]) >= 0 &&
+                    sign * mesh_cross(p[b], p[c], p[v]) >= 0 &&
+                    sign * mesh_cross(p[c], p[a], p[v]) >= 0) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked)
+                continue;
+            triangles[used++] = a;
+            triangles[used++] = b;
+            triangles[used++] = c;
+            for (size_t j = i; j + 1 < left; j++)
+                indices[j] = indices[j + 1];
+            left--;
+            found = true;
+            break;
+        }
+        if (!found)
+            return CUI_PLOT_DEGENERATE;
+    }
+    for (size_t i = 0; i < 3; i++)
+        triangles[used++] = indices[i];
+    *required = used;
+    if (!out || capacity < used)
+        return CUI_PLOT_CAPACITY;
+    for (size_t i = 0; i < used; i++)
+        out[i] = (cui_plot_mesh_vertex){p[triangles[i]], {0, 1}};
+    *bounds = box;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_mesh_coverage(cui_plot_point st, cui_plot_point dx, cui_plot_point dy,
+                                       double *coverage) {
+    if (!coverage || !isfinite(st.x) || !isfinite(st.y) || !isfinite(dx.x) || !isfinite(dx.y) ||
+        !isfinite(dy.x) || !isfinite(dy.y))
+        return CUI_PLOT_INVALID;
+    double alpha = 1;
+    if (hypot(dx.x, dy.x) >= .001) {
+        double gx = 2 * st.x * dx.x - dx.y, gy = 2 * st.x * dy.x - dy.y;
+        double f = st.x * st.x - st.y, gradient = hypot(gx, gy);
+        if (!isfinite(f) || !isfinite(gradient))
+            return CUI_PLOT_OVERFLOW;
+        if (gradient == 0)
+            return CUI_PLOT_DEGENERATE;
+        alpha = fmax(0, fmin(1, .5 - f / gradient));
+    }
+    *coverage = alpha;
+    return CUI_PLOT_OK;
+}
+
+static bool mesh_point_valid(cui_plot_point p) {
+    return isfinite(p.x) && isfinite(p.y) && fabs(p.x) <= 16384 && fabs(p.y) <= 16384;
+}
+static double mesh_chord_distance(cui_plot_point p, cui_plot_point a, cui_plot_point b) {
+    double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+    double t = length ? fmax(0, fmin(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length)) : 0;
+    return hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+static cui_plot_point mesh_midpoint(cui_plot_point a, cui_plot_point b) {
+    return (cui_plot_point){a.x / 2 + b.x / 2, a.y / 2 + b.y / 2};
+}
+cui_plot_result cui_plot_cubic_flatten(cui_plot_point start, cui_plot_point c1, cui_plot_point c2,
+                                       cui_plot_point end, double tolerance, cui_plot_point *out,
+                                       size_t capacity, size_t *required) {
+    if (!required || (capacity && !out) || !mesh_point_valid(start) || !mesh_point_valid(c1) ||
+        !mesh_point_valid(c2) || !mesh_point_valid(end) || !isfinite(tolerance) ||
+        tolerance < 1e-6 || tolerance > 16384)
+        return CUI_PLOT_INVALID;
+    typedef struct {
+        cui_plot_point p[4];
+        unsigned depth;
+    } cubic_piece;
+    cubic_piece stack[25] = {{{start, c1, c2, end}, 0}};
+    size_t pending = 1, used = 1;
+    cui_plot_point points[4097];
+    points[0] = start;
+    while (pending) {
+        cubic_piece piece = stack[--pending];
+        if (fmax(mesh_chord_distance(piece.p[1], piece.p[0], piece.p[3]),
+                 mesh_chord_distance(piece.p[2], piece.p[0], piece.p[3])) <= tolerance) {
+            if (used == 4097)
+                return CUI_PLOT_CAPACITY;
+            points[used++] = piece.p[3];
+            continue;
+        }
+        if (piece.depth == 24 || pending + 2 > 25)
+            return CUI_PLOT_CAPACITY;
+        cui_plot_point a = mesh_midpoint(piece.p[0], piece.p[1]);
+        cui_plot_point b = mesh_midpoint(piece.p[1], piece.p[2]);
+        cui_plot_point c = mesh_midpoint(piece.p[2], piece.p[3]);
+        cui_plot_point d = mesh_midpoint(a, b), e = mesh_midpoint(b, c), m = mesh_midpoint(d, e);
+        stack[pending++] = (cubic_piece){{m, e, c, piece.p[3]}, piece.depth + 1};
+        stack[pending++] = (cubic_piece){{piece.p[0], a, d, m}, piece.depth + 1};
+    }
+    *required = used;
+    if (!out || capacity < used)
+        return CUI_PLOT_CAPACITY;
+    memcpy(out, points, used * sizeof *out);
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *p, size_t n, double width, double limit,
+                                     cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
+                                     cui_plot_rect *bounds) {
+    if (!p || !required || !bounds || n < 2 || n > 64 || (capacity && !out) || !isfinite(width) ||
+        width < 0 || width > 1024 || !isfinite(limit) || limit < 1 || limit > 64)
+        return CUI_PLOT_INVALID;
+    cui_plot_point direction[63];
+    for (size_t i = 0; i < n; i++) {
+        if (!mesh_point_valid(p[i]))
+            return CUI_PLOT_INVALID;
+        if (i) {
+            double dx = p[i].x - p[i - 1].x, dy = p[i].y - p[i - 1].y, length = hypot(dx, dy);
+            if (length == 0)
+                return CUI_PLOT_DEGENERATE;
+            direction[i - 1] = (cui_plot_point){dx / length, dy / length};
+        }
+    }
+    if (width == 0) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    cui_plot_point side[2][128], contour[256];
+    size_t used[2] = {0, 0};
+    double half = width / 2;
+    for (size_t k = 0; k < 2; k++) {
+        double sign = k == 0 ? 1 : -1;
+        for (size_t i = 0; i < n; i++) {
+            cui_plot_point prev = direction[i ? i - 1 : 0], next = direction[i + 1 < n ? i : n - 2];
+            double cross = prev.x * next.y - prev.y * next.x,
+                   dot = prev.x * next.x + prev.y * next.y;
+            if (i && i + 1 < n && cross == 0 && dot > 0)
+                continue;
+            double denominator = 1 + dot;
+            if (denominator <= 0)
+                return CUI_PLOT_DEGENERATE;
+            cui_plot_point m = {-(prev.y + next.y) / denominator, (prev.x + next.x) / denominator};
+            if (sign * cross < 0 && hypot(m.x, m.y) > 2 * limit) {
+                side[k][used[k]++] =
+                    (cui_plot_point){p[i].x - sign * half * prev.y, p[i].y + sign * half * prev.x};
+                side[k][used[k]++] =
+                    (cui_plot_point){p[i].x - sign * half * next.y, p[i].y + sign * half * next.x};
+            } else
+                side[k][used[k]++] =
+                    (cui_plot_point){p[i].x + sign * half * m.x, p[i].y + sign * half * m.y};
+        }
+    }
+    size_t count = 0;
+    for (size_t i = 0; i < used[0]; i++)
+        contour[count++] = side[0][i];
+    for (size_t i = used[1]; i; i--)
+        contour[count++] = side[1][i - 1];
+    for (size_t i = 0; i < count; i++)
+        if (!mesh_point_valid(contour[i]))
+            return CUI_PLOT_OVERFLOW;
+    return cui_plot_fill_mesh(contour, count, out, capacity, required, bounds);
 }
 
 #endif

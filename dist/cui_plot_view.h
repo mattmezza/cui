@@ -182,6 +182,47 @@ cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned widt
                                             size_t stride, size_t capacity_bytes,
                                             const cui_plot_background_shape *, size_t count,
                                             cui_color clear);
+/* Shader-source color seam, distinct from encoded cui_color bytes. Hsla inputs
+ * are normalized0..1; source conversion interprets their RGB as linear. */
+typedef struct {
+    float h, s, l, a;
+} cui_plot_hsla;
+typedef struct {
+    float r, g, b, a;
+} cui_plot_linear_rgba;
+typedef struct {
+    cui_plot_hsla color;
+    double position;
+} cui_plot_hsla_stop;
+typedef struct {
+    cui_plot_background_kind kind;
+    cui_plot_color_space color_space;
+    cui_plot_hsla solid;
+    double angle;
+    cui_plot_hsla_stop from, to;
+    double pattern_width, pattern_interval, pattern_size;
+} cui_plot_hsla_background;
+/* Source short-axis projection, pattern rules and checked bounds as above.
+ * Coverage0..1 multiplies alpha. Output is linear premultiplied RGB, preserving
+ * shader out-of-gamut values without byte encoding/clamping. Not bit-identical
+ * GPU floating arithmetic. Invalid inputs preserve output. */
+cui_plot_result cui_plot_hsla_background_sample(const cui_plot_hsla_background *,
+                                                cui_plot_rect frame, cui_plot_point position,
+                                                double coverage, cui_plot_linear_rgba *out);
+typedef struct {
+    cui_plot_cached_path path;
+    cui_plot_rect background_frame;
+    cui_plot_hsla_background fill, stroke;
+    float stroke_width;
+} cui_plot_hsla_shape;
+/* Caller linear premultiplied float pixels, stride/capacity in RGBA pixels.
+ * Same geometry/work bounds as raster_backgrounds, fill then stroke source-over.
+ * Clear is already premultiplied, finite RGB0..alpha and alpha0..1. No encoding,
+ * display transfer, byte rounding, retained rendering or triangle-edge AA.
+ * Buffers stable/disjoint; errors preserve all pixels. */
+cui_plot_result cui_plot_raster_hsla(cui_plot_linear_rgba *pixels, unsigned width, unsigned height,
+                                     size_t stride, size_t capacity, const cui_plot_hsla_shape *,
+                                     size_t count, cui_plot_linear_rgba clear);
 /* Caller RGBA8 storage, straight alpha. Rasterizer accepts Move/Line/Cubic/Close;
  * use arc_flatten for ARC commands. Cubics use 16 uniform parameter chords.
  * Each shape <=4096 flattened segments, <=64 shapes, dimensions1..1024,
@@ -645,9 +686,7 @@ static unsigned char plot_srgb_encode(double value) {
     double encoded = value <= .0031308 ? value * 12.92 : 1.055 * pow(value, 1. / 2.4) - .055;
     return (unsigned char)lround(fmax(0, fmin(1, encoded)) * 255);
 }
-static void plot_color_lab(cui_color color, double out[3]) {
-    double r = plot_srgb_decode(color.r / 255.), g = plot_srgb_decode(color.g / 255.);
-    double b = plot_srgb_decode(color.b / 255.);
+static void plot_rgb_lab(double r, double g, double b, double out[3]) {
     double l = cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b);
     double m = cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b);
     double s = cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
@@ -655,8 +694,11 @@ static void plot_color_lab(cui_color color, double out[3]) {
     out[1] = 1.9779984951 * l - 2.4285922050 * m + .4505937099 * s;
     out[2] = .0259040371 * l + .7827717662 * m - .8086757660 * s;
 }
-static cui_color plot_lab_color(const double a[3], const double b[3], double t,
-                                unsigned char alpha) {
+static void plot_color_lab(cui_color color, double out[3]) {
+    plot_rgb_lab(plot_srgb_decode(color.r / 255.), plot_srgb_decode(color.g / 255.),
+                 plot_srgb_decode(color.b / 255.), out);
+}
+static void plot_lab_rgb(const double a[3], const double b[3], double t, double out[3]) {
     double L = a[0] * (1 - t) + b[0] * t, A = a[1] * (1 - t) + b[1] * t;
     double B = a[2] * (1 - t) + b[2] * t;
     double l = L + .3963377774 * A + .2158037573 * B;
@@ -665,11 +707,18 @@ static cui_color plot_lab_color(const double a[3], const double b[3], double t,
     l *= l * l;
     m *= m * m;
     s *= s * s;
-    return (cui_color){plot_srgb_encode(4.0767416621 * l - 3.3077115913 * m + .2309699292 * s),
-                       plot_srgb_encode(-1.2684380046 * l + 2.6097574011 * m - .3413193965 * s),
-                       plot_srgb_encode(-.0041960863 * l - .7034186147 * m + 1.7076147010 * s),
+    out[0] = 4.0767416621 * l - 3.3077115913 * m + .2309699292 * s;
+    out[1] = -1.2684380046 * l + 2.6097574011 * m - .3413193965 * s;
+    out[2] = -.0041960863 * l - .7034186147 * m + 1.7076147010 * s;
+}
+static cui_color plot_lab_color(const double a[3], const double b[3], double t,
+                                unsigned char alpha) {
+    double rgb[3];
+    plot_lab_rgb(a, b, t, rgb);
+    return (cui_color){plot_srgb_encode(rgb[0]), plot_srgb_encode(rgb[1]), plot_srgb_encode(rgb[2]),
                        alpha};
 }
+
 typedef struct {
     const cui_plot_background *background;
     double center_x, center_y, x, y, pattern_width, pattern_period;
@@ -759,6 +808,24 @@ cui_plot_result cui_plot_background_sample(const cui_plot_background *background
     *out = background_color(background_sampler(background, frame), position);
     return CUI_PLOT_OK;
 }
+static void raster_hits(const plot_segment *lines, size_t used, cui_plot_point origin, double px,
+                        double py, double stroke_width, bool *inside, bool *stroked) {
+    *inside = false;
+    *stroked = false;
+    for (size_t j = 0; j < used; ++j) {
+        cui_plot_point a = {lines[j].line.start.x + origin.x, lines[j].line.start.y + origin.y};
+        cui_plot_point b = {lines[j].line.end.x + origin.x, lines[j].line.end.y + origin.y};
+        if (lines[j].closed && ((a.y > py) != (b.y > py)) &&
+            px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
+            *inside = !*inside;
+        if (stroke_width > 0) {
+            double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
+            double t = length ? fmax(0, fmin(1, ((px - a.x) * dx + (py - a.y) * dy) / length)) : 0;
+            if (hypot(px - a.x - t * dx, py - a.y - t * dy) <= stroke_width / 2)
+                *stroked = true;
+        }
+    }
+}
 static void raster_segments(unsigned char *pixels, unsigned width, unsigned height, size_t stride,
                             const plot_segment *lines, size_t used, cui_plot_point origin,
                             cui_color fill, cui_color stroke, float stroke_width,
@@ -770,22 +837,9 @@ static void raster_segments(unsigned char *pixels, unsigned width, unsigned heig
     for (unsigned y = 0; y < height; ++y)
         for (unsigned x = 0; x < width; ++x) {
             double px = x + .5, py = y + .5;
-            bool inside = false, stroked = false;
-            for (size_t j = 0; j < used; ++j) {
-                cui_plot_point a = {lines[j].line.start.x + origin.x,
-                                    lines[j].line.start.y + origin.y};
-                cui_plot_point b = {lines[j].line.end.x + origin.x, lines[j].line.end.y + origin.y};
-                if (lines[j].closed && ((a.y > py) != (b.y > py)) &&
-                    px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
-                    inside = !inside;
-                if ((stroke_background || stroke.a) && stroke_width > 0) {
-                    double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
-                    double t =
-                        length ? fmax(0, fmin(1, ((px - a.x) * dx + (py - a.y) * dy) / length)) : 0;
-                    if (hypot(px - a.x - t * dx, py - a.y - t * dy) <= stroke_width / 2)
-                        stroked = true;
-                }
-            }
+            bool inside, stroked;
+            raster_hits(lines, used, origin, px, py,
+                        (stroke_background || stroke.a) ? stroke_width : 0, &inside, &stroked);
             if (!inside && !stroked)
                 continue;
             cui_plot_point relative = {px - origin.x, py - origin.y};
@@ -1494,6 +1548,191 @@ cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned widt
                         shapes[i].path.count, shapes[i].path.origin, (cui_color){0}, (cui_color){0},
                         shapes[i].stroke_width, &shapes[i].fill, &shapes[i].stroke,
                         shapes[i].background_frame);
+    return CUI_PLOT_OK;
+}
+
+static bool hsla_valid(cui_plot_hsla c) {
+    return isfinite(c.h) && isfinite(c.s) && isfinite(c.l) && isfinite(c.a) && c.h >= 0 &&
+           c.h <= 1 && c.s >= 0 && c.s <= 1 && c.l >= 0 && c.l <= 1 && c.a >= 0 && c.a <= 1;
+}
+static cui_plot_background hsla_geometry(const cui_plot_hsla_background *bg) {
+    return (cui_plot_background){.kind = bg->kind,
+                                 .color_space = bg->color_space,
+                                 .angle = bg->angle,
+                                 .from = {.position = bg->from.position},
+                                 .to = {.position = bg->to.position},
+                                 .source_projection = true,
+                                 .pattern_width = bg->pattern_width,
+                                 .pattern_interval = bg->pattern_interval,
+                                 .pattern_size = bg->pattern_size};
+}
+static bool hsla_background_valid(const cui_plot_hsla_background *bg) {
+    if (!bg)
+        return false;
+    cui_plot_background geometry = hsla_geometry(bg);
+    return background_valid(&geometry) &&
+           (bg->kind == CUI_PLOT_BACKGROUND_LINEAR
+                ? hsla_valid(bg->from.color) && hsla_valid(bg->to.color)
+                : hsla_valid(bg->solid));
+}
+static cui_plot_linear_rgba hsla_linear(cui_plot_hsla c) {
+    double h = c.h * 6., chroma = (1 - fabs(2. * c.l - 1)) * c.s;
+    double x = chroma * (1 - fabs(fmod(h, 2) - 1)), m = c.l - chroma / 2;
+    cui_plot_linear_rgba rgb = {(float)m, (float)m, (float)m, c.a};
+    if (h < 1) {
+        rgb.r += (float)chroma;
+        rgb.g += (float)x;
+    } else if (h < 2) {
+        rgb.r += (float)x;
+        rgb.g += (float)chroma;
+    } else if (h < 3) {
+        rgb.g += (float)chroma;
+        rgb.b += (float)x;
+    } else if (h < 4) {
+        rgb.g += (float)x;
+        rgb.b += (float)chroma;
+    } else if (h < 5) {
+        rgb.r += (float)x;
+        rgb.b += (float)chroma;
+    } else {
+        rgb.r += (float)chroma;
+        rgb.b += (float)x;
+    }
+    return rgb;
+}
+static double shader_srgb_decode(double value) {
+    return value < .04045 ? value / 12.92 : pow((value + .055) / 1.055, 2.4);
+}
+static double shader_srgb_encode(double value) {
+    return value < .0031308 ? value * 12.92 : 1.055 * pow(value, 1. / 2.4) - .055;
+}
+typedef struct {
+    const cui_plot_hsla_background *background;
+    plot_background_sampler geometry;
+    cui_plot_linear_rgba solid;
+    double from[3], to[3];
+} plot_hsla_sampler;
+static plot_hsla_sampler hsla_sampler(const cui_plot_hsla_background *bg, cui_plot_rect frame) {
+    cui_plot_background geometry = hsla_geometry(bg);
+    /* Color preparation is handled below; avoid meaningless byte-Lab work. */
+    geometry.color_space = CUI_PLOT_COLOR_SRGB;
+    plot_hsla_sampler sample = {.background = bg,
+                                .geometry = background_sampler(&geometry, frame),
+                                .solid = hsla_linear(bg->solid)};
+    sample.geometry.background = NULL;
+    if (bg->kind == CUI_PLOT_BACKGROUND_LINEAR) {
+        cui_plot_linear_rgba a = hsla_linear(bg->from.color), b = hsla_linear(bg->to.color);
+        if (bg->color_space == CUI_PLOT_COLOR_OKLAB) {
+            plot_rgb_lab(a.r, a.g, a.b, sample.from);
+            plot_rgb_lab(b.r, b.g, b.b, sample.to);
+        } else {
+            sample.from[0] = shader_srgb_encode(a.r);
+            sample.from[1] = shader_srgb_encode(a.g);
+            sample.from[2] = shader_srgb_encode(a.b);
+            sample.to[0] = shader_srgb_encode(b.r);
+            sample.to[1] = shader_srgb_encode(b.g);
+            sample.to[2] = shader_srgb_encode(b.b);
+        }
+    }
+    return sample;
+}
+static cui_plot_linear_rgba hsla_fragment(plot_hsla_sampler sample, cui_plot_point p,
+                                          double coverage) {
+    const cui_plot_hsla_background *bg = sample.background;
+    plot_background_sampler g = sample.geometry;
+    cui_plot_linear_rgba color = sample.solid;
+    if (bg->kind == CUI_PLOT_BACKGROUND_LINEAR) {
+        double position = .5 + (p.x - g.center_x) * g.x + (p.y - g.center_y) * g.y;
+        double interval = bg->to.position - bg->from.position;
+        double t = interval == 0 ? (position >= bg->to.position ? 1 : 0)
+                                 : (position - bg->from.position) / interval;
+        t = fmax(0, fmin(1, t));
+        double rgb[3];
+        if (bg->color_space == CUI_PLOT_COLOR_OKLAB)
+            plot_lab_rgb(sample.from, sample.to, t, rgb);
+        else
+            for (size_t i = 0; i < 3; i++)
+                rgb[i] = shader_srgb_decode(sample.from[i] * (1 - t) + sample.to[i] * t);
+        color = (cui_plot_linear_rgba){(float)rgb[0], (float)rgb[1], (float)rgb[2],
+                                       (float)(bg->from.color.a * (1 - t) + bg->to.color.a * t)};
+    } else if (bg->kind == CUI_PLOT_BACKGROUND_SLASH ||
+               bg->kind == CUI_PLOT_BACKGROUND_CHECKERBOARD) {
+        double x = p.x - g.center_x, y = p.y - g.center_y;
+        if (bg->kind == CUI_PLOT_BACKGROUND_CHECKERBOARD)
+            coverage *= fmax(
+                0, fmin(1, fmod(floor(x / bg->pattern_size) + floor(y / bg->pattern_size), 2)));
+        else {
+            double phase =
+                fmod(cosf(3.1415926f / 4) * x + sinf(3.1415926f / 4) * y, g.pattern_period);
+            double distance = fmin(phase, g.pattern_period - phase) - g.pattern_width;
+            coverage *= fmax(0, fmin(1, .5 - distance));
+        }
+    }
+    color.a *= (float)coverage;
+    color.r *= color.a;
+    color.g *= color.a;
+    color.b *= color.a;
+    return color;
+}
+cui_plot_result cui_plot_hsla_background_sample(const cui_plot_hsla_background *bg,
+                                                cui_plot_rect frame, cui_plot_point position,
+                                                double coverage, cui_plot_linear_rgba *out) {
+    if (!out || !hsla_background_valid(bg) || !background_frame_valid(frame) ||
+        !point_valid(position) || !isfinite(coverage) || coverage < 0 || coverage > 1)
+        return CUI_PLOT_INVALID;
+    *out = hsla_fragment(hsla_sampler(bg, frame), position, coverage);
+    return CUI_PLOT_OK;
+}
+static void linear_over(cui_plot_linear_rgba *below, cui_plot_linear_rgba above) {
+    float remainder = 1 - above.a;
+    below->r = above.r + below->r * remainder;
+    below->g = above.g + below->g * remainder;
+    below->b = above.b + below->b * remainder;
+    below->a = above.a + below->a * remainder;
+}
+cui_plot_result cui_plot_raster_hsla(cui_plot_linear_rgba *pixels, unsigned width, unsigned height,
+                                     size_t stride, size_t capacity,
+                                     const cui_plot_hsla_shape *shapes, size_t count,
+                                     cui_plot_linear_rgba clear) {
+    if (!pixels || !width || !height || width > 1024 || height > 1024 || stride < width ||
+        stride > SIZE_MAX / sizeof *pixels / height || count > 64 || (count && !shapes) ||
+        !isfinite(clear.r) || !isfinite(clear.g) || !isfinite(clear.b) || !isfinite(clear.a) ||
+        clear.a < 0 || clear.a > 1 || clear.r < 0 || clear.r > clear.a || clear.g < 0 ||
+        clear.g > clear.a || clear.b < 0 || clear.b > clear.a)
+        return CUI_PLOT_INVALID;
+    if (capacity < stride * height)
+        return CUI_PLOT_CAPACITY;
+    size_t total = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!cached_path_valid(shapes[i].path) ||
+            !background_frame_valid(shapes[i].background_frame) ||
+            !hsla_background_valid(&shapes[i].fill) || !hsla_background_valid(&shapes[i].stroke) ||
+            !isfinite(shapes[i].stroke_width) || shapes[i].stroke_width < 0 ||
+            shapes[i].stroke_width > 1024)
+            return CUI_PLOT_INVALID;
+        total += shapes[i].path.count;
+    }
+    if (total && (size_t)width * height > 64000000 / total)
+        return CUI_PLOT_CAPACITY;
+    for (unsigned y = 0; y < height; y++)
+        for (unsigned x = 0; x < width; x++)
+            pixels[y * stride + x] = clear;
+    for (size_t i = 0; i < count; i++) {
+        const cui_plot_hsla_shape *shape = shapes + i;
+        plot_hsla_sampler fill = hsla_sampler(&shape->fill, shape->background_frame);
+        plot_hsla_sampler stroke = hsla_sampler(&shape->stroke, shape->background_frame);
+        for (unsigned y = 0; y < height; y++)
+            for (unsigned x = 0; x < width; x++) {
+                bool inside, stroked;
+                raster_hits(shape->path.segments, shape->path.count, shape->path.origin, x + .5,
+                            y + .5, shape->stroke_width, &inside, &stroked);
+                cui_plot_point p = {x + .5 - shape->path.origin.x, y + .5 - shape->path.origin.y};
+                if (inside)
+                    linear_over(pixels + y * stride + x, hsla_fragment(fill, p, 1));
+                if (stroked)
+                    linear_over(pixels + y * stride + x, hsla_fragment(stroke, p, 1));
+            }
+    }
     return CUI_PLOT_OK;
 }
 

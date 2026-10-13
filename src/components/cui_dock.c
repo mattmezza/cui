@@ -1713,12 +1713,11 @@ typedef struct {
     void *host_constraints_user;
 } dock_workspace_scene;
 static cui_dock_group_constraints dock_workspace_constraints(void *user, const cui_dock *model,
-                                                              cui_dock_node node) {
+                                                             cui_dock_node node) {
     const dock_workspace_scene *scene = user;
-    cui_dock_group_constraints result = scene->host_constraints
-                                            ? scene->host_constraints(scene->host_constraints_user,
-                                                                      model, node)
-                                            : (cui_dock_group_constraints){0};
+    cui_dock_group_constraints result =
+        scene->host_constraints ? scene->host_constraints(scene->host_constraints_user, model, node)
+                                : (cui_dock_group_constraints){0};
     result.locked = true;
     return result;
 }
@@ -2372,8 +2371,8 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                             .clip = true,
                             .background = theme->background});
     if (!cui_track_bounds(ui, id, &state->bounds))
-        scene.result.error = cui_last_error(ui) == CUI_ERROR_CAPACITY ? CUI_DOCK_CAPACITY
-                                                                     : CUI_DOCK_INVALID;
+        scene.result.error =
+            cui_last_error(ui) == CUI_ERROR_CAPACITY ? CUI_DOCK_CAPACITY : CUI_DOCK_INVALID;
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Dock area"), options.view.disabled, false, 0);
     cui_set_semantic_details(ui, id,
                              (cui_semantic_details){.pointer_activatable = true, .no_focus = true});
@@ -2412,8 +2411,9 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
         else if (nodes + (request->axis == CUI_DOCK_TABS ? 0 : 2) > target->view->node_capacity ||
                  panels + 1 > target->view->panel_capacity)
             error = CUI_DOCK_CAPACITY;
-        dock_scene permission = {
-            .dock = request->source_model, .options = scene.options.view, .cross_destination = true};
+        dock_scene permission = {.dock = request->source_model,
+                                 .options = scene.options.view,
+                                 .cross_destination = true};
         if (error == CUI_DOCK_OK &&
             dock_group_constraints(scene.options.view, target->model, request->destination).locked)
             scene.result.denied = true;
@@ -2908,15 +2908,14 @@ cui_dock_area *cui_dock_area_create(cui_dock_config config, size_t panel_capacit
     area->notified_active = calloc(panel_capacity, sizeof(*area->notified_active));
     area->workspace = cui_dock_workspace_create();
     for (size_t i = 0; i < 4; i++) {
-        area->models[i] = cui_dock_create_with_root(
-            config, i ? CUI_DOCK_ROOT_ANY : CUI_DOCK_ROOT_SPLIT);
+        area->models[i] =
+            cui_dock_create_with_root(config, i ? CUI_DOCK_ROOT_ANY : CUI_DOCK_ROOT_SPLIT);
         area->views[i] = cui_dock_view_create(config.node_capacity, panel_capacity);
     }
     if (!area->descriptors || !area->panels || !area->current || !area->scratch ||
         !area->zoom_events || !area->notified || !area->notified_active || !area->workspace ||
-        !area->models[0] || !area->models[1] ||
-        !area->models[2] || !area->models[3] || !area->views[0] || !area->views[1] ||
-        !area->views[2] || !area->views[3]) {
+        !area->models[0] || !area->models[1] || !area->models[2] || !area->models[3] ||
+        !area->views[0] || !area->views[1] || !area->views[2] || !area->views[3]) {
         cui_dock_area_destroy(area);
         return NULL;
     }
@@ -2943,14 +2942,12 @@ void cui_dock_area_destroy(cui_dock_area *area) {
     free(area);
 }
 cui_dock *cui_dock_area_model(cui_dock_area *area, cui_dock_region region) {
-    return area && region >= CUI_DOCK_CENTER && region <= CUI_DOCK_BOTTOM
-               ? area->models[region]
-               : NULL;
+    return area && region >= CUI_DOCK_CENTER && region <= CUI_DOCK_BOTTOM ? area->models[region]
+                                                                          : NULL;
 }
 cui_dock_view *cui_dock_area_view(cui_dock_area *area, cui_dock_region region) {
-    return area && region >= CUI_DOCK_CENTER && region <= CUI_DOCK_BOTTOM
-               ? area->views[region]
-               : NULL;
+    return area && region >= CUI_DOCK_CENTER && region <= CUI_DOCK_BOTTOM ? area->views[region]
+                                                                          : NULL;
 }
 cui_dock_workspace *cui_dock_area_workspace(cui_dock_area *area) {
     return area ? area->workspace : NULL;
@@ -2996,25 +2993,27 @@ cui_dock_result cui_dock_area_toggle_dock(cui_dock_area *area, cui_dock_region r
         return CUI_DOCK_INVALID;
     return cui_dock_area_reconcile(area);
 }
-cui_dock_result cui_dock_area_set_dock_collapsible(cui_dock_area *area,
-                                                    cui_dock_region region, bool collapsible) {
+cui_dock_result cui_dock_area_set_dock_collapsible(cui_dock_area *area, cui_dock_region region,
+                                                   bool collapsible) {
     if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM)
         return CUI_DOCK_INVALID;
     if (!cui_dock_area_has_dock(area, region))
         return CUI_DOCK_NOT_FOUND;
     return cui_dock_workspace_set_collapsible(area->workspace, region, collapsible)
-               ? CUI_DOCK_OK : CUI_DOCK_INVALID;
+               ? CUI_DOCK_OK
+               : CUI_DOCK_INVALID;
 }
 cui_dock_result cui_dock_area_set_dock_size(cui_dock_area *area, cui_dock_region region,
-                                             float size) {
+                                            float size) {
     if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM ||
         !isfinite(size) || size <= 0 || size > 1e9f)
         return CUI_DOCK_INVALID;
     if (!cui_dock_area_has_dock(area, region))
         return CUI_DOCK_NOT_FOUND;
     return cui_dock_workspace_set_edge(area->workspace, region,
-                                        area->workspace->snapshot.open[region - 1], size)
-               ? CUI_DOCK_OK : CUI_DOCK_INVALID;
+                                       area->workspace->snapshot.open[region - 1], size)
+               ? CUI_DOCK_OK
+               : CUI_DOCK_INVALID;
 }
 cui_dock_result cui_dock_area_remove_dock(cui_dock_area *area, cui_dock_region region) {
     if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM)
@@ -3031,16 +3030,14 @@ cui_dock_result cui_dock_area_remove_dock(cui_dock_area *area, cui_dock_region r
     if (result != CUI_DOCK_OK)
         return result;
     if (zoom_descriptor != SIZE_MAX)
-        area->zoom_events[area->zoom_count++] =
-            (dock_area_zoom_event){zoom_descriptor, false};
+        area->zoom_events[area->zoom_count++] = (dock_area_zoom_event){zoom_descriptor, false};
     cui_dock_view_reset(area->views[region]);
     area->workspace->schema_present[region - 1] = false;
     area->workspace->snapshot.open[region - 1] = false;
     return cui_dock_area_reconcile(area);
 }
 cui_dock_result cui_dock_area_register(cui_dock_area *area, cui_dock_area_panel descriptor) {
-    if (!area || area->delivering ||
-        (descriptor.retain == NULL) != (descriptor.release == NULL) ||
+    if (!area || area->delivering || (descriptor.retain == NULL) != (descriptor.release == NULL) ||
         dock_area_descriptor(area, descriptor.panel.key) != SIZE_MAX)
         return CUI_DOCK_INVALID;
     if (area->descriptor_count == area->capacity)
@@ -3060,8 +3057,9 @@ cui_dock_result cui_dock_area_reconcile(cui_dock_area *area) {
         return CUI_DOCK_INVALID;
     size_t count = 0;
     for (size_t i = 0; i < 4; i++) {
-        cui_dock_result result = dock_area_fill(area, i, cui_dock_root(area->models[i]),
-                                                area->scratch, &count, i == 0 || workspace.open[i - 1]);
+        cui_dock_result result =
+            dock_area_fill(area, i, cui_dock_root(area->models[i]), area->scratch, &count,
+                           i == 0 || workspace.open[i - 1]);
         if (result != CUI_DOCK_OK)
             return result;
     }
@@ -3098,8 +3096,8 @@ static bool dock_area_region_of(const cui_dock_area *area, uint64_t key, size_t 
         }
     return false;
 }
-cui_dock_result cui_dock_area_insert(cui_dock_area *area, cui_dock_region region,
-                                      cui_dock_node tab, uint64_t key, size_t index) {
+cui_dock_result cui_dock_area_insert(cui_dock_area *area, cui_dock_region region, cui_dock_node tab,
+                                     uint64_t key, size_t index) {
     if (!area || area->delivering || region < CUI_DOCK_CENTER || region > CUI_DOCK_BOTTOM ||
         dock_area_descriptor(area, key) == SIZE_MAX)
         return CUI_DOCK_INVALID;
@@ -3120,12 +3118,10 @@ cui_dock_result cui_dock_area_remove(cui_dock_area *area, uint64_t key) {
     cui_dock_result result = cui_dock_remove(area->models[region], key);
     return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
 }
-cui_dock_result cui_dock_area_move(cui_dock_area *area, uint64_t key,
-                                    cui_dock_region destination, cui_dock_node target,
-                                    size_t index, cui_dock_kind axis, double ratio, bool before,
-                                    cui_dock_node *new_tab) {
-    if (!area || area->delivering || destination < CUI_DOCK_CENTER ||
-        destination > CUI_DOCK_BOTTOM)
+cui_dock_result cui_dock_area_move(cui_dock_area *area, uint64_t key, cui_dock_region destination,
+                                   cui_dock_node target, size_t index, cui_dock_kind axis,
+                                   double ratio, bool before, cui_dock_node *new_tab) {
+    if (!area || area->delivering || destination < CUI_DOCK_CENTER || destination > CUI_DOCK_BOTTOM)
         return CUI_DOCK_INVALID;
     size_t source;
     if (!dock_area_region_of(area, key, &source))
@@ -3137,8 +3133,8 @@ cui_dock_result cui_dock_area_move(cui_dock_area *area, uint64_t key,
     else if (axis == CUI_DOCK_TABS)
         result = cui_dock_move(area->models[source], key, target, index);
     else
-        result = cui_dock_move_split(area->models[source], key, target, axis, ratio, before,
-                                     new_tab);
+        result =
+            cui_dock_move_split(area->models[source], key, target, axis, ratio, before, new_tab);
     return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
 }
 cui_dock_result cui_dock_area_activate(cui_dock_area *area, uint64_t key) {
@@ -3157,8 +3153,8 @@ cui_dock_result cui_dock_area_set_zoom(cui_dock_area *area, uint64_t key, bool z
     if (!dock_area_region_of(area, key, &region))
         return CUI_DOCK_NOT_FOUND;
     const dock_area_location *location = dock_area_find(area->current, area->current_count, key);
-    if (!location || (zoomed && (!location->active ||
-                                  !area->panels[location->descriptor].zoomable)))
+    if (!location ||
+        (zoomed && (!location->active || !area->panels[location->descriptor].zoomable)))
         return CUI_DOCK_INVALID;
     size_t previous_region = SIZE_MAX;
     uint64_t previous_key = 0;
@@ -3184,8 +3180,7 @@ cui_dock_result cui_dock_area_set_zoom(cui_dock_area *area, uint64_t key, bool z
     if (zoomed) {
         if (!cui_dock_view_set_zoom(area->views[region], area->models[region], key, true))
             return CUI_DOCK_INVALID;
-        area->zoom_events[area->zoom_count++] =
-            (dock_area_zoom_event){location->descriptor, true};
+        area->zoom_events[area->zoom_count++] = (dock_area_zoom_event){location->descriptor, true};
     }
     return cui_dock_area_reconcile(area);
 }
@@ -3199,16 +3194,15 @@ static bool dock_area_schema_key(void *user, const cui_dock_schema_node *source,
     return context->key && context->key(context->user, source, key) &&
            dock_area_descriptor(context->area, *key) != SIZE_MAX;
 }
-cui_dock_result cui_dock_area_schema_import(cui_dock_area *area,
-                                             const cui_dock_schema_area *schema,
-                                             cui_dock_schema_key_fn key, void *user) {
+cui_dock_result cui_dock_area_schema_import(cui_dock_area *area, const cui_dock_schema_area *schema,
+                                            cui_dock_schema_key_fn key, void *user) {
     if (!area || area->delivering || !schema || !key)
         return CUI_DOCK_INVALID;
     cui_dock_region_content regions[4];
     cui_dock_area_regions(area, regions);
     dock_area_import_key context = {area, key, user};
-    cui_dock_result result = cui_dock_workspace_schema_import(
-        area->workspace, regions, schema, dock_area_schema_key, &context);
+    cui_dock_result result = cui_dock_workspace_schema_import(area->workspace, regions, schema,
+                                                              dock_area_schema_key, &context);
     return result == CUI_DOCK_OK ? cui_dock_area_reconcile(area) : result;
 }
 bool cui_dock_area_tick(cui_dock_area *area) {

@@ -1,6 +1,6 @@
 # Styled Dock
 
-The Dock view composes the portable Dock model, Tabs, Buttons and Resizable into a themed workspace. Each leaf shows an overflow-scrolling tab strip and calls only its active panel's content renderer. Nested horizontal and vertical splits use pointer and keyboard resize handles; changed ratios are written back to the model and therefore included in its serialization.
+The Dock view composes the portable Dock model, Tabs, Buttons and Resizable into a themed workspace. Each leaf shows an overflow-scrolling tab strip and calls only its active panel's content renderer. Nested horizontal and vertical splits use pointer and keyboard resize handles; changed ratios or opt-in n-ary slot sizes are written back to the model and therefore included in its serialization.
 
 This implementation was checked against the frozen GPUI Kit 0.7.1 reference, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, including `crates/component/src/dock/dock.rs`, `tab_panel.rs` and `website/component/dock.md`. It implements a specific subset, not full Dock family parity. Panel menus are implemented. Native floating windows are outside the frozen Dock API audited here. Edge regions have explicit limits described below. Programmatic `cui_dock_move` and `cui_dock_split` remain available. No platform or Clay types appear in the public API.
 
@@ -155,7 +155,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 
 | Frozen exports / presentation | CUI coverage and precise limits |
 | --- | --- |
-| `DockLayout`, `PaneTree`, `PaneNode`, `PaneRef`, `NodeId`, `PanelId`, `RootKind`, `InsertTarget`, `EditResult` | Bounded model, stable keys, node inspection, insert/move/split/reorder/remove/activate, transactional restore and normalization. Binary splits replace Rust n-ary storage; same-axis slot inspection/concrete measured sizing are available. No identical builder or optional unknown-size vector API. |
+| `DockLayout`, `PaneTree`, `PaneNode`, `PaneRef`, `NodeId`, `PanelId`, `RootKind`, `InsertTarget`, `EditResult` | Bounded model, stable keys, node inspection, insert/move/split/reorder/remove/activate, transactional restore and normalization. The default constructor preserves binary v1 layouts. The opt-in constructor supports canonical n-ary children, optional sizes, same-axis normalization and transactional v2 persistence. No identical fluent builder or selectable Rust `RootKind` policy. |
 | `DockArea`, `DockAreaRenderer`, `DockContext`, `DockEvent` | Styled view and workspace own no panels; callbacks compose ordinary CUI controls, region handles and post-edit notifications. No arbitrary renderer trait override per chrome element. |
 | `Dock`, `DockSizing`, `DockPlacement` | Retained left/right/bottom open flags and preferred sizes, bounds/minima clamping and pointer/keyboard resizing. Frozen component deliberately does not re-export base `Dock`. Opt-in bottom collapse includes its strip/live-size snapping. Per-edge collapsibility is retained and guards closing and bottom drag snapping. |
 | `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
@@ -275,7 +275,7 @@ Workspace transfers evaluate visibility against each region's model. Hiding a dr
 
 ### Concrete multi-slot sizing
 
-The frozen `layout/node.rs` exposes n-ary split children and optional pixel sizes; `layout/edit.rs::set_sizes` rejects a vector whose length differs from the child count. CUI offers a concrete measured-size subset while preserving its binary topology and v1 persistence format.
+The frozen `layout/node.rs` exposes n-ary split children and optional pixel sizes; `layout/edit.rs::set_sizes` rejects a vector whose length differs from the child count. The default constructor offers concrete measured sizing while preserving binary topology and v1 persistence. The opt-in canonical model below implements immediate n-ary children and optional sizes.
 
 `cui_dock_split_slots(model, split, slots, capacity, &count)` flattens descendants with the same axis in visual order. A tab group or opposite-axis subtree is one slot. Pass null output to query the count; insufficient capacity reports the required count and leaves output untouched. Tab nodes reject the query.
 
@@ -288,8 +288,53 @@ cui_dock_result result = cui_dock_set_slot_sizes(model, split, sizes, 3, 4);
 /* At an axis extent of 608, these widths are exact if minima allow them. */
 ```
 
-At the measured extent `sum(sizes) + (count - 1) * gap`, layout reproduces the requested sizes unless minima constrain them. At other extents the existing binary ratios govern resizing; use the same gap and adopt new measured sizes when appropriate. This is not absolute-size storage, optional unknown-size distribution or a true n-ary tree. Persisted ratios round-trip through the existing v1 format and older layouts still restore unchanged. Headless tests cover three slots with an opposite-axis subtree, gap geometry, minima precedence, query output on insufficient capacity, invalid-vector rollback and persistence.
+At the measured extent `sum(sizes) + (count - 1) * gap`, layout reproduces the requested sizes unless minima constrain them. At other extents the existing binary ratios govern resizing; use the same gap and adopt new measured sizes when appropriate. For a legacy model this remains ratio projection, rather than canonical optional-size storage. Persisted ratios round-trip through the existing v1 format and older layouts still restore unchanged. Headless tests cover three slots with an opposite-axis subtree, gap geometry, minima precedence, query output on insufficient capacity, invalid-vector rollback and persistence.
 
+
+### Opt-in canonical n-ary models
+
+Use `cui_dock_create_nary(config)` to select canonical splits. The existing `cui_dock_create(config)` keeps its binary edits and exact v1 serialization. Both use the same caller-specified bounded node/panel pools and stable panel keys. A same-axis split inserts one sibling instead of introducing another binary container; opposite-axis splits introduce a new container. `cui_dock_node_get` exposes `child_count` and `nary`; `first` and `second` remain the first two children for compatibility. Enumerate every immediate child with `cui_dock_child_at`.
+
+```c
+cui_dock *model = cui_dock_create_nary((cui_dock_config){0});
+cui_dock_node first = cui_dock_root(model), second, third;
+cui_dock_insert(model, first, 10, 0);
+cui_dock_split(model, first, CUI_DOCK_SPLIT_HORIZONTAL, .5, 20, false, &second);
+cui_dock_split(model, second, CUI_DOCK_SPLIT_HORIZONTAL, .5, 30, false, &third);
+cui_dock_node split = cui_dock_root(model);
+const cui_dock_slot_size sizes[] = {
+    {.has_size = true, .size = 100},
+    {.has_size = false},
+    {.has_size = true, .size = 200},
+};
+cui_dock_result result = cui_dock_set_sizes(model, split, sizes, 3);
+/* At width 400 and gap 4, these occupy 100, 92 and 200 pixels. */
+```
+
+Check allocations and operation results in application code. `set_sizes` requires exactly the immediate child count. Known sizes may be zero and must be finite, nonnegative and at most 1e9; unknown numeric fields are ignored. The complete vector is validated before mutation. With unknown children, known sizes reserve pixels and unknown children share remaining space. An all-known positive vector scales proportionally to the available extent; an all-zero vector shares it equally. Minima take precedence, and infeasible minima compress proportionally. `cui_dock_children_layout` returns each immediate child's bounds, aggregate minimum and visibility; a null output queries the count, and insufficient capacity leaves output untouched. Hidden children retain their stored sizes and IDs but consume no geometry or gap.
+
+Same-axis normalization follows frozen `distribute_slot`: when an outer size and every inner size are known and the inner sum is positive, inner sizes are scaled to the outer size. If any relevant size is unknown, inner sizes pass through unchanged. Surviving child IDs remain stable; a flattened container ID expires. Explicit nonzero CUI split minima retain a constraint boundary instead of flattening it. Removing a singleton container promotes its child and preserves the container's minimum. Loading does not normalize or infer pixel sizes. A split of a known slot divides its stored size using the requested ratio; splitting an unknown slot retains unknown sizes rather than inventing a measured viewport.
+
+Canonical models serialize as `CUIDOCK 2`, using `X`/`Y` splits with child counts and explicit known-size flags; tab and legacy binary node encodings remain available in v2. Restore accepts both v1 and v2 transactionally and selects the encoded editing mode. Restoring v1 into a n-ary-created object therefore resumes legacy binary editing without migration. Malformed counts, duplicate keys, invalid sizes and capacity failures preserve the previous model and output values. Legacy ratio and two-child geometry APIs reject canonical splits with more than two children using `CUI_DOCK_INVALID`; use `set_sizes`/`children_layout` instead. `cui_dock_balance` assigns equal canonical weights, or the legacy .5 ratio.
+
+The styled adapter submits one real Resizable handle per visible adjacent child pair; `cui_dock_resize_id_at` identifies a handle by its preceding child index. Pointer and keyboard changes persist accepted measured sizes; merely rendering at a new viewport does not overwrite stored optional sizes. Cancellation ends capture while retaining the last accepted live size, matching the source resize interaction. Disabled state and operation policies block changes. Topology/visibility changes invalidate held splitter state. View capacity checks remain conservative for split gestures: reserve two spare cache entries even when a canonical sibling insertion would need only one model node.
+
+Headless checks cover three-child geometry, unknown/zero sizes, minimum compression, nested same/opposite-axis normalization, malformed v2 rollback, exact v1 round trips, full-capacity two-model rejection and 7,000 random edits in each mode. Styled tests exercise the second divider, cancellation, disabled/policy rejection, hidden siblings and edge split/merge with unchanged child counts.
+
+### Frozen method-family mapping
+
+The export-family table above is complemented by these operation mappings. CUI exposes portable operations rather than Rust entity types or method signatures.
+
+| Frozen method family | CUI operation / limit |
+| --- | --- |
+| `PaneTree` node/panel lookup, root, insert/remove/move/split, active selection, sizes and normalization | `root`, `node_get`, `child_at`, panel queries, `insert`, `remove`, `move`, `move_split`, `split`, `activate`, `set_sizes`; canonical same-axis normalization is automatic after edits. Rust selectable root-kind preservation is not exposed. |
+| `PanelBuilder` horizontal/vertical splits, child optional sizes, tabs and active index | Compose canonical model operations and `set_sizes`; no fluent builder or direct serde tree import. |
+| `DockArea` center/edge installation, open/toggle/collapsible, add/remove/select/move, zoom, dump/load | Workspace descriptors and edge setters/snapshot plus model/view operations; hosts supply independent models and caller-owned factory payload records. |
+| `TabGroup` sealed/in-split constraints, active/displayed panel, close/zoom and renderer | Group constraint constructors/callback, visibility-aware queries, real view controls, menu/policy callbacks and scene callbacks. |
+| `Panel` visible, closable, zoomable, title/style/suffix, toolbar, menu, focus and lifecycle | Borrowed descriptors and presentation callbacks, visibility predicate, factory/dump helpers and caller-owned lifecycle reconciliation. Per-title chrome palette remains absent. |
+| `DockSizing` bounds/minima, pointer resize, collapsed-bottom reopen | Retained workspace handles, minimum compression and collapsibility flags; no native window creation. |
+
+Lifecycle reconciliation is explicitly deferred and net-state based; it does not reproduce every synchronous Rust entity arrival or intermediate zoom event. Panel payload envelopes are caller-owned and are not a compatible implementation of the frozen serde JSON schema. These remaining differences prevent a full Dock-family parity claim.
 
 ### Caller-owned panel reconstruction and payloads
 

@@ -15,6 +15,9 @@ typedef struct {
     cui_dock_kind kind;
     size_t parent, a, b, first, last, active, count;
     double ratio, minw, minh;
+    bool canonical, has_size;
+    size_t sibling_prev, sibling_next, child_count;
+    double size;
 } cui_dock_private_node;
 typedef struct {
     bool used;
@@ -31,6 +34,7 @@ struct cui_dock {
     cui_dock_private_state state, scratch;
     uint32_t generation;
     size_t memory_bytes;
+    bool nary_edits;
 };
 static size_t cui_dock_private_node_index(const cui_dock *d, cui_dock_node id) {
     size_t n = (size_t)(uint32_t)id;
@@ -74,7 +78,76 @@ static void cui_dock_private_init_node(cui_dock_private_state *s, size_t n, uint
                                           .first = SIZE_MAX,
                                           .last = SIZE_MAX,
                                           .active = SIZE_MAX,
-                                          .ratio = 0.5};
+                                          .ratio = 0.5,
+                                          .sibling_prev = SIZE_MAX,
+                                          .sibling_next = SIZE_MAX};
+}
+static size_t cui_dock_private_child_count(const cui_dock_private_node *n) {
+    return n->kind == CUI_DOCK_TABS ? 0 : n->canonical ? n->child_count : 2;
+}
+static size_t cui_dock_private_next_child(const cui_dock_private_state *s, size_t parent,
+                                          size_t child) {
+    const cui_dock_private_node *n = &s->nodes[parent];
+    return n->canonical ? s->nodes[child].sibling_next : child == n->a ? n->b : SIZE_MAX;
+}
+static void cui_dock_private_replace_child(cui_dock_private_state *s, size_t parent, size_t old,
+                                           size_t replacement) {
+    if (parent == SIZE_MAX) {
+        s->root = replacement;
+        s->nodes[replacement].parent = SIZE_MAX;
+        return;
+    }
+    cui_dock_private_node *p = &s->nodes[parent], *r = &s->nodes[replacement], *o = &s->nodes[old];
+    r->parent = parent;
+    if (!p->canonical) {
+        if (p->a == old)
+            p->a = replacement;
+        else
+            p->b = replacement;
+        return;
+    }
+    r->sibling_prev = o->sibling_prev;
+    r->sibling_next = o->sibling_next;
+    r->has_size = o->has_size;
+    r->size = o->size;
+    if (o->sibling_prev != SIZE_MAX)
+        s->nodes[o->sibling_prev].sibling_next = replacement;
+    else
+        p->a = replacement;
+    if (o->sibling_next != SIZE_MAX)
+        s->nodes[o->sibling_next].sibling_prev = replacement;
+    else
+        p->b = replacement;
+}
+static void cui_dock_private_insert_child(cui_dock_private_state *s, size_t parent, size_t child,
+                                          size_t before) {
+    cui_dock_private_node *p = &s->nodes[parent], *c = &s->nodes[child];
+    size_t previous = before == SIZE_MAX ? p->b : s->nodes[before].sibling_prev;
+    c->parent = parent;
+    c->sibling_prev = previous;
+    c->sibling_next = before;
+    if (previous == SIZE_MAX)
+        p->a = child;
+    else
+        s->nodes[previous].sibling_next = child;
+    if (before == SIZE_MAX)
+        p->b = child;
+    else
+        s->nodes[before].sibling_prev = child;
+    p->child_count++;
+}
+static void cui_dock_private_remove_child(cui_dock_private_state *s, size_t parent, size_t child) {
+    cui_dock_private_node *p = &s->nodes[parent], *c = &s->nodes[child];
+    if (c->sibling_prev == SIZE_MAX)
+        p->a = c->sibling_next;
+    else
+        s->nodes[c->sibling_prev].sibling_next = c->sibling_next;
+    if (c->sibling_next == SIZE_MAX)
+        p->b = c->sibling_prev;
+    else
+        s->nodes[c->sibling_next].sibling_prev = c->sibling_prev;
+    p->child_count--;
+    c->sibling_prev = c->sibling_next = SIZE_MAX;
 }
 static bool cui_dock_private_dimension(double x) {
     return isfinite(x) && x >= 0 && x <= CUI_DOCK_PRIVATE_MAX_DIMENSION;
@@ -119,6 +192,12 @@ cui_dock *cui_dock_create(cui_dock_config c) {
     d->state.root = 0;
     return d;
 }
+cui_dock *cui_dock_create_nary(cui_dock_config config) {
+    cui_dock *d = cui_dock_create(config);
+    if (d)
+        d->nary_edits = true;
+    return d;
+}
 void cui_dock_destroy(cui_dock *d) {
     if (d) {
         free(d->state.nodes);
@@ -141,17 +220,20 @@ bool cui_dock_node_get(const cui_dock *d, cui_dock_node id, cui_dock_node_info *
     if (i == SIZE_MAX)
         return false;
     const cui_dock_private_node *n = &d->state.nodes[i];
-    *out = (cui_dock_node_info){id,
-                                cui_dock_private_id(&d->state, n->parent),
-                                cui_dock_private_id(&d->state, n->a),
-                                cui_dock_private_id(&d->state, n->b),
-                                n->kind,
-                                n->ratio,
-                                n->minw,
-                                n->minh,
-                                n->count,
-                                n->active != SIZE_MAX,
-                                n->active != SIZE_MAX ? d->state.panels[n->active].key : 0};
+    *out = (cui_dock_node_info){
+        id,
+        cui_dock_private_id(&d->state, n->parent),
+        cui_dock_private_id(&d->state, n->a),
+        cui_dock_private_id(&d->state, n->canonical ? d->state.nodes[n->a].sibling_next : n->b),
+        n->kind,
+        n->ratio,
+        n->minw,
+        n->minh,
+        n->count,
+        n->active != SIZE_MAX,
+        n->active != SIZE_MAX ? d->state.panels[n->active].key : 0,
+        cui_dock_private_child_count(n),
+        n->canonical};
     return true;
 }
 bool cui_dock_panel_at(const cui_dock *d, cui_dock_node id, size_t index, uint64_t *key) {
@@ -223,16 +305,21 @@ static void cui_dock_private_collapse(cui_dock_private_state *s, size_t n) {
     cui_dock_private_node *t = &s->nodes[n];
     if (t->count || n == s->root)
         return;
-    size_t parent = t->parent,
-           sibling = s->nodes[parent].a == n ? s->nodes[parent].b : s->nodes[parent].a,
-           grand = s->nodes[parent].parent;
-    s->nodes[sibling].parent = grand;
-    if (grand == SIZE_MAX)
-        s->root = sibling;
-    else if (s->nodes[grand].a == parent)
-        s->nodes[grand].a = sibling;
-    else
-        s->nodes[grand].b = sibling;
+    size_t parent = t->parent;
+    if (s->nodes[parent].canonical) {
+        cui_dock_private_remove_child(s, parent, n);
+        t->used = false;
+        if (s->nodes[parent].child_count == 1) {
+            size_t only = s->nodes[parent].a;
+            s->nodes[only].minw = fmax(s->nodes[only].minw, s->nodes[parent].minw);
+            s->nodes[only].minh = fmax(s->nodes[only].minh, s->nodes[parent].minh);
+            cui_dock_private_replace_child(s, s->nodes[parent].parent, parent, only);
+            s->nodes[parent].used = false;
+        }
+        return;
+    }
+    size_t sibling = s->nodes[parent].a == n ? s->nodes[parent].b : s->nodes[parent].a;
+    cui_dock_private_replace_child(s, s->nodes[parent].parent, parent, sibling);
     t->used = false;
     s->nodes[parent].used = false;
 }
@@ -257,6 +344,40 @@ cui_dock_result cui_dock_insert(cui_dock *d, cui_dock_node id, uint64_t key, siz
     cui_dock_private_attach(&d->state, p, n, index);
     return CUI_DOCK_OK;
 }
+static void cui_dock_private_normalize(cui_dock_private_state *s, size_t node) {
+    cui_dock_private_node *n = &s->nodes[node];
+    if (n->kind == CUI_DOCK_TABS)
+        return;
+    for (size_t child = n->a; child != SIZE_MAX;
+         child = cui_dock_private_next_child(s, node, child))
+        cui_dock_private_normalize(s, child);
+    if (!n->canonical)
+        return;
+    size_t child = n->a;
+    while (child != SIZE_MAX) {
+        cui_dock_private_node *c = &s->nodes[child];
+        size_t next = c->sibling_next;
+        if (c->canonical && c->kind == n->kind && !c->minw && !c->minh) {
+            bool all_known = true;
+            double total = 0;
+            for (size_t inner = c->a; inner != SIZE_MAX; inner = s->nodes[inner].sibling_next) {
+                all_known &= s->nodes[inner].has_size;
+                total += s->nodes[inner].size;
+            }
+            size_t inner = c->a;
+            while (inner != SIZE_MAX) {
+                size_t inner_next = s->nodes[inner].sibling_next;
+                if (c->has_size && all_known && total > 0)
+                    s->nodes[inner].size *= c->size / total;
+                cui_dock_private_insert_child(s, node, inner, child);
+                inner = inner_next;
+            }
+            cui_dock_private_remove_child(s, node, child);
+            c->used = false;
+        }
+        child = next;
+    }
+}
 cui_dock_result cui_dock_split(cui_dock *d, cui_dock_node id, cui_dock_kind axis, double ratio,
                                uint64_t key, bool before, cui_dock_node *out) {
     if (!d || !cui_dock_private_ratio(ratio) ||
@@ -269,6 +390,27 @@ cui_dock_result cui_dock_split(cui_dock *d, cui_dock_node id, cui_dock_kind axis
         return CUI_DOCK_INVALID;
     if (cui_dock_private_find_panel(d, &d->state, key) != SIZE_MAX)
         return CUI_DOCK_DUPLICATE_PANEL;
+    size_t existing_parent = d->state.nodes[n].parent;
+    if (d->nary_edits && existing_parent != SIZE_MAX && d->state.nodes[existing_parent].canonical &&
+        d->state.nodes[existing_parent].kind == axis) {
+        size_t child = cui_dock_private_free_node(d, &d->state),
+               panel = cui_dock_private_free_panel(d, &d->state);
+        if (child == SIZE_MAX || panel == SIZE_MAX || d->generation == UINT32_MAX)
+            return CUI_DOCK_CAPACITY;
+        cui_dock_private_init_node(&d->state, child, ++d->generation, existing_parent);
+        double old_size = d->state.nodes[n].size;
+        d->state.nodes[child].has_size = d->state.nodes[n].has_size;
+        d->state.nodes[child].size = old_size * (before ? ratio : 1 - ratio);
+        d->state.nodes[n].size = old_size * (before ? 1 - ratio : ratio);
+        size_t before_node = before ? n : d->state.nodes[n].sibling_next;
+        cui_dock_private_insert_child(&d->state, existing_parent, child, before_node);
+        d->state.panels[panel] = (cui_dock_private_panel){.used = true, .key = key};
+        cui_dock_private_attach(&d->state, panel, child, 0);
+        cui_dock_private_normalize(&d->state, d->state.root);
+        if (out)
+            *out = cui_dock_private_id(&d->state, child);
+        return CUI_DOCK_OK;
+    }
     size_t depth = 1;
     for (size_t p = d->state.nodes[n].parent; p != SIZE_MAX; p = d->state.nodes[p].parent)
         depth++;
@@ -289,17 +431,24 @@ cui_dock_result cui_dock_split(cui_dock *d, cui_dock_node id, cui_dock_kind axis
     cui_dock_private_init_node(&d->state, b, ++d->generation, a);
     d->state.nodes[a].kind = axis;
     d->state.nodes[a].ratio = ratio;
-    d->state.nodes[a].a = before ? b : n;
-    d->state.nodes[a].b = before ? n : b;
-    d->state.nodes[n].parent = a;
-    if (parent == SIZE_MAX)
-        d->state.root = a;
-    else if (d->state.nodes[parent].a == n)
-        d->state.nodes[parent].a = a;
-    else
-        d->state.nodes[parent].b = a;
+    cui_dock_private_replace_child(&d->state, parent, n, a);
+    d->state.nodes[a].canonical = d->nary_edits;
+    if (d->nary_edits) {
+        d->state.nodes[a].a = d->state.nodes[a].b = SIZE_MAX;
+        cui_dock_private_insert_child(&d->state, a, before ? b : n, SIZE_MAX);
+        cui_dock_private_insert_child(&d->state, a, before ? n : b, SIZE_MAX);
+        d->state.nodes[n].has_size = d->state.nodes[b].has_size = true;
+        d->state.nodes[n].size = before ? 1 - ratio : ratio;
+        d->state.nodes[b].size = before ? ratio : 1 - ratio;
+    } else {
+        d->state.nodes[a].a = before ? b : n;
+        d->state.nodes[a].b = before ? n : b;
+        d->state.nodes[n].parent = a;
+    }
     d->state.panels[p] = (cui_dock_private_panel){.used = true, .key = key};
     cui_dock_private_attach(&d->state, p, b, 0);
+    if (d->nary_edits)
+        cui_dock_private_normalize(&d->state, d->state.root);
     if (out)
         *out = cui_dock_private_id(&d->state, b);
     return CUI_DOCK_OK;
@@ -325,6 +474,8 @@ cui_dock_result cui_dock_move(cui_dock *d, uint64_t key, cui_dock_node id, size_
         d->state.nodes[n].active = p;
     if (old != n)
         cui_dock_private_collapse(&d->state, old);
+    if (d->nary_edits)
+        cui_dock_private_normalize(&d->state, d->state.root);
     return CUI_DOCK_OK;
 }
 cui_dock_result cui_dock_move_split(cui_dock *d, uint64_t key, cui_dock_node destination,
@@ -435,6 +586,8 @@ cui_dock_result cui_dock_remove(cui_dock *d, uint64_t key) {
     cui_dock_private_detach(&d->state, p);
     d->state.panels[p].used = false;
     cui_dock_private_collapse(&d->state, n);
+    if (d->nary_edits)
+        cui_dock_private_normalize(&d->state, d->state.root);
     return CUI_DOCK_OK;
 }
 cui_dock_result cui_dock_activate(cui_dock *d, uint64_t key) {
@@ -454,15 +607,47 @@ cui_dock_result cui_dock_set_ratio(cui_dock *d, cui_dock_node id, double ratio) 
         return CUI_DOCK_NOT_FOUND;
     if (d->state.nodes[n].kind == CUI_DOCK_TABS)
         return CUI_DOCK_INVALID;
+    if (d->state.nodes[n].canonical) {
+        if (d->state.nodes[n].child_count != 2)
+            return CUI_DOCK_INVALID;
+        size_t a = d->state.nodes[n].a, b = d->state.nodes[n].b;
+        double total =
+            fmin(CUI_DOCK_PRIVATE_MAX_DIMENSION, d->state.nodes[a].size + d->state.nodes[b].size);
+        if (!(total > 0))
+            total = 1;
+        d->state.nodes[a].has_size = d->state.nodes[b].has_size = true;
+        d->state.nodes[a].size = total * ratio;
+        d->state.nodes[b].size = total * (1 - ratio);
+    }
     d->state.nodes[n].ratio = ratio;
+    return CUI_DOCK_OK;
+}
+cui_dock_result cui_dock_balance(cui_dock *d, cui_dock_node id) {
+    if (!d)
+        return CUI_DOCK_INVALID;
+    size_t n = cui_dock_private_node_index(d, id);
+    if (n == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    if (d->state.nodes[n].kind == CUI_DOCK_TABS)
+        return CUI_DOCK_INVALID;
+    if (!d->state.nodes[n].canonical)
+        return cui_dock_set_ratio(d, id, .5);
+    for (size_t child = d->state.nodes[n].a; child != SIZE_MAX;
+         child = d->state.nodes[child].sibling_next) {
+        d->state.nodes[child].has_size = true;
+        d->state.nodes[child].size = 1;
+    }
     return CUI_DOCK_OK;
 }
 static size_t cui_dock_private_slot_count(const cui_dock_private_state *s, size_t n,
                                           cui_dock_kind axis) {
     if (s->nodes[n].kind != axis)
         return 1;
-    return cui_dock_private_slot_count(s, s->nodes[n].a, axis) +
-           cui_dock_private_slot_count(s, s->nodes[n].b, axis);
+    size_t count = 0;
+    for (size_t child = s->nodes[n].a; child != SIZE_MAX;
+         child = cui_dock_private_next_child(s, n, child))
+        count += cui_dock_private_slot_count(s, child, axis);
+    return count;
 }
 static void cui_dock_private_slots(const cui_dock_private_state *s, size_t n, cui_dock_kind axis,
                                    cui_dock_node *out, size_t *i) {
@@ -470,8 +655,9 @@ static void cui_dock_private_slots(const cui_dock_private_state *s, size_t n, cu
         out[(*i)++] = cui_dock_private_id(s, n);
         return;
     }
-    cui_dock_private_slots(s, s->nodes[n].a, axis, out, i);
-    cui_dock_private_slots(s, s->nodes[n].b, axis, out, i);
+    for (size_t child = s->nodes[n].a; child != SIZE_MAX;
+         child = cui_dock_private_next_child(s, n, child))
+        cui_dock_private_slots(s, child, axis, out, i);
 }
 cui_dock_result cui_dock_split_slots(const cui_dock *d, cui_dock_node id, cui_dock_node *out,
                                      size_t capacity, size_t *count) {
@@ -497,6 +683,19 @@ static double cui_dock_private_adopt_sizes(cui_dock_private_state *s, size_t n, 
                                            const double *sizes, size_t *i, double gap) {
     if (s->nodes[n].kind != axis)
         return sizes[(*i)++];
+    if (s->nodes[n].canonical) {
+        double total = 0;
+        size_t count = 0;
+        for (size_t child = s->nodes[n].a; child != SIZE_MAX;
+             child = cui_dock_private_next_child(s, n, child)) {
+            double span = cui_dock_private_adopt_sizes(s, child, axis, sizes, i, gap);
+            s->nodes[child].has_size = true;
+            s->nodes[child].size = span;
+            total += span;
+            count++;
+        }
+        return total + (count - 1) * gap;
+    }
     double a = cui_dock_private_adopt_sizes(s, s->nodes[n].a, axis, sizes, i, gap);
     double b = cui_dock_private_adopt_sizes(s, s->nodes[n].b, axis, sizes, i, gap);
     s->nodes[n].ratio = a / (a + b);
@@ -523,6 +722,10 @@ cui_dock_result cui_dock_set_slot_sizes(cui_dock *d, cui_dock_node id, const dou
         if (trial.state.nodes[j].used && trial.state.nodes[j].kind != CUI_DOCK_TABS &&
             !cui_dock_private_ratio(trial.state.nodes[j].ratio))
             return CUI_DOCK_INVALID;
+    for (size_t j = 0; j < d->config.node_capacity; j++)
+        if (trial.state.nodes[j].used && trial.state.nodes[j].has_size &&
+            !cui_dock_private_dimension(trial.state.nodes[j].size))
+            return CUI_DOCK_INVALID;
     cui_dock_private_commit(d, &trial);
     return CUI_DOCK_OK;
 }
@@ -536,6 +739,47 @@ cui_dock_result cui_dock_set_minimum(cui_dock *d, cui_dock_node id, double w, do
     d->state.nodes[n].minh = h == 0 ? 0 : h;
     return CUI_DOCK_OK;
 }
+bool cui_dock_child_at(const cui_dock *d, cui_dock_node id, size_t index, cui_dock_node *out,
+                       cui_dock_slot_size *size) {
+    if (!d)
+        return false;
+    size_t node = cui_dock_private_node_index(d, id);
+    if (node == SIZE_MAX || index >= cui_dock_private_child_count(&d->state.nodes[node]))
+        return false;
+    size_t child = d->state.nodes[node].a;
+    while (index--)
+        child = cui_dock_private_next_child(&d->state, node, child);
+    if (out)
+        *out = cui_dock_private_id(&d->state, child);
+    if (size)
+        *size =
+            (cui_dock_slot_size){d->state.nodes[node].canonical && d->state.nodes[child].has_size,
+                                 d->state.nodes[node].canonical && d->state.nodes[child].has_size
+                                     ? d->state.nodes[child].size
+                                     : 0};
+    return true;
+}
+cui_dock_result cui_dock_set_sizes(cui_dock *d, cui_dock_node id, const cui_dock_slot_size *sizes,
+                                   size_t count) {
+    if (!d || !sizes)
+        return CUI_DOCK_INVALID;
+    size_t n = cui_dock_private_node_index(d, id);
+    if (n == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    if (!d->state.nodes[n].canonical || count != d->state.nodes[n].child_count)
+        return CUI_DOCK_INVALID;
+    for (size_t i = 0; i < count; i++)
+        if (sizes[i].has_size && !cui_dock_private_dimension(sizes[i].size))
+            return CUI_DOCK_INVALID;
+    size_t child = d->state.nodes[n].a;
+    for (size_t i = 0; i < count; i++) {
+        d->state.nodes[child].has_size = sizes[i].has_size;
+        d->state.nodes[child].size = sizes[i].has_size ? sizes[i].size : 0;
+        child = d->state.nodes[child].sibling_next;
+    }
+    cui_dock_private_normalize(&d->state, d->state.root);
+    return CUI_DOCK_OK;
+}
 typedef struct {
     double w, h;
     size_t tabs;
@@ -543,15 +787,31 @@ typedef struct {
 static cui_dock_private_minimum cui_dock_private_min(const cui_dock_private_state *s, size_t i,
                                                      double gap) {
     const cui_dock_private_node *n = &s->nodes[i];
-    if (n->kind == CUI_DOCK_TABS)
+    if (n->kind == CUI_DOCK_TABS) {
         return (cui_dock_private_minimum){n->minw, n->minh, 1};
-    cui_dock_private_minimum a = cui_dock_private_min(s, n->a, gap),
-                             b = cui_dock_private_min(s, n->b, gap);
-    return (cui_dock_private_minimum){
-        fmax(n->minw, n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? a.w + b.w + gap : fmax(a.w, b.w)),
-        fmax(n->minh, n->kind == CUI_DOCK_SPLIT_VERTICAL ? a.h + b.h + gap : fmax(a.h, b.h)),
-        a.tabs + b.tabs};
+    }
+    cui_dock_private_minimum min = {0};
+    size_t count = 0;
+    for (size_t child = n->a; child != SIZE_MAX; child = cui_dock_private_next_child(s, i, child)) {
+        cui_dock_private_minimum c = cui_dock_private_min(s, child, gap);
+        min.w = n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? min.w + c.w : fmax(min.w, c.w);
+        min.h = n->kind == CUI_DOCK_SPLIT_VERTICAL ? min.h + c.h : fmax(min.h, c.h);
+        min.tabs += c.tabs;
+        count++;
+    }
+    if (count > 1) {
+        if (n->kind == CUI_DOCK_SPLIT_HORIZONTAL)
+            min.w += (count - 1) * gap;
+        else
+            min.h += (count - 1) * gap;
+    }
+    min.w = fmax(min.w, n->minw);
+    min.h = fmax(min.h, n->minh);
+    return min;
 }
+static void cui_dock_private_children_geometry(const cui_dock *, size_t, cui_rect, double,
+                                               cui_dock_visibility_fn, void *, bool,
+                                               cui_dock_child_geometry *);
 static cui_dock_split_geometry cui_dock_private_split(const cui_dock_private_state *s, size_t i,
                                                       cui_rect r, double gap) {
     const cui_dock_private_node *n = &s->nodes[i];
@@ -580,19 +840,31 @@ static cui_dock_split_geometry cui_dock_private_split(const cui_dock_private_sta
                                      .second_minimum = {(float)b.w, (float)b.h},
                                      .fit_minimum = ma + mb <= available};
 }
-static void cui_dock_private_geometry(const cui_dock_private_state *s, size_t i, cui_rect r,
-                                      double gap, cui_dock_geometry *out, size_t *at) {
+static cui_dock_result cui_dock_private_geometry(const cui_dock *d, size_t i, cui_rect r,
+                                                 double gap, cui_dock_geometry *out, size_t *at) {
+    const cui_dock_private_state *s = &d->state;
     const cui_dock_private_node *n = &s->nodes[i];
     if (n->kind == CUI_DOCK_TABS) {
         out[(*at)++] =
             (cui_dock_geometry){cui_dock_private_id(s, i), r, n->count, n->active != SIZE_MAX,
                                 n->active != SIZE_MAX ? s->panels[n->active].key : 0};
-        return;
+        return CUI_DOCK_OK;
     }
-    cui_dock_split_geometry split = cui_dock_private_split(s, i, r, gap);
-    cui_rect ra = split.first, rb = split.second;
-    cui_dock_private_geometry(s, n->a, ra, gap, out, at);
-    cui_dock_private_geometry(s, n->b, rb, gap, out, at);
+    size_t count = cui_dock_private_child_count(n);
+    cui_dock_child_geometry *children = calloc(count, sizeof(*children));
+    if (!children)
+        return CUI_DOCK_CAPACITY;
+    cui_dock_private_children_geometry(d, i, r, gap, NULL, NULL, false, children);
+    size_t child = n->a;
+    cui_dock_result result = CUI_DOCK_OK;
+    for (size_t j = 0; j < count; j++) {
+        result = cui_dock_private_geometry(d, child, children[j].bounds, gap, out, at);
+        if (result != CUI_DOCK_OK)
+            break;
+        child = cui_dock_private_next_child(s, i, child);
+    }
+    free(children);
+    return result;
 }
 cui_dock_result cui_dock_split_layout(const cui_dock *d, cui_dock_node id, cui_rect r, float gap,
                                       cui_dock_split_geometry *out) {
@@ -605,6 +877,17 @@ cui_dock_result cui_dock_split_layout(const cui_dock *d, cui_dock_node id, cui_r
         return CUI_DOCK_NOT_FOUND;
     if (d->state.nodes[node].kind == CUI_DOCK_TABS)
         return CUI_DOCK_INVALID;
+    if (d->state.nodes[node].canonical) {
+        if (d->state.nodes[node].child_count != 2)
+            return CUI_DOCK_INVALID;
+        cui_dock_child_geometry children[2];
+        cui_dock_private_children_geometry(d, node, r, gap, NULL, NULL, false, children);
+        cui_dock_private_minimum min = cui_dock_private_min(&d->state, node, gap);
+        *out =
+            (cui_dock_split_geometry){children[0].bounds, children[1].bounds, children[0].minimum,
+                                      children[1].minimum, r.w >= min.w && r.h >= min.h};
+        return CUI_DOCK_OK;
+    }
     *out = cui_dock_private_split(&d->state, node, r, gap);
     return CUI_DOCK_OK;
 }
@@ -623,39 +906,64 @@ cui_dock_result cui_dock_layout(const cui_dock *d, cui_rect r, float gap, cui_do
         return CUI_DOCK_OK;
     if (capacity < min.tabs)
         return CUI_DOCK_CAPACITY;
+    cui_dock_geometry *staged = calloc(min.tabs, sizeof(*staged));
+    if (!staged && min.tabs)
+        return CUI_DOCK_CAPACITY;
     size_t at = 0;
-    cui_dock_private_geometry(&d->state, d->state.root, r, gap, out, &at);
-    return CUI_DOCK_OK;
+    cui_dock_result result = cui_dock_private_geometry(d, d->state.root, r, gap, staged, &at);
+    if (result == CUI_DOCK_OK)
+        memcpy(out, staged, min.tabs * sizeof(*out));
+    free(staged);
+    return result;
 }
 static cui_dock_private_minimum cui_dock_private_visible_min(const cui_dock *d, size_t i,
                                                              double gap,
                                                              cui_dock_visibility_fn visible,
                                                              void *user) {
-    const cui_dock_private_node *n = &d->state.nodes[i];
+    const cui_dock_private_state *s = &d->state;
+    const cui_dock_private_node *n = &s->nodes[i];
     if (n->kind == CUI_DOCK_TABS) {
-        if (!cui_dock_visible_count(d, cui_dock_private_id(&d->state, i), visible, user))
+        if (!cui_dock_visible_count(d, cui_dock_private_id(s, i), visible, user))
             return (cui_dock_private_minimum){0};
         return (cui_dock_private_minimum){n->minw, n->minh, 1};
     }
-    cui_dock_private_minimum a = cui_dock_private_visible_min(d, n->a, gap, visible, user),
-                             b = cui_dock_private_visible_min(d, n->b, gap, visible, user);
-    if (!a.tabs && !b.tabs)
-        return (cui_dock_private_minimum){0};
-    if (!a.tabs || !b.tabs) {
-        cui_dock_private_minimum survivor = a.tabs ? a : b;
-        survivor.w = fmax(survivor.w, n->minw);
-        survivor.h = fmax(survivor.h, n->minh);
-        return survivor;
+    cui_dock_private_minimum min = {0};
+    size_t count = 0;
+    for (size_t child = n->a; child != SIZE_MAX; child = cui_dock_private_next_child(s, i, child)) {
+        cui_dock_private_minimum c = cui_dock_private_visible_min(d, child, gap, visible, user);
+        if (!c.tabs)
+            continue;
+        min.w = n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? min.w + c.w : fmax(min.w, c.w);
+        min.h = n->kind == CUI_DOCK_SPLIT_VERTICAL ? min.h + c.h : fmax(min.h, c.h);
+        min.tabs += c.tabs;
+        count++;
     }
-    return (cui_dock_private_minimum){
-        fmax(n->minw, n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? a.w + b.w + gap : fmax(a.w, b.w)),
-        fmax(n->minh, n->kind == CUI_DOCK_SPLIT_VERTICAL ? a.h + b.h + gap : fmax(a.h, b.h)),
-        a.tabs + b.tabs};
+    if (!count)
+        return min;
+    if (count > 1) {
+        if (n->kind == CUI_DOCK_SPLIT_HORIZONTAL)
+            min.w += (count - 1) * gap;
+        else
+            min.h += (count - 1) * gap;
+    }
+    min.w = fmax(min.w, n->minw);
+    min.h = fmax(min.h, n->minh);
+    return min;
 }
 static cui_dock_visible_split_geometry
 cui_dock_private_visible_split(const cui_dock *d, size_t i, cui_rect r, double gap,
                                cui_dock_visibility_fn visible, void *user) {
     const cui_dock_private_node *n = &d->state.nodes[i];
+    if (n->canonical) {
+        cui_dock_child_geometry children[2];
+        cui_dock_private_children_geometry(d, i, r, gap, visible, user, true, children);
+        cui_dock_private_minimum min = cui_dock_private_visible_min(d, i, gap, visible, user);
+        return (cui_dock_visible_split_geometry){
+            .geometry = {children[0].bounds, children[1].bounds, children[0].minimum,
+                         children[1].minimum, r.w >= min.w && r.h >= min.h},
+            .first_visible = children[0].visible,
+            .second_visible = children[1].visible};
+    }
     cui_dock_private_minimum a = cui_dock_private_visible_min(d, n->a, gap, visible, user),
                              b = cui_dock_private_visible_min(d, n->b, gap, visible, user);
     cui_dock_visible_split_geometry result = {
@@ -695,6 +1003,93 @@ cui_dock_private_visible_split(const cui_dock *d, size_t i, cui_rect r, double g
     result.geometry.fit_minimum = ma + mb <= available;
     return result;
 }
+static void cui_dock_private_children_geometry(const cui_dock *d, size_t node, cui_rect r,
+                                               double gap, cui_dock_visibility_fn visible,
+                                               void *user, bool filtered,
+                                               cui_dock_child_geometry *out) {
+    const cui_dock_private_node *n = &d->state.nodes[node];
+    if (!n->canonical) {
+        cui_dock_split_geometry geometry;
+        bool a = true, b = true;
+        if (filtered) {
+            cui_dock_visible_split_geometry value =
+                cui_dock_private_visible_split(d, node, r, gap, visible, user);
+            geometry = value.geometry;
+            a = value.first_visible;
+            b = value.second_visible;
+        } else
+            geometry = cui_dock_private_split(&d->state, node, r, gap);
+        out[0] = (cui_dock_child_geometry){cui_dock_private_id(&d->state, n->a), geometry.first,
+                                           geometry.first_minimum, a};
+        out[1] = (cui_dock_child_geometry){cui_dock_private_id(&d->state, n->b), geometry.second,
+                                           geometry.second_minimum, b};
+        return;
+    }
+    bool horizontal = n->kind == CUI_DOCK_SPLIT_HORIZONTAL;
+    size_t nv = 0, unknown = 0, index = 0;
+    double known = 0, minsum = 0;
+    for (size_t child = n->a; child != SIZE_MAX; child = d->state.nodes[child].sibling_next) {
+        cui_dock_private_minimum min =
+            filtered ? cui_dock_private_visible_min(d, child, gap, visible, user)
+                     : cui_dock_private_min(&d->state, child, gap);
+        bool present = min.tabs != 0;
+        out[index++] = (cui_dock_child_geometry){.node = cui_dock_private_id(&d->state, child),
+                                                 .minimum = {(float)min.w, (float)min.h},
+                                                 .visible = present};
+        if (present) {
+            nv++;
+            minsum += horizontal ? min.w : min.h;
+            if (d->state.nodes[child].has_size)
+                known += d->state.nodes[child].size;
+            else
+                unknown++;
+        }
+    }
+    double extent = horizontal ? r.w : r.h;
+    double g = nv > 1 ? fmin(gap, extent / (nv - 1)) : 0;
+    double available = fmax(0, extent - (nv ? nv - 1 : 0) * g);
+    double desired_total = 0;
+    index = 0;
+    for (size_t child = n->a; child != SIZE_MAX;
+         child = d->state.nodes[child].sibling_next, index++) {
+        if (!out[index].visible)
+            continue;
+        double min = horizontal ? out[index].minimum.width : out[index].minimum.height;
+        double desired;
+        if (nv == 1)
+            desired = available;
+        else if (!unknown)
+            desired = known > 0 ? available * d->state.nodes[child].size / known : available / nv;
+        else if (d->state.nodes[child].has_size)
+            desired = known > available ? available * d->state.nodes[child].size / known
+                                        : d->state.nodes[child].size;
+        else
+            desired = fmax(0, available - known) / unknown;
+        desired = fmax(desired, min);
+        out[index].bounds.w = (float)desired; /* Temporary axis extent. */
+        desired_total += desired;
+    }
+    double position = horizontal ? r.x : r.y;
+    for (size_t j = 0; j < n->child_count; j++) {
+        if (!out[j].visible)
+            continue;
+        double min = horizontal ? out[j].minimum.width : out[j].minimum.height;
+        double span = out[j].bounds.w;
+        if (minsum > available && minsum > 0)
+            span = available * min / minsum;
+        else if (desired_total > available && desired_total > minsum)
+            span = min + fmax(0, span - min) * (available - minsum) / (desired_total - minsum);
+        out[j].bounds = r;
+        if (horizontal) {
+            out[j].bounds.x = (float)position;
+            out[j].bounds.w = (float)span;
+        } else {
+            out[j].bounds.y = (float)position;
+            out[j].bounds.h = (float)span;
+        }
+        position += span + g;
+    }
+}
 static bool cui_dock_private_bounds(cui_rect r, float gap) {
     return isfinite(r.x) && isfinite(r.y) && isfinite(r.w) && isfinite(r.h) && r.w >= 0 &&
            r.h >= 0 && isfinite(gap) && gap >= 0 && fabs((double)r.x + r.w) <= FLT_MAX &&
@@ -710,12 +1105,15 @@ cui_dock_result cui_dock_split_layout_visible(const cui_dock *d, cui_dock_node i
         return CUI_DOCK_NOT_FOUND;
     if (d->state.nodes[node].kind == CUI_DOCK_TABS)
         return CUI_DOCK_INVALID;
+    if (d->state.nodes[node].canonical && d->state.nodes[node].child_count != 2)
+        return CUI_DOCK_INVALID;
     *out = cui_dock_private_visible_split(d, node, r, gap, visible, user);
     return CUI_DOCK_OK;
 }
-static void cui_dock_private_visible_geometry(const cui_dock *d, size_t i, cui_rect r, float gap,
-                                              cui_dock_visibility_fn visible, void *user,
-                                              cui_dock_geometry *out, size_t *at) {
+static cui_dock_result cui_dock_private_visible_geometry(const cui_dock *d, size_t i, cui_rect r,
+                                                         float gap, cui_dock_visibility_fn visible,
+                                                         void *user, cui_dock_geometry *out,
+                                                         size_t *at) {
     const cui_dock_private_node *n = &d->state.nodes[i];
     if (n->kind == CUI_DOCK_TABS) {
         uint64_t displayed;
@@ -723,16 +1121,25 @@ static void cui_dock_private_visible_geometry(const cui_dock *d, size_t i, cui_r
         if (cui_dock_displayed_panel(d, id, visible, user, &displayed))
             out[(*at)++] = (cui_dock_geometry){id, r, cui_dock_visible_count(d, id, visible, user),
                                                true, displayed};
-        return;
+        return CUI_DOCK_OK;
     }
-    cui_dock_visible_split_geometry split =
-        cui_dock_private_visible_split(d, i, r, gap, visible, user);
-    if (split.first_visible)
-        cui_dock_private_visible_geometry(d, n->a, split.geometry.first, gap, visible, user, out,
-                                          at);
-    if (split.second_visible)
-        cui_dock_private_visible_geometry(d, n->b, split.geometry.second, gap, visible, user, out,
-                                          at);
+    size_t count = cui_dock_private_child_count(n);
+    cui_dock_child_geometry *children = calloc(count, sizeof(*children));
+    if (!children)
+        return CUI_DOCK_CAPACITY;
+    cui_dock_private_children_geometry(d, i, r, gap, visible, user, true, children);
+    cui_dock_result result = CUI_DOCK_OK;
+    size_t child = n->a;
+    for (size_t j = 0; j < count; j++) {
+        if (children[j].visible)
+            result = cui_dock_private_visible_geometry(d, child, children[j].bounds, gap, visible,
+                                                       user, out, at);
+        if (result != CUI_DOCK_OK)
+            break;
+        child = cui_dock_private_next_child(&d->state, i, child);
+    }
+    free(children);
+    return result;
 }
 cui_dock_result cui_dock_layout_visible(const cui_dock *d, cui_rect r, float gap,
                                         cui_dock_visibility_fn visible, void *user,
@@ -750,8 +1157,41 @@ cui_dock_result cui_dock_layout_visible(const cui_dock *d, cui_rect r, float gap
         return CUI_DOCK_OK;
     if (capacity < min.tabs)
         return CUI_DOCK_CAPACITY;
+    if (!min.tabs)
+        return CUI_DOCK_OK;
+    cui_dock_geometry *staged = calloc(min.tabs, sizeof(*staged));
+    if (!staged)
+        return CUI_DOCK_CAPACITY;
     size_t at = 0;
-    cui_dock_private_visible_geometry(d, d->state.root, r, gap, visible, user, out, &at);
+    cui_dock_result result =
+        cui_dock_private_visible_geometry(d, d->state.root, r, gap, visible, user, staged, &at);
+    if (result == CUI_DOCK_OK)
+        memcpy(out, staged, min.tabs * sizeof(*out));
+    free(staged);
+    return result;
+}
+cui_dock_result cui_dock_children_layout(const cui_dock *d, cui_dock_node id, cui_rect r, float gap,
+                                         cui_dock_visibility_fn visible, void *user,
+                                         cui_dock_child_geometry *out, size_t capacity,
+                                         size_t *count, bool *fit) {
+    if (!d || !cui_dock_private_bounds(r, gap))
+        return CUI_DOCK_INVALID;
+    size_t node = cui_dock_private_node_index(d, id);
+    if (node == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    size_t needed = cui_dock_private_child_count(&d->state.nodes[node]);
+    if (!needed)
+        return CUI_DOCK_INVALID;
+    cui_dock_private_minimum min = cui_dock_private_visible_min(d, node, gap, visible, user);
+    if (count)
+        *count = needed;
+    if (fit)
+        *fit = r.w >= min.w && r.h >= min.h;
+    if (!out)
+        return CUI_DOCK_OK;
+    if (capacity < needed)
+        return CUI_DOCK_CAPACITY;
+    cui_dock_private_children_geometry(d, node, r, gap, visible, user, true, out);
     return CUI_DOCK_OK;
 }
 typedef struct {
@@ -792,10 +1232,11 @@ static void cui_dock_private_number(cui_dock_private_writer *w, double value) {
 static void cui_dock_private_write_node(const cui_dock_private_state *s, size_t i,
                                         cui_dock_private_writer *w) {
     const cui_dock_private_node *n = &s->nodes[i];
-    cui_dock_private_write(w, n->kind == CUI_DOCK_TABS               ? "T "
-                              : n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? "H "
-                                                                     : "V ");
-    if (n->kind != CUI_DOCK_TABS)
+    cui_dock_private_write(w, n->kind == CUI_DOCK_TABS ? "T "
+                              : n->canonical
+                                  ? (n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? "X " : "Y ")
+                                  : (n->kind == CUI_DOCK_SPLIT_HORIZONTAL ? "H " : "V "));
+    if (n->kind != CUI_DOCK_TABS && !n->canonical)
         cui_dock_private_number(w, n->ratio);
     cui_dock_private_number(w, n->minw);
     cui_dock_private_number(w, n->minh);
@@ -807,6 +1248,14 @@ static void cui_dock_private_write_node(const cui_dock_private_state *s, size_t 
         cui_dock_private_uint(w, n->count);
         for (size_t p = n->first; p != SIZE_MAX; p = s->panels[p].next)
             cui_dock_private_uint(w, s->panels[p].key);
+    } else if (n->canonical) {
+        cui_dock_private_uint(w, n->child_count);
+        for (size_t child = n->a; child != SIZE_MAX; child = s->nodes[child].sibling_next) {
+            cui_dock_private_uint(w, s->nodes[child].has_size);
+            if (s->nodes[child].has_size)
+                cui_dock_private_number(w, s->nodes[child].size);
+            cui_dock_private_write_node(s, child, w);
+        }
     } else {
         cui_dock_private_write_node(s, n->a, w);
         cui_dock_private_write_node(s, n->b, w);
@@ -817,7 +1266,7 @@ cui_dock_result cui_dock_serialize(const cui_dock *d, char *output, size_t capac
     if (!d)
         return CUI_DOCK_INVALID;
     cui_dock_private_writer w = {0};
-    cui_dock_private_write(&w, "CUIDOCK 1 ");
+    cui_dock_private_write(&w, d->nary_edits ? "CUIDOCK 2 " : "CUIDOCK 1 ");
     cui_dock_private_write_node(&d->state, d->state.root, &w);
     cui_dock_private_write(&w, "\n");
     if (length)
@@ -829,7 +1278,7 @@ cui_dock_result cui_dock_serialize(const cui_dock *d, char *output, size_t capac
     if (capacity <= w.used)
         return CUI_DOCK_CAPACITY;
     w = (cui_dock_private_writer){.out = output};
-    cui_dock_private_write(&w, "CUIDOCK 1 ");
+    cui_dock_private_write(&w, d->nary_edits ? "CUIDOCK 2 " : "CUIDOCK 1 ");
     cui_dock_private_write_node(&d->state, d->state.root, &w);
     cui_dock_private_write(&w, "\n");
     output[w.used] = 0;
@@ -841,6 +1290,7 @@ typedef struct {
     size_t pos;
     uint32_t generation;
     cui_dock_result error;
+    uint64_t version;
 } cui_dock_private_parser;
 static bool cui_dock_private_space(char c) {
     return c == ' ' || c == '\n' || c == '\r' || c == '\t';
@@ -972,16 +1422,19 @@ static size_t cui_dock_private_read_node(cui_dock_private_parser *p, size_t pare
     char kind[64];
     if (!cui_dock_private_token(p, kind))
         return SIZE_MAX;
-    if (strcmp(kind, "T") && strcmp(kind, "H") && strcmp(kind, "V")) {
+    bool canonical = !strcmp(kind, "X") || !strcmp(kind, "Y");
+    if ((canonical && p->version != 2) ||
+        (!canonical && strcmp(kind, "T") && strcmp(kind, "H") && strcmp(kind, "V"))) {
         p->error = CUI_DOCK_INVALID;
         return SIZE_MAX;
     }
     cui_dock_private_init_node(s, n, ++p->generation, parent);
     cui_dock_private_node *node = &s->nodes[n];
-    node->kind = kind[0] == 'T'   ? CUI_DOCK_TABS
-                 : kind[0] == 'H' ? CUI_DOCK_SPLIT_HORIZONTAL
-                                  : CUI_DOCK_SPLIT_VERTICAL;
-    if (node->kind != CUI_DOCK_TABS &&
+    node->canonical = canonical;
+    node->kind = kind[0] == 'T'                     ? CUI_DOCK_TABS
+                 : kind[0] == 'H' || kind[0] == 'X' ? CUI_DOCK_SPLIT_HORIZONTAL
+                                                    : CUI_DOCK_SPLIT_VERTICAL;
+    if (node->kind != CUI_DOCK_TABS && !canonical &&
         (!cui_dock_private_read_number(p, &node->ratio) || !cui_dock_private_ratio(node->ratio))) {
         p->error = CUI_DOCK_INVALID;
         return SIZE_MAX;
@@ -1022,6 +1475,35 @@ static size_t cui_dock_private_read_node(cui_dock_private_parser *p, size_t pare
             if (i == (size_t)active)
                 node->active = slot;
         }
+    } else if (canonical) {
+        uint64_t count;
+        if (!cui_dock_private_read_uint(p, &count))
+            return SIZE_MAX;
+        if (count < 2) {
+            p->error = CUI_DOCK_INVALID;
+            return SIZE_MAX;
+        }
+        if (count > d->config.node_capacity) {
+            p->error = CUI_DOCK_CAPACITY;
+            return SIZE_MAX;
+        }
+        for (size_t i = 0; i < count; i++) {
+            uint64_t has_size;
+            double size = 0;
+            if (!cui_dock_private_read_uint(p, &has_size))
+                return SIZE_MAX;
+            if (has_size > 1 || (has_size && (!cui_dock_private_read_number(p, &size) ||
+                                              !cui_dock_private_dimension(size)))) {
+                p->error = CUI_DOCK_INVALID;
+                return SIZE_MAX;
+            }
+            size_t child = cui_dock_private_read_node(p, n, depth + 1);
+            if (child == SIZE_MAX)
+                return SIZE_MAX;
+            s->nodes[child].has_size = has_size != 0;
+            s->nodes[child].size = size;
+            cui_dock_private_insert_child(s, n, child, SIZE_MAX);
+        }
     } else {
         node->a = cui_dock_private_read_node(p, n, depth + 1);
         if (node->a == SIZE_MAX)
@@ -1039,12 +1521,14 @@ cui_dock_result cui_dock_restore(cui_dock *d, cui_str text) {
         return CUI_DOCK_CAPACITY;
     memset(d->scratch.nodes, 0, d->config.node_capacity * sizeof(*d->scratch.nodes));
     memset(d->scratch.panels, 0, d->config.panel_capacity * sizeof(*d->scratch.panels));
-    cui_dock_private_parser p = {d, text, 0, d->generation, CUI_DOCK_OK};
+    cui_dock_private_parser p = {
+        .dock = d, .text = text, .generation = d->generation, .error = CUI_DOCK_OK};
     char magic[64];
     uint64_t version;
     if (!cui_dock_private_token(&p, magic) || strcmp(magic, "CUIDOCK") ||
-        !cui_dock_private_read_uint(&p, &version) || version != 1)
+        !cui_dock_private_read_uint(&p, &version) || (version != 1 && version != 2))
         return CUI_DOCK_INVALID;
+    p.version = version;
     size_t root = cui_dock_private_read_node(&p, SIZE_MAX, 1);
     if (root == SIZE_MAX)
         return p.error == CUI_DOCK_OK ? CUI_DOCK_INVALID : p.error;
@@ -1057,6 +1541,7 @@ cui_dock_result cui_dock_restore(cui_dock *d, cui_str text) {
     d->state = d->scratch;
     d->scratch = old;
     d->generation = p.generation;
+    d->nary_edits = version == 2;
     return CUI_DOCK_OK;
 }
 

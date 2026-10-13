@@ -9,6 +9,12 @@ typedef struct {
     cui_dock_node node;
     cui_resizable_state resize;
     cui_resizable_slot slots[2];
+    size_t child_capacity;
+    cui_resizable_slot *child_slots;
+    cui_dock_child_geometry *child_geometry;
+    cui_resizable_panel *child_panels;
+    struct dock_child_scene *child_scenes;
+    cui_dock_slot_size *child_sizes;
     cui_tab_scroll_state scroll;
     cui_tab_drag_state drag;
     cui_menu_tree_state menu;
@@ -113,8 +119,11 @@ static void dock_drop_target(dock_scene *s, cui_dock_node node, float x, float y
     if (!cui_dock_node_get(s->dock, node, &info))
         return;
     if (info.kind != CUI_DOCK_TABS) {
-        dock_drop_target(s, info.first, x, y);
-        dock_drop_target(s, info.second, x, y);
+        for (size_t i = 0; i < info.child_count; i++) {
+            cui_dock_node child;
+            cui_dock_child_at(s->dock, node, i, &child, NULL);
+            dock_drop_target(s, child, x, y);
+        }
         return;
     }
     if (dock_group_constraints(s->options, s->dock, node).locked)
@@ -272,8 +281,13 @@ static bool dock_first_active(const cui_dock *model, cui_dock_node node, uint64_
     if (info.kind == CUI_DOCK_TABS)
         return cui_dock_displayed_panel(model, node, options.panel_visible, options.visibility_user,
                                         key);
-    return dock_first_active(model, info.first, key, options) ||
-           dock_first_active(model, info.second, key, options);
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        cui_dock_child_at(model, node, i, &child, NULL);
+        if (dock_first_active(model, child, key, options))
+            return true;
+    }
+    return false;
 }
 static cui_id dock_part(cui_id id, uint64_t key, uint64_t tag) {
     uint64_t x = id ^ (key + tag);
@@ -321,12 +335,18 @@ cui_id cui_dock_close_id(cui_id view, uint64_t panel) {
 cui_id cui_dock_group_id(cui_id view, cui_dock_node node) {
     return dock_part(view, node, UINT64_C(0xe3d2a54f74c98b51));
 }
-cui_id cui_dock_resize_id(cui_id view, const cui_dock *model, cui_dock_node split) {
+cui_id cui_dock_resize_id_at(cui_id view, const cui_dock *model, cui_dock_node split,
+                             size_t index) {
     cui_dock_node_info info;
-    if (!cui_dock_node_get(model, split, &info) || info.kind == CUI_DOCK_TABS)
+    cui_dock_node child;
+    if (!cui_dock_node_get(model, split, &info) || index >= info.child_count ||
+        index + 1 >= info.child_count || !cui_dock_child_at(model, split, index, &child, NULL))
         return 0;
-    cui_id preceding = dock_part(view, info.first, UINT64_C(0x729d1cc28b3a17a1));
+    cui_id preceding = dock_part(view, child, UINT64_C(0x729d1cc28b3a17a1));
     return cui_resizable_handle_id(cui_dock_group_id(view, split), preceding);
+}
+cui_id cui_dock_resize_id(cui_id view, const cui_dock *model, cui_dock_node split) {
+    return cui_dock_resize_id_at(view, model, split, 0);
 }
 cui_dock_view *cui_dock_view_create(size_t nodes, size_t panels) {
     if (!nodes)
@@ -350,9 +370,25 @@ cui_dock_view *cui_dock_view_create(size_t nodes, size_t panels) {
     }
     return view;
 }
+static void dock_cache_release_children(dock_cache *cache) {
+    free(cache->child_slots);
+    free(cache->child_geometry);
+    free(cache->child_panels);
+    free(cache->child_scenes);
+    free(cache->child_sizes);
+    cache->child_slots = NULL;
+    cache->child_geometry = NULL;
+    cache->child_panels = NULL;
+    cache->child_scenes = NULL;
+    cache->child_sizes = NULL;
+    cache->child_capacity = 0;
+}
 void cui_dock_view_destroy(cui_dock_view *view) {
     if (!view)
         return;
+    if (view->cache)
+        for (size_t i = 0; i < view->count; i++)
+            dock_cache_release_children(&view->cache[i]);
     free(view->cache);
     free(view->items);
     free(view->parts);
@@ -362,6 +398,8 @@ void cui_dock_view_destroy(cui_dock_view *view) {
 void cui_dock_view_reset(cui_dock_view *view) {
     if (!view)
         return;
+    for (size_t i = 0; i < view->count; i++)
+        dock_cache_release_children(&view->cache[i]);
     memset(view->cache, 0, view->node_capacity * sizeof *view->cache);
     view->count = 0;
     view->dragging = false;
@@ -401,6 +439,7 @@ static dock_cache *dock_cache_get(dock_scene *s, cui_dock_node node) {
     if (index == s->view->count)
         ++s->view->count;
     dock_cache *cache = &s->view->cache[index];
+    dock_cache_release_children(cache);
     memset(cache, 0, sizeof *cache);
     cache->node = node;
     cui_resizable_state_init(&cache->resize, cache->slots, 2);
@@ -416,8 +455,14 @@ static cui_dock_result dock_preflight(const cui_dock *model, cui_dock_node node,
         *panels += info.panel_count;
         return CUI_DOCK_OK;
     }
-    cui_dock_result error = dock_preflight(model, info.first, nodes, panels);
-    return error == CUI_DOCK_OK ? dock_preflight(model, info.second, nodes, panels) : error;
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        cui_dock_child_at(model, node, i, &child, NULL);
+        cui_dock_result error = dock_preflight(model, child, nodes, panels);
+        if (error != CUI_DOCK_OK)
+            return error;
+    }
+    return CUI_DOCK_OK;
 }
 static void dock_close_suffix(cui_context *ui, const cui_choice_item *item, size_t index,
                               void *user) {
@@ -891,7 +936,7 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
     cui_end_box(s->ui);
     cui_end_box(s->ui);
 }
-typedef struct {
+typedef struct dock_child_scene {
     dock_scene *scene;
     cui_dock_node node;
     dock_cache *cache;
@@ -902,9 +947,151 @@ typedef struct {
 static void dock_render_child(cui_context *ui, void *user) {
     dock_child_scene *child = user;
     (void)ui;
-    float span = child->cache->slots[child->index].size;
+    float span = child->cache->resize.slots[child->index].size;
     dock_render_node(child->scene, child->node, child->horizontal ? span : child->cross,
                      child->horizontal ? child->cross : span);
+}
+static bool dock_cache_children(dock_cache *cache, size_t count) {
+    if (cache->child_capacity == count)
+        return true;
+    cui_resizable_slot *slots = calloc(count, sizeof(*slots));
+    cui_dock_child_geometry *geometry = calloc(count, sizeof(*geometry));
+    cui_resizable_panel *panels = calloc(count, sizeof(*panels));
+    dock_child_scene *scenes = calloc(count, sizeof(*scenes));
+    cui_dock_slot_size *sizes = calloc(count, sizeof(*sizes));
+    if (!slots || !geometry || !panels || !scenes || !sizes) {
+        free(slots);
+        free(geometry);
+        free(panels);
+        free(scenes);
+        free(sizes);
+        return false;
+    }
+    dock_cache_release_children(cache);
+    cache->child_slots = slots;
+    cache->child_geometry = geometry;
+    cache->child_panels = panels;
+    cache->child_scenes = scenes;
+    cache->child_sizes = sizes;
+    cache->child_capacity = count;
+    cui_resizable_state_init(&cache->resize, slots, count);
+    return true;
+}
+static void dock_render_nary(dock_scene *s, cui_dock_node_info info, dock_cache *cache, float w,
+                             float h) {
+    if (!dock_cache_children(cache, info.child_count)) {
+        s->result.error = CUI_DOCK_CAPACITY;
+        return;
+    }
+    bool fit;
+    size_t count;
+    cui_dock_result error = cui_dock_children_layout(
+        s->dock, info.id, (cui_rect){0, 0, w, h}, 0, s->options.panel_visible,
+        s->options.visibility_user, cache->child_geometry, cache->child_capacity, &count, &fit);
+    if (error != CUI_DOCK_OK) {
+        s->result.error = error;
+        return;
+    }
+    s->result.fit_minimum &= fit;
+    size_t visible = 0, sole = 0;
+    bool changed_visibility = false;
+    for (size_t i = 0; i < count; i++) {
+        if (cache->child_geometry[i].visible) {
+            visible++;
+            sole = i;
+        }
+        if (cache->resize.count == count &&
+            (cache->child_slots[i].hidden == cache->child_geometry[i].visible ||
+             cache->child_slots[i].id !=
+                 dock_part(s->id, cache->child_geometry[i].node, UINT64_C(0x729d1cc28b3a17a1))))
+            changed_visibility = true;
+    }
+    if (changed_visibility)
+        cui_resizable_clear(&cache->resize);
+    if (visible <= 1) {
+        cui_resizable_clear(&cache->resize);
+        if (visible)
+            dock_render_node(s, cache->child_geometry[sole].node, w, h);
+        return;
+    }
+    bool horizontal = info.kind == CUI_DOCK_SPLIT_HORIZONTAL;
+    float extent = horizontal ? w : h, cross = horizontal ? h : w;
+    for (size_t i = 0; i < count; i++) {
+        cui_dock_child_geometry *geometry = &cache->child_geometry[i];
+        float span = horizontal ? geometry->bounds.w : geometry->bounds.h;
+        if (cache->resize.count == count && !cache->resize.dragging)
+            cache->child_slots[i].size = span;
+        cache->child_scenes[i] = (dock_child_scene){s, geometry->node, cache, i, cross, horizontal};
+        cui_resizable_panel panel = cui_resizable_panel_default(
+            dock_part(s->id, geometry->node, UINT64_C(0x729d1cc28b3a17a1)));
+        panel.initial_size = span;
+        panel.has_initial_size = true;
+        panel.custom_range = true;
+        panel.minimum = fit ? (horizontal ? geometry->minimum.width : geometry->minimum.height) : 0;
+        panel.maximum = fmaxf(extent, panel.minimum);
+        panel.hidden = !geometry->visible;
+        panel.content = dock_render_child;
+        panel.content_user = &cache->child_scenes[i];
+        panel.accessibility_label = cui_string("Dock region");
+        cache->child_panels[i] = panel;
+    }
+    cui_resizable_options options = cui_resizable_options_default();
+    options.axis = horizontal ? CUI_RESIZABLE_HORIZONTAL : CUI_RESIZABLE_VERTICAL;
+    options.extent = extent;
+    options.cross_size = cross;
+    options.disabled = s->options.disabled;
+    options.key_step = s->options.key_step;
+    options.reduced_motion = s->options.reduced_motion;
+    options.now_seconds = s->options.now_seconds;
+    options.box = (cui_box){
+        .width = w, .height = h, .fixed_width = w == 0, .fixed_height = h == 0, .clip = true};
+    uint64_t policy_key = 0;
+    bool allowed = !s->options.allow_operation ||
+                   (dock_first_active(s->dock, info.id, &policy_key, s->options) &&
+                    dock_allowed(s, CUI_DOCK_RESIZED, policy_key, info.id, 0, info.kind, false));
+    if (!allowed) {
+        size_t event_count;
+        const cui_event *events = cui_frame_events(s->ui, &event_count);
+        for (size_t e = 0; e < event_count; e++) {
+            cui_id target = cui_event_target(s->ui, e);
+            for (size_t i = 0; i + 1 < count; i++) {
+                cui_id handle = cui_resizable_handle_id(cui_dock_group_id(s->id, info.id),
+                                                        cache->child_panels[i].id);
+                if (target == handle &&
+                    (events[e].type == CUI_EVENT_POINTER_DOWN ||
+                     (events[e].type == CUI_EVENT_POINTER_MOVE &&
+                      cache->resize.active_handle == handle) ||
+                     (events[e].type == CUI_EVENT_KEY_DOWN &&
+                      (events[e].key == CUI_KEY_LEFT || events[e].key == CUI_KEY_RIGHT ||
+                       events[e].key == CUI_KEY_UP || events[e].key == CUI_KEY_DOWN ||
+                       events[e].key == CUI_KEY_HOME || events[e].key == CUI_KEY_END))))
+                    s->result.denied = true;
+            }
+        }
+    }
+    options.disabled |= !allowed;
+    cui_resizable_error resize = cui_resizable(s->ui, cui_dock_group_id(s->id, info.id), s->theme,
+                                               &cache->resize, cache->child_panels, count, options);
+    if (resize != CUI_RESIZABLE_OK && resize != CUI_RESIZABLE_INFEASIBLE) {
+        s->result.error = CUI_DOCK_INVALID;
+        return;
+    }
+    bool changed = false;
+    for (size_t i = 0; i < count; i++) {
+        cui_dock_child_at(s->dock, info.id, i, NULL, &cache->child_sizes[i]);
+        if (!cache->child_geometry[i].visible)
+            continue;
+        float initial =
+            horizontal ? cache->child_geometry[i].bounds.w : cache->child_geometry[i].bounds.h;
+        changed |= fabsf(cache->child_slots[i].size - initial) > .001f;
+        cache->child_sizes[i] = (cui_dock_slot_size){true, cache->child_slots[i].size};
+    }
+    if (changed && allowed && !s->options.disabled) {
+        if (cui_dock_set_sizes(s->dock, info.id, cache->child_sizes, count) == CUI_DOCK_OK) {
+            s->result.resized = true;
+            dock_emit(s, CUI_DOCK_RESIZED, 0, info.id);
+        }
+    }
 }
 static void dock_render_node(dock_scene *s, cui_dock_node node, float w, float h) {
     cui_dock_node_info info;
@@ -922,6 +1109,10 @@ static void dock_render_node(dock_scene *s, cui_dock_node node, float w, float h
         s->options.collapsed |= dock_group_constraints(s->options, s->dock, node).collapsed;
         dock_render_tabs(s, info, cache, w, h);
         s->options.collapsed = collapsed;
+        return;
+    }
+    if (info.nary) {
+        dock_render_nary(s, info, cache, w, h);
         return;
     }
     bool horizontal = info.kind == CUI_DOCK_SPLIT_HORIZONTAL;
@@ -1075,6 +1266,11 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
         cui_dock_view_reset(view);
     view->model = model;
     view->id = id;
+    for (size_t i = 0; i < view->count; i++) {
+        cui_dock_node_info cached;
+        if (!cui_dock_node_get(model, view->cache[i].node, &cached))
+            dock_cache_release_children(&view->cache[i]);
+    }
     dock_scene scene = {.ui = ui,
                         .id = id,
                         .theme = theme,
@@ -1208,7 +1404,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
             if (!dock_allowed(&scene, CUI_DOCK_RESIZED, scene.menu_key, info.parent, 0,
                               CUI_DOCK_TABS, false))
                 scene.result.denied = true;
-            else if (cui_dock_set_ratio(model, info.parent, .5) == CUI_DOCK_OK) {
+            else if (cui_dock_balance(model, info.parent) == CUI_DOCK_OK) {
                 scene.result.resized = true;
                 dock_emit(&scene, CUI_DOCK_RESIZED, scene.menu_key, info.parent);
                 cui_invalidate(ui);
@@ -1367,9 +1563,15 @@ static bool dock_leaf_at(dock_workspace_scene *s, unsigned region, cui_dock_node
     cui_dock_node_info info;
     if (!cui_dock_node_get(s->regions[region].model, node, &info))
         return false;
-    if (info.kind != CUI_DOCK_TABS)
-        return dock_leaf_at(s, region, info.first, x, y, out) ||
-               dock_leaf_at(s, region, info.second, x, y, out);
+    if (info.kind != CUI_DOCK_TABS) {
+        for (size_t i = 0; i < info.child_count; i++) {
+            cui_dock_node child;
+            cui_dock_child_at(s->regions[region].model, node, i, &child, NULL);
+            if (dock_leaf_at(s, region, child, x, y, out))
+                return true;
+        }
+        return false;
+    }
     if (!dock_contains(
             cui_bounds(s->ui,
                        cui_dock_group_id(cui_dock_region_id(s->id, (cui_dock_region)region), node)),
@@ -1693,8 +1895,13 @@ static bool dock_node_visible(const cui_dock *model, cui_dock_node node,
     if (info.kind == CUI_DOCK_TABS)
         return cui_dock_visible_count(model, node, options.panel_visible,
                                       options.visibility_user) != 0;
-    return dock_node_visible(model, info.first, options) ||
-           dock_node_visible(model, info.second, options);
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        cui_dock_child_at(model, node, i, &child, NULL);
+        if (dock_node_visible(model, child, options))
+            return true;
+    }
+    return false;
 }
 static bool dock_workspace_visible(dock_workspace_scene *s, unsigned region) {
     return dock_node_visible(s->regions[region].model, cui_dock_root(s->regions[region].model),
@@ -1707,11 +1914,16 @@ static cui_size dock_model_minimum(const cui_dock *model, cui_dock_node node,
         return (cui_size){0};
     if (info.kind == CUI_DOCK_TABS)
         return (cui_size){(float)info.min_width, (float)info.min_height};
-    cui_size a = dock_model_minimum(model, info.first, options),
-             b = dock_model_minimum(model, info.second, options);
-    cui_size min = info.kind == CUI_DOCK_SPLIT_HORIZONTAL
-                       ? (cui_size){a.width + b.width, fmaxf(a.height, b.height)}
-                       : (cui_size){fmaxf(a.width, b.width), a.height + b.height};
+    cui_size min = {0};
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        cui_dock_child_at(model, node, i, &child, NULL);
+        cui_size c = dock_model_minimum(model, child, options);
+        min.width = info.kind == CUI_DOCK_SPLIT_HORIZONTAL ? min.width + c.width
+                                                           : fmaxf(min.width, c.width);
+        min.height = info.kind == CUI_DOCK_SPLIT_VERTICAL ? min.height + c.height
+                                                          : fmaxf(min.height, c.height);
+    }
     min.width = fmaxf(min.width, (float)info.min_width);
     min.height = fmaxf(min.height, (float)info.min_height);
     return min;
@@ -2185,18 +2397,30 @@ static size_t dock_lifecycle_count(const cui_dock *model, cui_dock_node node) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
         return 0;
-    return info.kind == CUI_DOCK_TABS
-               ? info.panel_count
-               : dock_lifecycle_count(model, info.first) + dock_lifecycle_count(model, info.second);
+    if (info.kind == CUI_DOCK_TABS)
+        return info.panel_count;
+    size_t count = 0;
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        cui_dock_child_at(model, node, i, &child, NULL);
+        count += dock_lifecycle_count(model, child);
+    }
+    return count;
 }
 static bool dock_lifecycle_unique(const cui_dock_lifecycle_region *regions, size_t region,
                                   cui_dock_node node) {
     const cui_dock *model = regions[region].model;
     cui_dock_node_info info;
     cui_dock_node_get(model, node, &info);
-    if (info.kind != CUI_DOCK_TABS)
-        return dock_lifecycle_unique(regions, region, info.first) &&
-               dock_lifecycle_unique(regions, region, info.second);
+    if (info.kind != CUI_DOCK_TABS) {
+        for (size_t i = 0; i < info.child_count; i++) {
+            cui_dock_node child;
+            cui_dock_child_at(model, node, i, &child, NULL);
+            if (!dock_lifecycle_unique(regions, region, child))
+                return false;
+        }
+        return true;
+    }
     for (size_t i = 0; i < info.panel_count; i++) {
         uint64_t key;
         cui_dock_panel_at(model, node, i, &key);
@@ -2212,8 +2436,11 @@ static void dock_lifecycle_fill(cui_dock_lifecycle *state, const cui_dock_lifecy
     cui_dock_node_info info;
     cui_dock_node_get(region->model, node, &info);
     if (info.kind != CUI_DOCK_TABS) {
-        dock_lifecycle_fill(state, region, info.first, zoom_group, panels, panel_count, index);
-        dock_lifecycle_fill(state, region, info.second, zoom_group, panels, panel_count, index);
+        for (size_t i = 0; i < info.child_count; i++) {
+            cui_dock_node child;
+            cui_dock_child_at(region->model, node, i, &child, NULL);
+            dock_lifecycle_fill(state, region, child, zoom_group, panels, panel_count, index);
+        }
         return;
     }
     bool collapsed = region->collapsed ||

@@ -1998,6 +1998,150 @@ static void test_hidden_styled_geometry(void) {
     cui_dock_view_destroy(v);
     cui_dock_destroy(m);
 }
+static bool nary_resize_allowed = true;
+static bool nary_policy(void *user, const cui_dock_request *request) {
+    assert(user == &nary_resize_allowed && request->operation == CUI_DOCK_RESIZED &&
+           request->source);
+    return nary_resize_allowed;
+}
+static cui_dock_view_result nary_frame(cui_dock *m, cui_dock_view *v, cui_dock_panel *descriptors,
+                                       cui_dock_view_options opts) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_dock_view_result value = cui_dock_view_render(ui, 9700, &theme, m, v, descriptors, 3, opts);
+    assert(value.error == CUI_DOCK_OK && cui_end_frame(ui).count > 0 &&
+           cui_last_error(ui) == CUI_OK);
+    return value;
+}
+static void test_nary_styled(void) {
+    cui_dock *m = cui_dock_create_nary((cui_dock_config){0});
+    cui_dock_node a = cui_dock_root(m), b, c;
+    assert(cui_dock_insert(m, a, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(m, a, CUI_DOCK_SPLIT_HORIZONTAL, .5, 1, false, &b) == CUI_DOCK_OK);
+    assert(cui_dock_split(m, b, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &c) == CUI_DOCK_OK);
+    cui_dock_node root = cui_dock_root(m);
+    cui_dock_slot_size initial[] = {{true, 200}, {true, 200}, {true, 200}};
+    assert(cui_dock_set_sizes(m, root, initial, 3) == CUI_DOCK_OK);
+    cui_dock_panel descriptors[3];
+    for (size_t i = 0; i < 3; i++)
+        descriptors[i] =
+            (cui_dock_panel){.key = i, .title = cui_string("Native pane"), .render = content};
+    cui_dock_view *v = cui_dock_view_create(0, 0);
+    cui_dock_view_options opts = cui_dock_view_options_default();
+    opts.width = 600;
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    cui_id second = cui_dock_resize_id_at(9700, m, root, 1);
+    assert(second && cui_dock_resize_id_at(9700, m, root, 2) == 0);
+    assert(semantic_role(second) == CUI_ROLE_SEPARATOR);
+    cui_rect handle = cui_bounds(ui, second);
+    char before[4096], after[4096];
+    size_t n;
+    assert(cui_dock_serialize(m, before, sizeof before, &n) == CUI_DOCK_OK);
+    pointer(CUI_EVENT_POINTER_DOWN, floorf(handle.x + handle.w / 2), handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_MOVE, floorf(handle.x + handle.w / 2) + 40, handle.y + handle.h / 2);
+    assert(nary_frame(m, v, descriptors, opts).resized);
+    pointer(CUI_EVENT_POINTER_UP, floorf(handle.x + handle.w / 2) + 40, handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    cui_dock_slot_size size;
+    assert(cui_dock_child_at(m, root, 0, NULL, &size) && fabs(size.size - 200) < .01);
+    assert(cui_dock_child_at(m, root, 1, NULL, &size) && fabs(size.size - 240) < .01);
+    assert(cui_dock_child_at(m, root, 2, NULL, &size) && fabs(size.size - 160) < .01);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && strcmp(before, after));
+    strcpy(before, after);
+    handle = cui_bounds(ui, second);
+    pointer(CUI_EVENT_POINTER_DOWN, floorf(handle.x + handle.w / 2), handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_MOVE, floorf(handle.x + handle.w / 2) + 20, handle.y + handle.h / 2);
+    assert(nary_frame(m, v, descriptors, opts).resized);
+    assert(cui_dock_serialize(m, before, sizeof before, &n) == CUI_DOCK_OK);
+    pointer(CUI_EVENT_CANCEL, floorf(handle.x + handle.w / 2) + 20, handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    pointer(CUI_EVENT_POINTER_MOVE, floorf(handle.x + handle.w / 2) + 60, handle.y + handle.h / 2);
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    double hidden_size;
+    assert(cui_dock_child_at(m, root, 1, NULL, &size));
+    hidden_size = size.size;
+    opts.disabled = true;
+    cui_focus(ui, second);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    opts.disabled = false;
+    opts.allow_operation = nary_policy;
+    opts.policy_user = &nary_resize_allowed;
+    nary_resize_allowed = true;
+    nary_frame(m, v, descriptors, opts);
+    handle = cui_bounds(ui, second);
+    pointer(CUI_EVENT_POINTER_DOWN, floorf(handle.x + handle.w / 2), handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    nary_resize_allowed = false;
+    pointer(CUI_EVENT_POINTER_MOVE, floorf(handle.x + handle.w / 2) + 20, handle.y + handle.h / 2);
+    cui_dock_view_result denied_resize = nary_frame(m, v, descriptors, opts);
+    assert(!denied_resize.resized && denied_resize.denied);
+    pointer(CUI_EVENT_POINTER_UP, floorf(handle.x + handle.w / 2) + 20, handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    nary_resize_allowed = false;
+    handle = cui_bounds(ui, second);
+    pointer(CUI_EVENT_POINTER_DOWN, floorf(handle.x + handle.w / 2), handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_MOVE, floorf(handle.x + handle.w / 2) + 20, handle.y + handle.h / 2);
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    pointer(CUI_EVENT_POINTER_UP, floorf(handle.x + handle.w / 2) + 20, handle.y + handle.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    nary_resize_allowed = true;
+    opts.allow_operation = NULL;
+    visibility_model = m;
+    hidden_bits = 2;
+    opts.panel_visible = panel_visible;
+    opts.visibility_user = &hidden_bits;
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    assert(semantic_role(second) == CUI_ROLE_NONE);
+    assert(cui_bounds(ui, cui_dock_tab_id(9700, 1)).w == 0);
+    assert(cui_dock_child_at(m, root, 1, NULL, &size) && size.size == hidden_size);
+    hidden_bits = 0;
+    nary_frame(m, v, descriptors, opts);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    /* Replacing a child at unchanged sibling count resets cache identity safely. */
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(9700, 0));
+    cui_rect target = cui_bounds(ui, cui_dock_group_id(9700, c));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_MOVE, target.x + target.w - 2, target.y + target.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_UP, target.x + target.w - 2, target.y + target.h / 2);
+    assert(nary_frame(m, v, descriptors, opts).split);
+    cui_dock_node_info info;
+    assert(cui_dock_node_get(m, root, &info) && info.child_count == 3);
+    assert(cui_dock_serialize(m, before, sizeof before, &n) == CUI_DOCK_OK);
+    assert(!nary_frame(m, v, descriptors, opts).resized);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    /* Drop onto the third pane exercises traversal beyond binary first/second. */
+    tab = cui_bounds(ui, cui_dock_tab_id(9700, 0));
+    target = cui_bounds(ui, cui_dock_group_id(9700, c));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_MOVE, target.x + target.w / 2, target.y + target.h / 2);
+    nary_frame(m, v, descriptors, opts);
+    pointer(CUI_EVENT_POINTER_UP, target.x + target.w / 2, target.y + target.h / 2);
+    assert(nary_frame(m, v, descriptors, opts).moved);
+    cui_dock_node moved;
+    assert(cui_dock_panel_find(m, 0, &moved, NULL) && moved == c && cui_dock_root(m) == root);
+    nary_frame(m, v, descriptors, opts);
+    assert(cui_dock_serialize(m, before, sizeof before, &n) == CUI_DOCK_OK);
+    assert(cui_dock_restore(m, (cui_str){before, n}) == CUI_DOCK_OK);
+    nary_frame(m, v, descriptors, opts);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    visibility_model = NULL;
+    hidden_bits = 0;
+    cui_dock_view_destroy(v);
+    cui_dock_destroy(m);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -2005,6 +2149,7 @@ int main(void) {
     test_factory_reconstruction();
     test_lifecycle();
     test_hidden_styled_geometry();
+    test_nary_styled();
     memset(rendered, 0, sizeof rendered);
     assert(ui && model && view);
     options = cui_dock_view_options_default();

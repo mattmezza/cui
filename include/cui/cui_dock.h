@@ -29,6 +29,8 @@ typedef struct {
     size_t panel_count;
     bool has_active;
     uint64_t active_panel;
+    size_t child_count;
+    bool nary; /* Canonical optional-size split; false for legacy ratio nodes. */
 } cui_dock_node_info;
 typedef struct {
     cui_dock_node node;
@@ -38,6 +40,8 @@ typedef struct {
     uint64_t active_panel;
 } cui_dock_geometry;
 cui_dock *cui_dock_create(cui_dock_config config);
+/* Explicit optional-size/n-ary edit mode; legacy constructor remains binary. */
+cui_dock *cui_dock_create_nary(cui_dock_config config);
 void cui_dock_destroy(cui_dock *dock);
 cui_dock_node cui_dock_root(const cui_dock *dock);
 size_t cui_dock_memory_bytes(const cui_dock *dock);
@@ -70,6 +74,7 @@ cui_dock_result cui_dock_remove_many(cui_dock *, const uint64_t *panels, size_t 
 cui_dock_result cui_dock_remove(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_activate(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_set_ratio(cui_dock *dock, cui_dock_node split, double ratio);
+cui_dock_result cui_dock_balance(cui_dock *, cui_dock_node split);
 /* Flatten only descendants sharing split's axis, in visual order. NULL slots
  * queries count. Insufficient capacity leaves output untouched. */
 cui_dock_result cui_dock_split_slots(const cui_dock *, cui_dock_node split, cui_dock_node *slots,
@@ -107,6 +112,25 @@ typedef struct {
 cui_dock_result cui_dock_split_layout_visible(const cui_dock *, cui_dock_node, cui_rect, float gap,
                                               cui_dock_visibility_fn, void *,
                                               cui_dock_visible_split_geometry *);
+typedef struct {
+    bool has_size;
+    double size;
+} cui_dock_slot_size;
+bool cui_dock_child_at(const cui_dock *, cui_dock_node split, size_t index, cui_dock_node *child,
+                       cui_dock_slot_size *size);
+/* Exact immediate-child count; canonical splits only. Rejection is atomic. */
+cui_dock_result cui_dock_set_sizes(cui_dock *, cui_dock_node split, const cui_dock_slot_size *,
+                                   size_t count);
+typedef struct {
+    cui_dock_node node;
+    cui_rect bounds;
+    cui_size minimum;
+    bool visible;
+} cui_dock_child_geometry;
+/* Arbitrary immediate children; hidden slots have visible=false. */
+cui_dock_result cui_dock_children_layout(const cui_dock *, cui_dock_node split, cui_rect, float gap,
+                                         cui_dock_visibility_fn, void *, cui_dock_child_geometry *,
+                                         size_t capacity, size_t *count, bool *fit_minimum);
 /* Required serialized length excludes NUL. Insufficient output is untouched.
    Restore is bounded and transactional; successful restore invalidates IDs. */
 cui_dock_result cui_dock_serialize(const cui_dock *dock, char *output, size_t capacity,
@@ -295,6 +319,8 @@ cui_id cui_dock_tab_id(cui_id view, uint64_t panel);
 cui_id cui_dock_close_id(cui_id view, uint64_t panel);
 cui_id cui_dock_group_id(cui_id view, cui_dock_node node);
 cui_id cui_dock_resize_id(cui_id view, const cui_dock *, cui_dock_node split);
+cui_id cui_dock_resize_id_at(cui_id view, const cui_dock *, cui_dock_node split,
+                             size_t preceding_child);
 /* Submit within a frame. width/height must be positive finite logical pixels.
  * Registry strings/user data and view must survive renderer completion.
  * Model may not be mutated/destroyed by render or event callbacks.

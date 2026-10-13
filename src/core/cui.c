@@ -145,6 +145,7 @@ struct cui_context {
     size_t string_used;
     cui_id focus, capture, space_capture;
     float pointer_x, pointer_y, dt;
+    bool pointer_position_known;
     struct {
         uint64_t id, device;
         float x, y, start_x, start_y;
@@ -163,7 +164,13 @@ struct cui_context {
     cui_error error;
     bool in_frame, focus_visible, dirty;
 };
+#if defined(__cplusplus)
+static thread_local cui_context *cui_core_paint_context;
+#elif defined(_MSC_VER)
+static __declspec(thread) cui_context *cui_core_paint_context;
+#else
 static _Thread_local cui_context *cui_core_paint_context;
+#endif
 static bool cui_core_layout_only(const cui_context *ui) {
     return ui && ui->in_frame && ui->depth && !ui->overflow_depth && ui->opened[ui->depth - 1] &&
            ui->nodes[ui->node_stack[ui->depth - 1]].layout_only;
@@ -1117,6 +1124,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             isfinite(e.x) && isfinite(e.y)) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
+            ui->pointer_position_known = true;
         }
         cui_id gesture_target = 0;
         cui_id before_capture = ui->capture;
@@ -1241,6 +1249,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             e.type == CUI_EVENT_POINTER_UP) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
+            ui->pointer_position_known = true;
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
@@ -1452,9 +1461,9 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     ui->nodes[ui->node_count] = (cui_core_box_node){
         .clay_id = internal_id,
         .id = id,
+        .parent = parent,
         .focus_scope = ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX,
         .prepaint = SIZE_MAX,
-        .parent = parent,
         .clip = b.clip,
         .layout_only = layout_only,
         .inert = inert,
@@ -2080,7 +2089,11 @@ static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderComman
     return bounds;
 }
 static void *cui_core_frame_copy(cui_context *ui, const void *data, size_t bytes) {
+#if defined(__cplusplus)
+    size_t alignment = alignof(max_align_t);
+#else
     size_t alignment = _Alignof(max_align_t);
+#endif
     size_t padding = (alignment - ui->string_used % alignment) % alignment;
     size_t available = ui->config.frame_bytes - ui->string_used;
     if (padding > available || bytes > available - padding) {
@@ -2279,6 +2292,8 @@ static bool cui_core_prepaint_above(cui_context *ui, size_t candidate, size_t pr
     return a->layer > b->layer || (a->layer == b->layer && ao >= bo);
 }
 static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray commands) {
+    if (!ui->prepaint_count)
+        return;
     cui_rect viewport = {0, 0, ui->config.width, ui->config.height};
     for (size_t i = 0; i < ui->node_count; i++) {
         Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = ui->nodes[i].clay_id});
@@ -2299,12 +2314,14 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
     cui_id hit_id = 0;
     for (size_t i = 0; i < ui->node_count; i++) {
         cui_core_geometry *g = &ui->geometry[i];
-        for (size_t n = i; n != SIZE_MAX; n = ui->nodes[n].parent)
-            if (ui->nodes[n].clip)
-                g->clip = cui_core_prepaint_intersection(g->clip, ui->geometry[n].bounds);
+        size_t parent = ui->nodes[i].parent;
+        if (parent != SIZE_MAX)
+            g->clip = ui->geometry[parent].clip;
+        if (ui->nodes[i].clip)
+            g->clip = cui_core_prepaint_intersection(g->clip, g->bounds);
         g->visible = cui_core_prepaint_intersection(g->bounds, g->clip);
         if (g->found && g->modal_allowed && !ui->nodes[i].layout_only &&
-            ui->nodes[i].hover_hitbox &&
+            ui->nodes[i].hover_hitbox && ui->pointer_position_known &&
             cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
             cui_core_prepaint_above(ui, i, hit)) {
             hit = i;
@@ -2317,17 +2334,22 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
             (!cui_core_focusable(s) && !s->details.pointer_activatable && !s->details.scrollable) ||
             !cui_core_prepaint_scope(ui, ui->semantic_scopes[i]))
             continue;
-        for (size_t n = 0; n < ui->node_count; n++)
-            if (ui->nodes[n].id == s->id) {
-                cui_core_geometry *g = &ui->geometry[n];
-                if (g->found && !ui->nodes[n].inert && !ui->nodes[n].layout_only &&
-                    g->modal_allowed && cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
-                    cui_core_prepaint_above(ui, n, hit)) {
-                    hit = n;
-                    hit_id = s->id;
-                }
-                break;
-            }
+        Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(cui_core_folded(s->id));
+        if (item == &Clay_LayoutElementHashMapItem_DEFAULT || !item->layoutElement)
+            continue;
+        void *data = item->layoutElement->config.userData;
+        if (!data || data == ui)
+            continue; /* Layout-only nodes deliberately carry the context marker. */
+        size_t n = (size_t)((cui_core_box_node *)data - ui->nodes);
+        if (n >= ui->node_count || ui->nodes[n].id != s->id)
+            continue;
+        cui_core_geometry *g = &ui->geometry[n];
+        if (g->found && !ui->nodes[n].inert && !ui->nodes[n].layout_only && g->modal_allowed &&
+            cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
+            cui_core_prepaint_above(ui, n, hit)) {
+            hit = n;
+            hit_id = s->id;
+        }
     }
     for (size_t i = 0; i < ui->prepaint_count; i++) {
         cui_core_prepaint *p = &ui->prepaints[i];
@@ -2340,8 +2362,10 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
             .visible_bounds = g->visible,
             .pointer_x = ui->pointer_x,
             .pointer_y = ui->pointer_y,
-            .pointer_valid = isfinite(ui->pointer_x) && isfinite(ui->pointer_y),
-            .pointer_inside = g->found && cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y),
+            .pointer_valid =
+                ui->pointer_position_known && isfinite(ui->pointer_x) && isfinite(ui->pointer_y),
+            .pointer_inside = ui->pointer_position_known && g->found &&
+                              cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y),
             .modal_allowed = g->modal_allowed,
             .inert = n->inert || !g->found,
             .pointer_hit = hit_id,
@@ -2468,10 +2492,10 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     if (!ui->prepaint_capacity)
         cui_core_prepaint_prepare(ui, a);
     ui->count = 0;
-    if (ui->prepaint_capacity)
-        goto cui_core_commands_done;
     uint32_t underlay_background_id = 0;
     size_t conversion_clip_depth = 0;
+    if (ui->prepaint_capacity)
+        goto cui_core_commands_done;
     for (int32_t i = 0; i < a.length; i++) {
         Clay_RenderCommand *c = &a.internalArray[i];
         if (!conversion_clip_depth && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END &&

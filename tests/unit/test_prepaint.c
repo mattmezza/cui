@@ -304,6 +304,44 @@ int main(void) {
     assert(image_seen && mesh_seen);
     balanced(d);
     cui_destroy(ui);
+    ui = create(128, 4096);
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    owner(ui, &info, &calls, 0, 3, 0, false);
+    cui_end_frame(ui);
+    assert(!info.pointer_valid && !info.pointer_inside && !info.pointer_visible &&
+           info.pointer_hit == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 15, .y = 15}));
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    owner(ui, &info, &calls, 0, 3, 0, false);
+    cui_end_frame(ui);
+    assert(info.pointer_valid && info.pointer_inside && info.pointer_visible &&
+           info.pointer_hit == 20);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    owner(ui, &info, &calls, 0, 3, 0, false);
+    cui_end_frame(ui);
+    assert(info.pointer_valid && info.pointer_visible);
+    cui_destroy(ui);
+    ui = create(128, 4096);
+    assert(!cui_set_prepaint(ui, (cui_prepaint_options){0}));
+    assert(cui_last_error(ui) == CUI_ERROR_LIFECYCLE);
+    cui_clear_error(ui);
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    assert(!cui_set_prepaint(ui, (cui_prepaint_options){.callback = paint, .command_budget = 3}));
+    cui_begin_box(ui, 60, (cui_box){.width = 100, .height = 40});
+    assert(!cui_set_prepaint(ui, (cui_prepaint_options){.command_budget = 3}));
+    assert(!cui_set_prepaint(ui, (cui_prepaint_options){.callback = paint}));
+    assert(!cui_set_prepaint(
+        ui, (cui_prepaint_options){.callback = paint, .command_budget = 3, .payload_bytes = 1}));
+    assert(cui_last_error(ui) == CUI_OK);
+    p = (payload){ui, &info, &calls, 0, 1234.5};
+    assert(cui_set_prepaint(
+        ui, (cui_prepaint_options){
+                .callback = paint, .command_budget = 3, .payload = &p, .payload_bytes = sizeof p}));
+    cui_end_box(ui);
+    d = cui_end_frame(ui);
+    assert(color_index(d, 11) != SIZE_MAX);
+    cui_destroy(ui);
     /* A positive layer preceding a portal owner is also rejected atomically. */
     ui = create(128, 4096);
     assert(cui_begin_frame(ui, 300, 200, .016f));

@@ -344,3 +344,52 @@ explicit repaint requests. This is Core evidence, not physical-device evidence
 or a claim that Chart/Plot consumers already use the new seam. Arbitrary
 layout-submitted tooltip content still requires a separate integration design;
 the new deferred stream deliberately supports fixed paint only.
+
+## Follow-up portability, presence, and scaling review
+
+The phase guard uses C++ `thread_local`, MSVC C `__declspec(thread)`, or standard
+C11 `_Thread_local`. Strict C11 Core tests and C++11 public-header/TLS declaration
+probes pass on the available Linux compiler. Windows/MSVC execution was not
+available. The complete standalone implementation remains C11 source: a C++20
+implementation compile still rejects pre-existing implicit `void *` conversions,
+C aggregate enum initializers, and out-of-order designated initializers. Compile
+implementation as C and link from C++ through the public header; this review does
+not certify a complete C++ implementation build. Temporary standalone generation
+used `scripts/amalgamate.py`'s `generate` function without editing distribution.
+
+Pointer position initially is unknown. Only accepted pointer down/move/up events
+make it known; `pointer_valid`, `pointer_inside`, and `pointer_visible` are false
+and `pointer_hit` is zero before that first event. The last known coordinates
+persist on idle frames and after CANCEL. CANCEL withdraws capture/activation;
+it does not mean the pointer physically left the window. The existing event
+surface has no explicit host pointer-leave/presence event, so this API cannot
+infer physical pointer presence after host leave or focus loss. Legacy input
+routing remains unchanged.
+
+Malformed options (missing callback, zero budget, null nonempty payload, invalid
+layer, or an unidentified/missing open owner) return false without installing a
+registration or consuming its budget. They do not set a new sticky error; this
+matches the existing option-setter convention. Calls outside layout or from a
+callback report lifecycle errors; duplicates and capacity have the explicit
+errors described above.
+
+Preparation now skips entirely when no prepaint callback is registered. With
+callbacks it resolves current semantic nodes through Clay's existing hash map,
+not an N-by-S scan. Ancestor clips propagate once from already submitted parents.
+Snapshot work is O(N + S), plus bounded focus-scope ancestry checks (depth at most
+256). Callback selection remains O(P squared); deferred insertion costs O(C*P +
+P squared), with raw scissor look-ahead potentially O(C squared) for an artificial
+sequence of clip-only commands. N, S, P and C are configured/submitted nodes,
+semantics, callbacks and render commands, respectively. At default N=4096,
+P=4096 means about 16.8 million callback selection comparisons; ordinary single
+Chart/Plot use has P near one. The supported million-element ceiling is a
+capacity bound, not a performance guarantee. Large callback-heavy virtualized
+scenes need a sorted index and cached layer look-ahead before scaling claims.
+Virtualized offscreen rows should not register callbacks for every model item.
+
+New retained storage is N*(sizeof registration + sizeof geometry) plus
+C*(sizeof draw command + sizeof bool), allocated once at context creation. On
+this 64-bit build these sizes are 192, 52, 264, and 1 bytes: default capacities add
+3,170,304 bytes, before allocator rounding. Payloads/text consume the existing
+frame arena. There is no hidden per-frame heap allocation or unbounded binding
+cache, but the extra fixed reservation is material for small embedded hosts.

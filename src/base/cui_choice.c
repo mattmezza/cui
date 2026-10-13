@@ -987,6 +987,8 @@ typedef struct {
     size_t count;
     bool *selected;
     cui_choice_activation_fn external;
+    cui_choice_confirm_fn confirm;
+    cui_choice_cancel_fn cancel;
     void *external_user;
 } cui_choice_multi_reducer;
 static void cui_choice_multi_activate(cui_id item, void *user) {
@@ -999,13 +1001,28 @@ static void cui_choice_multi_activate(cui_id item, void *user) {
     if (reducer->external)
         reducer->external(item, reducer->external_user);
 }
+static void cui_choice_multi_confirm(cui_id item, bool secondary, void *user) {
+    cui_choice_multi_reducer *reducer = user;
+    reducer->confirm(item, secondary, reducer->external_user);
+}
+static void cui_choice_multi_cancel(void *user) {
+    cui_choice_multi_reducer *reducer = user;
+    reducer->cancel(reducer->external_user);
+}
 bool cui_base_list_multi(cui_context *ui, const cui_choice_item *items, size_t count,
                          bool *selected, cui_list_state *state, cui_list_options options) {
     if (!items || !state || !selected || !count)
         return false;
-    cui_choice_multi_reducer reducer = {items, count, selected, options.on_activate,
+    cui_choice_multi_reducer reducer = {items,
+                                        count,
+                                        selected,
+                                        options.on_activate,
+                                        options.on_confirm,
+                                        options.on_cancel,
                                         options.activation_user};
     options.on_activate = cui_choice_multi_activate;
+    options.on_confirm = reducer.confirm ? cui_choice_multi_confirm : NULL;
+    options.on_cancel = reducer.cancel ? cui_choice_multi_cancel : NULL;
     options.activation_user = &reducer;
     cui_id action = 0;
     bool activated = cui_base_list(ui, items, count, &action, state, options);
@@ -1049,7 +1066,7 @@ cui_combobox_result cui_base_combobox_multi(cui_context *ui, cui_id input, cui_s
                                             bool disabled) {
     if (!selected || (!filtered_selected && capacity))
         return (cui_combobox_result){.error = CUI_EDIT_INVALID_ARGUMENT};
-    cui_choice_multi_reducer reducer = {items, count, selected, NULL, NULL};
+    cui_choice_multi_reducer reducer = {.items = items, .count = count, .selected = selected};
     cui_id action = 0;
     cui_combobox_result result = cui_choice_reduce_combobox(
         ui, input, name, query, items, count, filtered, capacity, &action, state, disabled, true,

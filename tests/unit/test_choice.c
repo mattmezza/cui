@@ -2849,6 +2849,86 @@ static void list_legacy_confirm(cui_id item, void *user) {
     assert(item == 10 && user == &list_confirms);
     list_legacy_confirms++;
 }
+typedef struct {
+    bool selected[3];
+    unsigned activated, confirmed, cancelled;
+} multi_notification_owner;
+static void multi_notification_activate(cui_id item, void *user) {
+    multi_notification_owner *owner = user;
+    assert(item == 20 && owner->activated == owner->confirmed);
+    ++owner->activated;
+    owner->selected[0] = true;
+}
+static void multi_notification_confirm(cui_id item, bool secondary, void *user) {
+    multi_notification_owner *owner = user;
+    assert(item == 20 && !secondary && owner->activated == owner->confirmed + 1);
+    ++owner->confirmed;
+    /* Confirmation is allowed to apply the external owner's final selection. */
+    owner->selected[0] = false;
+    owner->selected[1] = true;
+}
+static void multi_notification_cancel(void *user) {
+    multi_notification_owner *owner = user;
+    ++owner->cancelled;
+    owner->selected[0] = true;
+    owner->selected[1] = false;
+}
+static bool multi_notification_frame(cui_context *ui, multi_notification_owner *owner,
+                                     cui_list_state *state, bool disabled) {
+    cui_choice_item entries[] = {
+        {10, {"Earlier", 7}, false}, {20, {"Later", 5}, false}, {30, {"Disabled", 8}, true}};
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_begin_box(ui, 90, (cui_box){.width = 240});
+    bool activated = cui_list_multi(ui, 91, &theme, entries, 3, owner->selected, state,
+                                    (cui_list_options){.disabled = disabled,
+                                                       .on_activate = multi_notification_activate,
+                                                       .on_confirm = multi_notification_confirm,
+                                                       .on_cancel = multi_notification_cancel,
+                                                       .activation_user = owner});
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        for (size_t j = 0; j < 3; ++j)
+            if (semantics[i].id == entries[j].id)
+                assert(semantics[i].checked == owner->selected[j] &&
+                       semantics[i].details.selected == owner->selected[j]);
+    assert(cui_last_error(ui) == CUI_OK);
+    return activated;
+}
+static void test_multi_notification_owner(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    multi_notification_owner owner = {.selected = {true, false, false}};
+    cui_list_state state = {.active = 10};
+    multi_notification_frame(ui, &owner, &state, false);
+    click(ui, 20);
+    assert(multi_notification_frame(ui, &owner, &state, false));
+    assert(owner.activated == 1 && owner.confirmed == 1 && !owner.cancelled);
+    assert(!owner.selected[0] && owner.selected[1]);
+    assert(!multi_notification_frame(ui, &owner, &state, false));
+    assert(owner.activated == 1 && owner.confirmed == 1);
+    click(ui, 30);
+    assert(!multi_notification_frame(ui, &owner, &state, false));
+    click(ui, 20);
+    assert(!multi_notification_frame(ui, &owner, &state, true));
+    assert(owner.activated == 1 && owner.confirmed == 1);
+    cui_focus(ui, 20);
+    key(ui, CUI_KEY_ESCAPE);
+    assert(!multi_notification_frame(ui, &owner, &state, true));
+    assert(!owner.cancelled);
+    multi_notification_frame(ui, &owner, &state, false);
+    cui_focus(ui, 20);
+    key(ui, CUI_KEY_ESCAPE);
+    assert(!multi_notification_frame(ui, &owner, &state, false));
+    assert(owner.cancelled == 1 && owner.selected[0] && !owner.selected[1]);
+    assert(!multi_notification_frame(ui, &owner, &state, false));
+    assert(owner.cancelled == 1);
+    cui_destroy(ui);
+}
+
 static void test_list_confirmation_contract(void) {
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
@@ -4271,6 +4351,7 @@ int main(void) {
     test_tab_independent_palette();
     test_tab_reference_size_metrics();
     test_list_confirmation_contract();
+    test_multi_notification_owner();
     test_structured_tab_parts();
     test_custom_tab_width_caps();
     test_dropdown_configurable_palettes();

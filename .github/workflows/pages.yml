@@ -37,6 +37,8 @@ jobs:
         run: uv run tests/web/test_touch_components.py
       - name: Verify additional touch controls and actual clipboard
         run: uv run tests/web/test_touch_more.py
+      - name: Verify mobile page swipe fallback and control ownership
+        run: uv run tests/web/test_touch_page_navigation.py
       - name: Verify interaction guides design controls and composed app
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions

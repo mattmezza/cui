@@ -306,6 +306,7 @@ function render(){
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(frameReducedMotion));lastTime=now;
  wasm.gallery_theme_preset(themeChoice==='high-contrast'?-1:selectedPreset());
  if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
+ applyTouchPageFallback();
  let clips=0;
  for(let i=0;i<wasm.gallery_count();i++){
   const f=n=>wasm.gallery_command(i,n);const type=f(0),x=f(1),y=f(2),w=f(3),h=f(4);
@@ -634,10 +635,36 @@ function prefersCharacterInput(e){return plainCharacterInput(e)&&Array.from({len
 function mods(e){return(e.shiftKey?1:0)|(e.ctrlKey?2:0)|(e.altKey?4:0)|(e.metaKey?8:0);}
 const pointerButton=e=>e.button===2?1:e.button===1?2:0;
 let suppressCompatibilityMouse=false;
+const pageTouches=new Map();
+function applyTouchPageFallback(){
+ for(const [id,t] of pageTouches){
+  const dx=t.x-t.originX,dy=t.y-t.originY;
+  if(!t.owned&&!t.blocked&&pageTouches.size===1&&Math.abs(dy)>=8&&Math.abs(dy)>Math.abs(dx)&&wasm.gallery_touch_page_available(id)){
+   t.owned=true;wasm.gallery_touch(7,0,0,id,1);requestFrame();
+   window.scrollBy(0,-(t.y-t.ackY));
+  }
+  t.ackY=t.y;
+ }
+}
+
 for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])canvas.addEventListener(event,e=>{
  if(!wasm)return;
  const rect=canvas.getBoundingClientRect();
- if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=e.pointerType!=='mouse';}
+ if(e.pointerType==='touch'){
+  if(type===1){
+   if(pageTouches.size>=16){for(const t of pageTouches.values())t.blocked=true;}
+   else {const blocked=pageTouches.size!==0;for(const t of pageTouches.values())t.blocked=true;
+    const hostOnly=Array.from(pageTouches.values()).some(t=>t.owned);
+    pageTouches.set(e.pointerId,{originX:e.clientX,originY:e.clientY,x:e.clientX,y:e.clientY,ackY:e.clientY,owned:hostOnly,blocked});
+    if(hostOnly){canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=true;requestFrame();return;}
+   }
+  }else {const t=pageTouches.get(e.pointerId);if(t){
+   if(t.owned){if(type===0&&!t.blocked&&pageTouches.size===1)window.scrollBy(0,t.y-e.clientY);
+    t.x=e.clientX;t.y=e.clientY;if(type===2)pageTouches.delete(e.pointerId);requestFrame();return;}
+   t.x=e.clientX;t.y=e.clientY;if(type===2)pageTouches.delete(e.pointerId);
+  }}
+ }
+ if(type===1){canvas.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=e.pointerType!=='mouse';}
  if(type!==0&&e.pointerType==='mouse')return; // MouseEvent.detail carries the click count; PointerEvent.detail is zero.
  if(e.pointerType==='touch'||e.pointerType==='pen')wasm.gallery_touch(type,e.clientX-rect.left,e.clientY-rect.top,e.pointerId,e.pointerType==='touch'?1:2);
  else wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),type===0?0:1);requestFrame();
@@ -657,7 +684,10 @@ canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('click',()=>{suppressCompatibilityMouse=false;});
 canvas.style.touchAction='none';
-canvas.addEventListener('pointercancel',e=>{wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
+function cancelPageTouches(){for(const [id,t] of pageTouches)if(!t.owned)wasm?.gallery_touch(7,0,0,id,1);pageTouches.clear();requestFrame();}
+window.addEventListener('blur',cancelPageTouches);window.addEventListener('hashchange',cancelPageTouches);
+canvas.addEventListener('lostpointercapture',e=>{const t=pageTouches.get(e.pointerId);if(!t)return;pageTouches.delete(e.pointerId);if(!t.owned)wasm?.gallery_touch(7,0,0,e.pointerId,1);requestFrame();});
+canvas.addEventListener('pointercancel',e=>{const t=pageTouches.get(e.pointerId);pageTouches.delete(e.pointerId);if(!t?.owned)wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
 canvas.addEventListener('blur',e=>{if(e.relatedTarget===imeTarget)return;wasm?.gallery_event(7,0,0,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
 for(const target of [canvas,imeTarget])for(const [event,type] of [['keydown',3],['keyup',4]])target.addEventListener(event,e=>{
  if(!wasm)return;const key=keyIdentity(e.key);

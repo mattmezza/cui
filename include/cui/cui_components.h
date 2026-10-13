@@ -299,6 +299,8 @@ typedef struct {
     cui_text_input_purpose content_type;
     cui_input_mask_storage *mask_storage;
     cui_input_mask_allocator mask_allocator;
+    cui_edit_format format;
+    cui_edit_workspace format_workspace; /* Caller-owned final formatted value + NUL. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

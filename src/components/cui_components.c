@@ -2149,6 +2149,23 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
         ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
          (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_edit_checked_result configured =
+        cui_edit_apply_checked(edit,
+                               (cui_edit_request){.kind = CUI_EDIT_REQUEST_PRESENT,
+                                                  .format = options.format,
+                                                  .format_workspace = options.format_workspace},
+                               (cui_edit_acceptance){0});
+    if (configured.error != CUI_EDIT_OK)
+        return (cui_input_result){.error = configured.error};
+    bool pattern_placeholder = options.format.pattern.length && !options.placeholder.length;
+    if (pattern_placeholder) {
+        cui_str placeholder;
+        cui_edit_result error =
+            cui_edit_format_placeholder(options.format, options.format_workspace.data,
+                                        options.format_workspace.bytes, &placeholder);
+        if (error != CUI_EDIT_OK)
+            return (cui_input_result){.error = error};
+    }
     cui_input_mask_cache *mask = NULL;
     if (options.masked) {
         cui_input_visual_cache *plain = cui_input_visual_resource(ui, id);
@@ -2207,6 +2224,8 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
             .validate = options.validate,
             .validate_user = options.validate_user,
             .normalization = options.normalization,
+            .format = options.format,
+            .format_workspace = options.format_workspace,
             .masked = options.masked,
             .content_type = options.content_type,
             .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},
@@ -2221,6 +2240,12 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
         mask->revision = cui_edit_get_state(edit).revision;
         if (!state->behavior.composition || !state->behavior.composition->active)
             mask->visible = mask->committed;
+    }
+    if (pattern_placeholder) {
+        cui_str placeholder;
+        (void)cui_edit_format_placeholder(options.format, options.format_workspace.data,
+                                          options.format_workspace.bytes, &placeholder);
+        options.placeholder = placeholder;
     }
     options.invalid = options.invalid || result.error != CUI_EDIT_OK;
     cui_input_paint(ui, id, t, name, edit, state, options);

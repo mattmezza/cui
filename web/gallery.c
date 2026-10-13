@@ -24,6 +24,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_questionnaire.h"
+#include "cui/cui_radio_group.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_root.h"
 #include "cui/cui_scroll.h"
@@ -1075,7 +1076,18 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
                        &attachment_states[index], options);
     }
 }
-static int radio, clicks;
+static int clicks;
+static cui_id radio_selected;
+static cui_radio_group_state radio_group_state;
+static unsigned radio_requests;
+static void gallery_radio_change(void *user, cui_id selected) {
+    (void)user;
+    radio_requests++;
+    radio_selected = selected;
+}
+unsigned gallery_radio_stat(unsigned field) {
+    return field == 0 ? radio_requests : 0;
+}
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
 static bool dropdown_outline, dropdown_selected;
@@ -3128,16 +3140,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 4: {
-        cui_radio_options options = {.size = (cui_control_size)control_size,
-                                     .design_size = design_size,
-                                     .disabled = disabled,
-                                     .required = choice_required != 0,
-                                     .invalid = choice_invalid != 0,
-                                     .skip_tab = choice_skip_tab != 0};
-        cui_radio_ex(ui, cui_id_from(ui, "radio-a"), &t, cui_string("Standard"), &radio, 0,
-                     options);
-        cui_radio_ex(ui, cui_id_from(ui, "radio-b"), &t, cui_string("Priority"), &radio, 1,
-                     options);
+        cui_radio_group_item items[] = {
+            {cui_id_from(ui, "radio-a"), cui_string("Standard"), false},
+            {cui_id_from(ui, "radio-b"), cui_string("Priority"), false},
+            {cui_id_from(ui, "radio-c"), cui_string("Express (unavailable)"), true}};
+        if (!radio_selected)
+            radio_selected = items[0].id;
+        cui_radio_group(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
+                        &radio_group_state,
+                        (cui_radio_group_options){.name = cui_string("Delivery options"),
+                                                  .vertical = true,
+                                                  .size = (cui_control_size)control_size,
+                                                  .design_size = design_size,
+                                                  .disabled = disabled,
+                                                  .required = choice_required != 0,
+                                                  .invalid = choice_invalid != 0,
+                                                  .skip_tab = choice_skip_tab != 0,
+                                                  .on_change = gallery_radio_change});
         break;
     }
     case 5:

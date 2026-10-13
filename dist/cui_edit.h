@@ -56,6 +56,10 @@ const cui_edit_selection *cui_edit_get_selections(const cui_edit *, size_t *coun
 /* Validates grapheme endpoints, merges overlapping/adjacent ranges, and preserves
  * active ID/orientation. Failure preserves model and attached arrays. */
 cui_edit_result cui_edit_select_many(cui_edit *, const cui_edit_selection *, size_t count);
+/* Preserve ordered disjoint row ranges without adjacency/coincidence merging.
+ * Endpoints must be grapheme boundaries; IDs unique, first entry active. Selection
+ * changes update current history metadata but create no document Undo entry. */
+cui_edit_result cui_edit_select_disjoint(cui_edit *, const cui_edit_selection *, size_t count);
 /* Repeat the same UTF-8 text across normalized selections, atomically. One
  * document/history step; resulting cursors preserve IDs and active-first order.
  * Candidate cursor endpoints must remain grapheme boundaries. Undo/Redo restore
@@ -78,6 +82,17 @@ typedef enum {
     CUI_EDIT_UNICODE_WORD_PREVIOUS,
     CUI_EDIT_UNICODE_WORD_NEXT
 } cui_edit_motion;
+/* Read-only replacement preflight; internal scratch may change, model/history
+ * do not. Same validation as replace_selections. */
+cui_edit_result cui_edit_can_replace_selections(cui_edit *, cui_str);
+/* Empty clipboard preserves ranges. LF lines (including final empty line) are
+ * distributed in document order only when count matches normalized selections;
+ * otherwise whole text repeats. One Undo restores the original collection. */
+cui_edit_result cui_edit_paste_selections(cui_edit *, cui_str);
+/* Join nonempty ranges in document order with LF and a trailing NUL. Caller
+ * buffer/output must be disjoint from all model storage. Both stay untouched on
+ * validation/capacity failure; output borrows buffer. Does not change selection. */
+cui_edit_result cui_edit_copy_selections(const cui_edit *, char *, size_t, cui_str *output);
 size_t cui_edit_selection_capacity(const cui_edit *);
 /* Add collapsed cursors, retaining active-first order. Duplicate offsets and
  * points inside existing selections are ignored. New IDs must be unique.
@@ -195,6 +210,12 @@ cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui
  * insert at the collapsed cursor. Outdent removes only an exact line prefix.
  * One successful change is one undo step with both selection endpoints mapped.
  * Attached inline tokens reject indent; detach or use host token-aware editing. */
+/* Attached multicursor indent: any noncollapsed range (or block=true) selects
+ * whole LF lines, inclusive endpoint row and deduplicated shared rows. Inline
+ * inserts at cursors. Outdent removes one exact leading unit per touched row.
+ * Remaps every endpoint across all edits; atomic one Undo, no token support. */
+cui_edit_result cui_edit_indent_selections(cui_edit *, bool outdent, bool block, size_t tab_size,
+                                           bool hard_tabs);
 cui_edit_result cui_edit_indent(cui_edit *, bool outdent, size_t tab_size, bool hard_tabs);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
@@ -4180,9 +4201,39 @@ cui_edit_result cui_edit_select_many(cui_edit *edit, const cui_edit_selection *i
     cui_edit_private_save_state(edit);
     return CUI_EDIT_OK;
 }
+cui_edit_result cui_edit_select_disjoint(cui_edit *edit, const cui_edit_selection *input,
+                                         size_t count) {
+    if (!edit || !edit->selections || edit->token_count || !input || !count ||
+        count > CUI_EDIT_MAX_SELECTIONS)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (count > edit->selection_capacity)
+        return CUI_EDIT_CAPACITY;
+    cui_str text = cui_edit_get_text(edit);
+    cui_edit_selection next[CUI_EDIT_MAX_SELECTIONS];
+    for (size_t i = 0; i < count; ++i) {
+        next[i] = input[i];
+        if (!cui_grapheme_boundary(text, next[i].anchor) ||
+            !cui_grapheme_boundary(text, next[i].cursor))
+            return CUI_EDIT_BOUNDARY;
+        if (i &&
+            cui_edit_private_selection_start(next[i]) < cui_edit_private_selection_end(next[i - 1]))
+            return CUI_EDIT_INVALID_ARGUMENT;
+        for (size_t j = 0; j < i; ++j)
+            if (next[i].id == next[j].id)
+                return CUI_EDIT_INVALID_ARGUMENT;
+    }
+    memcpy(edit->selections, next, count * sizeof(*next));
+    edit->selection_count = count;
+    edit->anchor = next[0].anchor;
+    edit->cursor = next[0].cursor;
+    edit->preferred_column_valid = false;
+    cui_edit_private_save_state(edit);
+    return CUI_EDIT_OK;
+}
 static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_str text,
                                                            const cui_edit_selection *input,
-                                                           size_t count, bool merge_ranges) {
+                                                           size_t count, bool merge_ranges,
+                                                           const cui_str *pieces, bool commit) {
     if (!edit || !edit->selections || !edit->selection_count || edit->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!cui_edit_valid_utf8(text))
@@ -4209,18 +4260,27 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
         removed +=
             cui_edit_private_selection_end(sorted[i]) - cui_edit_private_selection_start(sorted[i]);
     }
-    size_t remaining = edit->length - removed;
-    if (text.length && count > (edit->config.capacity - 1 - remaining) / text.length)
-        return CUI_EDIT_CAPACITY;
+    size_t remaining = edit->length - removed, inserted = 0;
+    for (size_t i = 0; i < count; ++i) {
+        cui_str piece = pieces ? pieces[i] : text;
+        if (!cui_edit_valid_utf8(piece))
+            return CUI_EDIT_INVALID_UTF8;
+        if (!cui_edit_private_accepted(edit, piece))
+            return CUI_EDIT_LINE_BREAK;
+        if (piece.length > edit->config.capacity - 1 - remaining - inserted)
+            return CUI_EDIT_CAPACITY;
+        inserted += piece.length;
+    }
     size_t at = 0, out = 0;
     for (size_t i = 0; i < count; ++i) {
         size_t start = cui_edit_private_selection_start(sorted[i]),
                end = cui_edit_private_selection_end(sorted[i]);
         memcpy(edit->scratch + out, edit->config.buffer + at, start - at);
         out += start - at;
-        if (text.length)
-            memcpy(edit->scratch + out, text.data, text.length);
-        out += text.length;
+        cui_str piece = pieces ? pieces[i] : text;
+        if (piece.length)
+            memcpy(edit->scratch + out, piece.data, piece.length);
+        out += piece.length;
         at = end;
         results[i] = (cui_edit_selection){sorted[i].id, out, out};
     }
@@ -4248,6 +4308,8 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
         return normalized;
     memcpy(results, normalized_results, resulting_count * sizeof(*results));
     count = resulting_count;
+    if (!commit)
+        return CUI_EDIT_OK;
     bool changes = out != edit->length || memcmp(edit->scratch, edit->config.buffer, out);
     if (changes)
         cui_edit_private_save_state(edit);
@@ -4269,7 +4331,91 @@ cui_edit_result cui_edit_replace_selections(cui_edit *edit, cui_str text) {
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     return cui_edit_private_replace_collection(edit, text, edit->selections, edit->selection_count,
-                                               false);
+                                               false, NULL, true);
+}
+cui_edit_result cui_edit_can_replace_selections(cui_edit *edit, cui_str text) {
+    if (!edit)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    return cui_edit_private_replace_collection(edit, text, edit->selections, edit->selection_count,
+                                               false, NULL, false);
+}
+cui_edit_result cui_edit_paste_selections(cui_edit *edit, cui_str text) {
+    if (!edit || !edit->selections || edit->token_count)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_valid_utf8(text))
+        return CUI_EDIT_INVALID_UTF8;
+    if (!text.length)
+        return CUI_EDIT_OK;
+    cui_edit_selection normalized[CUI_EDIT_MAX_SELECTIONS];
+    size_t count;
+    cui_edit_result error = cui_edit_private_normalize_selections(
+        cui_edit_get_text(edit), edit->selections, edit->selection_count, normalized,
+        edit->selection_capacity, &count);
+    if (error != CUI_EDIT_OK)
+        return error;
+    cui_str lines[CUI_EDIT_MAX_SELECTIONS];
+    size_t line_count = 0, start = 0;
+    for (size_t at = 0; at <= text.length; ++at) {
+        if (at == text.length || text.data[at] == '\n') {
+            if (line_count < CUI_EDIT_MAX_SELECTIONS)
+                lines[line_count] = (cui_str){text.data + start, at - start};
+            ++line_count;
+            start = at + 1;
+        }
+    }
+    return cui_edit_private_replace_collection(edit, text, normalized, count, false,
+                                               count > 1 && line_count == count ? lines : NULL,
+                                               true);
+}
+static bool cui_edit_private_model_overlap(const cui_edit *edit, const void *p, size_t size) {
+    return cui_edit_private_storage_overlap(p, size, edit, sizeof(*edit)) ||
+           cui_edit_private_storage_overlap(p, size, edit->config.buffer, edit->config.capacity) ||
+           cui_edit_private_storage_overlap(p, size, edit->scratch, edit->config.capacity) ||
+           cui_edit_private_storage_overlap(p, size, edit->history,
+                                            edit->slots * edit->config.capacity) ||
+           cui_edit_private_storage_overlap(p, size, edit->states,
+                                            edit->slots * sizeof(*edit->states)) ||
+           cui_edit_private_storage_overlap(p, size, edit->selections,
+                                            edit->selection_capacity * sizeof(*edit->selections)) ||
+           cui_edit_private_storage_overlap(p, size, edit->selection_history,
+                                            edit->slots * sizeof(*edit->selection_history));
+}
+cui_edit_result cui_edit_copy_selections(const cui_edit *edit, char *buffer, size_t capacity,
+                                         cui_str *output) {
+    if (!edit || !edit->selections || edit->token_count || !buffer || !capacity || !output ||
+        cui_edit_private_model_overlap(edit, buffer, capacity) ||
+        cui_edit_private_model_overlap(edit, output, sizeof(*output)) ||
+        cui_edit_private_storage_overlap(buffer, capacity, output, sizeof(*output)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_selection sorted[CUI_EDIT_MAX_SELECTIONS];
+    memcpy(sorted, edit->selections, edit->selection_count * sizeof(*sorted));
+    cui_edit_private_sort_selections(sorted, edit->selection_count);
+    size_t length = 0, nonempty = 0;
+    for (size_t i = 0; i < edit->selection_count; ++i) {
+        size_t bytes =
+            cui_edit_private_selection_end(sorted[i]) - cui_edit_private_selection_start(sorted[i]);
+        if (!bytes)
+            continue;
+        size_t separator = nonempty ? 1 : 0;
+        if (separator > capacity - 1 - length || bytes > capacity - 1 - length - separator)
+            return CUI_EDIT_CAPACITY;
+        length += bytes + separator;
+        ++nonempty;
+    }
+    size_t at = 0;
+    for (size_t i = 0; i < edit->selection_count; ++i) {
+        size_t first = cui_edit_private_selection_start(sorted[i]),
+               last = cui_edit_private_selection_end(sorted[i]);
+        if (first == last)
+            continue;
+        if (at)
+            buffer[at++] = '\n';
+        memcpy(buffer + at, edit->config.buffer + first, last - first);
+        at += last - first;
+    }
+    buffer[at] = 0;
+    *output = (cui_str){buffer, at};
+    return CUI_EDIT_OK;
 }
 size_t cui_edit_selection_capacity(const cui_edit *edit) {
     return edit ? edit->selection_capacity : 0;
@@ -4375,7 +4521,7 @@ cui_edit_result cui_edit_erase_selections(cui_edit *edit, bool backwards, bool b
         }
     }
     return cui_edit_private_replace_collection(edit, (cui_str){0}, ranges, edit->selection_count,
-                                               true);
+                                               true, NULL, true);
 }
 static bool cui_edit_private_string_equal(cui_str a, cui_str b) {
     return a.length == b.length && (!a.length || !memcmp(a.data, b.data, a.length));
@@ -4550,6 +4696,87 @@ static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t an
     cui_edit_private_detach_tokens(e);
     e->revision++;
     cui_edit_private_record(e);
+}
+cui_edit_result cui_edit_indent_selections(cui_edit *e, bool outdent, bool block, size_t tab_size,
+                                           bool hard_tabs) {
+    if (!e || !e->selections || !e->config.multiline || e->token_count || !tab_size ||
+        tab_size > 4096)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t count = e->selection_count, unit = hard_tabs ? 1 : tab_size;
+    cui_edit_selection mapped[CUI_EDIT_MAX_SELECTIONS];
+    size_t first_lines[CUI_EDIT_MAX_SELECTIONS], last_lines[CUI_EDIT_MAX_SELECTIONS];
+    cui_str text = cui_edit_get_text(e);
+    for (size_t i = 0; i < count; ++i) {
+        mapped[i] = e->selections[i];
+        if (!cui_grapheme_boundary(text, mapped[i].anchor) ||
+            !cui_grapheme_boundary(text, mapped[i].cursor))
+            return CUI_EDIT_BOUNDARY;
+        if (mapped[i].anchor != mapped[i].cursor)
+            block = true;
+        first_lines[i] =
+            cui_edit_private_line_start(e, cui_edit_private_selection_start(mapped[i]));
+        last_lines[i] = cui_edit_private_line_start(e, cui_edit_private_selection_end(mapped[i]));
+    }
+    size_t output = 0, edits = 0;
+    for (size_t at = 0; at <= e->length;) {
+        bool line_start = !at || e->config.buffer[at - 1] == '\n', selected = false;
+        for (size_t i = 0; i < count; ++i) {
+            if (block || outdent)
+                selected |= line_start && at >= first_lines[i] && at <= last_lines[i];
+            else
+                selected |= at == e->selections[i].cursor;
+        }
+        if (selected && (!outdent || cui_edit_private_indent_match(e, at, unit, hard_tabs))) {
+            if (outdent) {
+                for (size_t i = 0; i < count; ++i) {
+                    size_t old[2] = {e->selections[i].anchor, e->selections[i].cursor};
+                    size_t *targets[2] = {&mapped[i].anchor, &mapped[i].cursor};
+                    for (size_t j = 0; j < 2; ++j) {
+                        if (old[j] >= at + unit)
+                            *targets[j] -= unit;
+                        else if (old[j] >= at)
+                            *targets[j] = output;
+                    }
+                }
+                at += unit;
+            } else {
+                if (unit > e->config.capacity - 1 - output)
+                    return CUI_EDIT_CAPACITY;
+                for (size_t i = 0; i < count; ++i) {
+                    if (e->selections[i].anchor >= at)
+                        mapped[i].anchor += unit;
+                    if (e->selections[i].cursor >= at)
+                        mapped[i].cursor += unit;
+                }
+                memset(e->scratch + output, hard_tabs ? '\t' : ' ', unit);
+                output += unit;
+            }
+            ++edits;
+        }
+        if (at == e->length)
+            break;
+        if (output == e->config.capacity - 1)
+            return CUI_EDIT_CAPACITY;
+        e->scratch[output++] = e->config.buffer[at++];
+    }
+    if (!edits)
+        return CUI_EDIT_OK;
+    e->scratch[output] = 0;
+    cui_str candidate = {e->scratch, output};
+    for (size_t i = 0; i < count; ++i)
+        if (!cui_grapheme_boundary(candidate, mapped[i].anchor) ||
+            !cui_grapheme_boundary(candidate, mapped[i].cursor))
+            return CUI_EDIT_BOUNDARY;
+    cui_edit_private_save_state(e);
+    memcpy(e->config.buffer, e->scratch, output + 1);
+    e->length = output;
+    memcpy(e->selections, mapped, count * sizeof(*mapped));
+    e->anchor = mapped[0].anchor;
+    e->cursor = mapped[0].cursor;
+    e->preferred_column_valid = false;
+    ++e->revision;
+    cui_edit_private_record(e);
+    return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_indent(cui_edit *e, bool outdent, size_t tab_size, bool hard_tabs) {
     if (!e || !e->config.multiline || !tab_size || tab_size > 4096 || e->token_count)

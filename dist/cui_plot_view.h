@@ -127,6 +127,42 @@ cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, un
                                        size_t stride, size_t capacity_bytes,
                                        const cui_plot_cached_shape *, size_t count,
                                        cui_color clear);
+/* Source Background subset for software paths: encoded-sRGB solid/two-stop
+ * gradients. No Oklab, slash/checkerboard patterns or native renderer triangles.
+ * Angle0 points up,90 right; caller angle is never changed for bar orientation. */
+typedef enum { CUI_PLOT_BACKGROUND_SOLID, CUI_PLOT_BACKGROUND_LINEAR } cui_plot_background_kind;
+typedef struct {
+    cui_color color;
+    double position;
+} cui_plot_color_stop;
+typedef struct {
+    cui_plot_background_kind kind;
+    cui_color solid;
+    double angle;
+    cui_plot_color_stop from, to;
+} cui_plot_background;
+cui_plot_background cui_plot_solid_background(cui_color);
+cui_plot_background cui_plot_linear_background(double angle, cui_plot_color_stop from,
+                                               cui_plot_color_stop to);
+/* Explicit positive finite relative frame/position within +/-16384. Stops0..1
+ * may be reversed; equal stops make a right-continuous hard edge. Projection
+ * clamps beyond stops. Channels interpolate straight encoded-sRGB RGBA8; this
+ * is not a claim of byte-identical GPUI shader/color-space output. */
+cui_plot_result cui_plot_background_sample(const cui_plot_background *, cui_plot_rect frame,
+                                           cui_plot_point position, cui_color *out);
+typedef struct {
+    cui_plot_cached_path path;
+    cui_plot_rect background_frame; /* origin-relative; paint colors share this frame */
+    cui_plot_background fill, stroke;
+    float stroke_width;
+} cui_plot_background_shape;
+/* Cached geometry with per-pixel fill/stroke background. Same raster budgets,
+ * sampling and transaction/lifetime contract as raster_cached. Origin translates
+ * frame+geometry together; changing paint backgrounds never tessellates again. */
+cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned width, unsigned height,
+                                            size_t stride, size_t capacity_bytes,
+                                            const cui_plot_background_shape *, size_t count,
+                                            cui_color clear);
 /* Caller RGBA8 storage, straight alpha. Rasterizer accepts Move/Line/Cubic/Close;
  * use arc_flatten for ARC commands. Cubics use 16 uniform parameter chords.
  * Each shape <=4096 flattened segments, <=64 shapes, dimensions1..1024,
@@ -206,6 +242,67 @@ typedef struct {
  * implicit zoom/pan or per-shape hit testing. */
 cui_plot_result cui_plot_view(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_view_options *);
+/* Portable PlotElement composition seam. Host supplies CURRENT global bounds,
+ * live pointer and occlusion-aware hover; Core has no prepaint/current-hitbox
+ * query. Bounds must match this frame's plot layout and bitmap extent. */
+typedef struct {
+    cui_id owner;
+    cui_plot_cursor_memory cursor;
+    cui_plot_hover_memory hover;
+    cui_plot_transition_clock transition;
+    bool request_frame;
+    cui_plot_transition_clock appear_clock;
+    cui_plot_appear_value appearance;
+    uint64_t generation, last_frame, scope_identity;
+    cui_plot_appear_registry *scope;
+    bool has_frame, has_generation;
+} cui_plot_element_state;
+typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
+                                               cui_plot_rect current_bounds,
+                                               cui_plot_tooltip_state *out, void *user);
+typedef void (*cui_plot_compose_fn)(cui_context *, cui_id owner, const cui_theme *,
+                                    const cui_plot_hover_memory *hover,
+                                    cui_plot_rect current_bounds, void *user);
+typedef void (*cui_plot_appear_fn)(cui_id owner, const cui_plot_appear_value *, void *user);
+typedef struct {
+    cui_plot_rect bounds;
+    cui_plot_point pointer;
+    bool hovered, appearing, touch;
+    cui_plot_transition_policy enter, exit;
+    cui_plot_resolve_fn resolve;
+    cui_plot_compose_fn marks, children, tooltip;
+    void *user;
+    int16_t tooltip_layer; /* zero selects1, otherwise must be positive */
+    /* Optional first-paint appearance. Host increments serial every frame,
+     * including frames omitting this plot. Pass active innermost registry
+     * begun with the same frame serial. */
+    bool has_appearance;
+    uint64_t generation, frame_serial;
+    cui_plot_transition_policy appear;
+    cui_plot_appear_registry *appear_scope;
+    cui_plot_appear_fn on_appear; /* synchronous, no UI; may prepare bitmap/marks */
+} cui_plot_element_options;
+/* Zero-init state. Owner change resets it. Resolver is synchronous preflight:
+ * OK supplies relative datum/dots, EMPTY supplies none; it must not compose UI
+ * or mutate state/options. Dots stay borrowed until replacement/exit completes.
+ * Uses Core frame time/reduced-motion; marks then ordinary children are composed
+ * inside the plot after bitmap/axes, tooltip last in an inert global portal with
+ * plot extent and hover opacity. Tooltip callback places its body relative to
+ * that portal and may extend outside it. Text/bitmap payloads stay live through
+ * renderer completion. Callbacks balance boxes and must not mutate driver state.
+ * Primary activation uses existing view routing. Touch hosts update state.cursor
+ * through cursor_long_press before composition; touch=true preserves that gate.
+ * Driver requests redraw for clocks; host advances frames. Disabled/passive
+ * plots reset hover, suppress resolver/tooltip and still compose children.
+ * Appearance runs even disabled/passive, notifies on_appear during preflight
+ * before resolver/bitmap paint (sample pointer lives only for that callback),
+ * suppresses datum resolution while its LINEAR time<1 and combines redraw flags.
+ * Generation/rekey/frame gap restarts; active scope remembers only completed
+ * generations. Default appear duration0/reduced motion complete immediately.
+ * No implicit prepaint/layout pass, native mesh cache or OS long-press detector. */
+cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
+                                 const cui_plot_view_options *, cui_plot_element_state *,
+                                 const cui_plot_element_options *);
 #ifdef __cplusplus
 }
 #endif
@@ -446,9 +543,80 @@ static void blend(unsigned char *p, cui_color c) {
     p[2] = (unsigned char)lround((c.b * a + p[2] * old * (1 - a)) / alpha);
     p[3] = (unsigned char)lround(alpha * 255);
 }
+static bool background_frame_valid(cui_plot_rect frame) {
+    return point_valid((cui_plot_point){frame.x_min, frame.y_min}) &&
+           point_valid((cui_plot_point){frame.x_max, frame.y_max}) && frame.x_min < frame.x_max &&
+           frame.y_min < frame.y_max;
+}
+static bool background_valid(const cui_plot_background *background) {
+    if (!background || background->kind < CUI_PLOT_BACKGROUND_SOLID ||
+        background->kind > CUI_PLOT_BACKGROUND_LINEAR)
+        return false;
+    return background->kind == CUI_PLOT_BACKGROUND_SOLID ||
+           (isfinite(background->angle) && isfinite(background->from.position) &&
+            isfinite(background->to.position) && background->from.position >= 0 &&
+            background->from.position <= 1 && background->to.position >= 0 &&
+            background->to.position <= 1);
+}
+cui_plot_background cui_plot_solid_background(cui_color color) {
+    return (cui_plot_background){.solid = color};
+}
+cui_plot_background cui_plot_linear_background(double angle, cui_plot_color_stop from,
+                                               cui_plot_color_stop to) {
+    return (cui_plot_background){
+        .kind = CUI_PLOT_BACKGROUND_LINEAR, .angle = angle, .from = from, .to = to};
+}
+typedef struct {
+    const cui_plot_background *background;
+    double center_x, center_y, x, y;
+} plot_background_sampler;
+static plot_background_sampler background_sampler(const cui_plot_background *background,
+                                                  cui_plot_rect frame) {
+    plot_background_sampler sample = {.background = background};
+    if (!background || background->kind == CUI_PLOT_BACKGROUND_SOLID)
+        return sample;
+    double angle = fmod(background->angle, 360) * (3.14159265358979323846 / 180);
+    double dx = sin(angle), dy = -cos(angle);
+    double length = fabs((frame.x_max - frame.x_min) * dx) + fabs((frame.y_max - frame.y_min) * dy);
+    sample.x = dx / length;
+    sample.y = dy / length;
+    sample.center_x = frame.x_min / 2 + frame.x_max / 2;
+    sample.center_y = frame.y_min / 2 + frame.y_max / 2;
+    return sample;
+}
+static cui_color background_color(plot_background_sampler sample, cui_plot_point point) {
+    const cui_plot_background *background = sample.background;
+    if (background->kind == CUI_PLOT_BACKGROUND_SOLID)
+        return background->solid;
+    double position =
+        .5 + (point.x - sample.center_x) * sample.x + (point.y - sample.center_y) * sample.y;
+    double interval = background->to.position - background->from.position;
+    double t = interval == 0 ? (position >= background->to.position ? 1 : 0)
+                             : (position - background->from.position) / interval;
+    t = fmax(0, fmin(1, t));
+    cui_color a = background->from.color, b = background->to.color;
+    return (cui_color){(unsigned char)lround(a.r * (1 - t) + b.r * t),
+                       (unsigned char)lround(a.g * (1 - t) + b.g * t),
+                       (unsigned char)lround(a.b * (1 - t) + b.b * t),
+                       (unsigned char)lround(a.a * (1 - t) + b.a * t)};
+}
+cui_plot_result cui_plot_background_sample(const cui_plot_background *background,
+                                           cui_plot_rect frame, cui_plot_point position,
+                                           cui_color *out) {
+    if (!out || !background_valid(background) || !background_frame_valid(frame) ||
+        !point_valid(position))
+        return CUI_PLOT_INVALID;
+    *out = background_color(background_sampler(background, frame), position);
+    return CUI_PLOT_OK;
+}
 static void raster_segments(unsigned char *pixels, unsigned width, unsigned height, size_t stride,
                             const plot_segment *lines, size_t used, cui_plot_point origin,
-                            cui_color fill, cui_color stroke, float stroke_width) {
+                            cui_color fill, cui_color stroke, float stroke_width,
+                            const cui_plot_background *fill_background,
+                            const cui_plot_background *stroke_background,
+                            cui_plot_rect background_frame) {
+    plot_background_sampler fill_sample = background_sampler(fill_background, background_frame);
+    plot_background_sampler stroke_sample = background_sampler(stroke_background, background_frame);
     for (unsigned y = 0; y < height; ++y)
         for (unsigned x = 0; x < width; ++x) {
             double px = x + .5, py = y + .5;
@@ -460,7 +628,7 @@ static void raster_segments(unsigned char *pixels, unsigned width, unsigned heig
                 if (lines[j].closed && ((a.y > py) != (b.y > py)) &&
                     px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
                     inside = !inside;
-                if (stroke.a && stroke_width > 0) {
+                if ((stroke_background || stroke.a) && stroke_width > 0) {
                     double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
                     double t =
                         length ? fmax(0, fmin(1, ((px - a.x) * dx + (py - a.y) * dy) / length)) : 0;
@@ -468,11 +636,21 @@ static void raster_segments(unsigned char *pixels, unsigned width, unsigned heig
                         stroked = true;
                 }
             }
+            if (!inside && !stroked)
+                continue;
+            cui_plot_point relative = {px - origin.x, py - origin.y};
             unsigned char *p = pixels + y * stride + x * 4;
-            if (inside && fill.a)
-                blend(p, fill);
-            if (stroked)
-                blend(p, stroke);
+            if (inside) {
+                cui_color color = fill_background ? background_color(fill_sample, relative) : fill;
+                if (color.a)
+                    blend(p, color);
+            }
+            if (stroked) {
+                cui_color color =
+                    stroke_background ? background_color(stroke_sample, relative) : stroke;
+                if (color.a)
+                    blend(p, color);
+            }
         }
 }
 cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned height,
@@ -505,12 +683,119 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
     for (size_t i = 0; i < count; ++i) {
         (void)segments(shapes + i, lines, &used);
         raster_segments(pixels, width, height, stride, lines, used, (cui_plot_point){0},
-                        shapes[i].fill, shapes[i].stroke, shapes[i].stroke_width);
+                        shapes[i].fill, shapes[i].stroke, shapes[i].stroke_width, NULL, NULL,
+                        (cui_plot_rect){0});
     }
     return CUI_PLOT_OK;
 }
-cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme,
-                              const cui_plot_view_options *o) {
+static cui_plot_result element_appearance(cui_context *ui, cui_id id, cui_plot_element_state *next,
+                                          const cui_plot_element_options *o) {
+    next->appearance = (cui_plot_appear_value){.time = 1, .progress = 1};
+    if (!o->has_appearance) {
+        next->has_generation = next->has_frame = false;
+        next->scope = NULL;
+        next->appear_clock = (cui_plot_transition_clock){0};
+        return CUI_PLOT_OK;
+    }
+    if (next->has_frame && next->last_frame != o->frame_serial &&
+        (next->last_frame == UINT64_MAX || next->last_frame + 1 != o->frame_serial))
+        *next = (cui_plot_element_state){.owner = id};
+    next->last_frame = o->frame_serial;
+    next->has_frame = true;
+    uint64_t scope_identity = o->appear_scope ? o->appear_scope->identity : 0;
+    if (!next->has_generation || next->generation != o->generation ||
+        next->scope != o->appear_scope || next->scope_identity != scope_identity)
+        next->appear_clock = (cui_plot_transition_clock){0};
+    next->generation = o->generation;
+    next->has_generation = true;
+    next->scope = o->appear_scope;
+    next->scope_identity = scope_identity;
+    bool complete = false;
+    if (o->appear_scope) {
+        cui_plot_result result =
+            cui_plot_appear_registry_complete(o->appear_scope, id, o->generation, &complete);
+        if (result != CUI_PLOT_OK)
+            return result;
+        if (o->appear_scope->last_frame != o->frame_serial)
+            return CUI_PLOT_INVALID;
+    }
+    if (complete)
+        next->appearance = (cui_plot_appear_value){.time = 1, .progress = 1};
+    else {
+        cui_plot_result result =
+            cui_plot_appear_step(&next->appear_clock, cui_frame_time(ui), o->appear,
+                                 cui_reduced_motion(ui), &next->appearance);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (o->appear_scope && next->appearance.time == 1 && !complete) {
+        size_t index = 0;
+        while (index < o->appear_scope->count && o->appear_scope->entries[index].identity != id)
+            ++index;
+        if (index == o->appear_scope->count && index == o->appear_scope->capacity)
+            return CUI_PLOT_CAPACITY;
+    }
+    return CUI_PLOT_OK;
+}
+static cui_plot_result element_prepare(cui_context *ui, cui_id id,
+                                       const cui_plot_view_options *view,
+                                       cui_plot_element_state *next,
+                                       const cui_plot_element_options *o) {
+    if (!o || !next || !point_valid(o->pointer) ||
+        !point_valid((cui_plot_point){o->bounds.x_min, o->bounds.y_min}) ||
+        !point_valid((cui_plot_point){o->bounds.x_max, o->bounds.y_max}) ||
+        o->bounds.x_max - o->bounds.x_min != view->bitmap.width ||
+        o->bounds.y_max - o->bounds.y_min != view->bitmap.height || o->tooltip_layer < 0)
+        return CUI_PLOT_INVALID;
+    if (next->owner != id)
+        *next = (cui_plot_element_state){.owner = id};
+    cui_plot_result result = element_appearance(ui, id, next, o);
+    if (result != CUI_PLOT_OK)
+        return result;
+    if (o->on_appear)
+        o->on_appear(id, &next->appearance, o->user);
+    next->request_frame = next->appearance.request_frame;
+    if (!view->interactive || view->disabled) {
+        next->cursor = (cui_plot_cursor_memory){0};
+        next->hover = (cui_plot_hover_memory){0};
+        next->transition = (cui_plot_transition_clock){0};
+        return CUI_PLOT_OK;
+    }
+    if (!o->touch) {
+        cui_plot_cursor_update update;
+        result = cui_plot_cursor_mouse(&next->cursor, o->bounds, o->pointer, o->hovered, &update);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    cui_plot_point relative = {0};
+    bool resolved = false;
+    result =
+        cui_plot_cursor_resolve(&next->cursor, o->bounds, o->pointer,
+                                o->appearing || next->appearance.appearing, &relative, &resolved);
+    if (result != CUI_PLOT_OK)
+        return result;
+    cui_plot_tooltip_state live = {0};
+    bool has_live = false;
+    if (resolved && o->resolve) {
+        result = o->resolve(relative, o->bounds, &live, o->user);
+        if (result != CUI_PLOT_OK && result != CUI_PLOT_EMPTY)
+            return result;
+        has_live = result == CUI_PLOT_OK;
+    }
+    cui_plot_motion_value motion;
+    result =
+        cui_plot_transition_step(&next->transition, has_live ? 1 : 0, cui_frame_time(ui),
+                                 has_live ? o->enter : o->exit, cui_reduced_motion(ui), &motion);
+    if (result != CUI_PLOT_OK)
+        return result;
+    next->request_frame |= motion.request_frame;
+    result = cui_plot_hover_track(&next->hover, has_live ? &live : NULL,
+                                  has_live ? &relative : NULL, motion.value);
+    return result;
+}
+static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_theme *theme,
+                                      const cui_plot_view_options *o, cui_plot_element_state *state,
+                                      const cui_plot_element_options *element) {
     if (!ui || !id || !theme || !o || (!o->name.data && o->name.length) ||
         !cui_bitmap_valid(o->bitmap) || o->bitmap.width > 16384 || o->bitmap.height > 16384)
         return CUI_PLOT_INVALID;
@@ -523,7 +808,19 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
         if (result != CUI_PLOT_OK)
             return result;
     }
+    cui_plot_element_state next = {0};
+    if (element) {
+        if (!state)
+            return CUI_PLOT_INVALID;
+        next = *state;
+        cui_plot_result result = element_prepare(ui, id, o, &next, element);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
     cui_rect bounds = cui_bounds(ui, id);
+    if (element)
+        bounds = (cui_rect){(float)element->bounds.x_min, (float)element->bounds.y_min,
+                            (float)o->bitmap.width, (float)o->bitmap.height};
     cui_begin_box(ui, id,
                   (cui_box){.width = (float)o->bitmap.width,
                             .height = (float)o->bitmap.height,
@@ -540,6 +837,17 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
                                               .fixed_height = true});
     if (o->axis)
         axis_paint(ui, id, theme, o->axis, geometry, labels);
+    if (painted && element) {
+        *state = next;
+        if (element->has_appearance && element->appear_scope && state->appearance.time == 1)
+            (void)cui_plot_appear_registry_record(element->appear_scope, id, element->generation,
+                                                  1);
+        const cui_plot_hover_memory *hover = state->hover.has_state ? &state->hover : NULL;
+        if (element->marks)
+            element->marks(ui, id, theme, hover, element->bounds, element->user);
+        if (element->children)
+            element->children(ui, id, theme, hover, element->bounds, element->user);
+    }
     cui_end_box(ui);
     if (painted) {
         size_t count;
@@ -554,7 +862,31 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
                 (void)cui_consume_event(ui, i);
             }
     }
+    if (painted && element) {
+        if (next.request_frame)
+            cui_invalidate(ui);
+        if (state->hover.has_state && element->tooltip) {
+            cui_begin_portal(ui, id ^ UINT64_C(0xad79e25c10000400),
+                             (cui_box){.inert = true,
+                                       .opacity = (float)state->hover.progress,
+                                       .custom_opacity = true},
+                             bounds, element->tooltip_layer ? element->tooltip_layer : 1);
+            element->tooltip(ui, id, theme, &state->hover, element->bounds, element->user);
+            cui_end_box(ui);
+        }
+    }
     return painted ? CUI_PLOT_OK : CUI_PLOT_CAPACITY;
+}
+cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme,
+                              const cui_plot_view_options *o) {
+    return plot_view_impl(ui, id, theme, o, NULL, NULL);
+}
+cui_plot_result cui_plot_element(cui_context *ui, cui_id id, const cui_theme *theme,
+                                 const cui_plot_view_options *view, cui_plot_element_state *state,
+                                 const cui_plot_element_options *element) {
+    if (!state || !element)
+        return CUI_PLOT_INVALID;
+    return plot_view_impl(ui, id, theme, view, state, element);
 }
 
 cui_plot_result cui_plot_grid_ex(cui_context *ui, cui_id id, const cui_theme *theme,
@@ -973,7 +1305,45 @@ cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, un
     for (size_t i = 0; i < count; ++i)
         raster_segments(pixels, width, height, stride, shapes[i].path.segments,
                         shapes[i].path.count, shapes[i].path.origin, shapes[i].fill,
-                        shapes[i].stroke, shapes[i].stroke_width);
+                        shapes[i].stroke, shapes[i].stroke_width, NULL, NULL, (cui_plot_rect){0});
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned width, unsigned height,
+                                            size_t stride, size_t capacity_bytes,
+                                            const cui_plot_background_shape *shapes, size_t count,
+                                            cui_color clear) {
+    if (!pixels || !width || !height || width > 1024 || height > 1024 ||
+        stride < (size_t)width * 4 || stride > SIZE_MAX / height || count > 64 ||
+        (count && !shapes))
+        return CUI_PLOT_INVALID;
+    if (capacity_bytes < stride * height)
+        return CUI_PLOT_CAPACITY;
+    size_t total = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!cached_path_valid(shapes[i].path) ||
+            !background_frame_valid(shapes[i].background_frame) ||
+            !background_valid(&shapes[i].fill) || !background_valid(&shapes[i].stroke) ||
+            !isfinite(shapes[i].stroke_width) || shapes[i].stroke_width < 0 ||
+            shapes[i].stroke_width > 1024)
+            return CUI_PLOT_INVALID;
+        total += shapes[i].path.count;
+    }
+    if (total && (size_t)width * height > 64000000 / total)
+        return CUI_PLOT_CAPACITY;
+    for (unsigned y = 0; y < height; ++y)
+        for (unsigned x = 0; x < width; ++x) {
+            unsigned char *p = pixels + y * stride + x * 4;
+            p[0] = clear.r;
+            p[1] = clear.g;
+            p[2] = clear.b;
+            p[3] = clear.a;
+        }
+    for (size_t i = 0; i < count; ++i)
+        raster_segments(pixels, width, height, stride, shapes[i].path.segments,
+                        shapes[i].path.count, shapes[i].path.origin, (cui_color){0}, (cui_color){0},
+                        shapes[i].stroke_width, &shapes[i].fill, &shapes[i].stroke,
+                        shapes[i].background_frame);
     return CUI_PLOT_OK;
 }
 

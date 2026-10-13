@@ -1324,9 +1324,8 @@ static void test_area_schema_scene(void) {
     cui_dock_workspace_set_version(edges, true, 0);
     assert(cui_dock_workspace_version(edges, &version) && version == 0);
     cui_dock_schema_node split_children[] = {leaves[0], leaves[1]};
-    cui_dock_schema_node split = {.kind = CUI_DOCK_SCHEMA_STACK,
-                                  .children = split_children,
-                                  .child_count = 2};
+    cui_dock_schema_node split = {
+        .kind = CUI_DOCK_SCHEMA_STACK, .children = split_children, .child_count = 2};
     area.center = split;
     area.edge_present[0] = area.edge_present[1] = area.edge_present[2] = false;
     assert(cui_dock_workspace_schema_import(edges, regions, &area, area_scene_key, NULL) ==

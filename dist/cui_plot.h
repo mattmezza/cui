@@ -461,6 +461,20 @@ typedef struct {
 cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *, double target, double now,
                                          cui_plot_transition_policy, bool reduced_motion,
                                          cui_plot_motion_value *);
+/* First-paint Presence clock: unlike transition_step, initializes 0->1.
+ * Linear time is kept independently of easing, so stagger samples local time
+ * before easing. Complete samples bypass easing. Policy/user are borrowed. */
+typedef struct {
+    double time, progress;
+    cui_plot_easing_fn easing;
+    void *user;
+    bool appearing, request_frame;
+} cui_plot_appear_value;
+cui_plot_result cui_plot_appear_step(cui_plot_transition_clock *, double now,
+                                     cui_plot_transition_policy, bool reduced_motion,
+                                     cui_plot_appear_value *);
+cui_plot_result cui_plot_appear_value_stagger(const cui_plot_appear_value *, size_t index,
+                                              size_t count, double spread, double *out);
 /* Scalar pointer glide: source PlotHover.glide targets one Pixels channel.
  * The host owns one zero-initialized state per channel and supplies seconds.
  * Elapsed time advances toward the PREVIOUS target before retargeting. */
@@ -2892,6 +2906,62 @@ cui_plot_result cui_plot_shape_key_point(cui_plot_shape_key *key, cui_plot_point
         return CUI_PLOT_INVALID;
     (void)cui_plot_shape_key_float(key, (float)point.x);
     return cui_plot_shape_key_float(key, (float)point.y);
+}
+
+static double plot_appear_linear(double progress, void *user) {
+    (void)user;
+    return progress;
+}
+cui_plot_result cui_plot_appear_step(cui_plot_transition_clock *clock, double now,
+                                     cui_plot_transition_policy policy, bool reduced_motion,
+                                     cui_plot_appear_value *out) {
+    if (!clock || !out || !isfinite(now) || now < 0 || !isfinite(policy.duration) ||
+        policy.duration < 0 || !isfinite(policy.delay))
+        return CUI_PLOT_INVALID;
+    cui_plot_transition_clock next = *clock;
+    if (!next.initialized)
+        next = (cui_plot_transition_clock){0, 1, now, 1, policy.duration, true};
+    cui_plot_transition_policy linear = policy;
+    linear.easing = plot_appear_linear;
+    linear.user = NULL;
+    cui_plot_motion_value motion;
+    cui_plot_result result =
+        cui_plot_transition_step(&next, 1, now, linear, reduced_motion, &motion);
+    if (result != CUI_PLOT_OK)
+        return result;
+    cui_plot_appear_value value = {
+        motion.value, 1, policy.easing, policy.user, motion.value < 1, motion.request_frame};
+    if (value.appearing)
+        value.progress = plot_transition_sample(policy, motion.value);
+    if (!isfinite(value.progress) || !isfinite(value.time) || value.time < 0 || value.time > 1)
+        return CUI_PLOT_INVALID;
+    *clock = next;
+    *out = value;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_value_stagger(const cui_plot_appear_value *value, size_t index,
+                                              size_t count, double spread, double *out) {
+    if (!value || !out || !isfinite(value->time) || value->time < 0 || value->time > 1 ||
+        !isfinite(value->progress) || !isfinite(spread))
+        return CUI_PLOT_INVALID;
+    double progress = 1;
+    if (value->time < 1) {
+        if (count <= 1)
+            progress = value->progress;
+        else {
+            double time;
+            cui_plot_result result =
+                cui_plot_appear_stagger(value->time, index, count, spread, &time);
+            if (result != CUI_PLOT_OK)
+                return result;
+            progress = plot_transition_sample(
+                (cui_plot_transition_policy){.easing = value->easing, .user = value->user}, time);
+        }
+    }
+    if (!isfinite(progress))
+        return CUI_PLOT_INVALID;
+    *out = progress;
+    return CUI_PLOT_OK;
 }
 
 #endif

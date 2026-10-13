@@ -124,6 +124,23 @@ double gallery_editor_stat(int field) {
         cui_edit_get_selections(editor_edit, &count);
         return (double)count;
     }
+    case 14:
+        return editor_state.view.viewport.x;
+    case 15:
+        return editor_state.view.viewport.y;
+    case 16:
+        return editor_state.view.viewport.w;
+    case 17:
+        return editor_state.view.line_height;
+    case 18: {
+        size_t count = 0, selected = 0;
+        const cui_edit_selection *selections = cui_edit_get_selections(editor_edit, &count);
+        for (size_t i = 0; i < count; ++i)
+            selected += selections[i].cursor > selections[i].anchor
+                            ? selections[i].cursor - selections[i].anchor
+                            : selections[i].anchor - selections[i].cursor;
+        return (double)selected;
+    }
     default:
         return -1;
     }
@@ -3471,7 +3488,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             ui, &t,
             cui_string("Editable C code: line numbers, syntax colors, undo and Ctrl/Meta-F."));
         cui_text(ui,
-                 cui_string("Ctrl/Alt+Up/Down or Alt-click adds cursors; Escape returns to one."),
+                 cui_string(
+                     "Ctrl/Alt+Up/Down adds cursors; Shift+Alt-drag selects a block; Esc resets."),
                  12, t.muted);
         cui_begin_box(ui, cui_id_from(ui, "edit-actions"),
                       (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});

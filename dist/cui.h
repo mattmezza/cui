@@ -94,6 +94,8 @@ typedef enum {
     CUI_KEY_7,
     CUI_KEY_8,
     CUI_KEY_9,
+    CUI_KEY_LEFT_BRACKET,
+    CUI_KEY_RIGHT_BRACKET,
 } cui_key;
 /* ASCII shortcut identity, independent of text/IME input. Letters normalize to
  * uppercase; unsupported characters/keys map to NONE/zero. */
@@ -460,6 +462,12 @@ bool cui_hovered(cui_context *ui, cui_id id);
 /* Cursor of the captured or topmost hovered enabled semantic from the completed
  * frame. Hosts apply this after end_frame; clipping and modal scopes apply. */
 cui_cursor cui_pointer_cursor(cui_context *ui);
+/* Most recent processed pointer Move/Down/Up coordinates, initially0,0.
+ * Queued events update them at begin_frame; idle frames retain them. This is
+ * position only, not hover/occlusion/capture. Outputs must be distinct. Null or
+ * nonfinite coordinates return false and leave both outputs unchanged. */
+bool cui_pointer_position(const cui_context *, float *x, float *y);
+
 /* Current primary-pointer or Space capture; submit behavior before querying. */
 bool cui_pressed(cui_context *ui, cui_id id);
 cui_id cui_focused(cui_context *ui);
@@ -7558,9 +7566,17 @@ cui_key cui_key_from_character(char character) {
         return letters[character - 'A'];
     if (character >= '0' && character <= '9')
         return (cui_key)(CUI_KEY_0 + character - '0');
+    if (character == '[')
+        return CUI_KEY_LEFT_BRACKET;
+    if (character == ']')
+        return CUI_KEY_RIGHT_BRACKET;
     return CUI_KEY_NONE;
 }
 char cui_key_character(cui_key key) {
+    if (key == CUI_KEY_LEFT_BRACKET)
+        return '[';
+    if (key == CUI_KEY_RIGHT_BRACKET)
+        return ']';
     if (key >= CUI_KEY_0 && key <= CUI_KEY_9)
         return (char)('0' + key - CUI_KEY_0);
     for (char c = 'A'; c <= 'Z'; c++)
@@ -7603,6 +7619,14 @@ bool cui_scroll_gesture_filter(cui_scroll_gesture *state, cui_event *event, doub
         else
             event->dx = 0;
     }
+    return true;
+}
+
+bool cui_pointer_position(const cui_context *ui, float *x, float *y) {
+    if (!ui || !x || !y || x == y || !isfinite(ui->pointer_x) || !isfinite(ui->pointer_y))
+        return false;
+    *x = ui->pointer_x;
+    *y = ui->pointer_y;
     return true;
 }
 

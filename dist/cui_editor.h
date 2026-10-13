@@ -22,6 +22,11 @@ typedef struct {
     bool open;
 } cui_editor_completion_state;
 typedef struct cui_editor_matcher cui_editor_matcher;
+/* Source column identity: byte offset plus rounded space-width columns past
+ * a short row's end. Rectangles clip byte columns left to grapheme boundaries. */
+typedef struct {
+    size_t offset, columns_past_end;
+} cui_editor_column_point;
 typedef struct {
     uint64_t id;
     size_t anchor, cursor;
@@ -37,7 +42,13 @@ typedef struct {
     uint64_t cursor_anchor_revision, next_cursor_id;
     cui_text_style cursor_anchor_style;
     float cursor_anchor_font_size;
-    bool multi_pointer;
+    bool multi_pointer, clipboard_active;
+    cui_editor_column_point column_start;
+    uint64_t column_revision;
+    cui_text_style column_style;
+    float column_font_size, column_wrap_width;
+    float column_pointer_x, column_pointer_y;
+    bool column_dragged;
 
 } cui_editor_state;
 typedef struct {
@@ -51,6 +62,12 @@ typedef struct {
     cui_editor_matcher *search; /* Optional borrowed retained matcher, synchronized by view. */
     bool custom_search_colors;
     cui_color search_color, search_current_color;
+    /* Optional caller scratch for multicursor Copy/Cut, including joined LF/NUL.
+     * Disjoint from all model/view resources, borrowed for submission. Clipboard
+     * callbacks must not reenter UI/editor or mutate model/resources; returned
+     * text stays immutable through the synchronous operation. */
+    char *clipboard_scratch;
+    size_t clipboard_capacity;
 } cui_editor_options;
 bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, size_t capacity);
 /* Required before submitting a model with attached multi-selection storage.
@@ -58,6 +75,12 @@ bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, 
  * model/live selection/state storage, and remain unchanged by the host. No alloc.
  * Reinitialize to clear preferred columns after host font-provider changes. */
 bool cui_editor_multicursor_init(cui_editor_state *, cui_editor_cursor_anchor *, size_t capacity);
+/* Uses the current style-aware visual layout (must match model revision).
+ * Topmost visible row is active; one fresh-ID range per visible wrapped/folded
+ * row, ordered left-to-right. Capacity/validation failure preserves collection,
+ * history and ID counter. Selection itself creates no document Undo step. */
+cui_edit_result cui_editor_select_rectangle(cui_editor_state *, cui_editor_column_point start,
+                                            cui_editor_column_point end);
 /* Host supplies validated UTF-8 items and one original document byte range.
  * No copying/filtering/provider calls. Empty count closes the menu. Invalid
  * input preserves both existing menu and document. Item bytes remain immutable
@@ -385,10 +408,157 @@ static size_t cui_editor_clip_grapheme(cui_str text, size_t offset, bool forward
     }
     return iterator.offset == offset || forward ? iterator.offset : previous;
 }
+cui_edit_result cui_editor_select_rectangle(cui_editor_state *editor, cui_editor_column_point start,
+                                            cui_editor_column_point end) {
+    if (!editor || !editor->edit || editor->clipboard_active ||
+        editor->view.revision != cui_edit_get_state(editor->edit).revision ||
+        !cui_edit_selection_capacity(editor->edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str text = cui_edit_get_text(editor->edit);
+    if (!cui_grapheme_boundary(text, start.offset) || !cui_grapheme_boundary(text, end.offset))
+        return CUI_EDIT_BOUNDARY;
+    size_t first = cui_textarea_row_for_offset(&editor->view, start.offset, false),
+           last = cui_textarea_row_for_offset(&editor->view, end.offset, false);
+    if (first == SIZE_MAX || last == SIZE_MAX)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (start.offset < editor->view.lines[first].start ||
+        start.offset > editor->view.lines[first].end ||
+        end.offset < editor->view.lines[last].start || end.offset > editor->view.lines[last].end)
+        return CUI_EDIT_BOUNDARY;
+    size_t a = start.offset - editor->view.lines[first].start,
+           b = end.offset - editor->view.lines[last].start;
+    if (start.columns_past_end > SIZE_MAX - a || end.columns_past_end > SIZE_MAX - b)
+        return CUI_EDIT_BOUNDARY;
+    a += start.columns_past_end;
+    b += end.columns_past_end;
+    size_t left = a < b ? a : b, right = a > b ? a : b;
+    if (first > last) {
+        size_t swap = first;
+        first = last;
+        last = swap;
+    }
+    size_t count = last - first + 1;
+    if (count > cui_edit_selection_capacity(editor->edit))
+        return CUI_EDIT_CAPACITY;
+    size_t old_count;
+    const cui_edit_selection *live = cui_edit_get_selections(editor->edit, &old_count);
+    uint64_t next = cui_editor_next_cursor(editor, live, old_count);
+    if (count > UINT64_MAX - next)
+        return CUI_EDIT_CAPACITY;
+    cui_edit_selection rows[CUI_EDIT_MAX_SELECTIONS];
+    for (size_t i = 0; i < count; ++i) {
+        cui_textarea_line line = editor->view.lines[first + i];
+        size_t length = line.end - line.start;
+        size_t anchor = line.start + (left < length ? left : length),
+               cursor = line.start + (right < length ? right : length);
+        anchor = cui_editor_clip_grapheme(text, anchor, false);
+        cursor = cui_editor_clip_grapheme(text, cursor, false);
+        rows[i] = (cui_edit_selection){next + i, anchor, cursor};
+    }
+    cui_edit_result error = cui_edit_select_disjoint(editor->edit, rows, count);
+    if (error == CUI_EDIT_OK)
+        editor->next_cursor_id = next + count;
+    return error;
+}
+static cui_edit_result cui_editor_column_hit(cui_context *ui, cui_editor_state *editor, float x,
+                                             float y, cui_editor_column_point *point) {
+    bool affinity = editor->view.upstream_affinity;
+    size_t offset = cui_textarea_hit_test(ui, editor->edit, &editor->view, x, y);
+    editor->view.upstream_affinity = affinity;
+    if (offset == SIZE_MAX)
+        return CUI_EDIT_BOUNDARY;
+    float relative =
+        fmaxf(0, (y - editor->view.viewport.y + editor->view.scroll_y) / editor->view.line_height);
+    size_t row = relative >= editor->view.count ? editor->view.count - 1 : (size_t)relative;
+    cui_textarea_line line = editor->view.lines[row];
+    size_t extra = 0;
+    if (offset == line.end && (line.hard_break || row + 1 == editor->view.count)) {
+        float width = cui_textarea_row_x(ui, editor->edit, &editor->view, row, line.end);
+        float space = cui_measure_text_ex(ui, cui_string(" "), editor->view.font_size,
+                                          editor->view.text_style)
+                          .width;
+        double past = (double)x - editor->view.viewport.x + editor->view.scroll_x - width;
+        if (space > 0 && isfinite(space) && past > 0) {
+            double columns = round(past / space);
+            if (!isfinite(columns) || columns >= (double)SIZE_MAX)
+                return CUI_EDIT_BOUNDARY;
+            extra = (size_t)columns;
+        }
+    }
+    *point = (cui_editor_column_point){offset, extra};
+    return CUI_EDIT_OK;
+}
+static float cui_editor_column_scroll_delta(cui_editor_state *editor, float y) {
+    float bottom = editor->view.viewport.y + editor->view.viewport.h - 16,
+          top = editor->view.viewport.y + 16;
+    if (y > bottom)
+        return 12 + fminf(1, (y - bottom) / 96) * 52;
+    if (y < top)
+        return -(12 + fminf(1, (top - y) / 96) * 52);
+    return 0;
+}
+static bool cui_editor_storage_overlap(const void *, size_t, const void *, size_t);
+static cui_edit_result cui_editor_multi_clipboard(cui_editor_state *editor,
+                                                  cui_editor_options options, cui_key key) {
+    const cui_platform *host = options.textarea.clipboard;
+    bool paste = key == CUI_KEY_V;
+    if (!host || !(host->capabilities & CUI_PLATFORM_CLIPBOARD) ||
+        (paste ? !host->clipboard_get : !host->clipboard_set))
+        return CUI_EDIT_CLIPBOARD_UNAVAILABLE;
+    if (options.textarea.readonly && key == CUI_KEY_V)
+        return CUI_EDIT_OK;
+    size_t count;
+    const cui_edit_selection *live = cui_edit_get_selections(editor->edit, &count);
+    cui_edit_selection before[CUI_EDIT_MAX_SELECTIONS];
+    memcpy(before, live, count * sizeof(*live));
+    uint64_t revision = cui_edit_get_state(editor->edit).revision;
+    cui_str text = {0};
+    cui_edit_result error = CUI_EDIT_OK;
+    if (!paste) {
+        char *scratch = options.clipboard_scratch;
+        size_t capacity = options.clipboard_capacity;
+        if (!scratch || !capacity ||
+            cui_editor_storage_overlap(scratch, capacity, editor, sizeof(*editor)) ||
+            cui_editor_storage_overlap(scratch, capacity, editor->view.lines,
+                                       editor->view.capacity * sizeof(*editor->view.lines)) ||
+            cui_editor_storage_overlap(scratch, capacity, editor->cursor_anchors,
+                                       editor->cursor_anchor_capacity *
+                                           sizeof(*editor->cursor_anchors)))
+            return CUI_EDIT_INVALID_ARGUMENT;
+        error = cui_edit_copy_selections(editor->edit, scratch, capacity, &text);
+        if (error != CUI_EDIT_OK)
+            return error;
+        if (key == CUI_KEY_X && !options.textarea.readonly) {
+            error = cui_edit_can_replace_selections(editor->edit, (cui_str){0});
+            if (error != CUI_EDIT_OK)
+                return error;
+        }
+    }
+    editor->clipboard_active = true;
+    bool copied = true;
+    if (paste)
+        text = host->clipboard_get(host->user);
+    else
+        copied = host->clipboard_set(host->user, text);
+    editor->clipboard_active = false;
+    size_t after_count;
+    live = cui_edit_get_selections(editor->edit, &after_count);
+    if (revision != cui_edit_get_state(editor->edit).revision || count != after_count ||
+        memcmp(before, live, count * sizeof(*live)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!copied)
+        return CUI_EDIT_CLIPBOARD_UNAVAILABLE;
+    if (paste)
+        return cui_edit_paste_selections(editor->edit, text);
+    return key == CUI_KEY_X && !options.textarea.readonly
+               ? cui_edit_replace_selections(editor->edit, (cui_str){0})
+               : CUI_EDIT_OK;
+}
 static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                                                    cui_editor_state *editor,
-                                                   cui_textarea_options options,
+                                                   cui_editor_options editor_options,
                                                    cui_textarea_metrics metrics, float width) {
+    cui_textarea_options options = editor_options.textarea;
     cui_textarea_result result = {.error = CUI_TEXTAREA_OK};
     size_t count;
     const cui_edit_selection *live = cui_edit_get_selections(editor->edit, &count);
@@ -399,25 +569,42 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
     size_t before_count = count;
     float before_x = editor->view.scroll_x, before_y = editor->view.scroll_y;
     uint64_t before_revision = cui_edit_get_state(editor->edit).revision;
+    if (editor->multi_pointer &&
+        (options.disabled || cui_focused(ui) != id || editor->column_revision != before_revision ||
+         editor->column_font_size != metrics.font_size || editor->column_wrap_width != width ||
+         !cui_editor_style_equal(editor->column_style, options.text_style))) {
+        editor->multi_pointer = false;
+        editor->column_dragged = false;
+    }
     cui_editor_cursor_sync(editor, options.text_style, metrics.font_size);
     size_t event_count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t event_index = 0; event_index < event_count; ++event_index) {
         cui_event event = events[event_index];
-        if (event.type == CUI_EVENT_CANCEL)
+        if (event.type == CUI_EVENT_CANCEL) {
             editor->multi_pointer = false;
+            editor->column_dragged = false;
+        }
         if (options.disabled || cui_event_consumed(ui, event_index) ||
             cui_event_target(ui, event_index) != id ||
             (event.type == CUI_EVENT_KEY_DOWN &&
              (event.ime_composing || event.prefer_character_input)))
             continue;
         if (editor->multi_pointer &&
-            (event.type == CUI_EVENT_POINTER_MOVE || event.type == CUI_EVENT_POINTER_UP)) {
-            if (event.type == CUI_EVENT_POINTER_UP)
-                editor->multi_pointer = false;
+            (cui_focused(ui) != id ||
+             editor->column_revision != cui_edit_get_state(editor->edit).revision ||
+             editor->column_font_size != metrics.font_size || editor->column_wrap_width != width ||
+             !cui_editor_style_equal(editor->column_style, options.text_style))) {
+            editor->multi_pointer = false;
+            editor->column_dragged = false;
+        }
+        if (editor->multi_pointer && event.type == CUI_EVENT_POINTER_UP) {
+            editor->multi_pointer = false;
+            editor->column_dragged = false;
             cui_consume_event(ui, event_index);
             continue;
         }
+        bool rectangle = editor->multi_pointer && event.type == CUI_EVENT_POINTER_MOVE;
         bool shift = (event.modifiers & CUI_MOD_SHIFT) != 0,
              alt = (event.modifiers & CUI_MOD_ALT) != 0;
         bool command = (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) != 0;
@@ -427,19 +614,29 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
         bool add = vertical && (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN) && alt &&
                    (command || shift);
         bool pointer = event.type == CUI_EVENT_POINTER_DOWN &&
-                       event.pointer_button == CUI_POINTER_PRIMARY && alt && !shift && !command;
+                       event.pointer_button == CUI_POINTER_PRIMARY && alt;
+        bool clipboard =
+            event.type == CUI_EVENT_KEY_DOWN && command &&
+            (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V);
+        char character = cui_key_character(event.key);
+        bool block_indent =
+            event.type == CUI_EVENT_KEY_DOWN && command && (character == '[' || character == ']');
+        bool indent = event.type == CUI_EVENT_KEY_DOWN && !alt &&
+                      ((event.key == CUI_KEY_TAB && !command) || block_indent) &&
+                      !options.no_indent && !options.readonly;
         bool key = event.type == CUI_EVENT_KEY_DOWN &&
                    (event.key == CUI_KEY_ESCAPE || event.key == CUI_KEY_LEFT ||
                     event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_HOME ||
                     event.key == CUI_KEY_END || event.key == CUI_KEY_BACKSPACE ||
                     event.key == CUI_KEY_DELETE || event.key == CUI_KEY_ENTER);
-        if (!vertical && !pointer && !key && event.type != CUI_EVENT_TEXT)
+        if (!vertical && !pointer && !rectangle && !key && !clipboard && !indent &&
+            event.type != CUI_EVENT_TEXT)
             continue;
         if (event.key == CUI_KEY_ESCAPE && count == 1)
             continue;
-        if (options.readonly &&
-            (add || pointer || event.type == CUI_EVENT_TEXT || event.key == CUI_KEY_ENTER ||
-             event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE)) {
+        if (options.readonly && (indent || (clipboard && event.key == CUI_KEY_V) ||
+                                 event.type == CUI_EVENT_TEXT || event.key == CUI_KEY_ENTER ||
+                                 event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE)) {
             cui_consume_event(ui, event_index);
             continue;
         }
@@ -454,9 +651,36 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
         cui_editor_cursor_anchor anchors[CUI_EDIT_MAX_SELECTIONS];
         memcpy(anchors, editor->cursor_anchors, count * sizeof(*anchors));
         size_t reveal = SIZE_MAX;
-        bool reveal_upstream = false, preserve = false;
+        bool reveal_upstream = false, preserve = false, reveal_cursor = true;
         cui_edit_result error = CUI_EDIT_OK;
-        if (pointer || add) {
+        if (rectangle) {
+            cui_editor_column_point point;
+            error = cui_editor_column_hit(ui, editor, event.x, event.y, &point);
+            if (error == CUI_EDIT_OK)
+                error = cui_editor_select_rectangle(editor, editor->column_start, point);
+            if (error == CUI_EDIT_OK) {
+                editor->column_pointer_x = event.x;
+                editor->column_pointer_y = event.y;
+                editor->column_dragged = true;
+                reveal_cursor = false;
+            }
+        } else if (clipboard) {
+            uint64_t old_revision = cui_edit_get_state(editor->edit).revision;
+            cui_edit_selection old[CUI_EDIT_MAX_SELECTIONS];
+            memcpy(old, live, count * sizeof(*old));
+            error = cui_editor_multi_clipboard(editor, editor_options, event.key);
+            size_t new_count;
+            const cui_edit_selection *new_live = cui_edit_get_selections(editor->edit, &new_count);
+            if (old_revision == cui_edit_get_state(editor->edit).revision && count == new_count &&
+                !memcmp(old, new_live, count * sizeof(*old))) {
+                preserve = true;
+                reveal_cursor = false;
+            }
+        } else if (indent) {
+            error = cui_edit_indent_selections(
+                editor->edit, block_indent ? character == '[' : shift, block_indent,
+                options.tab_size ? options.tab_size : 2, options.hard_tabs);
+        } else if (pointer || add) {
             cui_edit_selection additions[CUI_EDIT_MAX_SELECTIONS];
             cui_editor_cursor_anchor added_anchors[CUI_EDIT_MAX_SELECTIONS];
             size_t added = 0;
@@ -482,7 +706,27 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                         .valid = true,
                         .upstream = target_affinity};
                 }
-                editor->multi_pointer = true;
+                if (error == CUI_EDIT_OK) {
+                    cui_editor_column_point point;
+                    error = cui_editor_column_hit(ui, editor, event.x, event.y, &point);
+                    if (error == CUI_EDIT_OK) {
+                        editor->column_start = point;
+                        editor->column_revision = cui_edit_get_state(editor->edit).revision;
+                        editor->column_style = options.text_style;
+                        editor->column_font_size = metrics.font_size;
+                        editor->column_wrap_width = width;
+                        editor->column_pointer_x = event.x;
+                        editor->column_pointer_y = event.y;
+                        editor->column_dragged = false;
+                        editor->multi_pointer = true;
+                        if (shift || (event.modifiers & CUI_MOD_CTRL)) {
+                            error = cui_edit_select(editor->edit, point.offset, point.offset);
+                            anchors[0] = added_anchors[0];
+                            anchors[0].id = live[0].id;
+                            added = 0;
+                        }
+                    }
+                }
             } else {
                 bool up = event.key == CUI_KEY_UP;
                 for (size_t i = 0; i < count && error == CUI_EDIT_OK; ++i) {
@@ -710,8 +954,34 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
             reveal = live[0].cursor;
             reveal_upstream = editor->cursor_anchors[0].upstream;
         }
-        cui_editor_multi_reveal(ui, editor, reveal, reveal_upstream);
+        if (reveal_cursor)
+            cui_editor_multi_reveal(ui, editor, reveal, reveal_upstream);
         cui_invalidate(ui);
+    }
+    if (editor->multi_pointer && editor->column_dragged && !options.disabled &&
+        cui_focused(ui) == id &&
+        editor->column_revision == cui_edit_get_state(editor->edit).revision) {
+        float delta = cui_editor_column_scroll_delta(editor, editor->column_pointer_y);
+        float old_y = editor->view.scroll_y;
+        float next = fminf(editor->view.maximum_y,
+                           fmaxf(0, old_y + delta * fminf(.1f, cui_frame_delta(ui)) / .016f));
+        if (next != old_y) {
+            editor->view.scroll_y = next;
+            cui_editor_column_point point;
+            cui_edit_result error = cui_editor_column_hit(ui, editor, editor->column_pointer_x,
+                                                          editor->column_pointer_y, &point);
+            if (error == CUI_EDIT_OK)
+                error = cui_editor_select_rectangle(editor, editor->column_start, point);
+            if (error != CUI_EDIT_OK) {
+                editor->view.scroll_y = old_y;
+                result.edit_error = error;
+            } else {
+                cui_editor_cursor_sync(editor, options.text_style, metrics.font_size);
+                cui_textarea_layout_ex(ui, editor->edit, &editor->view, metrics, width,
+                                       !options.no_wrap, options.text_style);
+                cui_invalidate(ui);
+            }
+        }
     }
     live = cui_edit_get_selections(editor->edit, &count);
     result.scrolled = before_x != editor->view.scroll_x || before_y != editor->view.scroll_y;
@@ -721,10 +991,11 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
 }
 cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cui_editor_state *s,
                                     cui_editor_options o, cui_textarea_metrics metrics) {
-    if (!ui || !id || !s || !s->edit || cui_edit_get_content(s->edit).token_count ||
-        !s->view.lines || !s->view.capacity || s->view.capacity > 65536 ||
-        !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
-        metrics.line_height <= 0 || o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+    if (!ui || !id || !s || !s->edit || s->clipboard_active ||
+        cui_edit_get_content(s->edit).token_count || !s->view.lines || !s->view.capacity ||
+        !isfinite(metrics.font_size) || metrics.font_size <= 0 ||
+        !isfinite(metrics.line_height) || metrics.line_height <= 0 ||
+        o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
         o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||
         (o.language.length && !o.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
@@ -754,13 +1025,12 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     if (saved_live)
         memcpy(saved, saved_live, saved_count * sizeof(*saved));
     cui_edit_result completion_error = cui_editor_completion_events(ui, id, s, o.textarea);
-    cui_textarea_result multiple = cui_editor_multi_events(ui, id, s, o.textarea, metrics, width);
+    cui_textarea_result multiple = cui_editor_multi_events(ui, id, s, o, metrics, width);
     if (multiple.error != CUI_TEXTAREA_OK)
         return multiple;
     size_t current_count;
     cui_edit_get_selections(s->edit, &current_count);
-    if (current_count > 1)
-        o.textarea.no_indent = true;
+    (void)current_count;
     cui_textarea_result result =
         cui_base_textarea(ui, id, name, s->edit, &s->view, o.textarea, metrics);
     result.changed |= multiple.changed;

@@ -1451,9 +1451,8 @@ static void large_document_editor(void) {
         buffer[2 * i + 1] = '\n';
     }
     buffer[bytes] = 0;
-    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-                                                      .capacity = bytes + 64,
-                                                      .multiline = true});
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = bytes + 64, .multiline = true});
     assert(edit);
     cui_editor_state state;
     assert(cui_editor_state_init(&state, edit, lines, rows + 1));

@@ -62,6 +62,29 @@ typedef enum {
     CUI_BUTTON_ROUNDED_CUSTOM
 } cui_button_rounding;
 typedef void (*cui_button_click_fn)(void *user);
+typedef enum {
+    CUI_BUTTON_CLICK_POINTER,
+    CUI_BUTTON_CLICK_KEYBOARD,
+    CUI_BUTTON_CLICK_ACCESSIBILITY
+} cui_button_click_origin;
+/* Pointer-free accepted-event snapshot; copyable beyond callback/frame lifetime.
+ * Pointer fields describe release, not a fabricated down event. */
+typedef struct {
+    cui_button_click_origin origin;
+    cui_id target;
+    uint64_t frame_sequence;
+    size_t event_index;
+    cui_event_type event_type;
+    cui_key key;
+    unsigned modifiers;
+    bool repeat, has_position;
+    float x, y;
+    cui_pointer_type pointer_type;
+    cui_pointer_button pointer_button;
+    uint64_t pointer_id, pointer_device;
+    unsigned click_count; /* Pointer zero normalizes to one; nonpointer is zero. */
+} cui_button_click_event;
+typedef void (*cui_button_click_event_fn)(void *user, const cui_button_click_event *event);
 typedef void (*cui_button_hover_fn)(void *user, bool hovered);
 /* Optional bounded storage, one state per stable Button ID; retain through end_frame.
  * No allocation/cleanup. Hover callbacks and tooltip require this state. */
@@ -112,6 +135,7 @@ typedef struct {
     bool allow_content_overflow;   /* Explicit legacy overflow/wrapping opt-out; default clips. */
     float pixel_size; /* 0: legacy/design sizing; finite (0,4096]: numeric source sizing. */
     bool open; /* Active presentation only; independent of selected/checked/menu lifecycle. */
+    cui_button_click_event_fn on_click_event; /* After legacy on_click, per accepted event. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);

@@ -117,6 +117,10 @@ cui_button_group_result cui_base_button_group_end(cui_context *ui, cui_button_gr
                 w->items[index].on_click(w->items[index].action_user);
                 ++result.callbacks;
             }
+            if (index != SIZE_MAX && w->items[index].on_click_event) {
+                w->items[index].on_click_event(w->items[index].event_user, ui, e);
+                ++result.callbacks;
+            }
             continue;
         }
         bool pointer = events[e].type == CUI_EVENT_POINTER_UP;

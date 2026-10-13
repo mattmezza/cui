@@ -212,3 +212,67 @@ The numeric formulas come from pinned `button/button.rs` lines 615–619 and
 commit `87d10ae5e1299d1be18670a37570c5402f952e34`. Numeric Link/Text normal and icon-only buttons use intrinsic height and width,
 matching the source no-padding branch; explicit caller dimensions still win.
 The zero numeric default preserves CUI's established legacy icon-only sizing.
+
+### Event-aware click callbacks
+
+`on_click_event` receives one `cui_button_click_event` for every accepted
+activation, in frame input order. The legacy `on_click` runs first for each event
+when both are present, using the same `action_user`. Either callback can be used
+alone. `cui_button_ex` continues to return one boolean indicating that at least
+one activation was accepted; the callbacks preserve each individual event.
+
+The payload contains the stable target ID, successful frame sequence, event
+index and event type. Pointer activations include release coordinates in Core
+logical pixels, pointer type/button/contact/device, release modifiers, and click
+count (an unspecified zero normalizes to one). Keyboard activations carry the
+accepted key and modifier bits, without a fabricated pointer position.
+Accessibility activations have a distinct origin. Modifier bits for keyboard or
+touch are a CUI extension: the pinned source ClickEvent helper reports no such
+modifiers. This is an accepted-event snapshot, not a full source MouseClickEvent
+with down and up samples, keyboard hitbox, first-mouse or touch long-press data.
+
+The callback pointer is borrowed only until that callback returns. The structure
+contains no borrowed pointers, so copying the value retains it safely across
+frames or context destruction. `event_index` identifies that dispatched frame,
+not a future queue entry; `frame_sequence` is scoped to context lifetime and its
+existing wrap boundary. The callback must not end/reenter a frame or overwrite
+an active Group workspace. Callback registration and descriptor fields are
+snapshots; controlled model changes retain their existing semantics.
+
+Disabled, loading, cancelled and passive inert/layout-only submissions produce
+no callback. Repeated key events rejected by Core produce no callback. In a
+styled ButtonGroup, child legacy and event callbacks both dispatch when the
+group has no `on_change`. When `on_change` is present it overrides both child
+callbacks, including the existing pointer-only/default or ALL_ACTIVATIONS policy.
+The Base optional child event-index hook runs at that same dispatch point, after
+legacy, and `result.callbacks` counts each actual callback invocation.
+
+Cooperative `cui_consume_event` during the legacy notification cannot erase the
+new notification for the already accepted event. The event-aware callback returns
+`void`; it does not promise GPUI capture/bubble propagation or restore a consumed
+event. The separate capture/propagation proposal records the remaining source
+contracts in `validation/button-click-capture-next33.md`.
+
+```c
+struct button_model {
+    unsigned clicks;
+    cui_button_click_event last_click;
+};
+static void button_clicked(void *user, const cui_button_click_event *event) {
+    struct button_model *model = user;
+    model->last_click = *event;
+    model->clicks++;
+}
+bool draw_event_button(cui_context *ui, const cui_theme *theme,
+                       struct button_model *model) {
+    return cui_button_ex(ui, 100, theme, cui_string("Open"),
+        (cui_button_options){.on_click_event = button_clicked, .action_user = model});
+}
+```
+
+The focused unit fixture verifies same-frame multiplicity and order, release
+metadata, repeat/cancel/current-disabled rejection, cross-frame touch identity,
+copy lifetime, accessibility, Group override and legacy-then-event order.
+The real Noto native fixture uses that same implementation. Chromium WASM uses
+actual mouse/keyboard/CDP touch input, modifiers, cancellation, passive rejection
+and joined Group behavior; it is not evidence of physical OS/device input.

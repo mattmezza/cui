@@ -45,6 +45,9 @@ typedef struct {
     float outline_width;
     cui_color outline_color;
     cui_corner_radii outline_radii;
+    cui_drop_shadow shadows[CUI_DROP_SHADOW_MAX];
+    size_t shadow_count;
+    cui_corner_radii shadow_radii;
     cui_rect underlay_bounds;
     cui_underlay_layout underlay_layout;
     cui_color underlay_color;
@@ -1700,6 +1703,56 @@ bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box bo
     cui_end_box(ui);
     return ok;
 }
+bool cui_drop_shadow_bounds(cui_drop_shadow_paint p, cui_rect *out) {
+    const float values[] = {p.caster.x,        p.caster.y,          p.caster.w,
+                            p.caster.h,        p.layer.offset_x,    p.layer.offset_y,
+                            p.layer.sigma,     p.layer.spread,      p.radii.top_left,
+                            p.radii.top_right, p.radii.bottom_left, p.radii.bottom_right};
+    if (!out)
+        return false;
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++)
+        if (!isfinite(values[i]))
+            return false;
+    if (fabsf(p.caster.x) > 16384 || fabsf(p.caster.y) > 16384 || p.caster.w < 0 ||
+        p.caster.h < 0 || p.caster.w > 16384 || p.caster.h > 16384 ||
+        fabsf(p.layer.offset_x) > 4096 || fabsf(p.layer.offset_y) > 4096 ||
+        fabsf(p.layer.spread) > 4096 || p.layer.sigma < 0 || p.layer.sigma > 256 ||
+        p.radii.top_left < 0 || p.radii.top_right < 0 || p.radii.bottom_left < 0 ||
+        p.radii.bottom_right < 0 || p.radii.top_left > 16384 || p.radii.top_right > 16384 ||
+        p.radii.bottom_left > 16384 || p.radii.bottom_right > 16384)
+        return false;
+    cui_rect next = {0};
+    if (p.caster.w > 0 && p.caster.h > 0 && p.caster.w + 2 * p.layer.spread > 0 &&
+        p.caster.h + 2 * p.layer.spread > 0) {
+        float margin = p.layer.spread + 3 * p.layer.sigma + 1;
+        next = (cui_rect){p.caster.x + p.layer.offset_x - margin,
+                          p.caster.y + p.layer.offset_y - margin, p.caster.w + 2 * margin,
+                          p.caster.h + 2 * margin};
+    }
+    *out = next;
+    return true;
+}
+bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t count,
+                          cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
+        count > CUI_DROP_SHADOW_MAX || (count && !layers))
+        return false;
+    cui_rect ignored;
+    for (size_t i = 0; i < count; i++)
+        if (!cui_drop_shadow_bounds(
+                (cui_drop_shadow_paint){.caster = {0, 0, 1, 1}, .radii = radii, .layer = layers[i]},
+                &ignored))
+            return false;
+    cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    if (count)
+        memcpy(node->shadows, layers, count * sizeof(*layers));
+    node->shadow_count = count;
+    node->shadow_radii = radii;
+    Clay__GetOpenLayoutElement()->config.custom.customData = node;
+    return true;
+}
 bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
         return false;
@@ -2266,8 +2319,9 @@ static bool cui_core_prepaint_rect(cui_rect r) {
            r.h >= 0 && isfinite(r.x + r.w) && isfinite(r.y + r.h);
 }
 static bool cui_core_prepaint_command(cui_draw_command *c) {
-    if (!cui_core_prepaint_rect(c->bounds) || c->type < CUI_DRAW_RECT || c->type > CUI_DRAW_MESH ||
-        c->type == CUI_DRAW_CLIP_PUSH || c->type == CUI_DRAW_CLIP_POP)
+    if (!cui_core_prepaint_rect(c->bounds) || c->type < CUI_DRAW_RECT ||
+        c->type > CUI_DRAW_DROP_SHADOW || c->type == CUI_DRAW_CLIP_PUSH ||
+        c->type == CUI_DRAW_CLIP_POP)
         return false;
     if (!isfinite(c->radius) || c->radius < 0 || !isfinite(c->stroke) || c->stroke < 0)
         return false;
@@ -2285,6 +2339,8 @@ static bool cui_core_prepaint_command(cui_draw_command *c) {
             if (!isfinite(edges[i]) || edges[i] < 0)
                 return false;
     }
+    if (c->type == CUI_DRAW_DROP_SHADOW)
+        return cui_drop_shadow_bounds(c->shadow, &c->bounds);
     if (c->type == CUI_DRAW_IMAGE)
         return cui_core_bitmap_paint_valid(&c->bitmap);
     if (c->type == CUI_DRAW_MESH)
@@ -2312,6 +2368,13 @@ static bool cui_core_prepaint_command(cui_draw_command *c) {
                c->text_color_count)
         return false;
     return true;
+}
+bool cui_prepaint_drop_shadow(cui_prepaint_writer *writer, const cui_drop_shadow_paint *paint,
+                              bool deferred) {
+    if (!paint)
+        return cui_prepaint_emit(writer, NULL, deferred);
+    cui_draw_command command = {.type = CUI_DRAW_DROP_SHADOW, .shadow = *paint};
+    return cui_prepaint_emit(writer, &command, deferred);
 }
 bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *command,
                        bool deferred) {
@@ -2532,6 +2595,8 @@ static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool
             cui_draw_command c = ui->prepaint_commands[p->offset + i];
             if (c.type == CUI_DRAW_IMAGE)
                 c.bitmap.opacity *= p->info.opacity;
+            else if (c.type == CUI_DRAW_DROP_SHADOW)
+                c.shadow.layer.color.a = (uint8_t)(c.shadow.layer.color.a * p->info.opacity);
             else if (c.type == CUI_DRAW_MESH) {
                 c.mesh.color.r *= p->info.opacity;
                 c.mesh.color.g *= p->info.opacity;
@@ -2657,11 +2722,25 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
             background.a = (uint8_t)(background.a * opacity);
             size_t needed = (node->has_underlay ? 3 : 0) + (background.a ? 1 : 0) +
-                            (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0);
+                            (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0) +
+                            node->shadow_count;
             if (needed > ui->config.max_commands - ui->count) {
                 cui_core_fail(ui, CUI_ERROR_CAPACITY);
                 ui->count = 0;
                 goto cui_core_commands_done;
+            }
+            for (size_t shadow = 0; shadow < node->shadow_count; shadow++) {
+                cui_draw_command command = {.type = CUI_DRAW_DROP_SHADOW,
+                                            .shadow = {.caster = d.bounds,
+                                                       .radii = node->shadow_radii,
+                                                       .layer = node->shadows[shadow]}};
+                command.shadow.layer.color.a = (uint8_t)(command.shadow.layer.color.a * opacity);
+                if (!cui_drop_shadow_bounds(command.shadow, &command.bounds)) {
+                    cui_core_fail(ui, CUI_ERROR_LAYOUT);
+                    ui->count = 0;
+                    goto cui_core_commands_done;
+                }
+                ui->commands[ui->count++] = command;
             }
             if (node->outline_width > 0) {
                 float w = node->outline_width;

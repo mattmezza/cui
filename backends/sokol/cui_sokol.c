@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sokol.h"
 #include "../software/cui_bitmap.h"
+#include "../software/cui_shadow.h"
 #define SOKOL_GLCORE
 #define SOKOL_VALIDATE_NON_FATAL
 #ifndef CUI_SOKOL_EXTERNAL_RUNTIME
@@ -43,9 +44,11 @@ typedef struct {
     sg_image image;
     sg_view view;
     cui_bitmap_key key;
+    bool shadow;
     uint64_t used, frame;
 } cached_bitmap;
 struct cui_sokol {
+    cui_shadow_cache shadows;
     cui_sokol_config config;
     vertex *vertices;
     draw *draws;
@@ -58,7 +61,7 @@ struct cui_sokol {
     sg_view white_view;
     cached_glyph glyphs[CUI_SOKOL_GLYPHS];
     cached_bitmap bitmaps[CUI_SOKOL_BITMAPS];
-    size_t bitmap_bytes;
+    size_t bitmap_bytes, shadow_bytes;
     size_t glyph_bytes;
     uint64_t clock, frame, hits, misses;
     bool owns_runtime, ok, rendered, listening;
@@ -277,6 +280,7 @@ static void evict(cui_sokol *r, cached_glyph *g) {
 void cui_sokol_destroy(cui_sokol *r) {
     if (!r)
         return;
+    cui_shadow_destroy(&r->shadows);
     if (sg_isvalid()) {
         if (r->listening)
             sg_remove_commit_listener((sg_commit_listener){committed, r});
@@ -493,6 +497,7 @@ static sg_view bitmap_view(cui_sokol *r, const cui_draw_command *c) {
         fail(r, "CUI Sokol bitmap exceeds cache budget");
         return (sg_view){0};
     }
+    bool shadow = c->type == CUI_DRAW_DROP_SHADOW;
     cached_bitmap *entry = NULL;
     for (size_t i = 0; i < CUI_SOKOL_BITMAPS; i++)
         if (r->bitmaps[i].image.id && cui_bitmap_key_equal(&key, &r->bitmaps[i].key)) {
@@ -509,7 +514,8 @@ static sg_view bitmap_view(cui_sokol *r, const cui_draw_command *c) {
                 else if (b->frame != r->frame && (!oldest || b->used < oldest->used))
                     oldest = b;
             }
-            if (empty && r->bitmap_bytes + bytes <= CUI_SOKOL_BITMAP_BYTES) {
+            if (empty && r->bitmap_bytes + bytes <= CUI_SOKOL_BITMAP_BYTES &&
+                (!shadow || r->shadow_bytes + bytes <= CUI_SHADOW_CACHE_BYTES)) {
                 entry = empty;
                 break;
             }
@@ -517,6 +523,8 @@ static sg_view bitmap_view(cui_sokol *r, const cui_draw_command *c) {
                 fail(r, "CUI Sokol frame exceeds bitmap cache capacity");
                 return (sg_view){0};
             }
+            if (oldest->shadow)
+                r->shadow_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
             r->bitmap_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
             sg_destroy_view(oldest->view);
             sg_destroy_image(oldest->image);
@@ -541,8 +549,10 @@ static sg_view bitmap_view(cui_sokol *r, const cui_draw_command *c) {
             fail(r, "CUI Sokol bitmap upload failed");
             return (sg_view){0};
         }
-        *entry = (cached_bitmap){.image = image, .view = view, .key = key};
+        *entry = (cached_bitmap){.image = image, .view = view, .key = key, .shadow = shadow};
         r->bitmap_bytes += bytes;
+        if (shadow)
+            r->shadow_bytes += bytes;
     }
     entry->used = ++r->clock;
     entry->frame = r->frame;
@@ -563,6 +573,11 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
         return fail(r, "CUI Sokol render cannot run inside an active host pass");
     if (r->rendered)
         return fail(r, "Host must commit before rendering this CUI adapter again");
+    cui_draw_list prepared;
+    if (!cui_shadow_prepare(&r->shadows, list, r->config.target.width / list->width,
+                            r->config.target.height / list->height, 0, 0, &prepared))
+        return fail(r, "Invalid or over-budget CUI shadow transform");
+    list = &prepared;
     cui_rect stack[64];
     size_t depth = 0;
     r->clip = (cui_rect){0, 0, list->width, list->height};
@@ -579,6 +594,7 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
             if (!mesh(r, c->mesh))
                 return false;
             break;
+        case CUI_DRAW_DROP_SHADOW:
         case CUI_DRAW_IMAGE:
             if (c->bounds.w > 0 && c->bounds.h > 0) {
                 sg_view view = bitmap_view(r, c);
@@ -697,7 +713,7 @@ static void destroy(void *r) {
 }
 cui_renderer cui_sokol_interface(cui_sokol *r) {
     unsigned capabilities = CUI_RENDER_ACCELERATED | CUI_RENDER_ROUNDED | CUI_RENDER_CLIP |
-                            CUI_RENDER_IMAGE | CUI_RENDER_MESH;
+                            CUI_RENDER_IMAGE | CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW;
 #ifdef CUI_HAS_TEXT
     if (r && r->config.font)
         capabilities |= CUI_RENDER_TEXT;

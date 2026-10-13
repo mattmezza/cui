@@ -312,6 +312,19 @@ typedef enum { CUI_ALIGN_START, CUI_ALIGN_CENTER, CUI_ALIGN_END } cui_align;
 typedef struct {
     float top_left, top_right, bottom_left, bottom_right;
 } cui_corner_radii;
+/* Bounded drop shadow; blur sigma is standard deviation, in logical pixels. */
+enum { CUI_DROP_SHADOW_MAX = 8 };
+typedef struct {
+    float offset_x, offset_y, sigma, spread;
+    cui_color color;
+} cui_drop_shadow;
+typedef struct {
+    cui_rect caster;
+    cui_corner_radii radii; /* Clamped to original caster, never to spread bounds. */
+    cui_drop_shadow layer;
+} cui_drop_shadow_paint;
+/* Invalid input leaves output untouched. Collapsed spread is an empty extent. */
+bool cui_drop_shadow_bounds(cui_drop_shadow_paint, cui_rect *out);
 typedef struct {
     float left, right, top, bottom;
 } cui_border_edges;
@@ -397,7 +410,8 @@ typedef enum {
     CUI_DRAW_CLIP_PUSH,
     CUI_DRAW_CLIP_POP,
     CUI_DRAW_IMAGE,
-    CUI_DRAW_MESH
+    CUI_DRAW_MESH,
+    CUI_DRAW_DROP_SHADOW
 } cui_draw_type;
 typedef enum {
     CUI_TEXT_WEIGHT_NORMAL,
@@ -430,6 +444,7 @@ typedef struct {
     cui_text_line_source text_source;       /* Frame-owned; zero = legacy text. */
     const cui_text_color_span *text_colors; /* Frame-owned. */
     size_t text_color_count;
+    cui_drop_shadow_paint shadow; /* Value-owned; color includes ancestor opacity. */
 } cui_draw_command;
 typedef struct {
     const cui_draw_command *commands;
@@ -528,6 +543,9 @@ bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
 /* Paint an outside border band without affecting layout or filling its interior.
  * Uses current-frame box bounds and ancestor clipping. Zero width clears it. */
 bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
+/* Copies <=8 layers immediately; count 0 clears. Paints before background. */
+bool cui_set_drop_shadows(cui_context *, const cui_drop_shadow *, size_t count, cui_corner_radii);
+
 typedef struct {
     cui_rect bounds;
     cui_align horizontal, vertical;
@@ -543,6 +561,7 @@ bool cui_set_bitmap_underlay(cui_context *, cui_underlay_layout, cui_bitmap_pain
 /* Current-frame paint after the single layout pass. Register on an open box
  * with a nonzero ID. No layout/input/focus mutation is permitted in callbacks. */
 typedef struct cui_prepaint_writer cui_prepaint_writer;
+bool cui_prepaint_drop_shadow(cui_prepaint_writer *, const cui_drop_shadow_paint *, bool deferred);
 typedef struct {
     cui_id owner;
     cui_rect bounds, clip, visible_bounds;

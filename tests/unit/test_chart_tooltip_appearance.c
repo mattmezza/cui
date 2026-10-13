@@ -46,8 +46,8 @@ static const cui_draw_command *surface(cui_draw_list d) {
 }
 static const cui_draw_command *ring(cui_draw_list d) {
     for (size_t i = 0; i < d.count; i++)
-        if (d.commands[i].type == CUI_DRAW_RECT && d.commands[i].color.r == 250 &&
-            d.commands[i].color.g == 0)
+        if (d.commands[i].type == CUI_DRAW_DROP_SHADOW &&
+            d.commands[i].shadow.layer.color.r == 250 && d.commands[i].shadow.layer.color.g == 0)
             return &d.commands[i];
     return NULL;
 }
@@ -57,11 +57,18 @@ static void ring_geometry(cui_draw_list d, bool bare, unsigned alpha) {
         return;
     }
     const cui_draw_command *r = ring(d), *box = surface(d);
-    assert(r && box && r < box && r->bounds.x == box->bounds.x - 1 &&
-           r->bounds.y == box->bounds.y - 1 && r->bounds.w == box->bounds.w + 2 &&
-           r->bounds.h == box->bounds.h + 2 && r->stroke == 0 && r->color.a == alpha);
-    assert((r->custom_corners ? r->corner_radii.top_left : r->radius) ==
+    assert(r && box && r < box && r->shadow.caster.x == box->bounds.x &&
+           r->shadow.caster.y == box->bounds.y && r->shadow.caster.w == box->bounds.w &&
+           r->shadow.caster.h == box->bounds.h && r->shadow.layer.spread == 1 &&
+           r->shadow.layer.sigma == 0 && r->shadow.layer.color.a == alpha);
+    assert(r->shadow.radii.top_left ==
            (box->custom_corners ? box->corner_radii.top_left : box->radius));
+    assert(r + 2 < box && r[1].type == CUI_DRAW_DROP_SHADOW && r[2].type == CUI_DRAW_DROP_SHADOW);
+    assert(r[1].shadow.layer.offset_y == 4 && r[1].shadow.layer.sigma == 3 &&
+           r[1].shadow.layer.spread == -1);
+    assert(r[2].shadow.layer.offset_y == 2 && r[2].shadow.layer.sigma == 2 &&
+           r[2].shadow.layer.spread == -2);
+    assert(r[1].shadow.layer.color.a == alpha && r[2].shadow.layer.color.a == alpha);
 }
 static cui_theme theme(void) {
     return (cui_theme){.radius = 10,
@@ -263,6 +270,48 @@ static void behavior(bool current, bool typed, bool bare) {
     }
     cui_destroy(ui);
 }
+static void shadow_override(void) {
+    for (unsigned current = 0; current < 2; current++)
+        for (unsigned custom = 0; custom < 2; custom++) {
+            cui_context *ui = cui_create((cui_config){.max_elements = 128,
+                                                      .max_commands = 1024,
+                                                      .frame_bytes = 65536,
+                                                      .measure_styled = measure});
+            assert(ui);
+            unsigned char pixels[128 * 96 * 4];
+            cui_chart_datum data[] = {{.value = 20}, {.value = 40}};
+            cui_chart_tooltip_style s = style();
+            s.ring_color = (cui_color){0, 130, 0, 26};
+            if (custom) {
+                s.shadow_count = 1;
+                s.shadows[0] = (cui_drop_shadow){.sigma = 2, .color = {170, 0, 170, 40}};
+            }
+            cui_chart_options o = options(data, current, true, &s);
+            cui_chart_state state = {
+                .pixels = pixels, .byte_capacity = sizeof pixels, .hovered = SIZE_MAX};
+            assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+            state.hovered = 0;
+            state.tooltip_cursor_valid = true;
+            state.tooltip_cursor_x = state.tooltip_cursor_y = 20;
+            if (current)
+                assert(cui_queue_event(
+                    ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 20, .y = 20}));
+            cui_draw_list d = frame(ui, &state, o, 0, false, true);
+            unsigned count = 0;
+            for (size_t i = 0; i < d.count; i++)
+                if (d.commands[i].type == CUI_DRAW_DROP_SHADOW) {
+                    cui_drop_shadow layer = d.commands[i].shadow.layer;
+                    if (!count)
+                        assert(custom ? (layer.sigma == 2 && layer.color.r == 170 &&
+                                         layer.color.a == 40)
+                                      : (layer.sigma == 0 && layer.color.r == 0 &&
+                                         layer.color.g == 130 && layer.color.a == 26));
+                    count++;
+                }
+            assert(count == (custom ? 1u : 3u));
+            cui_destroy(ui);
+        }
+}
 static void invalid(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 128,
                                               .max_commands = 1024,
@@ -271,7 +320,7 @@ static void invalid(void) {
     assert(ui);
     unsigned char pixels[128 * 96 * 4];
     cui_chart_datum data[] = {{.value = 20}, {.value = 40}};
-    for (unsigned i = 0; i < 8; i++)
+    for (unsigned i = 0; i < 12; i++)
         for (unsigned current = 0; current < 2; current++) {
             cui_chart_tooltip_style s = style();
             if (i == 0)
@@ -290,6 +339,14 @@ static void invalid(void) {
                 s.padding = 10000;
             if (i == 7)
                 s.swatch_gap = -1;
+            if (i == 8)
+                s.shadow_count = CUI_DROP_SHADOW_MAX + 1;
+            if (i == 9)
+                s.shadows[1].sigma = NAN;
+            if (i == 10)
+                s.shadows[1].spread = 4097;
+            if (i == 11)
+                s.shadows[1].offset_y = INFINITY;
             cui_chart_state state = {.pixels = pixels,
                                      .byte_capacity = sizeof pixels,
                                      .hovered = SIZE_MAX,
@@ -494,6 +551,7 @@ int main(void) {
     custom();
     fade(false);
     fade(true);
+    shadow_override();
     invalid();
     measured_failure(false, false);
     measured_failure(true, false);

@@ -268,3 +268,15 @@ bool cui_theme_preset_get(size_t index, cui_theme *output) {
     *output = theme;
     return true;
 }
+
+bool cui_theme_popover_shadows(const cui_theme *theme, float strength, cui_drop_shadow out[3]) {
+    if (!theme || !out || !isfinite(strength))
+        return false;
+    unsigned char alpha = (unsigned char)lroundf(25.5f * fminf(1, fmaxf(0, strength)));
+    cui_drop_shadow next[3] = {
+        {.spread = 1, .color = {theme->text.r, theme->text.g, theme->text.b, alpha}},
+        {.offset_y = 4, .sigma = 3, .spread = -1, .color = {0, 0, 0, alpha}},
+        {.offset_y = 2, .sigma = 2, .spread = -2, .color = {0, 0, 0, alpha}}};
+    memcpy(out, next, sizeof(next));
+    return true;
+}

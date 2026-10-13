@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_chart.h"
+#include "cui/cui_effects.h"
 #include <stdio.h>
 #include <string.h>
 static cui_context *ui;
@@ -173,4 +174,24 @@ unsigned probe_bitmap(unsigned i, unsigned field) {
         return 0;
     const cui_bitmap *b = &draw.commands[i].bitmap.bitmap;
     return field == 0 ? b->width : field == 1 ? b->height : (unsigned)b->stride;
+}
+
+double probe_shadow(unsigned index, unsigned field) {
+    if (index >= draw.count || draw.commands[index].type != CUI_DRAW_DROP_SHADOW)
+        return 0;
+    cui_drop_shadow_paint s = draw.commands[index].shadow;
+    const float v[] = {
+        s.caster.x,       s.caster.y,        s.caster.w,          s.caster.h,
+        s.radii.top_left, s.radii.top_right, s.radii.bottom_left, s.radii.bottom_right,
+        s.layer.offset_x, s.layer.offset_y,  s.layer.sigma,       s.layer.spread,
+        s.layer.color.r,  s.layer.color.g,   s.layer.color.b,     s.layer.color.a};
+    return field < 16 ? v[field] : 0;
+}
+
+float probe_shadow_coverage(unsigned index, float x, float y) {
+    if (index >= draw.count || draw.commands[index].type != CUI_DRAW_DROP_SHADOW)
+        return 0;
+    float alpha = 0;
+    cui_effect_drop_shadow_sample(draw.commands[index].shadow, 1, 0, 0, x, y, &alpha);
+    return alpha;
 }

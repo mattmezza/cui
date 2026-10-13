@@ -154,6 +154,7 @@ typedef struct {
     cui_dock_drag_palette drag_palette;
     float toolbar_height; /* Zero defaults to 32 when a toolbar/control is present. */
     bool hide_menu;
+    bool collapsed; /* Tab strip only: no close/zoom/content or drag actions. */
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;
@@ -219,6 +220,7 @@ typedef struct {
     bool (*allow_transfer)(void *, const cui_dock_transfer_request *);
     void (*on_transfer)(void *, const cui_dock_transfer_request *);
     void *transfer_user;
+    bool collapsible_bottom; /* Opt in to the frozen 29px closed bottom strip. */
 } cui_dock_workspace_options;
 typedef struct {
     cui_dock_result error;

@@ -605,6 +605,7 @@ typedef struct {
     dock_scene *scene;
     cui_id *selected;
     float suffix_width, height;
+    const cui_dock_title_style *style;
 } dock_title_context;
 static void dock_title_body(cui_context *ui, const cui_choice_item *item, size_t index,
                             void *user) {
@@ -626,6 +627,8 @@ static void dock_title_body(cui_context *ui, const cui_choice_item *item, size_t
         cui_color ink = *context->selected == item->id || cui_hovered(ui, item->id)
                             ? s->theme->tab_active_foreground
                             : s->theme->tab_foreground;
+        if (context->style)
+            ink = context->style->foreground;
         if (item->disabled)
             ink = s->theme->muted;
         cui_text(ui, item->label, metrics.font_size, ink);
@@ -661,14 +664,15 @@ static void dock_simple_title(dock_scene *s, cui_dock_node_info info, dock_title
     float suffix = fminf(context->suffix_width, fmaxf(0, width - leading - close_width));
     context->suffix_width = suffix;
     context->height = height;
-    cui_begin_box(s->ui, dock_part(s->id, info.id, UINT64_C(0x124b79d89af392e1)),
-                  (cui_box){.width = width,
-                            .max_width = width,
-                            .height = height,
-                            .row = true,
-                            .clip = true,
-                            .align_y = CUI_ALIGN_CENTER,
-                            .background = s->theme->tab_bar});
+    cui_begin_box(
+        s->ui, dock_part(s->id, info.id, UINT64_C(0x124b79d89af392e1)),
+        (cui_box){.width = width,
+                  .max_width = width,
+                  .height = height,
+                  .row = true,
+                  .clip = true,
+                  .align_y = CUI_ALIGN_CENTER,
+                  .background = context->style ? context->style->background : s->theme->tab_bar});
     cui_begin_box(s->ui, 0, (cui_box){.width = leading});
     cui_end_box(s->ui);
     cui_id title = s->view->items[0].id;
@@ -784,7 +788,11 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
         memset(&cache->drag, 0, sizeof cache->drag);
     cui_id strip = dock_part(s->id, info.id, UINT64_C(0x124b79d89af392e1));
     suffix_width = fminf(suffix_width, fmaxf(0, w - 1));
-    dock_title_context title_context = {s, &selected, suffix_width, s->options.tab_height};
+    dock_title_context title_context = {.scene = s,
+                                        .selected = &selected,
+                                        .suffix_width = suffix_width,
+                                        .height = s->options.tab_height,
+                                        .style = simple && initial ? initial->title_style : NULL};
     bool changed = false;
     if (simple) {
         if (!hidden_title)

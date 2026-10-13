@@ -158,6 +158,9 @@ typedef enum {
 } cui_dock_zoom_control;
 typedef enum { CUI_DOCK_PANEL_TAB_BAR, CUI_DOCK_PANEL_AUTO } cui_dock_panel_style;
 typedef struct {
+    cui_color background, foreground;
+} cui_dock_title_style;
+typedef struct {
     uint64_t key;
     cui_str title;
     bool closable, disabled;
@@ -181,6 +184,8 @@ typedef struct {
     void (*set_active)(void *, uint64_t panel, bool);
     void (*set_zoomed)(void *, uint64_t panel, bool);
     const void *lifecycle_identity; /* Optional token distinguishes replacement at the same key. */
+    /* Borrowed palette for Auto single-panel titles; custom scenes choose their own ink. */
+    const cui_dock_title_style *title_style;
 
 } cui_dock_panel;
 /* Caller-owned reconstruction seam; strings/payloads are borrowed opaque bytes. */

@@ -163,7 +163,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; dynamic visibility predicate; caller-owned next-tick lifecycle reconciliation and factory payload dump callbacks; no automatic view-owned lifetime management. |
 | `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. Named caller-owned factories reconstruct live descriptors and preserve unknown payloads; no automatic JSON schema/parser or Rust state-schema import. |
 | `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
-| Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Per-title chrome colors remain a gap. |
+| Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Optional per-panel simple-title background/foreground match the frozen `TitleStyle` scope. |
 | Component `ToggleZoom`, `ClosePanel` | Real controls and close shortcut with focus/policy gates; user zoom is withheld when controls are None, and restore stays reachable. No Rust action dispatch registration. |
 
 Native floating is not exported or described as a Dock feature in the frozen modules/docs. The occurrences of detach refer to panel removal/reinsertion or detached asynchronous tasks, not native window creation. A future CUI multiwindow host example is an optional extension and cannot stand in for the source gaps above.
@@ -331,7 +331,7 @@ The export-family table above is complemented by these operation mappings. CUI e
 | `PanelBuilder` horizontal/vertical splits, child optional sizes, tabs and active index | Compose canonical model operations and `set_sizes`; no fluent builder or direct serde tree import. |
 | `DockArea` center/edge installation, open/toggle/collapsible, add/remove/select/move, zoom, dump/load | Workspace descriptors and edge setters/snapshot plus model/view operations; hosts supply independent models and caller-owned factory payload records. |
 | `TabGroup` sealed/in-split constraints, active/displayed panel, close/zoom and renderer | Group constraint constructors/callback, visibility-aware queries, real view controls, menu/policy callbacks and scene callbacks. |
-| `Panel` visible, closable, zoomable, title/style/suffix, toolbar, menu, focus and lifecycle | Borrowed descriptors and presentation callbacks, visibility predicate, factory/dump helpers and caller-owned lifecycle reconciliation. Per-title chrome palette remains absent. |
+| `Panel` visible, closable, zoomable, title/style/suffix, toolbar, menu, focus and lifecycle | Borrowed descriptors and presentation callbacks, visibility predicate, factory/dump helpers and caller-owned lifecycle reconciliation. Optional simple-title palettes match the source; custom title scenes choose their own explicit ink. |
 | `DockSizing` bounds/minima, pointer resize, collapsed-bottom reopen | Retained workspace handles, minimum compression and collapsibility flags; no native window creation. |
 
 Lifecycle reconciliation is explicitly deferred and net-state based; it does not reproduce every synchronous Rust entity arrival or intermediate zoom event. Panel payload envelopes are caller-owned and are not a compatible implementation of the frozen serde JSON schema. These remaining differences prevent a full Dock-family parity claim.
@@ -421,3 +421,18 @@ Filtered leaf metadata counts visible panels and reports the displayed fallback 
 The styled renderer omits hidden groups and their splitter semantics, cancels held splitters when a branch disappears, and uses surviving subtree minima. Open all-hidden workspace edges are omitted too. Ratios, node IDs, panel order, serialized layout and workspace open/preferred-size state remain unchanged; showing the panels restores their prior geometry. An entirely hidden root paints the workspace background. Center remains the host's workspace area when no edge is present.
 
 Meaningful tests cover nested same/opposite axes, hidden minima/gaps, filtered metadata, all-hidden zero geometry, unchanged short output, equality with legacy geometry when every panel is visible, stored-ratio restoration, real held-pointer cancellation, omitted splitter semantics and open-edge omission/reappearance with unchanged preferred state.
+
+### Per-panel simple-title palettes
+
+Frozen `component/src/dock/panel.rs::TitleStyle` contains background and foreground colors. `tab_panel.rs::render_title` applies them to the Auto single-panel title; the tab-bar renderer does not read this override. CUI follows that scope with a borrowed optional `cui_dock_panel.title_style` pointer:
+
+```c
+cui_dock_title_style warning_title = {
+    .background = {83, 47, 17, 255},
+    .foreground = {255, 225, 177, 255},
+};
+registry[0].title_style = &warning_title;
+options.panel_style = CUI_DOCK_PANEL_AUTO;
+```
+
+Keep the palette alive through the frame. Changing it between frames updates the header immediately without rebuilding the model or changing persisted data. A null pointer uses the theme. TabBar, multi-visible-panel groups, collapsed strips and a hidden title bar ignore it; content retains its ordinary palette. Disabled default titles retain the theme's muted ink. Explicit custom title/suffix callbacks submit their own colors because CUI scenes do not inherit Rust text styling. Ordinary close/menu controls retain their themed control palette. Tests inspect actual fill/text commands and check geometry, focus, disabled ink and all excluded presentation modes.

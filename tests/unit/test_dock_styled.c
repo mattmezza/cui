@@ -1194,6 +1194,71 @@ static cui_role semantic_role(cui_id id) {
             return semantics[i].role;
     return CUI_ROLE_NONE;
 }
+static size_t title_color_count(cui_color color, cui_draw_type type) {
+    size_t count = 0;
+    for (size_t i = 0; i < last_draw.count; i++) {
+        const cui_draw_command *command = &last_draw.commands[i];
+        count += command->type == type && !memcmp(&command->color, &color, sizeof color);
+    }
+    return count;
+}
+static void test_title_palette(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    assert(model && cui_dock_insert(model, cui_dock_root(model), 0, 0) == CUI_DOCK_OK);
+    options.panel_style = CUI_DOCK_PANEL_AUTO;
+    options.hide_menu = true;
+    char before[1024], after[1024];
+    size_t length;
+    assert(cui_dock_serialize(model, before, sizeof before, &length) == CUI_DOCK_OK);
+    cui_dock_title_style palette = {{17, 31, 47, 255}, {231, 173, 119, 255}};
+    panels[0].title_style = &palette;
+    frame();
+    frame();
+    cui_id title = cui_dock_tab_id(workspace, 0);
+    cui_rect title_bounds = cui_bounds(ui, title), content_bounds = cui_bounds(ui, 800);
+    assert(title_color_count(palette.background, CUI_DRAW_RECT) == 1);
+    assert(title_color_count(palette.foreground, CUI_DRAW_TEXT) == 1);
+    click(title);
+    assert(cui_focused(ui) == title);
+    palette.background = (cui_color){41, 53, 67, 255};
+    palette.foreground = (cui_color){149, 211, 233, 255};
+    frame();
+    assert(title_color_count(palette.background, CUI_DRAW_RECT) == 1);
+    assert(title_color_count(palette.foreground, CUI_DRAW_TEXT) == 1);
+    assert(cui_focused(ui) == title && cui_bounds(ui, title).h == title_bounds.h &&
+           cui_bounds(ui, 800).y == content_bounds.y);
+    panels[0].disabled = true;
+    frame();
+    assert(title_color_count(palette.background, CUI_DRAW_RECT) == 1);
+    assert(title_color_count(palette.foreground, CUI_DRAW_TEXT) == 0);
+    panels[0].disabled = false;
+    panels[0].hide_title_bar = true;
+    frame();
+    assert(!title_color_count(palette.background, CUI_DRAW_RECT));
+    panels[0].hide_title_bar = false;
+    options.panel_style = CUI_DOCK_PANEL_TAB_BAR;
+    frame();
+    assert(!title_color_count(palette.background, CUI_DRAW_RECT) &&
+           !title_color_count(palette.foreground, CUI_DRAW_TEXT));
+    options.panel_style = CUI_DOCK_PANEL_AUTO;
+    assert(cui_dock_insert(model, cui_dock_root(model), 1, SIZE_MAX) == CUI_DOCK_OK);
+    frame();
+    assert(!title_color_count(palette.background, CUI_DRAW_RECT));
+    assert(cui_dock_remove(model, 1) == CUI_DOCK_OK);
+    options.collapsed = true;
+    frame();
+    assert(!title_color_count(palette.background, CUI_DRAW_RECT));
+    options.collapsed = false;
+    panels[0].title_style = NULL;
+    frame();
+    assert(!title_color_count(palette.background, CUI_DRAW_RECT) &&
+           cui_bounds(ui, title).h == title_bounds.h);
+    assert(cui_dock_serialize(model, after, sizeof after, &length) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    options.panel_style = CUI_DOCK_PANEL_TAB_BAR;
+    options.hide_menu = false;
+}
 static void test_title_modes_padding(void) {
     cui_dock_destroy(model);
     model = cui_dock_create((cui_dock_config){0});
@@ -2277,6 +2342,7 @@ int main(void) {
     test_panel_menus();
     test_title_composition();
     test_title_modes_padding();
+    test_title_palette();
     test_group_constraints();
     test_workspace_constraints();
     test_dynamic_visibility();

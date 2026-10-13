@@ -1,6 +1,124 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_base.h"
 #include <math.h>
+static float cui_progress_fraction(float value) {
+    return isfinite(value) ? fmaxf(0, fminf(1, value)) : 0;
+}
+static double cui_progress_quadratic(double value) {
+    return value < .5 ? 2 * value * value : 1 - 2 * (1 - value) * (1 - value);
+}
+cui_progress_geometry cui_progress_measure(float fraction, bool indeterminate, bool source_motion,
+                                           double now, bool reduced) {
+    cui_progress_geometry result = {.fraction = cui_progress_fraction(fraction)};
+    if (!indeterminate) {
+        result.length = result.fraction;
+        return result;
+    }
+    bool moving = !reduced && isfinite(now) && now >= 0;
+    result.animating = moving;
+    if (source_motion) {
+        if (!moving) {
+            result.start = .325f;
+            result.length = .35f;
+        } else {
+            double delta = fmod(now, 1);
+            double start = cui_progress_quadratic(fmax(0, fmin(1, (delta - .5) * 2)));
+            double end = cui_progress_quadratic(1 - delta);
+            result.start = (float)start;
+            result.length = (float)fmax(0, 1 - start - end);
+        }
+    } else {
+        double phase = moving ? .5 - .5 * cos(fmod(now, 1.6) * (6.283185307179586 / 1.6)) : .5;
+        result.start = (float)(.7 * phase);
+        result.length = .3f;
+    }
+    return result;
+}
+float cui_base_progress(cui_context *ui, cui_id id, cui_str name, float fraction,
+                        bool indeterminate) {
+    float value = cui_progress_fraction(fraction);
+    if (!ui || !id || (name.length && !name.data))
+        return value;
+    cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, name.length ? name : cui_string("Progress"), false,
+                 false, indeterminate ? 0 : value);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){
+            .minimum = 0, .maximum = 1, .busy = indeterminate, .no_focus = true});
+    cui_set_tab_stop(ui, id, false);
+    return value;
+}
+static float cui_progress_ease(float fraction) {
+    if (fraction <= 0 || fraction >= 1)
+        return fraction;
+    double low = 0, high = 1, parameter = fraction;
+    for (unsigned i = 0; i < 24; i++) {
+        parameter = (low + high) * .5;
+        double inverse = 1 - parameter;
+        double x = 3 * inverse * inverse * parameter * .2 + parameter * parameter * parameter;
+        if (x < fraction)
+            low = parameter;
+        else
+            high = parameter;
+    }
+    return (float)(3 * (1 - parameter) * parameter * parameter + parameter * parameter * parameter);
+}
+static void cui_progress_motion_sample(cui_progress_motion *state, double now) {
+    if (!state->active)
+        return;
+    double elapsed = now - state->start;
+    float fraction = (float)fmax(0, fmin(1, elapsed / state->duration));
+    state->value = state->from + (state->target - state->from) * cui_progress_ease(fraction);
+    if (fraction >= 1) {
+        state->value = state->target;
+        state->active = false;
+    }
+}
+bool cui_progress_animate(cui_progress_motion *state, float value, double now, float duration,
+                          bool reduced, cui_progress_motion_result *result) {
+    if (!state || !result || !isfinite(value) || !isfinite(now) || now < 0 || !isfinite(duration) ||
+        duration < 0 || duration > 60 ||
+        (state->ready &&
+         (!isfinite(state->start) || !isfinite(state->last_time) || !isfinite(state->from) ||
+          !isfinite(state->target) || !isfinite(state->value) || !isfinite(state->duration) ||
+          state->duration < 0 || state->duration > 60 || state->start < 0 ||
+          state->last_time < state->start || state->from < 0 || state->from > 1 ||
+          state->target < 0 || state->target > 1 || state->value < 0 || state->value > 1 ||
+          (state->active && state->duration <= 0))))
+        return false;
+    value = cui_progress_fraction(value);
+    cui_progress_motion next = *state;
+    if (!next.ready) {
+        next = (cui_progress_motion){.ready = true,
+                                     .from = value,
+                                     .target = value,
+                                     .value = value,
+                                     .start = now,
+                                     .last_time = now,
+                                     .duration = duration};
+    } else {
+        now = fmax(now, next.last_time);
+        cui_progress_motion_sample(&next, now);
+        if (next.target != value) {
+            next.from = next.value;
+            next.target = value;
+            next.start = now;
+            next.duration = duration;
+            next.active = next.from != value;
+        }
+        if (reduced || duration == 0) {
+            next.from = next.target = next.value = value;
+            next.active = false;
+            next.duration = duration;
+            next.start = now;
+        }
+        next.last_time = now;
+        cui_progress_motion_sample(&next, now);
+    }
+    *state = next;
+    *result = (cui_progress_motion_result){next.value, next.active};
+    return true;
+}
 cui_interaction cui_base_button(cui_context *ui, cui_id id, cui_str name, bool disabled) {
     return cui_interact(ui, id, CUI_ROLE_BUTTON, name, disabled, false, 0);
 }

@@ -3,6 +3,82 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+static void progress_geometry_and_motion(void) {
+    cui_progress_geometry g = cui_progress_measure(2, false, true, 0, false);
+    assert(g.fraction == 1 && g.start == 0 && g.length == 1 && !g.animating);
+    g = cui_progress_measure(NAN, false, false, 0, false);
+    assert(g.fraction == 0 && g.length == 0);
+    const double times[] = {0, .25, .5, .75, 1};
+    const float starts[] = {0, 0, 0, .5f, 0};
+    const float lengths[] = {0, .125f, .5f, .375f, 0};
+    for (size_t i = 0; i < 5; i++) {
+        g = cui_progress_measure(.8f, true, true, times[i], false);
+        assert(g.animating && g.start == starts[i] && g.length == lengths[i]);
+    }
+    for (unsigned i = 0; i < 1000; i++) {
+        g = cui_progress_measure(.8f, true, true, i * .001, false);
+        assert(g.start >= 0 && g.length >= 0 && g.start + g.length <= 1.000001f);
+    }
+    const double invalid_times[] = {NAN, INFINITY, -1};
+    for (size_t i = 0; i < 3; i++) {
+        g = cui_progress_measure(.8f, true, true, invalid_times[i], false);
+        assert(!g.animating && g.start == .325f && g.length == .35f);
+    }
+    g = cui_progress_measure(.8f, true, true, .2, true);
+    assert(!g.animating && g.start == .325f && g.length == .35f);
+    g = cui_progress_measure(.8f, true, false, .4, false);
+    assert(g.animating && fabsf(g.start - .35f) < .00001f && g.length == .3f);
+    cui_progress_motion state = {0};
+    cui_progress_motion_result result = {0};
+    assert(cui_progress_animate(&state, 0, 0, 1, false, &result) && !result.active &&
+           result.value == 0);
+    assert(cui_progress_animate(&state, 1, 0, 1, false, &result) && result.active &&
+           result.value == 0);
+    /* The Bezier control point parameter t=.5 maps x=.2 to y=.5. */
+    assert(cui_progress_animate(&state, 1, .2, 1, false, &result) &&
+           fabsf(result.value - .5f) < .00001f);
+    float continuous = result.value;
+    assert(cui_progress_animate(&state, 0, .2, 1, false, &result) && result.value == continuous &&
+           result.active);
+    assert(cui_progress_animate(&state, 0, 1.2, 1, false, &result) && !result.active &&
+           result.value == 0);
+    assert(cui_progress_animate(&state, 1, .1, 1, false, &result) && result.active &&
+           result.value == 0);
+    assert(state.start == 1.2 && state.last_time == 1.2);
+    assert(cui_progress_animate(&state, 1, 1.3, 1, false, &result) && result.value > 0);
+    assert(cui_progress_animate(&state, 1, 1.3, 1, true, &result) && result.value == 1 &&
+           !result.active);
+    assert(cui_progress_animate(&state, -1, 1.3, 0, false, &result) && result.value == 0 &&
+           !result.active);
+    cui_progress_motion before = state;
+    cui_progress_motion_result saved = result;
+    assert(!cui_progress_animate(&state, NAN, 2, 1, false, &result));
+    assert(!cui_progress_animate(&state, .5f, NAN, 1, false, &result));
+    assert(!cui_progress_animate(&state, .5f, 2, -1, false, &result));
+    assert(!cui_progress_animate(&state, .5f, 2, 61, false, &result));
+    assert(!cui_progress_animate(&state, .5f, 2, 1, false, NULL));
+    assert(!memcmp(&state, &before, sizeof state) && !memcmp(&result, &saved, sizeof result));
+    cui_context *ctx = cui_create((cui_config){.width = 200, .height = 100});
+    assert(ctx);
+    for (unsigned i = 0; i < 3; i++) {
+        assert(cui_begin_frame(ctx, 200, 100, .016f));
+        cui_begin_box(ctx, 90, (cui_box){.width = 100, .height = 8});
+        assert(cui_base_progress(ctx, 90, cui_string("Download"),
+                                 i == 0   ? -1
+                                 : i == 1 ? 2
+                                          : NAN,
+                                 i == 2) == (i == 1 ? 1 : 0));
+        cui_end_box(ctx);
+        cui_draw_list draw = cui_end_frame(ctx);
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ctx, &count);
+        assert(draw.count == 0 && count == 1 && sem[0].role == CUI_ROLE_PROGRESSBAR);
+        assert(sem[0].details.minimum == 0 && sem[0].details.maximum == 1 &&
+               sem[0].details.busy == (i == 2));
+        assert(sem[0].value == (i == 1 ? 1 : 0) && sem[0].tab_index == -1 && !sem[0].focused);
+    }
+    cui_destroy(ctx);
+}
 static cui_context *ui;
 static const cui_id id = 101;
 static bool checked, disabled;
@@ -135,6 +211,7 @@ static void editor_composition_routing(void) {
     }
 }
 int main(void) {
+    progress_geometry_and_motion();
     editor_composition_routing();
     editor_navigation_consumption();
     ui = cui_create((cui_config){.width = 400, .height = 200});

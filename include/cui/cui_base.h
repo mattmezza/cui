@@ -19,6 +19,34 @@ bool cui_base_check(cui_context *, cui_id, cui_str, cui_check_state *, bool disa
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);
 typedef struct {
+    float fraction, start, length;
+    bool animating;
+} cui_progress_geometry;
+/* Pure geometry in normalized track units. Nonfinite fraction becomes zero;
+ * reduced/invalid clocks produce a static centered loading segment. Source
+ * loading uses the frozen one-second growing/shrinking quadratic cycle; false
+ * preserves the legacy1.6s fixed-width CUI cycle. */
+cui_progress_geometry cui_progress_measure(float fraction, bool indeterminate, bool source_motion,
+                                           double now_seconds, bool reduced_motion);
+/* Submit inside a box with this id; paints nothing. Controlled normalized
+ * fraction, numeric0..1 semantics, indeterminate busy/unknown value and no focus. */
+float cui_base_progress(cui_context *, cui_id, cui_str name, float fraction, bool indeterminate);
+typedef struct {
+    double start, last_time;
+    float from, target, value, duration;
+    bool ready, active;
+} cui_progress_motion;
+typedef struct {
+    float value;
+    bool active;
+} cui_progress_motion_result;
+/* Caller-owned deterministic transition, source move cubic-bezier(.2,0,0,1).
+ * Initial submission is immediate; changes/reversals continue from the current
+ * value. Duration0/reduced motion snaps. Invalid/nonfinite arguments preserve
+ * state and result. A regressing clock is clamped to the last observed time. */
+bool cui_progress_animate(cui_progress_motion *, float fraction, double now_seconds, float duration,
+                          bool reduced_motion, cui_progress_motion_result *);
+typedef struct {
     bool changed, submitted;
     cui_edit_result error;
 } cui_input_result;

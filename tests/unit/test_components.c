@@ -953,6 +953,63 @@ static void test_badge_variants(void) {
     assert(calls == prior && list.count == 0);
     cui_destroy(ui);
 }
+static void test_progress_source_style(void) {
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 80});
+    cui_theme theme = cui_theme_light();
+    assert(ui);
+    const cui_id id = 90, fill = id ^ UINT64_C(0x7129d4cd19342f11);
+    const float heights[] = {8, 6, 10, 4};
+    for (int size = CUI_CONTROL_MEDIUM; size <= CUI_CONTROL_XSMALL; size++) {
+        cui_progress_options o = cui_progress_defaults();
+        o.size = (cui_control_size)size;
+        o.color = (cui_color){18, 77, 133, 200};
+        o.custom_color = true;
+        assert(cui_begin_frame(ui, 200, 80, .016f));
+        assert(!cui_progress_ex(ui, id, &theme, .5f, 100, o));
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_bounds(ui, id).h == heights[size] && cui_bounds(ui, fill).w == 50);
+        bool track = false, indicator = false;
+        for (size_t i = 0; i < draw.count; i++) {
+            cui_draw_command c = draw.commands[i];
+            if (c.type == CUI_DRAW_RECT && c.color.r == 18 && c.color.g == 77 && c.color.b == 133) {
+                assert(c.radius == heights[size] / 2);
+                track |= c.color.a == 40;
+                indicator |= c.color.a == 200;
+            }
+        }
+        assert(track && indicator);
+    }
+    cui_progress_motion motion = {0};
+    cui_progress_options o = cui_progress_defaults();
+    o.motion = &motion;
+    for (unsigned frame = 0; frame < 4; frame++) {
+        o.now_seconds = frame < 2 ? 0 : frame == 2 ? .036 : .05;
+        o.reduced_motion = frame == 3;
+        assert(cui_begin_frame(ui, 200, 80, .016f));
+        bool moving = cui_progress_ex(ui, id, &theme, frame == 0 ? 0 : 1, 100, o);
+        cui_end_frame(ui);
+        assert(moving == (frame == 1 || frame == 2));
+        if (frame == 2)
+            assert(fabsf(cui_bounds(ui, fill).w - 50) < .01f);
+        if (frame == 3)
+            assert(cui_bounds(ui, fill).w == 100);
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        assert(count == 1 && sem[0].value == (frame == 0 ? 0 : 1));
+    }
+    theme.radius = 0;
+    o = cui_progress_defaults();
+    o.indeterminate = true;
+    o.now_seconds = .25;
+    assert(cui_begin_frame(ui, 200, 80, .016f));
+    assert(cui_progress_ex(ui, id, &theme, .8f, 100, o));
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(fabsf(cui_bounds(ui, fill).w - 12.5f) < 1);
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT)
+            assert(draw.commands[i].radius == 0);
+    cui_destroy(ui);
+}
 static void test_progress_motion(void) {
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 40});
     cui_theme theme = cui_theme_light();
@@ -1115,6 +1172,7 @@ static void design_scale(void) {
 int main(void) {
     design_scale();
     test_badge_variants();
+    test_progress_source_style();
     test_progress_motion();
     test_button_hover_and_disabled_paint();
     test_button_paint_composition();

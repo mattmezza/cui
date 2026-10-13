@@ -221,10 +221,18 @@ bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
                   cui_button_content_fn content, void *user);
 typedef struct {
     bool indeterminate, reduced_motion;
-    double now_seconds; /* Monotonic host clock; one back-and-forth cycle is 1.6s. */
-    float height;       /* Zero selects the default 8px track. */
+    double now_seconds; /* Monotonic host clock; source cycle1s, legacy cycle1.6s. */
+    float height;       /* Zero selects the size-based4/6/8/10px track. */
     cui_str name;       /* Zero selects "Progress". */
+    cui_control_size size;
+    cui_color color;
+    bool custom_color, source_motion;
+    cui_corner_radii corners;
+    bool custom_corners;
+    cui_progress_motion *motion; /* Optional caller-owned determinate transition. */
+    float duration; /* Zero selects source180ms; explicit instant via reduced_motion. */
 } cui_progress_options;
+cui_progress_options cui_progress_defaults(void);
 /* Returns true while indeterminate motion needs another frame. The application
  * owns the fraction and clock; reduced motion shows a static centered segment. */
 bool cui_progress_ex(cui_context *, cui_id, const cui_theme *, float fraction, float width,

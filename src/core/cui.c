@@ -3209,7 +3209,7 @@ bool cui_event_hit_within_scope(cui_context *ui, size_t index, cui_id scope) {
     size_t hit = SIZE_MAX;
     for (size_t i = 0; i < ui->previous_count; ++i) {
         const cui_semantic *s = &ui->previous[i];
-        if ((s->details.blocks_pointer_activation ||
+        if (((e.type != CUI_EVENT_SCROLL && s->details.blocks_pointer_activation) ||
              (!s->disabled && (cui_core_focusable(s) || s->details.pointer_activatable ||
                                s->details.scrollable))) &&
             cui_core_previous_allowed(ui, i) && cui_core_inside(ui->previous_hits[i], e.x, e.y) &&

@@ -82,3 +82,45 @@ size_t cui_editor_match_count(const cui_editor_state *s, cui_str query) {
     }
     return count;
 }
+
+bool cui_editor_set_folds(cui_editor_state *state, cui_editor_fold *folds, size_t count) {
+    return state && cui_textarea_set_folds(&state->view, state->edit, folds, count);
+}
+cui_edit_result cui_editor_set_folded(cui_editor_state *state, size_t index, bool collapsed) {
+    if (!state || !state->edit || index >= state->view.fold_count ||
+        state->view.fold_revision != cui_edit_get_state(state->edit).revision)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_textarea_set_folds(&state->view, state->edit, state->view.folds,
+                                state->view.fold_count))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_editor_fold *fold = &state->view.folds[index];
+    cui_str text = cui_edit_get_text(state->edit);
+    cui_edit_state selection = cui_edit_get_state(state->edit);
+    size_t line = 0, cursor_line = 0, anchor_line = 0, opening_end = 0;
+    for (size_t i = 0; i <= text.length; ++i) {
+        if (i < text.length && text.data[i] != '\r' && text.data[i] != '\n')
+            continue;
+        if (line == fold->start_line)
+            opening_end = i;
+        if (i == text.length)
+            break;
+        size_t next = i + 1;
+        if (text.data[i] == '\r' && next < text.length && text.data[next] == '\n')
+            ++next;
+        if (next <= selection.cursor)
+            ++cursor_line;
+        if (next <= selection.anchor)
+            ++anchor_line;
+        ++line;
+        i = next - 1;
+    }
+    if (collapsed && ((cursor_line > fold->start_line && cursor_line < fold->end_line) ||
+                      (anchor_line > fold->start_line && anchor_line < fold->end_line))) {
+        cui_edit_result error = cui_edit_select(state->edit, opening_end, opening_end);
+        if (error != CUI_EDIT_OK)
+            return error;
+    }
+    fold->collapsed = collapsed;
+    state->view.preferred_valid = false;
+    return CUI_EDIT_OK;
+}

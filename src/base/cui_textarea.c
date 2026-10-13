@@ -55,6 +55,39 @@ bool cui_textarea_state_init(cui_textarea_state *state, cui_textarea_line *lines
     *state = (cui_textarea_state){.lines = lines, .capacity = capacity};
     return true;
 }
+static bool cui_textarea_folds_valid(cui_str text, const cui_textarea_fold *folds, size_t count) {
+    if ((count && !folds) || count > 65536)
+        return false;
+    if (!count)
+        return true;
+    size_t line_count = 1;
+    for (size_t i = 0; i < text.length; ++i) {
+        if (text.data[i] == '\r') {
+            ++line_count;
+            if (i + 1 < text.length && text.data[i + 1] == '\n')
+                ++i;
+        } else if (text.data[i] == '\n') {
+            ++line_count;
+        }
+    }
+    for (size_t i = 0; i < count; ++i)
+        if (folds[i].end_line >= line_count || folds[i].start_line >= folds[i].end_line ||
+            folds[i].end_line - folds[i].start_line < 2 ||
+            (i && folds[i].start_line <= folds[i - 1].start_line))
+            return false;
+    return true;
+}
+bool cui_textarea_set_folds(cui_textarea_state *state, cui_edit *edit, cui_textarea_fold *folds,
+                            size_t count) {
+    if (!state || !edit || !cui_edit_get_state(edit).multiline ||
+        !cui_textarea_folds_valid(cui_edit_get_text(edit), folds, count))
+        return false;
+    state->folds = folds;
+    state->fold_count = count;
+    state->fold_revision = cui_edit_get_state(edit).revision;
+    state->preferred_valid = false;
+    return true;
+}
 cui_textarea_options cui_textarea_default(void) {
     return (cui_textarea_options){0};
 }
@@ -114,6 +147,34 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         return CUI_TEXTAREA_INVALID;
     }
     cui_str text = cui_edit_get_text(edit);
+    cui_edit_state selection = cui_edit_get_state(edit);
+    if (state->fold_count && state->fold_revision != selection.revision) {
+        state->folds = NULL;
+        state->fold_count = 0;
+    }
+    if (!cui_textarea_folds_valid(text, state->folds, state->fold_count))
+        return state->error = CUI_TEXTAREA_INVALID;
+    if (state->fold_count) {
+        size_t cursor_line = 0, anchor_line = 0;
+        for (size_t i = 0; i < text.length; ++i) {
+            if (text.data[i] != '\r' && text.data[i] != '\n')
+                continue;
+            size_t next = i + 1;
+            if (text.data[i] == '\r' && next < text.length && text.data[next] == '\n')
+                ++next;
+            if (next <= selection.cursor)
+                ++cursor_line;
+            if (next <= selection.anchor)
+                ++anchor_line;
+            i = next - 1;
+        }
+        for (size_t i = 0; i < state->fold_count; ++i) {
+            cui_textarea_fold *fold = &state->folds[i];
+            if ((cursor_line > fold->start_line && cursor_line < fold->end_line) ||
+                (anchor_line > fold->start_line && anchor_line < fold->end_line))
+                fold->collapsed = false;
+        }
+    }
     state->text_style = style;
     state->count = 0;
     state->font_size = metrics.font_size;
@@ -121,9 +182,26 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     state->wrap_width = width;
     if (text.length > 65536)
         return state->error = CUI_TEXTAREA_CAPACITY;
-    size_t start = 0;
+    size_t start = 0, logical_line = 0, fold_index = 0, hidden_until = 0;
     float maximum = 0;
     for (;;) {
+        while (fold_index < state->fold_count &&
+               state->folds[fold_index].start_line < logical_line) {
+            cui_textarea_fold fold = state->folds[fold_index++];
+            if (fold.collapsed && fold.end_line > hidden_until)
+                hidden_until = fold.end_line;
+        }
+        if (logical_line < hidden_until) {
+            while (start < text.length && text.data[start] != '\r' && text.data[start] != '\n')
+                ++start;
+            if (start < text.length) {
+                char newline = text.data[start++];
+                if (newline == '\r' && start < text.length && text.data[start] == '\n')
+                    ++start;
+            }
+            ++logical_line;
+            continue;
+        }
         if (state->count == state->capacity) {
             state->count = 0;
             return state->error = CUI_TEXTAREA_CAPACITY;
@@ -159,6 +237,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         if (finish == text.length)
             break;
         start = next;
+        if (hard)
+            ++logical_line;
     }
     cui_edit_state current = cui_edit_get_state(edit);
     state->caret_line = cui_textarea_cursor_line(state, current.cursor);

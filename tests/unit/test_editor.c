@@ -231,7 +231,101 @@ static void find_panel(void) {
     cui_edit_destroy(q);
     cui_edit_destroy(edit);
 }
+static void folding(void) {
+    char buffer[256] = "open\none\ninner\ntwo\nend\nclose\ntail";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 512,
+                                                       .max_history_steps = 8});
+    cui_textarea_line lines[32];
+    cui_editor_state state;
+    assert(cui_editor_state_init(&state, edit, lines, 32));
+    cui_editor_fold folds[] = {{0, 5, true}, {2, 4, true}};
+    assert(cui_editor_set_folds(&state, folds, 2));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 200;
+    o.textarea.height = 58;
+    cui_draw_list commands;
+    assert(draw(ui, &state, o, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.view.count == 3 && lines[0].start == 0 && lines[1].start == 23 &&
+           lines[2].start == 29 && state.view.maximum_y == 20);
+    assert(!strcmp(buffer, "open\none\ninner\ntwo\nend\nclose\ntail"));
+    assert(cui_textarea_hit_test(ui, edit, &state.view, state.view.viewport.x + 1,
+                                 state.view.viewport.y + 21) == 23);
+    bool closing_number = false;
+    for (size_t i = 0; i < commands.count; ++i)
+        if (commands.commands[i].type == CUI_DRAW_TEXT && commands.commands[i].text.length == 1 &&
+            commands.commands[i].text.data[0] == '6')
+            closing_number = true;
+    assert(closing_number);
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    cui_id expand = 0;
+    for (size_t i = 0; i < semantic_count; ++i)
+        if (semantics[i].role == CUI_ROLE_BUTTON && semantics[i].name.length == 13 &&
+            !memcmp(semantics[i].name.data, "Expand line 1", 13))
+            expand = semantics[i].id;
+    assert(expand);
+    cui_rect control = cui_bounds(ui, expand);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = control.x + 4,
+                                           .y = control.y + 4,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    draw(ui, &state, o, &commands);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = control.x + 4,
+                                           .y = control.y + 4,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    draw(ui, &state, o, &commands);
+    assert(!folds[0].collapsed);
+    draw(ui, &state, o, &commands);
+    assert(state.view.count == 6);
+    assert(cui_editor_set_folded(&state, 0, true) == CUI_EDIT_OK);
+
+    cui_edit_select(edit, 0, 0);
+    cui_focus(ui, 10);
+    draw(ui, &state, o, &commands);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    draw(ui, &state, o, &commands);
+    assert(cui_edit_get_state(edit).cursor == 23);
+    assert(cui_editor_set_folded(&state, 0, false) == CUI_EDIT_OK);
+    draw(ui, &state, o, &commands);
+    assert(state.view.count == 6 && folds[1].collapsed);
+    cui_edit_select(edit, 16, 17);
+    assert(cui_editor_set_folded(&state, 0, true) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 4 && cui_edit_get_state(edit).anchor == 4);
+    draw(ui, &state, o, &commands);
+    assert(state.view.count == 3);
+    cui_edit_select(edit, 0, 0);
+    assert(cui_editor_find(&state, cui_string("one"), false, false) == CUI_EDIT_OK);
+    draw(ui, &state, o, &commands);
+    assert(!folds[0].collapsed && state.view.count == 6);
+    cui_edit_select(edit, 16, 17);
+    draw(ui, &state, o, &commands);
+    assert(!folds[1].collapsed && state.view.count == 7);
+    cui_editor_fold invalid[] = {{0, 99, true}};
+    cui_textarea_fold *saved = state.view.folds;
+    assert(!cui_editor_set_folds(&state, invalid, 1) && state.view.folds == saved);
+    cui_editor_fold duplicate[] = {{0, 5, false}, {0, 4, false}};
+    assert(!cui_editor_set_folds(&state, duplicate, 2));
+    assert(cui_editor_set_folded(&state, 99, true) == CUI_EDIT_INVALID_ARGUMENT);
+    cui_edit_select(edit, 0, cui_edit_get_text(edit).length);
+    assert(cui_editor_set_folded(&state, 0, true) == CUI_EDIT_OK);
+    draw(ui, &state, o, &commands);
+    assert(state.view.count == 3 && cui_edit_get_state(edit).anchor == 0 &&
+           cui_edit_get_state(edit).cursor == cui_edit_get_text(edit).length);
+    cui_edit_select(edit, 4, 4);
+    assert(cui_edit_insert(edit, cui_string("!")) == CUI_EDIT_OK);
+    draw(ui, &state, o, &commands);
+    assert(state.view.fold_count == 0 && state.view.count == 7);
+    assert(cui_editor_set_folded(&state, 0, false) == CUI_EDIT_INVALID_ARGUMENT);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    folding();
     find_panel();
     base_and_utf8();
     editor_interactions();

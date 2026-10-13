@@ -22,6 +22,24 @@ static float cui_editor_prefix(cui_context *ui, cui_str text, cui_textarea_line 
     return cui_measure_text_ex(ui, (cui_str){text.data + line.start, end - line.start}, font, style)
         .width;
 }
+static float cui_editor_gutter(cui_context *ui, cui_str document, float font, cui_text_style style,
+                               bool numbers, size_t fold_count) {
+    if (!numbers)
+        return 0;
+    size_t count = 1;
+    for (size_t i = 0; i < document.length; ++i) {
+        if (document.data[i] == '\r') {
+            ++count;
+            if (i + 1 < document.length && document.data[i + 1] == '\n')
+                ++i;
+        } else if (document.data[i] == '\n')
+            ++count;
+    }
+    char digits[32];
+    int length = snprintf(digits, sizeof digits, "%zu", count);
+    return cui_measure_text_ex(ui, (cui_str){digits, (size_t)length}, font, style).width + 16 +
+           (fold_count ? 16 : 0);
+}
 cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                cui_editor_state *editor, cui_editor_options config) {
     if (!editor || !editor->edit || (config.language.length && !config.language.data))
@@ -45,19 +63,14 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                                          design.padding_y};
     }
     float border = !options.no_appearance && !options.no_border ? 1 : 0;
-    size_t logical_count = 1;
+    if (state->fold_count && state->fold_revision != cui_edit_get_state(edit).revision) {
+        state->folds = NULL;
+        state->fold_count = 0;
+    }
     cui_str document = cui_edit_get_text(edit);
-    for (size_t i = 0; i < document.length; ++i)
-        if (document.data[i] == '\n')
-            ++logical_count;
-    char digits[32];
-    int digit_count = snprintf(digits, sizeof digits, "%zu", logical_count);
-    float gutter = config.line_numbers
-                       ? cui_measure_text_ex(ui, (cui_str){digits, (size_t)digit_count},
-                                             metrics.font_size, options.text_style)
-                                 .width +
-                             16
-                       : 0;
+    float gutter = cui_editor_gutter(ui, document, metrics.font_size, options.text_style,
+                                     config.line_numbers, state->fold_count);
+    size_t toggle_fold = SIZE_MAX;
     float px = metrics.padding_x + border, py = metrics.padding_y + border;
     float width = options.width > 0       ? options.width - 2 * px - gutter
                   : state->viewport.w > 0 ? state->viewport.w
@@ -74,6 +87,12 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
+    document = cui_edit_get_text(edit);
+    float updated_gutter = cui_editor_gutter(ui, document, metrics.font_size, options.text_style,
+                                             config.line_numbers, state->fold_count);
+    width = fmaxf(1, width + gutter - updated_gutter);
+    gutter = updated_gutter;
+    state->viewport.w = width;
     height = options.height > 0
                  ? options.height
                  : cui_editor_visible_rows(options, state->count) * metrics.line_height + 2 * py;
@@ -121,15 +140,48 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
             ui, id ^ UINT64_C(0x147dc03f2198af04),
             (cui_box){
                 .width = gutter, .fixed_width = true, .height = state->viewport.h, .clip = true});
-        size_t logical = 1;
+        size_t logical = 0, scanned = 0;
         for (size_t row = 0; row < state->count; ++row) {
+            while (scanned < state->lines[row].start) {
+                char c = document.data[scanned++];
+                if (c == '\r') {
+                    ++logical;
+                    if (scanned < document.length && document.data[scanned] == '\n')
+                        ++scanned;
+                } else if (c == '\n')
+                    ++logical;
+            }
             if (row == 0 || state->lines[row - 1].hard_break) {
                 char number[32];
-                int n = snprintf(number, sizeof number, "%zu", logical++);
+                int n = snprintf(number, sizeof number, "%zu", logical + 1);
                 float y = row * metrics.line_height - state->scroll_y;
                 if (y + metrics.line_height > 0 && y < state->viewport.h) {
-                    cui_begin_absolute_box(ui, cui_editor_child(id, row, 20), (cui_box){0},
-                                           (cui_rect){0, y, gutter, metrics.line_height});
+                    float number_x = state->fold_count ? 16 : 0;
+                    for (size_t f = 0; f < state->fold_count; ++f) {
+                        cui_editor_fold fold = state->folds[f];
+                        if (fold.start_line != logical)
+                            continue;
+                        cui_id control = cui_editor_child(id, fold.start_line, 21);
+                        cui_begin_absolute_box(ui, control, (cui_box){0},
+                                               (cui_rect){0, y, 16, metrics.line_height});
+                        char label[64];
+                        int length = snprintf(label, sizeof label, "%s line %zu",
+                                              fold.collapsed ? "Expand" : "Collapse", logical + 1);
+                        cui_interaction interaction = cui_base_button(
+                            ui, control, (cui_str){label, (size_t)length}, options.disabled);
+                        cui_set_semantic_details(
+                            ui, control,
+                            (cui_semantic_details){.parent = id, .expanded = !fold.collapsed});
+                        if (interaction.activated && !options.disabled)
+                            toggle_fold = f;
+                        cui_text_line(ui, cui_string(fold.collapsed ? "+" : "-"), metrics.font_size,
+                                      theme->muted, metrics.line_height, options.text_style);
+                        cui_end_box(ui);
+                        break;
+                    }
+                    cui_begin_absolute_box(
+                        ui, cui_editor_child(id, row, 20), (cui_box){0},
+                        (cui_rect){number_x, y, gutter - number_x, metrics.line_height});
                     cui_text_line(ui, (cui_str){number, (size_t)n}, metrics.font_size, theme->muted,
                                   metrics.line_height, options.text_style);
                     cui_end_box(ui);
@@ -236,6 +288,14 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     cui_begin_box(ui, cui_editor_child(id, 0, 7), (cui_box){.height = py, .fixed_height = true});
     cui_end_box(ui);
     cui_end_box(ui);
+    if (toggle_fold != SIZE_MAX) {
+        cui_edit_state before_toggle = cui_edit_get_state(edit);
+        cui_editor_set_folded(editor, toggle_fold, !state->folds[toggle_fold].collapsed);
+        cui_edit_state after_toggle = cui_edit_get_state(edit);
+        result.selection_changed |= before_toggle.cursor != after_toggle.cursor ||
+                                    before_toggle.anchor != after_toggle.anchor;
+        cui_invalidate(ui); /* The next draw rebuilds the projected rows. */
+    }
     return result;
 }
 

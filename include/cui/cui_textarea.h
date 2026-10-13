@@ -21,6 +21,12 @@ typedef struct {
     float width;
     bool hard_break;
 } cui_textarea_line;
+/* Zero-based logical lines. Collapsing hides only interior lines, retaining
+ * the opening and closing lines. Caller owns this mutable array. */
+typedef struct {
+    size_t start_line, end_line;
+    bool collapsed;
+} cui_textarea_fold;
 typedef struct {
     cui_textarea_line *lines;
     size_t capacity, count, caret_line;
@@ -33,6 +39,9 @@ typedef struct {
     double blink_started;
     cui_textarea_error error;
     cui_text_style text_style; /* Style of measured visual rows. */
+    cui_textarea_fold *folds;
+    size_t fold_count;
+    uint64_t fold_revision;
 } cui_textarea_state;
 typedef struct {
     cui_textarea_size size;
@@ -62,6 +71,10 @@ typedef struct {
 } cui_textarea_result;
 /* Caller owns workspace and editor. No allocation; state must not be shared by widgets. */
 bool cui_textarea_state_init(cui_textarea_state *, cui_textarea_line *, size_t capacity);
+/* Sorted unique starts, in-document bounds, at least one interior line.
+ * Invalid attachment preserves state. Text revisions detach stale ranges;
+ * selection endpoints inside a fold automatically expand it during layout. */
+bool cui_textarea_set_folds(cui_textarea_state *, cui_edit *, cui_textarea_fold *, size_t count);
 cui_textarea_options cui_textarea_default(void);
 bool cui_textarea_measure(cui_textarea_options, float root_font_size, cui_textarea_metrics *);
 cui_id cui_textarea_viewport_id(cui_id);

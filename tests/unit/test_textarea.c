@@ -487,7 +487,39 @@ static void test_complete_text_style(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_fold_projection(void) {
+    styled_probe p = {.width = 5};
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &p});
+    char buffer[128] = "abcd\r\nxx\r\nyy\r\nzz\r\nend";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[16];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 16));
+    state.viewport.h = 100;
+    cui_textarea_fold folds[] = {{0, 3, true}};
+    assert(cui_textarea_set_folds(&state, edit, folds, 1));
+    cui_textarea_metrics metrics = {14, 20, 0, 0};
+    assert(cui_textarea_layout_ex(ui, edit, &state, metrics, 10, true, (cui_text_style){0}) ==
+           CUI_TEXTAREA_OK);
+    assert(state.count == 5 && lines[0].start == 0 && lines[1].start == 2 && lines[2].start == 14 &&
+           lines[3].start == 18 && lines[4].start == 20);
+    assert(cui_textarea_hit_test(ui, edit, &state, 1, 41) == 14);
+    folds[0].end_line = SIZE_MAX;
+    assert(cui_textarea_layout_ex(ui, edit, &state, metrics, 10, true, (cui_text_style){0}) ==
+           CUI_TEXTAREA_INVALID);
+    folds[0].end_line = 3;
+    cui_edit_select(edit, 6, 8);
+    assert(cui_textarea_layout_ex(ui, edit, &state, metrics, 10, true, (cui_text_style){0}) ==
+           CUI_TEXTAREA_OK);
+    assert(!folds[0].collapsed && state.count == 7 && state.caret_line == 2);
+    assert(cui_textarea_set_folds(&state, edit, NULL, 0));
+    assert(!state.fold_count);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_fold_projection();
     test_complete_text_style();
     test_repeated_down_visible_rows();
     test_composition_navigation();

@@ -22,6 +22,12 @@ typedef struct {
     void *highlight_user;
 } cui_editor_options;
 bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, size_t capacity);
+typedef cui_textarea_fold cui_editor_fold;
+/* Attach caller-owned ranges; edits detach them, requiring host refresh. */
+bool cui_editor_set_folds(cui_editor_state *, cui_editor_fold *, size_t count);
+/* Collapsing moves hidden selection endpoints to the opening line end.
+ * Other selections, text, and edit history stay unchanged. */
+cui_edit_result cui_editor_set_folded(cui_editor_state *, size_t index, bool collapsed);
 cui_editor_options cui_editor_default(void);
 /* Literal, case-sensitive UTF-8 search; selects a match, optionally wrapping.
  * Missing/invalid queries preserve selection. Reverse search starts before the

@@ -47,7 +47,7 @@ ligatures/contextual shaping. Disabled text may still receive host syntax colors
 Verified scope includes search direction/wrap, editing selected matches,
 undo, readonly input, line-number output, colored syntax text, invalid-hook
 fallback, invalid dimensions, and caret reveal. Frozen GPUI Editor has much
-broader display maps, folding, diagnostics, completion, language services, and
+broader display maps, diagnostics, completion, language services, and
 search features; those are not implemented here. This is a usable adapter, not
 full Editor parity. Navigation follows the existing UTF-8 scalar model rather
 than extended grapheme clusters; visual bidirectional navigation is unsupported.
@@ -74,3 +74,33 @@ matches; query edits update counts immediately, while navigation explicitly
 selects a match. Search bars use the existing Input/Button styled components,
 so editor amalgamations require the basic components module as well as textarea.
 This panel adds no replace mode, regex, case-folding, or all-match decorations.
+
+
+Attach sorted caller-owned `cui_editor_fold` ranges with `cui_editor_set_folds`.
+Line indices are zero-based, starts must be unique, and each range needs at least
+one interior line within the document. Nested or overlapping collapsed ranges
+hide the union of their interiors. This follows the frozen GPUI FoldMap boundary
+rule: opening **and closing** logical lines stay visible. Every wrapped row of
+an interior line is hidden. Ranges are validated on attachment and layout;
+malformed caller mutations reject layout rather than reading beyond bounds.
+
+`cui_editor_set_folded` changes presentation without modifying text/history.
+Collapsing while either selection endpoint is inside moves both endpoints to
+the opening line's end. A selection spanning a whole fold is preserved, and
+copy/delete still operate on the original full document. Programmatic selection,
+find results, or horizontal navigation entering hidden lines automatically
+expand containing folds on layout. Vertical navigation and pointer hit testing
+use visible rows and skip folded interiors. The line-number gutter exposes
+Expand/Collapse buttons with expanded semantics. Activation requests redraw;
+its updated projection is rendered on the next frame. Disable line numbers to
+use folding through the model API without gutter controls.
+
+Any document revision detaches all ranges, including after undo/redo; the host
+must refresh and reattach candidates against current text. This deliberately
+avoids applying stale line indices after arbitrary edits. It differs from
+GPUI's incremental parser/candidate remapping. No fold discovery, automatic
+indent/syntax folding, fold-all command, hidden-text placeholder, or parser-owned
+persistent range tracking is supplied. Array memory stays caller-owned and must
+remain alive and unmodified except for `collapsed` until detached. Selection
+motion remains scalar-based, and styled syntax callbacks receive original byte
+ranges of visible document rows.

@@ -235,6 +235,12 @@ void cui_divider(cui_context *ui, cui_id id, const cui_theme *t, float length, b
                             .background = t->border});
     cui_end_box(ui);
 }
+typedef struct {
+    cui_rect content;
+    float width, placed_height, maximum, font_size, padding, gap;
+    uint64_t revision;
+    bool measured;
+} cui_hover_card_measurement;
 static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme *t,
                                     cui_hover_state *state, cui_str name, cui_hover_options o,
                                     bool card) {
@@ -268,16 +274,52 @@ static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme 
         return false;
     }
     float width = cui_content_positive(o.width, card ? 240 : 200);
+    bool intrinsic = card && (!isfinite(o.height) || o.height <= 0);
+    cui_hover_card_measurement *measurement = NULL;
+    float max_height = o.viewport.h;
+    if (intrinsic && isfinite(o.max_height) && o.max_height > 0)
+        max_height = fminf(max_height, o.max_height);
     float height =
         cui_content_positive(o.height, card ? 120 : t->font_size * 1.5f + t->padding * 2);
+    if (intrinsic) {
+        measurement = cui_resource_get(ui, id, UINT64_C(0x29ca7264138d9517), sizeof(*measurement),
+                                       NULL, NULL);
+        if (!measurement)
+            return false;
+        height = measurement->measured ? measurement->content.h + 2 * t->padding
+                                       : 2 * t->padding + t->font_size;
+        height = fminf(max_height, fmaxf(0, height));
+        if (!measurement->measured || measurement->width != width ||
+            measurement->maximum != max_height || measurement->font_size != t->font_size ||
+            measurement->padding != t->padding || measurement->gap != t->gap ||
+            measurement->revision != o.content_revision ||
+            fabsf(measurement->placed_height - height) > .01f)
+            cui_invalidate(ui);
+        measurement->width = width;
+        measurement->maximum = max_height;
+        measurement->font_size = t->font_size;
+        measurement->padding = t->padding;
+        measurement->gap = t->gap;
+        measurement->revision = o.content_revision;
+        measurement->placed_height = height;
+        measurement->measured = true;
+    }
     cui_popup_result placement =
         cui_popup_place(anchor, (cui_size){width, height}, o.viewport, o.side, o.gap);
+    if (intrinsic) {
+        /* The first content measurement is not known at begin. Keep that frame
+         * within the viewport while retaining its actual fit height for the
+         * scheduled collision-placement redraw. */
+        max_height = fminf(max_height, fmaxf(0, o.viewport.y + o.viewport.h - placement.bounds.y));
+        placement.bounds.h = 0;
+    }
     float padding =
         card ? t->padding
              : fminf(t->padding,
                      fmaxf(0, (height - cui_measure_text(ui, name, t->font_size).height) / 2));
     cui_begin_portal(ui, id,
                      (cui_box){.padding = padding,
+                               .max_height = intrinsic ? max_height : 0,
                                .gap = t->gap,
                                .align_x = card ? CUI_ALIGN_START : CUI_ALIGN_CENTER,
                                .align_y = card ? CUI_ALIGN_START : CUI_ALIGN_CENTER,
@@ -313,8 +355,23 @@ bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state
 }
 bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state *state,
                           cui_str name, cui_hover_options options) {
-    return cui_content_hover_panel(ui, id, t, state, name, options, true);
+    if (!cui_content_hover_panel(ui, id, t, state, name, options, true))
+        return false;
+    /* A clipping container permits horizontal overflow in Clay. Constrain a
+     * non-scrolling inner content box so text actually reflows at card width. */
+    float width = fminf(cui_content_positive(options.width, 240), options.viewport.w);
+    cui_begin_box(
+        ui, cui_content_child(id, 17),
+        (cui_box){.width = fmaxf(0, width - 2 * t->padding), .fixed_width = true, .gap = t->gap});
+    if (!isfinite(options.height) || options.height <= 0) {
+        cui_hover_card_measurement *measurement = cui_resource_get(
+            ui, id, UINT64_C(0x29ca7264138d9517), sizeof(*measurement), NULL, NULL);
+        if (measurement)
+            cui_track_bounds(ui, cui_content_child(id, 17), &measurement->content);
+    }
+    return true;
 }
 void cui_end_hover_card(cui_context *ui) {
+    cui_end_box(ui);
     cui_end_box(ui);
 }

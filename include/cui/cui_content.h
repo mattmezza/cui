@@ -74,13 +74,21 @@ typedef struct {
     cui_popup_side side;
     float width, height, gap, dt, open_delay, close_delay;
     bool disabled;
+    /* HoverCard only: height<=0 fits children; positive max_height bounds the
+     * intrinsic panel. Increment revision when arbitrary child content changes
+     * without a width change so collision placement receives a measured redraw. */
+    float max_height;
+    uint64_t content_revision;
 } cui_hover_options;
 /* Trigger must already have been submitted. State is persistent/application-owned.
  * Explicit dimensions clip content, flip at viewport edges, and bound placement. */
 bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_state *state,
                  cui_str text, cui_hover_options options);
 /* Pair end only when begin returns true; accepts arbitrary children without a
- * modal focus trap. Hover/focus inside the open card extends its lifetime. */
+ * modal focus trap. Hover/focus inside the open card extends its lifetime.
+ * Default height fits children and is bounded by the viewport. Collision
+ * placement settles after the retained measurement redraw; explicit positive
+ * height remains fixed. Context owns measurement storage, not the caller. */
 bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *theme,
                           cui_hover_state *state, cui_str name, cui_hover_options options);
 void cui_end_hover_card(cui_context *ui);

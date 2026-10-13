@@ -604,6 +604,30 @@ static unsigned toolbar_activations[4];
 static char toolbar_query_buffer[64] = "find";
 static cui_edit *toolbar_query;
 static cui_input_state toolbar_query_state;
+static unsigned toolbar_query_changes;
+static const char *const toolbar_document[] = {"Find a quiet place to write.",
+                                               "Save your draft before sharing it.",
+                                               "Find collaborators in the workspace."};
+static bool toolbar_contains(const char *line, cui_str query) {
+    if (!query.length)
+        return false;
+    size_t length = strlen(line);
+    for (size_t i = 0; i + query.length <= length; i++) {
+        size_t j = 0;
+        for (; j < query.length; j++) {
+            unsigned char a = (unsigned char)line[i + j], b = (unsigned char)query.data[j];
+            if (a >= 'A' && a <= 'Z')
+                a += 'a' - 'A';
+            if (b >= 'A' && b <= 'Z')
+                b += 'a' - 'A';
+            if (a != b)
+                break;
+        }
+        if (j == query.length)
+            return true;
+    }
+    return false;
+}
 static int sidebar_mode, sidebar_side, sidebar_collapsed;
 static int sidebar_selected;
 static unsigned sidebar_actions;
@@ -701,7 +725,7 @@ static cui_title_bar_state title_state;
 static cui_window_info title_query(void *user) {
     (void)user;
     return (cui_window_info){.decoration = (cui_window_decoration)title_decoration,
-                             .actions = title_decoration == CUI_WINDOW_CLIENT_DECORATED ? 127 : 0,
+                             .actions = title_decoration != CUI_WINDOW_BROWSER && !title_fullscreen ? 127 : 0,
                              .maximized = title_maximized,
                              .fullscreen = title_fullscreen != 0};
 }
@@ -732,11 +756,51 @@ static void toolbar_query_render(cui_context *context, const cui_theme *theme,
                                  const cui_toolbar_presentation *presentation, void *user) {
     (void)presentation;
     (void)user;
-    cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme, cui_string("Find"),
-                 toolbar_query, &toolbar_query_state,
-                 (cui_input_options){.width = 112,
-                                     .placeholder = cui_string("Find"),
-                                     .disabled = toolbar_disabled});
+    cui_input_result result = cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme,
+                                           cui_string("Find"), toolbar_query, &toolbar_query_state,
+                                           (cui_input_options){.width = 112,
+                                                               .placeholder = cui_string("Find"),
+                                                               .disabled = toolbar_disabled});
+    if (result.changed)
+        toolbar_query_changes++;
+}
+static void title_simulated_controls(cui_context *context, const cui_theme *theme, bool disabled) {
+    static const char *const names[] = {"Simulated close", "Simulated minimize",
+                                        "Simulated maximize"};
+    const cui_color colors[] = {{255, 95, 87, 255}, {254, 188, 46, 255}, {40, 200, 64, 255}};
+    const cui_window_action actions[] = {CUI_WINDOW_CLOSE, CUI_WINDOW_MINIMIZE,
+                                         title_maximized ? CUI_WINDOW_RESTORE
+                                                         : CUI_WINDOW_MAXIMIZE};
+    cui_begin_absolute_box(context, cui_id_from(context, "title-simulated-controls"),
+                           (cui_box){.row = true, .align_y = CUI_ALIGN_CENTER, .gap = 2},
+                           (cui_rect){8, 0, 68, 34});
+    for (unsigned i = 0; i < 3; i++) {
+        cui_id id = cui_id_from(context, names[i]);
+        const char *name = i == 2 && title_maximized ? "Simulated restore" : names[i];
+        cui_interaction input =
+            cui_interact(context, id, CUI_ROLE_BUTTON, cui_string(name), disabled, false, 0);
+        cui_begin_box(context, id,
+                      (cui_box){.width = 20,
+                                .height = 24,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
+        cui_begin_box(context, 0,
+                      (cui_box){.width = 12,
+                                .height = 12,
+                                .radius = 6,
+                                .background = disabled ? theme->muted : colors[i],
+                                .border = input.focused ? theme->text : colors[i],
+                                .border_width = input.focused ? 2 : 0});
+        cui_end_box(context);
+        cui_end_box(context);
+        if (input.activated) {
+            if (!i && title_override)
+                title_close(NULL);
+            else
+                title_perform(NULL, actions[i], 0, 0);
+        }
+    }
+    cui_end_box(context);
 }
 static void toolbar_group_render(cui_context *context, const cui_theme *theme,
                                  const cui_toolbar_presentation *presentation, void *user) {
@@ -2370,6 +2434,20 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 68: {
         toolbar_disabled = disabled != 0;
+        size_t event_count = 0;
+        const cui_event *events = cui_frame_events(ui, &event_count);
+        if (!toolbar_disabled && toolbar_show_input)
+            for (size_t i = 0; i < event_count; i++) {
+                const cui_event *event = &events[i];
+                if (event->type == CUI_EVENT_KEY_DOWN && !event->repeat && !event->ime_composing &&
+                    !event->prefer_character_input &&
+                    !(event->modifiers & (CUI_MOD_ALT | CUI_MOD_SHIFT)) &&
+                    (event->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
+                    event->key == cui_key_from_character('F') && !cui_event_consumed(ui, i)) {
+                    cui_consume_event(ui, i);
+                    cui_focus(ui, cui_id_from(ui, "toolbar-query"));
+                }
+            }
         const char *labels[] = {"Save", "Undo", "Bold", "Italic"};
         cui_toolbar_command commands[4];
         for (unsigned i = 0; i < 4; i++)
@@ -2404,17 +2482,63 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                           .custom_size = 20,
                                           .label = cui_string("Editing toolbar"),
                                           .disabled = disabled != 0});
+        cui_str query = cui_edit_get_text(toolbar_query);
+        unsigned matches = 0;
+        for (unsigned i = 0; i < 3; i++)
+            matches += toolbar_contains(toolbar_document[i], query);
+        char summary[128];
+        if (query.length)
+            snprintf(summary, sizeof summary, "Find: %u matching %s", matches,
+                     matches == 1 ? "line" : "lines");
+        else
+            snprintf(summary, sizeof summary, "Find: enter a search term");
+        cui_label(ui, &t, cui_string(summary));
+        if (query.length && !matches)
+            cui_label(ui, &t, cui_string("No results in this document."));
+        cui_label(ui, &t, cui_string("Document"));
+        if (toolbar_show_input)
+            cui_label(ui, &t, cui_string("Ctrl/Cmd+F focuses Find while the preview has focus."));
+        for (unsigned i = 0; i < 3; i++) {
+            bool matched = toolbar_contains(toolbar_document[i], query);
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = -1,
+                                    .padding = 6,
+                                    .background = matched ? t.secondary : t.surface});
+            char line[160];
+            snprintf(line, sizeof line, "%s%s", matched ? "Match: " : "", toolbar_document[i]);
+            cui_label(ui, &t, cui_string(line));
+            cui_end_box(ui);
+        }
         break;
     }
     case 69: {
         cui_chrome_item items[] = {
             {.id = cui_id_from(ui, "title-workspace"), .text = cui_string("CUI workspace")},
             {.id = cui_id_from(ui, "title-document"), .text = cui_string("Untitled document")}};
+        cui_begin_box(ui, cui_id_from(ui, "title-simulation-wrapper"),
+                      (cui_box){.width = width - 48, .height = 34});
         cui_title_bar(ui, cui_id_from(ui, "title-preview"), &t, &title_state, items, 2,
                       (cui_title_bar_options){.width = width - 48,
                                               .name = cui_string("Window title bar"),
                                               .host = &title_host,
                                               .on_close = title_override ? title_close : NULL});
+        if (title_decoration == CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS && !title_fullscreen)
+            title_simulated_controls(ui, &t, disabled != 0);
+        cui_end_box(ui);
+        cui_label(
+            ui, &t,
+            cui_string(
+                title_decoration == CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS
+                    ? title_fullscreen
+                          ? "Browser simulation: native controls hidden in fullscreen."
+                          : "Browser simulation of OS traffic lights; actions affect this preview."
+                    : "Window actions are simulated in this browser preview."));
+        char status[160];
+        snprintf(status, sizeof status,
+                 "Preview: %s; minimized %u; close requests %u; overrides %u",
+                 title_maximized ? "maximized" : "normal", title_actions[CUI_WINDOW_MINIMIZE],
+                 title_actions[CUI_WINDOW_CLOSE], title_closed);
+        cui_label(ui, &t, cui_string(status));
         break;
     }
     case 70: {
@@ -3548,7 +3672,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .viewport = {0, 0, width, height},
                                      .side = CUI_POPUP_BELOW,
                                      .width = width > 360 ? 280 : width - 48,
-                                     .height = 100,
+                                     .height = story == 23 ? 100 : 0,
                                      .gap = 8,
                                      .dt = host_dt,
                                      .open_delay = .25f,
@@ -4539,7 +4663,7 @@ void gallery_toolbar_options(int size, int grouped, int show_input) {
     toolbar_show_input = show_input != 0;
 }
 unsigned gallery_toolbar_activations(unsigned index) {
-    return index < 4 ? toolbar_activations[index] : 0;
+    return index < 4 ? toolbar_activations[index] : index == 4 ? toolbar_query_changes : 0;
 }
 unsigned gallery_toolbar_cursor(void) {
     return toolbar_query ? (unsigned)cui_edit_get_state(toolbar_query).cursor : 0;

@@ -3392,7 +3392,8 @@
       "tests": [
         "tests/unit/test_components.c",
         "tests/unit/test_input.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_input_reference_contracts.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3401,7 +3402,8 @@
       },
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
-        "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md."
+        "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
+        "Composed Input history, grapheme navigation, retained-state blur/rebind grouping and single-line Up/Down delegation have tests. Whole-value edit acceptance callbacks remain absent; explicit invalid semantics do not replace validation. See docs/INPUT_REFERENCE_CONTRACTS.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3427,8 +3429,12 @@
         },
         {
           "name": "undo/redo and grapheme boundaries",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_input_reference_contracts.c",
+            "docs/INPUT_REFERENCE_CONTRACTS.md"
+          ]
         },
         {
           "name": "validation/disabled/error/semantic states",
@@ -3507,7 +3513,7 @@
           "JavaScript"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -5458,7 +5464,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "38 pinned palettes, caller-owned bounded registry, transactional supported legacy/semantic imports, explicit host appearance/high-contrast/reduced-motion projection, semantic typography/shadow snapshots and native font-backed import rendering are tested. Native OS preference observation is pending; application must pass host preferences explicitly. Semantic font/spacing/shadow and motion snapshots require explicit consumer integration. Unsupported source gradients, syntax/highlight and nonrepresentable fields reject by default, or return an observable partial import when opted in. Registry name ordering uses ASCII case folding. See docs/THEME_REGISTRY_GUIDE.md and docs/THEME_PRESETS.md."
+        "38 pinned palettes, caller-owned bounded registry, transactional supported legacy/semantic imports, explicit host appearance/high-contrast/reduced-motion projection, semantic typography/shadow snapshots and native font-backed import rendering are tested. SDL actual system-theme queries and queued change notifications, explicit overrides and a native follow-system application have tests. Physical OS setting changes, native high contrast and native reduced-motion observation remain unverified; applications pass those preferences explicitly. Semantic font/spacing/shadow and motion snapshots require explicit consumer integration. Unsupported source gradients, syntax/highlight and nonrepresentable fields reject by default, or return an observable partial import when opted in. Registry name ordering uses ASCII case folding. See docs/THEME_REGISTRY_GUIDE.md and docs/THEME_PRESETS.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5516,6 +5522,16 @@
             "tests/integration/test_theme_registry_native.c",
             "tests/web/test_theme_registry.py"
           ]
+        },
+        {
+          "name": "SDL system appearance observation and native follow-system application",
+          "status": "tested",
+          "evidence": [
+            "tests/integration/test_sdl3_appearance.c",
+            "tests/integration/test_system_theme_app.c",
+            "examples/system_theme/main.c",
+            "docs/SDL_SYSTEM_APPEARANCE.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5526,7 +5542,7 @@
           "Theme Registry"
         ]
       },
-      "last_tested_commit": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
+      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -5872,7 +5888,8 @@
       },
       "limitations": [
         "Basic rendering for seven chart families, bounded geometry, explicit Sankey topology, theme colors and pointer hover are tested. Source-complete axes, legends, tooltips, gradients, layout refinement and animation remain unfinished; see docs/CHART.md.",
-        "Chart appearance gates new tooltip entry by linear timeline completion and resumes a valid stationary pointer. Current-frame origin/occlusion, arbitrary tooltip layout and complete source owner motion remain unfinished; see docs/CHART_APPEARANCE_HOVER.md and docs/validation/core-prepaint-contract-next23.md."
+        "Chart appearance gates new tooltip entry by linear timeline completion and resumes a valid stationary pointer. Current-frame origin/occlusion, arbitrary tooltip layout and complete source owner motion remain unfinished; see docs/CHART_APPEARANCE_HOVER.md and docs/validation/core-prepaint-contract-next23.md.",
+        "Explicit value-owned appearance/enter/exit policies and independent owner pointer clocks have headless and actual WASM pixel tests. Legacy defaults remain; automatic current-frame geometry and arbitrary layout tooltip consumption are separate gaps."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5916,6 +5933,15 @@
           "evidence": [
             "tests/unit/test_chart.c",
             "tests/web/test_chart_appearance_hover.py"
+          ]
+        },
+        {
+          "name": "value-owned explicit motion policies and independent pointer spring clocks",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot_chart_owner_motion.c",
+            "tests/web/test_plot_chart_owner_motion.py",
+            "docs/PLOT_CHART_OWNER_MOTION.md"
           ]
         }
       ],
@@ -5962,7 +5988,7 @@
           "Real-time Updates"
         ]
       },
-      "last_tested_commit": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d"
+      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc"
     },
     {
       "name": "Command",
@@ -6160,7 +6186,8 @@
       "limitations": [
         "Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.",
         "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.",
-        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Bounded multi-contour fills now support holes, even-odd/nonzero rules and crossings; extended strokes cover closed paths, caps, joins and dash splitting with native/sanitizer/WASI geometry tests. Exact Lyon topology, unbounded geometry, variable-width/automatic curved routing, broader scale/legend/selection behavior, automatic prepaint and styled native mesh integration remain incomplete."
+        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Bounded multi-contour fills now support holes, even-odd/nonzero rules and crossings; extended strokes cover closed paths, caps, joins and dash splitting with native/sanitizer/WASI geometry tests. Exact Lyon topology, unbounded geometry, variable-width/automatic curved routing, broader scale/legend/selection behavior, automatic prepaint and styled native mesh integration remain incomplete.",
+        "Explicit value-owned appearance/enter/exit policies and independent owner pointer clocks have headless and actual WASM pixel tests. Legacy defaults remain; automatic current-frame geometry and arbitrary layout tooltip consumption are separate gaps."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6223,6 +6250,15 @@
             "tests/unit/test_plot_styled.c",
             "docs/PLOT.md"
           ]
+        },
+        {
+          "name": "value-owned explicit motion policies and independent pointer spring clocks",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot_chart_owner_motion.c",
+            "tests/web/test_plot_chart_owner_motion.py",
+            "docs/PLOT_CHART_OWNER_MOTION.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -6247,7 +6283,7 @@
           "Custom Bar Chart Implementation"
         ]
       },
-      "last_tested_commit": "8e00114d894b8eba3e39f942171f7184bf35328e"
+      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc"
     },
     {
       "name": "Table",

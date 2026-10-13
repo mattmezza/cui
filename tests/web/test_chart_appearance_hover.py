@@ -44,6 +44,9 @@ def main():
                     return page
                 browser.new_page = controlled_page
             a = Audit(browser, f'http://127.0.0.1:{server.server_port}')
+            if args.controlled_clock:
+                # One source second needs 100 genuine rendered browser frames.
+                a.page.set_default_timeout(15000)
             a.page.emulate_media(reduced_motion='no-preference')
             a.route('Chart')
             chart = a.target('Project activity chart')

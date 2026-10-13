@@ -2,7 +2,7 @@
 
 CUI is a working alpha. A live gallery and passing tests demonstrate useful functionality; they do not establish production readiness or complete component parity. This assessment is dated 13 October 2026.
 
-The catalog contains all 78 families: 76 tested subsets, two implemented families and zero fully verified families. The feature ledger contains 324 entries: 274 tested, four implemented and 46 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.
+The catalog contains all 78 families: 76 tested subsets, two implemented families and zero fully verified families. The feature ledger contains 327 entries: 278 tested, four implemented and 45 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.
 
 ## Release gates
 
@@ -15,7 +15,7 @@ The catalog contains all 78 families: 76 tested subsets, two implemented familie
 | Accessibility | Roles, state, names, actions and focus have headless semantic tests. The optional Linux AccessKit package passes native DBus and relocated CMake/pkg-config consumer tests; assistive-technology and broader platform acceptance remain open. | Implement and validate platform accessibility bridges with real assistive technologies; cover contrast, text scaling, reduced motion and touch targets. |
 | Platforms | Portable library CI includes Linux, Windows and macOS; browser and Linux native runtime checks exist. | Native Windows/macOS, Linux display-server variants and Android/iOS runtime evidence. Compile-only evidence must remain labeled separately. |
 | API and ownership | Portable C11 APIs, layered implementation, generated embedding headers and explicit memory contracts exist. | Review ABI/version policy, lifetimes, failure behavior, capacity limits and upgrade compatibility; finish the optional ecosystem promised by the scope. |
-| Themes and motion | Bounded owned theme registry, transactional supported imports, semantic snapshots and explicit host preference/motion projection have native, header-only and browser tests. | Finish native preference observation and component integration of typography, spacing, shadows and owner motion; close remaining source styling and current-frame chart/plot geometry gaps. |
+| Themes and motion | Bounded owned theme registry, transactional supported imports, semantic snapshots and explicit host preference/motion projection have native, header-only and browser tests. | Validate physical native preference changes, native contrast/motion observation and broader component integration of typography, spacing and shadows; close remaining source styling and current-frame chart/plot consumer geometry gaps. |
 | Performance and safety | Warning builds, sanitizers, WASI and browser tests; selected measured workloads. | Reproducible startup, memory and frame-budget baselines, broad stress/fuzz coverage and regression thresholds on supported targets. |
 | Documentation | Browsable guides, compiled C snippets, callback/state explanations and host-language examples. | Every shipped capability has accurate usage, ownership, limitations and reproduction instructions; examples must match released APIs. |
 

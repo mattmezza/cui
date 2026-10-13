@@ -73,7 +73,10 @@ int main(void) {
                 for (unsigned variant = 0; variant <= CUI_BUTTON_CUSTOM; variant++) {
                     values[0] = values[2] = true;
                     values[1] = false;
-                    cui_context *ui = cui_create((cui_config){0});
+                    /* Three children need bounded fixture capacity, not default application arenas.
+                     */
+                    cui_context *ui = cui_create((cui_config){
+                        .max_elements = 128, .max_commands = 512, .frame_bytes = 16384});
                     assert(ui);
                     cui_theme theme = cui_theme_light();
                     if (compact)
@@ -124,7 +127,8 @@ int main(void) {
                     assert(cui_last_error(ui) == CUI_OK);
                     cui_destroy(ui);
                 }
-    cui_context *ui = cui_create((cui_config){0});
+    cui_context *ui =
+        cui_create((cui_config){.max_elements = 128, .max_commands = 512, .frame_bytes = 16384});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_button_group_style_options o = {.behavior = {.on_change = change}};
@@ -180,7 +184,7 @@ int main(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
     /* Styled passive layout/paint participates without semantics or lifecycle callbacks. */
-    ui = cui_create((cui_config){0});
+    ui = cui_create((cui_config){.max_elements = 128, .max_commands = 512, .frame_bytes = 16384});
     assert(ui);
     cui_button_state states[3] = {{0}};
     for (size_t i = 0; i < 3; i++)

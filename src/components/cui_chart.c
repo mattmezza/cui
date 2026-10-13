@@ -648,7 +648,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                 float target = (float)candle.wick.x_min;
                 if (o->custom_motion) {
                     if (!chart_motion_pointer(ui, o, &state->motion_mark, target,
-                        !state->emphasis_started, &state->emphasis_center, &state->emphasis_velocity))
+                                              !state->emphasis_started, &state->emphasis_center,
+                                              &state->emphasis_velocity))
                         return false;
                     state->emphasis_started = true;
                 } else if (!state->emphasis_started || instant) {
@@ -666,8 +667,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
             for (size_t i = 0; i < o->count && i < 256; i++) {
                 float target = active && state->hovered == i ? 1 : 0;
                 if (o->custom_motion) {
-                    if (!chart_motion_pointer(ui, o, &state->motion_pie[i], target,
-                        false, &state->pie_lift[i], &state->pie_lift_velocity[i]))
+                    if (!chart_motion_pointer(ui, o, &state->motion_pie[i], target, false,
+                                              &state->pie_lift[i], &state->pie_lift_velocity[i]))
                         return false;
                 } else if (instant) {
                     state->pie_lift[i] = target;

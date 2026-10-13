@@ -342,6 +342,10 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #define CUI_THEME_IMPLEMENTATION
 #endif
 #include "cui_theme.h"
+#ifndef CUI_PLOT_MOTION_IMPLEMENTATION
+#define CUI_PLOT_MOTION_IMPLEMENTATION
+#endif
+#include "cui_plot_motion.h"
 #ifndef CUI_CONTENT_IMPLEMENTATION
 #define CUI_CONTENT_IMPLEMENTATION
 #endif

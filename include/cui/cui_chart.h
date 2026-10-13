@@ -235,7 +235,7 @@ typedef struct {
     void *area_radar_fill_user;
     /* Distinguishes source explicit x_tick_count(0) from default stride selection. */
     bool custom_x_tick_count;
-    bool custom_motion; /* false preserves legacy defaults; true uses value policy */
+    bool custom_motion;            /* false preserves legacy defaults; true uses value policy */
     cui_plot_motion_policy motion; /* positive legacy durations override policy durations */
 } cui_chart_options;
 typedef struct {

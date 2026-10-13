@@ -418,13 +418,6 @@ static bool cui_text_view_glyph_selected(const cui_text_view_state *s, const cui
         return false;
     return cui_text_view_overlap(g->text, s->workspace.blocks[g->block].projected_selection);
 }
-static float cui_text_view_opacity(const cui_text_view_state *s, size_t at) {
-    if (!s->stream_fade || s->reduced_motion || s->workspace.mapping[at].born < 0)
-        return 1;
-    float age = s->time - s->workspace.mapping[at].born;
-    float t = s->fade_duration > 0 ? fminf(fmaxf(age / s->fade_duration, 0), 1) : 1;
-    return 1 - (1 - t) * (1 - t) * (1 - t);
-}
 static cui_color cui_text_view_foreground(const cui_text_view_state *s,
                                           const cui_text_view_glyph *g, cui_text_view_style style,
                                           cui_text_view_options o) {
@@ -662,7 +655,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         }
         cui_color color = cui_text_view_foreground(s, first, style, o);
         bool selected = o.selectable && cui_text_view_glyph_selected(s, first, selection);
-        float opacity = cui_text_view_opacity(s, first->text.begin);
+        float opacity = cui_text_view_stream_opacity(s, first->text.begin);
         size_t end = i + 1;
         while (end < s->glyph_count) {
             cui_text_view_glyph *g = &s->workspace.glyphs[end],
@@ -670,7 +663,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             if (g->span != first->span || g->bounds.y != first->bounds.y ||
                 g->text.begin != previous->text.end ||
                 cui_text_view_glyph_selected(s, g, selection) != selected ||
-                cui_text_view_opacity(s, g->text.begin) != opacity ||
+                cui_text_view_stream_opacity(s, g->text.begin) != opacity ||
                 !cui_text_view_color_equal(cui_text_view_foreground(s, g, style, o), color))
                 break;
             bool same = true;
@@ -865,6 +858,8 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
         !isfinite(o.dt) || o.dt < 0 || !isfinite(o.code_actions_height) ||
         o.code_actions_height < 0 || !isfinite(o.table_actions_height) ||
         o.table_actions_height < 0)
+        return false;
+    if (o.custom_motion && !cui_text_view_set_motion(s, o.motion))
         return false;
     cui_text_view_style style = o.custom_style ? o.style : cui_text_view_style_from_theme(theme);
     float width = o.width > 0 ? o.width : s->viewport.w > 0 ? s->viewport.w : 320;

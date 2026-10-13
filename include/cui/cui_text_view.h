@@ -113,6 +113,15 @@ typedef struct {
     cui_text_view_highlight *highlights;
     size_t highlight_capacity;
 } cui_text_view_workspace;
+typedef enum {
+    CUI_TEXT_VIEW_FADE_EASE_OUT_CUBIC,
+    CUI_TEXT_VIEW_FADE_LINEAR,
+    CUI_TEXT_VIEW_FADE_EASE_IN_OUT_CUBIC
+} cui_text_view_fade_easing;
+typedef struct {
+    float duration, stagger;
+    cui_text_view_fade_easing easing;
+} cui_text_view_motion;
 typedef struct {
     cui_text_view_workspace workspace;
     cui_text_view_format format;
@@ -122,7 +131,8 @@ typedef struct {
         selection_override, multi_click_release;
     float pointer_x, pointer_y, press_x, press_y, selection_x, selection_y;
     cui_id secondary_link;
-    float time, fade_duration, width, height;
+    float time, fade_duration, fade_stagger, width, height;
+    cui_text_view_fade_easing fade_easing;
     cui_scroll_state scroll;
     cui_rect viewport;
     bool reveal_pending;
@@ -171,6 +181,16 @@ cui_text_view_error cui_text_view_set_highlights(cui_text_view_state *,
 cui_text_view_error cui_text_view_reveal(cui_text_view_state *, cui_text_view_range);
 /* Paint clock is application-driven. Returns true while animation/reveal needs a frame. */
 bool cui_text_view_advance(cui_text_view_state *, float dt);
+/* Default styled stream policy: .35 seconds, no stagger, ease-out cubic.
+ * Stagger reveals words with trailing whitespace, or individual CJK scalars.
+ * If an updated text leaf would start its last unit after duration, that leaf
+ * fades as one chunk. Zero duration snaps. Invalid policy leaves state intact.
+ * Set before set_text so a streamed update receives the chosen birth times. */
+cui_text_view_motion cui_text_view_motion_default(void);
+bool cui_text_view_set_motion(cui_text_view_state *, cui_text_view_motion);
+/* Sample a rendered byte's alpha multiplier; invalid offsets, disabled stream
+ * fade and reduced motion return one. No mutation or platform dependence. */
+float cui_text_view_stream_opacity(const cui_text_view_state *, size_t rendered_byte);
 typedef cui_size (*cui_text_view_measure_fn)(void *, cui_str, float font_size, unsigned flags);
 typedef bool (*cui_text_view_font_metrics_fn)(void *, float font_size, unsigned flags,
                                               cui_font_metrics *);
@@ -235,6 +255,8 @@ typedef struct {
     size_t max_lines;
     bool custom_style;
     cui_text_view_style style;
+    bool custom_motion;
+    cui_text_view_motion motion;
     const cui_platform *clipboard;
     cui_text_view_copy_format copy_format;
     char *copy_buffer;

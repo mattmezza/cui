@@ -71,7 +71,7 @@ Remaining frozen-source gaps are tracked explicitly: complete CommonMark/HTML5
 and complete nested-list/quote structure, MDX/plugins/YAML front matter, image
 error UI, complete shared-window selection identity, touch selection menus
 and handles, grapheme/BiDi shaping, inherited parent foreground palettes, fully configurable table/action refinements,
-custom word/CJK stagger and easing, automatic enclosing-list reveal, background
+automatic enclosing-list reveal, background
 syntax styles, cached/asynchronous parsing and layout. Default wrap tables use
 capped text-length column proportions (5 to 150 characters) and 64px minimum
 columns. Narrow wrap tables clip at the document edge; opt-in adaptive horizontal
@@ -379,3 +379,66 @@ they are not missing HTML reconstruction features promised by that source.
 Mouse multi-click selection now uses the pinned source character classes and 128-scalar word boundary limit. Double-click selects a word without splitting UTF-8 or crossing image runs; triple-click selects an ordinary paragraph or the visual row in an image-flow paragraph. Higher counts use logical-line boundaries. Plain multi-click copy preserves the chosen text override while Source copy retains Markdown markup. Shared selection clears other members, retains focus ownership and preserves the selection after release. Headless tests cover bounded long words, UTF-8 offsets, whitespace/punctuation, image boundaries, paragraph/row copy, text mutation and shared view ownership. Touch gesture selection and complete coverage of every block/run kind remain unfinished.
 
 The website's Markdown example starts with a visible fenced C code block, then shows emphasis, a link, lists, a quote and a table. Select **Scrollable** to constrain the document viewport, or switch **TextView format** to HTML or plain text. Fenced code is parsed and rendered in monospace with the theme's code background; it is separate from the website's copyable C usage excerpt.
+
+
+## Stream motion policy
+
+The frozen `crates/base/src/text/stream_fade.rs` at commit
+`87d10ae5e1299d1be18670a37570c5402f952e34` defines words with their trailing
+whitespace as reveal units, or individual Chinese/Japanese/Korean scalars.
+CUI now exposes this timing through `cui_text_view_motion`,
+`cui_text_view_set_motion`, and styled `options.custom_motion/options.motion`.
+The default remains 350 ms, no stagger, ease-out cubic. Linear and ease-in-out
+cubic are also supported; arbitrary user-defined easing functions are not.
+
+Configure state **before** applying an appended document update. Initial document
+loading normally precedes enabling streaming so existing text appears immediately:
+
+```c
+cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN);
+cui_text_view_set_text(&state, cui_string("Existing reply"));
+state.stream_fade = true;
+cui_text_view_motion motion = cui_text_view_motion_default();
+motion.duration = .6f;
+motion.stagger = .08f;
+cui_text_view_set_motion(&state, motion);
+/* A later model update appends text; preserve state/workspace between frames. */
+cui_text_view_set_text(&state, cui_string("Existing reply with new words"));
+cui_text_view_options options = cui_text_view_default();
+options.stream_fade = true;
+options.custom_motion = true;
+options.motion = motion;
+/* Inside an active frame; dt is elapsed host time. */
+options.dt = dt;
+cui_text_view(ui, id, theme, &state, options);
+```
+
+Each changed contiguous run within a paragraph/code/table-cell leaf starts its
+own word timing. Unicode whitespace follows the preceding word; leading
+whitespace joins the first word. CJK ranges match the pinned source:
+Hiragana/Katakana, CJK Extension A/unified/compatibility ideographs, Hangul
+syllables, and ideograph extensions U+20000–U+2FA1F. Every byte of a UTF-8 scalar
+receives the same birth time. Staggering spans inline formatting within a leaf;
+it restarts at block and table-cell boundaries. If the last unit would start
+later than the fade duration, the entire changed run fades as one chunk. CUI
+uses its existing rendered-byte/format comparison, rather than introducing a
+full source leaf-identity tracker; more complex reparses can have different
+chunk boundaries from the frozen implementation.
+
+`cui_text_view_stream_opacity` samples the current alpha multiplier without
+painting. `cui_text_view_advance` continues to request frames until the last
+delayed unit reaches full opacity. A disabled fade, zero duration, replacement,
+or reduced motion paints immediately. Replacing text clears unfinished fades
+in unchanged prefixes too. Invalid negative/nonfinite durations or stagger and
+unknown easing values fail without changing the state. A zero duration clears
+pending fades; other policy changes update durations/easing of active fades but
+do not reschedule already recorded stagger birth times. Set a policy before
+`set_text` for deterministic new-chunk timing. The styled custom policy is
+validated before image, link, or composition callbacks run.
+
+Headless tests exercise overlapping word timing, delayed animation completion,
+Latin/CJK/Unicode-whitespace scalar boundaries, oversized chunks, easing values,
+zero/invalid policies, replacement and reduced motion, Markdown completion,
+independent table-cell timings, transactional failed parses, and actual text
+command alpha. Complete parser/plugins, touch selection, shaping and other gaps
+listed above remain outside this change.

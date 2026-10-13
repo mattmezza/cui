@@ -590,6 +590,119 @@ static void test_markdown(void) {
     assert(s->text_length == old);
     s->workspace.span_capacity = 512;
 }
+static void test_stream_motion_policy(void) {
+    static fixture f;
+    setup(&f, CUI_TEXT_VIEW_PLAIN);
+    cui_text_view_state *s = &f.state;
+    cui_text_view_motion motion = cui_text_view_motion_default();
+    assert(motion.duration == .35f && motion.stagger == 0 &&
+           motion.easing == CUI_TEXT_VIEW_FADE_EASE_OUT_CUBIC);
+    motion = (cui_text_view_motion){
+        .duration = .6f, .stagger = .1f, .easing = CUI_TEXT_VIEW_FADE_LINEAR};
+    assert(cui_text_view_set_motion(s, motion));
+    assert(cui_text_view_set_text(s, text("prefix ")) == CUI_TEXT_VIEW_OK);
+    s->stream_fade = true;
+    s->time = 2;
+    assert(cui_text_view_set_text(s, text("prefix one two three")) == CUI_TEXT_VIEW_OK);
+    assert(f.mapping[7].born == 2 && f.mapping[10].born == 2);
+    assert(f.mapping[11].born == 2.1f && f.mapping[15].born == 2.2f);
+    assert(cui_text_view_stream_opacity(s, 0) == 1);
+    assert(cui_text_view_stream_opacity(s, 7) == 0);
+    assert(cui_text_view_advance(s, .15f));
+    assert(fabsf(cui_text_view_stream_opacity(s, 7) - .25f) < .00001f);
+    assert(cui_text_view_stream_opacity(s, 15) == 0);
+    assert(cui_text_view_set_text(s, text("prefix one two three four")) == CUI_TEXT_VIEW_OK);
+    assert(f.mapping[15].born == 2.2f);     /* Existing delayed units keep their schedule. */
+    assert(f.mapping[21].born == s->time);  /* The next chunk overlaps the first. */
+    assert(cui_text_view_advance(s, .55f)); /* Last word is still fading. */
+    assert(!cui_text_view_advance(s, .11f));
+    assert(cui_text_view_stream_opacity(s, 15) == 1);
+    /* A replacement must clear even an unchanged prefix's unfinished fade. */
+    s->time = 3;
+    assert(cui_text_view_set_text(s, text("prefix one two three four new")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_stream_opacity(s, 26) == 0);
+    assert(cui_text_view_set_text(s, text("prefix one two three four next")) == CUI_TEXT_VIEW_OK);
+    assert(!cui_text_view_advance(s, 0));
+    for (size_t i = 0; i < s->text_length; ++i)
+        assert(cui_text_view_stream_opacity(s, i) == 1);
+    /* Invalid policy is transactional. */
+    cui_text_view_motion invalid[] = {{.duration = NAN},
+                                      {.duration = -1},
+                                      {.duration = INFINITY},
+                                      {.duration = 1, .stagger = NAN},
+                                      {.duration = 1, .stagger = -1},
+                                      {.duration = 1, .easing = (cui_text_view_fade_easing)99}};
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
+        assert(!cui_text_view_set_motion(s, invalid[i]));
+        assert(s->fade_duration == motion.duration && s->fade_stagger == motion.stagger &&
+               s->fade_easing == motion.easing);
+    }
+    assert(!cui_text_view_set_motion(NULL, motion));
+    assert(cui_text_view_stream_opacity(NULL, 0) == 1);
+    assert(cui_text_view_stream_opacity(s, SIZE_MAX) == 1);
+    assert(cui_text_view_set_motion(s, (cui_text_view_motion){0}));
+    assert(cui_text_view_set_text(s, text("prefix one two three four next snap")) ==
+           CUI_TEXT_VIEW_OK);
+    assert(!cui_text_view_advance(s, 0));
+}
+static void test_stream_stagger_utf8_and_leaf_limits(void) {
+    static fixture f;
+    setup(&f, CUI_TEXT_VIEW_PLAIN);
+    cui_text_view_state *s = &f.state;
+    s->stream_fade = true;
+    s->time = 1;
+    assert(cui_text_view_set_motion(s, (cui_text_view_motion){.duration = .4f, .stagger = .1f}));
+    assert(cui_text_view_set_text(s, text("é 你好あ한 A")) == CUI_TEXT_VIEW_OK);
+    /* Latin word plus trailing space, then each Chinese/Japanese/Hangul scalar.
+     * Six units exceed .4 seconds, so the complete leaf fades as one chunk. */
+    for (size_t i = 0; i < s->text_length; ++i)
+        assert(f.mapping[i].born == 1);
+    assert(cui_text_view_set_text(s, text("")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_set_text(s, text("你好あ한")) == CUI_TEXT_VIEW_OK);
+    for (size_t scalar = 0; scalar < 4; ++scalar)
+        for (size_t byte = 0; byte < 3; ++byte)
+            assert(f.mapping[scalar * 3 + byte].born == 1 + (float)scalar * .1f);
+    /* Unicode whitespace remains with its preceding word. */
+    assert(cui_text_view_set_text(s, text("")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_set_text(s, text("é\xc2\xa0"
+                                          "tail")) == CUI_TEXT_VIEW_OK);
+    assert(f.mapping[0].born == 1 && f.mapping[3].born == 1 && f.mapping[4].born == 1.1f);
+    s->time = 1.1f;
+    assert(fabsf(cui_text_view_stream_opacity(s, 0) - .578125f) < .00001f);
+    assert(cui_text_view_set_motion(
+        s,
+        (cui_text_view_motion){.duration = .4f, .easing = CUI_TEXT_VIEW_FADE_EASE_IN_OUT_CUBIC}));
+    assert(fabsf(cui_text_view_stream_opacity(s, 0) - .0625f) < .00001f);
+    s->time = 1.3f;
+    assert(fabsf(cui_text_view_stream_opacity(s, 0) - .9375f) < .00001f);
+    s->reduced_motion = true;
+    assert(cui_text_view_stream_opacity(s, 0) == 1 && !cui_text_view_advance(s, 0));
+    /* Markdown completion reparses formatting: changed glyphs fade together,
+     * while distinct table-cell leaves each restart their local stagger. */
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    s = &f.state;
+    assert(cui_text_view_set_text(s, text("**bo")) == CUI_TEXT_VIEW_OK);
+    s->stream_fade = true;
+    s->time = 2;
+    assert(cui_text_view_set_motion(s, (cui_text_view_motion){.duration = .5f, .stagger = .1f}));
+    assert(cui_text_view_set_text(s, text("**bold**")) == CUI_TEXT_VIEW_OK);
+    assert(f.mapping[0].born == 2 && f.mapping[3].born == 2);
+    assert(cui_text_view_set_text(s, text("")) == CUI_TEXT_VIEW_OK);
+    assert(cui_text_view_set_text(s, text("| A B | C D |\n| --- | --- |\n| E F | G H |")) ==
+           CUI_TEXT_VIEW_OK);
+    for (size_t i = 0; i < s->block_count; ++i) {
+        cui_text_view_block *b = &f.blocks[i];
+        if (b->kind == CUI_TEXT_VIEW_TABLE_CELL) {
+            assert(f.mapping[b->text.begin].born == 2);
+            assert(f.mapping[b->text.begin + 2].born == 2.1f);
+        }
+    }
+    /* Failed parse preserves pending fade times and the last document. */
+    float born = f.mapping[0].born;
+    size_t length = s->text_length;
+    assert(cui_text_view_set_text(s, (cui_str){"\xff", 1}) == CUI_TEXT_VIEW_INVALID);
+    assert(f.mapping[0].born == born && s->text_length == length);
+}
 static void test_unicode_ranges_and_stream(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -1323,6 +1436,49 @@ static cui_draw_list frame(cui_context *ui, fixture *f, cui_text_view_options o)
     cui_draw_list d = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
     return d;
+}
+static void test_styled_stream_motion(void) {
+    static fixture f;
+    setup(&f, CUI_TEXT_VIEW_PLAIN);
+    cui_context *ui = cui_create((cui_config){0});
+    assert(ui);
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 300;
+    o.stream_fade = true;
+    o.custom_motion = true;
+    o.motion =
+        (cui_text_view_motion){.duration = 1, .stagger = .2f, .easing = CUI_TEXT_VIEW_FADE_LINEAR};
+    o.custom_style = true;
+    o.style = cui_text_view_style_default();
+    o.style.foreground = (cui_color){10, 20, 30, 200};
+    frame(ui, &f, o); /* Installs motion before the streamed update. */
+    f.state.time = 2;
+    assert(cui_text_view_set_text(&f.state, text("one two")) == CUI_TEXT_VIEW_OK);
+    f.state.time = 2.5f;
+    cui_draw_list draw = frame(ui, &f, o);
+    bool first = false, second = false;
+    for (size_t i = 0; i < draw.count; ++i) {
+        const cui_draw_command *c = &draw.commands[i];
+        if (c->type == CUI_DRAW_TEXT && c->color.r == 10) {
+            if (c->text.length == 4 && !memcmp(c->text.data, "one ", 4)) {
+                assert(c->color.a == 100);
+                first = true;
+            }
+            if (c->text.length == 3 && !memcmp(c->text.data, "two", 3)) {
+                assert(c->color.a >= 59 && c->color.a <= 60);
+                second = true;
+            }
+        }
+    }
+    assert(first && second);
+    float duration = f.state.fade_duration;
+    o.motion.duration = NAN;
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_theme theme = cui_theme_light();
+    assert(!cui_text_view(ui, 77, &theme, &f.state, o));
+    assert(f.state.fade_duration == duration);
+    cui_end_frame(ui);
+    cui_destroy(ui);
 }
 static unsigned clicks;
 static cui_pointer_button clicked_button;
@@ -3048,6 +3204,8 @@ int main(void) {
     test_image_font_metrics();
     test_markdown();
     test_unicode_ranges_and_stream();
+    test_stream_motion_policy();
+    test_stream_stagger_utf8_and_leaf_limits();
     test_html();
     test_source_copy();
     test_proportional_table_defaults();
@@ -3071,6 +3229,7 @@ int main(void) {
     test_bounded_parser();
     test_table_highlight_edits_and_nested_html();
 #ifndef CUI_TEXT_VIEW_BASE_ONLY
+    test_styled_stream_motion();
     test_styled_selection();
     test_styled_multi_click();
     test_document_plain_clipboard();

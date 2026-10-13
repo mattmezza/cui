@@ -114,6 +114,15 @@ typedef struct {
     cui_text_view_highlight *highlights;
     size_t highlight_capacity;
 } cui_text_view_workspace;
+typedef enum {
+    CUI_TEXT_VIEW_FADE_EASE_OUT_CUBIC,
+    CUI_TEXT_VIEW_FADE_LINEAR,
+    CUI_TEXT_VIEW_FADE_EASE_IN_OUT_CUBIC
+} cui_text_view_fade_easing;
+typedef struct {
+    float duration, stagger;
+    cui_text_view_fade_easing easing;
+} cui_text_view_motion;
 typedef struct {
     cui_text_view_workspace workspace;
     cui_text_view_format format;
@@ -123,7 +132,8 @@ typedef struct {
         selection_override, multi_click_release;
     float pointer_x, pointer_y, press_x, press_y, selection_x, selection_y;
     cui_id secondary_link;
-    float time, fade_duration, width, height;
+    float time, fade_duration, fade_stagger, width, height;
+    cui_text_view_fade_easing fade_easing;
     cui_scroll_state scroll;
     cui_rect viewport;
     bool reveal_pending;
@@ -172,6 +182,16 @@ cui_text_view_error cui_text_view_set_highlights(cui_text_view_state *,
 cui_text_view_error cui_text_view_reveal(cui_text_view_state *, cui_text_view_range);
 /* Paint clock is application-driven. Returns true while animation/reveal needs a frame. */
 bool cui_text_view_advance(cui_text_view_state *, float dt);
+/* Default styled stream policy: .35 seconds, no stagger, ease-out cubic.
+ * Stagger reveals words with trailing whitespace, or individual CJK scalars.
+ * If an updated text leaf would start its last unit after duration, that leaf
+ * fades as one chunk. Zero duration snaps. Invalid policy leaves state intact.
+ * Set before set_text so a streamed update receives the chosen birth times. */
+cui_text_view_motion cui_text_view_motion_default(void);
+bool cui_text_view_set_motion(cui_text_view_state *, cui_text_view_motion);
+/* Sample a rendered byte's alpha multiplier; invalid offsets, disabled stream
+ * fade and reduced motion return one. No mutation or platform dependence. */
+float cui_text_view_stream_opacity(const cui_text_view_state *, size_t rendered_byte);
 typedef cui_size (*cui_text_view_measure_fn)(void *, cui_str, float font_size, unsigned flags);
 typedef bool (*cui_text_view_font_metrics_fn)(void *, float font_size, unsigned flags,
                                               cui_font_metrics *);
@@ -236,6 +256,8 @@ typedef struct {
     size_t max_lines;
     bool custom_style;
     cui_text_view_style style;
+    bool custom_motion;
+    cui_text_view_motion motion;
     const cui_platform *clipboard;
     cui_text_view_copy_format copy_format;
     char *copy_buffer;
@@ -386,11 +408,11 @@ static void cui_text_view_emit(cui_text_view_parser *p, cui_str text, cui_text_v
     for (size_t i = 0; i < text.length; ++i) {
         if (p->write) {
             float born = -1;
-            if (p->text < p->state->text_length && w->rendered[p->text] == text.data[i] &&
-                w->mapping[p->text].flags == flags)
+            if (p->fade && p->text < p->state->text_length &&
+                w->rendered[p->text] == text.data[i] && w->mapping[p->text].flags == flags)
                 born = w->mapping[p->text].born;
             else if (p->fade)
-                born = p->state->time;
+                born = -2; /* Resolved scalar-safe after the complete bounded parse. */
             w->rendered[p->text] = text.data[i];
             w->mapping[p->text] =
                 (cui_text_view_mapping){.source = source, .flags = flags, .born = born};
@@ -1761,6 +1783,80 @@ static bool cui_text_view_table_highlight_stable(const cui_text_view_state *s,
     }
     return true;
 }
+static unsigned cui_text_view_codepoint(cui_str, size_t);
+static unsigned cui_text_view_character_kind(unsigned);
+static bool cui_text_view_cjk(unsigned c) {
+    return (c >= 0x3040 && c <= 0x30ff) || (c >= 0x3400 && c <= 0x4dbf) ||
+           (c >= 0x4e00 && c <= 0x9fff) || (c >= 0xac00 && c <= 0xd7af) ||
+           (c >= 0xf900 && c <= 0xfaff) || (c >= 0x20000 && c <= 0x2fa1f);
+}
+/* Two passes count units before assigning birth times: large chunks snap back
+ * to a single fade, rather than an arbitrarily fast sweep. Per-block ranges
+ * isolate table cells/code/paragraphs, matching the source's text leaves. */
+static void cui_text_view_stagger_range(cui_text_view_state *s, size_t begin, size_t end) {
+    cui_str text = cui_text_view_rendered_text(s);
+    size_t units = 1;
+    bool glyph = false;
+    unsigned previous = 0;
+    for (size_t at = begin; at < end; at += cui_text_view_scalar(text, at)) {
+        unsigned c = cui_text_view_codepoint(text, at);
+        bool space = cui_text_view_character_kind(c) == 2;
+        if (glyph && !space &&
+            (cui_text_view_cjk(c) || cui_text_view_character_kind(previous) == 2 ||
+             cui_text_view_cjk(previous)))
+            ++units;
+        glyph |= !space;
+        previous = c;
+    }
+    float step =
+        (double)s->fade_stagger * (double)(units - 1) <= s->fade_duration ? s->fade_stagger : 0;
+    size_t unit = 0;
+    glyph = false;
+    previous = 0;
+    for (size_t at = begin; at < end;) {
+        unsigned c = cui_text_view_codepoint(text, at);
+        size_t n = cui_text_view_scalar(text, at);
+        bool space = cui_text_view_character_kind(c) == 2;
+        if (glyph && !space &&
+            (cui_text_view_cjk(c) || cui_text_view_character_kind(previous) == 2 ||
+             cui_text_view_cjk(previous)))
+            ++unit;
+        float born = s->time + (float)unit * step;
+        if (!isfinite(born))
+            born = s->time;
+        for (size_t j = 0; j < n; ++j)
+            s->workspace.mapping[at + j].born = born;
+        glyph |= !space;
+        previous = c;
+        at += n;
+    }
+}
+static void cui_text_view_finish_fade(cui_text_view_state *s) {
+    cui_str text = cui_text_view_rendered_text(s);
+    for (size_t b = 0; b < s->block_count; ++b) {
+        cui_text_view_range range = s->workspace.blocks[b].text;
+        size_t begin = SIZE_MAX;
+        for (size_t at = range.begin; at < range.end;) {
+            size_t n = cui_text_view_scalar(text, at);
+            bool fresh = false;
+            for (size_t j = 0; j < n; ++j)
+                fresh |= s->workspace.mapping[at + j].born == -2;
+            if (fresh && begin == SIZE_MAX)
+                begin = at;
+            if (!fresh && begin != SIZE_MAX) {
+                cui_text_view_stagger_range(s, begin, at);
+                begin = SIZE_MAX;
+            }
+            at += n;
+        }
+        if (begin != SIZE_MAX)
+            cui_text_view_stagger_range(s, begin, range.end);
+    }
+    /* Block separators and non-text markers are not independent fade leaves. */
+    for (size_t at = 0; at < s->text_length; ++at)
+        if (s->workspace.mapping[at].born == -2)
+            s->workspace.mapping[at].born = s->time;
+}
 cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input) {
     if (!s || !s->workspace.source || !cui_text_view_valid(input))
         return CUI_TEXT_VIEW_INVALID;
@@ -1811,7 +1907,8 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     cui_text_view_parser actual = {.state = s,
                                    .input = {s->workspace.source, input.length},
                                    .write = true,
-                                   .fade = append && s->stream_fade && !s->reduced_motion};
+                                   .fade = append && s->stream_fade && !s->reduced_motion &&
+                                           s->fade_duration > 0};
     cui_text_view_parse(&actual);
     s->source_length = input.length;
     s->text_length = actual.text;
@@ -1820,6 +1917,7 @@ cui_text_view_error cui_text_view_set_text(cui_text_view_state *s, cui_str input
     s->glyph_count = 0;
     s->selection_projected = s->selection_override = s->multi_click_release = false;
     s->workspace.rendered[s->text_length] = 0;
+    cui_text_view_finish_fade(s);
     s->highlight_count = 0;
     for (size_t i = 0; i < kept; ++i) {
         cui_text_view_highlight h = s->workspace.highlights[i];
@@ -2045,6 +2143,33 @@ cui_text_view_error cui_text_view_reveal(cui_text_view_state *s, cui_text_view_r
     s->reveal_pending = true;
     s->reveal_age = 0;
     return CUI_TEXT_VIEW_OK;
+}
+cui_text_view_motion cui_text_view_motion_default(void) {
+    return (cui_text_view_motion){.duration = .35f, .easing = CUI_TEXT_VIEW_FADE_EASE_OUT_CUBIC};
+}
+bool cui_text_view_set_motion(cui_text_view_state *s, cui_text_view_motion motion) {
+    if (!s || !isfinite(motion.duration) || motion.duration < 0 || !isfinite(motion.stagger) ||
+        motion.stagger < 0 || motion.easing < CUI_TEXT_VIEW_FADE_EASE_OUT_CUBIC ||
+        motion.easing > CUI_TEXT_VIEW_FADE_EASE_IN_OUT_CUBIC)
+        return false;
+    s->fade_duration = motion.duration;
+    s->fade_stagger = motion.stagger;
+    s->fade_easing = motion.easing;
+    if (motion.duration == 0)
+        for (size_t i = 0; i < s->text_length; ++i)
+            s->workspace.mapping[i].born = -1;
+    return true;
+}
+float cui_text_view_stream_opacity(const cui_text_view_state *s, size_t at) {
+    if (!s || at >= s->text_length || !s->stream_fade || s->reduced_motion ||
+        s->workspace.mapping[at].born < 0 || s->fade_duration <= 0)
+        return 1;
+    float t = fminf(fmaxf((s->time - s->workspace.mapping[at].born) / s->fade_duration, 0), 1);
+    if (s->fade_easing == CUI_TEXT_VIEW_FADE_LINEAR)
+        return t;
+    if (s->fade_easing == CUI_TEXT_VIEW_FADE_EASE_IN_OUT_CUBIC)
+        return t < .5f ? 4 * t * t * t : 1 - 4 * (1 - t) * (1 - t) * (1 - t);
+    return 1 - (1 - t) * (1 - t) * (1 - t);
 }
 bool cui_text_view_advance(cui_text_view_state *s, float dt) {
     if (!s || !isfinite(dt) || dt < 0)
@@ -3730,13 +3855,6 @@ static bool cui_text_view_glyph_selected(const cui_text_view_state *s, const cui
         return false;
     return cui_text_view_overlap(g->text, s->workspace.blocks[g->block].projected_selection);
 }
-static float cui_text_view_opacity(const cui_text_view_state *s, size_t at) {
-    if (!s->stream_fade || s->reduced_motion || s->workspace.mapping[at].born < 0)
-        return 1;
-    float age = s->time - s->workspace.mapping[at].born;
-    float t = s->fade_duration > 0 ? fminf(fmaxf(age / s->fade_duration, 0), 1) : 1;
-    return 1 - (1 - t) * (1 - t) * (1 - t);
-}
 static cui_color cui_text_view_foreground(const cui_text_view_state *s,
                                           const cui_text_view_glyph *g, cui_text_view_style style,
                                           cui_text_view_options o) {
@@ -3974,7 +4092,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
         }
         cui_color color = cui_text_view_foreground(s, first, style, o);
         bool selected = o.selectable && cui_text_view_glyph_selected(s, first, selection);
-        float opacity = cui_text_view_opacity(s, first->text.begin);
+        float opacity = cui_text_view_stream_opacity(s, first->text.begin);
         size_t end = i + 1;
         while (end < s->glyph_count) {
             cui_text_view_glyph *g = &s->workspace.glyphs[end],
@@ -3982,7 +4100,7 @@ static void cui_text_view_paint_range(cui_context *ui, cui_id id, const cui_them
             if (g->span != first->span || g->bounds.y != first->bounds.y ||
                 g->text.begin != previous->text.end ||
                 cui_text_view_glyph_selected(s, g, selection) != selected ||
-                cui_text_view_opacity(s, g->text.begin) != opacity ||
+                cui_text_view_stream_opacity(s, g->text.begin) != opacity ||
                 !cui_text_view_color_equal(cui_text_view_foreground(s, g, style, o), color))
                 break;
             bool same = true;
@@ -4177,6 +4295,8 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
         !isfinite(o.dt) || o.dt < 0 || !isfinite(o.code_actions_height) ||
         o.code_actions_height < 0 || !isfinite(o.table_actions_height) ||
         o.table_actions_height < 0)
+        return false;
+    if (o.custom_motion && !cui_text_view_set_motion(s, o.motion))
         return false;
     cui_text_view_style style = o.custom_style ? o.style : cui_text_view_style_from_theme(theme);
     float width = o.width > 0 ? o.width : s->viewport.w > 0 ? s->viewport.w : 320;

@@ -125,16 +125,28 @@ bool cui_textarea_measure(cui_textarea_options options, float root, cui_textarea
     *out = (cui_textarea_metrics){font * density, 20 * density, px * density, py * density};
     return true;
 }
-static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t cursor) {
+static size_t cui_textarea_cursor_line_ex(const cui_textarea_state *state, size_t cursor,
+                                          bool upstream_affinity) {
     for (size_t i = 0; i < state->count; i++) {
         cui_textarea_line line = state->lines[i];
         if (cursor < line.end ||
             (cursor == line.end &&
-             (line.hard_break || state->upstream_affinity || i + 1 == state->count)) ||
+             (line.hard_break || upstream_affinity || i + 1 == state->count)) ||
             cursor < line.next)
             return i;
     }
     return state->count ? state->count - 1 : 0;
+}
+static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t cursor) {
+    return cui_textarea_cursor_line_ex(state, cursor, state->upstream_affinity);
+}
+/* A point just outside a selection can land in a folded gap even though both
+ * selection endpoints are visible. Clamp it in the movement direction. */
+static size_t cui_textarea_visible_offset(const cui_textarea_state *state, size_t offset, bool up) {
+    for (size_t i = 0; i + 1 < state->count; ++i)
+        if (offset >= state->lines[i].next && offset < state->lines[i + 1].start)
+            return up ? state->lines[i].end : state->lines[i + 1].start;
+    return offset;
 }
 cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
                                           cui_textarea_state *state, cui_textarea_metrics metrics,
@@ -418,19 +430,37 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                    (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN ||
                     event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN)) {
             cui_edit_state selection = cui_edit_get_state(edit);
-            size_t row = state->caret_line;
+            cui_str text = cui_edit_get_text(edit);
+            bool up = event.key == CUI_KEY_UP || event.key == CUI_KEY_PAGEUP;
+            bool collapse = !shift && selection.anchor != selection.cursor &&
+                            (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN);
+            size_t effective = selection.cursor, row = state->caret_line;
+            if (collapse) {
+                size_t first =
+                    selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
+                size_t last =
+                    selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+                /* Frozen move_vertical: previous_boundary(start-1) subtracts
+                 * another byte before left clipping; next_boundary(end-1)
+                 * right-clips end. Clip to CUI's whole-grapheme boundaries. */
+                effective =
+                    up ? cui_textarea_boundary_before(text, 0, first > 1 ? first - 2 : 0, false)
+                       : cui_textarea_boundary_after(text, 0, last);
+                effective = cui_textarea_visible_offset(state, effective, up);
+                bool affinity = !up && effective == selection.cursor && state->upstream_affinity;
+                row = cui_textarea_cursor_line_ex(state, effective, affinity);
+                state->preferred_valid = false;
+            }
             cui_textarea_line line = state->lines[row];
             if (!state->preferred_valid) {
-                state->preferred_x =
-                    cui_textarea_width(ui, cui_edit_get_text(edit), line.start,
-                                       selection.cursor < line.end ? selection.cursor : line.end,
-                                       metrics.font_size, options.text_style);
+                state->preferred_x = cui_textarea_width(ui, text, line.start,
+                                                        effective < line.end ? effective : line.end,
+                                                        metrics.font_size, options.text_style);
                 state->preferred_valid = true;
             }
             size_t step = event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN
                               ? (size_t)fmaxf(1, floorf(state->viewport.h / metrics.line_height))
                               : 1;
-            bool up = event.key == CUI_KEY_UP || event.key == CUI_KEY_PAGEUP;
             size_t previous_row = row;
             row = up ? (step > row ? 0 : row - step)
                      : (step >= state->count - row ? state->count - 1 : row + step);

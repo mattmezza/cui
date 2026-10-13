@@ -199,11 +199,10 @@ selectable; disabled or composition-owned key events remain ignored. Movement
 changes selection only, without adding an undo step or changing the document
 revision. Shift+PageUp/PageDown retain their existing CUI row-clamping behavior.
 
-This slice does not change plain Up/Down collapse of an existing selection: CUI
-still starts from the active cursor, while frozen `move_vertical` derives an
-effective point outside the directional selection edge. Explicit legacy
-`WORD_PREVIOUS`/`NEXT` motions retain their heuristic contracts;
-modified keyboard word behavior is described below.
+Plain Up/Down collapse of an existing selection now uses the frozen directional
+effective-point behavior described below. Explicit legacy `WORD_PREVIOUS`/`NEXT`
+motions retain their heuristic contracts; modified keyboard word behavior is
+described below.
 
 Unicode word movement and deletion
 ----------------------------------
@@ -245,3 +244,30 @@ Shift selection, punctuation/ideographs, Hebrew quotes, numeric separators,
 Katakana, identifiers, emoji/Indic/combining clusters, NBSP, partial-cluster
 selection, atomic erasure/undo, scalar compatibility, readonly view behavior,
 and Editor completion dismissal after modified navigation/deletion.
+
+Plain vertical selection collapse
+---------------------------------
+
+Plain Up/Down from a nonempty selection derives a directional effective point
+before moving one visible row, rather than moving from whichever endpoint is
+the active cursor. It recomputes preferred x at that point and collapses the
+selection at the target. Shift movement continues from the active cursor with
+the original anchor; PageUp/PageDown also start from the active cursor, matching
+the frozen reference's non-collapsing page calculation.
+
+The calculation follows frozen Input `move_vertical` literally: Up calls
+`previous_boundary(start.saturating_sub(1))`, whose helper subtracts another
+byte before left clipping. CUI therefore floors `max(start - 2, 0)` to an
+extended-grapheme boundary. Down calls `next_boundary(end - 1)`, which right-clips
+the selection end. A point inside a folded gap clamps backward to the preceding
+visible row end, or forward to the next visible row start. Down retains
+upstream soft-wrap affinity only if the effective point equals the active
+cursor; otherwise it starts on the downstream row at that shared byte offset.
+These details matter at logical line starts, wrap boundaries, and folded gaps.
+
+Tests cover both selection orientations, fresh/preserved preferred x, exact
+line-start math, wrapped geometry, active-endpoint affinity, folded gap clamping,
+readonly/disabled views, page behavior, whole-grapheme targets, and unchanged
+document revision/undo history. This implements the retained single-selection
+behavior; frozen multi-cursor merging and host token-boundary overrides remain
+outside this adapter's scope.

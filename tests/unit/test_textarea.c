@@ -695,7 +695,137 @@ static void test_unicode_word_keyboard(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_vertical_selection_collapse(void) {
+    styled_probe probe = {.width = 5};
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
+    char buffer[128] = "abcde\nfghij\nklmno\npqrst";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_options options = {.width = 100, .height = 100, .no_wrap = true};
+    frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    for (unsigned reversed = 0; reversed < 2; reversed++) {
+        cui_edit_select(edit, reversed ? 15 : 8, reversed ? 8 : 15);
+        frame(ui, edit, &state, options);
+        key(ui, CUI_KEY_UP, 0);
+        assert(frame(ui, edit, &state, options).selection_changed);
+        assert(cui_edit_get_state(edit).cursor == 0 && cui_edit_get_state(edit).anchor == 0);
+        assert(state.preferred_x == 0);
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 6);
+        cui_edit_select(edit, reversed ? 15 : 8, reversed ? 8 : 15);
+        frame(ui, edit, &state, options);
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 21 && cui_edit_get_state(edit).anchor == 21);
+        assert(state.preferred_x == 15);
+    }
+    /* Exact frozen byte-biased Up calculation when selection begins at a
+     * logical line start: floor(start-2), then move one visible row. */
+    cui_edit_select(edit, 12, 16);
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_UP, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 4);
+    /* Page motion is explicitly non-collapsing in the frozen reference. */
+    cui_edit_select(edit, 15, 8);
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_PAGEDOWN, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 20 && cui_edit_get_state(edit).anchor == 20);
+    options.readonly = true;
+    cui_edit_select(edit, 15, 8);
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_DOWN, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 21);
+    options.disabled = true;
+    cui_edit_select(edit, 8, 15);
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_UP, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 15 && cui_edit_get_state(edit).anchor == 8);
+    assert(cui_edit_get_state(edit).revision == 0 && !cui_edit_get_state(edit).can_undo);
+    cui_edit_destroy(edit);
+    strcpy(buffer, "abcdefghijklmnopqrst");
+    edit = editor(buffer, sizeof buffer);
+    assert(cui_textarea_state_init(&state, lines, 32));
+    options = (cui_textarea_options){.width = 40, .height = 100};
+    frame(ui, edit, &state, options);
+    assert(state.count == 7 && lines[2].start == 6 && lines[4].start == 12);
+    cui_focus(ui, 10);
+    for (unsigned reversed = 0; reversed < 2; reversed++) {
+        cui_edit_select(edit, reversed ? 13 : 8, reversed ? 8 : 13);
+        frame(ui, edit, &state, options);
+        key(ui, CUI_KEY_UP, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 3);
+        cui_edit_select(edit, reversed ? 13 : 8, reversed ? 8 : 13);
+        frame(ui, edit, &state, options);
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 16);
+        /* The end of a wrap row and start of the next share byte9. Only an
+         * active endpoint with upstream affinity retains the previous row. */
+        cui_edit_select(edit, reversed ? 9 : 4, reversed ? 4 : 9);
+        frame(ui, edit, &state, options);
+        state.upstream_affinity = !reversed;
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 12 && cui_edit_get_state(edit).anchor == 12);
+        assert(state.caret_line == (reversed ? 4 : 3));
+        assert(state.upstream_affinity == !reversed);
+        assert(state.preferred_x == (reversed ? 0 : 15));
+    }
+    cui_edit_destroy(edit);
+    strcpy(buffer, "abcde\nfghij\nklmno\npqrst\nuvwxy\nzABCD");
+    edit = editor(buffer, sizeof buffer);
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_fold fold = {1, 4, true};
+    assert(cui_textarea_set_folds(&state, edit, &fold, 1));
+    options = (cui_textarea_options){.width = 100, .height = 100, .no_wrap = true};
+    frame(ui, edit, &state, options);
+    assert(state.count == 4);
+    cui_focus(ui, 10);
+    for (unsigned reversed = 0; reversed < 2; reversed++) {
+        cui_edit_select(edit, reversed ? 26 : 24, reversed ? 24 : 26);
+        frame(ui, edit, &state, options);
+        key(ui, CUI_KEY_UP, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 5 && fold.collapsed);
+        cui_edit_select(edit, reversed ? 26 : 24, reversed ? 24 : 26);
+        frame(ui, edit, &state, options);
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 32 && fold.collapsed);
+    }
+    assert(cui_edit_get_state(edit).revision == 0 && !cui_edit_get_state(edit).can_undo);
+    cui_edit_destroy(edit);
+    strcpy(buffer, "abcde\néXYZ\nabcde");
+    edit = editor(buffer, sizeof buffer);
+    assert(cui_textarea_state_init(&state, lines, 32));
+    frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 9, 15);
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_UP, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 0);
+    cui_edit_select(edit, 0, 7); /* scalar endpoint inside e + combining mark */
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_DOWN, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 16);
+    assert(cui_grapheme_boundary(cui_edit_get_text(edit), cui_edit_get_state(edit).cursor));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_vertical_selection_collapse();
     test_unicode_word_keyboard();
     test_vertical_selection_document_edges();
     test_grapheme_geometry();

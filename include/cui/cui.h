@@ -307,6 +307,7 @@ typedef enum {
 typedef struct {
     cui_text_weight weight;
     bool italic, monospace;
+    uint32_t family; /* Application-defined font-family ID; zero selects default. */
 } cui_text_style;
 typedef struct {
     cui_draw_type type;

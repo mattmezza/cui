@@ -13,8 +13,12 @@ typedef void (*cui_glyph_fn)(void *user, int x, int y, int width, int height, in
 cui_font *cui_font_open(const char *path);
 void cui_font_close(cui_font *font);
 /* Borrow an actual face opened by the caller; pass NULL to remove a variant.
- * Keep variants alive through measurement/drawing. Unregistered styles use
- * the regular face for both operations. */
+ * Keep variants alive through measurement/drawing. Registrations are keyed by
+ * family ID, weight, italic and monospace. Nonzero families may register a
+ * regular face; family zero's regular face is the one passed to font_open.
+ * Fallback: exact family/style, named family regular, default family/style,
+ * then the opened regular face. A family-only registration is not an OS name
+ * lookup. Remove styles independently; clearing regular retains other styles. */
 bool cui_font_set_style(cui_font *font, cui_text_style style, cui_font *variant);
 /* Convenience path registration owns the opened face. Failure preserves the
  * previous registration; replacement and font_close release owned faces. */

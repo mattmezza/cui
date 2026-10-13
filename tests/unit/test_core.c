@@ -51,10 +51,13 @@ static void test_font_metrics(void) {
     cui_context *ui = cui_create((cui_config){
         .width = 300, .height = 200, .measure_user = &p, .font_metrics = font_metrics_probe});
     assert(ui);
-    cui_text_style style = {.weight = CUI_TEXT_WEIGHT_SEMIBOLD, .italic = true, .monospace = true};
+    cui_text_style style = {.weight = CUI_TEXT_WEIGHT_SEMIBOLD,
+                            .italic = true,
+                            .monospace = true,
+                            .family = UINT32_MAX};
     assert(cui_measure_font_metrics(ui, 14.5f, style, &out));
     assert(p.calls == 1 && p.size == 14.5f && p.style.weight == style.weight && p.style.italic &&
-           p.style.monospace);
+           p.style.monospace && p.style.family == UINT32_MAX);
     /* Font line spacing can legitimately be smaller than ascent + descent. */
     assert(out.ascent == 15 && out.descent == 4 && out.line_height == 17.5f);
     out = sentinel;
@@ -82,6 +85,75 @@ static void test_font_metrics(void) {
     p.value = (cui_font_metrics){20, 5, 30};
     cui_text_metrics_changed(ui);
     assert(cui_measure_font_metrics(ui, 20, style, &out) && out.ascent == 20);
+    cui_destroy(ui);
+}
+typedef struct {
+    float family_width[3];
+    unsigned calls[3];
+} family_probe;
+static cui_size family_measure(void *user, cui_str text, float size, cui_text_style style) {
+    family_probe *p = user;
+    unsigned family = style.family == 7 ? 1 : style.family == UINT32_MAX ? 2 : 0;
+    ++p->calls[family];
+    return (cui_size){text.length * p->family_width[family], size};
+}
+static void test_family_text_pipeline(void) {
+    family_probe p = {{10, 17, 23}, {0}};
+    cui_context *ui = cui_create((cui_config){
+        .width = 300, .height = 200, .measure_styled = family_measure, .measure_user = &p});
+    assert(ui);
+    cui_text_style a = {.family = 7}, b = {.family = UINT32_MAX};
+    assert(cui_measure_text_ex(ui, cui_string("abc"), 14, a).width == 51);
+    assert(cui_measure_text_ex(ui, cui_string("abc"), 14, b).width == 69);
+    assert(cui_measure_text(ui, cui_string("abc"), 14).width == 30);
+    for (unsigned frame = 0; frame < 4; ++frame) {
+        if (frame == 2) {
+            p.family_width[1] = 19;
+            p.family_width[2] = 29;
+            cui_text_metrics_changed(ui);
+        }
+        assert(cui_begin_frame(ui, 300, 200, .016f));
+        cui_begin_box(ui, 71, (cui_box){.width = 300});
+        cui_text_style first = frame % 2 ? b : a, second = frame % 2 ? a : b;
+        cui_text_ex(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255}, 20, first);
+        cui_text_ex(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255}, 20, second);
+        cui_text(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255});
+        cui_end_box(ui);
+        cui_draw_list draw = cui_end_frame(ui);
+        unsigned found = 0;
+        float previous_y = -1;
+        for (size_t i = 0; i < draw.count; ++i)
+            if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                cui_draw_command c = draw.commands[i];
+                unsigned family = c.text_style.family == 7            ? 1
+                                  : c.text_style.family == UINT32_MAX ? 2
+                                                                      : 0;
+                assert(c.bounds.w == p.family_width[family] * 3 && c.font_size == 14 &&
+                       c.bounds.y > previous_y);
+                if (found < 2)
+                    assert(c.text_style.family == (found == 0 ? first.family : second.family));
+                else
+                    assert(c.text_style.family == 0);
+                previous_y = c.bounds.y;
+                ++found;
+            }
+        assert(found == 3 && cui_last_error(ui) == CUI_OK);
+    }
+    assert(p.calls[0] && p.calls[1] && p.calls[2]);
+    cui_destroy(ui);
+    /* Hosts with only the legacy callback retain draw family metadata while
+     * choosing their own fallback measurement. */
+    ui = make();
+    begin(ui);
+    cui_text_ex(ui, cui_string("abc"), 14, (cui_color){1, 2, 3, 255}, 0, a);
+    cui_draw_list draw = cui_end_frame(ui);
+    bool found = false;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_TEXT) {
+            assert(draw.commands[i].text_style.family == 7);
+            found = true;
+        }
+    assert(found);
     cui_destroy(ui);
 }
 static void test_styled_text_pipeline(void) {
@@ -2447,6 +2519,7 @@ int main(void) {
     test_unpainted_semantic_does_not_own_ancestor();
     test_semantic_parent_query();
     test_font_metrics();
+    test_family_text_pipeline();
     test_styled_text_pipeline();
     test_bitmap_underlay();
     test_context_resources();

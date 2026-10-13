@@ -7,20 +7,50 @@
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
+typedef struct cui_font_family {
+    uint32_t id;
+    struct cui_font *variants[4][2][2];
+    bool owns_variant[4][2][2];
+    struct cui_font_family *next;
+} cui_font_family;
 struct cui_font {
     FT_Library library;
     FT_Face face;
     hb_font_t *shaper;
-    struct cui_font *variants[4][2][2];
-    bool owns_variant[4][2][2];
+    cui_font_family default_family;
+    cui_font_family *families;
 };
 static bool valid_style(cui_text_style style) {
     return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
 }
+static cui_font_family *family_find(cui_font *font, uint32_t id, bool create) {
+    if (!id)
+        return &font->default_family;
+    for (cui_font_family *f = font->families; f; f = f->next)
+        if (f->id == id)
+            return f;
+    if (!create)
+        return NULL;
+    cui_font_family *f = calloc(1, sizeof(*f));
+    if (!f)
+        return NULL;
+    f->id = id;
+    f->next = font->families;
+    font->families = f;
+    return f;
+}
 static cui_font *selected(cui_font *font, cui_text_style style) {
     if (!font || !valid_style(style))
         return NULL;
-    cui_font *variant = font->variants[style.weight][style.italic][style.monospace];
+    cui_font_family *family = family_find(font, style.family, false);
+    if (family) {
+        cui_font *variant = family->variants[style.weight][style.italic][style.monospace];
+        if (variant)
+            return variant;
+        if (style.family && family->variants[0][0][0])
+            return family->variants[0][0][0];
+    }
+    cui_font *variant = font->default_family.variants[style.weight][style.italic][style.monospace];
     return variant ? variant : font;
 }
 cui_font *cui_font_open(const char *path) {
@@ -41,11 +71,18 @@ cui_font *cui_font_open(const char *path) {
 void cui_font_close(cui_font *f) {
     if (!f)
         return;
-    for (size_t weight = 0; weight < 4; weight++)
-        for (size_t italic = 0; italic < 2; italic++)
-            for (size_t mono = 0; mono < 2; mono++)
-                if (f->owns_variant[weight][italic][mono])
-                    cui_font_close(f->variants[weight][italic][mono]);
+    cui_font_family *family = &f->default_family;
+    while (family) {
+        for (size_t weight = 0; weight < 4; weight++)
+            for (size_t italic = 0; italic < 2; italic++)
+                for (size_t mono = 0; mono < 2; mono++)
+                    if (family->owns_variant[weight][italic][mono])
+                        cui_font_close(family->variants[weight][italic][mono]);
+        cui_font_family *next = family == &f->default_family ? f->families : family->next;
+        if (family != &f->default_family)
+            free(family);
+        family = next;
+    }
     if (f->shaper)
         hb_font_destroy(f->shaper);
     if (f->face)
@@ -56,11 +93,16 @@ void cui_font_close(cui_font *f) {
 }
 bool cui_font_set_style(cui_font *font, cui_text_style style, cui_font *variant) {
     if (!font || !valid_style(style) ||
-        (style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic && !style.monospace) ||
+        (!style.family && style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic &&
+         !style.monospace) ||
         font == variant)
         return false;
-    cui_font **slot = &font->variants[style.weight][style.italic][style.monospace];
-    bool *owned = &font->owns_variant[style.weight][style.italic][style.monospace];
+    cui_font_family *family = family_find(font, style.family, variant != NULL);
+    if (!family) {
+        return variant == NULL;
+    }
+    cui_font **slot = &family->variants[style.weight][style.italic][style.monospace];
+    bool *owned = &family->owns_variant[style.weight][style.italic][style.monospace];
     if (*slot == variant)
         return true;
     if (*owned)
@@ -71,13 +113,20 @@ bool cui_font_set_style(cui_font *font, cui_text_style style, cui_font *variant)
 }
 bool cui_font_register_style(cui_font *font, cui_text_style style, const char *path) {
     if (!font || !valid_style(style) ||
-        (style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic && !style.monospace) || !path)
+        (!style.family && style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic &&
+         !style.monospace) ||
+        !path)
         return false;
     cui_font *variant = cui_font_open(path);
     if (!variant)
         return false;
-    cui_font **slot = &font->variants[style.weight][style.italic][style.monospace];
-    bool *owned = &font->owns_variant[style.weight][style.italic][style.monospace];
+    cui_font_family *family = family_find(font, style.family, true);
+    if (!family) {
+        cui_font_close(variant);
+        return false;
+    }
+    cui_font **slot = &family->variants[style.weight][style.italic][style.monospace];
+    bool *owned = &family->owns_variant[style.weight][style.italic][style.monospace];
     if (*owned)
         cui_font_close(*slot);
     *slot = variant;

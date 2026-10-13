@@ -1034,7 +1034,8 @@ static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_h
         if (ui->text_styles[i].size == size && ui->text_styles[i].line_height == line_height &&
             ui->text_styles[i].style.weight == style.weight &&
             ui->text_styles[i].style.italic == style.italic &&
-            ui->text_styles[i].style.monospace == style.monospace)
+            ui->text_styles[i].style.monospace == style.monospace &&
+            ui->text_styles[i].style.family == style.family)
             return (uint16_t)(i + 1);
     if (ui->text_style_count == ui->text_style_capacity) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
@@ -1058,7 +1059,8 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
     size = isfinite(size) ? fminf(65535, fmaxf(0, size)) : 0;
     line_height = isfinite(line_height) ? fminf(65535, fmaxf(0, line_height)) : 0;
     bool special = size != floorf(size) || line_height != floorf(line_height) ||
-                   text_style.weight || text_style.italic || text_style.monospace;
+                   text_style.weight || text_style.italic || text_style.monospace ||
+                   text_style.family;
     uint16_t style = special ? cui_core_text_style_id(ui, size, line_height, text_style) : 0;
     if (special && !style)
         return;

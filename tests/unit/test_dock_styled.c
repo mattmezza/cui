@@ -14,6 +14,15 @@ static unsigned rendered[5], selected_events, closed_events, reordered_events, r
 static unsigned moved_events, split_events;
 static cui_dock_view_result result;
 static cui_dock_result expected_error;
+static unsigned preview_backgrounds, accepted_indicators, rejected_indicators;
+static cui_dock_event deny_operation;
+static unsigned policy_calls;
+static bool policy(void *user, const cui_dock_request *request) {
+    assert(user == &policy_calls);
+    ++policy_calls;
+    assert(request->source && cui_dock_panel_find(model, request->panel, NULL, NULL));
+    return request->operation != deny_operation;
+}
 static cui_dock_view_options options;
 static void content(cui_context *ctx, uint64_t key, void *user) {
     (void)user;
@@ -47,7 +56,15 @@ static void frame(void) {
     result = cui_dock_view_render(ui, workspace, &theme, model, view, panels, 5, options);
     cui_draw_list commands = cui_end_frame(ui);
     assert(result.error == expected_error && cui_last_error(ui) == CUI_OK && commands.count > 0);
+    preview_backgrounds = accepted_indicators = rejected_indicators = 0;
     for (size_t i = 0; i < commands.count; ++i) {
+        cui_color color = commands.commands[i].color;
+        if (color.r == 7 && color.g == 13 && color.b == 19)
+            ++preview_backgrounds;
+        if (color.r == 31 && color.g == 37 && color.b == 41)
+            ++accepted_indicators;
+        if (color.r == 43 && color.g == 47 && color.b == 53)
+            ++rejected_indicators;
         cui_rect b = commands.commands[i].bounds;
         assert(isfinite(b.x) && isfinite(b.y) && isfinite(b.w) && isfinite(b.h));
     }
@@ -184,6 +201,98 @@ static void test_cross_group(void) {
     assert(cui_dock_serialize(model, after, sizeof after, &length) == CUI_DOCK_OK);
     assert(!strcmp(before, after));
 }
+static void test_policy_preview(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    cui_dock_node left = cui_dock_root(model), right, found;
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, left, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &right) ==
+           CUI_DOCK_OK);
+    options.allow_operation = policy;
+    options.policy_user = &policy_calls;
+    options.custom_palette = true;
+    options.drag_palette = (cui_dock_drag_palette){
+        {31, 37, 41, 255}, {43, 47, 53, 255}, {7, 13, 19, 255}, {59, 61, 67, 255}};
+    deny_operation = CUI_DOCK_MOVED;
+    frame();
+    frame();
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    cui_rect group = cui_bounds(ui, cui_dock_group_id(workspace, right));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, group.x + group.w / 2, group.y + group.h / 2);
+    frame();
+    assert(preview_backgrounds && rejected_indicators && !accepted_indicators);
+    unsigned calls = policy_calls;
+    options.disable_preview = true;
+    frame();
+    assert(!preview_backgrounds && !rejected_indicators);
+    options.disable_preview = false;
+    options.reduced_motion = false;
+    frame();
+    assert(preview_backgrounds && rejected_indicators);
+    options.reduced_motion = true;
+    pointer(CUI_EVENT_POINTER_UP, group.x + group.w / 2, group.y + group.h / 2);
+    frame();
+    assert(result.denied && !result.moved && policy_calls > calls);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    deny_operation = CUI_DOCK_SPLIT;
+    gesture(1, right, 1, CUI_EVENT_POINTER_MOVE);
+    assert(result.denied && !result.split && cui_dock_panel_find(model, 1, &found, NULL) &&
+           found == left);
+    deny_operation = CUI_DOCK_CLOSED;
+    click(cui_dock_close_id(workspace, 1));
+    assert(result.denied && !result.closed && cui_dock_panel_find(model, 1, NULL, NULL));
+    assert(cui_dock_activate(model, 1) == CUI_DOCK_OK);
+    frame();
+    cui_focus(ui, cui_dock_tab_id(workspace, 1));
+    key(CUI_KEY_W, CUI_MOD_CTRL);
+    assert(result.denied && cui_dock_panel_find(model, 1, NULL, NULL));
+    deny_operation = CUI_DOCK_REORDERED;
+    frame();
+    tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    cui_rect first = cui_bounds(ui, cui_dock_tab_id(workspace, 0));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, first.x + 2, first.y + first.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_UP, first.x + 2, first.y + first.h / 2);
+    frame();
+    uint64_t key_value;
+    assert(result.denied && !result.reordered && cui_dock_panel_at(model, left, 0, &key_value) &&
+           key_value == 0);
+    deny_operation = CUI_DOCK_CLOSED;
+    frame();
+    tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    group = cui_bounds(ui, cui_dock_group_id(workspace, right));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, group.x + group.w / 2, group.y + group.h / 2);
+    frame();
+    assert(preview_backgrounds && accepted_indicators && !rejected_indicators);
+    pointer(CUI_EVENT_CANCEL, 0, 0);
+    frame();
+    assert(!preview_backgrounds && !accepted_indicators);
+    /* A host disabling the source while dragging cancels preview and release. */
+    frame();
+    tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, group.x + group.w / 2, group.y + group.h / 2);
+    frame();
+    assert(preview_backgrounds);
+    panels[1].disabled = true;
+    frame();
+    assert(!preview_backgrounds && !accepted_indicators);
+    pointer(CUI_EVENT_POINTER_UP, group.x + group.w / 2, group.y + group.h / 2);
+    frame();
+    assert(!result.moved && cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    panels[1].disabled = false;
+    options.allow_operation = NULL;
+    options.policy_user = NULL;
+    options.custom_palette = false;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -306,6 +415,7 @@ int main(void) {
     cui_end_frame(ui);
     cui_dock_view_destroy(small);
     test_cross_group();
+    test_policy_preview();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

@@ -98,16 +98,32 @@ typedef enum {
     CUI_DOCK_SPLIT
 } cui_dock_event;
 typedef struct {
+    cui_dock_event operation; /* CLOSED, MOVED, SPLIT or REORDERED */
+    uint64_t panel;
+    cui_dock_node source, destination;
+    size_t index;
+    cui_dock_kind axis;
+    bool before;
+} cui_dock_request;
+typedef struct {
+    cui_color accepted, rejected, background, text;
+} cui_dock_drag_palette;
+typedef struct {
     float width, height, tab_height, key_step;
     bool disabled, reduced_motion, allow_reorder, focus_content;
     double now_seconds;
     void (*on_event)(void *user, cui_dock_event, uint64_t panel, cui_dock_node node);
     void *event_user;
+    /* Pure callback: queried for preview and again before commit; NULL allows. */
+    bool (*allow_operation)(void *user, const cui_dock_request *);
+    void *policy_user;
+    bool disable_preview, custom_palette;
+    cui_dock_drag_palette drag_palette;
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;
     bool selected, closed, reordered, resized, fit_minimum;
-    bool moved, split;
+    bool moved, split, denied;
     uint64_t moved_panel;
     uint64_t selected_panel, closed_panel, reordered_panel;
 } cui_dock_view_result;

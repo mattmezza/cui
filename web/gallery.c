@@ -3026,6 +3026,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                {2, 4, 16, {0}}, {3, 5, 30, {0}}, {4, 5, 16, {0}}};
         float logical_width = fminf(width - 48, 720);
         cui_chart_options options = {.kind = (cui_chart_kind)chart_kind,
+                                     .interaction_mode = CUI_PLOT_INTERACTION_CURRENT_FRAME,
                                      .data = data,
                                      .count = sizeof(data) / sizeof(data[0]),
                                      .links = links,

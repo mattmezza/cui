@@ -44,7 +44,7 @@ HTML = '''<!doctype html><style>body{margin:0}canvas{display:block;margin:10px}<
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,default=ROOT/'build/plot-chart-prepaint-probe')
-    parser.add_argument('--chromium',required=True)
+    parser.add_argument('--chromium')
     args=parser.parse_args();out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
     tree=ast.parse((ROOT/'scripts/build_web.py').read_text())
     sources=next(ast.literal_eval(n.value)for n in tree.body if isinstance(n,ast.Assign)and any(isinstance(t,ast.Name)and t.id=='SOURCES'for t in n.targets))
@@ -59,7 +59,7 @@ def main():
     threading.Thread(target=server.serve_forever,daemon=True).start()
     try:
         with sync_playwright()as p:
-            browser=p.chromium.launch(headless=True,executable_path=args.chromium)
+            browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium}if args.chromium else{}))
             page=browser.new_page(viewport={'width':300,'height':300});errors=[]
             page.on('pageerror',lambda error:errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}');page.wait_for_function('window.probe?.frames===1')

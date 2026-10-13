@@ -185,8 +185,7 @@ V3 are in `third_party/unicode/17.0.0`. Run
 embedded test fixtures. Headless tests cover all 766 official Unicode conformance
 cases, iterator suffixes, keyboard selection/erasure/undo, scalar compatibility,
 invalid inputs, and whole-cluster wrapping/hit geometry. This does not add
-Unicode word segmentation, bidirectional visual navigation, language services,
-or font shaping; those remain separate host/backend responsibilities.
+bidirectional visual navigation, language services, or font shaping; those remain separate host/backend responsibilities.
 
 Vertical selection at document edges
 ------------------------------------
@@ -202,6 +201,47 @@ revision. Shift+PageUp/PageDown retain their existing CUI row-clamping behavior.
 
 This slice does not change plain Up/Down collapse of an existing selection: CUI
 still starts from the active cursor, while frozen `move_vertical` derives an
-effective point outside the directional selection edge. Ctrl word movement
-continues to use the documented existing heuristic rather than frozen Unicode
-word-boundary segmentation.
+effective point outside the directional selection edge. Explicit legacy
+`WORD_PREVIOUS`/`NEXT` motions retain their heuristic contracts;
+modified keyboard word behavior is described below.
+
+Unicode word movement and deletion
+----------------------------------
+
+Ctrl/Alt+Left targets the start of the last non-whitespace Unicode word segment
+in the text before the cursor. Ctrl/Alt+Right targets the end of the first
+non-whitespace segment after the cursor. Shift extends the selection with the
+same targets. This follows frozen Input `previous_start_of_word_at` and
+`next_end_of_word_at`: it uses default Unicode word segments, including
+punctuation, rather than moving between identifier starts. For `one,  two`,
+Right visits offsets 3, 4, and 9; Left visits 6, 3, and 0. Default boundaries
+keep apostrophes in `can't`, numeric separators in `3.14`, and underscores in
+`foo_bar`; ideographs remain separate segments without dictionary segmentation.
+Unicode White_Space segments are skipped. Targets are clipped outward to
+extended-grapheme boundaries for the existing whole-cluster keyboard contract.
+
+Ctrl/Alt+Backspace and Ctrl/Alt+Delete erase to those targets as one history step.
+A nonempty selection takes precedence and uses whole-grapheme selection erasure.
+Undo restores the original byte selection. Readonly views permit navigation
+while rejecting erasure; disabled and composition-owned events are unchanged.
+These are portable modifier bindings; hosts may translate platform conventions
+before routing events. OS-specific macOS Command line-erasure bindings are not
+introduced by this portable model.
+
+Hosts can call appended `CUI_EDIT_UNICODE_WORD_PREVIOUS`/`NEXT` motions and
+`cui_edit_backspace_word`/`delete_word`. Explicit legacy `CUI_EDIT_WORD_PREVIOUS`/
+`NEXT` continue to use their original identifier heuristic and next-start
+behavior. `cui_word_next`/`previous`/`boundary` expose the Unicode 17.0.0 default
+boundaries with the same complete UTF-8 validation and byte-offset contract as
+the grapheme queries. They scan caller-supplied text without allocation; the edit
+model continues to borrow its NUL-terminated buffer. This does not add frozen
+host token-boundary overrides, multi-cursor editing, or dictionary segmentation.
+
+Pinned `WordBreakProperty.txt`, `WordBreakTest.txt`, and `PropList.txt` supply the
+word properties, 1,944 official conformance cases, and Unicode White_Space.
+`python3 scripts/generate_word.py --check` verifies their hashes and generated
+inline properties/test fixture. Headless tests additionally cover both modifiers,
+Shift selection, punctuation/ideographs, Hebrew quotes, numeric separators,
+Katakana, identifiers, emoji/Indic/combining clusters, NBSP, partial-cluster
+selection, atomic erasure/undo, scalar compatibility, readonly view behavior,
+and Editor completion dismissal after modified navigation/deletion.

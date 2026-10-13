@@ -657,7 +657,46 @@ static void test_vertical_selection_document_edges(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_unicode_word_keyboard(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    char buffer[128] = "one,  two";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[16];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 16));
+    cui_textarea_options options = {.width = 200, .no_wrap = true};
+    frame(ui, edit, &state, options);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 0, 0);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_CTRL);
+    assert(frame(ui, edit, &state, options).selection_changed);
+    assert(cui_edit_get_state(edit).cursor == 3);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_ALT | CUI_MOD_SHIFT);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 4 && cui_edit_get_state(edit).anchor == 3);
+    key(ui, CUI_KEY_DELETE, CUI_MOD_CTRL);
+    assert(frame(ui, edit, &state, options).changed);
+    assert(!strcmp(buffer, "one  two"));
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(!strcmp(buffer, "one,  two"));
+    assert(cui_edit_get_state(edit).cursor == 4 && cui_edit_get_state(edit).anchor == 3);
+    options.readonly = true;
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    key(ui, CUI_KEY_BACKSPACE, CUI_MOD_CTRL);
+    assert(!frame(ui, edit, &state, options).changed);
+    assert(cui_edit_get_state(edit).revision == revision && !strcmp(buffer, "one,  two"));
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 9);
+    key(ui, CUI_KEY_LEFT, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 6);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_unicode_word_keyboard();
     test_vertical_selection_document_edges();
     test_grapheme_geometry();
     test_fold_projection();

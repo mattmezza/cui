@@ -293,9 +293,7 @@ static void test_word_and_vertical_navigation(void) {
     size_t cafe = (size_t)(strstr(buffer, "café") - buffer);
     size_t chinese = (size_t)(strstr(buffer, "三个") - buffer);
     uint64_t revision = cui_edit_get_state(edit).revision;
-    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
-                                                  .key = CUI_KEY_LEFT,
-                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_PREVIOUS, false) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == chinese);
     assert(cui_edit_move(edit, CUI_EDIT_WORD_PREVIOUS, false) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == cafe);
@@ -303,14 +301,9 @@ static void test_word_and_vertical_navigation(void) {
     assert(cui_edit_get_state(edit).cursor == two);
     assert(cui_edit_move(edit, CUI_EDIT_WORD_PREVIOUS, false) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == 0);
-    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
-                                                  .key = CUI_KEY_RIGHT,
-                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_NEXT, false) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == two);
-    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
-                                                  .key = CUI_KEY_RIGHT,
-                                                  .modifiers = CUI_MOD_ALT | CUI_MOD_SHIFT}) ==
-           CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_WORD_NEXT, true) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == cafe && cui_edit_get_state(edit).anchor == two);
     assert(cui_edit_move(edit, CUI_EDIT_WORD_NEXT, true) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == chinese && cui_edit_get_state(edit).anchor == two);
@@ -469,7 +462,155 @@ static void test_grapheme_editing(void) {
     cui_edit_destroy(e);
 }
 
+#include "cui_edit_word_tests.inc"
+static void test_word_conformance(void) {
+    for (size_t i = 0; i < sizeof word_cases / sizeof word_cases[0]; i++) {
+        cui_str text = {word_cases[i].text, word_cases[i].length};
+        size_t count = word_cases[i].count;
+        for (size_t at = 0; at <= text.length; at++) {
+            bool expected = false;
+            for (size_t j = 0; j < count; j++)
+                expected |= word_cases[i].offsets[j] == at;
+            if (cui_word_boundary(text, at) != expected) {
+                fprintf(stderr, "word conformance case %zu offset %zu expected %d\n", i, at,
+                        expected);
+                assert(false);
+            }
+        }
+        for (size_t j = 0; j < count; j++) {
+            size_t at = word_cases[i].offsets[j];
+            assert(cui_word_next(text, at) == word_cases[i].offsets[j + (j + 1 < count)]);
+            assert(cui_word_previous(text, at) == word_cases[i].offsets[j - (j > 0)]);
+        }
+    }
+    assert(cui_word_next((cui_str){0}, 0) == 0);
+    assert(cui_word_boundary((cui_str){0}, 0));
+    const cui_str invalid[] = {{NULL, 1}, {"a\xc2", 2}, {"\xed\xa0\x80", 3}};
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
+        assert(cui_word_next(invalid[i], 0) == SIZE_MAX);
+        assert(cui_word_previous(invalid[i], 0) == SIZE_MAX);
+        assert(!cui_word_boundary(invalid[i], 0));
+    }
+    assert(cui_word_next((cui_str){"é", 2}, 1) == SIZE_MAX);
+    assert(cui_word_previous((cui_str){"é", 2}, 3) == SIZE_MAX);
+}
+static void test_unicode_word_events(void) {
+    const char *tokens[] = {"can't",    "3.14", "foo_bar",         "אב\"גד",
+                            "カタカナ", "é",    "👩🏽‍💻", "क्‍ष"};
+    for (size_t i = 0; i < sizeof tokens / sizeof tokens[0]; i++) {
+        char buffer[128];
+        snprintf(buffer, sizeof buffer, "  %s  ", tokens[i]);
+        cui_edit *edit = make(buffer, sizeof buffer, false, 16);
+        size_t end = 2 + strlen(tokens[i]);
+        cui_edit_select(edit, 0, 0);
+        assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                      .key = CUI_KEY_RIGHT,
+                                                      .modifiers = CUI_MOD_CTRL | CUI_MOD_SHIFT}) ==
+               CUI_EDIT_OK);
+        assert(cui_edit_get_state(edit).cursor == end && cui_edit_get_state(edit).anchor == 0);
+        assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                      .key = CUI_KEY_LEFT,
+                                                      .modifiers = CUI_MOD_ALT}) == CUI_EDIT_OK);
+        assert(cui_edit_get_state(edit).cursor == 2 && cui_edit_get_state(edit).anchor == 2);
+        assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                      .key = CUI_KEY_DELETE,
+                                                      .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+        assert(!strcmp(buffer, "    "));
+        assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+        assert(cui_edit_get_state(edit).cursor == 2);
+        assert(cui_edit_select(edit, end, end) == CUI_EDIT_OK);
+        assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                      .key = CUI_KEY_BACKSPACE,
+                                                      .modifiers = CUI_MOD_ALT}) == CUI_EDIT_OK);
+        assert(!strcmp(buffer, "    "));
+        assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+        assert(cui_edit_get_state(edit).cursor == end);
+        cui_edit_destroy(edit);
+    }
+    char buffer[128] = "one,  two";
+    cui_edit *edit = make(buffer, sizeof buffer, false, 16);
+    const size_t targets[] = {3, 4, 9};
+    cui_edit_select(edit, 0, 0);
+    for (size_t i = 0; i < 3; i++) {
+        assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                      .key = CUI_KEY_RIGHT,
+                                                      .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK);
+        assert(cui_edit_get_state(edit).cursor == targets[i]);
+    }
+    const size_t backwards[] = {6, 3, 0};
+    for (size_t i = 0; i < 3; i++) {
+        assert(cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_PREVIOUS, false) == CUI_EDIT_OK);
+        assert(cui_edit_get_state(edit).cursor == backwards[i]);
+    }
+    const char *remaining[] = {",  two", "  two", ""};
+    for (size_t i = 0; i < 3; i++) {
+        assert(cui_edit_delete_word(edit) == CUI_EDIT_OK);
+        assert(!strcmp(buffer, remaining[i]));
+    }
+    for (size_t i = 0; i < 3; i++)
+        assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "one,  two") && cui_edit_get_state(edit).cursor == 0);
+    cui_edit_select(edit, 9, 9);
+    assert(cui_edit_backspace_word(edit) == CUI_EDIT_OK && !strcmp(buffer, "one,  "));
+    assert(cui_edit_backspace_word(edit) == CUI_EDIT_OK && !strcmp(buffer, "one"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && cui_edit_get_state(edit).cursor == 6);
+    cui_edit_destroy(edit);
+    /* Ideographs are separate default segments, not a dictionary word. */
+    strcpy(buffer, "三个");
+    edit = make(buffer, sizeof buffer, false, 16);
+    cui_edit_select(edit, 0, 0);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_NEXT, false);
+    assert(cui_edit_get_state(edit).cursor == 3);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_NEXT, false);
+    assert(cui_edit_get_state(edit).cursor == 6);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_PREVIOUS, false);
+    assert(cui_edit_get_state(edit).cursor == 3);
+    cui_edit_destroy(edit);
+    /* Unicode whitespace is skipped, while combining whitespace segments are
+     * non-whitespace, matching the frozen trim_start predicate. */
+    strcpy(buffer, "\xc2\xa0"
+                   "word");
+    edit = make(buffer, sizeof buffer, false, 16);
+    cui_edit_select(edit, 0, 0);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_NEXT, false);
+    assert(cui_edit_get_state(edit).cursor == 6);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_PREVIOUS, false);
+    assert(cui_edit_get_state(edit).cursor == 2);
+    cui_edit_destroy(edit);
+    /* The frozen reference segments the prefix/suffix sliced at the cursor,
+     * rather than simply consulting boundaries in the entire document. */
+    strcpy(buffer, "can't");
+    edit = make(buffer, sizeof buffer, false, 16);
+    cui_edit_select(edit, 4, 4);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_PREVIOUS, false);
+    assert(cui_edit_get_state(edit).cursor == 3);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_PREVIOUS, false);
+    assert(cui_edit_get_state(edit).cursor == 0);
+    cui_edit_select(edit, 3, 3);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_NEXT, false);
+    assert(cui_edit_get_state(edit).cursor == 4);
+    cui_edit_destroy(edit);
+    strcpy(buffer, "a ̈b");
+    edit = make(buffer, sizeof buffer, false, 16);
+    cui_edit_select(edit, 1, 1);
+    cui_edit_move(edit, CUI_EDIT_UNICODE_WORD_NEXT, false);
+    assert(cui_edit_get_state(edit).cursor == 4);
+    cui_edit_destroy(edit);
+    strcpy(buffer, "AéZ");
+    edit = make(buffer, sizeof buffer, false, 16);
+    cui_edit_select(edit, 2, 2);
+    assert(cui_edit_delete_word(edit) == CUI_EDIT_OK && !strcmp(buffer, "AZ"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && cui_edit_get_state(edit).cursor == 2);
+    cui_edit_select(edit, 2, 4);
+    assert(cui_edit_backspace_word(edit) == CUI_EDIT_OK && !strcmp(buffer, "AZ"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).anchor == 2 && cui_edit_get_state(edit).cursor == 4);
+    assert(cui_edit_delete_word(NULL) == CUI_EDIT_INVALID_ARGUMENT);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_unicode_word_events();
+    test_word_conformance();
     test_grapheme_conformance();
     test_grapheme_editing();
     test_composition_keys();

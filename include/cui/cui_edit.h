@@ -40,7 +40,9 @@ typedef enum {
     CUI_EDIT_LINE_PREVIOUS,
     CUI_EDIT_LINE_NEXT,
     CUI_EDIT_GRAPHEME_PREVIOUS,
-    CUI_EDIT_GRAPHEME_NEXT
+    CUI_EDIT_GRAPHEME_NEXT,
+    CUI_EDIT_UNICODE_WORD_PREVIOUS,
+    CUI_EDIT_UNICODE_WORD_NEXT
 } cui_edit_motion;
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
@@ -69,9 +71,18 @@ typedef struct {
 } cui_grapheme_iterator;
 bool cui_grapheme_iterator_init(cui_grapheme_iterator *iterator, cui_str text);
 size_t cui_grapheme_iterator_next(cui_grapheme_iterator *iterator);
+#define CUI_WORD_UNICODE_VERSION "17.0.0"
+/* Default UAX #29 word boundaries, including punctuation/whitespace segments.
+ * Validation and strict/clamped offset behavior match the grapheme functions. */
+size_t cui_word_next(cui_str text, size_t offset);
+size_t cui_word_previous(cui_str text, size_t offset);
+bool cui_word_boundary(cui_str text, size_t offset);
 cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
-/* Word motions skip punctuation/space and move between word starts. Letters,
+/* Legacy WORD motions skip punctuation/space and move between word starts. Letters,
  * digits, underscores and common Unicode letter/combining ranges form words.
+ * UNICODE_WORD motions use Unicode default word segments: previous targets
+ * the last non-whitespace segment start in the prefix, next targets the first
+ * non-whitespace segment end in the suffix. Targets are grapheme-safe.
  * Vertical motions preserve a scalar column across logical LF-delimited lines;
  * visual wrapping and pixel-column movement belong to the styled textarea. */
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
@@ -91,10 +102,15 @@ cui_edit_result cui_edit_delete(cui_edit *edit);
  * retain their original behavior. Undo restores the original byte selection. */
 cui_edit_result cui_edit_backspace_grapheme(cui_edit *edit);
 cui_edit_result cui_edit_delete_grapheme(cui_edit *edit);
+/* Atomic Unicode word erasure. Nonempty selections use grapheme erasure;
+ * collapsed cursors delete to the corresponding UNICODE_WORD motion target. */
+cui_edit_result cui_edit_backspace_word(cui_edit *edit);
+cui_edit_result cui_edit_delete_word(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);
 cui_edit_result cui_edit_redo(cui_edit *edit);
 /* Apply one event in caller-defined order. Ordinary Left/Right and erasure use
- * graphemes; word/vertical motions retain their existing contracts. Pointer
+ * graphemes; Ctrl/Alt arrows and erasure use Unicode word segments. Explicit
+ * legacy word/vertical motions retain their contracts. Pointer
  * events are ignored. */
 cui_edit_result cui_edit_apply_event(cui_edit *, cui_event);
 /* Applies events already routed to id; returns the first rejected edit while

@@ -20,6 +20,18 @@
     "LICENSE.txt": {
       "url": "https://www.unicode.org/license.txt",
       "sha256": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96"
+    },
+    "WordBreakProperty.txt": {
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/auxiliary/WordBreakProperty.txt",
+      "sha256": "72274cac1e6b919507db35655c3e175aa27274668a1ece95c28d2069f2ad9852"
+    },
+    "WordBreakTest.txt": {
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/auxiliary/WordBreakTest.txt",
+      "sha256": "1de23a75f37904abc7d206239ee8d34f8fdf0fb4ab32a7174dfbabbde25419b2"
+    },
+    "PropList.txt": {
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/PropList.txt",
+      "sha256": "130dcddcaadaf071008bdfce1e7743e04fdfbc910886f017d9f9ac931d8c64dd"
     }
   }
 }

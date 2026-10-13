@@ -525,6 +525,23 @@ static void completion_popup(void) {
     assert(!state.completion.open);
     cui_edit_select(edit, 3, 3);
     cui_editor_show_completions(&state, items, 10, 0, 3);
+    cui_focus(ui, 10);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT, .modifiers = CUI_MOD_CTRL}));
+    draw(ui, &state, o, &commands);
+    assert(!state.completion.open && cui_edit_get_state(edit).cursor == 4);
+    assert(!strcmp(buffer, "pri()"));
+    cui_edit_select(edit, 3, 3);
+    cui_editor_show_completions(&state, items, 10, 0, 3);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DELETE, .modifiers = CUI_MOD_CTRL}));
+    assert(draw(ui, &state, o, &commands).changed);
+    assert(!state.completion.open && !strcmp(buffer, "pri)"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "pri()") && cui_edit_get_state(edit).cursor == 3);
+    cui_editor_show_completions(&state, items, 10, 0, 3);
     o.textarea.readonly = true;
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     draw(ui, &state, o, &commands);

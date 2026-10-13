@@ -1,0 +1,68 @@
+Foreign language integration source fc56f33; website/docs/format checkpoint 5c8b3bc.
+Existing portable library behavior unchanged from validated Sheet checkpoint8777cc4.
+Examples are a narrow C host ABI, Linux native SDL3/X11 validation; no full bindings/platform parity claim.
+
+bindings-native-tests.log
+      Start 75: text_view_base_only
+75/77 Test #75: text_view_base_only ..............   Passed    0.02 sec
+      Start 76: chart_base_only
+76/77 Test #76: chart_base_only ..................   Passed    0.05 sec
+      Start 77: speech_base_only
+77/77 Test #77: speech_base_only .................   Passed    0.00 sec
+
+100% tests passed out of 77
+
+Total Test time (real) =   9.25 sec
+
+bindings-integrated-check.log
+Go count: 1
+Go count: 2
+Rust count: 1
+Rust count: 2
+Node count: 1
+Node count: 2
+Node count: 1
+Node count: 2
+TypeScript count: 1
+TypeScript count: 2
+
+bindings-native-go.log
+Go count: 1
+
+bindings-native-rust.log
+Rust count: 1
+
+bindings-native-node.log
+Node count: 1
+
+bindings-native-typescript.log
+TypeScript count: 1
+
+bindings-browser.log
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+Alert second confirmation: {'attempts': 2, 'open': 0, 'pointers': [1, 1, 143, 143], 'canvas': [339, 371.390625], 'semantics': [{'name': 'Delete workspace', 'role': 1, 'bounds': [24, 24, 136.73153686523438, 32], 'focused': 1, 'scroll': 0, 'maximum': 0}]}
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+
+bindings-docs-final.log
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.591s
+
+OK
+
+bindings-sharing-final.log
+...
+----------------------------------------------------------------------
+Ran 3 tests in 1.429s
+
+OK
+Prerendered metadata and no-JavaScript content for 148 shareable pages.
+
+bindings-quality-final.log
+python scripts/check_manifest.py
+78 unique components: {'not_started': 0, 'scaffolded': 0, 'implemented': 5, 'tested': 73, 'verified': 0}
+python scripts/check_licenses.py
+Pinned dependency hashes and license files match
+python scripts/theme_presets.py --check
+python scripts/format.py --check
+python scripts/amalgamate.py --check

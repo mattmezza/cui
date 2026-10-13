@@ -1,58 +1,55 @@
 {
-  "source": "5b87567",
-  "published_source": "f6c8cf8109b5575f54e15344095c150b81e13507",
+  "source": "dc12d14",
+  "published_source": "917f17d25a8a12a39bbd481f816ffae2341dd651",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Combined sorting/SVG, indeterminate Progress, composed Resizable/Dock, scrolling VirtualList, continuous Chart strokes and Plot zoom/pan pass native77, sanitizer75, WASI67, Chromium78, visual and quality checks. Portable source is unchanged from8e4e15b. Publishedf6c8cf8 passes HTTPS78 and twenty artifact file comparisons. Full78-family parity and remaining user feedback are unfinished.",
+  "summary": "Published scrolling fixes pass HTTPS78 and thirty artifact byte comparisons. The next eyedropper/Theme/TextView batch is integrated and its combined browser check is in progress. Full 78-family parity and the remaining feedback are unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "8e4e15b",
+      "source": "917f17d",
       "passed": 77,
       "total": 77,
-      "log": "native-8e4e15b.txt"
+      "log": "combined-scroll-917f17d.txt"
     },
     {
       "name": "sanitizers",
-      "source": "8e4e15b",
+      "source": "917f17d",
       "passed": 75,
       "total": 75,
-      "log": "sanitizers-8e4e15b.txt"
+      "log": "combined-scroll-917f17d.txt"
     },
     {
       "name": "WASI",
-      "source": "8e4e15b",
+      "source": "917f17d",
       "passed": 67,
       "total": 67,
-      "log": "wasi-8e4e15b.txt"
+      "log": "combined-scroll-917f17d.txt"
     },
     {
       "name": "browser",
-      "source": "5b87567",
+      "source": "917f17d",
       "passed": 78,
       "total": 78,
-      "log": "browser-5b87567.txt"
+      "log": "combined-scroll-917f17d.txt"
     },
     {
-      "name": "visual",
-      "source": "8e4e15b",
-      "log": "visual-8e4e15b.txt"
-    },
-    {
-      "name": "quality",
-      "source": "8e4e15b",
-      "log": "quality-8e4e15b.txt"
+      "name": "docs",
+      "source": "917f17d",
+      "passed": 3,
+      "total": 3,
+      "log": "combined-scroll-917f17d.txt"
     }
   ],
   "visual_regressions": "visual-cf11f39.txt",
   "failing_before": "alert-failing-before-593bbb1.txt",
   "quality": "quality-cf11f39.txt",
-  "published_evidence": "published-e6a5395.txt",
+  "published_evidence": "published-917f17d.txt",
   "latest_deployment": {
-    "source": "e6a5395d8c2d7a5940d0c344ce17a9c23182883b",
+    "source": "917f17d25a8a12a39bbd481f816ffae2341dd651",
     "status": "success",
-    "pages_run": 38318335379,
-    "ci_run": 38318335400,
-    "direct_https_verification": "Chromium78 and fifteen files pass"
+    "pages_run": 38327988056,
+    "ci_run": 38327988079,
+    "direct_https_verification": "Chromium78 and thirty files pass"
   },
   "feedback_audit": "../website-feedback.md"
 }

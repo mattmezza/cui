@@ -1,0 +1,8 @@
+Published scrolling source: 917f17d25a8a12a39bbd481f816ffae2341dd651
+Library CI 38327988079: SUCCESS.
+WebAssembly and GitHub Pages 38327988056: SUCCESS.
+Actual https://matteo.merola.co/cui/ full Chromium interaction suite: 78 stories PASS.
+Thirty actual HTTPS files byte-match the github-pages artifact, including WASM/JS,
+HTML/CSS/catalog/themes/docs/image/llms aliases and eighteen relevant Markdown files.
+Includes viewport-correct textarea and moving sidebar content with CSS-pixel wheels.
+The 78 families remain present; this is a tested publication, not complete parity.

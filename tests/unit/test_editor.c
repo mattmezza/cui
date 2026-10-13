@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 typedef struct {
     size_t calls;
@@ -1440,7 +1441,44 @@ static void rectangle_selection(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void large_document_editor(void) {
+    const size_t rows = 200000, bytes = rows * 2;
+    char *buffer = malloc(bytes + 64);
+    cui_textarea_line *lines = malloc((rows + 1) * sizeof(*lines));
+    assert(buffer && lines);
+    for (size_t i = 0; i < rows; ++i) {
+        buffer[2 * i] = 'a';
+        buffer[2 * i + 1] = '\n';
+    }
+    buffer[bytes] = 0;
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = bytes + 64,
+                                                      .multiline = true});
+    assert(edit);
+    cui_editor_state state;
+    assert(cui_editor_state_init(&state, edit, lines, rows + 1));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_focus(ui, 10);
+    cui_editor_options options = cui_editor_default();
+    options.textarea.width = 200;
+    options.textarea.height = 80;
+    cui_draw_list commands;
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.view.count == rows + 1);
+    assert(cui_edit_select(edit, bytes - 2, bytes - 2) == CUI_EDIT_OK);
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.view.caret_line == rows - 1 && state.view.scroll_y > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(buffer[bytes - 2] == 'z' && buffer[bytes - 1] == 'a');
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+    free(lines);
+    free(buffer);
+}
 int main(void) {
+    large_document_editor();
     rectangle_selection();
     multicursor_clipboard_and_indent();
     multicursor_visual_rows();

@@ -67,13 +67,13 @@ static size_t cui_textarea_fit(cui_context *ui, cui_str text, size_t start, size
     return low;
 }
 bool cui_textarea_state_init(cui_textarea_state *state, cui_textarea_line *lines, size_t capacity) {
-    if (!state || !lines || !capacity || capacity > 65536)
+    if (!state || !lines || !capacity)
         return false;
     *state = (cui_textarea_state){.lines = lines, .capacity = capacity};
     return true;
 }
 static bool cui_textarea_folds_valid(cui_str text, const cui_textarea_fold *folds, size_t count) {
-    if ((count && !folds) || count > 65536)
+    if (count && !folds)
         return false;
     if (!count)
         return true;
@@ -166,7 +166,7 @@ static size_t cui_textarea_visible_offset(const cui_textarea_state *state, size_
 cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
                                           cui_textarea_state *state, cui_textarea_metrics metrics,
                                           float width, bool wrap, cui_text_style style) {
-    if (!ui || !edit || !state || !state->lines || !state->capacity || state->capacity > 65536 ||
+    if (!ui || !edit || !state || !state->lines || !state->capacity ||
         !cui_edit_get_state(edit).multiline || !isfinite(width) || width <= 0 ||
         !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
         metrics.line_height <= 0 || style.weight < CUI_TEXT_WEIGHT_NORMAL ||
@@ -212,8 +212,6 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     state->font_size = metrics.font_size;
     state->line_height = metrics.line_height;
     state->wrap_width = width;
-    if (text.length > 65536)
-        return state->error = CUI_TEXTAREA_CAPACITY;
     size_t start = 0, logical_line = 0, fold_index = 0, hidden_until = 0;
     float maximum = 0;
     for (;;) {

@@ -432,8 +432,8 @@ Backspace/Delete use extended grapheme boundaries; Ctrl/Meta/Alt deletion and
 horizontal movement use Unicode word targets. Arrow, visual Home/End, Page, and
 Shift selection motion apply to each cursor and merge overlapping/adjacent ranges
 while preserving the active ID/orientation. Document Home/End and Ctrl Up/Down
-retain the source behavior of collapsing extra cursors. Readonly blocks additions
-and edits while allowing navigation. Pure `cui_edit_selection_motion` computes a
+retain the source behavior of collapsing extra cursors. Readonly permits cursor
+selection and navigation while blocking edits. Pure `cui_edit_selection_motion` computes a
 single target without mutation; `cui_edit_move_selections`,
 `cui_edit_erase_selections`, and `cui_edit_add_cursors` provide bounded atomic model
 operations. Add-cursor preserves an endpoint cursor next to a selected range;
@@ -480,8 +480,38 @@ base reducer rejects reentrant submission while a clipboard callback is active.
 `cui_edit_can_replace_selections` provides a read-only model preflight; internal
 scratch contents may change. No async clipboard permission/request API is claimed.
 
-This slice does not implement rectangular Alt-drag, typing-history coalescing,
-or multiple IME composition ranges. Preferred columns remain view metadata rather
+With attached selections, Alt + primary click adds a caret. Hold and move the
+pointer to select a rectangular block; Shift+Alt + primary drag replaces the
+collection with a block immediately. Ctrl+Alt works the same as Shift+Alt on
+Linux hosts. The start row remains active, and each pointer update allocates
+fresh IDs for the visible rows between the endpoints. Release or Cancel stops
+the drag; moving near the viewport edge scrolls and extends it. Readonly still
+allows block selection. The caller owns the model selection/history arrays,
+Editor cursor anchors, and visual row array for the full document lifetime.
+The row array needs enough entries for every displayed row, including wrapped
+rows. An undersized row array reports `CUI_TEXTAREA_CAPACITY`; an undersized
+selection array reports `CUI_EDIT_CAPACITY` without changing the collection or
+ID counter.
+
+Hosts can also call `cui_editor_select_rectangle` after a current-revision
+Editor layout. Each `cui_editor_column_point` contains a byte offset on a
+visible row and a count of virtual space-width columns beyond that row's end.
+The method clips columns to the end of shorter rows; virtual columns do not
+insert padding into the document. Soft-wrapped rows and collapsed folds follow
+display order, and hidden fold interiors cannot be endpoints. Grapheme endpoints
+clip left, an intentional CUI extension to the upstream byte-column behavior.
+Selection changes create no document Undo step; a later edit restores the block
+through Undo. Block geometry depends on the current text measurement provider;
+reinitialize Editor state after changing that provider.
+
+Textarea and Editor accept documents beyond 64 KiB when the caller supplies
+enough visual rows. A headless test exercises selection, scrolling, and editing
+near the end of 200,000 LF rows. Layout still scans and stores the complete
+display-row set each frame; this is functional large-document support, with no
+viewport virtualization or 60 Hz performance claim.
+
+This slice does not implement typing-history coalescing or multiple IME
+composition ranges. Preferred columns remain view metadata rather
 than Undo state. Inline-token annotations are excluded from these attached
 multicursor models and CodeEditor, so token-aware clipboard/indent remapping is not
 claimed. Search mode buttons show selected presentation as well as their semantic

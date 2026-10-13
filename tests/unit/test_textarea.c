@@ -2,6 +2,7 @@
 #include "cui/cui_textarea.h"
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 static cui_draw_list drawing;
 static cui_textarea_result frame(cui_context *ui, cui_edit *edit, cui_textarea_state *state,
@@ -905,7 +906,38 @@ static void test_atomic_inline_tokens(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_large_document_viewport(void) {
+    const size_t rows = 200000, bytes = rows * 2;
+    char *buffer = malloc(bytes + 64);
+    cui_textarea_line *lines = malloc((rows + 1) * sizeof(*lines));
+    assert(buffer && lines);
+    for (size_t i = 0; i < rows; ++i) {
+        buffer[2 * i] = 'a';
+        buffer[2 * i + 1] = '\n';
+    }
+    buffer[bytes] = 0;
+    cui_edit *edit = editor(buffer, bytes + 64);
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, rows + 1));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_focus(ui, 10);
+    cui_textarea_options options = {.width = 180, .height = 80};
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.count == rows + 1 && state.maximum_y > 1000000);
+    assert(cui_edit_select(edit, bytes - 2, bytes - 2) == CUI_EDIT_OK);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.scroll_y > 0 && state.caret_line == rows - 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(buffer[bytes - 2] == 'z' && buffer[bytes - 1] == 'a');
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+    free(lines);
+    free(buffer);
+}
 int main(void) {
+    test_large_document_viewport();
     test_atomic_inline_tokens();
     test_vertical_selection_collapse();
     test_unicode_word_keyboard();

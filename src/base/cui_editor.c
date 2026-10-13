@@ -786,7 +786,7 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
                                     cui_editor_options o, cui_textarea_metrics metrics) {
     if (!ui || !id || !s || !s->edit || s->clipboard_active ||
         cui_edit_get_content(s->edit).token_count || !s->view.lines || !s->view.capacity ||
-        s->view.capacity > 65536 || !isfinite(metrics.font_size) || metrics.font_size <= 0 ||
+        !isfinite(metrics.font_size) || metrics.font_size <= 0 ||
         !isfinite(metrics.line_height) || metrics.line_height <= 0 ||
         o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
         o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||

@@ -1,0 +1,13 @@
+Published source: 65da7b2fdf8d0889ab72b68c21360729c46cc394
+Framework CI: https://github.com/mattmezza/cui/actions/runs/38379332595 — all six jobs PASS.
+Pages: https://github.com/mattmezza/cui/actions/runs/38379332380 — build/deploy PASS.
+Actual HTTPS gallery: https://matteo.merola.co/cui/
+276/276 public files byte-match the uploaded Pages artifact.
+Complete public browser suite PASS:78 catalog families,78 C/WASM stories,78 compiled excerpts, input/component interactions, mobile geometry, themes/search/docs/shared routes.
+Public extensions suite PASS:all78 usage guides, real pixel effects, typography/scales/motion, composed app actions/themes/mobile.
+Public CDP touch suite PASS:actual touch tap/drag/cancel, scroll and opt-in pan/pinch contacts; no mouse substitution.
+Preserved logs: /home/matteo/.cache/cui-validation/published-65da7b2-{files,touch,browser,extensions}.log
+Artifact: /home/matteo/.cache/cui-validation/release-65da7b2-artifact/artifact.tar
+Portable source fingerprint e877a784efc403a4b75d9f6b68f718d5e2f17d9925c63ba699f41ba9d9f237fb.
+Integrated native90/90, ASan/UBSan90/90 (driver leak detection disabled), WASI75/75 at measured finite40B instruction budget; see touch-mesh-chart-f7343a5.txt.
+Full family verification remains0/78. Physical-device and per-family touch acceptance, custom image cursors, native accessibility and complete international text remain unfinished. Bidi and IME follow-up work is not in this published release.

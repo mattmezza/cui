@@ -131,6 +131,24 @@ static void bounds(void) {
     depth[n] = 0;
     assert(cui_theme_semantic_import(string(depth), &base, &tokens, &theme, &report) ==
            CUI_THEME_REGISTRY_CAPACITY_ERROR);
+    /* Maximum permitted nesting must still validate escapes. The parser's
+     * workspace is shared rather than multiplied by each recursive frame. */
+    n = 0;
+    for (unsigned i = 0; i < 16; i++)
+        depth[n++] = '[';
+    memcpy(depth + n, "\"\\uD83D\\uDE00\"", 14);
+    n += 14;
+    for (unsigned i = 0; i < 16; i++)
+        depth[n++] = ']';
+    depth[n] = 0;
+    assert(cui_theme_semantic_import(string(depth), &base, &tokens, &theme, &report) ==
+           CUI_THEME_REGISTRY_INVALID); /* Valid JSON, unsupported root shape. */
+    assert(!memcmp(&saved, &tokens, sizeof saved));
+    memcpy(depth + 16, "\"\\uD83D\\uDE0X\"", 14);
+    assert(cui_theme_semantic_import(string(depth), &base, &tokens, &theme, &report) ==
+               CUI_THEME_REGISTRY_INVALID &&
+           report.byte_offset > 16);
+    assert(!memcmp(&saved, &tokens, sizeof saved));
     char *huge = malloc(CUI_THEME_JSON_MAX_BYTES + 1);
     assert(huge);
     memset(huge, ' ', CUI_THEME_JSON_MAX_BYTES + 1);

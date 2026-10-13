@@ -24,6 +24,9 @@ typedef struct {
 typedef struct {
     cui_str source;
     cui_theme_private_theme_json_node nodes[CUI_THEME_PRIVATE_THEME_JSON_NODES];
+    /* One shared validation workspace per import, never per recursive level.
+     * A string is decoded/validated completely before parsing resumes. */
+    char decoded[CUI_THEME_JSON_MAX_BYTES + 1];
     size_t count, cursor;
     cui_theme_registry_error error;
 } cui_theme_private_theme_json;
@@ -254,8 +257,7 @@ static bool cui_theme_private_json_value(cui_theme_private_theme_json *j, unsign
         /* Decode arbitrary source strings once for strict Unicode/escape validity.
          * Input is cui_theme_private_bounded; the temporary never becomes retained registry data.
          */
-        char decoded[CUI_THEME_JSON_MAX_BYTES + 1];
-        if (!cui_theme_private_json_string(j, index, decoded, sizeof decoded))
+        if (!cui_theme_private_json_string(j, index, j->decoded, sizeof j->decoded))
             return false;
     } else if (c == 't' || c == 'f' || c == 'n') {
         const char *word = c == 't' ? "true" : c == 'f' ? "false" : "null";

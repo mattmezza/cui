@@ -143,7 +143,7 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT/'build/pointer-presence-probe')
     parser.add_argument('--directory', type=Path, help='Also require actual gallery host regression against this built directory')
     parser.add_argument('--zig', default='zig')
-    parser.add_argument('--chromium', default=str(Path.home()/'.cache/ms-playwright/chromium-1208/chrome-linux64/chrome'))
+    parser.add_argument('--chromium')
     args = parser.parse_args(); out = args.output.resolve(); out.mkdir(parents=True, exist_ok=True)
     assert subprocess.check_output([args.zig, 'version'], text=True).strip() == '0.16.0'
     exports = ['presence_init', 'presence_event', 'presence_frame', 'presence_stat', 'presence_count', 'presence_command']
@@ -154,7 +154,7 @@ def main():
     gallery_server = None
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, executable_path=args.chromium)
+            browser = p.chromium.launch(headless=True, **({'executable_path':args.chromium} if args.chromium else {}))
             fixture(browser, url, out)
             if args.directory:
                 assert (args.directory/'gallery.wasm').is_file()

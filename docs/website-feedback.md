@@ -62,3 +62,16 @@ Full GPUI Kit 0.7.1 parity remains unfinished. See `gpui-parity.json` and `swarm
 Native75, sanitizer75, WASI67, full Chromium78 and targeted visual regression checks pass. The Radio redraw regression fails against the previous base implementation. The Image gallery uses an original generated landscape; image-state, fit, grayscale, opacity and failure checks remain active. See [native](validation/native-3d05c2a.txt), [sanitizers](validation/sanitizers-3d05c2a.txt), [WASI](validation/wasi-3d05c2a.txt), [browser](validation/browser-3d05c2a.txt) and [visual regressions](validation/visual-3d05c2a.txt). These checks close the specific defects above; they do not certify full component parity.
 
 Navigation evidence: [native](validation/native-a679582.txt), [sanitizers](validation/sanitizers-a679582.txt), [WASI](validation/wasi-a679582.txt), [browser](validation/browser-a679582.txt), and [failing-before word motion](validation/edit-failing-before-a679582.txt).
+
+## Feedback published on 2026-10-13
+
+- [x] Refresh the README image using the current real composed C/WASM workspace.
+- [x] Remove the redundant inherited-size label; use base by default and one shared-size selector.
+- [x] Remove upstream branding from visible website copy while preserving source links and required license notices.
+- [x] Center the Accordion caret in both open and closed states.
+- [x] Fit unspecified AlertDialog height to wrapped content and actions instead of the fixed gallery height.
+
+These changes and the composed overview wrapping correction are in `1f9ddda`.
+See [local regression checks](validation/website-feedback-new.txt) and
+[successful deployment and direct HTTPS checks](validation/published-1f9ddda.txt).
+The overall component parity scope remains in progress.

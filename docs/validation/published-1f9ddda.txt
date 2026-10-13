@@ -1,0 +1,20 @@
+Published website feedback verification — 2026-10-13
+
+Commit: 1f9dddaef1a277c08d34551d58900db0dd2f8231
+CI 38368236333: all six jobs succeeded (Linux GCC/Clang native + renderer
+readback, portable Linux/macOS/Windows, distribution/style).
+Pages 38368236154: build and deploy succeeded.
+
+196/196 checked HTTPS files byte-match the downloaded Pages artifact:
+all 161 routes, WASM/JS/CSS/catalog/themes/docs, agent exports and original
+media, including the new README workspace screenshot.
+
+Direct HTTPS Chromium ran the complete 78-story interaction suite and
+compiled all 78 usage excerpts; /cui/ paths, 390px layout, themes, touch,
+search and reported controls passed. The extension suite passed all 78
+usage guides, bitmap effects, typography, motion and Northstar app workflows.
+
+Local source validation: docs/validation/website-feedback-new.txt.
+Artifact: ~/.cache/cui-validation/release-1f9ddda-artifact/artifact.tar
+Logs: ~/.cache/cui-validation/published-1f9ddda-{hashes,browser,extensions}.log
+No full component-family or cross-platform runtime parity is claimed.

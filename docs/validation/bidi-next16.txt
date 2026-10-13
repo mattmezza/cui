@@ -1,0 +1,11 @@
+Isolated integration/next16: bidi module6d90cb1 plus wrapped-line558d412 and root CMake/dependency/install registration.
+Pinned SheenBidi3.0.0, Unicode17; optional compiled cui_bidi archive, no implicit Core dependency.
+Native headless warning build and CTest85/85 PASS.
+Unicode conformance:91707 BidiCharacterTest +770241 BidiTest =861948 cases PASS.
+Wrapped lines: exact pinned-source differential tests, paragraph direction retained across lines, per-line L1/L2 resets, ownership and atomic failures PASS.
+Integrated ASan/UBSan bidi test PASS, including all conformance cases and wrapped lines.
+Optional OFF build/CTest84/84 PASS.
+Installed pkg-config consumer links archive without a separate vendor archive and resolves Hebrew:PASS.
+Pinned hashes/licenses, format and docs5 PASS.
+Logs:/home/matteo/.cache/cui-validation/next16-bidi-{wrapped-test,wrapped-asan-test,off-test}.log
+Bidi rendering/shaping, cluster handling, caret/hit-testing/selection integration remain unfinished; this branch is not published and does not establish full international text parity.

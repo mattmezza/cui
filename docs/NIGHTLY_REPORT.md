@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `integration/next16`. Evidence/source commit before this report update: `eed8bcd97410419252720d27d8a5af4366517a91`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `30deb99704e28e7fa82721fc5199de53822fdd53`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -22,7 +22,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Next16 is integrated locally: native93/93, ASan/UBSan93/93, WASI77/77; all78 browser stories and compiled excerpts; native Chromium IME across four consumers; actual touch42/42 plus follow-up16/16. Public source remains65da7b2 until publication proof. No full family is verified. See ime-bidi-touch-next16.txt for source boundaries and limits.
+Published30deb99 passes all six CI jobs and Pages. Actual HTTPS:286/286 artifact files, all78 browser stories/compiled excerpts, extensions, native Chromium composition across four consumers, and actual touch42/42 plus16/16. Integrated source passes native93/93, ASan/UBSan93/93 and WASI77/77. Full family verification remains0/78; website page-pan fallback, additional IME consumers, font fallback and full international/native accessibility/platform scope remain active. See published-30deb99.txt and ime-bidi-touch-next16.txt for exact evidence and limits.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
@@ -272,6 +272,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [published-1dc98a9.txt](validation/published-1dc98a9.txt)
 - [published-1f9ddda.txt](validation/published-1f9ddda.txt)
 - [published-2be466c.txt](validation/published-2be466c.txt)
+- [published-30deb99.txt](validation/published-30deb99.txt)
 - [published-3386332.txt](validation/published-3386332.txt)
 - [published-3aecd89.txt](validation/published-3aecd89.txt)
 - [published-49d4bfe.txt](validation/published-49d4bfe.txt)

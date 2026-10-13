@@ -1,0 +1,13 @@
+Published source:30deb99704e28e7fa82721fc5199de53822fdd53.
+Framework CI:https://github.com/mattmezza/cui/actions/runs/38387558035 — all six jobs PASS.
+Pages:https://github.com/mattmezza/cui/actions/runs/38387558135 — build/deploy PASS.
+Actual HTTPS gallery:https://matteo.merola.co/cui/.
+286/286 public files byte-match uploaded Pages artifact.
+Public full browser suite PASS:78 catalog families,78 real C/WASM stories,78 compiled excerpts, interactions, callbacks, themes/search/docs/shared routes and mobile geometry.
+Public extensions PASS:78 usage guides, real paint pixels, typography/scales/motion and composed app interactions/themes/mobile.
+Public native Chromium IME PASS:Input/Textarea/Editor/Questionnaire preedit,commit,cancel,read-only/disabled,singleUndo.
+Public actual CDP touch PASS:generic contact/pan/pinch,42/42 catalog assertions and16/16 additional control/clipboard assertions. These are representative paths, not full family/physical-device acceptance.
+Artifact:/home/matteo/.cache/cui-validation/release-30deb99-artifact/artifact.tar.
+Logs:/home/matteo/.cache/cui-validation/published-30deb99-{files,browser,extensions,ime,touch,touch-components,touch-more}.log.
+Compiled-source proof:validation/ime-bidi-touch-next16.txt; native93/93,ASan/UBSan93/93(driver leak detection disabled),WASI77/77. Optional native bidi/shaping and four-consumer IME are included.
+Full family verification remains0/78. Numeric/OTP composition and explicit font fallback are separate next17 work. Website page-pan fallback is a confirmed remaining touch gap; native accessibility, bidi caret/wrap integration and physical OS/device acceptance remain unfinished.

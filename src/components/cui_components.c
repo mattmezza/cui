@@ -2414,6 +2414,7 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
             .normalization = options.normalization,
             .format = options.format,
             .format_workspace = options.format_workspace,
+            .matcher = options.matcher,
             .masked = options.masked,
             .content_type = options.content_type,
             .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},

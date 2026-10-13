@@ -327,6 +327,7 @@ static cui_edit_result cui_input_checked(cui_edit *edit, cui_edit_request reques
     request.normalization = options.normalization;
     request.format = options.format;
     request.format_workspace = options.format_workspace;
+    request.matcher = options.matcher;
     request.presentation = options.presentation;
     request.masked_words = options.masked;
     cui_edit_checked_result result = cui_edit_apply_checked(

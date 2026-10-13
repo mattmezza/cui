@@ -304,6 +304,7 @@ typedef struct {
     cui_input_mask_allocator mask_allocator;
     cui_edit_format format;
     cui_edit_workspace format_workspace; /* Caller-owned final formatted value + NUL. */
+    cui_text_match matcher; /* Optional synchronous whole-value regex/provider policy. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

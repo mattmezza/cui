@@ -1467,6 +1467,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
 
 struct cui_dock_workspace {
     cui_dock_workspace_snapshot snapshot;
+    bool locked;
     bool schema_present[3], has_version;
     size_t version;
     cui_resizable_state resize[3];
@@ -1492,6 +1493,18 @@ cui_dock_workspace *cui_dock_workspace_create(void) {
 }
 void cui_dock_workspace_destroy(cui_dock_workspace *state) {
     free(state);
+}
+void cui_dock_workspace_set_locked(cui_dock_workspace *state, bool locked) {
+    if (!state || state->locked == locked)
+        return;
+    state->locked = locked;
+    if (locked) {
+        state->dragging = false;
+        state->crossed = false;
+    }
+}
+bool cui_dock_workspace_locked(const cui_dock_workspace *state) {
+    return state && state->locked;
 }
 bool cui_dock_workspace_set_edge(cui_dock_workspace *state, cui_dock_region edge, bool open,
                                  float size) {
@@ -1692,7 +1705,19 @@ typedef struct {
     cui_dock_workspace_result result;
     bool pending_transfer;
     cui_dock_transfer_request transfer;
+    cui_dock_group_constraints (*host_constraints)(void *, const cui_dock *, cui_dock_node);
+    void *host_constraints_user;
 } dock_workspace_scene;
+static cui_dock_group_constraints dock_workspace_constraints(void *user, const cui_dock *model,
+                                                              cui_dock_node node) {
+    const dock_workspace_scene *scene = user;
+    cui_dock_group_constraints result = scene->host_constraints
+                                            ? scene->host_constraints(scene->host_constraints_user,
+                                                                      model, node)
+                                            : (cui_dock_group_constraints){0};
+    result.locked = true;
+    return result;
+}
 static const cui_dock_panel *dock_region_panel(const cui_dock_region_content *region,
                                                uint64_t key) {
     for (size_t i = 0; i < region->panel_count; ++i)
@@ -2298,6 +2323,12 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                                   .regions = regions,
                                   .options = options,
                                   .result = {.error = CUI_DOCK_OK, .fit_minimum = true}};
+    if (state->locked) {
+        scene.host_constraints = options.view.group_constraints;
+        scene.host_constraints_user = options.view.constraints_user;
+        scene.options.view.group_constraints = dock_workspace_constraints;
+        scene.options.view.constraints_user = &scene;
+    }
     if (!cui_begin_focus_scope(ui, id, false))
         return invalid;
     if (options.collapsible_bottom && !options.view.disabled && !state->snapshot.open[2] &&
@@ -2375,9 +2406,9 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                  panels + 1 > target->view->panel_capacity)
             error = CUI_DOCK_CAPACITY;
         dock_scene permission = {
-            .dock = request->source_model, .options = options.view, .cross_destination = true};
+            .dock = request->source_model, .options = scene.options.view, .cross_destination = true};
         if (error == CUI_DOCK_OK &&
-            dock_group_constraints(options.view, target->model, request->destination).locked)
+            dock_group_constraints(scene.options.view, target->model, request->destination).locked)
             scene.result.denied = true;
         if (error == CUI_DOCK_OK &&
             !dock_allowed(

@@ -1751,6 +1751,70 @@ static void test_workspace_constraints(void) {
     cui_dock_workspace_destroy(edges);
     constrained_model = NULL;
 }
+static void test_workspace_lock(void) {
+    edges = cui_dock_workspace_create();
+    assert(edges && !cui_dock_workspace_locked(edges));
+    edge_options = (cui_dock_workspace_options){.view = cui_dock_view_options_default()};
+    edge_options.view.width = 640;
+    edge_options.view.height = 480;
+    edge_options.view.reduced_motion = true;
+    edge_options.on_resize = edge_resize;
+    edge_options.resize_user = &edge_resize_events;
+    edge_options.view.group_constraints = group_constraints;
+    edge_options.view.constraints_user = &constraint_calls;
+    constraint_flags = (cui_dock_group_constraints){0};
+    constraint_calls = 0;
+    edge_resize_events = 0;
+    for (unsigned r = 0; r < 4; r++) {
+        regions[r] = (cui_dock_region_content){.model = cui_dock_create((cui_dock_config){0}),
+                                               .view = cui_dock_view_create(0, 0),
+                                               .panels = panels,
+                                               .panel_count = 5};
+        assert(regions[r].model && regions[r].view);
+    }
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_insert(regions[1].model, cui_dock_root(regions[1].model), 2, 0) == CUI_DOCK_OK);
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_LEFT, true, 160));
+    cui_dock_workspace_set_locked(edges, true);
+    assert(cui_dock_workspace_locked(edges));
+    edge_frame();
+    edge_frame();
+    assert(constraint_calls > 0);
+    cui_id center = cui_dock_region_id(700, CUI_DOCK_CENTER);
+    assert(cui_bounds(ui, cui_dock_close_id(center, 0)).w == 0);
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(center, 1));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_UP, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    cui_dock_node_info info;
+    assert(cui_dock_node_get(regions[0].model, cui_dock_root(regions[0].model), &info) &&
+           info.active_panel == 1);
+    cui_rect left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    transfer_gesture(0, 0, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(!edge_result.transferred && cui_dock_panel_find(regions[0].model, 0, NULL, NULL));
+    cui_id handle = cui_dock_edge_resize_id(700, CUI_DOCK_LEFT);
+    cui_focus(ui, handle);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
+    edge_frame();
+    cui_dock_workspace_snapshot saved;
+    assert(cui_dock_workspace_save(edges, &saved) && saved.size[0] > 160 &&
+           edge_resize_events == 1);
+    cui_dock_workspace_set_locked(edges, false);
+    assert(!cui_dock_workspace_locked(edges));
+    edge_frame();
+    assert(cui_bounds(ui, cui_dock_close_id(center, 0)).w > 0);
+    left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    transfer_gesture(0, 0, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && cui_dock_panel_find(regions[1].model, 0, NULL, NULL));
+    for (unsigned r = 0; r < 4; r++) {
+        cui_dock_view_destroy(regions[r].view);
+        cui_dock_destroy(regions[r].model);
+    }
+    cui_dock_workspace_destroy(edges);
+    constrained_model = NULL;
+}
 static const cui_dock *visibility_model;
 static uint64_t hidden_bits;
 static bool hidden_max;
@@ -2642,6 +2706,7 @@ int main(void) {
     test_area_schema_scene();
     test_group_constraints();
     test_workspace_constraints();
+    test_workspace_lock();
     test_dynamic_visibility();
     test_workspace_visibility();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */

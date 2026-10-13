@@ -232,6 +232,8 @@ A missing callback or all-zero result preserves prior CUI behavior. `locked` sup
 
 The callback receives the actual model and tab-node ID, including configured closed-edge targets. Cross-region constraints are checked against both models; foreign node IDs are never interpreted as source-model nodes. A denied closed-edge drop leaves both serialized layouts and open flags intact and does not fall through to an unrelated in-region split. Locked workspace destinations paint a rejected target indication. A source that becomes locked while dragging cancels the gesture. Model APIs remain independent of UI constraints and bypass them.
 
+`cui_dock_workspace_set_locked` retains the frozen `DockArea::set_locked` policy across frames. It composes with every host group constraint: user close, reorder, drag, split and drop are blocked across all regions, while tab selection, content controls, zoom and splitter resizing remain available. Locking during a workspace drag cancels it. The lock is transient UI state, separate from snapshots and typed persistence. Render again after changing it so the scene reflects the new affordances.
+
 ```c
 static cui_dock_group_constraints constraints(void *user, const cui_dock *model,
                                                cui_dock_node group) {
@@ -245,7 +247,7 @@ static cui_dock_group_constraints constraints(void *user, const cui_dock *model,
 options.group_constraints = constraints;
 ```
 
-Callbacks and user data remain host-owned; evaluate deterministically and do not mutate model/view/registry data. Constraints are presentation policy, not serialized model data. Restore can invalidate node IDs, so derive them from stable keys or refresh host mappings. `preserve_last` counts visible panels through the optional visibility predicate. The frozen lock originates at DockArea; CUI's per-node callback is a portable host seam rather than a claim about a second frozen pinned-group primitive. It protects panel rearrangement, not splitter geometry; hosts can separately veto `CUI_DOCK_RESIZED` through `allow_operation`.
+Callbacks and user data remain host-owned; evaluate deterministically and do not mutate model/view/registry data. Constraints are presentation policy, not serialized model data. Restore can invalidate node IDs, so derive them from stable keys or refresh host mappings. `preserve_last` counts visible panels through the optional visibility predicate. The per-node callback permits additional host policy rather than a second frozen pinned-group primitive. The workspace lock protects panel rearrangement, not splitter geometry; hosts can separately veto `CUI_DOCK_RESIZED` through `allow_operation`.
 
 Headless checks exercise constructors in model-only linkage, sealed-source selection/content, blocked close/shortcut/menu and drag, locked targets with byte-equal model serialization, unclosable-but-movable groups, sole-panel preservation, isolated collapse, preserved active key after bulk close, cross-model locked-source/target rejection, closed-edge non-opening, target permission revoked after preview and successful transfer after unlocking.
 
@@ -329,7 +331,7 @@ The export-family table above is complemented by these operation mappings. CUI e
 | --- | --- |
 | `PaneTree` node/panel lookup, root, insert/remove/move/split, active selection, sizes and normalization | `root`, `node_get`, `child_at`, panel queries, `insert`, `remove`, `move`, `move_split`, `split`, `activate`, `set_sizes`; canonical same-axis normalization is automatic after edits. `create_with_root` selects source-style root preservation. |
 | `PanelBuilder` horizontal/vertical splits, child optional sizes, tabs and active index | Compose canonical model operations and `set_sizes`; typed schema conversion is available; no fluent builder or JSON parser. |
-| `DockArea` center/edge installation, open/toggle/collapsible, add/remove/select/move, zoom, dump/load | Workspace descriptors and edge setters/snapshot plus model/view operations; hosts supply independent models and caller-owned factory payload records. |
+| `DockArea` center/edge installation, open/toggle/collapsible, lock, add/remove/select/move, zoom, dump/load | Workspace descriptors, retained layout lock, edge setters/snapshot and model/view operations; hosts supply independent models and caller-owned factory payload records. |
 | `TabGroup` sealed/in-split constraints, active/displayed panel, close/zoom and renderer | Group constraint constructors/callback, visibility-aware queries, real view controls, menu/policy callbacks and scene callbacks. |
 | `Panel` visible, closable, zoomable, title/style/suffix, toolbar, menu, focus and lifecycle | Borrowed descriptors and presentation callbacks, visibility predicate, factory/dump helpers and caller-owned lifecycle reconciliation. Optional simple-title palettes match the source; custom title scenes choose their own explicit ink. |
 | `DockSizing` bounds/minima, pointer resize, collapsed-bottom reopen | Retained workspace handles, minimum compression and collapsibility flags; no native window creation. |

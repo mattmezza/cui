@@ -458,6 +458,9 @@ typedef struct {
 } cui_dock_workspace_result;
 cui_dock_workspace *cui_dock_workspace_create(void);
 void cui_dock_workspace_destroy(cui_dock_workspace *);
+/* Layout lock blocks user close/reorder/move/split; selection and resize remain available. */
+void cui_dock_workspace_set_locked(cui_dock_workspace *, bool locked);
+bool cui_dock_workspace_locked(const cui_dock_workspace *);
 bool cui_dock_workspace_set_edge(cui_dock_workspace *, cui_dock_region, bool open, float size);
 /* Preserve open/size state; an open noncollapsible edge cannot be closed. */
 bool cui_dock_workspace_set_collapsible(cui_dock_workspace *, cui_dock_region, bool collapsible);

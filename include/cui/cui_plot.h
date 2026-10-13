@@ -184,6 +184,39 @@ typedef struct {
 cui_plot_result cui_plot_radial_path(const cui_plot_radial_sample *, size_t count,
                                      cui_plot_gap_policy, bool closed, bool fill, bool area,
                                      cui_plot_path_command *, size_t capacity, size_t *required);
+typedef enum {
+    CUI_PLOT_BAR_BOTTOM,
+    CUI_PLOT_BAR_TOP,
+    CUI_PLOT_BAR_LEFT,
+    CUI_PLOT_BAR_RIGHT
+} cui_plot_bar_alignment;
+typedef struct {
+    cui_plot_rect frame;
+    cui_plot_point label_origin;
+    double gradient_angle;
+} cui_plot_bar_geometry;
+/* Already projected coordinates: cross is the leading band edge, not center.
+ * Source value-end label origin uses 10px text/2px gap; no clipping or text
+ * measurement. Zero width/height still returns valid degenerate geometry.
+ * All orientations support values on either side of baseline. */
+cui_plot_result cui_plot_bar_layout(cui_plot_bar_alignment, double cross, double band_width,
+                                    double baseline, double value, cui_plot_bar_geometry *);
+typedef struct {
+    double width, height;
+    const double *x, *y, *dashes;
+    size_t x_count, y_count, dash_count;
+} cui_plot_grid_options;
+/* Source 1px centered grid quads, vertical lines then horizontal lines.
+ * SVG alternating dash/gap; odd arrays repeat twice, negative lengths clamp
+ * to zero, all-nonpositive/empty patterns draw solid. Extents/positions finite
+ * within +/-16384 (positive extents); positions are not silently clipped.
+ * At most256 lines per axis/64 dash entries/4096 output quads. If the bounded
+ * generator exceeds4096 quads CAPACITY reports4097 as a lower bound, even for
+ * a size query. Other capacity errors report exact count. Tiny nonadvancing
+ * dash steps return DEGENERATE. All errors leave geometry unchanged; only
+ * OK/CAPACITY publish required. Buffers must be disjoint/stable. */
+cui_plot_result cui_plot_grid_layout(const cui_plot_grid_options *, cui_plot_rect *,
+                                     size_t capacity, size_t *required);
 /* Domain must ascend; pixel ranges may reverse. All endpoints finite. */
 cui_plot_result cui_plot_validate(const cui_plot_scale *);
 cui_plot_result cui_plot_map(const cui_plot_scale *, double value, double *pixel);

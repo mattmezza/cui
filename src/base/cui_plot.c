@@ -935,3 +935,122 @@ cui_plot_result cui_plot_radial_path(const cui_plot_radial_sample *samples, size
         return CUI_PLOT_CAPACITY;
     return cui_plot_radial_pass(samples, count, gaps, closed, fill, area, out, &needed);
 }
+
+cui_plot_result cui_plot_bar_layout(cui_plot_bar_alignment alignment, double cross, double width,
+                                    double base, double value, cui_plot_bar_geometry *out) {
+    if (!out || alignment < CUI_PLOT_BAR_BOTTOM || alignment > CUI_PLOT_BAR_RIGHT ||
+        !isfinite(cross) || !isfinite(width) || width < 0 || !isfinite(base) || !isfinite(value))
+        return CUI_PLOT_INVALID;
+    cui_plot_bar_geometry geometry = {0};
+    double band_end, center;
+    cui_plot_result result = cui_plot_number((long double)cross + width, &band_end);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)cross + width / 2, &center);
+    if (result != CUI_PLOT_OK)
+        return result;
+    double low = fmin(base, value), high = fmax(base, value);
+    if (alignment == CUI_PLOT_BAR_BOTTOM || alignment == CUI_PLOT_BAR_TOP) {
+        geometry.frame = (cui_plot_rect){cross, low, band_end, high};
+        geometry.label_origin.x = center;
+        bool below = alignment == CUI_PLOT_BAR_BOTTOM ? value > base : value >= base;
+        result = cui_plot_number((long double)value + (below ? 2 : -12), &geometry.label_origin.y);
+        geometry.gradient_angle = alignment == CUI_PLOT_BAR_BOTTOM ? 0 : 180;
+    } else {
+        geometry.frame = (cui_plot_rect){low, cross, high, band_end};
+        bool right = alignment == CUI_PLOT_BAR_LEFT ? value >= base : value > base;
+        result = cui_plot_number((long double)value + (right ? 2 : -2), &geometry.label_origin.x);
+        if (result == CUI_PLOT_OK)
+            result = cui_plot_number((long double)center - 5, &geometry.label_origin.y);
+        geometry.gradient_angle = alignment == CUI_PLOT_BAR_LEFT ? 90 : 270;
+    }
+    if (result == CUI_PLOT_OK)
+        *out = geometry;
+    return result;
+}
+static bool cui_plot_grid_valid(const cui_plot_grid_options *o) {
+    if (!o || !isfinite(o->width) || !isfinite(o->height) || o->width <= 0 || o->height <= 0 ||
+        o->width > 16384 || o->height > 16384 || o->x_count > 256 || o->y_count > 256 ||
+        o->dash_count > 64 || (o->x_count && !o->x) || (o->y_count && !o->y) ||
+        (o->dash_count && !o->dashes))
+        return false;
+    for (size_t i = 0; i < o->x_count; ++i)
+        if (!isfinite(o->x[i]) || fabs(o->x[i]) > 16384)
+            return false;
+    for (size_t i = 0; i < o->y_count; ++i)
+        if (!isfinite(o->y[i]) || fabs(o->y[i]) > 16384)
+            return false;
+    for (size_t i = 0; i < o->dash_count; ++i)
+        if (!isfinite(o->dashes[i]))
+            return false;
+    return true;
+}
+static cui_plot_result cui_plot_grid_quad(cui_plot_rect *out, size_t *used, bool vertical,
+                                          double cross, double start, double end) {
+    if (*used == 4096) {
+        ++*used;
+        return CUI_PLOT_CAPACITY;
+    }
+    if (out)
+        out[*used] = vertical ? (cui_plot_rect){cross - .5, start, cross + .5, end}
+                              : (cui_plot_rect){start, cross - .5, end, cross + .5};
+    ++*used;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_grid_pass(const cui_plot_grid_options *o, cui_plot_rect *out,
+                                          size_t *used) {
+    *used = 0;
+    bool positive = false, painted = false;
+    size_t pattern = o->dash_count * (o->dash_count % 2 ? 2 : 1);
+    for (size_t i = 0; i < pattern; ++i)
+        if (o->dashes[i % o->dash_count] > 0) {
+            positive = true;
+            if (i % 2 == 0)
+                painted = true;
+        }
+    for (size_t axis = 0; axis < 2; ++axis) {
+        size_t count = axis ? o->y_count : o->x_count;
+        const double *positions = axis ? o->y : o->x;
+        double length = axis ? o->width : o->height;
+        for (size_t i = 0; i < count; ++i) {
+            if (!positive) {
+                cui_plot_result result =
+                    cui_plot_grid_quad(out, used, !axis, positions[i], 0, length);
+                if (result != CUI_PLOT_OK)
+                    return result;
+                continue;
+            }
+            if (!painted)
+                continue;
+            double position = 0;
+            size_t index = 0;
+            while (position < length) {
+                double dash = fmax(0, o->dashes[index % o->dash_count]);
+                double next = (double)fminl((long double)position + dash, length);
+                if (dash > 0 && next <= position)
+                    return CUI_PLOT_DEGENERATE;
+                if (index % 2 == 0 && next > position) {
+                    cui_plot_result result =
+                        cui_plot_grid_quad(out, used, !axis, positions[i], position, next);
+                    if (result != CUI_PLOT_OK)
+                        return result;
+                }
+                position = next;
+                index = (index + 1) % pattern;
+            }
+        }
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_grid_layout(const cui_plot_grid_options *o, cui_plot_rect *out,
+                                     size_t capacity, size_t *required) {
+    if (!required || (!out && capacity) || !cui_plot_grid_valid(o))
+        return CUI_PLOT_INVALID;
+    size_t used;
+    cui_plot_result result = cui_plot_grid_pass(o, NULL, &used);
+    if (result != CUI_PLOT_OK && result != CUI_PLOT_CAPACITY)
+        return result;
+    *required = used;
+    if (result == CUI_PLOT_CAPACITY || capacity < used)
+        return CUI_PLOT_CAPACITY;
+    return cui_plot_grid_pass(o, out, &used);
+}

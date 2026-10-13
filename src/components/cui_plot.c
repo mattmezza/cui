@@ -75,12 +75,12 @@ static void axis_paint(cui_context *ui, cui_id id, const cui_theme *theme,
     cui_color stroke = resolved(o->stroke, theme->border);
     if (o->has_x && o->x_line) {
         cui_begin_absolute_box(ui, id ^ UINT64_C(0xa1), (cui_box){.background = stroke},
-                               (cui_rect){0, o->x, o->width, 1});
+                               (cui_rect){0, o->x - .5f, o->width, 1});
         cui_end_box(ui);
     }
     if (o->has_y && o->y_line) {
         cui_begin_absolute_box(ui, id ^ UINT64_C(0xa2), (cui_box){.background = stroke},
-                               (cui_rect){o->y, 0, 1, o->height});
+                               (cui_rect){o->y - .5f, 0, 1, o->height});
         cui_end_box(ui);
     }
     for (size_t i = 0; i < count; ++i) {
@@ -320,4 +320,31 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
             }
     }
     return painted ? CUI_PLOT_OK : CUI_PLOT_CAPACITY;
+}
+
+cui_plot_result cui_plot_grid(cui_context *ui, cui_id id, const cui_theme *theme,
+                              const cui_plot_grid_options *o, cui_color stroke) {
+    if (!ui || !id || !theme)
+        return CUI_PLOT_INVALID;
+    cui_plot_rect quads[4096];
+    size_t count;
+    cui_plot_result result = cui_plot_grid_layout(o, quads, 4096, &count);
+    if (result != CUI_PLOT_OK)
+        return result;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = (float)o->width,
+                            .height = (float)o->height,
+                            .fixed_width = true,
+                            .fixed_height = true});
+    stroke = resolved(stroke, theme->border);
+    for (size_t i = 0; i < count; ++i) {
+        cui_plot_rect q = quads[i];
+        cui_begin_absolute_box(ui, id ^ UINT64_C(0x891ac3714f982000) ^ (i + 1),
+                               (cui_box){.background = stroke},
+                               (cui_rect){(float)q.x_min, (float)q.y_min,
+                                          (float)(q.x_max - q.x_min), (float)(q.y_max - q.y_min)});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return CUI_PLOT_OK;
 }

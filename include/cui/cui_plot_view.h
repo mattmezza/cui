@@ -67,6 +67,10 @@ typedef struct {
 cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned height,
                                 size_t stride, size_t capacity_bytes, const cui_plot_shape *,
                                 size_t count, cui_color clear);
+/* Fixed-size themed Grid, borrowing pure geometry options for this call.
+ * Alpha-zero stroke selects theme border. Preflight failures submit nothing. */
+cui_plot_result cui_plot_grid(cui_context *, cui_id, const cui_theme *,
+                              const cui_plot_grid_options *, cui_color stroke);
 typedef void (*cui_plot_activate_fn)(cui_context *, cui_id, cui_plot_point bitmap_position,
                                      void *user);
 typedef struct {

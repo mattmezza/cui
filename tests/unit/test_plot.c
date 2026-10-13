@@ -487,10 +487,102 @@ static void arc_and_radial_paths(void) {
                                 &needed) == CUI_PLOT_OK &&
            needed == 0);
 }
+static void bar_and_grid_geometry(void) {
+    cui_plot_bar_geometry bar, original;
+    memset(&bar, 0x5a, sizeof bar);
+    original = bar;
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_BOTTOM, 10, 8, 50, 20, &bar) == CUI_PLOT_OK);
+    assert(bar.frame.x_min == 10 && bar.frame.x_max == 18 && bar.frame.y_min == 20 &&
+           bar.frame.y_max == 50 && bar.label_origin.x == 14 && bar.label_origin.y == 8 &&
+           bar.gradient_angle == 0);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_BOTTOM, 10, 8, 20, 50, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.y == 52);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_TOP, 10, 8, 20, 50, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.y == 52 && bar.gradient_angle == 180);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_TOP, 10, 8, 50, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.y == 8);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_LEFT, 10, 8, 20, 50, &bar) == CUI_PLOT_OK &&
+           bar.frame.x_min == 20 && bar.frame.x_max == 50 && bar.frame.y_min == 10 &&
+           bar.frame.y_max == 18 && bar.label_origin.x == 52 && bar.label_origin.y == 9 &&
+           bar.gradient_angle == 90);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_LEFT, 10, 8, 50, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.x == 18);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_RIGHT, 10, 8, 50, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.x == 18 && bar.gradient_angle == 270);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_RIGHT, 10, 8, 20, 50, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.x == 52);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_BOTTOM, 10, 0, 20, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.y == 8);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_TOP, 10, 0, 20, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.y == 22);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_LEFT, 10, 0, 20, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.x == 22);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_RIGHT, 10, 0, 20, 20, &bar) == CUI_PLOT_OK &&
+           bar.label_origin.x == 18);
+    original = bar;
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_LEFT, DBL_MAX, DBL_MAX, 0, 1, &bar) ==
+               CUI_PLOT_OVERFLOW &&
+           memcmp(&bar, &original, sizeof bar) == 0);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_LEFT, 0, -1, 0, 1, &bar) == CUI_PLOT_INVALID);
+    assert(cui_plot_bar_layout((cui_plot_bar_alignment)99, 0, 1, 0, 1, &bar) == CUI_PLOT_INVALID);
+    assert(cui_plot_bar_layout(CUI_PLOT_BAR_LEFT, 0, 1, NAN, 1, &bar) == CUI_PLOT_INVALID);
+    double x[] = {10}, y[] = {5}, dashes[] = {4, 2, 1};
+    cui_plot_grid_options o = {
+        .width = 20, .height = 11, .x = x, .y = y, .x_count = 1, .y_count = 1};
+    cui_plot_rect quads[16], saved[16];
+    size_t required = 99;
+    memset(quads, 0x5a, sizeof quads);
+    memcpy(saved, quads, sizeof quads);
+    assert(cui_plot_grid_layout(&o, quads, 1, &required) == CUI_PLOT_CAPACITY && required == 2 &&
+           memcmp(quads, saved, sizeof quads) == 0);
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_OK && required == 2);
+    assert(quads[0].x_min == 9.5 && quads[0].x_max == 10.5 && quads[0].y_min == 0 &&
+           quads[0].y_max == 11);
+    assert(quads[1].x_min == 0 && quads[1].x_max == 20 && quads[1].y_min == 4.5 &&
+           quads[1].y_max == 5.5);
+    o.x_count = 0;
+    o.dashes = dashes;
+    o.dash_count = 2;
+    o.width = 11;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_OK && required == 2);
+    assert(quads[0].x_min == 0 && quads[0].x_max == 4 && quads[1].x_min == 6 &&
+           quads[1].x_max == 10);
+    o.dash_count = 3;
+    o.width = 20;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_OK && required == 4);
+    assert(quads[1].x_min == 6 && quads[1].x_max == 7 && quads[2].x_min == 11 &&
+           quads[2].x_max == 13 && quads[3].x_min == 14 && quads[3].x_max == 18);
+    dashes[0] = -1;
+    dashes[1] = 0;
+    o.dash_count = 2;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_OK && required == 1 &&
+           quads[0].x_max == 20);
+    dashes[1] = 2;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_OK && required == 0);
+    dashes[0] = 1;
+    dashes[1] = DBL_TRUE_MIN;
+    memcpy(saved, quads, sizeof quads);
+    required = 99;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_DEGENERATE &&
+           required == 99 && memcmp(quads, saved, sizeof quads) == 0);
+    dashes[0] = .001;
+    dashes[1] = .001;
+    o.width = 20;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_CAPACITY &&
+           required == 4097 && memcmp(quads, saved, sizeof quads) == 0);
+    dashes[0] = NAN;
+    required = 99;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_INVALID && required == 99);
+    o = (cui_plot_grid_options){.width = 20, .height = 11};
+    assert(cui_plot_grid_layout(&o, NULL, 0, &required) == CUI_PLOT_OK && required == 0);
+    o.y_count = 1;
+    assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_INVALID);
+}
 int main(void) {
     shape_geometry();
     pie_geometry();
     arc_and_radial_paths();
+    bar_and_grid_geometry();
     band_scales();
     point_scales();
     ordinal_scales();

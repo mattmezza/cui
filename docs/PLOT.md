@@ -44,7 +44,7 @@ extent up to 16384, positions/ticks within +/-16384, font sizes up to 1024.
 Label geometry and required count remain unchanged on INVALID; CAPACITY
 publishes the required label count without partial geometry. Buffers must be
 stable and disjoint during the call. `cui_plot_axis` submits the same rectangles
-and 1px axis lines inside a fixed-size surface. Labels can extend outside that
+and centered 1px axis lines inside a fixed-size surface. Labels can extend outside that
 surface; ancestor clipping still applies. This allows explicit gutters rather
 than silently truncating labels at the axis edge.
 
@@ -182,3 +182,18 @@ reversed-range numeric ticks, line/area/bar/pie and cubic pixels, stride padding
 transactional failures, software bitmap output, and captured pointer behavior.
 This is a reusable styled Plot foundation; it does not establish complete
 GPUI Plot rendering or interaction parity.
+
+
+## Themed dashed grids
+
+`cui_plot_grid` paints caller-specified `cui_plot_grid_options` from the pure
+module as fixed-size themed quads. Alpha-zero stroke selects theme `border`.
+Its preflight uses `cui_plot_grid_layout`; errors submit no elements. Geometry,
+dash parity, clipping and budget rules are documented in [PLOT_MODEL.md](PLOT_MODEL.md).
+The view does not implicitly create or retain a grid. Submit a grid in an
+application overlay/absolute box before the bitmap if it should appear behind
+transparent shapes; alternatively use the pure quads to create closed paths
+for `cui_plot_raster`. Core element/command budgets still apply to a large styled
+grid; check `cui_last_error` after `cui_end_frame`. The 1px quads are centered on
+coordinates, matching frozen Grid and the corrected styled axis stroke placement.
+Software tests verify both dash pixels and gaps using pixel-center coverage.

@@ -457,3 +457,53 @@ the pure `cui_plot.h` module does not duplicate them or claim a standalone
 Sankey topology/path generator. Adding another solver here would require a
 separate ownership/API decision rather than counting the existing Chart solver
 as full Plot parity.
+
+
+## Bar alignments and grid quads
+
+`cui_plot_bar_layout` consumes already projected `cross`, band width, baseline,
+and value-end coordinates. Cross is the band's leading edge, unlike the older
+`cui_plot_project_bar` helper's mapped center. Bottom/Top produce vertical
+frames; Left/Right produce horizontal frames. The value axis bounds use
+`min(baseline,value)` and `max(baseline,value)`, so each orientation supports
+values on either side of the baseline. Zero band width or equal baseline/value
+returns valid degenerate geometry without clipping or rendering.
+
+The output includes source-exact default label origins. Vertical labels anchor
+at `cross+width/2`; above means value minus 12px, below means value plus 2px.
+Bottom chooses above on ties; Top chooses below on ties. Horizontal labels
+anchor at value plus/minus 2px and `cross+width/2-5`; Left chooses right on ties,
+Right chooses left on ties. Text alignment, actual text measurement and custom
+label content remain the application's responsibility. `gradient_angle` is
+0/180/90/270 degrees for Bottom/Top/Left/Right, matching the frozen metadata;
+this does not add a gradient renderer. Inputs are finite, band width is
+nonnegative, and overflow/invalid inputs preserve the entire output.
+
+`cui_plot_grid_layout` implements frozen `grid.rs` geometry: vertical X lines
+first, then horizontal Y lines, each as a 1px quad centered on the configured
+coordinate. For example X=10 produces X bounds 9.5..10.5. Line lengths follow
+positive width/height; positions outside the surface are not silently clipped.
+Applications or ancestor boxes decide clipping.
+
+Dash entries alternate dash/gap starting at zero for each line. Odd patterns
+repeat twice to preserve SVG parity. Negative entries clamp to zero; empty or
+all-nonpositive patterns draw solid lines, matching the source. An even pattern
+with only positive gaps draws no quads. Final dashes clip to the line's endpoint.
+Nonfinite entries are INVALID. Tiny positive steps that cannot advance at the
+current double position return DEGENERATE rather than looping indefinitely.
+
+Extents are positive finite at most 16384; positions are finite within
++/-16384. At most 256 lines per axis, 64 dash entries and 4096 quads are accepted.
+Capacity queries publish exact counts unless more than 4096 quads are needed;
+then CAPACITY publishes 4097 as a **lower bound** and no larger buffer bypasses
+the bounded generator. Coarsen the dash pattern or split the grid into smaller
+calls. Other errors preserve required count; all errors preserve output quads.
+No allocation or retained pointers are used; arrays must be disjoint and stable
+for the call. Tests cover orientation/tie behavior, source dash cases, centered
+quads, numerical failures, budget limits and transactional capacity failures.
+
+The frozen exports only ScaleLinear/Band/Point/Ordinal, and only Natural/Linear/
+StepAfter Cartesian curves. There is no frozen StepBefore curve or Step scale
+being omitted under another name. Decimal value support, retained paint caches,
+custom label/content callbacks and renderer-specific styling are separate from
+these original C geometry APIs.

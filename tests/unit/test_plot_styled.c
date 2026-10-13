@@ -73,11 +73,38 @@ static void axes(cui_context *ui) {
             ++texts;
             assert(draw.commands[i].color.g == 255);
         }
-        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.r == 255)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].color.r == 255) {
             ++lines;
+            assert(draw.commands[i].bounds.y == 59.5f && draw.commands[i].bounds.h == 1);
+        }
     }
     assert(texts == 3 && lines == 1);
     assert(cui_last_error(ui) == CUI_OK);
+}
+static void grid_pixels(cui_context *ui) {
+    const double x[] = {10}, y[] = {20}, dash[] = {4, 2};
+    cui_plot_grid_options grid = {.width = 40,
+                                  .height = 40,
+                                  .x = x,
+                                  .y = y,
+                                  .x_count = 1,
+                                  .y_count = 1,
+                                  .dashes = dash,
+                                  .dash_count = 2};
+    cui_theme theme = cui_theme_light();
+    theme.border = red;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_grid(ui, 55, &theme, &grid, (cui_color){0}) == CUI_PLOT_OK);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_software *renderer = cui_software_create(100, 100, NULL);
+    assert(renderer);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    unsigned w, h;
+    const unsigned char *pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(2 * w + 9) * 4] == 255 && pixels[(5 * w + 9) * 4 + 3] == 0);
+    assert(pixels[(19 * w + 2) * 4] == 255 && pixels[(19 * w + 5) * 4 + 3] == 0);
+    cui_software_destroy(renderer);
 }
 static void raster(void) {
     unsigned char pixels[64 * 64 * 4], saved[sizeof pixels];
@@ -268,6 +295,7 @@ int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 100, .height = 100, .measure = measure});
     assert(ui);
     axes(ui);
+    grid_pixels(ui);
     raster();
     unsigned char pixels[64 * 64 * 4];
     assert(cui_plot_raster(pixels, 64, 64, 256, sizeof pixels, NULL, 0, blue) == CUI_PLOT_OK);

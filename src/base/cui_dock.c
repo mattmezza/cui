@@ -357,6 +357,56 @@ cui_dock_result cui_dock_move_split(cui_dock *d, uint64_t key, cui_dock_node des
         *out = node;
     return CUI_DOCK_OK;
 }
+static cui_dock cui_dock_private_stage(cui_dock *model) {
+    cui_dock trial = *model;
+    trial.state = model->scratch;
+    trial.state.root = model->state.root;
+    memcpy(trial.state.nodes, model->state.nodes,
+           model->config.node_capacity * sizeof(*model->state.nodes));
+    memcpy(trial.state.panels, model->state.panels,
+           model->config.panel_capacity * sizeof(*model->state.panels));
+    return trial;
+}
+static void cui_dock_private_commit(cui_dock *model, cui_dock *trial) {
+    cui_dock_private_state old = model->state;
+    model->state = trial->state;
+    model->scratch = old;
+    model->generation = trial->generation;
+}
+cui_dock_result cui_dock_transfer(cui_dock *source, uint64_t key, cui_dock *destination,
+                                  cui_dock_node target, size_t index, cui_dock_kind axis,
+                                  double ratio, bool before, cui_dock_node *out) {
+    if (!source || !destination || source == destination ||
+        (axis != CUI_DOCK_TABS && axis != CUI_DOCK_SPLIT_HORIZONTAL &&
+         axis != CUI_DOCK_SPLIT_VERTICAL))
+        return CUI_DOCK_INVALID;
+    cui_dock_node source_node;
+    cui_dock_node_info info;
+    if (!cui_dock_panel_find(source, key, &source_node, NULL) ||
+        !cui_dock_node_get(source, source_node, &info))
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock a = cui_dock_private_stage(source), b = cui_dock_private_stage(destination);
+    cui_dock_node leaf = target;
+    cui_dock_result result = cui_dock_remove(&a, key);
+    if (result == CUI_DOCK_OK) {
+        if (axis == CUI_DOCK_TABS) {
+            result = cui_dock_insert(&b, target, key, index);
+            if (result == CUI_DOCK_OK)
+                cui_dock_activate(&b, key);
+        } else {
+            result = cui_dock_split(&b, target, axis, ratio, key, before, &leaf);
+            if (result == CUI_DOCK_OK)
+                cui_dock_set_minimum(&b, leaf, info.min_width, info.min_height);
+        }
+    }
+    if (result != CUI_DOCK_OK)
+        return result;
+    cui_dock_private_commit(source, &a);
+    cui_dock_private_commit(destination, &b);
+    if (out)
+        *out = leaf;
+    return CUI_DOCK_OK;
+}
 cui_dock_result cui_dock_reorder(cui_dock *d, uint64_t key, size_t index) {
     cui_dock_node n;
     if (!cui_dock_panel_find(d, key, &n, NULL))

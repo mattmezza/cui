@@ -382,6 +382,9 @@ static cui_dock_workspace *edges;
 static cui_dock_region_content regions[4];
 static cui_dock_workspace_options edge_options;
 static cui_dock_workspace_result edge_result;
+static cui_dock_result edge_expected_error;
+static bool edge_modal;
+static unsigned edge_preview_accepted, edge_preview_rejected;
 static unsigned edge_resize_events;
 static void edge_resize(void *user, cui_dock_region region, float size) {
     assert(user == &edge_resize_events && region >= CUI_DOCK_LEFT && region <= CUI_DOCK_BOTTOM &&
@@ -391,10 +394,24 @@ static void edge_resize(void *user, cui_dock_region region, float size) {
 static void edge_frame(void) {
     cui_theme theme = cui_theme_dark();
     assert(cui_begin_frame(ui, 640, 480, .016f));
+    if (edge_modal) {
+        assert(cui_begin_focus_scope(ui, 9000, true));
+        cui_begin_portal(ui, 9001, (cui_box){.background = {10, 10, 10, 255}},
+                         (cui_rect){0, 0, 640, 480}, 100);
+        cui_interact(ui, 9001, CUI_ROLE_BUTTON, cui_string("Modal guard"), false, false, 0);
+        cui_end_box(ui);
+        cui_end_focus_scope(ui);
+    }
     edge_result = cui_dock_workspace_render(ui, 700, &theme, edges, regions, edge_options);
     cui_draw_list commands = cui_end_frame(ui);
-    assert(edge_result.error == CUI_DOCK_OK && cui_last_error(ui) == CUI_OK && commands.count);
+    assert(edge_result.error == edge_expected_error && cui_last_error(ui) == CUI_OK &&
+           commands.count);
     for (size_t i = 0; i < commands.count; ++i) {
+        cui_color ink = commands.commands[i].color;
+        if (ink.r == 31 && ink.g == 37 && ink.b == 41)
+            ++edge_preview_accepted;
+        if (ink.r == 43 && ink.g == 47 && ink.b == 53)
+            ++edge_preview_rejected;
         cui_rect b = commands.commands[i].bounds;
         assert(isfinite(b.x) && isfinite(b.y) && isfinite(b.w) && isfinite(b.h));
     }
@@ -486,6 +503,256 @@ static void test_edge_regions(void) {
     for (unsigned i = 0; i < 4; ++i) {
         cui_dock_view_destroy(regions[i].view);
         cui_dock_destroy(regions[i].model);
+    }
+    cui_dock_workspace_destroy(edges);
+}
+static unsigned region_rendered[4][5], transfer_events;
+static bool transfer_denied;
+static void transfer_content(cui_context *ctx, uint64_t key, void *user) {
+    unsigned region = (unsigned)(uintptr_t)user;
+    assert(region < 4 && key < 5);
+    ++region_rendered[region][key];
+    cui_text(ctx, cui_string("Owned region panel"), 16, (cui_color){200, 200, 200, 255});
+}
+static bool transfer_policy(void *user, const cui_dock_transfer_request *request) {
+    assert(user == &transfer_events && request->source_model != request->destination_model);
+    assert(cui_dock_panel_find(request->source_model, request->panel, NULL, NULL));
+    return !transfer_denied;
+}
+static void transferred(void *user, const cui_dock_transfer_request *request) {
+    assert(user == &transfer_events &&
+           !cui_dock_panel_find(request->source_model, request->panel, NULL, NULL));
+    assert(cui_dock_panel_find(request->destination_model, request->panel, NULL, NULL));
+    ++transfer_events;
+}
+static void transfer_gesture(unsigned source, uint64_t key, float x, float y,
+                             cui_event_type cancel) {
+    edge_frame();
+    edge_frame();
+    cui_rect tab =
+        cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, (cui_dock_region)source), key));
+    assert(tab.w > 0);
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_MOVE, x, y);
+    edge_frame();
+    if (cancel == CUI_EVENT_CANCEL) {
+        pointer(CUI_EVENT_CANCEL, x, y);
+        edge_frame();
+    }
+    if (cancel == CUI_EVENT_KEY_DOWN) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+        edge_frame();
+    }
+    pointer(CUI_EVENT_POINTER_UP, x, y);
+    edge_frame();
+}
+static void region_serialize(unsigned region, char *out) {
+    size_t size;
+    assert(cui_dock_serialize(regions[region].model, out, 4096, &size) == CUI_DOCK_OK);
+}
+static bool transfer_source_veto(void *user, const cui_dock_request *request) {
+    assert(user == &transfer_events && request->source && request->panel == 4);
+    return request->operation != CUI_DOCK_MOVED;
+}
+static void rejected_transfer(unsigned source, unsigned destination, uint64_t key, float x, float y,
+                              cui_dock_result error) {
+    /* Compare from the original active key, including an inactive-tab drag. */
+    edge_frame();
+    edge_frame();
+    char before_source[4096], before_destination[4096], after[4096];
+    region_serialize(source, before_source);
+    region_serialize(destination, before_destination);
+    cui_dock_workspace_snapshot before, after_snapshot;
+    assert(cui_dock_workspace_save(edges, &before));
+    cui_rect tab =
+        cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, (cui_dock_region)source), key));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_MOVE, x, y);
+    edge_frame();
+    edge_expected_error = error;
+    pointer(CUI_EVENT_POINTER_UP, x, y);
+    edge_frame();
+    edge_expected_error = CUI_DOCK_OK;
+    assert(!edge_result.transferred && !edge_result.opened);
+    region_serialize(source, after);
+    assert(!strcmp(before_source, after));
+    region_serialize(destination, after);
+    assert(!strcmp(before_destination, after));
+    assert(cui_dock_workspace_save(edges, &after_snapshot) &&
+           !memcmp(&before, &after_snapshot, sizeof before));
+}
+static void test_workspace_transfers(void) {
+    cui_dock_panel metadata[4][5];
+    edges = cui_dock_workspace_create();
+    assert(edges);
+    edge_options = (cui_dock_workspace_options){.view = cui_dock_view_options_default(),
+                                                .allow_transfer = transfer_policy,
+                                                .on_transfer = transferred,
+                                                .transfer_user = &transfer_events};
+    for (unsigned r = 0; r < 4; ++r) {
+        for (unsigned p = 0; p < 5; ++p)
+            metadata[r][p] = (cui_dock_panel){.key = p,
+                                              .title = cui_string("Owned panel"),
+                                              .render = transfer_content,
+                                              .user = (void *)(uintptr_t)r};
+        regions[r] = (cui_dock_region_content){.model = cui_dock_create((cui_dock_config){0}),
+                                               .view = cui_dock_view_create(0, 0),
+                                               .panels = metadata[r],
+                                               .panel_count = 5};
+        assert(regions[r].model && regions[r].view);
+        assert(cui_dock_insert(regions[r].model, cui_dock_root(regions[r].model), r, 0) ==
+               CUI_DOCK_OK);
+    }
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 4, 1) == CUI_DOCK_OK);
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_LEFT, true, 160));
+    edge_frame();
+    edge_frame();
+    cui_rect left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    transfer_gesture(0, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_CANCEL);
+    assert(!edge_result.transferred && cui_dock_panel_find(regions[0].model, 4, NULL, NULL));
+    cui_dock_node_info cancelled_info;
+    assert(cui_dock_node_get(regions[0].model, cui_dock_root(regions[0].model), &cancelled_info) &&
+           cancelled_info.active_panel == 0);
+    transfer_gesture(0, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_KEY_DOWN);
+    assert(!edge_result.transferred && cui_dock_panel_find(regions[0].model, 4, NULL, NULL));
+    edge_modal = true;
+    transfer_gesture(0, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(!edge_result.transferred && cui_dock_panel_find(regions[0].model, 4, NULL, NULL));
+    edge_modal = false;
+    edge_frame();
+    edge_frame();
+    edge_options.view.custom_palette = true;
+    edge_options.view.drag_palette = (cui_dock_drag_palette){
+        {31, 37, 41, 255}, {43, 47, 53, 255}, {7, 13, 19, 255}, {59, 61, 67, 255}};
+    assert(cui_dock_activate(regions[0].model, 0) == CUI_DOCK_OK);
+    char denied_before[4096], denied_after[4096];
+    region_serialize(0, denied_before);
+    transfer_denied = true;
+    transfer_gesture(0, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.denied && !edge_result.transferred && transfer_events == 0);
+    assert(edge_preview_rejected > 0);
+    region_serialize(0, denied_after);
+    assert(!strcmp(denied_before, denied_after));
+    transfer_denied = false;
+    edge_options.disable_cross_region = true;
+    transfer_gesture(0, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(!edge_result.transferred && cui_dock_panel_find(regions[0].model, 4, NULL, NULL));
+    edge_options.disable_cross_region = false;
+    unsigned source_callbacks = region_rendered[0][4],
+             destination_callbacks = region_rendered[1][4];
+    transfer_gesture(0, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && !edge_result.opened && transfer_events == 1);
+    assert(edge_preview_accepted > 0);
+    edge_options.view.custom_palette = false;
+    unsigned source_after = region_rendered[0][4];
+    edge_frame();
+    assert(region_rendered[0][4] == source_after && source_after >= source_callbacks &&
+           region_rendered[1][4] > destination_callbacks);
+    assert(cui_focused(ui) == cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_LEFT), 4));
+    /* Dropping on a closed right-edge landing zone opens it only after commit. */
+    transfer_gesture(1, 4, 638, 240, CUI_EVENT_CANCEL);
+    cui_dock_workspace_snapshot saved;
+    assert(cui_dock_workspace_save(edges, &saved) && !saved.open[1]);
+    transfer_gesture(1, 4, 638, 240, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && edge_result.opened && transfer_events == 2);
+    assert(cui_dock_workspace_save(edges, &saved) && saved.open[1]);
+    edge_frame();
+    assert(cui_focused(ui) == cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_RIGHT), 4));
+    /* Closed bottom opens into its independent registry. */
+    transfer_gesture(2, 4, 320, 478, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.opened && edge_result.destination_region == CUI_DOCK_BOTTOM);
+    edge_frame();
+    assert(region_rendered[3][4] > 0);
+    /* Duplicate-key rejection preserves both serialized layouts. */
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 4, SIZE_MAX) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_activate(regions[3].model, 4) == CUI_DOCK_OK);
+    edge_frame();
+    edge_frame();
+    char before_source[4096], before_target[4096], after[4096];
+    region_serialize(3, before_source);
+    region_serialize(0, before_target);
+    cui_rect center = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_CENTER));
+    /* Queue release separately to assert the expected rejection only there. */
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_BOTTOM), 4));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_MOVE, center.x + center.w / 2, center.y + center.h / 2);
+    edge_frame();
+    edge_expected_error = CUI_DOCK_DUPLICATE_PANEL;
+    pointer(CUI_EVENT_POINTER_UP, center.x + center.w / 2, center.y + center.h / 2);
+    edge_frame();
+    edge_expected_error = CUI_DOCK_OK;
+    assert(!edge_result.transferred);
+    region_serialize(3, after);
+    assert(!strcmp(before_source, after));
+    region_serialize(0, after);
+    assert(!strcmp(before_target, after));
+    assert(cui_dock_remove(regions[0].model, 4) == CUI_DOCK_OK);
+    edge_frame();
+    edge_frame();
+    /* Successful cross-region edge split creates a new destination leaf. */
+    left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    transfer_gesture(3, 4, left.x + 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && edge_result.destination_region == CUI_DOCK_LEFT);
+    cui_dock_node_info split_info;
+    assert(cui_dock_node_get(regions[1].model, cui_dock_root(regions[1].model), &split_info) &&
+           split_info.kind == CUI_DOCK_SPLIT_HORIZONTAL);
+    edge_frame();
+    cui_rect bottom = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_BOTTOM));
+    transfer_gesture(1, 4, bottom.x + bottom.w / 2, bottom.y + bottom.h / 2,
+                     CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred);
+    edge_frame();
+    left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    metadata[1][4].disabled = true;
+    rejected_transfer(3, 1, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_DOCK_INVALID);
+    metadata[1][4].disabled = false;
+    regions[1].panel_count = 4;
+    rejected_transfer(3, 1, 4, left.x + left.w / 2, left.y + left.h / 2, CUI_DOCK_NOT_FOUND);
+    regions[1].panel_count = 5;
+    /* Full destination capacity cannot open a closed edge. */
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_RIGHT, false, 200));
+    assert(cui_dock_activate(regions[3].model, 3) == CUI_DOCK_OK);
+    edge_options.view.allow_operation = transfer_source_veto;
+    edge_options.view.policy_user = &transfer_events;
+    rejected_transfer(3, 2, 4, 638, 240, CUI_DOCK_OK);
+    assert(edge_result.denied);
+    edge_options.view.allow_operation = NULL;
+    edge_options.view.policy_user = NULL;
+    transfer_denied = true;
+    rejected_transfer(3, 2, 4, 638, 240, CUI_DOCK_OK);
+    assert(edge_result.denied);
+    transfer_denied = false;
+    cui_dock_destroy(regions[2].model);
+    regions[2].model = cui_dock_create((cui_dock_config){.panel_capacity = 1});
+    assert(regions[2].model);
+    cui_dock_view_reset(regions[2].view);
+    assert(cui_dock_insert(regions[2].model, cui_dock_root(regions[2].model), 2, 0) == CUI_DOCK_OK);
+    rejected_transfer(3, 2, 4, 638, 240, CUI_DOCK_CAPACITY);
+    /* Split-capacity failure also preserves both layouts. */
+    cui_dock_destroy(regions[0].model);
+    regions[0].model = cui_dock_create((cui_dock_config){.node_capacity = 1, .panel_capacity = 3});
+    assert(regions[0].model);
+    cui_dock_view_reset(regions[0].view);
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 0, 0) == CUI_DOCK_OK);
+    edge_frame();
+    edge_frame();
+    center = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_CENTER));
+    rejected_transfer(3, 0, 4, center.x + 2, center.y + center.h / 2, CUI_DOCK_CAPACITY);
+    /* Opening an empty closed model transfers callback ownership normally. */
+    assert(cui_dock_remove(regions[1].model, 1) == CUI_DOCK_OK);
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_LEFT, false, 160));
+    transfer_gesture(3, 4, 2, 240, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && edge_result.opened &&
+           edge_result.destination_region == CUI_DOCK_LEFT);
+    edge_frame();
+    assert(cui_focused(ui) == cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_LEFT), 4));
+    for (unsigned r = 0; r < 4; ++r) {
+        cui_dock_view_destroy(regions[r].view);
+        cui_dock_destroy(regions[r].model);
     }
     cui_dock_workspace_destroy(edges);
 }
@@ -653,6 +920,7 @@ int main(void) {
     test_policy_preview();
     test_zoom_toolbar();
     test_edge_regions();
+    test_workspace_transfers();
     test_oversized_content();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));

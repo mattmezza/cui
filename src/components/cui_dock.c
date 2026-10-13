@@ -44,8 +44,8 @@ struct dock_scene {
     cui_dock_node destination;
     cui_dock_kind edge_axis;
 };
-static bool allowed(dock_scene *s, cui_dock_event operation, uint64_t panel,
-                    cui_dock_node destination, size_t index, cui_dock_kind axis, bool before) {
+static bool dock_allowed(dock_scene *s, cui_dock_event operation, uint64_t panel,
+                         cui_dock_node destination, size_t index, cui_dock_kind axis, bool before) {
     if (!s->options.allow_operation)
         return true;
     cui_dock_node source = 0;
@@ -56,7 +56,7 @@ static bool allowed(dock_scene *s, cui_dock_event operation, uint64_t panel,
 static bool dock_contains(cui_rect b, float x, float y) {
     return b.w > 0 && b.h > 0 && x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h;
 }
-static void drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
+static void dock_drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
     if (s->view->zoomed && node == cui_dock_root(s->dock)) {
         cui_dock_node maximized;
         if (!cui_dock_panel_find(s->dock, s->view->zoom_key, &maximized, NULL))
@@ -67,8 +67,8 @@ static void drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
     if (!cui_dock_node_get(s->dock, node, &info))
         return;
     if (info.kind != CUI_DOCK_TABS) {
-        drop_target(s, info.first, x, y);
-        drop_target(s, info.second, x, y);
+        dock_drop_target(s, info.first, x, y);
+        dock_drop_target(s, info.second, x, y);
         return;
     }
     cui_rect b = cui_bounds(s->ui, cui_dock_group_id(s->id, node));
@@ -97,7 +97,7 @@ static void drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
             s->edge_axis = CUI_DOCK_TABS;
     }
 }
-static void drag_events(dock_scene *s) {
+static void dock_drag_events(dock_scene *s) {
     cui_dock_view *v = s->view;
     if (s->options.disabled || !s->options.allow_reorder) {
         v->dragging = false;
@@ -151,24 +151,24 @@ static void drag_events(dock_scene *s) {
         } else if (v->dragging && event.type == CUI_EVENT_POINTER_UP &&
                    event.pointer_button == CUI_POINTER_PRIMARY) {
             if (v->crossed)
-                drop_target(s, cui_dock_root(s->dock), event.x, event.y);
+                dock_drop_target(s, cui_dock_root(s->dock), event.x, event.y);
             v->dragging = false;
         }
     }
 }
-static void drag_preview(dock_scene *s) {
+static void dock_drag_preview(dock_scene *s) {
     cui_dock_view *v = s->view;
     if (!v->dragging || !v->crossed || s->options.disable_preview || s->options.disabled)
         return;
     dock_scene preview = *s;
     preview.pending_drop = false;
-    drop_target(&preview, cui_dock_root(s->dock), v->pointer_x, v->pointer_y);
+    dock_drop_target(&preview, cui_dock_root(s->dock), v->pointer_x, v->pointer_y);
     cui_dock_drag_palette palette =
         s->options.custom_palette ? s->options.drag_palette
                                   : (cui_dock_drag_palette){s->theme->primary, s->theme->danger,
                                                             s->theme->surface, s->theme->text};
     if (preview.pending_drop) {
-        bool permitted = allowed(
+        bool permitted = dock_allowed(
             s, preview.edge_axis == CUI_DOCK_TABS ? CUI_DOCK_MOVED : CUI_DOCK_SPLIT, v->drag_key,
             preview.destination, SIZE_MAX, preview.edge_axis, preview.edge_before);
         cui_rect b = cui_bounds(s->ui, cui_dock_group_id(s->id, preview.destination));
@@ -210,7 +210,7 @@ static void drag_preview(dock_scene *s) {
     cui_text(s->ui, panel ? panel->title : cui_string("Panel"), s->theme->font_size, palette.text);
     cui_end_box(s->ui);
 }
-static bool first_active(const cui_dock *model, cui_dock_node node, uint64_t *key) {
+static bool dock_first_active(const cui_dock *model, cui_dock_node node, uint64_t *key) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
         return false;
@@ -220,7 +220,7 @@ static bool first_active(const cui_dock *model, cui_dock_node node, uint64_t *ke
         *key = info.active_panel;
         return true;
     }
-    return first_active(model, info.first, key) || first_active(model, info.second, key);
+    return dock_first_active(model, info.first, key) || dock_first_active(model, info.second, key);
 }
 static cui_id dock_part(cui_id id, uint64_t key, uint64_t tag) {
     uint64_t x = id ^ (key + tag);
@@ -314,17 +314,17 @@ cui_dock_view_options cui_dock_view_options_default(void) {
     return (cui_dock_view_options){
         .width = 640, .height = 480, .tab_height = 36, .key_step = 8, .allow_reorder = true};
 }
-static const cui_dock_panel *panel_get(const dock_scene *s, uint64_t key) {
+static const cui_dock_panel *dock_panel_get(const dock_scene *s, uint64_t key) {
     for (size_t i = 0; i < s->panel_count; ++i)
         if (s->panels[i].key == key)
             return &s->panels[i];
     return NULL;
 }
-static void emit(dock_scene *s, cui_dock_event event, uint64_t key, cui_dock_node node) {
+static void dock_emit(dock_scene *s, cui_dock_event event, uint64_t key, cui_dock_node node) {
     if (s->options.on_event)
         s->options.on_event(s->options.event_user, event, key, node);
 }
-static dock_cache *cache_get(dock_scene *s, cui_dock_node node) {
+static dock_cache *dock_cache_get(dock_scene *s, cui_dock_node node) {
     for (size_t i = 0; i < s->view->count; ++i)
         if (s->view->cache[i].node == node)
             return &s->view->cache[i];
@@ -346,8 +346,8 @@ static dock_cache *cache_get(dock_scene *s, cui_dock_node node) {
     cui_resizable_state_init(&cache->resize, cache->slots, 2);
     return cache;
 }
-static cui_dock_result preflight(const cui_dock *model, cui_dock_node node, size_t *nodes,
-                                 size_t *panels) {
+static cui_dock_result dock_preflight(const cui_dock *model, cui_dock_node node, size_t *nodes,
+                                      size_t *panels) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
         return CUI_DOCK_NOT_FOUND;
@@ -356,14 +356,15 @@ static cui_dock_result preflight(const cui_dock *model, cui_dock_node node, size
         *panels += info.panel_count;
         return CUI_DOCK_OK;
     }
-    cui_dock_result error = preflight(model, info.first, nodes, panels);
-    return error == CUI_DOCK_OK ? preflight(model, info.second, nodes, panels) : error;
+    cui_dock_result error = dock_preflight(model, info.first, nodes, panels);
+    return error == CUI_DOCK_OK ? dock_preflight(model, info.second, nodes, panels) : error;
 }
-static void close_suffix(cui_context *ui, const cui_choice_item *item, size_t index, void *user) {
+static void dock_close_suffix(cui_context *ui, const cui_choice_item *item, size_t index,
+                              void *user) {
     dock_scene *s = user;
     (void)item;
     uint64_t key = s->view->keys[index];
-    const cui_dock_panel *panel = panel_get(s, key);
+    const cui_dock_panel *panel = dock_panel_get(s, key);
     if (!panel || !panel->closable)
         return;
     if (cui_button_ex(ui, cui_dock_close_id(s->id, key), s->theme, cui_string("Close panel"),
@@ -376,9 +377,9 @@ static void close_suffix(cui_context *ui, const cui_choice_item *item, size_t in
         s->close_key = key;
     }
 }
-static void render_node(dock_scene *, cui_dock_node, float, float);
-static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cache, float w,
-                        float h) {
+static void dock_render_node(dock_scene *, cui_dock_node, float, float);
+static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cache, float w,
+                             float h) {
     cui_id group = cui_dock_group_id(s->id, info.id);
     cui_begin_box(s->ui, group,
                   (cui_box){.width = w,
@@ -398,7 +399,7 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
     for (size_t i = 0; i < info.panel_count; ++i) {
         uint64_t key;
         cui_dock_panel_at(s->dock, info.id, i, &key);
-        const cui_dock_panel *panel = panel_get(s, key);
+        const cui_dock_panel *panel = dock_panel_get(s, key);
         s->view->keys[i] = key;
         s->view->items[i] =
             (cui_choice_item){.id = cui_dock_tab_id(s->id, key),
@@ -407,7 +408,7 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
         s->view->parts[i] = (cui_tab_parts){0};
         if (panel && panel->closable)
             s->view->parts[i] =
-                (cui_tab_parts){.suffix = close_suffix, .suffix_width = 28, .user = s};
+                (cui_tab_parts){.suffix = dock_close_suffix, .suffix_width = 28, .user = s};
         if (info.has_active && info.active_panel == key)
             selected = s->view->items[i].id;
     }
@@ -438,7 +439,7 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
                     info.has_active = true;
                     s->result.selected = true;
                     s->result.selected_panel = key;
-                    emit(s, CUI_DOCK_SELECTED, key, info.id);
+                    dock_emit(s, CUI_DOCK_SELECTED, key, info.id);
                 }
                 break;
             }
@@ -465,7 +466,7 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
     cui_id focused = cui_focused(s->ui);
     size_t event_count;
     const cui_event *events = cui_frame_events(s->ui, &event_count);
-    const cui_dock_panel *active = info.has_active ? panel_get(s, info.active_panel) : NULL;
+    const cui_dock_panel *active = info.has_active ? dock_panel_get(s, info.active_panel) : NULL;
     for (size_t i = 0;
          active && active->closable && !active->disabled && !s->options.disabled && i < event_count;
          ++i) {
@@ -540,27 +541,27 @@ typedef struct {
     size_t index;
     float cross;
     bool horizontal;
-} child_scene;
-static void render_child(cui_context *ui, void *user) {
-    child_scene *child = user;
+} dock_child_scene;
+static void dock_render_child(cui_context *ui, void *user) {
+    dock_child_scene *child = user;
     (void)ui;
     float span = child->cache->slots[child->index].size;
-    render_node(child->scene, child->node, child->horizontal ? span : child->cross,
-                child->horizontal ? child->cross : span);
+    dock_render_node(child->scene, child->node, child->horizontal ? span : child->cross,
+                     child->horizontal ? child->cross : span);
 }
-static void render_node(dock_scene *s, cui_dock_node node, float w, float h) {
+static void dock_render_node(dock_scene *s, cui_dock_node node, float w, float h) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(s->dock, node, &info)) {
         s->result.error = CUI_DOCK_NOT_FOUND;
         return;
     }
-    dock_cache *cache = cache_get(s, node);
+    dock_cache *cache = dock_cache_get(s, node);
     if (!cache) {
         s->result.error = CUI_DOCK_CAPACITY;
         return;
     }
     if (info.kind == CUI_DOCK_TABS) {
-        render_tabs(s, info, cache, w, h);
+        dock_render_tabs(s, info, cache, w, h);
         return;
     }
     bool horizontal = info.kind == CUI_DOCK_SPLIT_HORIZONTAL;
@@ -578,8 +579,8 @@ static void render_node(dock_scene *s, cui_dock_node node, float w, float h) {
         cache->slots[0].size = first;
         cache->slots[1].size = extent - first;
     }
-    child_scene children[2] = {{s, info.first, cache, 0, cross, horizontal},
-                               {s, info.second, cache, 1, cross, horizontal}};
+    dock_child_scene children[2] = {{s, info.first, cache, 0, cross, horizontal},
+                                    {s, info.second, cache, 1, cross, horizontal}};
     cui_resizable_panel panels[2];
     for (size_t i = 0; i < 2; ++i) {
         cui_size minimum = i == 0 ? geometry.first_minimum : geometry.second_minimum;
@@ -591,7 +592,7 @@ static void render_node(dock_scene *s, cui_dock_node node, float w, float h) {
         panels[i].minimum =
             geometry.fit_minimum ? (horizontal ? minimum.width : minimum.height) : 0;
         panels[i].maximum = fmaxf(extent, panels[i].minimum);
-        panels[i].content = render_child;
+        panels[i].content = dock_render_child;
         panels[i].content_user = &children[i];
         panels[i].accessibility_label =
             cui_string(i == 0 ? "First dock region" : "Second dock region");
@@ -620,7 +621,7 @@ static void render_node(dock_scene *s, cui_dock_node node, float w, float h) {
         if (fabs(ratio - info.ratio) > 1e-6 && fabsf(cache->slots[0].size - first) > .001f) {
             if (cui_dock_set_ratio(s->dock, node, ratio) == CUI_DOCK_OK) {
                 s->result.resized = true;
-                emit(s, CUI_DOCK_RESIZED, 0, node);
+                dock_emit(s, CUI_DOCK_RESIZED, 0, node);
             }
         }
     }
@@ -651,7 +652,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                 return invalid;
     }
     size_t nodes = 0, model_panels = 0;
-    cui_dock_result error = preflight(model, cui_dock_root(model), &nodes, &model_panels);
+    cui_dock_result error = dock_preflight(model, cui_dock_root(model), &nodes, &model_panels);
     if (error != CUI_DOCK_OK)
         return (cui_dock_view_result){.error = error};
     if (nodes > view->node_capacity || model_panels > view->panel_capacity)
@@ -669,7 +670,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                         .panel_count = count,
                         .options = options,
                         .result = {.error = CUI_DOCK_OK, .fit_minimum = true}};
-    drag_events(&scene);
+    dock_drag_events(&scene);
     size_t leaves = 0;
     bool fit = true;
     error = cui_dock_layout(model, (cui_rect){0, 0, options.width, options.height}, 0, NULL, 0,
@@ -693,52 +694,53 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
         } else {
             view->zoomed = false;
             scene.result.restored = true;
-            emit(&scene, CUI_DOCK_RESTORED, view->zoom_key, 0);
+            dock_emit(&scene, CUI_DOCK_RESTORED, view->zoom_key, 0);
             uint64_t survivor;
-            if (first_active(model, cui_dock_root(model), &survivor))
+            if (dock_first_active(model, cui_dock_root(model), &survivor))
                 cui_focus(ui, cui_dock_tab_id(id, survivor));
             visible_root = cui_dock_root(model);
         }
     }
-    render_node(&scene, visible_root, options.width, options.height);
-    drag_preview(&scene);
+    dock_render_node(&scene, visible_root, options.width, options.height);
+    dock_drag_preview(&scene);
     cui_end_box(ui);
     if (scene.pending_zoom) {
-        if (scene.zoom_in && !allowed(&scene, CUI_DOCK_ZOOMED, scene.zoom_key, visible_root, 0,
-                                      CUI_DOCK_TABS, false))
+        if (scene.zoom_in && !dock_allowed(&scene, CUI_DOCK_ZOOMED, scene.zoom_key, visible_root, 0,
+                                           CUI_DOCK_TABS, false))
             scene.result.denied = true;
         else {
             view->zoomed = scene.zoom_in;
             view->zoom_key = scene.zoom_key;
             scene.result.zoomed = scene.zoom_in;
             scene.result.restored = !scene.zoom_in;
-            emit(&scene, scene.zoom_in ? CUI_DOCK_ZOOMED : CUI_DOCK_RESTORED, scene.zoom_key,
-                 visible_root);
+            dock_emit(&scene, scene.zoom_in ? CUI_DOCK_ZOOMED : CUI_DOCK_RESTORED, scene.zoom_key,
+                      visible_root);
             cui_focus(ui, cui_dock_tab_id(id, scene.zoom_key));
             cui_invalidate(ui);
         }
     } else if (scene.pending_close) {
         cui_dock_node node;
-        if (!allowed(&scene, CUI_DOCK_CLOSED, scene.close_key, 0, 0, CUI_DOCK_TABS, false))
+        if (!dock_allowed(&scene, CUI_DOCK_CLOSED, scene.close_key, 0, 0, CUI_DOCK_TABS, false))
             scene.result.denied = true;
         else if (cui_dock_panel_find(model, scene.close_key, &node, NULL) &&
                  cui_dock_remove(model, scene.close_key) == CUI_DOCK_OK) {
             scene.result.closed = true;
             scene.result.closed_panel = scene.close_key;
-            emit(&scene, CUI_DOCK_CLOSED, scene.close_key, node);
+            dock_emit(&scene, CUI_DOCK_CLOSED, scene.close_key, node);
             cui_dock_node_info info;
             uint64_t survivor;
             if (cui_dock_node_get(model, node, &info) && info.has_active)
                 cui_focus(ui, cui_dock_tab_id(id, info.active_panel));
-            else if (first_active(model, cui_dock_root(model), &survivor))
+            else if (dock_first_active(model, cui_dock_root(model), &survivor))
                 cui_focus(ui, cui_dock_tab_id(id, survivor));
             cui_invalidate(ui);
         }
     } else if (scene.pending_drop) {
         cui_dock_node destination = scene.destination;
         cui_dock_result drop;
-        if (!allowed(&scene, scene.edge_axis == CUI_DOCK_TABS ? CUI_DOCK_MOVED : CUI_DOCK_SPLIT,
-                     view->drag_key, destination, SIZE_MAX, scene.edge_axis, scene.edge_before)) {
+        if (!dock_allowed(
+                &scene, scene.edge_axis == CUI_DOCK_TABS ? CUI_DOCK_MOVED : CUI_DOCK_SPLIT,
+                view->drag_key, destination, SIZE_MAX, scene.edge_axis, scene.edge_before)) {
             scene.result.denied = true;
             drop = CUI_DOCK_OK;
         } else if (scene.edge_axis == CUI_DOCK_TABS)
@@ -752,22 +754,22 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
             scene.result.moved = true;
             scene.result.split = scene.edge_axis != CUI_DOCK_TABS;
             scene.result.moved_panel = view->drag_key;
-            emit(&scene, scene.result.split ? CUI_DOCK_SPLIT : CUI_DOCK_MOVED, view->drag_key,
-                 destination);
+            dock_emit(&scene, scene.result.split ? CUI_DOCK_SPLIT : CUI_DOCK_MOVED, view->drag_key,
+                      destination);
             cui_focus(ui, cui_dock_tab_id(id, view->drag_key));
             cui_invalidate(ui);
         } else
             scene.result.error = drop;
     } else if (scene.pending_reorder) {
         cui_dock_node node;
-        if (!allowed(&scene, CUI_DOCK_REORDERED, scene.reorder_key, 0, scene.reorder_index,
-                     CUI_DOCK_TABS, false))
+        if (!dock_allowed(&scene, CUI_DOCK_REORDERED, scene.reorder_key, 0, scene.reorder_index,
+                          CUI_DOCK_TABS, false))
             scene.result.denied = true;
         else if (cui_dock_panel_find(model, scene.reorder_key, &node, NULL) &&
                  cui_dock_reorder(model, scene.reorder_key, scene.reorder_index) == CUI_DOCK_OK) {
             scene.result.reordered = true;
             scene.result.reordered_panel = scene.reorder_key;
-            emit(&scene, CUI_DOCK_REORDERED, scene.reorder_key, node);
+            dock_emit(&scene, CUI_DOCK_REORDERED, scene.reorder_key, node);
             cui_invalidate(ui);
         }
     }
@@ -779,6 +781,11 @@ struct cui_dock_workspace {
     cui_resizable_state resize[3];
     cui_resizable_slot slots[3][2];
     cui_id id;
+    bool dragging, crossed, pending_focus;
+    cui_dock_region source_region, focus_region;
+    uint64_t drag_key, focus_key, initial_active;
+    bool has_initial_active, cross_region;
+    float start_x, start_y, pointer_x, pointer_y;
 };
 cui_dock_workspace *cui_dock_workspace_create(void) {
     cui_dock_workspace *state = calloc(1, sizeof *state);
@@ -816,6 +823,8 @@ bool cui_dock_workspace_restore(cui_dock_workspace *state,
         if (!isfinite(saved->size[i]) || saved->size[i] <= 0)
             return false;
     state->snapshot = *saved;
+    state->dragging = false;
+    state->pending_focus = false;
     for (size_t i = 0; i < 3; ++i)
         cui_resizable_clear(&state->resize[i]);
     return true;
@@ -840,16 +849,281 @@ typedef struct {
     const cui_dock_region_content *regions;
     cui_dock_workspace_options options;
     cui_dock_workspace_result result;
-} workspace_scene;
+    bool pending_transfer;
+    cui_dock_transfer_request transfer;
+} dock_workspace_scene;
+static const cui_dock_panel *dock_region_panel(const cui_dock_region_content *region,
+                                               uint64_t key) {
+    for (size_t i = 0; i < region->panel_count; ++i)
+        if (region->panels[i].key == key)
+            return &region->panels[i];
+    return NULL;
+}
+static bool dock_region_ready(const cui_dock_region_content *region) {
+    return region->model && region->view && (!region->panel_count || region->panels);
+}
+static bool dock_leaf_at(dock_workspace_scene *s, unsigned region, cui_dock_node node, float x,
+                         float y, cui_dock_node *out) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(s->regions[region].model, node, &info))
+        return false;
+    if (info.kind != CUI_DOCK_TABS)
+        return dock_leaf_at(s, region, info.first, x, y, out) ||
+               dock_leaf_at(s, region, info.second, x, y, out);
+    if (!dock_contains(
+            cui_bounds(s->ui,
+                       cui_dock_group_id(cui_dock_region_id(s->id, (cui_dock_region)region), node)),
+            x, y))
+        return false;
+    *out = node;
+    return true;
+}
+static cui_dock_node dock_first_leaf(const cui_dock *model, cui_dock_node node) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(model, node, &info))
+        return 0;
+    return info.kind == CUI_DOCK_TABS ? node : dock_first_leaf(model, info.first);
+}
+static bool dock_workspace_target(dock_workspace_scene *s, cui_dock_transfer_request *request) {
+    cui_dock_workspace *state = s->state;
+    cui_rect area = cui_bounds(s->ui, s->id);
+    if (!dock_contains(area, state->pointer_x, state->pointer_y))
+        return false;
+    unsigned destination = 4;
+    bool opens = false;
+    float band = fminf(24, fminf(area.w, area.h) * .2f);
+    if (!s->options.disable_edge_opening) {
+        if (!state->snapshot.open[0] && state->pointer_x < area.x + band)
+            destination = 1;
+        else if (!state->snapshot.open[1] && state->pointer_x > area.x + area.w - band)
+            destination = 2;
+        else if (!state->snapshot.open[2] && state->pointer_y > area.y + area.h - band)
+            destination = 3;
+        opens = destination < 4;
+    }
+    if (destination == 4)
+        for (unsigned i = 0; i < 4; ++i)
+            if ((!i || state->snapshot.open[i - 1]) &&
+                dock_contains(cui_bounds(s->ui, cui_dock_region_id(s->id, (cui_dock_region)i)),
+                              state->pointer_x, state->pointer_y)) {
+                destination = i;
+                break;
+            }
+    if (destination == 4 || destination == (unsigned)state->source_region ||
+        !dock_region_ready(&s->regions[destination]))
+        return false;
+    const cui_dock_region_content *source = &s->regions[state->source_region],
+                                  *target = &s->regions[destination];
+    const cui_dock_panel *panel = dock_region_panel(source, state->drag_key);
+    if (!panel || panel->disabled || !dock_region_ready(source))
+        return false;
+    cui_dock_node source_node, target_node;
+    if (!cui_dock_panel_find(source->model, state->drag_key, &source_node, NULL))
+        return false;
+    if (opens)
+        target_node = dock_first_leaf(target->model, cui_dock_root(target->model));
+    else if (!dock_leaf_at(s, destination, cui_dock_root(target->model), state->pointer_x,
+                           state->pointer_y, &target_node))
+        return false;
+    *request = (cui_dock_transfer_request){state->source_region,
+                                           (cui_dock_region)destination,
+                                           state->drag_key,
+                                           source->model,
+                                           target->model,
+                                           source_node,
+                                           target_node,
+                                           CUI_DOCK_TABS,
+                                           false,
+                                           opens};
+    if (!opens) {
+        dock_scene probe = {.ui = s->ui,
+                            .id = cui_dock_region_id(s->id, (cui_dock_region)destination),
+                            .dock = target->model,
+                            .view = target->view,
+                            .options = s->options.view};
+        if (!probe.options.tab_height)
+            probe.options.tab_height = 36;
+        /* Derive edge placement from target geometry without requiring panel membership. */
+        cui_rect b = cui_bounds(s->ui, cui_dock_group_id(probe.id, target_node));
+        if (state->pointer_y >= b.y + probe.options.tab_height) {
+            float dx = fminf(32, b.w * .2f), dy = fminf(32, b.h * .2f);
+            if (state->pointer_x < b.x + dx || state->pointer_x > b.x + b.w - dx) {
+                request->axis = CUI_DOCK_SPLIT_HORIZONTAL;
+                request->before = state->pointer_x < b.x + dx;
+            } else if (state->pointer_y < b.y + probe.options.tab_height + dy ||
+                       state->pointer_y > b.y + b.h - dy) {
+                request->axis = CUI_DOCK_SPLIT_VERTICAL;
+                request->before = state->pointer_y < b.y + probe.options.tab_height + dy;
+            }
+        }
+    }
+    return true;
+}
+static void dock_workspace_restore_active(dock_workspace_scene *s) {
+    cui_dock_workspace *state = s->state;
+    cui_dock *model = s->regions[state->source_region].model;
+    if (!state->has_initial_active || !model)
+        return;
+    cui_dock_node node;
+    cui_dock_node_info info;
+    if (!cui_dock_panel_find(model, state->initial_active, &node, NULL) ||
+        !cui_dock_node_get(model, node, &info))
+        return;
+    if (info.active_panel != state->initial_active &&
+        cui_dock_activate(model, state->initial_active) == CUI_DOCK_OK) {
+        if (s->options.view.on_event)
+            s->options.view.on_event(s->options.view.event_user, CUI_DOCK_SELECTED,
+                                     state->initial_active, node);
+        s->result.regions[state->source_region].selected = true;
+        s->result.regions[state->source_region].selected_panel = state->initial_active;
+        cui_invalidate(s->ui);
+    }
+    state->pending_focus = true;
+    state->focus_region = state->source_region;
+    state->focus_key = state->initial_active;
+}
+static void dock_workspace_events(dock_workspace_scene *s) {
+    cui_dock_workspace *state = s->state;
+    if (s->options.view.disabled || !s->options.view.allow_reorder ||
+        s->options.disable_cross_region) {
+        if (state->dragging && state->crossed && state->cross_region)
+            dock_workspace_restore_active(s);
+        state->dragging = false;
+        return;
+    }
+    if (state->dragging && state->source_region != CUI_DOCK_CENTER &&
+        !state->snapshot.open[state->source_region - 1]) {
+        if (state->crossed && state->cross_region)
+            dock_workspace_restore_active(s);
+        state->dragging = false;
+    }
+    size_t count;
+    const cui_event *events = cui_frame_events(s->ui, &count);
+    for (size_t e = 0; e < count; ++e) {
+        cui_event event = events[e];
+        if (event.type == CUI_EVENT_CANCEL ||
+            (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE)) {
+            if (state->dragging && state->crossed && state->cross_region)
+                dock_workspace_restore_active(s);
+            state->dragging = false;
+        } else if (event.type == CUI_EVENT_POINTER_DOWN &&
+                   event.pointer_button == CUI_POINTER_PRIMARY) {
+            state->dragging = false;
+            if (!cui_event_hit_within_scope(s->ui, e, s->id))
+                continue;
+            for (unsigned r = 0; r < 4; ++r) {
+                if ((r && !state->snapshot.open[r - 1]) || !dock_region_ready(&s->regions[r]))
+                    continue;
+                cui_id view_id = cui_dock_region_id(s->id, (cui_dock_region)r);
+                for (size_t p = 0; p < s->regions[r].panel_count; ++p) {
+                    const cui_dock_panel *panel = &s->regions[r].panels[p];
+                    if (!panel->disabled &&
+                        cui_dock_panel_find(s->regions[r].model, panel->key, NULL, NULL) &&
+                        dock_contains(cui_bounds(s->ui, cui_dock_tab_id(view_id, panel->key)),
+                                      event.x, event.y) &&
+                        dock_contains(cui_bounds(s->ui, view_id), event.x, event.y) &&
+                        !dock_contains(cui_bounds(s->ui, cui_dock_close_id(view_id, panel->key)),
+                                       event.x, event.y)) {
+                        state->dragging = true;
+                        state->crossed = false;
+                        state->drag_key = panel->key;
+                        state->source_region = (cui_dock_region)r;
+                        cui_dock_node node;
+                        cui_dock_node_info info;
+                        cui_dock_panel_find(s->regions[r].model, panel->key, &node, NULL);
+                        cui_dock_node_get(s->regions[r].model, node, &info);
+                        state->has_initial_active = info.has_active;
+                        state->initial_active = info.active_panel;
+                        state->cross_region = false;
+                        state->start_x = event.x;
+                        state->start_y = event.y;
+                    }
+                }
+            }
+        } else if (state->dragging &&
+                   (event.type == CUI_EVENT_POINTER_MOVE || event.type == CUI_EVENT_POINTER_UP)) {
+            state->pointer_x = event.x;
+            state->pointer_y = event.y;
+            state->cross_region =
+                !dock_contains(cui_bounds(s->ui, cui_dock_region_id(s->id, state->source_region)),
+                               event.x, event.y);
+            if (hypotf(event.x - state->start_x, event.y - state->start_y) >= 6)
+                state->crossed = true;
+            if (event.type == CUI_EVENT_POINTER_UP && event.pointer_button == CUI_POINTER_PRIMARY) {
+                if (state->crossed && cui_event_hit_within_scope(s->ui, e, s->id))
+                    s->pending_transfer = dock_workspace_target(s, &s->transfer);
+                state->dragging = false;
+            }
+        }
+    }
+}
 typedef struct {
-    workspace_scene *scene;
+    dock_workspace_scene *scene;
     unsigned level, slot;
     bool edge;
     float cross;
-} workspace_child;
-static void workspace_layer(workspace_scene *, unsigned, float, float);
-static void workspace_region(workspace_scene *s, cui_dock_region region, float width,
-                             float height) {
+} dock_workspace_child;
+static void dock_workspace_preview(dock_workspace_scene *s) {
+    if (!s->state->dragging || !s->state->crossed || s->options.view.disable_preview)
+        return;
+    cui_dock_transfer_request request;
+    if (!dock_workspace_target(s, &request))
+        return;
+    const cui_dock_panel *panel =
+        dock_region_panel(&s->regions[request.destination_region], request.panel);
+    bool permitted = panel && !panel->disabled &&
+                     !cui_dock_view_zoomed(s->regions[request.destination_region].view, NULL);
+    dock_scene permission = {.dock = request.source_model, .options = s->options.view};
+    if (permitted)
+        permitted = dock_allowed(
+            &permission, request.axis == CUI_DOCK_TABS ? CUI_DOCK_MOVED : CUI_DOCK_SPLIT,
+            request.panel, request.destination, SIZE_MAX, request.axis, request.before);
+    if (permitted && s->options.allow_transfer)
+        permitted = s->options.allow_transfer(s->options.transfer_user, &request);
+    cui_rect bounds;
+    if (request.opens_edge) {
+        bounds = cui_bounds(s->ui, s->id);
+        unsigned index = request.destination_region - 1;
+        if (request.destination_region == CUI_DOCK_BOTTOM) {
+            bounds.h = fminf(bounds.h, s->state->snapshot.size[index]);
+            bounds.y += s->options.view.height - bounds.h;
+        } else {
+            bounds.w = fminf(bounds.w, s->state->snapshot.size[index]);
+            if (request.destination_region == CUI_DOCK_RIGHT)
+                bounds.x += s->options.view.width - bounds.w;
+        }
+    } else {
+        bounds = cui_bounds(s->ui,
+                            cui_dock_group_id(cui_dock_region_id(s->id, request.destination_region),
+                                              request.destination));
+        float tab = s->options.view.tab_height > 0 ? s->options.view.tab_height : 36;
+        bounds.y += tab;
+        bounds.h = fmaxf(0, bounds.h - tab);
+        if (request.axis == CUI_DOCK_SPLIT_HORIZONTAL) {
+            bounds.w *= .5f;
+            if (!request.before)
+                bounds.x += bounds.w;
+        }
+        if (request.axis == CUI_DOCK_SPLIT_VERTICAL) {
+            bounds.h *= .5f;
+            if (!request.before)
+                bounds.y += bounds.h;
+        }
+    }
+    cui_color ink = s->options.view.custom_palette
+                        ? (permitted ? s->options.view.drag_palette.accepted
+                                     : s->options.view.drag_palette.rejected)
+                        : (permitted ? s->theme->primary : s->theme->danger);
+    cui_color fill = ink;
+    fill.a = (uint8_t)(ink.a / 5);
+    cui_begin_portal(s->ui, s->id ^ UINT64_C(0x5e928ea123ec931b),
+                     (cui_box){.background = fill, .border = ink, .border_width = 2, .inert = true},
+                     bounds, 93);
+    cui_end_box(s->ui);
+}
+static void dock_workspace_layer(dock_workspace_scene *, unsigned, float, float);
+static void dock_workspace_region(dock_workspace_scene *s, cui_dock_region region, float width,
+                                  float height) {
     if (width <= 0 || height <= 0)
         return;
     const cui_dock_region_content *content = &s->regions[region];
@@ -869,57 +1143,58 @@ static void workspace_region(workspace_scene *s, cui_dock_region region, float w
     if (result.error != CUI_DOCK_OK)
         s->result.error = result.error;
 }
-static void workspace_render_child(cui_context *ui, void *user) {
+static void dock_workspace_render_child(cui_context *ui, void *user) {
     (void)ui;
-    workspace_child *child = user;
+    dock_workspace_child *child = user;
     float span = child->scene->state->slots[child->level][child->slot].size;
     bool horizontal = child->level < 2;
     float width = horizontal ? span : child->cross, height = horizontal ? child->cross : span;
     if (child->edge)
-        workspace_region(child->scene, (cui_dock_region)(child->level + 1), width, height);
+        dock_workspace_region(child->scene, (cui_dock_region)(child->level + 1), width, height);
     else
-        workspace_layer(child->scene, child->level + 1, width, height);
+        dock_workspace_layer(child->scene, child->level + 1, width, height);
 }
-static cui_size model_minimum(const cui_dock *model, cui_dock_node node) {
+static cui_size dock_model_minimum(const cui_dock *model, cui_dock_node node) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
         return (cui_size){0};
     if (info.kind == CUI_DOCK_TABS)
         return (cui_size){(float)info.min_width, (float)info.min_height};
-    cui_size a = model_minimum(model, info.first), b = model_minimum(model, info.second);
+    cui_size a = dock_model_minimum(model, info.first), b = dock_model_minimum(model, info.second);
     return info.kind == CUI_DOCK_SPLIT_HORIZONTAL
                ? (cui_size){a.width + b.width, fmaxf(a.height, b.height)}
                : (cui_size){fmaxf(a.width, b.width), a.height + b.height};
 }
-static float region_minimum(workspace_scene *s, unsigned region, bool horizontal) {
+static float dock_region_minimum(dock_workspace_scene *s, unsigned region, bool horizontal) {
     float value = horizontal ? s->regions[region].minimum.width : s->regions[region].minimum.height;
     cui_size minimum =
-        model_minimum(s->regions[region].model, cui_dock_root(s->regions[region].model));
+        dock_model_minimum(s->regions[region].model, cui_dock_root(s->regions[region].model));
     return fmaxf(value > 0     ? value
                  : region == 0 ? 64
                                : 48,
                  horizontal ? minimum.width : minimum.height);
 }
-static void workspace_layer(workspace_scene *s, unsigned level, float width, float height) {
+static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float width,
+                                 float height) {
     if (level == 3) {
-        workspace_region(s, CUI_DOCK_CENTER, width, height);
+        dock_workspace_region(s, CUI_DOCK_CENTER, width, height);
         return;
     }
     if (!s->state->snapshot.open[level]) {
-        workspace_layer(s, level + 1, width, height);
+        dock_workspace_layer(s, level + 1, width, height);
         return;
     }
     bool horizontal = level < 2;
     float extent = horizontal ? width : height, cross = horizontal ? height : width;
     unsigned edge_slot = level == 0 ? 0 : 1;
-    float edge_min = region_minimum(s, level + 1, horizontal);
-    float remaining_min = region_minimum(s, 0, horizontal);
+    float edge_min = dock_region_minimum(s, level + 1, horizontal);
+    float remaining_min = dock_region_minimum(s, 0, horizontal);
     if (horizontal && s->state->snapshot.open[2])
-        remaining_min = fmaxf(remaining_min, region_minimum(s, 3, true));
+        remaining_min = fmaxf(remaining_min, dock_region_minimum(s, 3, true));
     if (level == 0 && s->state->snapshot.open[1])
-        remaining_min += region_minimum(s, 2, true);
+        remaining_min += dock_region_minimum(s, 2, true);
     bool fit = edge_min + remaining_min <= extent;
-    s->result.fit_minimum &= fit && cross >= region_minimum(s, level + 1, !horizontal);
+    s->result.fit_minimum &= fit && cross >= dock_region_minimum(s, level + 1, !horizontal);
     float edge_size =
         fit ? fminf(extent - remaining_min, fmaxf(edge_min, s->state->snapshot.size[level]))
             : (edge_min + remaining_min > 0 ? extent * edge_min / (edge_min + remaining_min) : 0);
@@ -929,8 +1204,8 @@ static void workspace_layer(workspace_scene *s, unsigned level, float width, flo
         slots[edge_slot].size = edge_size;
         slots[1 - edge_slot].size = extent - edge_size;
     }
-    workspace_child children[2] = {{s, level, 0, edge_slot == 0, cross},
-                                   {s, level, 1, edge_slot == 1, cross}};
+    dock_workspace_child children[2] = {{s, level, 0, edge_slot == 0, cross},
+                                        {s, level, 1, edge_slot == 1, cross}};
     cui_resizable_panel panels[2];
     for (unsigned i = 0; i < 2; ++i) {
         panels[i] = cui_resizable_panel_default(
@@ -941,7 +1216,7 @@ static void workspace_layer(workspace_scene *s, unsigned level, float width, flo
         panels[i].custom_range = true;
         panels[i].minimum = fit ? (i == edge_slot ? edge_min : remaining_min) : 0;
         panels[i].maximum = fmaxf(extent, panels[i].minimum);
-        panels[i].content = workspace_render_child;
+        panels[i].content = dock_workspace_render_child;
         panels[i].content_user = &children[i];
         panels[i].accessibility_label =
             cui_string(i == edge_slot ? "Edge dock" : "Center workspace");
@@ -979,18 +1254,23 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                                                     cui_dock_workspace_options options) {
     cui_dock_workspace_result invalid = {.error = CUI_DOCK_INVALID};
     if (!ui || !id || !theme || !state || !regions || !isfinite(options.view.width) ||
-        options.view.width <= 0 || !isfinite(options.view.height) || options.view.height <= 0)
+        options.view.width <= 0 || !isfinite(options.view.height) || options.view.height <= 0 ||
+        !isfinite(options.view.tab_height) || options.view.tab_height < 0 ||
+        !isfinite(options.view.toolbar_height) || options.view.toolbar_height < 0 ||
+        !isfinite(options.view.key_step) || options.view.key_step < 0 ||
+        !isfinite(options.view.now_seconds))
         return invalid;
     for (unsigned i = 0; i < 4; ++i) {
-        if (i && !state->snapshot.open[i - 1])
-            continue;
         const cui_dock_region_content *region = &regions[i];
+        if (i && !state->snapshot.open[i - 1] && !region->model && !region->view &&
+            !region->panels && !region->panel_count)
+            continue;
         if (!region->model || !region->view || (region->panel_count && !region->panels) ||
             !isfinite(region->minimum.width) || region->minimum.width < 0 ||
             !isfinite(region->minimum.height) || region->minimum.height < 0)
             return invalid;
         for (unsigned j = 0; j < i; ++j)
-            if ((!j || state->snapshot.open[j - 1]) &&
+            if (regions[j].model &&
                 (regions[j].model == region->model || regions[j].view == region->view))
                 return invalid;
         if (region->panel_count > CUI_DOCK_PANEL_LIMIT)
@@ -1004,7 +1284,7 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
         }
         size_t nodes = 0, panels = 0;
         cui_dock_result error =
-            preflight(region->model, cui_dock_root(region->model), &nodes, &panels);
+            dock_preflight(region->model, cui_dock_root(region->model), &nodes, &panels);
         if (error != CUI_DOCK_OK)
             return (cui_dock_workspace_result){.error = error};
         if (nodes > region->view->node_capacity || panels > region->view->panel_capacity)
@@ -1014,16 +1294,97 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
         for (unsigned i = 0; i < 3; ++i)
             cui_resizable_clear(&state->resize[i]);
         state->id = id;
+        state->dragging = false;
+        state->pending_focus = false;
     }
-    workspace_scene scene = {
-        ui, id, theme, state, regions, options, {.error = CUI_DOCK_OK, .fit_minimum = true}};
+    dock_workspace_scene scene = {.ui = ui,
+                                  .id = id,
+                                  .theme = theme,
+                                  .state = state,
+                                  .regions = regions,
+                                  .options = options,
+                                  .result = {.error = CUI_DOCK_OK, .fit_minimum = true}};
+    if (!cui_begin_focus_scope(ui, id, false))
+        return invalid;
+    dock_workspace_events(&scene);
     cui_begin_box(ui, id,
                   (cui_box){.width = options.view.width,
                             .height = options.view.height,
                             .clip = true,
                             .background = theme->background});
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Dock area"), options.view.disabled, false, 0);
-    workspace_layer(&scene, 0, options.view.width, options.view.height);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.pointer_activatable = true, .no_focus = true});
+    dock_workspace_layer(&scene, 0, options.view.width, options.view.height);
+    dock_workspace_preview(&scene);
     cui_end_box(ui);
+    if (state->pending_focus) {
+        cui_id focus =
+            cui_dock_tab_id(cui_dock_region_id(id, state->focus_region), state->focus_key);
+        const cui_dock_panel *focused_panel =
+            dock_region_panel(&regions[state->focus_region], state->focus_key);
+        if (options.view.focus_content && focused_panel && focused_panel->focus_target)
+            focus = focused_panel->focus_target;
+        cui_focus(ui, focus);
+        state->pending_focus = false;
+    }
+    if (scene.pending_transfer &&
+        (scene.result.error != CUI_DOCK_OK || cui_last_error(ui) != CUI_OK)) {
+        dock_workspace_restore_active(&scene);
+        if (scene.result.error == CUI_DOCK_OK)
+            scene.result.error = CUI_DOCK_INVALID;
+        scene.pending_transfer = false;
+    }
+    if (scene.pending_transfer) {
+        cui_dock_transfer_request *request = &scene.transfer;
+        const cui_dock_region_content *target = &regions[request->destination_region];
+        const cui_dock_panel *panel = dock_region_panel(target, request->panel);
+        size_t nodes = 0, panels = 0;
+        cui_dock_result error =
+            dock_preflight(target->model, cui_dock_root(target->model), &nodes, &panels);
+        if (!panel)
+            error = CUI_DOCK_NOT_FOUND;
+        else if (panel->disabled || cui_dock_view_zoomed(target->view, NULL))
+            error = CUI_DOCK_INVALID;
+        else if (nodes + (request->axis == CUI_DOCK_TABS ? 0 : 2) > target->view->node_capacity ||
+                 panels + 1 > target->view->panel_capacity)
+            error = CUI_DOCK_CAPACITY;
+        dock_scene permission = {.dock = request->source_model, .options = options.view};
+        if (error == CUI_DOCK_OK &&
+            !dock_allowed(
+                &permission, request->axis == CUI_DOCK_TABS ? CUI_DOCK_MOVED : CUI_DOCK_SPLIT,
+                request->panel, request->destination, SIZE_MAX, request->axis, request->before))
+            scene.result.denied = true;
+        if (!scene.result.denied && error == CUI_DOCK_OK && options.allow_transfer &&
+            !options.allow_transfer(options.transfer_user, request))
+            scene.result.denied = true;
+        if (!scene.result.denied && error == CUI_DOCK_OK) {
+            cui_dock_node destination;
+            error = cui_dock_transfer(request->source_model, request->panel,
+                                      request->destination_model, request->destination, SIZE_MAX,
+                                      request->axis, .5, request->before, &destination);
+            if (error == CUI_DOCK_OK) {
+                scene.result.transferred = true;
+                scene.result.opened = request->opens_edge;
+                scene.result.transferred_panel = request->panel;
+                scene.result.source_region = request->source_region;
+                scene.result.destination_region = request->destination_region;
+                request->destination = destination;
+                if (request->opens_edge)
+                    state->snapshot.open[request->destination_region - 1] = true;
+                state->pending_focus = true;
+                state->focus_region = request->destination_region;
+                state->focus_key = request->panel;
+                if (options.on_transfer)
+                    options.on_transfer(options.transfer_user, request);
+                cui_invalidate(ui);
+            }
+        }
+        if (error != CUI_DOCK_OK)
+            scene.result.error = error;
+        if (error != CUI_DOCK_OK || scene.result.denied)
+            dock_workspace_restore_active(&scene);
+    }
+    cui_end_focus_scope(ui);
     return scene.result;
 }

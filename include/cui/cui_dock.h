@@ -54,6 +54,11 @@ cui_dock_result cui_dock_move(cui_dock *dock, uint64_t panel, cui_dock_node dest
 cui_dock_result cui_dock_move_split(cui_dock *, uint64_t panel, cui_dock_node destination,
                                     cui_dock_kind axis, double ratio, bool before,
                                     cui_dock_node *new_tab);
+/* Atomic two-model transfer. TABS inserts at index; split axes create a new leaf.
+ * Both models and output are unchanged on rejection. Models must be distinct. */
+cui_dock_result cui_dock_transfer(cui_dock *source, uint64_t panel, cui_dock *destination,
+                                  cui_dock_node target, size_t index, cui_dock_kind axis,
+                                  double ratio, bool before, cui_dock_node *new_tab);
 cui_dock_result cui_dock_reorder(cui_dock *dock, uint64_t panel, size_t index);
 cui_dock_result cui_dock_remove(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_activate(cui_dock *dock, uint64_t panel);
@@ -170,14 +175,30 @@ typedef struct {
     float size[3]; /* preferred logical pixels, retained when closed/constrained */
 } cui_dock_workspace_snapshot;
 typedef struct {
+    cui_dock_region source_region, destination_region;
+    uint64_t panel;
+    cui_dock *source_model, *destination_model;
+    cui_dock_node source, destination;
+    cui_dock_kind axis;
+    bool before, opens_edge;
+} cui_dock_transfer_request;
+typedef struct {
     cui_dock_view_options view;
     void (*on_resize)(void *, cui_dock_region, float size);
     void *resize_user;
+    bool disable_cross_region, disable_edge_opening;
+    /* Pure policy and post-commit notification; model/registry storage remains host-owned. */
+    bool (*allow_transfer)(void *, const cui_dock_transfer_request *);
+    void (*on_transfer)(void *, const cui_dock_transfer_request *);
+    void *transfer_user;
 } cui_dock_workspace_options;
 typedef struct {
     cui_dock_result error;
     bool fit_minimum, resized;
     cui_dock_view_result regions[4];
+    bool transferred, opened, denied;
+    uint64_t transferred_panel;
+    cui_dock_region source_region, destination_region;
 } cui_dock_workspace_result;
 cui_dock_workspace *cui_dock_workspace_create(void);
 void cui_dock_workspace_destroy(cui_dock_workspace *);
@@ -186,7 +207,7 @@ bool cui_dock_workspace_save(const cui_dock_workspace *, cui_dock_workspace_snap
 bool cui_dock_workspace_restore(cui_dock_workspace *, const cui_dock_workspace_snapshot *);
 cui_id cui_dock_region_id(cui_id workspace, cui_dock_region);
 cui_id cui_dock_edge_resize_id(cui_id workspace, cui_dock_region);
-/* regions are CENTER, LEFT, RIGHT, BOTTOM; open regions require distinct models/views.
+/* regions are CENTER, LEFT, RIGHT, BOTTOM; configured regions require distinct models/views.
  * Model persistence remains separate from the portable edge-size/open snapshot. */
 cui_dock_workspace_result cui_dock_workspace_render(cui_context *, cui_id, const cui_theme *,
                                                     cui_dock_workspace *,

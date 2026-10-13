@@ -359,7 +359,45 @@ static void test_move_split_transaction(void) {
     assert(cui_dock_node_get(d, moved, &info)); /* Rejected transaction preserves generations. */
     cui_dock_destroy(d);
 }
+static void test_two_model_transfer(void) {
+    cui_dock *a = make(),
+             *b = cui_dock_create((cui_dock_config){.node_capacity = 3, .panel_capacity = 2});
+    assert(b);
+    cui_dock_node ar = cui_dock_root(a), br = cui_dock_root(b), second, out = 999;
+    assert(cui_dock_insert(a, ar, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(a, ar, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_insert(b, br, 2, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(b, br, CUI_DOCK_SPLIT_HORIZONTAL, .5, 3, false, &second) == CUI_DOCK_OK);
+    char sa[8192], sb[8192], after[8192];
+    serialize(a, sa, sizeof sa);
+    serialize(b, sb, sizeof sb);
+    assert(cui_dock_transfer(a, 1, b, br, SIZE_MAX, CUI_DOCK_TABS, .5, false, &out) ==
+           CUI_DOCK_CAPACITY);
+    serialize(a, after, sizeof after);
+    assert(!strcmp(sa, after));
+    serialize(b, after, sizeof after);
+    assert(!strcmp(sb, after) && out == 999);
+    assert(cui_dock_node_get(a, ar, &(cui_dock_node_info){0}));
+    assert(cui_dock_remove(b, 3) == CUI_DOCK_OK);
+    assert(cui_dock_transfer(a, 1, b, br, SIZE_MAX, CUI_DOCK_SPLIT_VERTICAL, .5, true, &out) ==
+           CUI_DOCK_OK);
+    assert(!cui_dock_panel_find(a, 1, NULL, NULL) && cui_dock_panel_find(b, 1, NULL, NULL));
+    assert(cui_dock_insert(a, ar, 1, SIZE_MAX) == CUI_DOCK_OK);
+    serialize(a, sa, sizeof sa);
+    serialize(b, sb, sizeof sb);
+    assert(cui_dock_transfer(a, 1, b, out, SIZE_MAX, CUI_DOCK_TABS, .5, false, NULL) ==
+           CUI_DOCK_DUPLICATE_PANEL);
+    serialize(a, after, sizeof after);
+    assert(!strcmp(sa, after));
+    serialize(b, after, sizeof after);
+    assert(!strcmp(sb, after));
+    assert(cui_dock_transfer(a, 0, a, ar, SIZE_MAX, CUI_DOCK_TABS, .5, false, NULL) ==
+           CUI_DOCK_INVALID);
+    cui_dock_destroy(a);
+    cui_dock_destroy(b);
+}
 int main(void) {
+    test_two_model_transfer();
     test_move_split_transaction();
     test_split_layout();
     test_nested_geometry_move();

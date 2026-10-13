@@ -332,7 +332,53 @@ static void folding(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void narrow_editor_clipping(void) {
+    char buffer[1024];
+    memset(buffer, 'W', sizeof buffer - 1);
+    buffer[sizeof buffer - 1] = 0;
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    cui_textarea_line lines[8];
+    cui_editor_state state;
+    assert(cui_editor_state_init(&state, edit, lines, 8));
+    cui_context *ui = cui_create((cui_config){.width = 300, .height = 300});
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 252;
+    o.textarea.height = 100;
+    cui_draw_list commands;
+    for (unsigned frame = 0; frame < 3; ++frame) {
+        assert(draw(ui, &state, o, &commands).error == CUI_TEXTAREA_OK);
+        cui_rect outer = cui_bounds(ui, 10);
+        assert(outer.w == 252 && state.view.viewport.w < 252 && state.view.maximum_x > 252);
+        cui_rect clips[16];
+        size_t depth = 0;
+        bool text = false;
+        for (size_t i = 0; i < commands.count; ++i) {
+            cui_draw_command c = commands.commands[i];
+            if (c.type == CUI_DRAW_CLIP_PUSH) {
+                assert(depth < 16);
+                clips[depth++] = c.bounds;
+            } else if (c.type == CUI_DRAW_CLIP_POP) {
+                assert(depth);
+                --depth;
+            } else if (c.type == CUI_DRAW_TEXT) {
+                float left = c.bounds.x, right = c.bounds.x + c.bounds.w;
+                for (size_t k = 0; k < depth; ++k) {
+                    left = fmaxf(left, clips[k].x);
+                    right = fminf(right, clips[k].x + clips[k].w);
+                }
+                assert(right <= outer.x + 252 && left >= outer.x);
+                if (c.text.length > 100)
+                    text = true;
+            }
+        }
+        assert(text && depth == 0);
+    }
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    narrow_editor_clipping();
     folding();
     find_panel();
     base_and_utf8();

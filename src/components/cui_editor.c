@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_editor.h"
 #include "cui/cui_components.h"
+#include "cui/cui_editor.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 #include <stdio.h>
@@ -118,17 +118,20 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         background.a = (uint8_t)(background.a * .2f);
     }
     cui_color foreground = options.disabled ? theme->muted : theme->text;
-    cui_begin_box(ui, id,
-                  (cui_box){.width = options.width ? options.width : 280,
-                            .height = height,
-                            .fixed_height = true,
-                            .clip = true,
-                            .radius = options.no_appearance ? 0 : theme->radius,
-                            .background = options.no_appearance ? (cui_color){0} : background,
-                            .border = options.invalid ? theme->danger
-                                      : focused       ? theme->focus
-                                                      : theme->input,
-                            .border_width = border});
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = options.width ? options.width : 280,
+                  .fixed_width = options.width >= 0,
+                  .max_width = options.width >= 0 ? (options.width ? options.width : 280) : 0,
+                  .height = height,
+                  .fixed_height = true,
+                  .clip = true,
+                  .radius = options.no_appearance ? 0 : theme->radius,
+                  .background = options.no_appearance ? (cui_color){0} : background,
+                  .border = options.invalid ? theme->danger
+                            : focused       ? theme->focus
+                                            : theme->input,
+                  .border_width = border});
     cui_begin_box(ui, cui_editor_child(id, 0, 1), (cui_box){.height = py, .fixed_height = true});
     cui_end_box(ui);
     cui_begin_box(
@@ -197,7 +200,9 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         cui_end_box(ui);
     }
     cui_begin_box(ui, cui_textarea_viewport_id(id),
-                  (cui_box){.width = -1,
+                  (cui_box){.width = width,
+                            .fixed_width = true,
+                            .max_width = width,
                             .height = state->viewport.h,
                             .fixed_height = true,
                             .clip = true,

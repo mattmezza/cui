@@ -98,7 +98,10 @@ static void cui_carousel_pointer_events(cui_context *ui, cui_id id, cui_carousel
                 continue;
             bool handled;
             if (e->scroll_precise)
-                handled = cui_carousel_scroll(s, e->dx, e->dy, e->scroll_phase, o.now_seconds);
+                handled =
+                    e->pointer_type == CUI_POINTER_TOUCH
+                        ? cui_carousel_touch_scroll(s, e->dx, e->dy, e->scroll_phase, o.now_seconds)
+                        : cui_carousel_scroll(s, e->dx, e->dy, e->scroll_phase, o.now_seconds);
             else {
                 float delta = fabsf(e->dx) > fabsf(e->dy) ? e->dx : e->dy;
                 handled = cui_carousel_wheel(s, delta, o.now_seconds);

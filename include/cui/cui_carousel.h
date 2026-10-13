@@ -24,7 +24,7 @@ typedef struct {
     size_t gesture_index;
     bool dragging, axis_locked, suppress_click, scrolling, scroll_deferred, wheel_owned,
         scroll_seen;
-    bool focus_ring_suppressed;
+    bool focus_ring_suppressed, scroll_contact;
     cui_orientation scroll_axis;
     double last_time, last_scroll;
     bool clock_ready;
@@ -57,6 +57,10 @@ void cui_carousel_cancel(cui_carousel_state *);
 bool cui_carousel_wheel(cui_carousel_state *, float delta, double now_seconds);
 /* Precise deltas keep a dominant-axis lock until end/cancel or 28ms silence. */
 bool cui_carousel_scroll(cui_carousel_state *, float dx, float dy, cui_scroll_phase, double now);
+/* Captured touch deltas retain their axis/offset until explicit end/cancel;
+ * idle time does not terminate a contact. Host must deliver its terminal phase. */
+bool cui_carousel_touch_scroll(cui_carousel_state *, float dx, float dy, cui_scroll_phase,
+                               double now);
 /* Spring response .28s, damping .85, settle epsilon .5px. Returns pending motion. */
 bool cui_carousel_tick(cui_carousel_state *, double now_seconds, bool reduced_motion);
 /* One periodic placement per logical item, never duplicate callbacks/controls. */

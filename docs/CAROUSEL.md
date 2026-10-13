@@ -122,3 +122,5 @@ number. `cui_carousel_pagination_begin/end` supplies the source named Group and 
 8px-spaced, centered row, with an optional custom box. All callback arrays,
 strings and Theme pointers are borrowed for their call. Wrapper IDs must be
 unique and differ from IDs submitted by callback-owned controls.
+
+Captured touch scrolling uses `cui_carousel_touch_scroll`: precise pixel deltas retain their dominant axis and live offset until an explicit ended/cancelled phase. Pauses between finger movements do not trigger the 28 ms wheel-burst timeout. Styled Carousel selects this path for Core events whose pointer type is touch. Hosts using the headless model must deliver a terminal phase or call `cui_carousel_cancel` on capture/focus loss. Mouse wheels and ordinary precise trackpad bursts retain their documented timing policy.

@@ -778,9 +778,46 @@ static void test_widget(void) {
     }
 }
 #endif
+static void test_contact_lifecycle(void) {
+    cui_carousel_state s;
+    cui_carousel_geometry workspace[8], geometry[] = {{1, 0, 100}, {2, 100, 100}, {3, 200, 100}};
+    setup(&s, workspace, 3);
+    assert(cui_carousel_set_geometry(&s, geometry, 3, 100));
+    for (unsigned i = 0; i < 4; ++i) {
+        double now = i * .05;
+        assert(cui_carousel_touch_scroll(
+            &s, -16.25f, 0, i ? CUI_SCROLL_PHASE_MOVED : CUI_SCROLL_PHASE_STARTED, now));
+        cui_carousel_tick(&s, now + .049, true);
+        assert(s.scrolling && s.scroll_contact && s.selected == 0 && changes == 0);
+        near(s.offset, -16.25f * (i + 1));
+    }
+    assert(cui_carousel_touch_scroll(&s, 0, 0, CUI_SCROLL_PHASE_ENDED, .3));
+    assert(!s.scrolling && !s.scroll_contact && s.selected == 1 && changes == 1);
+    cui_carousel_tick(&s, .3, true);
+    near(s.offset, -100);
+    assert(cui_carousel_touch_scroll(&s, 20, 0, CUI_SCROLL_PHASE_STARTED, 1));
+    cui_carousel_tick(&s, 2, true);
+    near(s.offset, -80);
+    assert(cui_carousel_touch_scroll(&s, 0, 0, CUI_SCROLL_PHASE_CANCELLED, 3));
+    near(s.offset, -100);
+    assert(s.selected == 1 && changes == 1 && !s.scroll_contact);
+    assert(!cui_carousel_touch_scroll(&s, 0, 20, CUI_SCROLL_PHASE_STARTED, 4));
+    cui_carousel_tick(&s, 5, true);
+    assert(!cui_carousel_touch_scroll(&s, -65, 0, CUI_SCROLL_PHASE_MOVED, 6));
+    assert(!cui_carousel_touch_scroll(&s, 0, 0, CUI_SCROLL_PHASE_ENDED, 7));
+    assert(!s.scroll_contact && s.scroll_axis == CUI_ORIENTATION_UNSPECIFIED);
+    assert(cui_carousel_touch_scroll(&s, -20, 0, CUI_SCROLL_PHASE_STARTED, 8));
+    cui_carousel_cancel(&s);
+    assert(!s.scroll_contact && !s.scrolling);
+    /* Mouse/trackpad burst timeout remains distinct from a live contact. */
+    assert(cui_carousel_scroll(&s, -20, 0, CUI_SCROLL_PHASE_STARTED, 9));
+    cui_carousel_tick(&s, 9.05, true);
+    assert(!s.scrolling && !s.scroll_contact);
+}
 int main(void) {
     test_model();
     test_gestures();
+    test_contact_lifecycle();
     test_duplicate_snaps();
     test_programmatic_cancel();
 #ifndef CUI_CAROUSEL_BASE_ONLY

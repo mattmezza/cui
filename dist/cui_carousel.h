@@ -25,7 +25,7 @@ typedef struct {
     size_t gesture_index;
     bool dragging, axis_locked, suppress_click, scrolling, scroll_deferred, wheel_owned,
         scroll_seen;
-    bool focus_ring_suppressed;
+    bool focus_ring_suppressed, scroll_contact;
     cui_orientation scroll_axis;
     double last_time, last_scroll;
     bool clock_ready;
@@ -58,6 +58,10 @@ void cui_carousel_cancel(cui_carousel_state *);
 bool cui_carousel_wheel(cui_carousel_state *, float delta, double now_seconds);
 /* Precise deltas keep a dominant-axis lock until end/cancel or 28ms silence. */
 bool cui_carousel_scroll(cui_carousel_state *, float dx, float dy, cui_scroll_phase, double now);
+/* Captured touch deltas retain their axis/offset until explicit end/cancel;
+ * idle time does not terminate a contact. Host must deliver its terminal phase. */
+bool cui_carousel_touch_scroll(cui_carousel_state *, float dx, float dy, cui_scroll_phase,
+                               double now);
 /* Spring response .28s, damping .85, settle epsilon .5px. Returns pending motion. */
 bool cui_carousel_tick(cui_carousel_state *, double now_seconds, bool reduced_motion);
 /* One periodic placement per logical item, never duplicate callbacks/controls. */
@@ -140,7 +144,7 @@ static void cui_carousel_stop(cui_carousel_state *s) {
     if (!scrolling && !s->scroll_deferred)
         s->scroll_seen = false;
     s->wheel_owned = false;
-    s->dragging = s->axis_locked = s->scrolling = s->suppress_click = false;
+    s->dragging = s->axis_locked = s->scrolling = s->suppress_click = s->scroll_contact = false;
     s->gesture_delta = 0;
 }
 bool cui_carousel_state_init(cui_carousel_state *s, cui_carousel_geometry *items, size_t capacity,
@@ -406,12 +410,12 @@ bool cui_carousel_wheel(cui_carousel_state *s, float delta, double now) {
     s->scroll_seen = true;
     return s->wheel_owned;
 }
-bool cui_carousel_scroll(cui_carousel_state *s, float dx, float dy, cui_scroll_phase phase,
-                         double now) {
+static bool cui_carousel_scroll_impl(cui_carousel_state *s, float dx, float dy,
+                                     cui_scroll_phase phase, double now, bool contact) {
     if (!s || !isfinite(dx) || !isfinite(dy) || !isfinite(now) || phase < CUI_SCROLL_PHASE_NONE ||
         phase > CUI_SCROLL_PHASE_CANCELLED || s->count < 2 || !s->geometry_ready)
         return false;
-    if (s->scroll_seen && now - s->last_scroll >= .028) {
+    if (!contact && s->scroll_seen && now - s->last_scroll >= .028) {
         if (s->scrolling) {
             s->dragging = true;
             cui_carousel_finish_drag(s);
@@ -439,10 +443,12 @@ bool cui_carousel_scroll(cui_carousel_state *s, float dx, float dy, cui_scroll_p
                 cui_carousel_finish_drag(s);
             }
         }
+        s->scroll_contact = false;
         s->scroll_deferred = false;
         s->scroll_axis = CUI_ORIENTATION_UNSPECIFIED;
         return owned;
     }
+    s->scroll_contact = contact;
     if (s->scroll_deferred)
         return false;
     if (s->scroll_axis == CUI_ORIENTATION_UNSPECIFIED && (dx != 0 || dy != 0))
@@ -459,6 +465,7 @@ bool cui_carousel_scroll(cui_carousel_state *s, float dx, float dy, cui_scroll_p
         }
         cui_carousel_stop(s);
         s->scrolling = true;
+        s->scroll_contact = contact;
         s->scroll_seen = true;
         s->gesture_start = s->offset;
         s->gesture_index = s->selected;
@@ -479,18 +486,26 @@ bool cui_carousel_scroll(cui_carousel_state *s, float dx, float dy, cui_scroll_p
     }
     return true;
 }
+bool cui_carousel_scroll(cui_carousel_state *s, float dx, float dy, cui_scroll_phase phase,
+                         double now) {
+    return cui_carousel_scroll_impl(s, dx, dy, phase, now, false);
+}
+bool cui_carousel_touch_scroll(cui_carousel_state *s, float dx, float dy, cui_scroll_phase phase,
+                               double now) {
+    return cui_carousel_scroll_impl(s, dx, dy, phase, now, true);
+}
 bool cui_carousel_tick(cui_carousel_state *s, double now, bool reduced) {
     if (!s || !isfinite(now))
         return false;
     double dt = s->clock_ready ? fmax(0, now - s->last_time) : 0;
     s->last_time = s->clock_ready ? fmax(s->last_time, now) : now;
     s->clock_ready = true;
-    if (s->scrolling && now - s->last_scroll >= .028) {
+    if (!s->scroll_contact && s->scrolling && now - s->last_scroll >= .028) {
         s->dragging = true;
         cui_carousel_finish_drag(s);
         s->scroll_axis = CUI_ORIENTATION_UNSPECIFIED;
     }
-    if (s->scroll_deferred && now - s->last_scroll >= .028)
+    if (!s->scroll_contact && s->scroll_deferred && now - s->last_scroll >= .028)
         s->scroll_deferred = false;
     if (s->dragging)
         return false;
@@ -647,7 +662,10 @@ static void cui_carousel_pointer_events(cui_context *ui, cui_id id, cui_carousel
                 continue;
             bool handled;
             if (e->scroll_precise)
-                handled = cui_carousel_scroll(s, e->dx, e->dy, e->scroll_phase, o.now_seconds);
+                handled =
+                    e->pointer_type == CUI_POINTER_TOUCH
+                        ? cui_carousel_touch_scroll(s, e->dx, e->dy, e->scroll_phase, o.now_seconds)
+                        : cui_carousel_scroll(s, e->dx, e->dy, e->scroll_phase, o.now_seconds);
             else {
                 float delta = fabsf(e->dx) > fabsf(e->dy) ? e->dx : e->dy;
                 handled = cui_carousel_wheel(s, delta, o.now_seconds);

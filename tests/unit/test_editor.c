@@ -923,7 +923,180 @@ static void search_activation_and_paint(void) {
     cui_edit_destroy(q);
     cui_edit_destroy(edit);
 }
+static void multiple_cursor_adapter(void) {
+    char buffer[128] = "abcd\nx\nabcd";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 4});
+    cui_edit_selection live[8];
+    cui_edit_selection_snapshot history[5];
+    assert(edit && cui_edit_attach_selections(edit, live, 8, history, 5) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 3, 3) == CUI_EDIT_OK);
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    assert(cui_editor_state_init(&editor, edit, lines, 32));
+    cui_editor_cursor_anchor anchors[8];
+    assert(!cui_editor_multicursor_init(&editor, anchors, 7));
+    assert(cui_editor_multicursor_init(&editor, anchors, 8));
+    cui_context *ui =
+        cui_create((cui_config){.width = 400, .height = 300, .measure_styled = search_measure});
+    assert(ui);
+    cui_focus(ui, 10);
+    cui_set_reduced_motion(ui, true);
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 240;
+    o.textarea.height = 180;
+    o.textarea.text_style.family = 7;
+    cui_draw_list commands;
+    draw(ui, &editor, o, &commands);
+    for (size_t i = 0; i < 2; ++i) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                               .key = CUI_KEY_DOWN,
+                                               .modifiers = CUI_MOD_SHIFT | CUI_MOD_ALT}));
+        cui_textarea_result r = draw(ui, &editor, o, &commands);
+        assert(r.selection_changed && r.edit_error == CUI_EDIT_OK);
+    }
+    size_t count;
+    const cui_edit_selection *c = cui_edit_get_selections(edit, &count);
+    assert(count == 3 && c[0].cursor == 3 && c[1].cursor == 6 && c[2].cursor == 10);
+    assert(editor.cursor_anchors[2].valid && editor.cursor_anchors[2].x == 27);
+    cui_theme theme = cui_theme_light();
+    size_t carets = 0;
+    for (size_t i = 0; i < commands.count; ++i) {
+        cui_draw_command cmd = commands.commands[i];
+        if (cmd.type == CUI_DRAW_RECT && cmd.bounds.w == 1 && cmd.color.r == theme.caret.r &&
+            cmd.color.g == theme.caret.g && cmd.color.b == theme.caret.b)
+            ++carets;
+    }
+    assert(carets == 3);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "!"}));
+    assert(draw(ui, &editor, o, &commands).changed);
+    assert(!strcmp(buffer, "abc!d\nx!\nabc!d"));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_Z, .modifiers = CUI_MOD_CTRL}));
+    assert(draw(ui, &editor, o, &commands).changed && !strcmp(buffer, "abcd\nx\nabcd"));
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 3 && c[0].cursor == 3 && c[1].cursor == 6 && c[2].cursor == 10);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT, .modifiers = CUI_MOD_SHIFT}));
+    assert(draw(ui, &editor, o, &commands).selection_changed);
+    size_t paints = 0;
+    for (size_t i = 0; i < commands.count; ++i) {
+        cui_draw_command cmd = commands.commands[i];
+        if (cmd.type == CUI_DRAW_RECT && cmd.color.r == theme.selection.r &&
+            cmd.color.g == theme.selection.g && cmd.color.b == theme.selection.b)
+            ++paints;
+    }
+    assert(paints == 3);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DELETE}));
+    assert(draw(ui, &editor, o, &commands).changed && !strcmp(buffer, "abc\nxabc"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "abcd\nx\nabcd"));
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 3 && c[0].anchor == 3 && c[0].cursor == 4 && c[1].anchor == 6 &&
+           c[1].cursor == 7);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+    assert(draw(ui, &editor, o, &commands).selection_changed);
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 1 && c[0].anchor == 3 && c[0].cursor == 4);
+    cui_edit_selection add = {.id = 100, .anchor = 6, .cursor = 6};
+    assert(cui_edit_add_cursors(edit, &add, 1) == CUI_EDIT_OK);
+    draw(ui, &editor, o, &commands);
+    size_t row = cui_textarea_row_for_offset(&editor.view, 6, false);
+    assert(row == 1 && cui_textarea_row_x(ui, edit, &editor.view, row, 6) == 9);
+    assert(cui_textarea_row_offset(ui, edit, &editor.view, row, 27) == 6);
+    assert(isnan(cui_textarea_row_x(ui, edit, &editor.view, 99, 6)));
+    assert(cui_textarea_row_offset(ui, edit, &editor.view, 99, 27) == SIZE_MAX);
+    assert(cui_edit_select(edit, 3, 3) == CUI_EDIT_OK);
+    draw(ui, &editor, o, &commands);
+    float px = editor.view.viewport.x + 9,
+          py = editor.view.viewport.y + editor.view.line_height * 1.5f;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = px,
+                                           .y = py,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .modifiers = CUI_MOD_ALT}));
+    assert(draw(ui, &editor, o, &commands).selection_changed);
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 2 && c[0].cursor == 3 && c[1].cursor == 6);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = px,
+                                           .y = py,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    draw(ui, &editor, o, &commands);
+    draw(ui, &editor, o, &commands);
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 2 && c[0].cursor == 3 && c[1].cursor == 6);
+    o.textarea.readonly = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "X"}));
+    assert(!draw(ui, &editor, o, &commands).changed && !strcmp(buffer, "abcd\nx\nabcd"));
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 2);
+    draw(ui, &editor, o, &commands);
+    c = cui_edit_get_selections(edit, &count);
+    assert(count == 2);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
+static void multicursor_visual_rows(void) {
+    char buffer[128] = "abcdefghijklmnop";
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    cui_edit_selection live[4];
+    assert(edit && cui_edit_attach_selections(edit, live, 4, NULL, 0) == CUI_EDIT_OK);
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_cursor_anchor anchors[4];
+    assert(cui_editor_state_init(&editor, edit, lines, 32));
+    assert(cui_editor_multicursor_init(&editor, anchors, 4));
+    cui_context *ui =
+        cui_create((cui_config){.width = 400, .height = 300, .measure_styled = search_measure});
+    cui_focus(ui, 10);
+    cui_editor_options o = cui_editor_default();
+    o.line_numbers = false;
+    o.textarea.width = 90;
+    o.textarea.height = 100;
+    o.textarea.no_wrap = false;
+    o.textarea.text_style.family = 7;
+    cui_draw_list commands;
+    draw(ui, &editor, o, &commands);
+    draw(ui, &editor, o, &commands);
+    assert(editor.view.count > 1);
+    size_t boundary = lines[0].end;
+    assert(cui_edit_select(edit, boundary, boundary) == CUI_EDIT_OK);
+    draw(ui, &editor, o, &commands);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_LEFT}));
+    draw(ui, &editor, o, &commands);
+    assert(live[0].cursor == boundary && anchors[0].upstream);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_RIGHT}));
+    draw(ui, &editor, o, &commands);
+    assert(live[0].cursor == boundary && !anchors[0].upstream);
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_text(edit).length,
+                                  cui_string("aa\nbb\ncc\ndd\nee")) == CUI_EDIT_OK);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    cui_editor_fold fold = {0, 3, true};
+    assert(cui_editor_set_folds(&editor, &fold, 1));
+    o.textarea.no_wrap = true;
+    draw(ui, &editor, o, &commands);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                           .key = CUI_KEY_DOWN,
+                                           .modifiers = CUI_MOD_CTRL | CUI_MOD_ALT}));
+    draw(ui, &editor, o, &commands);
+    size_t count;
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2 && live[1].cursor == 10 && fold.collapsed);
+    cui_edit_selection hidden = {99, 7, 7};
+    assert(cui_edit_add_cursors(edit, &hidden, 1) == CUI_EDIT_OK);
+    draw(ui, &editor, o, &commands);
+    assert(!fold.collapsed);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    multicursor_visual_rows();
+    multiple_cursor_adapter();
     search_activation_and_paint();
     replacement_panel();
     retained_matcher();

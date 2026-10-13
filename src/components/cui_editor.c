@@ -8,6 +8,12 @@ static cui_id cui_editor_child(cui_id id, size_t row, unsigned part) {
     return id ^ UINT64_C(0x7cf5d0e25db29861) ^
            ((uint64_t)(row + 1) * UINT64_C(0x9e3779b97f4a7c15)) ^ part;
 }
+static cui_id cui_editor_cursor_child(cui_id id, size_t row, uint64_t cursor, unsigned part) {
+    uint64_t mixed = cursor + UINT64_C(0xd6e8feb86659fd93);
+    mixed = (mixed ^ (mixed >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    mixed = (mixed ^ (mixed >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return cui_editor_child(id, row, part) ^ mixed ^ (mixed >> 31);
+}
 static size_t cui_editor_visible_rows(cui_textarea_options options, size_t count) {
     if (!options.auto_grow)
         return options.rows ? options.rows : 1;
@@ -332,8 +338,13 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                             .fixed_height = true});
     cui_str text = cui_edit_get_text(edit);
     cui_edit_state selection = cui_edit_get_state(edit);
-    size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
-    size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    size_t selection_count;
+    const cui_edit_selection *selections = cui_edit_get_selections(edit, &selection_count);
+    cui_edit_selection primary = {0, selection.anchor, selection.cursor};
+    if (!selections) {
+        selections = &primary;
+        selection_count = 1;
+    }
     size_t begin = (size_t)floorf(state->scroll_y / metrics.line_height);
     if (begin >= state->count)
         begin = state->count - 1;
@@ -383,15 +394,19 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                         color.g = (uint8_t)((color.g + gray) / 2);
                         color.b = (uint8_t)((color.b + gray) / 2);
                     }
-                    cui_begin_absolute_box(
-                        ui, cui_editor_child(cui_editor_child(id, row, 70), range.start, 72),
-                        (cui_box){.background = color},
-                        (cui_rect){left, 0, right - left, metrics.line_height});
+                    cui_begin_absolute_box(ui, cui_editor_cursor_child(id, row, range.start, 72),
+                                           (cui_box){.background = color},
+                                           (cui_rect){left, 0, right - left, metrics.line_height});
                     cui_end_box(ui);
                 }
             }
         }
-        if (first < line.next && last > line.start) {
+        for (size_t cursor = 0; cursor < selection_count; ++cursor) {
+            cui_edit_selection selected = selections[cursor];
+            size_t first = selected.anchor < selected.cursor ? selected.anchor : selected.cursor;
+            size_t last = selected.anchor > selected.cursor ? selected.anchor : selected.cursor;
+            if (first >= line.next || last <= line.start)
+                continue;
             float left =
                 cui_editor_prefix(ui, text, line, first, metrics.font_size, options.text_style);
             float right =
@@ -401,7 +416,7 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                     cui_measure_text_ex(ui, cui_string(" "), metrics.font_size, options.text_style)
                         .width;
             if (right > left) {
-                cui_begin_absolute_box(ui, cui_editor_child(id, row, 71),
+                cui_begin_absolute_box(ui, cui_editor_cursor_child(id, row, selected.id, 73),
                                        (cui_box){.background = theme->selection},
                                        (cui_rect){left, 0, right - left, metrics.line_height});
                 cui_end_box(ui);
@@ -433,14 +448,22 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                 start = next;
             }
         }
-        if (caret && row == state->caret_line) {
-            float x = cui_editor_prefix(ui, text, line, selection.cursor, metrics.font_size,
-                                        options.text_style);
-            cui_begin_absolute_box(ui, cui_editor_child(id, row, 11),
-                                   (cui_box){.background = theme->caret},
-                                   (cui_rect){x, 0, 1, metrics.line_height});
-            cui_end_box(ui);
-        }
+        if (caret)
+            for (size_t cursor = 0; cursor < selection_count; ++cursor) {
+                bool upstream = cursor == 0 ? state->upstream_affinity : false;
+                for (size_t anchor = 0; anchor < editor->cursor_anchor_count; ++anchor)
+                    if (editor->cursor_anchors[anchor].id == selections[cursor].id)
+                        upstream = editor->cursor_anchors[anchor].upstream;
+                if (row != cui_textarea_row_for_offset(state, selections[cursor].cursor, upstream))
+                    continue;
+                float x = cui_editor_prefix(ui, text, line, selections[cursor].cursor,
+                                            metrics.font_size, options.text_style);
+                cui_begin_absolute_box(ui,
+                                       cui_editor_cursor_child(id, row, selections[cursor].id, 74),
+                                       (cui_box){.background = theme->caret},
+                                       (cui_rect){x, 0, 1, metrics.line_height});
+                cui_end_box(ui);
+            }
         cui_end_box(ui);
     }
     if (end < state->count) {

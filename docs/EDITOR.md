@@ -409,10 +409,42 @@ preserve document, selections, and paired history. Candidate cursor endpoints
 must remain grapheme boundaries. Inline-token annotations are excluded while this
 storage is attached. Reattaching clears cursor metadata for older document entries,
 which restore their legacy primary selection; detaching preserves text/history.
-Legacy single-selection APIs collapse extra cursors. This commit supplies the
-retained model/history foundation, not yet the Editor's multicursor keyboard,
-Alt-click, rectangular selection, per-cursor preferred columns, or rendering.
-The frozen cursor collection and range-edit helpers are private source structures;
-these portable APIs expose a bounded host-controlled equivalent without claiming
-those remaining interaction behaviors. Search mode buttons now show selected
+Legacy single-selection APIs collapse extra cursors. After attaching model storage,
+call `cui_editor_multicursor_init` with a separate caller-owned array of
+`cui_editor_cursor_anchor` entries covering the model's selection capacity. Keep
+all model/history/anchor/visual-row arrays disjoint, alive, and unchanged by the
+host while the editor is submitted. The adapter preflights this resource before
+consuming events; no model storage means the existing single-cursor path.
+
+The Editor accepts the frozen platform add-cursor combinations: Ctrl+Alt or
+Meta+Alt Up/Down, and Shift+Alt Up/Down. Each existing cursor contributes a target
+on the adjacent visible row; duplicate targets and targets inside selected ranges
+are skipped. Alt-click adds a measured cursor while preserving the active cursor;
+Escape keeps only the active range. Each cursor has a measured visual column,
+including short rows, soft-wrap affinity, and folded-row projection. All carets
+and selections paint using the complete configured text style. A hidden selection
+endpoint reveals its fold before layout. Style, font size, and document changes
+reset preferred columns; reinitialize anchors after changing a host measurement
+provider. Preferred columns are view metadata and do not round-trip through Undo.
+
+Typing and Enter repeat text at every range in one document/history transaction.
+Backspace/Delete use extended grapheme boundaries; Ctrl/Meta/Alt deletion and
+horizontal movement use Unicode word targets. Arrow, visual Home/End, Page, and
+Shift selection motion apply to each cursor and merge overlapping/adjacent ranges
+while preserving the active ID/orientation. Document Home/End and Ctrl Up/Down
+retain the source behavior of collapsing extra cursors. Readonly blocks additions
+and edits while allowing navigation. Pure `cui_edit_selection_motion` computes a
+single target without mutation; `cui_edit_move_selections`,
+`cui_edit_erase_selections`, and `cui_edit_add_cursors` provide bounded atomic model
+operations. Add-cursor preserves an endpoint cursor next to a selected range;
+replacement coalesces coincident resulting cursors. Errors preserve the document,
+collection, and paired history. Read-only Textarea row helpers expose measured
+positions without modifying selection or pointer state.
+
+This slice does not implement rectangular Alt-drag, distributed clipboard paste,
+multi-cursor line indentation, typing-history coalescing, or multiple IME
+composition ranges. Clipboard and other legacy single-range operations still use
+the primary selection and collapse extras on mutation. Tab with multiple cursors
+uses the existing focus behavior instead of partial line indentation. CodeEditor
+inline-token exclusion remains in force. Search mode buttons show selected
 presentation as well as their semantic checked state.

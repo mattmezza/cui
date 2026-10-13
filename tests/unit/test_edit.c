@@ -907,7 +907,53 @@ static void test_multiple_selections(void) {
            cui_edit_get_text(edit).length == 192);
     cui_edit_destroy(edit);
 }
+static void test_multi_motion_and_erasure(void) {
+    char buffer[128] = "one two three";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 4});
+    cui_edit_selection live[3];
+    cui_edit_selection_snapshot history[5];
+    assert(edit && cui_edit_attach_selections(edit, live, 3, history, 5) == CUI_EDIT_OK);
+    cui_edit_selection input[2] = {{11, 3, 3}, {22, 7, 7}};
+    assert(cui_edit_select_many(edit, input, 2) == CUI_EDIT_OK);
+    cui_edit_selection output = {99, 99, 99};
+    assert(cui_edit_selection_motion(edit, input[0], CUI_EDIT_UNICODE_WORD_NEXT, false, &output) ==
+           CUI_EDIT_OK);
+    assert(output.id == 11 && output.cursor == 7 && live[0].cursor == 3);
+    assert(cui_edit_erase_selections(edit, true, true) == CUI_EDIT_OK &&
+           !strcmp(buffer, "  three"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "one two three"));
+    size_t count;
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2 && live[0].id == 11 && live[0].cursor == 3 && live[1].cursor == 7);
+    assert(cui_edit_move_selections(edit, CUI_EDIT_GRAPHEME_PREVIOUS, true) == CUI_EDIT_OK);
+    assert(live[0].anchor == 3 && live[0].cursor == 2);
+    assert(cui_edit_erase_selections(edit, false, false) == CUI_EDIT_OK &&
+           !strcmp(buffer, "on tw three"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && live[0].anchor == 3 && live[0].cursor == 2);
+    cui_edit_selection duplicate = {33, 2, 2};
+    assert(cui_edit_add_cursors(edit, &duplicate, 1) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 2);
+    cui_edit_selection endpoint = {33, 3, 3};
+    assert(cui_edit_add_cursors(edit, &endpoint, 1) == CUI_EDIT_OK);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3 && live[2].cursor == 3);
+    cui_edit_selection overflow = {44, 12, 12};
+    cui_edit_selection saved[3];
+    memcpy(saved, live, sizeof saved);
+    assert(cui_edit_add_cursors(edit, &overflow, 1) == CUI_EDIT_CAPACITY);
+    assert(!memcmp(saved, live, sizeof saved) && !strcmp(buffer, "one two three"));
+    assert(cui_edit_replace_selections(edit, cui_string("!")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "on!! tw! three"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !memcmp(saved, live, sizeof saved));
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_multi_motion_and_erasure();
     test_multiple_selections();
     test_token_replacement();
     test_inline_content();

@@ -86,6 +86,14 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *, cui_edit *, cui_textare
                                           cui_textarea_metrics, float viewport_width, bool wrap,
                                           cui_text_style);
 size_t cui_textarea_hit_test(cui_context *, cui_edit *, cui_textarea_state *, float x, float y);
+/* Read-only measured row geometry for retained multi-cursor adapters. Invalid
+ * row/state/offset returns SIZE_MAX or NAN; no pointer/selection mutation. */
+size_t cui_textarea_row_for_offset(const cui_textarea_state *, size_t offset, bool upstream);
+size_t cui_textarea_project_offset(const cui_textarea_state *, size_t offset, bool upwards);
+size_t cui_textarea_row_offset(cui_context *, cui_edit *, const cui_textarea_state *, size_t row,
+                               float x);
+float cui_textarea_row_x(cui_context *, cui_edit *, const cui_textarea_state *, size_t row,
+                         size_t offset);
 /* Base uses the state's last viewport and supplied metrics, preserving caller layout. */
 cui_textarea_result cui_base_textarea(cui_context *, cui_id, cui_str name, cui_edit *,
                                       cui_textarea_state *, cui_textarea_options,

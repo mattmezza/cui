@@ -77,6 +77,21 @@ typedef enum {
     CUI_EDIT_UNICODE_WORD_PREVIOUS,
     CUI_EDIT_UNICODE_WORD_NEXT
 } cui_edit_motion;
+size_t cui_edit_selection_capacity(const cui_edit *);
+/* Add collapsed cursors, retaining active-first order. Duplicate offsets and
+ * points inside existing selections are ignored. New IDs must be unique.
+ * Batch capacity/validation errors preserve the full collection/history. */
+cui_edit_result cui_edit_add_cursors(cui_edit *, const cui_edit_selection *, size_t count);
+/* Multi-cursor movement merges ranges while preserving active ID; document
+ * START/END intentionally collapse extras. Visual row movement belongs to view. */
+cui_edit_result cui_edit_move_selections(cui_edit *, cui_edit_motion, bool extend);
+/* Read-only single-selection motion probe for measured view adapters. Writes
+ * output only on success; output must not overlap model/live selection storage. */
+cui_edit_result cui_edit_selection_motion(const cui_edit *, cui_edit_selection, cui_edit_motion,
+                                          bool extend, cui_edit_selection *output);
+/* Expand collapsed cursors over one grapheme/Unicode word, merge overlaps, and
+ * delete atomically. Undo restores original cursors rather than expanded ranges. */
+cui_edit_result cui_edit_erase_selections(cui_edit *, bool backwards, bool by_word);
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
 cui_edit *cui_edit_create(cui_edit_config config);

@@ -22,9 +22,22 @@ typedef struct {
 } cui_editor_completion_state;
 typedef struct cui_editor_matcher cui_editor_matcher;
 typedef struct {
+    uint64_t id;
+    size_t anchor, cursor;
+    float x;
+    bool valid, upstream;
+} cui_editor_cursor_anchor;
+typedef struct {
     cui_edit *edit; /* Borrowed, must outlive this state. */
     cui_textarea_state view;
     cui_editor_completion_state completion;
+    cui_editor_cursor_anchor *cursor_anchors; /* Optional borrowed per-ID visual columns. */
+    size_t cursor_anchor_capacity, cursor_anchor_count;
+    uint64_t cursor_anchor_revision, next_cursor_id;
+    cui_text_style cursor_anchor_style;
+    float cursor_anchor_font_size;
+    bool multi_pointer;
+
 } cui_editor_state;
 typedef struct {
     cui_textarea_options textarea;
@@ -39,6 +52,11 @@ typedef struct {
     cui_color search_color, search_current_color;
 } cui_editor_options;
 bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, size_t capacity);
+/* Required before submitting a model with attached multi-selection storage.
+ * Borrowed anchor array must cover selection_capacity(edit), be disjoint from
+ * model/live selection/state storage, and remain unchanged by the host. No alloc.
+ * Reinitialize to clear preferred columns after host font-provider changes. */
+bool cui_editor_multicursor_init(cui_editor_state *, cui_editor_cursor_anchor *, size_t capacity);
 /* Host supplies validated UTF-8 items and one original document byte range.
  * No copying/filtering/provider calls. Empty count closes the menu. Invalid
  * input preserves both existing menu and document. Item bytes remain immutable

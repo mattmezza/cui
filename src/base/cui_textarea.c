@@ -309,6 +309,41 @@ static size_t cui_textarea_offset(cui_context *ui, cui_str text, const cui_texta
     float b = cui_textarea_width(ui, text, line.start, right, state->font_size, state->text_style);
     return x - a < b - x ? left : right;
 }
+static bool cui_textarea_geometry_valid(const cui_textarea_state *state) {
+    return state && state->initialized && state->lines && state->count &&
+           state->count <= state->capacity && isfinite(state->font_size) && state->font_size > 0;
+}
+size_t cui_textarea_row_for_offset(const cui_textarea_state *state, size_t offset, bool upstream) {
+    return cui_textarea_geometry_valid(state) && offset <= state->lines[state->count - 1].next
+               ? cui_textarea_cursor_line_ex(state, offset, upstream)
+               : SIZE_MAX;
+}
+size_t cui_textarea_project_offset(const cui_textarea_state *state, size_t offset, bool upwards) {
+    return cui_textarea_geometry_valid(state) && offset <= state->lines[state->count - 1].next
+               ? cui_textarea_visible_offset(state, offset, upwards)
+               : SIZE_MAX;
+}
+size_t cui_textarea_row_offset(cui_context *ui, cui_edit *edit, const cui_textarea_state *state,
+                               size_t row, float x) {
+    if (!ui || !edit || !cui_textarea_geometry_valid(state) || row >= state->count ||
+        !isfinite(x) || state->revision != cui_edit_get_state(edit).revision)
+        return SIZE_MAX;
+    return cui_textarea_offset(ui, cui_edit_get_text(edit), state, row, x);
+}
+float cui_textarea_row_x(cui_context *ui, cui_edit *edit, const cui_textarea_state *state,
+                         size_t row, size_t offset) {
+    if (!ui || !edit || !cui_textarea_geometry_valid(state) || row >= state->count ||
+        state->revision != cui_edit_get_state(edit).revision ||
+        offset > cui_edit_get_text(edit).length)
+        return NAN;
+    cui_textarea_line line = state->lines[row];
+    if (offset < line.start)
+        offset = line.start;
+    if (offset > line.end)
+        offset = line.end;
+    return cui_textarea_width(ui, cui_edit_get_text(edit), line.start, offset, state->font_size,
+                              state->text_style);
+}
 size_t cui_textarea_hit_test(cui_context *ui, cui_edit *edit, cui_textarea_state *state, float x,
                              float y) {
     if (!ui || !edit || !state || !state->count || !isfinite(x) || !isfinite(y))

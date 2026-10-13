@@ -804,8 +804,7 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     }
     if (selection_capacity)
         cui_editor_reveal_all_folds(s);
-    if (s->view.initialized &&
-        s->view.text_metrics_revision != cui_text_metrics_revision(ui)) {
+    if (s->view.initialized && s->view.text_metrics_revision != cui_text_metrics_revision(ui)) {
         s->cursor_anchor_count = 0;
         s->view.preferred_valid = false;
         s->multi_pointer = false;

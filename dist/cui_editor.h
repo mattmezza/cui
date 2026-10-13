@@ -1011,6 +1011,12 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     }
     if (selection_capacity)
         cui_editor_reveal_all_folds(s);
+    if (s->view.initialized && s->view.text_metrics_revision != cui_text_metrics_revision(ui)) {
+        s->cursor_anchor_count = 0;
+        s->view.preferred_valid = false;
+        s->multi_pointer = false;
+        s->column_dragged = false;
+    }
     cui_textarea_state probe = s->view;
     float width = probe.viewport.w > 0 ? probe.viewport.w : probe.wrap_width;
     cui_textarea_error layout_error = cui_textarea_layout_ex(

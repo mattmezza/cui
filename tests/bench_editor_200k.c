@@ -48,8 +48,8 @@ int main(void) {
         buffer[2 * i + 1] = '\n';
     }
     buffer[bytes] = 0;
-    cui_edit *edit = cui_edit_create((cui_edit_config){
-        .buffer = buffer, .capacity = bytes + 64, .multiline = true});
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = bytes + 64, .multiline = true});
     cui_textarea_state view;
     assert(edit && cui_textarea_state_init(&view, lines, rows + 1));
     measure_probe probe = {0};

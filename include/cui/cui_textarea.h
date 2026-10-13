@@ -40,7 +40,7 @@ typedef struct {
     double blink_started;
     cui_textarea_error error;
     cui_text_style text_style; /* Style of measured visual rows. */
-    bool layout_wrap; /* Last successful visual-row layout mode. */
+    bool layout_wrap;          /* Last successful visual-row layout mode. */
     size_t layout_fold_count, layout_token_count;
     cui_textarea_line *layout_lines;
     size_t layout_capacity;

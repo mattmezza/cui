@@ -196,11 +196,10 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         !content.token_count && !state->layout_fold_count && !state->layout_token_count &&
         state->lines == state->layout_lines && state->capacity == state->layout_capacity &&
         state->text_metrics_revision == cui_text_metrics_revision(ui) &&
-        state->revision == selection.revision &&
-        state->font_size == metrics.font_size && state->line_height == metrics.line_height &&
-        state->wrap_width == width && state->layout_wrap == wrap &&
-        state->text_style.family == style.family && state->text_style.weight == style.weight &&
-        state->text_style.italic == style.italic &&
+        state->revision == selection.revision && state->font_size == metrics.font_size &&
+        state->line_height == metrics.line_height && state->wrap_width == width &&
+        state->layout_wrap == wrap && state->text_style.family == style.family &&
+        state->text_style.weight == style.weight && state->text_style.italic == style.italic &&
         state->text_style.monospace == style.monospace) {
         state->caret_line = cui_textarea_cursor_line(state, selection.cursor);
         state->cursor = selection.cursor;

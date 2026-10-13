@@ -920,10 +920,8 @@ static void test_large_document_viewport(void) {
     cui_edit *edit = editor(buffer, bytes + 64);
     cui_textarea_state state;
     assert(cui_textarea_state_init(&state, lines, rows + 1));
-    cui_context *ui = cui_create((cui_config){.width = 400,
-                                               .height = 300,
-                                               .measure_styled = styled_measure,
-                                               .measure_user = &probe});
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
     assert(ui);
     cui_focus(ui, 10);
     cui_textarea_options options = {.width = 180, .height = 80};

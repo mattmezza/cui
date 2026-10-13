@@ -863,3 +863,10 @@ cui_dock_result cui_dock_restore(cui_dock *d, cui_str text) {
     d->generation = p.generation;
     return CUI_DOCK_OK;
 }
+
+cui_dock_group_constraints cui_dock_group_sealed(void) {
+    return (cui_dock_group_constraints){.locked = true, .unclosable = true, .preserve_last = true};
+}
+cui_dock_group_constraints cui_dock_group_in_split(bool alone) {
+    return (cui_dock_group_constraints){.preserve_last = alone};
+}

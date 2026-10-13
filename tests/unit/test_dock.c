@@ -418,6 +418,11 @@ static void test_bulk_remove(void) {
     cui_dock_destroy(d);
 }
 int main(void) {
+    cui_dock_group_constraints sealed = cui_dock_group_sealed();
+    assert(sealed.locked && sealed.unclosable && sealed.preserve_last && !sealed.collapsed);
+    cui_dock_group_constraints split = cui_dock_group_in_split(false);
+    assert(!split.locked && !split.unclosable && !split.preserve_last && !split.collapsed);
+    assert(cui_dock_group_in_split(true).preserve_last);
     test_bulk_remove();
     test_two_model_transfer();
     test_move_split_transaction();

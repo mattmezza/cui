@@ -1306,6 +1306,168 @@ static void test_title_modes_padding(void) {
     options.hide_menu = false;
     panels[0].omit_inner_padding = false;
 }
+static cui_dock_node constrained_node;
+static const cui_dock *constrained_model;
+static cui_dock_group_constraints constraint_flags;
+static unsigned constraint_calls;
+static cui_dock_group_constraints group_constraints(void *user, const cui_dock *m,
+                                                    cui_dock_node node) {
+    assert(user == &constraint_calls);
+    ++constraint_calls;
+    return m == constrained_model && node == constrained_node ? constraint_flags
+                                                              : (cui_dock_group_constraints){0};
+}
+static void test_group_constraints(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    assert(model);
+    cui_dock_node left = cui_dock_root(model), right, found;
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, left, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &right) ==
+           CUI_DOCK_OK);
+    options.group_constraints = group_constraints;
+    options.constraints_user = &constraint_calls;
+    constrained_model = model;
+    constrained_node = left;
+    constraint_flags = cui_dock_group_sealed();
+    frame();
+    frame();
+    assert(cui_bounds(ui, cui_dock_close_id(workspace, 0)).w == 0);
+    assert(cui_bounds(ui, cui_dock_close_id(workspace, 2)).w > 0);
+    unsigned content_before = rendered[1];
+    click(cui_dock_tab_id(workspace, 1));
+    assert(result.selected && active(left) == 1 && rendered[1] > content_before);
+    char before[4096], after[4096];
+    size_t size;
+    assert(cui_dock_serialize(model, before, sizeof before, &size) == CUI_DOCK_OK);
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(!result.moved && cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    cui_focus(ui, cui_dock_tab_id(workspace, 1));
+    key(CUI_KEY_W, CUI_MOD_CTRL);
+    assert(!result.closed && cui_dock_panel_find(model, 1, NULL, NULL));
+    menu_click(1, CUI_DOCK_MENU_CLOSE_ALL);
+    assert(!result.closed);
+    /* A locked target refuses incoming moves while the source stays selectable. */
+    constrained_node = right;
+    frame();
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(!result.moved && cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    assert(cui_dock_serialize(model, after, sizeof after, &size) == CUI_DOCK_OK &&
+           !strcmp(before, after));
+    /* Unclosable alone does not prevent moving; clearing constraints reenables behavior. */
+    constrained_node = left;
+    constraint_flags = (cui_dock_group_constraints){.unclosable = true};
+    frame();
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(result.moved && cui_dock_panel_find(model, 1, &found, NULL) && found == right);
+    constraint_flags = cui_dock_group_in_split(true);
+    frame();
+    assert(cui_bounds(ui, cui_dock_close_id(workspace, 0)).w == 0);
+    gesture(0, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(!result.moved && cui_dock_panel_find(model, 0, &found, NULL) && found == left);
+    /* Collapsing one group suppresses only its content/actions; siblings still render. */
+    constraint_flags = (cui_dock_group_constraints){.collapsed = true};
+    unsigned left_before = rendered[0], right_before = rendered[1];
+    frame();
+    assert(rendered[0] == left_before && rendered[1] > right_before);
+    assert(cui_bounds(ui, cui_dock_tab_id(workspace, 0)).w > 0);
+    assert(cui_bounds(ui, cui_dock_menu_id(workspace, 0)).w == 0);
+    constraint_flags = (cui_dock_group_constraints){0};
+    frame();
+    click(cui_dock_close_id(workspace, 0));
+    assert(result.closed);
+    frame();
+    /* A preserve-last bulk close retains the active key, not an empty dock. */
+    constrained_node = cui_dock_root(model);
+    constraint_flags = cui_dock_group_in_split(true);
+    assert(cui_dock_activate(model, 1) == CUI_DOCK_OK);
+    frame();
+    menu_click(1, CUI_DOCK_MENU_CLOSE_ALL);
+    assert(result.closed_count == 1 && cui_dock_panel_find(model, 1, NULL, NULL) &&
+           !cui_dock_panel_find(model, 2, NULL, NULL));
+    frame();
+    assert(cui_bounds(ui, cui_dock_close_id(workspace, 1)).w == 0);
+    assert(constraint_calls);
+    options.group_constraints = NULL;
+    options.constraints_user = NULL;
+    frame();
+    assert(cui_bounds(ui, cui_dock_close_id(workspace, 1)).w > 0);
+}
+static void test_workspace_constraints(void) {
+    edges = cui_dock_workspace_create();
+    assert(edges);
+    edge_options = (cui_dock_workspace_options){.view = cui_dock_view_options_default()};
+    edge_options.view.width = 640;
+    edge_options.view.height = 480;
+    edge_options.view.group_constraints = group_constraints;
+    edge_options.view.constraints_user = &constraint_calls;
+    for (unsigned r = 0; r < 4; ++r) {
+        regions[r] = (cui_dock_region_content){.model = cui_dock_create((cui_dock_config){0}),
+                                               .view = cui_dock_view_create(0, 0),
+                                               .panels = panels,
+                                               .panel_count = 5};
+        assert(regions[r].model && regions[r].view);
+    }
+    assert(cui_dock_insert(regions[0].model, cui_dock_root(regions[0].model), 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(regions[1].model, cui_dock_root(regions[1].model), 2, 0) == CUI_DOCK_OK);
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_LEFT, true, 160));
+    edge_frame();
+    edge_frame();
+    constrained_model = regions[1].model;
+    constrained_node = cui_dock_root(constrained_model);
+    constraint_flags = cui_dock_group_sealed();
+    cui_rect left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    char a[4096], b[4096], after[4096];
+    region_serialize(0, a);
+    region_serialize(1, b);
+    transfer_gesture(0, 0, left.x + left.w / 2, left.y + left.h / 2, CUI_EVENT_POINTER_MOVE);
+    assert(!edge_result.transferred);
+    region_serialize(0, after);
+    assert(!strcmp(a, after));
+    region_serialize(1, after);
+    assert(!strcmp(b, after));
+    /* Locking the source also prevents opening an otherwise valid closed edge. */
+    constrained_model = regions[0].model;
+    constrained_node = cui_dock_root(constrained_model);
+    transfer_gesture(0, 0, 639, 240, CUI_EVENT_POINTER_MOVE);
+    cui_dock_workspace_snapshot saved;
+    assert(cui_dock_workspace_save(edges, &saved) && !saved.open[1] && !edge_result.transferred);
+    /* A locked closed destination stays closed; removing the lock permits atomic transfer. */
+    constrained_model = regions[2].model;
+    constrained_node = cui_dock_root(constrained_model);
+    transfer_gesture(0, 0, 639, 240, CUI_EVENT_POINTER_MOVE);
+    assert(cui_dock_workspace_save(edges, &saved) && !saved.open[1] && !edge_result.transferred);
+    region_serialize(0, after);
+    assert(!strcmp(a, after));
+    constraint_flags = (cui_dock_group_constraints){0};
+    edge_frame();
+    edge_frame();
+    cui_rect source_tab =
+        cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_CENTER), 0));
+    pointer(CUI_EVENT_POINTER_DOWN, source_tab.x + 8, source_tab.y + source_tab.h / 2);
+    edge_frame();
+    pointer(CUI_EVENT_POINTER_MOVE, 639, 240);
+    edge_frame();
+    constraint_flags = cui_dock_group_sealed(); /* Target revokes permission after preview. */
+    pointer(CUI_EVENT_POINTER_UP, 639, 240);
+    edge_frame();
+    assert(edge_result.denied && !edge_result.transferred);
+    assert(cui_dock_workspace_save(edges, &saved) && !saved.open[1]);
+    region_serialize(0, after);
+    assert(!strcmp(a, after));
+    constraint_flags = (cui_dock_group_constraints){0};
+    transfer_gesture(0, 0, 639, 240, CUI_EVENT_POINTER_MOVE);
+    assert(edge_result.transferred && edge_result.opened &&
+           cui_dock_panel_find(regions[2].model, 0, NULL, NULL));
+    for (unsigned r = 0; r < 4; ++r) {
+        cui_dock_view_destroy(regions[r].view);
+        cui_dock_destroy(regions[r].model);
+    }
+    cui_dock_workspace_destroy(edges);
+    constrained_model = NULL;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -1436,6 +1598,8 @@ int main(void) {
     test_panel_menus();
     test_title_composition();
     test_title_modes_padding();
+    test_group_constraints();
+    test_workspace_constraints();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

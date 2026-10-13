@@ -158,7 +158,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | `DockLayout`, `PaneTree`, `PaneNode`, `PaneRef`, `NodeId`, `PanelId`, `RootKind`, `InsertTarget`, `EditResult` | Bounded model, stable keys, node inspection, insert/move/split/reorder/remove/activate, transactional restore and normalization. Binary splits replace Rust n-ary children; no identical builder or optional measured-size vector API. |
 | `DockArea`, `DockAreaRenderer`, `DockContext`, `DockEvent` | Styled view and workspace own no panels; callbacks compose ordinary CUI controls, region handles and post-edit notifications. No arbitrary renderer trait override per chrome element. |
 | `Dock`, `DockSizing`, `DockPlacement` | Retained left/right/bottom open flags and preferred sizes, bounds/minima clamping and pointer/keyboard resizing. Frozen component deliberately does not re-export base `Dock`. Opt-in bottom collapse includes its strip/live-size snapping. Per-edge collapsibility is retained and guards closing and bottom drag snapping. |
-| `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. No sealed-group constraints object or isolated per-group lock is provided. Global disabled state is stronger than a drag-only lock. |
+| `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
 | `AnyDrag`, `DragPanel`, `DropIndicator`, `DropPlaceholderBounds`, `DropTarget`, `DragPanelPreview` | Portable queued tab gestures, cross-group/region transfer, content-edge splits, accepted/rejected target indications and previews. No GPUI entity drag payload or opaque host drag union is needed for CUI events. |
 | Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; no dynamic visibility predicate, automatic added/removed/active lifecycle hook or panel-specific dump callback. |
 | `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. No named factory registry or automatic panel construction from payload JSON. |
@@ -176,7 +176,7 @@ Set `workspace_options.collapsible_bottom = true` for the frozen closed-bottom b
 
 The bottom handle permits continuous resizing down to the strip, temporarily showing content above it. Release snaps to the strip or natural bottom minimum according to their midpoint; an open snap never leaves content below that minimum. Preferred size survives closing, so clicking the closed strip restores it. Keyboard handle resize also settles to a valid state. `on_resize` reports live changes and completion with logical size; save the validated workspace snapshot for persistence. Cancel/Escape, disablement or a blocking modal restores the complete pre-drag edge snapshot. Model content and serialization are untouched by this resize gesture. This adds no native window ownership.
 
-`view_options.collapsed` independently requests tab-only presentation for an ordinary styled view; it is the workspace's building block, not an automatic reopen controller. The caller owns open/close behavior when using it directly. Multiple/nested groups retain the model topology and each visible leaf's tabs; CUI does not yet expose the frozen per-group sealed/locked constraints. Optional arbitrary title rendering hooks are described below.
+`view_options.collapsed` independently requests tab-only presentation for an ordinary styled view; it is the workspace's building block, not an automatic reopen controller. The caller owns open/close behavior when using it directly. Multiple/nested groups retain the model topology and each visible leaf's tabs; CUI exposes optional sealed/locked constraints through the policy described below. Optional arbitrary title rendering hooks are described below.
 
 ## Per-edge collapsibility
 
@@ -223,3 +223,28 @@ panel.omit_inner_padding = true;
 ```
 
 Headless tests assert simple-label versus tab semantics, exact content-origin changes for title hiding and top spacing, active-panel padding override, collapsed reachability, custom-title/suffix invocation in Auto mode, close-policy veto and real cross-group dragging from a simple title. Mode validation rejects invalid enum values before callbacks or scene submission.
+
+## Group constraints and protected last panels
+
+Frozen `TabGroupConstraints` combines alone, dock-locked, collapsed and closable state. A draggable group is unlocked and does not hold the last visible panel in an alone container; closing additionally requires container and panel permission. `sealed()` starts locked, alone and unclosable. CUI provides `cui_dock_group_sealed()` and `cui_dock_group_in_split(alone)` plus an optional pure `view_options.group_constraints(user, model, node)` callback returning `locked`, `unclosable`, `preserve_last` and `collapsed`.
+
+A missing callback or all-zero result preserves prior CUI behavior. `locked` suppresses tab reordering, source dragging, incoming drops, splitting and user closing while selection, content controls and zoom remain usable. `unclosable` alone suppresses closing without blocking moves. `preserve_last` protects a group's sole panel against drag/close; with several panels, Close All retains the active key rather than emptying the group. `collapsed` paints that leaf as a tab-only strip without suppressing siblings. User close buttons, shortcuts, menu actions and transaction release checks all apply the constraints.
+
+The callback receives the actual model and tab-node ID, including configured closed-edge targets. Cross-region constraints are checked against both models; foreign node IDs are never interpreted as source-model nodes. A denied closed-edge drop leaves both serialized layouts and open flags intact and does not fall through to an unrelated in-region split. Locked workspace destinations paint a rejected target indication. A source that becomes locked while dragging cancels the gesture. Model APIs remain independent of UI constraints and bypass them.
+
+```c
+static cui_dock_group_constraints constraints(void *user, const cui_dock *model,
+                                               cui_dock_node group) {
+    (void)user;
+    /* Derive node identity from a stable panel key after every restore/edit. */
+    cui_dock_node editor_group;
+    if (cui_dock_panel_find(model, 42, &editor_group, NULL) && editor_group == group)
+        return cui_dock_group_sealed();
+    return cui_dock_group_in_split(group == cui_dock_root(model));
+}
+options.group_constraints = constraints;
+```
+
+Callbacks and user data remain host-owned; evaluate deterministically and do not mutate model/view/registry data. Constraints are presentation policy, not serialized model data. Restore can invalidate node IDs, so derive them from stable keys or refresh host mappings. `preserve_last` currently counts model panels, because dynamic visibility is a separate remaining gap. The frozen lock originates at DockArea; CUI's per-node callback is a portable host seam rather than a claim about a second frozen pinned-group primitive. It protects panel rearrangement, not splitter geometry; hosts can separately veto `CUI_DOCK_RESIZED` through `allow_operation`.
+
+Headless checks exercise constructors in model-only linkage, sealed-source selection/content, blocked close/shortcut/menu and drag, locked targets with byte-equal model serialization, unclosable-but-movable groups, sole-panel preservation, isolated collapse, preserved active key after bulk close, cross-model locked-source/target rejection, closed-edge non-opening, target permission revoked after preview and successful transfer after unlocking.

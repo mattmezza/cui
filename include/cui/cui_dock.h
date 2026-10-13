@@ -149,6 +149,11 @@ typedef struct {
     cui_color accepted, rejected, background, text;
 } cui_dock_drag_palette;
 typedef struct {
+    bool locked, unclosable, preserve_last, collapsed;
+} cui_dock_group_constraints;
+cui_dock_group_constraints cui_dock_group_sealed(void);
+cui_dock_group_constraints cui_dock_group_in_split(bool alone);
+typedef struct {
     float width, height, tab_height, key_step;
     bool disabled, reduced_motion, allow_reorder, focus_content;
     double now_seconds;
@@ -164,6 +169,9 @@ typedef struct {
     bool collapsed;                   /* Tab strip only: no close/zoom/content or drag actions. */
     cui_dock_panel_style panel_style; /* Zero preserves the original always-tabs presentation. */
     bool inner_padding; /* Source 8px top spacing in multi-panel groups; panel may omit it. */
+    /* Pure, borrowed host policy; no model/view mutation during evaluation. */
+    cui_dock_group_constraints (*group_constraints)(void *, const cui_dock *, cui_dock_node);
+    void *constraints_user;
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;

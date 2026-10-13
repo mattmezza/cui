@@ -1996,22 +1996,20 @@ static void test_factory_typed(void) {
     assert(m && cui_dock_insert(m, cui_dock_root(m), 0, 0) == CUI_DOCK_OK);
     assert(cui_dock_insert(m, cui_dock_root(m), 1, 1) == CUI_DOCK_OK);
     const char bytes[] = {'x', 0, 'y'};
-    cui_dock_schema_node child = {.kind = CUI_DOCK_SCHEMA_PANEL,
-                                  .panel_name = {"Nested", 6},
-                                  .payload = {bytes, 3}};
-    cui_dock_panel_typed_state typed[2] = {
-        {.key = 0,
-         .source = {.kind = CUI_DOCK_SCHEMA_PANEL,
-                    .panel_name = {"Known", 5},
-                    .payload = {bytes, 3},
-                    .children = &child,
-                    .child_count = 1}},
-        {.key = 1,
-         .source = {.kind = CUI_DOCK_SCHEMA_PANEL,
-                    .panel_name = {"Unknown", 7},
-                    .payload = {bytes, 3},
-                    .children = &child,
-                    .child_count = 1}}};
+    cui_dock_schema_node child = {
+        .kind = CUI_DOCK_SCHEMA_PANEL, .panel_name = {"Nested", 6}, .payload = {bytes, 3}};
+    cui_dock_panel_typed_state typed[2] = {{.key = 0,
+                                            .source = {.kind = CUI_DOCK_SCHEMA_PANEL,
+                                                       .panel_name = {"Known", 5},
+                                                       .payload = {bytes, 3},
+                                                       .children = &child,
+                                                       .child_count = 1}},
+                                           {.key = 1,
+                                            .source = {.kind = CUI_DOCK_SCHEMA_PANEL,
+                                                       .panel_name = {"Unknown", 7},
+                                                       .payload = {bytes, 3},
+                                                       .children = &child,
+                                                       .child_count = 1}}};
     cui_dock_panel_factory factory = {.name = cui_string("Known"),
                                       .user = &factory_builds,
                                       .build = factory_build,
@@ -2026,7 +2024,8 @@ static void test_factory_typed(void) {
            CUI_DOCK_INVALID);
     assert(!factory_builds && instances[0].panel.key == 777);
     typed[1].source.kind = CUI_DOCK_SCHEMA_PANEL;
-    assert(cui_dock_panels_reconstruct_typed(m, typed, 2, &factory, 1, instances, 2) == CUI_DOCK_OK);
+    assert(cui_dock_panels_reconstruct_typed(m, typed, 2, &factory, 1, instances, 2) ==
+           CUI_DOCK_OK);
     assert(factory_builds == 1 && instances[0].has_source && instances[1].has_source);
     cui_dock_schema_node dump = {0};
     factory_dump_fail = true;

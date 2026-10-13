@@ -228,7 +228,8 @@ typedef struct {
     const cui_dock *model;
     cui_dock_node tab;
     const cui_dock_panel_state *state;
-    const cui_dock_schema_node *source; /* Full borrowed leaf for typed reconstruction; else NULL. */
+    const cui_dock_schema_node
+        *source; /* Full borrowed leaf for typed reconstruction; else NULL. */
 } cui_dock_panel_build_context;
 typedef struct cui_dock_panel_factory {
     cui_str name;
@@ -256,12 +257,10 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *, const cui_dock_pan
                                             size_t factory_count, cui_dock_panel_instance *,
                                             size_t capacity);
 /* Typed leaves are borrowed through release; builders see their complete source. */
-cui_dock_result cui_dock_panels_reconstruct_typed(const cui_dock *,
-                                                  const cui_dock_panel_typed_state *,
-                                                  size_t state_count,
-                                                  const cui_dock_panel_factory *,
-                                                  size_t factory_count,
-                                                  cui_dock_panel_instance *, size_t capacity);
+cui_dock_result
+cui_dock_panels_reconstruct_typed(const cui_dock *, const cui_dock_panel_typed_state *,
+                                  size_t state_count, const cui_dock_panel_factory *,
+                                  size_t factory_count, cui_dock_panel_instance *, size_t capacity);
 /* Dump borrows the factory payload; failure leaves output unchanged. */
 cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *, cui_dock_panel_state *);
 /* Preserves the complete unknown leaf, or delegates to factory dump_schema. */

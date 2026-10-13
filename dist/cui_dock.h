@@ -229,6 +229,8 @@ typedef struct {
     const cui_dock *model;
     cui_dock_node tab;
     const cui_dock_panel_state *state;
+    const cui_dock_schema_node
+        *source; /* Full borrowed leaf for typed reconstruction; else NULL. */
 } cui_dock_panel_build_context;
 typedef struct cui_dock_panel_factory {
     cui_str name;
@@ -236,11 +238,18 @@ typedef struct cui_dock_panel_factory {
     cui_dock_result (*build)(void *, const cui_dock_panel_build_context *, cui_dock_panel *);
     void (*destroy)(void *, cui_dock_panel *);
     cui_dock_result (*dump)(void *, const cui_dock_panel *, cui_str *payload);
+    cui_dock_result (*dump_schema)(void *, const cui_dock_panel *, cui_dock_schema_node *);
 } cui_dock_panel_factory;
+typedef struct {
+    uint64_t key;
+    cui_dock_schema_node source; /* Borrowed full PanelState leaf, including children. */
+} cui_dock_panel_typed_state;
 typedef struct {
     cui_dock_panel_state state;
     cui_dock_panel panel;
     const cui_dock_panel_factory *factory; /* NULL: unknown-name placeholder. */
+    cui_dock_schema_node source;
+    bool has_source;
 } cui_dock_panel_instance;
 /* Exact key coverage required. On failure output/model are unchanged and staged
  * successful builds are destroyed. Output must not contain live instances. */
@@ -248,8 +257,15 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *, const cui_dock_pan
                                             size_t state_count, const cui_dock_panel_factory *,
                                             size_t factory_count, cui_dock_panel_instance *,
                                             size_t capacity);
+/* Typed leaves are borrowed through release; builders see their complete source. */
+cui_dock_result
+cui_dock_panels_reconstruct_typed(const cui_dock *, const cui_dock_panel_typed_state *,
+                                  size_t state_count, const cui_dock_panel_factory *,
+                                  size_t factory_count, cui_dock_panel_instance *, size_t capacity);
 /* Dump borrows the factory payload; failure leaves output unchanged. */
 cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *, cui_dock_panel_state *);
+/* Preserves the complete unknown leaf, or delegates to factory dump_schema. */
+cui_dock_result cui_dock_panel_dump_schema(const cui_dock_panel_instance *, cui_dock_schema_node *);
 /* Calls factory destroy once, then clears instances. No lifecycle notification. */
 void cui_dock_panels_release(cui_dock_panel_instance *, size_t count);
 /* Lifecycle captures the complete host workspace, including closed regions. */
@@ -5057,10 +5073,12 @@ void cui_dock_panels_release(cui_dock_panel_instance *instances, size_t count) {
         instances[i] = (cui_dock_panel_instance){0};
     }
 }
-cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
-                                            const cui_dock_panel_state *states, size_t count,
-                                            const cui_dock_panel_factory *factories, size_t nf,
-                                            cui_dock_panel_instance *out, size_t capacity) {
+static cui_dock_result dock_panels_reconstruct(const cui_dock *model,
+                                               const cui_dock_panel_state *states,
+                                               const cui_dock_panel_typed_state *typed,
+                                               size_t count,
+                                               const cui_dock_panel_factory *factories, size_t nf,
+                                               cui_dock_panel_instance *out, size_t capacity) {
     if (!model || (count && (!states || !out)) || (nf && !factories) ||
         count > CUI_DOCK_PANEL_LIMIT || nf > CUI_DOCK_PANEL_LIMIT)
         return CUI_DOCK_INVALID;
@@ -5109,6 +5127,10 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
     size_t built = 0;
     for (; built < count; built++) {
         staged[built].state = states[built];
+        if (typed) {
+            staged[built].source = typed[built].source;
+            staged[built].has_source = true;
+        }
         staged[built].panel = (cui_dock_panel){
             .key = states[built].key, .title = states[built].name, .closable = true};
         const cui_dock_panel_factory *factory = NULL;
@@ -5121,7 +5143,8 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
             continue;
         cui_dock_node tab;
         cui_dock_panel_find(model, states[built].key, &tab, NULL);
-        cui_dock_panel_build_context context = {model, tab, &states[built]};
+        cui_dock_panel_build_context context = {model, tab, &states[built],
+                                                typed ? &typed[built].source : NULL};
         result = factory->build(factory->user, &context, &staged[built].panel);
         if (result != CUI_DOCK_OK)
             break; /* Failed builder must release its own partial resources. */
@@ -5139,6 +5162,37 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
     free(staged);
     return result;
 }
+cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
+                                            const cui_dock_panel_state *states, size_t count,
+                                            const cui_dock_panel_factory *factories, size_t nf,
+                                            cui_dock_panel_instance *out, size_t capacity) {
+    return dock_panels_reconstruct(model, states, NULL, count, factories, nf, out, capacity);
+}
+cui_dock_result
+cui_dock_panels_reconstruct_typed(const cui_dock *model, const cui_dock_panel_typed_state *typed,
+                                  size_t count, const cui_dock_panel_factory *factories, size_t nf,
+                                  cui_dock_panel_instance *out, size_t capacity) {
+    if (count && !typed)
+        return CUI_DOCK_INVALID;
+    if (count > CUI_DOCK_PANEL_LIMIT)
+        return CUI_DOCK_INVALID;
+    cui_dock_panel_state *states = count ? calloc(count, sizeof(*states)) : NULL;
+    if (count && !states)
+        return CUI_DOCK_CAPACITY;
+    for (size_t i = 0; i < count; i++) {
+        const cui_dock_schema_node *source = &typed[i].source;
+        if (source->kind != CUI_DOCK_SCHEMA_PANEL || (source->child_count && !source->children) ||
+            source->size_count || source->sizes) {
+            free(states);
+            return CUI_DOCK_INVALID;
+        }
+        states[i] = (cui_dock_panel_state){typed[i].key, source->panel_name, source->payload};
+    }
+    cui_dock_result result =
+        dock_panels_reconstruct(model, states, typed, count, factories, nf, out, capacity);
+    free(states);
+    return result;
+}
 cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *instance,
                                     cui_dock_panel_state *out) {
     if (!instance || !out)
@@ -5153,6 +5207,29 @@ cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *instance,
             return CUI_DOCK_INVALID;
     }
     *out = state;
+    return CUI_DOCK_OK;
+}
+cui_dock_result cui_dock_panel_dump_schema(const cui_dock_panel_instance *instance,
+                                           cui_dock_schema_node *out) {
+    if (!instance || !out || !instance->has_source)
+        return CUI_DOCK_INVALID;
+    cui_dock_schema_node source = instance->source;
+    if (instance->factory && instance->factory->dump_schema) {
+        cui_dock_result result =
+            instance->factory->dump_schema(instance->factory->user, &instance->panel, &source);
+        if (result != CUI_DOCK_OK)
+            return result;
+    } else if (instance->factory && instance->factory->dump) {
+        cui_dock_result result =
+            instance->factory->dump(instance->factory->user, &instance->panel, &source.payload);
+        if (result != CUI_DOCK_OK)
+            return result;
+    }
+    if (source.kind != CUI_DOCK_SCHEMA_PANEL || !dock_state_string(source.panel_name) ||
+        !source.panel_name.length || !dock_state_string(source.payload) ||
+        (source.child_count && !source.children) || source.size_count || source.sizes)
+        return CUI_DOCK_INVALID;
+    *out = source;
     return CUI_DOCK_OK;
 }
 

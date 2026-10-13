@@ -2505,7 +2505,7 @@ static cui_dock_result dock_panels_reconstruct(const cui_dock *model,
         cui_dock_node tab;
         cui_dock_panel_find(model, states[built].key, &tab, NULL);
         cui_dock_panel_build_context context = {model, tab, &states[built],
-                                                 typed ? &typed[built].source : NULL};
+                                                typed ? &typed[built].source : NULL};
         result = factory->build(factory->user, &context, &staged[built].panel);
         if (result != CUI_DOCK_OK)
             break; /* Failed builder must release its own partial resources. */
@@ -2529,12 +2529,10 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
                                             cui_dock_panel_instance *out, size_t capacity) {
     return dock_panels_reconstruct(model, states, NULL, count, factories, nf, out, capacity);
 }
-cui_dock_result cui_dock_panels_reconstruct_typed(const cui_dock *model,
-                                                  const cui_dock_panel_typed_state *typed,
-                                                  size_t count,
-                                                  const cui_dock_panel_factory *factories,
-                                                  size_t nf, cui_dock_panel_instance *out,
-                                                  size_t capacity) {
+cui_dock_result
+cui_dock_panels_reconstruct_typed(const cui_dock *model, const cui_dock_panel_typed_state *typed,
+                                  size_t count, const cui_dock_panel_factory *factories, size_t nf,
+                                  cui_dock_panel_instance *out, size_t capacity) {
     if (count && !typed)
         return CUI_DOCK_INVALID;
     if (count > CUI_DOCK_PANEL_LIMIT)
@@ -2544,8 +2542,8 @@ cui_dock_result cui_dock_panels_reconstruct_typed(const cui_dock *model,
         return CUI_DOCK_CAPACITY;
     for (size_t i = 0; i < count; i++) {
         const cui_dock_schema_node *source = &typed[i].source;
-        if (source->kind != CUI_DOCK_SCHEMA_PANEL ||
-            (source->child_count && !source->children) || source->size_count || source->sizes) {
+        if (source->kind != CUI_DOCK_SCHEMA_PANEL || (source->child_count && !source->children) ||
+            source->size_count || source->sizes) {
             free(states);
             return CUI_DOCK_INVALID;
         }
@@ -2573,18 +2571,18 @@ cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *instance,
     return CUI_DOCK_OK;
 }
 cui_dock_result cui_dock_panel_dump_schema(const cui_dock_panel_instance *instance,
-                                            cui_dock_schema_node *out) {
+                                           cui_dock_schema_node *out) {
     if (!instance || !out || !instance->has_source)
         return CUI_DOCK_INVALID;
     cui_dock_schema_node source = instance->source;
     if (instance->factory && instance->factory->dump_schema) {
-        cui_dock_result result = instance->factory->dump_schema(
-            instance->factory->user, &instance->panel, &source);
+        cui_dock_result result =
+            instance->factory->dump_schema(instance->factory->user, &instance->panel, &source);
         if (result != CUI_DOCK_OK)
             return result;
     } else if (instance->factory && instance->factory->dump) {
-        cui_dock_result result = instance->factory->dump(
-            instance->factory->user, &instance->panel, &source.payload);
+        cui_dock_result result =
+            instance->factory->dump(instance->factory->user, &instance->panel, &source.payload);
         if (result != CUI_DOCK_OK)
             return result;
     }

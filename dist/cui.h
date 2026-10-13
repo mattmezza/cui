@@ -409,6 +409,10 @@ cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);
 /* Call after changing a host font registry or styled measurement policy. */
 void cui_text_metrics_changed(cui_context *);
+/* Context-local font measurement generation, initially1; null returns0.
+ * Changes only on accepted text_metrics_changed calls outside a frame.
+ * Cache by equality, not ordering; wrap skips0. */
+uint64_t cui_text_metrics_revision(const cui_context *);
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */
@@ -5650,6 +5654,7 @@ struct cui_context {
     cui_config config;
     cui_core_text_style *text_styles;
     size_t text_style_count, text_style_capacity;
+    uint64_t text_metrics_revision;
     cui_draw_command *commands;
     size_t count;
     cui_core_box_node *nodes;
@@ -5749,7 +5754,12 @@ void cui_text_metrics_changed(cui_context *ui) {
         return;
     cui_core_select_context(ui);
     Clay_ResetMeasureTextCache();
+    if (++ui->text_metrics_revision == 0)
+        ui->text_metrics_revision = 1;
     cui_invalidate(ui);
+}
+uint64_t cui_text_metrics_revision(const cui_context *ui) {
+    return ui ? ui->text_metrics_revision : 0;
 }
 static Clay_Dimensions cui_core_measure(Clay_StringSlice s, Clay_TextElementConfig *c, void *u) {
     cui_context *ui = u;
@@ -5850,6 +5860,7 @@ cui_context *cui_create(cui_config config) {
         return NULL;
     }
     ui->config = config;
+    ui->text_metrics_revision = 1;
     ui->dirty = true;
     ui->top_modal = ui->previous_top_modal = SIZE_MAX;
     ui->text_style_capacity = config.max_elements > 32767 ? 65535 : config.max_elements * 2;

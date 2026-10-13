@@ -1,0 +1,9 @@
+Published main:9220c22eedce0f3d8219be4f03793986e3da3b06
+Library CI38356734124 success; Pages38356734107 success.
+196/196 actualHTTPS files byte-match downloaded Pages artifact.
+ActualHTTPS full78 C/WASM stories and78 compiled snippets pass.
+ActualHTTPS fullChromium design/app/mobile extensions pass.
+Initial harness rerun failed because touch-page URL still used local output;
+corrected ALL localURL occurrences toactualHTTPS; fullrerun passed.
+Local logs /home/matteo/.cache/cui-validation/published-9220c22-{hashes,browser2,extensions}.log
+Full-family parity incomplete:2 implemented/76 tested/0 verified.

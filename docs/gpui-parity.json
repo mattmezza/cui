@@ -3047,8 +3047,8 @@
       "limitations": [
         "Styled multiline caret/selection/scroll, gutter/wrap, host syntax colors, ASCII-insensitive retained search and atomic replacement, visible match highlights, caller-owned folding and completion have headless/browser tests.",
         "Unicode17 grapheme and word keyboard editing passes pinned conformance fixtures; explicit scalar APIs remain compatible.",
-        "The measured multicursor adapter supports caller-owned selections/anchors, cursor creation, grapheme navigation, wraps/folds, readonly behavior, atomic typing and full-selection Undo/Redo. Rectangular drag, distributed clipboard, multirange indentation, undo coalescing, multicursor IME and restored preferred columns remain incomplete in this release. Language parsers/LSP, diagnostics and bidi remain incomplete; folds require host refresh after edits.",
-        "The200K-line performance obligation is not yet validated."
+        "Measured multicursor interaction supports cursor creation, rectangular Alt-drag selection, grapheme navigation, wraps/folds, readonly behavior, atomic typing, multirange indentation, synchronous host clipboard distribution and full-selection Undo/Redo. Undo coalescing, multicursor IME, restored preferred columns, parsers/LSP, diagnostics and bidi remain incomplete. Folds require host refresh after edits; browser clipboard does not yet expose the synchronous native seam.",
+        "200,000-line document correctness is tested; performance targets and viewport-only incremental layout are not yet validated in this release."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3109,6 +3109,16 @@
             "tests/unit/test_edit.c",
             "tests/unit/test_editor.c",
             "tests/web/test_browser.py"
+          ]
+        },
+        {
+          "name": "rectangular selection, multirange indentation and distributed synchronous clipboard",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_editor.c",
+            "tests/web/test_browser.py",
+            "docs/EDITOR.md"
           ]
         }
       ],
@@ -4298,7 +4308,7 @@
       "limitations": [
         "Styled tabs, menus, bulk close, zoom placement, nested resize, independent edge regions and atomic cross-region transfers are headless tested.",
         "Opt-in collapsed bottom tab strip and real resize reopening match the frozen bottom-edge behavior.",
-        "Opt-in canonical n-ary sized layouts, root normalization policies, sealed/per-group locks, panel visibility, payload reconstruction, deferred lifecycle reconciliation and simple-title palettes are tested subsets. Source-shaped PanelState/DockAreaState persistence and automatic lifecycle delivery remain incomplete in this release; hosts own descriptors, pure callbacks and commit timing. See DOCK.md frozen export audit."
+        "Canonical n-ary layouts, root policies, locks, visibility, title palettes, typed PanelState/DockAreaState atomic persistence and full-state factory reconstruction are tested subsets. Workspace dumps prefer matching rendered split sizes, then retained sizes, then source minimum. JSON parsing, automatic lifecycle delivery, host descriptor ownership and exact current-layout geometry integration remain incomplete. See DOCK.md frozen export audit."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4360,6 +4370,15 @@
             "tests/unit/test_dock.c",
             "tests/unit/test_dock_styled.c",
             "tests/web/test_browser.py"
+          ]
+        },
+        {
+          "name": "atomic source-shaped typed area persistence, measured split dumps and full leaf factory reconstruction",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "tests/unit/test_dock_styled.c",
+            "docs/DOCK.md"
           ]
         }
       ],
@@ -5947,7 +5966,7 @@
       "limitations": [
         "Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.",
         "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.",
-        "Source scale and shape subsets are tested. Broader grouped scale/legend/selection backlog is not fully implemented; numeric appearance/hover helpers require explicit host ownership and frame scheduling. Automatic styled appearance/hover orchestration, Core prepaint/hitbox integration, native path mesh caching and antialiasing remain incomplete in this release."
+        "Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Broader scale/legend/selection backlog, Core automatic prepaint, native meshes/caching, Oklab and patterns remain incomplete in this release."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6000,6 +6019,15 @@
             "tests/unit/test_plot.c",
             "tests/unit/test_plot_styled.c",
             "docs/PLOT_MODEL.md"
+          ]
+        },
+        {
+          "name": "styled appearance generations, scoped completion, retained hover tooltip composition and cached gradient path paint",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot.c",
+            "tests/unit/test_plot_styled.c",
+            "docs/PLOT.md"
           ]
         }
       ],

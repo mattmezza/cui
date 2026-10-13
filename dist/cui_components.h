@@ -650,7 +650,13 @@ static bool cui_button_label_prepaint(const cui_prepaint_info *info, const void 
     size_t prefix = name.length;
     float prefix_width = natural.width, tail_width = 0;
     cui_str tail = cui_string("…");
-    bool truncated = natural.width > width;
+    /* The constrained row reserves two representable steps for fractional
+     * child advances. Allow those plus subtraction rounding when deciding a
+     * measured exact fit; the existing viewport still clips physical paint. */
+    float fit_limit = width;
+    for (unsigned i = 0; i < 4; ++i)
+        fit_limit = nextafterf(fit_limit, INFINITY);
+    bool truncated = natural.width > fit_limit;
     if (truncated) {
         if (p->state && !info->inert)
             p->state->label[0] = 0;

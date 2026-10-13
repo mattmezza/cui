@@ -163,7 +163,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; no dynamic visibility predicate, automatic added/removed/active lifecycle hook or panel-specific dump callback. |
 | `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. No named factory registry or automatic panel construction from payload JSON. |
 | `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
-| Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Arbitrary title/title-suffix elements, per-title colors, Auto-vs-TabBar mode, `title_bar`/`inner_padding` overrides remain gaps. |
+| Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Per-title chrome colors, Auto-vs-TabBar mode and `title_bar`/`inner_padding` overrides remain gaps. |
 | Component `ToggleZoom`, `ClosePanel` | Real controls and close shortcut with focus/policy gates; user zoom is withheld when controls are None, and restore stays reachable. No Rust action dispatch registration. |
 
 Native floating is not exported or described as a Dock feature in the frozen modules/docs. The occurrences of detach refer to panel removal/reinsertion or detached asynchronous tasks, not native window creation. A future CUI multiwindow host example is an optional extension and cannot stand in for the source gaps above.
@@ -176,10 +176,32 @@ Set `workspace_options.collapsible_bottom = true` for the frozen closed-bottom b
 
 The bottom handle permits continuous resizing down to the strip, temporarily showing content above it. Release snaps to the strip or natural bottom minimum according to their midpoint; an open snap never leaves content below that minimum. Preferred size survives closing, so clicking the closed strip restores it. Keyboard handle resize also settles to a valid state. `on_resize` reports live changes and completion with logical size; save the validated workspace snapshot for persistence. Cancel/Escape, disablement or a blocking modal restores the complete pre-drag edge snapshot. Model content and serialization are untouched by this resize gesture. This adds no native window ownership.
 
-`view_options.collapsed` independently requests tab-only presentation for an ordinary styled view; it is the workspace's building block, not an automatic reopen controller. The caller owns open/close behavior when using it directly. Multiple/nested groups retain the model topology and each visible leaf's tabs; CUI does not yet expose the frozen per-group sealed/locked constraints or arbitrary title rendering hooks.
+`view_options.collapsed` independently requests tab-only presentation for an ordinary styled view; it is the workspace's building block, not an automatic reopen controller. The caller owns open/close behavior when using it directly. Multiple/nested groups retain the model topology and each visible leaf's tabs; CUI does not yet expose the frozen per-group sealed/locked constraints. Optional arbitrary title rendering hooks are described below.
 
 ## Per-edge collapsibility
 
 `cui_dock_workspace_set_collapsible(workspace, edge, false)` withholds closing for that edge; it preserves its current open flag and preferred size. This matches frozen `DockArea::set_dock_collapsible` and the open-edge guard in `toggle_dock`. An already closed edge may remain closed and can still be opened. Calling `set_edge` to close an **open** noncollapsible edge returns false before changing any state. Making the edge collapsible again permits closing. Center is not an edge and is rejected.
 
 Snapshots append `noncollapsible[3]` in left/right/bottom order; zero-initialized old host snapshots preserve the previous collapsible default. Persist these flags by field, together with open flags and sizes. A closed noncollapsible state is valid, as it is in the frozen reference. Restore remains atomic on invalid sizes. For an open noncollapsible bottom dock, resize respects the normal region minimum instead of snapping shut. A closed noncollapsible bottom still retains the opt-in strip; opening/resize returns it to a valid normal size. Headless checks cover all three flags, close rejection without snapshot mutation, valid closed-state restoration, invalid snapshot rollback and real keyboard resizing.
+
+## Panel title composition
+
+The frozen component Panel trait exposes `title` and `title_suffix`; `tab_panel.rs` paints every tab title and places the active panel's suffix outside the scrolling strip. CUI supports those hooks through `panel.title_render` and `panel.title_suffix`. Both callbacks receive the context, stable panel key and existing `panel.user`; descriptors and user data stay host-owned. The descriptor's `title` string remains the accessibility name, even when its visual body is an icon, badge or custom text. Do not mutate model/view/registry data from presentation callbacks, and keep callback-created control IDs globally unique across regions.
+
+A title callback requires a positive finite `title_width`; its body paints inside that fixed clipped slot. Without custom title callbacks, the original built-in title drawing is unchanged. A group mixing custom and ordinary titles draws ordinary labels with the same default tab metrics and palette. Oversized callback descendants can report raw bounds beyond the slot, but paint and input are clipped and cannot expand the pane. This hook replaces the body, not all tab chrome or its selected/hovered palette.
+
+A title-suffix callback requires positive finite `title_suffix_width`. Only the selected panel's callback runs, including the frame in which selection changes. The group reserves its largest declared suffix width (capped below pane width) and subtracts that space from the scroll viewport, preventing selection changes from shifting the strip or overlapping its trailing controls. The suffix wrapper is inert for a disabled workspace/panel; a collapsed group paints no suffix. Title callbacks still paint collapsed tab labels. Widths are validated before submitting the scene, and zero widths without callbacks preserve existing callers.
+
+```c
+static void title(cui_context *ui, uint64_t panel, void *user) {
+    (void)panel;
+    const cui_theme *theme = user;
+    cui_text(ui, cui_string("Editor • modified"), 14, theme->text);
+}
+/* Append to the ordinary panel descriptor. */
+panel.title_render = title;
+panel.title_width = 140;
+panel.user = &theme;
+```
+
+Headless tests verify real custom text/clip commands, unchanged semantic names, active-only suffix ownership and immediate selection routing, clickable suffix controls, disabled/collapsed gates, 160px pane allocation/hit isolation, stable key behavior after restore and atomic descriptor rejection. Per-title chrome colors, automatic simple-title mode and title-bar/content-padding overrides remain separate audited work.

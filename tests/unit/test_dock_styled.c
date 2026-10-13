@@ -1085,6 +1085,107 @@ static void test_panel_menus(void) {
     assert(cui_bounds(ui, cui_dock_menu_id(workspace, 2)).w == 0);
     options.hide_menu = false;
 }
+static unsigned title_calls[2], suffix_calls[2], suffix_actions;
+static void custom_title(cui_context *ctx, uint64_t key, void *user) {
+    assert(key < 2 && user == &title_calls);
+    ++title_calls[key];
+    cui_begin_box(ctx, 960 + key, (cui_box){.width = -1, .height = 18});
+    cui_text(ctx, cui_string("A badge and a deliberately oversized title"), 14,
+             (cui_color){17, 23, 29, 255});
+    cui_end_box(ctx);
+}
+static void custom_suffix(cui_context *ctx, uint64_t key, void *user) {
+    assert(key < 2 && user == &title_calls);
+    ++suffix_calls[key];
+    cui_theme theme = cui_theme_light();
+    if (cui_button_ex(ctx, 950 + key, &theme, cui_string("Status"),
+                      (cui_button_options){.size = CUI_CONTROL_SMALL,
+                                           .icon = cui_string("info"),
+                                           .icon_only = true}))
+        ++suffix_actions;
+}
+static void test_title_composition(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    assert(model);
+    for (unsigned i = 0; i < 2; ++i) {
+        assert(cui_dock_insert(model, cui_dock_root(model), i, SIZE_MAX) == CUI_DOCK_OK);
+        panels[i].title_render = custom_title;
+        panels[i].title_suffix = custom_suffix;
+        panels[i].title_width = 60;
+        panels[i].title_suffix_width = 64;
+        panels[i].user = &title_calls;
+    }
+    frame();
+    frame();
+    assert(title_calls[0] && title_calls[1] && suffix_calls[0] && !suffix_calls[1]);
+    bool title_ink = false, title_clip = false;
+    for (size_t i = 0; i < last_draw.count; ++i) {
+        const cui_draw_command *command = &last_draw.commands[i];
+        title_ink |= command->type == CUI_DRAW_TEXT && command->color.r == 17 &&
+                     command->color.g == 23 && command->color.b == 29;
+        title_clip |= command->type == CUI_DRAW_CLIP_PUSH && command->bounds.w == 60;
+    }
+    assert(title_ink && title_clip);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    bool label = false;
+    for (size_t i = 0; i < count; ++i)
+        if (semantics[i].id == cui_dock_tab_id(workspace, 0))
+            label |= semantics[i].name.length == panels[0].title.length &&
+                     !memcmp(semantics[i].name.data, panels[0].title.data, panels[0].title.length);
+    assert(label);
+    cui_rect suffix = cui_bounds(ui, 950);
+    assert(suffix.x >= 500 && suffix.x + suffix.w <= 640);
+    click(950);
+    assert(suffix_actions == 1);
+    unsigned old_suffix = suffix_calls[0];
+    click(cui_dock_tab_id(workspace, 1));
+    assert(result.selected && suffix_calls[1] && suffix_calls[0] == old_suffix);
+    frame();
+    assert(cui_bounds(ui, 950).w == 0 && cui_bounds(ui, 951).w > 0);
+    options.width = 160;
+    frame();
+    frame();
+    suffix = cui_bounds(ui, 951);
+    assert(suffix.x >= 96 && suffix.x + suffix.w <= 160);
+    pointer(CUI_EVENT_POINTER_MOVE, 163, suffix.y + suffix.h / 2);
+    frame();
+    assert(!cui_hovered(ui, 951));
+    options.width = 640;
+    char saved[4096];
+    size_t saved_size;
+    assert(cui_dock_serialize(model, saved, sizeof saved, &saved_size) == CUI_DOCK_OK);
+    assert(cui_dock_restore(model, (cui_str){saved, saved_size}) == CUI_DOCK_OK);
+    frame();
+    frame();
+    assert(cui_bounds(ui, 951).w > 0 && cui_bounds(ui, 950).w == 0);
+    options.disabled = true;
+    frame();
+    click(951);
+    assert(suffix_actions == 1);
+    options.disabled = false;
+    options.collapsed = true;
+    old_suffix = suffix_calls[0] + suffix_calls[1];
+    frame();
+    assert(suffix_calls[0] + suffix_calls[1] == old_suffix && cui_bounds(ui, 951).w == 0);
+    options.collapsed = false;
+    /* Descriptor validation is atomic and precedes any scene/callback submission. */
+    panels[0].title_width = NAN;
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    unsigned previous = title_calls[0];
+    assert(cui_dock_view_render(ui, workspace, &theme, model, view, panels, 5, options).error ==
+           CUI_DOCK_INVALID);
+    assert(!cui_end_frame(ui).count && title_calls[0] == previous);
+    for (unsigned i = 0; i < 2; ++i) {
+        panels[i].title_render = NULL;
+        panels[i].title_suffix = NULL;
+        panels[i].title_width = panels[i].title_suffix_width = 0;
+        panels[i].user = NULL;
+    }
+    frame();
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -1213,6 +1314,7 @@ int main(void) {
     test_workspace_transfers();
     test_oversized_content();
     test_panel_menus();
+    test_title_composition();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

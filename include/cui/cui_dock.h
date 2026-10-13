@@ -119,6 +119,10 @@ typedef struct {
     size_t menu_count;
     void (*menu_action)(void *user, uint64_t panel, cui_id action);
     cui_dock_zoom_control zoom_control;
+    /* Optional borrowed title composition; positive widths reserve clipped slots. */
+    void (*title_render)(cui_context *, uint64_t panel, void *user);
+    void (*title_suffix)(cui_context *, uint64_t panel, void *user);
+    float title_width, title_suffix_width;
 } cui_dock_panel;
 typedef enum {
     CUI_DOCK_SELECTED,

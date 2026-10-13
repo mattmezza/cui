@@ -506,6 +506,63 @@ static void dock_render_menu(dock_scene *s, dock_cache *cache, cui_dock_node_inf
     s->menu_key = active->key;
     s->custom_action = action;
 }
+typedef struct {
+    dock_scene *scene;
+    cui_id *selected;
+    float suffix_width;
+} dock_title_context;
+static void dock_title_body(cui_context *ui, const cui_choice_item *item, size_t index,
+                            void *user) {
+    dock_title_context *context = user;
+    dock_scene *s = context->scene;
+    uint64_t key = s->view->keys[index];
+    const cui_dock_panel *panel = dock_panel_get(s, key);
+    if (panel && panel->title_render) {
+        cui_begin_box(ui, dock_part(s->id, key, UINT64_C(0x348651f58752a026)),
+                      (cui_box){.width = panel->title_width,
+                                .max_width = panel->title_width,
+                                .clip = true,
+                                .inert = item->disabled});
+        panel->title_render(ui, key, panel->user);
+        cui_end_box(ui);
+    } else {
+        float density = s->theme->font_size / 16;
+        cui_tab_metrics metrics = cui_tab_size_metrics(CUI_TAB_DEFAULT, CUI_TAB_MEDIUM, density);
+        cui_color ink = *context->selected == item->id || cui_hovered(ui, item->id)
+                            ? s->theme->tab_active_foreground
+                            : s->theme->tab_foreground;
+        if (item->disabled)
+            ink = s->theme->muted;
+        cui_text(ui, item->label, metrics.font_size, ink);
+    }
+}
+static void dock_title_tail(cui_context *ui, void *user) {
+    dock_title_context *context = user;
+    dock_scene *s = context->scene;
+    if (s->options.collapsed)
+        return;
+    for (size_t i = 0; i < s->panel_count; ++i) {
+        const cui_dock_panel *panel = &s->panels[i];
+        if (cui_dock_tab_id(s->id, panel->key) != *context->selected)
+            continue;
+        cui_begin_box(ui, dock_part(s->id, panel->key, UINT64_C(0xf52720d3a973ba34)),
+                      (cui_box){.width = context->suffix_width,
+                                .max_width = context->suffix_width,
+                                .height = s->options.tab_height,
+                                .clip = true,
+                                .inert = s->options.disabled || panel->disabled});
+        if (panel->title_suffix)
+            panel->title_suffix(ui, panel->key, panel->user);
+        cui_end_box(ui);
+        return;
+    }
+}
+static bool dock_title_valid(const cui_dock_panel *panel) {
+    return isfinite(panel->title_width) && panel->title_width >= 0 &&
+           isfinite(panel->title_suffix_width) && panel->title_suffix_width >= 0 &&
+           (!panel->title_render || panel->title_width > 0) &&
+           (!panel->title_suffix || panel->title_suffix_width > 0);
+}
 static void dock_render_node(dock_scene *, cui_dock_node, float, float);
 static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cache, float w,
                              float h) {
@@ -525,10 +582,17 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
         return;
     }
     cui_id selected = 0;
+    bool custom_title = false;
+    float suffix_width = 0;
     for (size_t i = 0; i < info.panel_count; ++i) {
         uint64_t key;
         cui_dock_panel_at(s->dock, info.id, i, &key);
         const cui_dock_panel *panel = dock_panel_get(s, key);
+        if (panel) {
+            custom_title |= panel->title_render != NULL;
+            if (panel->title_suffix && !s->options.collapsed)
+                suffix_width = fmaxf(suffix_width, panel->title_suffix_width);
+        }
         s->view->keys[i] = key;
         s->view->items[i] =
             (cui_choice_item){.id = cui_dock_tab_id(s->id, key),
@@ -544,13 +608,19 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
     if (!s->options.allow_reorder || s->options.disabled || s->options.collapsed)
         memset(&cache->drag, 0, sizeof cache->drag);
     cui_id strip = dock_part(s->id, info.id, UINT64_C(0x124b79d89af392e1));
+    suffix_width = fminf(suffix_width, fmaxf(0, w - 1));
+    dock_title_context title_context = {s, &selected, suffix_width};
     bool changed = cui_tabs(
         s->ui, strip, s->theme, s->view->items, info.panel_count, &selected,
         (cui_tabs_options){.disabled = s->options.disabled,
                            .variant = CUI_TAB_DEFAULT,
                            .height = s->options.tab_height,
                            .scroll = &cache->scroll,
-                           .bar_extent = w,
+                           .bar_extent = fmaxf(1, w - suffix_width),
+                           .render = custom_title ? dock_title_body : NULL,
+                           .render_user = &title_context,
+                           .suffix = suffix_width > 0 ? dock_title_tail : NULL,
+                           .content_user = &title_context,
                            .reveal_selected = true,
                            .scrollbar = true,
                            .parts = s->view->parts,
@@ -825,6 +895,8 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
         size_t used = 0, total = 0;
         if (!dock_custom_menu_valid(id, panels[i].key, panels[i].menu_items, panels[i].menu_count,
                                     0, custom_ids, &used, &total))
+            return invalid;
+        if (!dock_title_valid(&panels[i]))
             return invalid;
         if (panels[i].zoom_control < CUI_DOCK_ZOOM_BOTH ||
             panels[i].zoom_control > CUI_DOCK_ZOOM_NONE)
@@ -1611,6 +1683,8 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
         if (region->panel_count > CUI_DOCK_PANEL_LIMIT)
             return invalid;
         for (size_t p = 0; p < region->panel_count; ++p) {
+            if (!dock_title_valid(&region->panels[p]))
+                return invalid;
             if (region->panels[p].zoom_control < CUI_DOCK_ZOOM_BOTH ||
                 region->panels[p].zoom_control > CUI_DOCK_ZOOM_NONE)
                 return invalid;

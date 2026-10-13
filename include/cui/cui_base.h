@@ -82,6 +82,8 @@ typedef struct {
     bool dragging;
     cui_edit_composition *composition; /* Optional caller-owned session and view buffers. */
     bool composition_owned;            /* Internal default resource flag; initialize false. */
+    uintptr_t bound_edit_identity; /* Internal numeric identity; no retained model pointer. */
+    bool focus_initialized, was_focused; /* Zero-init; focus/rebind splits typing history. */
 } cui_input_behavior_state;
 /* Lazy bounded default session (4095 preedit / 65535 rendered bytes). */
 cui_edit_composition *cui_base_composition(cui_context *, cui_id, cui_edit_composition *,

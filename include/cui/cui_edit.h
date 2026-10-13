@@ -40,6 +40,7 @@ typedef struct {
      * or its next update; original caller view_buffer remains caller-owned. */
     bool grow_view, view_valid;
     size_t view_length;
+    uintptr_t model_identity; /* Engine numeric binding; reset on model destruction/reuse. */
 } cui_edit_composition;
 /* Source single-line acceptance: empty values are valid; reject a candidate
  * only when its predicate fails and the previous visible value passes. */
@@ -82,7 +83,8 @@ typedef enum {
     CUI_EDIT_REQUEST_EVENT,
     CUI_EDIT_REQUEST_INSERT,
     CUI_EDIT_REQUEST_DELETE_SELECTION,
-    CUI_EDIT_REQUEST_COMPOSITION
+    CUI_EDIT_REQUEST_COMPOSITION,
+    CUI_EDIT_REQUEST_PRESENT /* Nonmutating initial/current presentation; see below. */
 } cui_edit_request_kind;
 typedef struct {
     cui_edit_request_kind kind;
@@ -92,6 +94,7 @@ typedef struct {
     bool editable;
     cui_edit_normalization normalization;
     cui_edit_presentation presentation;
+    bool masked_words; /* Checked-call word boundaries become whole-value endpoints. */
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;
@@ -104,13 +107,22 @@ typedef struct {
  * attempted reentry. Pure model getters remain available. External side effects
  * and direct caller-buffer writes are outside this protection. Multiline models
  * bypass the predicate, matching the source single-line contract. Undo/Redo and
- * composition START/CANCEL bypass it; UPDATE/COMMIT validate provisional text.
+ * composition START/CANCEL bypass the predicate; UPDATE/COMMIT validate provisional text.
  * Rejection preserves logical state and prior view's defined bytes; internal
  * scratch and unused buffer tails are unspecified. */
-/* Presentation is supported for single-line models only. Declared user,
+/* PRESENT prepares current committed text (NULL or inactive composition), or
+ * an active model-bound already-materialized composed view. It never invokes
+ * acceptance or changes logical/session state; editable is ignored. An inactive
+ * previously bound session must still belong to this model. Successful prepare
+ * returns prepared/applied=true despite unchanged text; absent prepare is a no-op.
+ * Caller must reset sessions before destroying/replacing their model.
+ * Presentation is supported for single-line models only. Declared user,
  * descriptor and up to three workspaces must be accurate disjoint extents,
  * outside model/session/payload storage. Unused spans must be zero. Preparation
- * runs once before predicates, including Undo/Redo resource preparation. Caller
+ * runs once before predicates, including Undo/Redo resource preparation. With a
+ * callback, composition START requires empty payload and prepares the empty-preedit
+ * selected-range replacement before session mutation; no predicate runs. Zero
+ * presentation retains legacy START behavior, and CANCEL never prepares. Caller
  * owns all staged resources: consume/discard before another request. Prepared
  * says prepare returned OK (even if later guard/predicate fails); applied says
  * the checked operation adopted that candidate. Completion is outside engine

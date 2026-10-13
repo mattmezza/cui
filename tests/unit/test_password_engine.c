@@ -303,7 +303,7 @@ static void composition(bool grow) {
     r.normalization = CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
     r.event = (cui_event){.type = CUI_EVENT_COMPOSITION_START};
     assert(cui_edit_apply_checked(e, r, (cui_edit_acceptance){validate, &s}).error == CUI_EDIT_OK &&
-           !s.prepares);
+           s.prepares == 1 && !s.predicates);
     r.event = (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
                           .text_data = "é\r\n😀",
                           .text_length = 8,
@@ -311,7 +311,7 @@ static void composition(bool grow) {
                           .composition_cursor = 8};
     cui_edit_checked_result out = cui_edit_apply_checked(e, r, (cui_edit_acceptance){validate, &s});
     assert(out.error == CUI_EDIT_OK && out.presentation_applied && s.provisional &&
-           s.prepares == 1 && c.anchor == 2 && c.cursor == 6);
+           s.prepares == 2 && c.anchor == 2 && c.cursor == 6);
     char old_view[64];
     cui_str visible = cui_edit_composition_view(e, &c);
     memcpy(old_view, visible.data, visible.length + 1);
@@ -386,7 +386,7 @@ static void growing_failure(void) {
     r.event = (cui_event){
         .type = CUI_EVENT_COMPOSITION_UPDATE, .text_data = payload, .text_length = 4500};
     cui_edit_checked_result result = cui_edit_apply_checked(e, r, (cui_edit_acceptance){0});
-    assert(result.error == CUI_EDIT_CAPACITY && s.prepares == 1 && !result.presentation_prepared);
+    assert(result.error == CUI_EDIT_CAPACITY && s.prepares == 2 && !result.presentation_prepared);
     cui_str retained = cui_edit_composition_view(e, &c);
     assert(retained.data == pointer && retained.length == old.length &&
            !strcmp(retained.data, "a") && !c.length);

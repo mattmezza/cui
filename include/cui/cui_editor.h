@@ -36,7 +36,7 @@ typedef struct {
     uint64_t cursor_anchor_revision, next_cursor_id;
     cui_text_style cursor_anchor_style;
     float cursor_anchor_font_size;
-    bool multi_pointer;
+    bool multi_pointer, clipboard_active;
 
 } cui_editor_state;
 typedef struct {
@@ -50,6 +50,12 @@ typedef struct {
     cui_editor_matcher *search; /* Optional borrowed retained matcher, synchronized by view. */
     bool custom_search_colors;
     cui_color search_color, search_current_color;
+    /* Optional caller scratch for multicursor Copy/Cut, including joined LF/NUL.
+     * Disjoint from all model/view resources, borrowed for submission. Clipboard
+     * callbacks must not reenter UI/editor or mutate model/resources; returned
+     * text stays immutable through the synchronous operation. */
+    char *clipboard_scratch;
+    size_t clipboard_capacity;
 } cui_editor_options;
 bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, size_t capacity);
 /* Required before submitting a model with attached multi-selection storage.

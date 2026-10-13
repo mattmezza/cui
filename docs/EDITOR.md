@@ -441,10 +441,48 @@ replacement coalesces coincident resulting cursors. Errors preserve the document
 collection, and paired history. Read-only Textarea row helpers expose measured
 positions without modifying selection or pointer state.
 
-This slice does not implement rectangular Alt-drag, distributed clipboard paste,
-multi-cursor line indentation, typing-history coalescing, or multiple IME
-composition ranges. Clipboard and other legacy single-range operations still use
-the primary selection and collapse extras on mutation. Tab with multiple cursors
-uses the existing focus behavior instead of partial line indentation. CodeEditor
-inline-token exclusion remains in force. Search mode buttons show selected
-presentation as well as their semantic checked state.
+Tab and Shift-Tab now use source-backed multicursor indentation. A noncollapsed
+range anywhere in the collection makes the operation a block action for every
+cursor: all touched LF rows, including a range's endpoint row, are processed once.
+Collapsed inline Tab inserts exactly the configured unit at each cursor (not a
+visual tab-stop calculation). Outdent removes only an exact leading unit from each
+touched row, once even when cursors share that row. Partial/mixed indentation is
+left unchanged. Hard tabs use one tab byte; soft tabs use `tab_size` spaces.
+`cui_edit_indent_selections` also exposes explicit block mode. Every endpoint maps
+through every earlier edit, including edits belonging to other cursors; points
+inside removed indentation clamp to the remaining line start. IDs, orientations,
+and collection order survive. The operation records one Undo transaction.
+Ctrl/Meta bracket block actions dispatch through `cui_key_character`; the host's
+portable key mapping must supply `[` or `]`. Hosts may also invoke explicit block
+mode directly. These actions use the attached multicursor adapter.
+
+Multicursor clipboard commands use the existing synchronous
+`textarea.clipboard` platform hooks. `cui_edit_paste_selections` treats empty text
+as no operation. It normalizes overlapping ranges, then splits on LF, retaining
+a trailing empty line. An equal number of lines and selections distributes one
+line per range in document order; otherwise the whole text repeats at every
+range. CR bytes are retained. One Undo restores the prior collection and text.
+`cui_edit_copy_selections` joins nonempty ranges in document order with LF, leaving
+collapsed cursors out. It writes a NUL-terminated caller buffer and returned slice
+only after capacity/alias preflight; failure leaves both outputs unchanged.
+
+Set `clipboard_scratch`/`clipboard_capacity` on Editor options for Copy/Cut. This
+borrowed buffer must fit joined text plus NUL and stay disjoint from document,
+model/history, visual rows, and cursor anchors. Paste uses model scratch and does
+not require this buffer. Cut preflights the document operation before calling the
+host write; a failed write preserves document and collection. Readonly Cut copies
+without deletion; readonly Paste does not call the read callback. Callbacks are
+synchronous, must not reenter UI/Editor or mutate the model/resources, and returned
+paste bytes must stay immutable through the operation. The adapter checks the
+revision and selection collection after a callback and rejects a stale paste/cut
+if the host changed them; host mutations are not rolled back. The same-editor
+base reducer rejects reentrant submission while a clipboard callback is active.
+`cui_edit_can_replace_selections` provides a read-only model preflight; internal
+scratch contents may change. No async clipboard permission/request API is claimed.
+
+This slice does not implement rectangular Alt-drag, typing-history coalescing,
+or multiple IME composition ranges. Preferred columns remain view metadata rather
+than Undo state. Inline-token annotations are excluded from these attached
+multicursor models and CodeEditor, so token-aware clipboard/indent remapping is not
+claimed. Search mode buttons show selected presentation as well as their semantic
+checked state.

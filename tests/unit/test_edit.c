@@ -952,7 +952,87 @@ static void test_multi_motion_and_erasure(void) {
     assert(cui_edit_undo(edit) == CUI_EDIT_OK && !memcmp(saved, live, sizeof saved));
     cui_edit_destroy(edit);
 }
+static void test_multi_indent_and_clipboard(void) {
+    char buffer[128] = "1\n2\n3";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 4});
+    cui_edit_selection live[8], input[] = {{31, 4, 4}, {11, 0, 0}, {21, 2, 2}};
+    cui_edit_selection_snapshot history[5];
+    assert(edit && cui_edit_attach_selections(edit, live, 8, history, 5) == CUI_EDIT_OK);
+    assert(cui_edit_select_many(edit, input, 3) == CUI_EDIT_OK);
+    assert(cui_edit_indent_selections(edit, false, false, 2, false) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "  1\n  2\n  3") && live[0].cursor == 10 && live[1].cursor == 6 &&
+           live[2].cursor == 2);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "1\n2\n3"));
+    assert(live[0].id == 31 && live[0].cursor == 4);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK);
+    assert(cui_edit_indent_selections(edit, true, false, 2, false) == CUI_EDIT_OK &&
+           !strcmp(buffer, "1\n2\n3"));
+    assert(cui_edit_paste_selections(edit, cui_string("x\ny\nz")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "x1\ny2\nz3") && live[0].cursor == 7 && live[1].cursor == 4 &&
+           live[2].cursor == 1);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "1\n2\n3"));
+    assert(cui_edit_paste_selections(edit, cui_string("x\ny\n")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "x1\ny2\n3") && live[0].cursor == 6);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(cui_edit_paste_selections(edit, cui_string("x\ny")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "x\ny1\nx\ny2\nx\ny3"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    cui_edit_selection selected[] = {{31, 5, 4}, {11, 0, 1}, {21, 2, 2}};
+    assert(cui_edit_select_many(edit, selected, 3) == CUI_EDIT_OK);
+    char copy[32] = "untouched";
+    cui_str output = cui_string("sentinel");
+    assert(cui_edit_copy_selections(edit, copy, 3, &output) == CUI_EDIT_CAPACITY);
+    assert(!strcmp(copy, "untouched") && output.length == 8);
+    assert(cui_edit_copy_selections(edit, (char *)(void *)history, sizeof history, &output) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_copy_selections(edit, copy, sizeof copy, &output) == CUI_EDIT_OK &&
+           !strcmp(copy, "1\n3"));
+    cui_edit_selection saved[3];
+    memcpy(saved, live, sizeof saved);
+    assert(cui_edit_paste_selections(edit, (cui_str){0}) == CUI_EDIT_OK &&
+           !memcmp(saved, live, sizeof saved));
+    assert(cui_edit_can_replace_selections(edit, cui_string("a")) == CUI_EDIT_OK &&
+           !memcmp(saved, live, sizeof saved));
+    /* Any selected range makes every selection a block; shared rows edit once. */
+    assert(cui_edit_indent_selections(edit, false, false, 2, true) == CUI_EDIT_OK &&
+           !strcmp(buffer, "\t1\n\t2\n\t3"));
+    assert(live[0].anchor == 8 && live[0].cursor == 7);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !memcmp(saved, live, sizeof saved));
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    assert(cui_edit_replace_range(edit, 0, 5, cui_string("  aa\nbb")) == CUI_EDIT_OK);
+    cui_edit_selection same_row[] = {{1, 1, 1}, {2, 3, 3}, {3, 6, 6}};
+    assert(cui_edit_select_many(edit, same_row, 3) == CUI_EDIT_OK);
+    assert(cui_edit_indent_selections(edit, true, false, 2, false) == CUI_EDIT_OK &&
+           !strcmp(buffer, "aa\nbb"));
+    assert(live[0].cursor == 0 && live[1].cursor == 1 && live[2].cursor == 4);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(cui_edit_indent_selections(edit, true, false, 3, false) == CUI_EDIT_OK &&
+           !strcmp(buffer, "  aa\nbb"));
+    assert(cui_edit_indent_selections(edit, false, true, 2, false) == CUI_EDIT_OK &&
+           !strcmp(buffer, "    aa\n  bb"));
+    assert(live[0].cursor == 3 && live[1].cursor == 5 && live[2].cursor == 10);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "  aa\nbb"));
+    assert(cui_edit_indent_selections(edit, false, false, 0, false) == CUI_EDIT_INVALID_ARGUMENT);
+    cui_edit_destroy(edit);
+    char tiny[8] = "abcd";
+    edit = cui_edit_create(
+        (cui_edit_config){.buffer = tiny, .capacity = sizeof tiny, .multiline = true});
+    assert(edit && cui_edit_attach_selections(edit, live, 8, NULL, 0) == CUI_EDIT_OK);
+    cui_edit_selection two[] = {{1, 0, 0}, {2, 3, 3}};
+    assert(cui_edit_select_many(edit, two, 2) == CUI_EDIT_OK);
+    assert(cui_edit_indent_selections(edit, false, false, 2, false) == CUI_EDIT_CAPACITY &&
+           !strcmp(tiny, "abcd"));
+    assert(live[0].cursor == 0 && live[1].cursor == 3);
+    assert(cui_edit_paste_selections(edit, cui_string("long\nlong")) == CUI_EDIT_CAPACITY &&
+           !strcmp(tiny, "abcd"));
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_multi_indent_and_clipboard();
     test_multi_motion_and_erasure();
     test_multiple_selections();
     test_token_replacement();

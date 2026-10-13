@@ -77,6 +77,17 @@ typedef enum {
     CUI_EDIT_UNICODE_WORD_PREVIOUS,
     CUI_EDIT_UNICODE_WORD_NEXT
 } cui_edit_motion;
+/* Read-only replacement preflight; internal scratch may change, model/history
+ * do not. Same validation as replace_selections. */
+cui_edit_result cui_edit_can_replace_selections(cui_edit *, cui_str);
+/* Empty clipboard preserves ranges. LF lines (including final empty line) are
+ * distributed in document order only when count matches normalized selections;
+ * otherwise whole text repeats. One Undo restores the original collection. */
+cui_edit_result cui_edit_paste_selections(cui_edit *, cui_str);
+/* Join nonempty ranges in document order with LF and a trailing NUL. Caller
+ * buffer/output must be disjoint from all model storage. Both stay untouched on
+ * validation/capacity failure; output borrows buffer. Does not change selection. */
+cui_edit_result cui_edit_copy_selections(const cui_edit *, char *, size_t, cui_str *output);
 size_t cui_edit_selection_capacity(const cui_edit *);
 /* Add collapsed cursors, retaining active-first order. Duplicate offsets and
  * points inside existing selections are ignored. New IDs must be unique.
@@ -194,6 +205,12 @@ cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui
  * insert at the collapsed cursor. Outdent removes only an exact line prefix.
  * One successful change is one undo step with both selection endpoints mapped.
  * Attached inline tokens reject indent; detach or use host token-aware editing. */
+/* Attached multicursor indent: any noncollapsed range (or block=true) selects
+ * whole LF lines, inclusive endpoint row and deduplicated shared rows. Inline
+ * inserts at cursors. Outdent removes one exact leading unit per touched row.
+ * Remaps every endpoint across all edits; atomic one Undo, no token support. */
+cui_edit_result cui_edit_indent_selections(cui_edit *, bool outdent, bool block, size_t tab_size,
+                                           bool hard_tabs);
 cui_edit_result cui_edit_indent(cui_edit *, bool outdent, size_t tab_size, bool hard_tabs);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);

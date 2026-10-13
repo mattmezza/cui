@@ -201,10 +201,68 @@ static size_t cui_editor_clip_grapheme(cui_str text, size_t offset, bool forward
     }
     return iterator.offset == offset || forward ? iterator.offset : previous;
 }
+static bool cui_editor_storage_overlap(const void *, size_t, const void *, size_t);
+static cui_edit_result cui_editor_multi_clipboard(cui_editor_state *editor,
+                                                  cui_editor_options options, cui_key key) {
+    const cui_platform *host = options.textarea.clipboard;
+    bool paste = key == CUI_KEY_V;
+    if (!host || !(host->capabilities & CUI_PLATFORM_CLIPBOARD) ||
+        (paste ? !host->clipboard_get : !host->clipboard_set))
+        return CUI_EDIT_CLIPBOARD_UNAVAILABLE;
+    if (options.textarea.readonly && key == CUI_KEY_V)
+        return CUI_EDIT_OK;
+    size_t count;
+    const cui_edit_selection *live = cui_edit_get_selections(editor->edit, &count);
+    cui_edit_selection before[CUI_EDIT_MAX_SELECTIONS];
+    memcpy(before, live, count * sizeof(*live));
+    uint64_t revision = cui_edit_get_state(editor->edit).revision;
+    cui_str text = {0};
+    cui_edit_result error = CUI_EDIT_OK;
+    if (!paste) {
+        char *scratch = options.clipboard_scratch;
+        size_t capacity = options.clipboard_capacity;
+        if (!scratch || !capacity ||
+            cui_editor_storage_overlap(scratch, capacity, editor, sizeof(*editor)) ||
+            cui_editor_storage_overlap(scratch, capacity, editor->view.lines,
+                                       editor->view.capacity * sizeof(*editor->view.lines)) ||
+            cui_editor_storage_overlap(scratch, capacity, editor->cursor_anchors,
+                                       editor->cursor_anchor_capacity *
+                                           sizeof(*editor->cursor_anchors)))
+            return CUI_EDIT_INVALID_ARGUMENT;
+        error = cui_edit_copy_selections(editor->edit, scratch, capacity, &text);
+        if (error != CUI_EDIT_OK)
+            return error;
+        if (key == CUI_KEY_X && !options.textarea.readonly) {
+            error = cui_edit_can_replace_selections(editor->edit, (cui_str){0});
+            if (error != CUI_EDIT_OK)
+                return error;
+        }
+    }
+    editor->clipboard_active = true;
+    bool copied = true;
+    if (paste)
+        text = host->clipboard_get(host->user);
+    else
+        copied = host->clipboard_set(host->user, text);
+    editor->clipboard_active = false;
+    size_t after_count;
+    live = cui_edit_get_selections(editor->edit, &after_count);
+    if (revision != cui_edit_get_state(editor->edit).revision || count != after_count ||
+        memcmp(before, live, count * sizeof(*live)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!copied)
+        return CUI_EDIT_CLIPBOARD_UNAVAILABLE;
+    if (paste)
+        return cui_edit_paste_selections(editor->edit, text);
+    return key == CUI_KEY_X && !options.textarea.readonly
+               ? cui_edit_replace_selections(editor->edit, (cui_str){0})
+               : CUI_EDIT_OK;
+}
 static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                                                    cui_editor_state *editor,
-                                                   cui_textarea_options options,
+                                                   cui_editor_options editor_options,
                                                    cui_textarea_metrics metrics, float width) {
+    cui_textarea_options options = editor_options.textarea;
     cui_textarea_result result = {.error = CUI_TEXTAREA_OK};
     size_t count;
     const cui_edit_selection *live = cui_edit_get_selections(editor->edit, &count);
@@ -244,17 +302,27 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                    (command || shift);
         bool pointer = event.type == CUI_EVENT_POINTER_DOWN &&
                        event.pointer_button == CUI_POINTER_PRIMARY && alt && !shift && !command;
+        bool clipboard =
+            event.type == CUI_EVENT_KEY_DOWN && command &&
+            (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V);
+        char character = cui_key_character(event.key);
+        bool block_indent =
+            event.type == CUI_EVENT_KEY_DOWN && command && (character == '[' || character == ']');
+        bool indent = event.type == CUI_EVENT_KEY_DOWN && !alt &&
+                      ((event.key == CUI_KEY_TAB && !command) || block_indent) &&
+                      !options.no_indent && !options.readonly;
         bool key = event.type == CUI_EVENT_KEY_DOWN &&
                    (event.key == CUI_KEY_ESCAPE || event.key == CUI_KEY_LEFT ||
                     event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_HOME ||
                     event.key == CUI_KEY_END || event.key == CUI_KEY_BACKSPACE ||
                     event.key == CUI_KEY_DELETE || event.key == CUI_KEY_ENTER);
-        if (!vertical && !pointer && !key && event.type != CUI_EVENT_TEXT)
+        if (!vertical && !pointer && !key && !clipboard && !indent && event.type != CUI_EVENT_TEXT)
             continue;
         if (event.key == CUI_KEY_ESCAPE && count == 1)
             continue;
         if (options.readonly &&
-            (add || pointer || event.type == CUI_EVENT_TEXT || event.key == CUI_KEY_ENTER ||
+            (add || pointer || indent || (clipboard && event.key == CUI_KEY_V) ||
+             event.type == CUI_EVENT_TEXT || event.key == CUI_KEY_ENTER ||
              event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE)) {
             cui_consume_event(ui, event_index);
             continue;
@@ -270,9 +338,25 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
         cui_editor_cursor_anchor anchors[CUI_EDIT_MAX_SELECTIONS];
         memcpy(anchors, editor->cursor_anchors, count * sizeof(*anchors));
         size_t reveal = SIZE_MAX;
-        bool reveal_upstream = false, preserve = false;
+        bool reveal_upstream = false, preserve = false, reveal_cursor = true;
         cui_edit_result error = CUI_EDIT_OK;
-        if (pointer || add) {
+        if (clipboard) {
+            uint64_t old_revision = cui_edit_get_state(editor->edit).revision;
+            cui_edit_selection old[CUI_EDIT_MAX_SELECTIONS];
+            memcpy(old, live, count * sizeof(*old));
+            error = cui_editor_multi_clipboard(editor, editor_options, event.key);
+            size_t new_count;
+            const cui_edit_selection *new_live = cui_edit_get_selections(editor->edit, &new_count);
+            if (old_revision == cui_edit_get_state(editor->edit).revision && count == new_count &&
+                !memcmp(old, new_live, count * sizeof(*old))) {
+                preserve = true;
+                reveal_cursor = false;
+            }
+        } else if (indent) {
+            error = cui_edit_indent_selections(
+                editor->edit, block_indent ? character == '[' : shift, block_indent,
+                options.tab_size ? options.tab_size : 2, options.hard_tabs);
+        } else if (pointer || add) {
             cui_edit_selection additions[CUI_EDIT_MAX_SELECTIONS];
             cui_editor_cursor_anchor added_anchors[CUI_EDIT_MAX_SELECTIONS];
             size_t added = 0;
@@ -526,7 +610,8 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
             reveal = live[0].cursor;
             reveal_upstream = editor->cursor_anchors[0].upstream;
         }
-        cui_editor_multi_reveal(ui, editor, reveal, reveal_upstream);
+        if (reveal_cursor)
+            cui_editor_multi_reveal(ui, editor, reveal, reveal_upstream);
         cui_invalidate(ui);
     }
     live = cui_edit_get_selections(editor->edit, &count);
@@ -537,10 +622,11 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
 }
 cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cui_editor_state *s,
                                     cui_editor_options o, cui_textarea_metrics metrics) {
-    if (!ui || !id || !s || !s->edit || cui_edit_get_content(s->edit).token_count ||
-        !s->view.lines || !s->view.capacity || s->view.capacity > 65536 ||
-        !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
-        metrics.line_height <= 0 || o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+    if (!ui || !id || !s || !s->edit || s->clipboard_active ||
+        cui_edit_get_content(s->edit).token_count || !s->view.lines || !s->view.capacity ||
+        s->view.capacity > 65536 || !isfinite(metrics.font_size) || metrics.font_size <= 0 ||
+        !isfinite(metrics.line_height) || metrics.line_height <= 0 ||
+        o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
         o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||
         (o.language.length && !o.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
@@ -570,13 +656,12 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     if (saved_live)
         memcpy(saved, saved_live, saved_count * sizeof(*saved));
     cui_edit_result completion_error = cui_editor_completion_events(ui, id, s, o.textarea);
-    cui_textarea_result multiple = cui_editor_multi_events(ui, id, s, o.textarea, metrics, width);
+    cui_textarea_result multiple = cui_editor_multi_events(ui, id, s, o, metrics, width);
     if (multiple.error != CUI_TEXTAREA_OK)
         return multiple;
     size_t current_count;
     cui_edit_get_selections(s->edit, &current_count);
-    if (current_count > 1)
-        o.textarea.no_indent = true;
+    (void)current_count;
     cui_textarea_result result =
         cui_base_textarea(ui, id, name, s->edit, &s->view, o.textarea, metrics);
     result.changed |= multiple.changed;

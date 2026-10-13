@@ -1094,7 +1094,139 @@ static void multicursor_visual_rows(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+typedef struct {
+    char bytes[128];
+    size_t writes, reads;
+    bool fail;
+    cui_edit *mutate;
+} multi_clipboard;
+static bool multi_copy(void *user, cui_str text) {
+    multi_clipboard *host = user;
+    ++host->writes;
+    if (host->fail)
+        return false;
+    assert(text.length < sizeof host->bytes);
+    memcpy(host->bytes, text.data, text.length);
+    host->bytes[text.length] = 0;
+    return true;
+}
+static cui_str multi_paste(void *user) {
+    multi_clipboard *host = user;
+    ++host->reads;
+    if (host->mutate)
+        assert(cui_edit_select(host->mutate, 0, 0) == CUI_EDIT_OK);
+    return cui_string(host->bytes);
+}
+static cui_textarea_result multi_key(cui_context *ui, cui_editor_state *editor,
+                                     cui_editor_options o, cui_key key, unsigned modifiers) {
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = key, .modifiers = modifiers}));
+    cui_draw_list commands;
+    return draw(ui, editor, o, &commands);
+}
+static void multicursor_clipboard_and_indent(void) {
+    char buffer[128] = "1\n2\n3", scratch[128];
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 4});
+    cui_edit_selection live[8], input[] = {{3, 4, 4}, {1, 0, 0}, {2, 2, 2}};
+    cui_edit_selection_snapshot history[5];
+    assert(edit && cui_edit_attach_selections(edit, live, 8, history, 5) == CUI_EDIT_OK);
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_cursor_anchor anchors[8];
+    assert(cui_editor_state_init(&editor, edit, lines, 32) &&
+           cui_editor_multicursor_init(&editor, anchors, 8));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_focus(ui, 10);
+    multi_clipboard host = {.bytes = "x\ny\nz"};
+    cui_platform platform = {.capabilities = CUI_PLATFORM_CLIPBOARD,
+                             .user = &host,
+                             .clipboard_set = multi_copy,
+                             .clipboard_get = multi_paste};
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 240;
+    o.textarea.height = 180;
+    o.textarea.clipboard = &platform;
+    o.clipboard_scratch = scratch;
+    o.clipboard_capacity = sizeof scratch;
+    assert(cui_edit_select_many(edit, input, 3) == CUI_EDIT_OK);
+    cui_draw_list commands;
+    draw(ui, &editor, o, &commands);
+    assert(multi_key(ui, &editor, o, CUI_KEY_TAB, 0).changed && !strcmp(buffer, "  1\n  2\n  3"));
+    assert(multi_key(ui, &editor, o, CUI_KEY_TAB, CUI_MOD_SHIFT).changed &&
+           !strcmp(buffer, "1\n2\n3"));
+    /* Activates once the integrator supplies portable bracket key identities. */
+    cui_key right_bracket = cui_key_from_character(']'), left_bracket = cui_key_from_character('[');
+    if (right_bracket != CUI_KEY_NONE && left_bracket != CUI_KEY_NONE) {
+        cui_edit_selection ends[] = {{3, 5, 5}, {1, 1, 1}, {2, 3, 3}};
+        assert(cui_edit_select_many(edit, ends, 3) == CUI_EDIT_OK);
+        assert(multi_key(ui, &editor, o, right_bracket, CUI_MOD_CTRL).changed &&
+               !strcmp(buffer, "  1\n  2\n  3") && live[0].cursor == 11);
+        assert(multi_key(ui, &editor, o, left_bracket, CUI_MOD_META).changed &&
+               !strcmp(buffer, "1\n2\n3") && live[0].cursor == 5);
+        assert(cui_edit_select_many(edit, input, 3) == CUI_EDIT_OK);
+    }
+    assert(multi_key(ui, &editor, o, CUI_KEY_V, CUI_MOD_CTRL).changed &&
+           !strcmp(buffer, "x1\ny2\nz3"));
+    assert(host.reads == 1);
+    assert(multi_key(ui, &editor, o, CUI_KEY_Z, CUI_MOD_CTRL).changed &&
+           !strcmp(buffer, "1\n2\n3"));
+    size_t count;
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3 && live[0].cursor == 4);
+    assert(multi_key(ui, &editor, o, CUI_KEY_DOWN, 0).selection_changed);
+    assert(anchors[0].valid);
+    cui_editor_cursor_anchor saved_anchor = anchors[0];
+    assert(!multi_key(ui, &editor, o, CUI_KEY_C, CUI_MOD_CTRL).changed);
+    assert(anchors[0].valid && anchors[0].x == saved_anchor.x &&
+           anchors[0].upstream == saved_anchor.upstream);
+    host.writes = 0;
+    cui_edit_selection selected[] = {{3, 4, 5}, {1, 0, 1}, {2, 2, 2}};
+    assert(cui_edit_select_many(edit, selected, 3) == CUI_EDIT_OK);
+    assert(!multi_key(ui, &editor, o, CUI_KEY_C, CUI_MOD_CTRL).changed &&
+           !strcmp(host.bytes, "1\n3"));
+    assert(host.writes == 1);
+    host.fail = true;
+    cui_textarea_result r = multi_key(ui, &editor, o, CUI_KEY_X, CUI_MOD_CTRL);
+    assert(!r.changed && r.edit_error == CUI_EDIT_CLIPBOARD_UNAVAILABLE &&
+           !strcmp(buffer, "1\n2\n3"));
+    host.fail = false;
+    o.clipboard_capacity = 2;
+    r = multi_key(ui, &editor, o, CUI_KEY_X, CUI_MOD_CTRL);
+    assert(!r.changed && r.edit_error == CUI_EDIT_CAPACITY && host.writes == 2);
+    o.clipboard_capacity = sizeof scratch;
+    r = multi_key(ui, &editor, o, CUI_KEY_X, CUI_MOD_CTRL);
+    assert(r.changed && !strcmp(buffer, "\n2\n") && !strcmp(host.bytes, "1\n3"));
+    assert(multi_key(ui, &editor, o, CUI_KEY_Z, CUI_MOD_CTRL).changed &&
+           !strcmp(buffer, "1\n2\n3"));
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3 && live[0].anchor == 4 && live[0].cursor == 5);
+    o.textarea.readonly = true;
+    size_t writes = host.writes, reads = host.reads;
+    assert(!multi_key(ui, &editor, o, CUI_KEY_X, CUI_MOD_CTRL).changed &&
+           host.writes == writes + 1);
+    assert(!multi_key(ui, &editor, o, CUI_KEY_V, CUI_MOD_CTRL).changed && host.reads == reads);
+    o.textarea.readonly = false;
+    host.bytes[0] = 0;
+    assert(!multi_key(ui, &editor, o, CUI_KEY_V, CUI_MOD_CTRL).changed);
+    cui_edit_get_selections(edit, &count);
+    assert(count == 3 && live[0].anchor == 4);
+    o.clipboard_scratch = (char *)(void *)anchors;
+    r = multi_key(ui, &editor, o, CUI_KEY_C, CUI_MOD_CTRL);
+    assert(r.edit_error == CUI_EDIT_INVALID_ARGUMENT && host.writes == writes + 1);
+    o.clipboard_scratch = scratch;
+    host.mutate = edit;
+    strcpy(host.bytes, "unexpected");
+    r = multi_key(ui, &editor, o, CUI_KEY_V, CUI_MOD_CTRL);
+    assert(!r.changed && r.edit_error == CUI_EDIT_INVALID_ARGUMENT && !strcmp(buffer, "1\n2\n3"));
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    multicursor_clipboard_and_indent();
     multicursor_visual_rows();
     multiple_cursor_adapter();
     search_activation_and_paint();

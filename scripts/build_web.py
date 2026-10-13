@@ -76,6 +76,7 @@ def main():
     (out / 'catalog.json').write_text(json.dumps(manifest, indent=2)+'\n')
     notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\nNanoSVG\n=======\n' + (ROOT / 'third_party/nanosvg/LICENSE').read_text(encoding='utf-8') + '\n\nGPUI Kit icons\n==============\n' + (ROOT / 'third_party/gpui_icons/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
     notices += '\n\nGPUI Kit theme presets\n======================\n' + (ROOT / 'third_party/gpui_themes/LICENSE').read_text(encoding='utf-8')
+    notices += '\n\nUnicode 17 grapheme data\n========================\n' + (ROOT / 'third_party/unicode/17.0.0/LICENSE.txt').read_text(encoding='utf-8')
     (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
     subprocess.run([sys.executable, str(ROOT / 'scripts/build_sharing.py'), '--output', str(out)], check=True)
     (out / '.nojekyll').touch()

@@ -16,13 +16,13 @@ PROPS = ['Other', 'CR', 'LF', 'Newline', 'Extend', 'ZWJ', 'Regional_Indicator',
 
 
 def generate():
-    manifest = json.loads((DATA / 'manifest.json').read_text())
+    manifest = json.loads((DATA / 'manifest.json').read_text(encoding="utf-8"))
     for name, record in manifest['files'].items():
         assert hashlib.sha256((DATA / name).read_bytes()).hexdigest() == record['sha256'], name
     flags = [0] * 0x110000
     for name, kind in [('WordBreakProperty.txt', 'wb'), ('emoji-data.txt', 'ep'),
                        ('PropList.txt', 'space')]:
-        for line in (DATA / name).read_text().splitlines():
+        for line in (DATA / name).read_text(encoding="utf-8").splitlines():
             fields = [x.strip() for x in line.split('#')[0].split(';')]
             if len(fields) < 2 or not fields[0]:
                 continue
@@ -51,7 +51,7 @@ def generate():
     table += 'static const struct { uint32_t first, last; unsigned char flags; }\n'
     table += 'cui_edit_private_word_ranges[] = {\n' + '\n'.join(rows) + '\n};\n// clang-format on\n' + END
     cases = []
-    for line in (DATA / 'WordBreakTest.txt').read_text().splitlines():
+    for line in (DATA / 'WordBreakTest.txt').read_text(encoding="utf-8").splitlines():
         words = line.split('#')[0].split()
         if not words:
             continue
@@ -78,7 +78,7 @@ def main():
     args = parser.parse_args()
     table, fixture = generate()
     path = ROOT / 'src/base/cui_edit.c'
-    source = path.read_text()
+    source = path.read_text(encoding="utf-8")
     if BEGIN in source:
         source = source[:source.index(BEGIN)] + table + source[source.index(END) + len(END):]
     else:
@@ -86,9 +86,9 @@ def main():
     outputs = [(path, source), (ROOT / 'tests/unit/cui_edit_word_tests.inc', fixture)]
     for path, output in outputs:
         if args.check:
-            assert path.read_text() == output, f'{path}: regenerate with {__file__}'
+            assert path.read_text(encoding="utf-8") == output, f'{path}: regenerate with {__file__}'
         else:
-            path.write_text(output)
+            path.write_text(output, encoding="utf-8", newline="\n")
 
 
 if __name__ == '__main__':

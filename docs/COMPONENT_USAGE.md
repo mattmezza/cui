@@ -165,13 +165,13 @@ API: `cui_avatar`. [Public header](../include/cui/cui_content.h); [guide](CONTEN
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns badge text.
+**State:** Caller owns counts, badge options and child state; callbacks compose arbitrary child content synchronously.
 
-**Interaction:** Presentation only; no action callback.
+**Interaction:** Child controls return their own actions; corner indicators provide nonfocusable status semantics.
 
-**Usage:** Submit the current badge text each frame.
+**Usage:** Initialize options with cui_badge_defaults, select count/dot/icon and call cui_badge_ex with a content callback every frame.
 
-API: `cui_badge`. [Public header](../include/cui/cui_components.h); [guide](COMPONENTS.md).
+API: `cui_badge_defaults`, `cui_badge_ex`, `cui_badge`. Callback: `cui_button_content_fn`. [Public header](../include/cui/cui_components.h); [guide](BADGE.md), [guide](COMPONENTS.md).
 
 ## Bubble
 

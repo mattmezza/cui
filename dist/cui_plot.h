@@ -22,6 +22,18 @@ typedef struct {
     double domain_min, domain_max, range_start, range_end;
     bool clamp;
 } cui_plot_scale;
+/* Source-compatible Linear tick model, separate from strict navigation scales.
+ * Extent constructor copies finite unordered values (<=4096); no borrowed storage.
+ * Empty/single-valued domains have no tick (EMPTY, output unchanged). Equal pixel
+ * endpoints are valid, mapping every finite value to the same pixel. No clamp,
+ * inverse, ticks or implicit nice domain; extrapolation is intentional. */
+typedef struct {
+    double domain_min, domain_max, range_start, range_end;
+} cui_plot_linear_extent;
+cui_plot_result cui_plot_linear_extent_init(cui_plot_linear_extent *, const double *domain,
+                                            size_t count, double range_start, double range_end);
+cui_plot_result cui_plot_linear_extent_tick(const cui_plot_linear_extent *, double value,
+                                            double *pixel);
 typedef struct {
     double x, y;
 } cui_plot_point;
@@ -193,6 +205,19 @@ cui_plot_result cui_plot_arc_path(const cui_plot_arc *, double inner_radius, dou
 cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *, double inner_radius, double outer_radius,
                                      size_t segments_per_turn, cui_plot_path_command *,
                                      size_t capacity, size_t *required);
+/* Explicit frozen Arc padding mode. SOURCE_PADDING overrides metadata pad to
+ * .0001 radians whenever positive span>=pi, including full circles; its single
+ * endpoint arc leaves the source seam. Also suppresses radius/span below1e-12.
+ * Legacy functions use SEAMLESS. Finite ordered radii and span<=2pi remain CUI
+ * bounds; this does not reproduce source f32 rounding or renderer tessellation. */
+typedef enum { CUI_PLOT_ARC_SEAMLESS, CUI_PLOT_ARC_SOURCE_PADDING } cui_plot_arc_policy;
+cui_plot_result cui_plot_arc_path_ex(const cui_plot_arc *, double inner_radius, double outer_radius,
+                                     cui_plot_arc_policy, cui_plot_path_command *, size_t capacity,
+                                     size_t *required);
+cui_plot_result cui_plot_arc_flatten_ex(const cui_plot_arc *, double inner_radius,
+                                        double outer_radius, size_t segments_per_turn,
+                                        cui_plot_arc_policy, cui_plot_path_command *,
+                                        size_t capacity, size_t *required);
 typedef struct {
     double angle, radius0, radius1;
     bool defined;
@@ -205,6 +230,14 @@ typedef struct {
 cui_plot_result cui_plot_radial_path(const cui_plot_radial_sample *, size_t count,
                                      cui_plot_gap_policy, bool closed, bool fill, bool area,
                                      cui_plot_path_command *, size_t capacity, size_t *required);
+typedef struct {
+    cui_plot_rect frame;
+    double radius, border_width;
+} cui_plot_dot_geometry;
+/* Source Line/RadialLine marker: square centered at point, radius=size/2,
+ * one-pixel border. Finite nonnegative size; zero produces a valid degenerate
+ * marker. Errors preserve output; source unchecked negative size is rejected. */
+cui_plot_result cui_plot_dot_layout(cui_plot_point center, double size, cui_plot_dot_geometry *);
 typedef enum {
     CUI_PLOT_BAR_BOTTOM,
     CUI_PLOT_BAR_TOP,
@@ -222,6 +255,16 @@ typedef struct {
  * All orientations support values on either side of baseline. */
 cui_plot_result cui_plot_bar_layout(cui_plot_bar_alignment, double cross, double band_width,
                                     double baseline, double value, cui_plot_bar_geometry *);
+/* Pure path representation of source Bar's independently rounded quad.
+ * Radii are top-left/top-right/bottom-right/bottom-left, finite and nonnegative;
+ * each clamps to half the shorter frame side, matching CUI styled adapters.
+ * Quarter circles use one cubic (kappa approximation), not renderer tessellation.
+ * Always 10 commands for a nondegenerate frame, including zero-radius cubics.
+ * Degenerate bars return EMPTY/required=0. Errors preserve commands; CAPACITY
+ * reports required=10. NULL output/zero capacity queries storage. */
+cui_plot_result cui_plot_bar_path(cui_plot_bar_alignment, double cross, double band_width,
+                                  double baseline, double value, const double radii[4],
+                                  cui_plot_path_command *, size_t capacity, size_t *required);
 typedef struct {
     double width, height;
     const double *x, *y, *dashes;
@@ -258,6 +301,37 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+/* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
+ * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
+ * Zero initialize. Invalid input leaves memory unchanged. */
+typedef struct {
+    size_t index;
+    cui_plot_point cross_line;
+    const cui_plot_point *dots;
+    size_t dot_count;
+} cui_plot_tooltip_state;
+typedef struct {
+    cui_plot_tooltip_state state;
+    cui_plot_point cursor;
+    double progress;
+    bool has_state, hovered, entering;
+} cui_plot_hover_memory;
+cui_plot_result cui_plot_hover_track(cui_plot_hover_memory *, const cui_plot_tooltip_state *live,
+                                     const cui_plot_point *cursor, double progress);
+/* Explicit scope entry: one slot per stable application identity. Only completed
+ * generations persist across disappearance; unfinished appearances restart.
+ * An identity change clears the slot. No allocation or implicit frame tracking. */
+typedef struct {
+    uint64_t identity, completed_generation;
+    bool has_completed;
+} cui_plot_appear_scope;
+bool cui_plot_appear_complete(cui_plot_appear_scope *, uint64_t identity, uint64_t generation);
+cui_plot_result cui_plot_appear_record(cui_plot_appear_scope *, uint64_t identity,
+                                       uint64_t generation, double linear_progress);
+/* Stagger the linear clock before applying the caller's existing easing policy.
+ * Spread clamps to [0,.95], index clamps to count-1. count<=1 is unstaggered. */
+cui_plot_result cui_plot_appear_stagger(double linear_progress, size_t index, size_t count,
+                                        double spread, double *local_progress);
 #ifdef __cplusplus
 }
 #endif
@@ -1013,22 +1087,29 @@ typedef struct {
     bool empty, full;
 } cui_plot_arc_angles;
 static cui_plot_result cui_plot_arc_angles_get(const cui_plot_arc *arc, double inner, double outer,
+                                               cui_plot_arc_policy policy,
                                                cui_plot_arc_angles *angles) {
-    if (!cui_plot_arc_valid(arc, inner, outer))
+    if ((policy != CUI_PLOT_ARC_SEAMLESS && policy != CUI_PLOT_ARC_SOURCE_PADDING) ||
+        !cui_plot_arc_valid(arc, inner, outer))
         return CUI_PLOT_INVALID;
     const long double pi = acosl(-1.L), tau = 2 * pi;
     long double span = (long double)arc->end_angle - arc->start_angle;
     if (span > tau + 1e-12L)
         return CUI_PLOT_INVALID;
     *angles = (cui_plot_arc_angles){0};
-    if (outer == 0 || span <= 0) {
+    if (outer == 0 || span <= 0 ||
+        (policy == CUI_PLOT_ARC_SOURCE_PADDING && (outer < 1e-12 || span < 1e-12L))) {
         angles->empty = true;
         return CUI_PLOT_OK;
     }
-    angles->full = fabsl(span - tau) <= 1e-12L;
+    angles->full = policy == CUI_PLOT_ARC_SEAMLESS && fabsl(span - tau) <= 1e-12L;
     if (angles->full)
         span = tau;
     long double pad = angles->full ? 0 : arc->pad_angle;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && span >= (double)pi)
+        pad = .0001L;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && inner <= 1e-12)
+        inner = 0;
     long double inner_pad =
         inner > 0 && pad > 0 ? fminl((outer / (long double)inner) * pad, span * .8L) : pad;
     /* Reduce before adding offsets to preserve geometry for large angles. */
@@ -1053,14 +1134,17 @@ static void cui_plot_circular_command(cui_plot_path_command *commands, size_t *u
     command.clockwise = clockwise;
     commands[(*used)++] = command;
 }
-cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double outer,
-                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+cui_plot_result cui_plot_arc_path_ex(const cui_plot_arc *arc, double inner, double outer,
+                                     cui_plot_arc_policy policy, cui_plot_path_command *out,
+                                     size_t capacity, size_t *required) {
     if (!required || (!out && capacity))
         return CUI_PLOT_INVALID;
     cui_plot_arc_angles angles;
-    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, &angles);
+    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, policy, &angles);
     if (result != CUI_PLOT_OK)
         return result;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && inner <= 1e-12)
+        inner = 0;
     cui_plot_path_command commands[8] = {{0}};
     size_t used = 0;
     if (!angles.empty) {
@@ -1097,15 +1181,18 @@ cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double 
         memcpy(out, commands, used * sizeof *out);
     return CUI_PLOT_OK;
 }
-cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, double outer,
-                                     size_t segments, cui_plot_path_command *out, size_t capacity,
-                                     size_t *required) {
+cui_plot_result cui_plot_arc_flatten_ex(const cui_plot_arc *arc, double inner, double outer,
+                                        size_t segments, cui_plot_arc_policy policy,
+                                        cui_plot_path_command *out, size_t capacity,
+                                        size_t *required) {
     if (!required || (!out && capacity) || segments < 4 || segments > 1024)
         return CUI_PLOT_INVALID;
     cui_plot_arc_angles angles;
-    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, &angles);
+    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, policy, &angles);
     if (result != CUI_PLOT_OK)
         return result;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && inner <= 1e-12)
+        inner = 0;
     const long double tau = 2 * acosl(-1.L);
     size_t outer_steps =
         angles.empty ? 0 : (size_t)ceill((angles.outer1 - angles.outer0) * segments / tau);
@@ -1368,6 +1455,183 @@ cui_plot_result cui_plot_area_paths(const cui_plot_area_sample *samples, size_t 
         }
     }
     return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_dot_layout(cui_plot_point center, double size,
+                                    cui_plot_dot_geometry *out) {
+    if (!out || !isfinite(center.x) || !isfinite(center.y) || !isfinite(size) || size < 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_dot_geometry geometry = {.radius = size / 2, .border_width = 1};
+    cui_plot_result result =
+        cui_plot_number((long double)center.x - size / 2, &geometry.frame.x_min);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)center.y - size / 2, &geometry.frame.y_min);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)center.x + size / 2, &geometry.frame.x_max);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)center.y + size / 2, &geometry.frame.y_max);
+    if (result == CUI_PLOT_OK)
+        *out = geometry;
+    return result;
+}
+
+cui_plot_result cui_plot_hover_track(cui_plot_hover_memory *memory,
+                                     const cui_plot_tooltip_state *live,
+                                     const cui_plot_point *cursor, double progress) {
+    if (!memory || !isfinite(progress) || progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    if (live) {
+        if (!cursor || !isfinite(cursor->x) || !isfinite(cursor->y) ||
+            !isfinite(live->cross_line.x) || !isfinite(live->cross_line.y) ||
+            (live->dot_count && !live->dots) || live->dot_count > 4096)
+            return CUI_PLOT_INVALID;
+        for (size_t i = 0; i < live->dot_count; ++i)
+            if (!isfinite(live->dots[i].x) || !isfinite(live->dots[i].y))
+                return CUI_PLOT_INVALID;
+    }
+    cui_plot_hover_memory next = *memory;
+    next.hovered = live != NULL;
+    next.progress = progress;
+    next.entering = next.hovered && progress == 0;
+    if (live) {
+        next.state = *live;
+        next.cursor = *cursor;
+        next.has_state = true;
+    } else if (progress == 0) {
+        next.state = (cui_plot_tooltip_state){0};
+        next.has_state = false;
+    }
+    *memory = next;
+    return CUI_PLOT_OK;
+}
+bool cui_plot_appear_complete(cui_plot_appear_scope *scope, uint64_t identity,
+                              uint64_t generation) {
+    if (!scope)
+        return false;
+    if (scope->identity != identity)
+        *scope = (cui_plot_appear_scope){.identity = identity};
+    return scope->has_completed && scope->completed_generation == generation;
+}
+cui_plot_result cui_plot_appear_record(cui_plot_appear_scope *scope, uint64_t identity,
+                                       uint64_t generation, double progress) {
+    if (!scope || !isfinite(progress) || progress < 0 || progress > 1)
+        return CUI_PLOT_INVALID;
+    (void)cui_plot_appear_complete(scope, identity, generation);
+    if (progress == 1) {
+        scope->completed_generation = generation;
+        scope->has_completed = true;
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_appear_stagger(double progress, size_t index, size_t count, double spread,
+                                        double *out) {
+    if (!out || !isfinite(progress) || progress < 0 || progress > 1 || !isfinite(spread))
+        return CUI_PLOT_INVALID;
+    double local = progress;
+    if (count > 1 && progress < 1) {
+        spread = fmax(0, fmin(.95, spread));
+        if (index >= count)
+            index = count - 1;
+        double start = spread * ((double)index / (double)(count - 1));
+        local = fmax(0, fmin(1, (progress - start) / (1 - spread)));
+    }
+    *out = local;
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_linear_extent_init(cui_plot_linear_extent *out, const double *domain,
+                                            size_t count, double start, double end) {
+    if (!out || (count && !domain) || count > 4096 || !isfinite(start) || !isfinite(end))
+        return CUI_PLOT_INVALID;
+    cui_plot_linear_extent next = {.range_start = start, .range_end = end};
+    for (size_t i = 0; i < count; ++i) {
+        if (!isfinite(domain[i]))
+            return CUI_PLOT_INVALID;
+        if (i == 0 || domain[i] < next.domain_min)
+            next.domain_min = domain[i];
+        if (i == 0 || domain[i] > next.domain_max)
+            next.domain_max = domain[i];
+    }
+    *out = next;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_linear_extent_tick(const cui_plot_linear_extent *s, double value,
+                                            double *pixel) {
+    if (!s || !pixel || !isfinite(value) || !isfinite(s->domain_min) || !isfinite(s->domain_max) ||
+        !isfinite(s->range_start) || !isfinite(s->range_end) || s->domain_min > s->domain_max)
+        return CUI_PLOT_INVALID;
+    if (s->domain_min == s->domain_max)
+        return CUI_PLOT_EMPTY;
+    if (s->range_start == s->range_end) {
+        *pixel = s->range_start;
+        return CUI_PLOT_OK;
+    }
+    return cui_plot_number(cui_plot_lerp(s->range_start, s->range_end,
+                                         cui_plot_fraction(value, s->domain_min, s->domain_max)),
+                           pixel);
+}
+
+cui_plot_result cui_plot_bar_path(cui_plot_bar_alignment alignment, double cross, double width,
+                                  double baseline, double value, const double radii[4],
+                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+    if (!required || !radii || (!out && capacity))
+        return CUI_PLOT_INVALID;
+    cui_plot_bar_geometry g;
+    cui_plot_result result = cui_plot_bar_layout(alignment, cross, width, baseline, value, &g);
+    if (result != CUI_PLOT_OK)
+        return result;
+    double r[4];
+    double limit =
+        fmin(g.frame.x_max / 2 - g.frame.x_min / 2, g.frame.y_max / 2 - g.frame.y_min / 2);
+    for (size_t i = 0; i < 4; ++i) {
+        if (!isfinite(radii[i]) || radii[i] < 0)
+            return CUI_PLOT_INVALID;
+        r[i] = fmin(radii[i], limit);
+    }
+    if (g.frame.x_min == g.frame.x_max || g.frame.y_min == g.frame.y_max) {
+        *required = 0;
+        return CUI_PLOT_EMPTY;
+    }
+    *required = 10;
+    if (capacity < 10)
+        return CUI_PLOT_CAPACITY;
+    const double k = .5522847498307933984;
+    double l = g.frame.x_min, t = g.frame.y_min, h = g.frame.x_max, b = g.frame.y_max;
+    cui_plot_path_command path[10] = {{.kind = CUI_PLOT_PATH_MOVE, .point = {l + r[0], t}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {h - r[1], t}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {h, t + r[1]},
+                                       .control1 = {h - r[1] + k * r[1], t},
+                                       .control2 = {h, t + r[1] - k * r[1]}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {h, b - r[2]}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {h - r[2], b},
+                                       .control1 = {h, b - r[2] + k * r[2]},
+                                       .control2 = {h - r[2] + k * r[2], b}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {l + r[3], b}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {l, b - r[3]},
+                                       .control1 = {l + r[3] - k * r[3], b},
+                                       .control2 = {l, b - r[3] + k * r[3]}},
+                                      {.kind = CUI_PLOT_PATH_LINE, .point = {l, t + r[0]}},
+                                      {.kind = CUI_PLOT_PATH_CUBIC,
+                                       .point = {l + r[0], t},
+                                       .control1 = {l, t + r[0] - k * r[0]},
+                                       .control2 = {l + r[0] - k * r[0], t}},
+                                      {.kind = CUI_PLOT_PATH_CLOSE}};
+    memcpy(out, path, sizeof path);
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double outer,
+                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+    return cui_plot_arc_path_ex(arc, inner, outer, CUI_PLOT_ARC_SEAMLESS, out, capacity, required);
+}
+cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, double outer,
+                                     size_t segments, cui_plot_path_command *out, size_t capacity,
+                                     size_t *required) {
+    return cui_plot_arc_flatten_ex(arc, inner, outer, segments, CUI_PLOT_ARC_SEAMLESS, out,
+                                   capacity, required);
 }
 
 #endif

@@ -109,21 +109,26 @@ cui_textarea_result cui_textarea(cui_context *, cui_id, const cui_theme *, cui_s
 
 #include <math.h>
 #include <string.h>
+/* The edit model guarantees stable valid UTF-8 and row starts are cluster
+ * boundaries. Seed an iterator here without rescanning the remaining document. */
 static size_t cui_textarea_next(cui_str text, size_t at) {
-    if (at >= text.length)
-        return text.length;
-    do {
-        at++;
-    } while (at < text.length && ((unsigned char)text.data[at] & 0xc0) == 0x80);
-    return at;
+    cui_grapheme_iterator iterator = {text, at};
+    return cui_grapheme_iterator_next(&iterator);
 }
-static size_t cui_textarea_previous(cui_str text, size_t at) {
-    if (!at)
-        return 0;
-    do {
-        at--;
-    } while (at && ((unsigned char)text.data[at] & 0xc0) == 0x80);
-    return at;
+static size_t cui_textarea_boundary_after(cui_str text, size_t start, size_t at) {
+    cui_grapheme_iterator iterator = {text, start};
+    while (iterator.offset < at)
+        cui_grapheme_iterator_next(&iterator);
+    return iterator.offset;
+}
+static size_t cui_textarea_boundary_before(cui_str text, size_t start, size_t at, bool strict) {
+    cui_grapheme_iterator iterator = {text, start};
+    size_t previous = start;
+    while (iterator.offset < at) {
+        previous = iterator.offset;
+        cui_grapheme_iterator_next(&iterator);
+    }
+    return !strict && iterator.offset == at ? at : previous;
 }
 static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, size_t end, float font,
                                 cui_text_style style) {
@@ -134,25 +139,22 @@ static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, siz
 static size_t cui_textarea_fit(cui_context *ui, cui_str text, size_t start, size_t end, float font,
                                float width, cui_text_style style) {
     size_t low = start, high = end - start > 64 ? start + 64 : end;
-    while (high < end && ((unsigned char)text.data[high] & 0xc0) == 0x80)
-        high++;
+    high = cui_textarea_boundary_after(text, start, high);
     while (cui_textarea_width(ui, text, start, high, font, style) <= width) {
         low = high;
         if (high == end)
             return end;
         size_t span = high - start;
         high = span > (end - start) / 2 ? end : start + span * 2;
-        while (high < end && ((unsigned char)text.data[high] & 0xc0) == 0x80)
-            high++;
+        high = cui_textarea_boundary_after(text, start, high);
     }
     while (low < high) {
         size_t middle = low + (high - low + 1) / 2;
-        while (middle < high && ((unsigned char)text.data[middle] & 0xc0) == 0x80)
-            middle++;
+        middle = cui_textarea_boundary_after(text, low, middle);
         if (cui_textarea_width(ui, text, start, middle, font, style) <= width)
             low = middle;
         else
-            high = cui_textarea_previous(text, middle);
+            high = cui_textarea_boundary_before(text, low, middle, true);
     }
     return low;
 }
@@ -230,16 +232,28 @@ bool cui_textarea_measure(cui_textarea_options options, float root, cui_textarea
     *out = (cui_textarea_metrics){font * density, 20 * density, px * density, py * density};
     return true;
 }
-static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t cursor) {
+static size_t cui_textarea_cursor_line_ex(const cui_textarea_state *state, size_t cursor,
+                                          bool upstream_affinity) {
     for (size_t i = 0; i < state->count; i++) {
         cui_textarea_line line = state->lines[i];
         if (cursor < line.end ||
             (cursor == line.end &&
-             (line.hard_break || state->upstream_affinity || i + 1 == state->count)) ||
+             (line.hard_break || upstream_affinity || i + 1 == state->count)) ||
             cursor < line.next)
             return i;
     }
     return state->count ? state->count - 1 : 0;
+}
+static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t cursor) {
+    return cui_textarea_cursor_line_ex(state, cursor, state->upstream_affinity);
+}
+/* A point just outside a selection can land in a folded gap even though both
+ * selection endpoints are visible. Clamp it in the movement direction. */
+static size_t cui_textarea_visible_offset(const cui_textarea_state *state, size_t offset, bool up) {
+    for (size_t i = 0; i + 1 < state->count; ++i)
+        if (offset >= state->lines[i].next && offset < state->lines[i + 1].start)
+            return up ? state->lines[i].end : state->lines[i + 1].start;
+    return offset;
 }
 cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
                                           cui_textarea_state *state, cui_textarea_metrics metrics,
@@ -332,6 +346,7 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
                 size_t word = finish;
                 while (word > start && text.data[word - 1] != ' ' && text.data[word - 1] != '\t')
                     word--;
+                word = cui_textarea_boundary_before(text, start, word, false);
                 if (word > start)
                     finish = word;
                 next = finish;
@@ -522,25 +537,47 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                    (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN ||
                     event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN)) {
             cui_edit_state selection = cui_edit_get_state(edit);
-            size_t row = state->caret_line;
+            cui_str text = cui_edit_get_text(edit);
+            bool up = event.key == CUI_KEY_UP || event.key == CUI_KEY_PAGEUP;
+            bool collapse = !shift && selection.anchor != selection.cursor &&
+                            (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN);
+            size_t effective = selection.cursor, row = state->caret_line;
+            if (collapse) {
+                size_t first =
+                    selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
+                size_t last =
+                    selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+                /* Frozen move_vertical: previous_boundary(start-1) subtracts
+                 * another byte before left clipping; next_boundary(end-1)
+                 * right-clips end. Clip to CUI's whole-grapheme boundaries. */
+                effective =
+                    up ? cui_textarea_boundary_before(text, 0, first > 1 ? first - 2 : 0, false)
+                       : cui_textarea_boundary_after(text, 0, last);
+                effective = cui_textarea_visible_offset(state, effective, up);
+                bool affinity = !up && effective == selection.cursor && state->upstream_affinity;
+                row = cui_textarea_cursor_line_ex(state, effective, affinity);
+                state->preferred_valid = false;
+            }
             cui_textarea_line line = state->lines[row];
             if (!state->preferred_valid) {
-                state->preferred_x =
-                    cui_textarea_width(ui, cui_edit_get_text(edit), line.start,
-                                       selection.cursor < line.end ? selection.cursor : line.end,
-                                       metrics.font_size, options.text_style);
+                state->preferred_x = cui_textarea_width(ui, text, line.start,
+                                                        effective < line.end ? effective : line.end,
+                                                        metrics.font_size, options.text_style);
                 state->preferred_valid = true;
             }
             size_t step = event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN
                               ? (size_t)fmaxf(1, floorf(state->viewport.h / metrics.line_height))
                               : 1;
-            bool up = event.key == CUI_KEY_UP || event.key == CUI_KEY_PAGEUP;
+            size_t previous_row = row;
             row = up ? (step > row ? 0 : row - step)
                      : (step >= state->count - row ? state->count - 1 : row + step);
-            size_t cursor =
-                cui_textarea_offset(ui, cui_edit_get_text(edit), state, row, state->preferred_x);
+            bool selection_edge = shift && row == previous_row &&
+                                  (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN);
+            size_t cursor = selection_edge ? (up ? 0 : cui_edit_get_text(edit).length)
+                                           : cui_textarea_offset(ui, cui_edit_get_text(edit), state,
+                                                                 row, state->preferred_x);
             state->upstream_affinity =
-                cursor == state->lines[row].end && !state->lines[row].hard_break;
+                !selection_edge && cursor == state->lines[row].end && !state->lines[row].hard_break;
             error = cui_edit_select(edit, shift ? selection.anchor : cursor, cursor);
             move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN && !command &&

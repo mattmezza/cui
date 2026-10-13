@@ -2,6 +2,8 @@
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 static bool cui_components_design(const cui_theme *theme, cui_design_size size,
                                   cui_design_metrics *metrics) {
     if (size == CUI_DESIGN_INHERIT) {
@@ -797,6 +799,80 @@ void cui_badge(cui_context *ui, cui_id id, const cui_theme *t, cui_str label) {
     cui_begin_box(ui, id, (cui_box){.padding = 4, .radius = t->radius, .background = t->primary});
     cui_text(ui, label, t->font_size * .8f, t->on_primary);
     cui_end_box(ui);
+}
+cui_badge_options cui_badge_defaults(void) {
+    return (cui_badge_options){.maximum = 99, .size = CUI_CONTROL_MEDIUM};
+}
+bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_options o,
+                  cui_button_content_fn content, void *user) {
+    if (!ui || !id || !t || o.variant < CUI_BADGE_COUNT || o.variant > CUI_BADGE_ICON ||
+        o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
+        (o.name.length && !o.name.data) || (o.icon.length && !o.icon.data))
+        return false;
+    char number[3 * sizeof(size_t) + 3];
+    if (o.count > o.maximum)
+        snprintf(number, sizeof(number), "%zu+", o.maximum);
+    else
+        snprintf(number, sizeof(number), "%zu", o.count);
+    bool visible = o.variant != CUI_BADGE_COUNT || o.count > 0;
+    cui_begin_box(ui, id, (cui_box){0});
+    if (content)
+        content(ui, user);
+    if (visible) {
+        float extent = o.size == CUI_CONTROL_LARGE ? 24 : o.size == CUI_CONTROL_MEDIUM ? 16 : 10;
+        float x = o.variant != CUI_BADGE_COUNT ? 0
+                                               : (o.size == CUI_CONTROL_LARGE    ? 1
+                                                  : o.size == CUI_CONTROL_MEDIUM ? 3
+                                                                                 : 4) *
+                                                     strlen(number);
+        float y = o.variant != CUI_BADGE_COUNT   ? 0
+                  : o.size == CUI_CONTROL_LARGE  ? 2
+                  : o.size == CUI_CONTROL_MEDIUM ? -3
+                                                 : -4;
+        cui_id overlay = id ^ UINT64_C(0x35d9258f62be9a0c);
+        cui_id indicator = id ^ UINT64_C(0x2780a7c4f39251db);
+        cui_begin_absolute_box(
+            ui, overlay,
+            (cui_box){.align_x = CUI_ALIGN_END,
+                      .align_y = o.variant == CUI_BADGE_ICON ? CUI_ALIGN_END : CUI_ALIGN_START},
+            (cui_rect){x, y, -1, -1});
+        cui_box mark = {.background = o.custom_color ? o.color : t->danger,
+                        .radius = 1024,
+                        .align_x = CUI_ALIGN_CENTER,
+                        .align_y = CUI_ALIGN_CENTER};
+        if (o.variant == CUI_BADGE_COUNT) {
+            mark.height = 14;
+            mark.width = fmaxf(14, cui_measure_text(ui, cui_string(number), 10).width + 4);
+        } else {
+            mark.width = mark.height = o.variant == CUI_BADGE_DOT ? 6 : extent;
+            if (o.variant == CUI_BADGE_ICON) {
+                mark.border = t->background;
+                mark.border_width = 1;
+            }
+        }
+        cui_begin_box(ui, indicator, mark);
+        cui_str name = o.name.length                  ? o.name
+                       : o.variant == CUI_BADGE_COUNT ? cui_string(number)
+                       : o.variant == CUI_BADGE_DOT   ? cui_string("Notification")
+                                                      : cui_string("Status");
+        cui_interact(ui, indicator, CUI_ROLE_STATUS, name, false, false, (float)o.count);
+        cui_set_semantic_details(ui, indicator,
+                                 (cui_semantic_details){.parent = id, .no_focus = true});
+        cui_set_tab_stop(ui, indicator, false);
+        if (o.variant == CUI_BADGE_COUNT)
+            cui_text_with_line_height(ui, cui_string(number), 10, (cui_color){255, 255, 255, 255},
+                                      10);
+        else if (o.variant == CUI_BADGE_ICON)
+            cui_icon_named(ui, indicator ^ UINT64_C(0x2c38f42991a75e63), t, o.icon,
+                           (cui_icon_options){.custom_size = extent - 2,
+                                              .size = CUI_ICON_CUSTOM,
+                                              .color = {255, 255, 255, 255},
+                                              .custom_color = true});
+        cui_end_box(ui);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return true;
 }
 bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width,
                      cui_progress_options o) {

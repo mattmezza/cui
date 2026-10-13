@@ -77,6 +77,11 @@ static char editor_query_buffer[128];
 static cui_edit *editor_edit, *editor_query;
 static cui_editor_state editor_state;
 static cui_editor_search_state editor_search;
+static const cui_editor_completion_item editor_completions[] = {
+    {{"cui_label", 9}, {"Draw a themed label", 18}, {"cui_label", 9}},
+    {{"cui_button", 10}, {"Draw an interactive button", 26}, {"cui_button", 10}},
+    {{"cui_begin_box", 13}, {"Compose a layout", 16}, {"cui_begin_box", 13}},
+};
 static cui_editor_fold editor_folds[] = {{.start_line = 3, .end_line = 9}};
 static cui_textarea_line editor_lines[512];
 double gallery_editor_stat(int field) {
@@ -96,6 +101,12 @@ double gallery_editor_stat(int field) {
         return (double)editor_state.view.fold_count;
     case 6:
         return editor_folds[0].collapsed;
+    case 7:
+        return editor_state.completion.open;
+    case 8:
+        return (double)editor_state.completion.selected;
+    case 9:
+        return (double)editor_state.completion.count;
     default:
         return -1;
     }
@@ -1219,6 +1230,19 @@ static size_t gallery_editor_token(void *user, cui_str language, cui_str text, s
     while (i < end && ((unsigned char)text.data[i] & 0xc0) == 0x80)
         i++;
     return i;
+}
+static size_t badge_count = 7;
+static bool badge_disabled;
+static void gallery_badge_content(cui_context *context, void *user) {
+    const char *name = user;
+    if (cui_button_ex(context, cui_id_from(context, name) ^ UINT64_C(0x7f3368229a10ce4b),
+                      &current_theme, cui_string(name),
+                      (cui_button_options){.size = (cui_control_size)control_size,
+                                           .width = 100,
+                                           .disabled = badge_disabled})) {
+        badge_count++;
+        cui_invalidate(context);
+    }
 }
 static void gallery_dock_toolbar(cui_context *context, uint64_t key, void *user) {
     (void)user;
@@ -3092,9 +3116,21 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 7:
         cui_label(ui, &t, cui_string("A useful label, rendered by CUI."));
         break;
-    case 8:
-        cui_badge(ui, cui_id_from(ui, "badge"), &t, cui_string("In review"));
+    case 8: {
+        badge_disabled = disabled != 0;
+        cui_label(ui, &t, cui_string("Counts, overflow, dot and SVG icon badges on any content."));
+        const char *names[] = {"Inbox", "Alerts", "Online", "Profile", "Quiet"};
+        for (unsigned i = 0; i < 5; i++) {
+            cui_badge_options options = cui_badge_defaults();
+            options.size = (cui_control_size)control_size;
+            options.count = i == 0 ? badge_count : i == 1 ? 125 : 0;
+            options.variant = i == 2 ? CUI_BADGE_DOT : i == 3 ? CUI_BADGE_ICON : CUI_BADGE_COUNT;
+            options.icon = cui_string("check");
+            cui_badge_ex(ui, cui_id_from(ui, names[i]), &t, options, gallery_badge_content,
+                         (void *)names[i]);
+        }
         break;
+    }
     case 9:
         cui_progress_ex(ui, cui_id_from(ui, "progress"), &t, slider / 100,
                         width > 360 ? 300 : width - 48,
@@ -3373,18 +3409,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 25: {
+        cui_id editor_id = cui_id_from(ui, "code-editor");
         cui_label(
             ui, &t,
             cui_string("Editable C code: line numbers, syntax colors, undo and Ctrl/Meta-F."));
-        cui_begin_box(ui, cui_id_from(ui, "edit-actions"), (cui_box){.row = true, .gap = 8});
+        cui_begin_box(ui, cui_id_from(ui, "edit-actions"),
+                      (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});
         if (cui_button(ui, cui_id_from(ui, "editor-find-open"), &t, cui_string("Find"), disabled))
             editor_search.open = true;
         if (cui_button(ui, cui_id_from(ui, "undo"), &t, cui_string("Undo"), disabled))
             cui_edit_undo(editor_edit);
         if (cui_button(ui, cui_id_from(ui, "redo"), &t, cui_string("Redo"), disabled))
             cui_edit_redo(editor_edit);
+        bool show_completions = cui_button_ex(ui, cui_id_from(ui, "editor-completions"), &t,
+                                              cui_string("Show completions"),
+                                              (cui_button_options){.size = CUI_CONTROL_SMALL,
+                                                                   .icon = cui_string("code"),
+                                                                   .icon_only = true,
+                                                                   .disabled = disabled != 0});
         cui_end_box(ui);
-        cui_id editor_id = cui_id_from(ui, "code-editor");
         cui_editor_find_bar(ui, cui_id_from(ui, "code-find"), editor_id, &t, &editor_state,
                             &editor_search, width - 48, disabled != 0);
         cui_editor_options options = cui_editor_default();
@@ -3394,6 +3437,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.language = cui_string("c");
         options.highlight = gallery_editor_token;
         cui_editor(ui, editor_id, &t, cui_string("C code editor"), &editor_state, options);
+        if (show_completions) {
+            cui_edit_state selection = cui_edit_get_state(editor_edit);
+            size_t start =
+                selection.cursor < selection.anchor ? selection.cursor : selection.anchor;
+            size_t end = selection.cursor > selection.anchor ? selection.cursor : selection.anchor;
+            cui_focus(ui, editor_id);
+            cui_editor_show_completions(&editor_state, editor_completions,
+                                        sizeof(editor_completions) / sizeof(editor_completions[0]),
+                                        start, end);
+            cui_invalidate(ui);
+        }
         break;
     }
     case 26: {
@@ -3482,8 +3536,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                                  .panel_count = 12};
         cui_dock_workspace_render(ui, cui_id_from(ui, "dock-workspace"), &t, dock_workspace,
                                   workspace_regions,
-                                  (cui_dock_workspace_options){
-                                      .view = view_options, .on_transfer = gallery_dock_transfer});
+                                  (cui_dock_workspace_options){.view = view_options,
+                                                               .on_transfer = gallery_dock_transfer,
+                                                               .collapsible_bottom = true});
         cui_dock_geometry regions[16];
         size_t count = 0;
         bool fits;

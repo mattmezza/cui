@@ -109,16 +109,21 @@
     },
     {
       "api_symbols": [
+        "cui_badge_defaults",
+        "cui_badge_ex",
         "cui_badge"
       ],
       "state_types": [],
-      "state_ownership": "Caller owns badge text.",
-      "interaction": "Presentation only; no action callback.",
-      "usage": "Submit the current badge text each frame.",
+      "state_ownership": "Caller owns counts, badge options and child state; callbacks compose arbitrary child content synchronously.",
+      "interaction": "Child controls return their own actions; corner indicators provide nonfocusable status semantics.",
+      "usage": "Initialize options with cui_badge_defaults, select count/dot/icon and call cui_badge_ex with a content callback every frame.",
       "docs": [
+        "docs/BADGE.md",
         "docs/COMPONENTS.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_button_content_fn"
+      ],
       "scope": "styled frame component",
       "name": "Badge",
       "public_header": "include/cui/cui_components.h",

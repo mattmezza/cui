@@ -12,8 +12,19 @@ extern "C" {
 typedef size_t (*cui_editor_highlight_fn)(void *user, cui_str language, cui_str document,
                                           size_t start, size_t line_end, cui_color *color);
 typedef struct {
+    cui_str label, detail, insert_text;
+} cui_editor_completion_item;
+typedef struct {
+    const cui_editor_completion_item *items; /* Borrowed until close. */
+    size_t count, selected, replace_start, replace_end;
+    size_t cursor, anchor; /* Selection captured when the proposal was opened. */
+    uint64_t revision;
+    bool open;
+} cui_editor_completion_state;
+typedef struct {
     cui_edit *edit; /* Borrowed, must outlive this state. */
     cui_textarea_state view;
+    cui_editor_completion_state completion;
 } cui_editor_state;
 typedef struct {
     cui_textarea_options textarea;
@@ -21,8 +32,21 @@ typedef struct {
     cui_str language; /* Borrowed for the draw call. */
     cui_editor_highlight_fn highlight;
     void *highlight_user;
+    float completion_width; /* Maximum popup width; zero defaults to 320. */
+    size_t completion_rows; /* Zero defaults to eight; maximum 32 visible rows. */
 } cui_editor_options;
 bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, size_t capacity);
+/* Host supplies validated UTF-8 items and one original document byte range.
+ * No copying/filtering/provider calls. Empty count closes the menu. Invalid
+ * input preserves both existing menu and document. Item bytes remain immutable
+ * and alive until the menu closes. Later document revisions dismiss it. */
+cui_edit_result cui_editor_show_completions(cui_editor_state *, const cui_editor_completion_item *,
+                                            size_t count, size_t replace_start, size_t replace_end);
+void cui_editor_cancel_completion(cui_editor_state *);
+cui_id cui_editor_completion_item_id(cui_id editor_id, size_t index);
+/* One atomic replace/history step. Failure preserves text/selection/history
+ * and leaves the current menu open, except that stale revisions dismiss it. */
+cui_edit_result cui_editor_accept_completion(cui_editor_state *);
 typedef cui_textarea_fold cui_editor_fold;
 /* Attach caller-owned ranges; edits detach them, requiring host refresh. */
 bool cui_editor_set_folds(cui_editor_state *, cui_editor_fold *, size_t count);
@@ -69,6 +93,7 @@ cui_textarea_result cui_editor(cui_context *, cui_id, const cui_theme *, cui_str
 /* src/base/cui_editor.c */
 /* SPDX-License-Identifier: MIT */
 
+#include <math.h>
 #include <string.h>
 bool cui_editor_state_init(cui_editor_state *s, cui_edit *edit, cui_textarea_line *lines,
                            size_t capacity) {
@@ -120,11 +145,100 @@ cui_edit_result cui_editor_find(cui_editor_state *s, cui_str query, bool reverse
     return found == SIZE_MAX ? CUI_EDIT_BOUNDARY
                              : cui_edit_select(s->edit, found, found + query.length);
 }
+cui_id cui_editor_completion_item_id(cui_id id, size_t index) {
+    return id ^ UINT64_C(0x6641ab75da98e031) ^
+           ((uint64_t)(index + 1) * UINT64_C(0x9e3779b97f4a7c15));
+}
+static cui_edit_result cui_editor_completion_events(cui_context *ui, cui_id id,
+                                                    cui_editor_state *state,
+                                                    cui_textarea_options options) {
+    if (!state->completion.open)
+        return CUI_EDIT_OK;
+    cui_edit_state current = cui_edit_get_state(state->edit);
+    if (state->completion.revision != current.revision ||
+        state->completion.cursor != current.cursor || state->completion.anchor != current.anchor ||
+        (cui_focused(ui) && cui_focused(ui) != id)) {
+        cui_editor_cancel_completion(state);
+        return CUI_EDIT_OK;
+    }
+    if (!state->completion.items || !state->completion.count ||
+        state->completion.selected >= state->completion.count) {
+        cui_editor_cancel_completion(state);
+        return CUI_EDIT_INVALID_ARGUMENT;
+    }
+    if (options.disabled || options.readonly)
+        return CUI_EDIT_OK;
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count && state->completion.open; ++i) {
+        cui_event e = events[i];
+        if (cui_event_consumed(ui, i))
+            continue;
+        cui_id target = cui_event_target(ui, i);
+        bool option = false;
+        for (size_t row = 0; target != id && !option && row < state->completion.count; ++row)
+            option = target == cui_editor_completion_item_id(id, row);
+        if (e.type == CUI_EVENT_CANCEL || (e.type == CUI_EVENT_POINTER_DOWN && !option)) {
+            cui_editor_cancel_completion(state);
+            break;
+        }
+        if (target != id && !option)
+            continue;
+        /* Never accept before an earlier queued text/navigation edit. Let the
+         * textarea process that queue in order, then discard stale proposals. */
+        if (e.type == CUI_EVENT_TEXT)
+            break;
+        if (e.type != CUI_EVENT_KEY_DOWN)
+            continue;
+        if (e.ime_composing || e.prefer_character_input ||
+            (e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META | CUI_MOD_ALT)))
+            break;
+        if (e.key == CUI_KEY_UP) {
+            state->completion.selected = state->completion.selected ? state->completion.selected - 1
+                                                                    : state->completion.count - 1;
+        } else if (e.key == CUI_KEY_DOWN) {
+            state->completion.selected = (state->completion.selected + 1) % state->completion.count;
+        } else if (e.key == CUI_KEY_ENTER && !(e.modifiers & CUI_MOD_SHIFT)) {
+            cui_edit_result result = cui_editor_accept_completion(state);
+            cui_consume_event(ui, i);
+            return result;
+        } else if (e.key == CUI_KEY_ESCAPE) {
+            cui_editor_cancel_completion(state);
+        } else
+            break;
+        cui_consume_event(ui, i);
+        cui_invalidate(ui);
+    }
+    return CUI_EDIT_OK;
+}
 cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cui_editor_state *s,
                                     cui_editor_options o, cui_textarea_metrics metrics) {
-    if (!s || !s->edit || (o.language.length && !o.language.data))
+    if (!ui || !id || !s || !s->edit || !s->view.lines || !s->view.capacity ||
+        s->view.capacity > 65536 || !isfinite(metrics.font_size) || metrics.font_size <= 0 ||
+        !isfinite(metrics.line_height) || metrics.line_height <= 0 ||
+        o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+        o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||
+        (o.language.length && !o.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
-    return cui_base_textarea(ui, id, name, s->edit, &s->view, o.textarea, metrics);
+    cui_textarea_state probe = s->view;
+    float width = probe.viewport.w > 0 ? probe.viewport.w : probe.wrap_width;
+    cui_textarea_error layout_error = cui_textarea_layout_ex(
+        ui, s->edit, &probe, metrics, width, !o.textarea.no_wrap, o.textarea.text_style);
+    if (layout_error != CUI_TEXTAREA_OK)
+        return (cui_textarea_result){.error = layout_error};
+    cui_edit_state before = cui_edit_get_state(s->edit);
+    cui_edit_result completion_error = cui_editor_completion_events(ui, id, s, o.textarea);
+    cui_textarea_result result =
+        cui_base_textarea(ui, id, name, s->edit, &s->view, o.textarea, metrics);
+    cui_edit_state after = cui_edit_get_state(s->edit);
+    result.changed |= before.revision != after.revision;
+    result.selection_changed |= before.cursor != after.cursor || before.anchor != after.anchor;
+    if (completion_error != CUI_EDIT_OK)
+        result.edit_error = completion_error;
+    if (s->completion.open &&
+        (s->completion.revision != after.revision || result.selection_changed))
+        cui_editor_cancel_completion(s);
+    return result;
 }
 
 bool cui_editor_search_init(cui_editor_search_state *s, cui_edit *query) {
@@ -194,6 +308,60 @@ cui_edit_result cui_editor_set_folded(cui_editor_state *state, size_t index, boo
     return CUI_EDIT_OK;
 }
 
+void cui_editor_cancel_completion(cui_editor_state *state) {
+    if (state)
+        state->completion = (cui_editor_completion_state){0};
+}
+cui_edit_result cui_editor_show_completions(cui_editor_state *state,
+                                            const cui_editor_completion_item *items, size_t count,
+                                            size_t start, size_t end) {
+    if (!state || !state->edit || count > 65536 || (count && !items))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!count) {
+        cui_editor_cancel_completion(state);
+        return CUI_EDIT_OK;
+    }
+    cui_str text = cui_edit_get_text(state->edit);
+    if (start > end || end > text.length || !cui_editor_boundary(text, start) ||
+        !cui_editor_boundary(text, end))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    for (size_t i = 0; i < count; ++i) {
+        if (!items[i].label.length || !items[i].label.data ||
+            (items[i].detail.length && !items[i].detail.data) ||
+            (items[i].insert_text.length && !items[i].insert_text.data))
+            return CUI_EDIT_INVALID_ARGUMENT;
+        if (!cui_edit_valid_utf8(items[i].label) || !cui_edit_valid_utf8(items[i].detail) ||
+            !cui_edit_valid_utf8(items[i].insert_text))
+            return CUI_EDIT_INVALID_UTF8;
+    }
+    cui_edit_state selection = cui_edit_get_state(state->edit);
+    state->completion =
+        (cui_editor_completion_state){.items = items,
+                                      .count = count,
+                                      .replace_start = start,
+                                      .replace_end = end,
+                                      .cursor = selection.cursor,
+                                      .anchor = selection.anchor,
+                                      .revision = cui_edit_get_state(state->edit).revision,
+                                      .open = true};
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_editor_accept_completion(cui_editor_state *state) {
+    if (!state || !state->edit || !state->completion.open || !state->completion.items ||
+        state->completion.selected >= state->completion.count)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (state->completion.revision != cui_edit_get_state(state->edit).revision) {
+        cui_editor_cancel_completion(state);
+        return CUI_EDIT_INVALID_ARGUMENT;
+    }
+    cui_edit_result result = cui_edit_replace_range(
+        state->edit, state->completion.replace_start, state->completion.replace_end,
+        state->completion.items[state->completion.selected].insert_text);
+    if (result == CUI_EDIT_OK)
+        cui_editor_cancel_completion(state);
+    return result;
+}
+
 /* src/components/cui_editor.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -238,6 +406,117 @@ static float cui_editor_gutter(cui_context *ui, cui_str document, float font, cu
     return cui_measure_text_ex(ui, (cui_str){digits, (size_t)length}, font, style).width + 16 +
            (fold_count ? 16 : 0);
 }
+static cui_edit_result cui_editor_completion_popup(cui_context *ui, cui_id id,
+                                                   const cui_theme *theme, cui_editor_state *editor,
+                                                   cui_editor_options options,
+                                                   cui_textarea_metrics metrics) {
+    cui_editor_completion_state *menu = &editor->completion;
+    cui_textarea_state *view = &editor->view;
+    if (!menu->open || cui_focused(ui) != id || options.textarea.disabled ||
+        options.textarea.readonly)
+        return CUI_EDIT_OK;
+    float row_height = metrics.line_height + 8;
+    if (view->viewport.w <= 0 || view->viewport.h < row_height + 4)
+        return CUI_EDIT_OK;
+    size_t rows = options.completion_rows ? options.completion_rows : 8;
+    size_t fitting = (size_t)floorf((view->viewport.h - 4) / row_height);
+    if (rows > fitting)
+        rows = fitting;
+    size_t first = menu->selected >= rows ? menu->selected - rows + 1 : 0;
+    size_t count = menu->count - first < rows ? menu->count - first : rows;
+    float width =
+        fminf(view->viewport.w, options.completion_width > 0 ? options.completion_width : 320);
+    float height = count * row_height + 4;
+    cui_edit_state caret = cui_edit_get_state(editor->edit);
+    cui_str text = cui_edit_get_text(editor->edit);
+    cui_textarea_line line = view->lines[view->caret_line];
+    float x = view->viewport.x +
+              cui_editor_prefix(ui, text, line, caret.cursor, metrics.font_size,
+                                options.textarea.text_style) -
+              view->scroll_x;
+    x = fmaxf(view->viewport.x, fminf(x, view->viewport.x + view->viewport.w - width));
+    float caret_y = view->viewport.y + view->caret_line * metrics.line_height - view->scroll_y;
+    float y = caret_y + metrics.line_height + 4;
+    if (y + height > view->viewport.y + view->viewport.h &&
+        caret_y - height - 4 >= view->viewport.y)
+        y = caret_y - height - 4;
+    y = fmaxf(view->viewport.y, fminf(y, view->viewport.y + view->viewport.h - height));
+    cui_id popup = id ^ UINT64_C(0x2b31c8fa65700394);
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    for (size_t i = 0; i < semantic_count; ++i)
+        if (semantics[i].id == id) {
+            cui_semantic_details details = semantics[i].details;
+            details.controls = popup;
+            details.expanded = true;
+            cui_set_semantic_details(ui, id, details);
+            break;
+        }
+    cui_begin_portal(ui, popup,
+                     (cui_box){.background = theme->surface,
+                               .border = theme->border,
+                               .border_width = 1,
+                               .radius = theme->radius,
+                               .padding = 2,
+                               .clip = true},
+                     (cui_rect){x, y, width, height}, 30);
+    cui_interact(ui, popup, CUI_ROLE_LISTBOX, cui_string("Code completions"), false, false, 0);
+    cui_set_semantic_details(ui, popup, (cui_semantic_details){.parent = id, .no_focus = true});
+    size_t accepted = SIZE_MAX;
+    for (size_t i = first; i < first + count; ++i) {
+        const cui_editor_completion_item *item = &menu->items[i];
+        cui_id row = cui_editor_completion_item_id(id, i);
+        cui_begin_box(
+            ui, row,
+            (cui_box){.width = -1,
+                      .height = row_height,
+                      .fixed_height = true,
+                      .row = true,
+                      .padding = 4,
+                      .gap = 8,
+                      .clip = true,
+                      .background = i == menu->selected ? theme->selection : (cui_color){0}});
+        cui_interaction interaction =
+            cui_interact(ui, row, CUI_ROLE_OPTION, item->label, false, i == menu->selected, 0);
+        cui_set_semantic_details(ui, row,
+                                 (cui_semantic_details){.parent = popup,
+                                                        .selected = i == menu->selected,
+                                                        .pos_in_set = (unsigned)i + 1,
+                                                        .set_size = (unsigned)menu->count,
+                                                        .no_focus = true,
+                                                        .pointer_activatable = true});
+        cui_set_tab_stop(ui, row, false);
+        if (interaction.activated)
+            accepted = i;
+        cui_begin_box(ui, row ^ UINT64_C(0x0eacf3958b100cea),
+                      (cui_box){.width = -1, .height = metrics.line_height, .clip = true});
+        cui_text_line(ui, item->label, metrics.font_size, theme->text, metrics.line_height,
+                      options.textarea.text_style);
+        cui_end_box(ui);
+        if (item->detail.length) {
+            float detail_width =
+                fminf(width * .45f, cui_measure_text_ex(ui, item->detail, metrics.font_size,
+                                                        options.textarea.text_style)
+                                        .width);
+            cui_begin_box(
+                ui, row ^ UINT64_C(0x3a84e1f926792cb5),
+                (cui_box){.width = detail_width, .height = metrics.line_height, .clip = true});
+            cui_text_line(ui, item->detail, metrics.font_size, theme->muted, metrics.line_height,
+                          options.textarea.text_style);
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    if (accepted != SIZE_MAX) {
+        menu->selected = accepted;
+        cui_edit_result result = cui_editor_accept_completion(editor);
+        cui_focus(ui, id);
+        cui_invalidate(ui);
+        return result;
+    }
+    return CUI_EDIT_OK;
+}
 cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                cui_editor_state *editor, cui_editor_options config) {
     if (!editor || !editor->edit || (config.language.length && !config.language.data))
@@ -245,12 +524,15 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     cui_edit *edit = editor->edit;
     cui_textarea_state *state = &editor->view;
     cui_textarea_options options = config.textarea;
+    bool had_bounds = state->initialized;
     cui_textarea_result result = {.error = CUI_TEXTAREA_INVALID};
     cui_textarea_metrics metrics;
     if (!ui || !id || !theme || !edit || !state ||
         !cui_textarea_measure(options, theme->font_size, &metrics) || !isfinite(options.width) ||
         !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
         options.rows > 65536 || options.min_rows > 65536 || options.max_rows > 65536 ||
+        !isfinite(config.completion_width) || config.completion_width < 0 ||
+        config.completion_width > 1000000 || config.completion_rows > 32 ||
         (options.placeholder.length && !options.placeholder.data))
         return result;
     if (options.design_size != CUI_DESIGN_INHERIT) {
@@ -282,7 +564,7 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         return result;
     state->viewport.w = width;
     state->viewport.h = fmaxf(0, height - 2 * py);
-    result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
+    result = cui_base_editor(ui, id, name, editor, config, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
     document = cui_edit_get_text(edit);
@@ -503,6 +785,20 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         result.selection_changed |= before_toggle.cursor != after_toggle.cursor ||
                                     before_toggle.anchor != after_toggle.anchor;
         cui_invalidate(ui); /* The next draw rebuilds the projected rows. */
+    }
+    if (editor->completion.open) {
+        if (had_bounds) {
+            cui_edit_state before_completion = cui_edit_get_state(edit);
+            cui_edit_result completion_error =
+                cui_editor_completion_popup(ui, id, theme, editor, config, metrics);
+            cui_edit_state after_completion = cui_edit_get_state(edit);
+            result.changed |= before_completion.revision != after_completion.revision;
+            result.selection_changed |= before_completion.cursor != after_completion.cursor ||
+                                        before_completion.anchor != after_completion.anchor;
+            if (completion_error != CUI_EDIT_OK)
+                result.edit_error = completion_error;
+        } else
+            cui_invalidate(ui); /* Anchor uses the first completed layout. */
     }
     return result;
 }

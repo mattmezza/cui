@@ -417,31 +417,38 @@
       "tests": [
         "tests/unit/test_components.c"
       ],
-      "status": "implemented",
+      "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
         "headless": "tested_partial"
       },
       "limitations": [
-        "Themed text badge renders. Count/dot/overflow and standalone semantic tests pending."
+        "Count, zero hiding, overflow, dot, configurable SVG icon, four sizes, colors and arbitrary content composition are headless tested; source corner geometry is covered on the first frame.",
+        "Generic inherited style refinement remains ordinary Core composition; browser-specific interaction and visual evidence is recorded separately."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "count and dot variants",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
         },
         {
           "name": "overflow count",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
         },
         {
           "name": "theme and accessible content",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3020,16 +3027,21 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled multiline caret/selection/scroll, line numbers, complete text-style measurement, host token colors, UTF-8 literal find panel and caller-owned folding are headless tested.",
-        "Language parsers, completion/LSP, regex/replace search, multicursor, grapheme and bidi navigation remain incomplete; folds require host refresh after edits."
+        "Styled multiline caret/selection/scroll, line numbers, host token colors, literal find, caller-owned folding and atomic host-supplied completion are headless tested.",
+        "Unicode 17 default grapheme keyboard editing and cluster-safe visual rows pass all 766 pinned conformance cases. Explicit scalar APIs remain compatible.",
+        "Language parsers/LSP, regex/replace search, multicursor and bidi remain incomplete; folds require host refresh after edits. Unicode word keyboard motions and atomic Ctrl/Alt deletion are conformance tested."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "UTF-8 grapheme editing and selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/cui_edit_grapheme_tests.inc",
+            "tests/unit/test_textarea.c"
+          ]
         },
         {
           "name": "undo/redo and multiline indentation",
@@ -4245,8 +4257,9 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled tabs, close/select, toolbar/zoom, nested resize, policy-veto, independent resizable edge regions, atomic cross-region transfers and closed-edge drop opening are headless tested; the gallery exercises actual closed-edge transfer.",
-        "Closed-edge resize-to-open, panel menus and native floating-window integration remain pending; not complete GPUI Dock parity."
+        "Styled tabs, menus, bulk close, zoom placement, nested resize, independent edge regions and atomic cross-region transfers are headless tested.",
+        "Opt-in collapsed bottom tab strip and real resize reopening match the frozen bottom-edge behavior.",
+        "N-ary sized layouts, sealed/per-group locks, dynamic panel lifecycle/payload reconstruction/visibility and title presentation overrides remain incomplete; per-edge collapsibility and custom title/suffix callbacks are tested. See DOCK.md frozen export audit."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

@@ -202,6 +202,23 @@ cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str nam
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);
 void cui_badge(cui_context *, cui_id, const cui_theme *, cui_str);
+typedef enum { CUI_BADGE_COUNT, CUI_BADGE_DOT, CUI_BADGE_ICON } cui_badge_variant;
+typedef struct {
+    cui_badge_variant variant;
+    size_t count, maximum;
+    cui_control_size size;
+    cui_str icon, name;
+    cui_color color;
+    bool custom_color;
+} cui_badge_options;
+cui_badge_options cui_badge_defaults(void);
+/* Compose arbitrary content with a zero-flow corner indicator. Count zero hides
+ * only the indicator; count overflow reads maximum+. Dot/icon always show.
+ * Numbers use source size offsets and fixed10px text, dots6px, icon10/16/24px.
+ * Content/name/icon bytes are borrowed for the call. Invalid options submit no
+ * UI and invoke no callback. Legacy cui_badge remains a standalone text pill. */
+bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
+                  cui_button_content_fn content, void *user);
 typedef struct {
     bool indeterminate, reduced_motion;
     double now_seconds; /* Monotonic host clock; one back-and-forth cycle is 1.6s. */

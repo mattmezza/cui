@@ -100,7 +100,7 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += [f"examples/{name}/main.c" for name in ("unstyled", "styled_settings")]
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
-    paths += ["third_party/clay/clay.h"]
+    paths += ["third_party/clay/clay.h", "tests/unit/cui_edit_grapheme_tests.inc", "tests/unit/cui_edit_word_tests.inc"]
     digest = hashlib.sha256()
     for path in sorted(set(paths)):
         digest.update(path.encode() + b"\0")

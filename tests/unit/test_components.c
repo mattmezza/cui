@@ -876,6 +876,83 @@ static void test_button_hover_and_disabled_paint(void) {
     assert(!hovered_color && count == 1 && semantics[0].disabled);
     cui_destroy(ui);
 }
+static void badge_content(cui_context *ui, void *user) {
+    (*(unsigned *)user)++;
+    cui_begin_box(ui, 713, (cui_box){.width = 80, .height = 40, .background = {20, 40, 60, 255}});
+    cui_text(ui, cui_string("Inbox"), 16, (cui_color){255, 255, 255, 255});
+    cui_end_box(ui);
+}
+static void test_badge_variants(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 100});
+    cui_theme theme = cui_theme_light();
+    const cui_id id = 712, marker = id ^ UINT64_C(0x2780a7c4f39251db);
+    unsigned calls = 0;
+    cui_badge_options o = cui_badge_defaults();
+    assert(o.maximum == 99 && o.variant == CUI_BADGE_COUNT);
+    for (int size = CUI_CONTROL_MEDIUM; size <= CUI_CONTROL_XSMALL; size++) {
+        o.size = (cui_control_size)size;
+        for (int variant = CUI_BADGE_COUNT; variant <= CUI_BADGE_ICON; variant++) {
+            o.variant = (cui_badge_variant)variant;
+            o.count = 100;
+            o.icon = cui_string("check");
+            o.name = cui_string("Unread inbox");
+            o.custom_color = true;
+            o.color = (cui_color){120, 40, 70, 255};
+            assert(cui_begin_frame(ui, 400, 100, .016f));
+            assert(cui_badge_ex(ui, id, &theme, o, badge_content, &calls));
+            cui_draw_list list = cui_end_frame(ui);
+            cui_rect parent = cui_bounds(ui, id), content = cui_bounds(ui, 713),
+                     mark = cui_bounds(ui, marker);
+            assert(parent.w == 80 && parent.h == 40 && content.w == 80 && content.h == 40);
+            float extent = size == CUI_CONTROL_LARGE ? 24 : size == CUI_CONTROL_MEDIUM ? 16 : 10;
+            if (variant == CUI_BADGE_COUNT) {
+                float x = (size == CUI_CONTROL_LARGE ? 1 : size == CUI_CONTROL_MEDIUM ? 3 : 4) * 3;
+                float y = size == CUI_CONTROL_LARGE ? 2 : size == CUI_CONTROL_MEDIUM ? -3 : -4;
+                assert(fabsf(mark.x + mark.w - (parent.x + parent.w + x)) < .01f);
+                assert(mark.y == parent.y + y && mark.h == 14 && mark.w >= 14);
+            } else {
+                float diameter = variant == CUI_BADGE_DOT ? 6 : extent;
+                assert(mark.w == diameter && mark.h == diameter);
+                assert(mark.x + mark.w == parent.x + parent.w);
+                assert(mark.y ==
+                       (variant == CUI_BADGE_DOT ? parent.y : parent.y + parent.h - diameter));
+            }
+            size_t count;
+            const cui_semantic *sem = cui_semantics(ui, &count);
+            assert(count == 1 && sem[0].role == CUI_ROLE_STATUS && sem[0].details.parent == id);
+            assert(sem[0].name.length == 12 && !memcmp(sem[0].name.data, "Unread inbox", 12));
+            assert(sem[0].tab_index == -1 && !sem[0].focused);
+            bool painted = false, overflow = false, icon = false;
+            for (size_t i = 0; i < list.count; i++) {
+                cui_draw_command command = list.commands[i];
+                if (command.type == CUI_DRAW_RECT && command.color.r == 120 &&
+                    command.color.g == 40)
+                    painted = true;
+                if (command.type == CUI_DRAW_TEXT && command.text.length == 3 &&
+                    !memcmp(command.text.data, "99+", 3))
+                    overflow = true;
+                if (command.type == CUI_DRAW_IMAGE)
+                    icon = true;
+            }
+            assert(painted && overflow == (variant == CUI_BADGE_COUNT) &&
+                   icon == (variant == CUI_BADGE_ICON));
+        }
+    }
+    o = cui_badge_defaults();
+    assert(cui_begin_frame(ui, 400, 100, .016f));
+    assert(cui_badge_ex(ui, id, &theme, o, badge_content, &calls));
+    cui_end_frame(ui);
+    size_t count;
+    cui_semantics(ui, &count);
+    assert(count == 0 && cui_bounds(ui, id).w == 80 && cui_bounds(ui, id).h == 40);
+    unsigned prior = calls;
+    assert(cui_begin_frame(ui, 400, 100, .016f));
+    o.variant = (cui_badge_variant)99;
+    assert(!cui_badge_ex(ui, id, &theme, o, badge_content, &calls));
+    cui_draw_list list = cui_end_frame(ui);
+    assert(calls == prior && list.count == 0);
+    cui_destroy(ui);
+}
 static void test_progress_motion(void) {
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 40});
     cui_theme theme = cui_theme_light();
@@ -1037,6 +1114,7 @@ static void design_scale(void) {
 }
 int main(void) {
     design_scale();
+    test_badge_variants();
     test_progress_motion();
     test_button_hover_and_disabled_paint();
     test_button_paint_composition();

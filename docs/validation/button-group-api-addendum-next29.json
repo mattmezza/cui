@@ -1,0 +1,142 @@
+{
+  "proposal_base": "021d553c23d066473db0b8e2bc67ef9ab525efb0",
+  "reference_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "production_edits": false,
+  "completion_claim": false,
+  "supersedes_prior_direction": "Use full per-accepted-event input-order dispatch; no collapsed Group callback contract. Accepted-event evidence replaces a proposed generic interaction count extension.",
+  "public_declarations": [
+    "CUI_BUTTON_GROUP_MAX_ITEMS = 256",
+    "cui_button_group_activation_policy",
+    "cui_button_group_request",
+    "cui_button_group_change_fn",
+    "cui_button_group_child_click_fn",
+    "cui_button_group_item",
+    "cui_button_group_options",
+    "cui_button_group_result",
+    "cui_button_group_workspace",
+    "cui_base_button_group_begin",
+    "cui_base_button_group_item",
+    "cui_base_button_group_end",
+    "cui_button_group_styled_item",
+    "cui_button_group_style_options",
+    "cui_button_group_ex"
+  ],
+  "workspace": {
+    "allocation": "caller-owned fixed bounded arrays; no heap or Core resources",
+    "selection_owner": "caller bool array; never silently mutated by group",
+    "borrowed_lifetimes": "descriptors, model, strings and callbacks through synchronous group end; Button state through existing end_frame rules",
+    "request_lifetime": "only synchronous callback; const index array and request must not escape",
+    "reentrancy": "no concurrent group on same workspace; each child registered exactly once; callbacks may change model but not resubmit/paint group",
+    "context_lifetime": "reset workspace before reusing with a newly created context",
+    "proposed_guard": "store context and nonzero ordinary-frame generation; reject cross-context/cross-frame item/end"
+  },
+  "inheritance_order": [
+    "copy child options including state, slots, hover, tooltip, pointer focus and custom cursor",
+    "apply explicit group size/variant overrides; non-INHERIT design size; true compact/outline enables only",
+    "existing individual positive height/font/icon overrides remain strongest",
+    "effective disabled = group disabled OR child disabled; loading remains child-local; interaction inert includes loading",
+    "selected paint and toggled semantic state from caller model; do not normalize multiple preselected single-mode values",
+    "apply segmented corner/edge masks for count > 1; count 1 preserves child shape; no equal-width rule"
+  ],
+  "callback_contract": {
+    "multiplicity": "one handler per eligible accepted event, original event-index order across children",
+    "ownership": "group callback replaces child click callbacks; no group callback preserves child handlers; hover callbacks unchanged",
+    "default_policy": "SOURCE_POINTER_CALLBACKS: source mouse-only group handler behavior; keyboard activation with group handler invokes neither replaced child handler nor group request",
+    "opt_in_policy": "ALL_ACTIVATIONS: group requests for pointer, keyboard and accessibility",
+    "without_group_handler": "child handler receives all accepted activations independent of policy",
+    "controlled_events": "next request uses model after preceding callback accepts or rejects",
+    "single": "clicked singleton, including reclick selected",
+    "multiple": "ascending current selected indices, then remove clicked selected or append clicked unselected",
+    "background": "actual group target and SIZE_MAX item index, unchanged selection",
+    "snapshot": "current submitted inert inputs validate all events; callback changes to external disabled/loading affect next frame",
+    "result": "accepted activation and delivered callback counts; neither means model changed",
+    "background_eligibility": "Only enabled group with installed group callback is pointer-activatable; otherwise passive collection preserves ancestor background routing"
+  },
+  "explicit_source_divergences": [
+    "disabled OR composition independent of builder order, unlike pinned child/children behavior",
+    "actual background identity instead of source stale render-local last child index",
+    "opt-in all-activation policy is useful extension, not claimed source keyboard equivalence"
+  ],
+  "required_core_seams": {
+    "accepted_event_query": "cui_id cui_event_accepted_activation(const cui_context *, size_t)",
+    "reason": "pending target query and consumed slot zero cannot distinguish accepted from current-disabled/accessibility rejected events; Boolean loses multiplicity",
+    "recording": "one ID per existing bounded dispatch event, set only after successful semantic registration and acceptance; reset each begin",
+    "query_revalidation": "current enabled target, final accessibility role/scope, ordinary phase; no consumption or new activation",
+    "lifecycle_query": "uint64_t cui_frame_sequence(const cui_context *); zero outside ordinary submission, increments each successful begin including dt=0, skips zero",
+    "excluded": [
+      "generic configurable activation engine",
+      "interaction activation_count field",
+      "Core config or secret changes",
+      "raw pointer event counting"
+    ],
+    "ownership": "coordinate after password Stage2 releases exclusive Core; no production edit yet"
+  },
+  "stages": [
+    "validate all borrowed input and workspace",
+    "register collection and all final-role/final-inert child semantics; refine metadata before dispatch",
+    "scan accepted records in input order and dispatch exactly one eligible handler per event",
+    "publish final checked/value metadata for every child",
+    "paint all children using final controlled model and shared private Button tooltip/hover helper"
+  ],
+  "paint": {
+    "existing_core_capability": [
+      "cui_box.custom_corners",
+      "cui_box.corner_radii",
+      "cui_box.custom_border_edges",
+      "cui_box.border_edges"
+    ],
+    "necessary_core_paint_extension": false,
+    "button_only_change": "append and validate these painter options; reuse existing commands/adapters",
+    "horizontal": "outer left first corners/right last corners; all first edges and omit subsequent left",
+    "vertical": "outer top first corners/bottom last corners; all first edges and omit subsequent top",
+    "width": "resolved actual Button border width; ghost/link/text do not gain outline",
+    "radius": "child resolved radius, count 1 untouched",
+    "gap": "zero segmented gap, explicit caller padding/bounds retained"
+  },
+  "ownership_proposal": {
+    "core": [
+      "narrow public accepted-event/frame-sequence queries",
+      "private record/reset/acceptance checks",
+      "new independent Core tests"
+    ],
+    "base": [
+      "new cui_button_group.h",
+      "new src/base/cui_button_group.c"
+    ],
+    "styled": [
+      "new src/components/cui_button_group.c",
+      "Button declarations/painter/private metadata-tooltip helper only",
+      "new private Button helper header"
+    ],
+    "proof": [
+      "new focused headless tests",
+      "new actual browser fixture/tests",
+      "new guide"
+    ],
+    "integrator": [
+      "CMake",
+      "umbrella",
+      "WASI",
+      "amalgamation",
+      "exports",
+      "manifest",
+      "gallery registration"
+    ]
+  },
+  "proof_required": [
+    "accepted evidence before/after registration; current inert/role/scope rejection; cancellation and repeats",
+    "same-child two clicks, alternating children in opposite input/array order, key/accessibility multiplicity",
+    "controlled accept/reject and final sibling semantic/pixel coherence",
+    "0/1/2/256 items; invalid IDs/enum/buffers; partial registration and lifecycle misuse",
+    "both callback policies, callback replacement, background identity",
+    "both orientations and first/interior/last separators/corners actual commands/pixels",
+    "4 legacy plus 14 design sizes, both densities, all variants, inherit/overrides",
+    "icons/loading/slots/text containment, hover/pressed/focus and cursor",
+    "actual browser mouse/keyboard/wheel/CDP touch, disabled/loading, cancel/next click, modal/clip and ancestor scrolling"
+  ],
+  "validation": {
+    "declaration_block": "compiled C11 -Wall -Wextra -Wpedantic -Werror -fsyntax-only against existing public headers",
+    "json": "parsed with Python json.tool",
+    "runtime": "no new runtime result; proposal only"
+  }
+}

@@ -124,6 +124,24 @@ size_t cui_theme_preset_count(void);
 cui_str cui_theme_preset_name(size_t index);
 bool cui_theme_preset_is_dark(size_t index);
 bool cui_theme_preset_get(size_t index, cui_theme *output);
+/* Source semantic motion policy; stored separately so legacy themes/consumers
+ * remain unchanged. Distances are rem units until explicitly projected. */
+typedef struct {
+    float x1, y1, x2, y2;
+} cui_theme_bezier;
+typedef struct {
+    float duration_instant, duration_fast, duration_normal, duration_slow;
+    cui_theme_bezier easing_enter, easing_exit, easing_move;
+    cui_spring_settings spring_control, spring_move;
+    float distance_short, distance_medium;
+} cui_theme_motion_tokens;
+cui_theme_motion_tokens cui_theme_motion_default(void);
+bool cui_theme_motion_valid(const cui_theme_motion_tokens *);
+/* Copies full policy, converts distances to pixels; reduced motion sets duration,
+ * distance and spring travel/response to zero without modifying the input. */
+bool cui_theme_motion_project(const cui_theme_motion_tokens *, float rem_pixels,
+                              bool reduced_motion, cui_theme_motion_tokens *);
+bool cui_theme_bezier_sample(cui_theme_bezier, float progress, float *output);
 #ifdef __cplusplus
 }
 #endif

@@ -273,7 +273,8 @@ typedef struct {
     bool tooltip_active, tooltip_started;
     size_t tooltip_visual_index; /* retained while fading out */
     double tooltip_visual_value;
-    cui_rect bounds; /* retained logical bounds for pointer interaction */
+    cui_rect bounds;           /* retained logical bounds for pointer interaction */
+    bool appear_hover_pending; /* private valid cursor deferred until reveal completes */
 } cui_chart_state;
 typedef struct {
     bool valid;
@@ -1871,6 +1872,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->emphasis_started = false;
         s->emphasis_visual_index = SIZE_MAX;
         s->tooltip_cursor_valid = false;
+        s->appear_hover_pending = false;
         s->tooltip_phase = s->tooltip_focus = 0;
         s->tooltip_from = 0;
         s->tooltip_active = s->tooltip_started = false;
@@ -2035,6 +2037,8 @@ cui_chart_hit cui_chart_update_hover(cui_chart_state *state, const cui_chart_opt
     hit = cui_chart_hit_test(options, x, y);
     state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
     state->hovered_value = hit.valid ? hit.value : 0;
+    if (!hit.valid)
+        state->appear_hover_pending = false;
     if (hit.valid) {
         state->tooltip_cursor_x = x;
         state->tooltip_cursor_y = y;
@@ -2106,6 +2110,8 @@ static void cui_chart_hover_spring(float *position, float *velocity, float targe
 }
 static float cui_chart_hover_ease(float progress, bool entering) {
     progress = fmaxf(0, fminf(1, progress));
+    if (progress == 0 || progress == 1)
+        return progress;
     float x1 = entering ? .16f : .4f, y1 = entering ? 1.f : 0.f;
     float x2 = entering ? .3f : 1.f, y2 = 1.f;
     float lo = 0, hi = 1;
@@ -2503,10 +2509,12 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.pointer_activatable = !o->noninteractive, .no_focus = true});
-    if (o->noninteractive)
+    if (o->noninteractive) {
+        state->appear_hover_pending = false;
         (void)cui_chart_update_hover(state, o, NAN, NAN);
-    else {
-        if (state->hovered < o->count && state->tooltip_cursor_valid)
+    } else {
+        if ((state->hovered < o->count || state->appear_hover_pending) &&
+            state->tooltip_cursor_valid)
             (void)cui_chart_update_hover(state, o, state->tooltip_cursor_x,
                                          state->tooltip_cursor_y);
         size_t count = 0;
@@ -2521,6 +2529,21 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
                                              events[i].y - state->bounds.y);
             }
         }
+    }
+    /* Source prepaint supplies no live datum until appearance is complete.
+     * Keep the valid cursor separately so a stationary pointer can resume;
+     * retained tooltip/emphasis presentation still follows its exit clock. */
+    bool appearing = state->rendered_reveal_progress < 1;
+    if (!o->reveal_enabled && state->appear_started && !o->disable_appear && !o->reduced_motion &&
+        !cui_reduced_motion(ui)) {
+        double duration = o->appear_duration > 0 ? o->appear_duration : 1;
+        /* Gate by linear time: quartic float progress may round to1 early. */
+        appearing = fmax(0, cui_frame_time(ui) - state->appear_started_at) < duration;
+    }
+    state->appear_hover_pending = appearing && !o->noninteractive && state->hovered < o->count;
+    if (appearing) {
+        state->hovered = SIZE_MAX;
+        state->hovered_value = 0;
     }
     {
         bool active = !o->noninteractive && state->hovered < o->count;

@@ -489,6 +489,45 @@ static void test_edge_regions(void) {
     }
     cui_dock_workspace_destroy(edges);
 }
+static bool oversized_hit[2];
+static void oversized_content(cui_context *ctx, uint64_t key, void *user) {
+    (void)user;
+    cui_id id = 980 + key;
+    cui_begin_box(ctx, id, (cui_box){.width = -1, .height = -1, .padding = 12, .gap = 8});
+    cui_interact(ctx, id, CUI_ROLE_GROUP, cui_string("Oversized content"), false, false, 0);
+    cui_set_semantic_details(ctx, id, (cui_semantic_details){.pointer_activatable = true});
+    size_t event_count;
+    cui_frame_events(ctx, &event_count);
+    if (event_count)
+        oversized_hit[key] = cui_hovered(ctx, id);
+    cui_text(ctx,
+             cui_string("A deliberately long single line of unwrapped content should not enlarge "
+                        "the adjacent dock pane"),
+             16, (cui_color){20, 30, 40, 255});
+    cui_end_box(ctx);
+}
+static void test_oversized_content(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    cui_dock_node left = cui_dock_root(model), right;
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 1, false, &right) ==
+           CUI_DOCK_OK);
+    panels[0].render = panels[1].render = oversized_content;
+    frame();
+    frame();
+    cui_rect a = cui_bounds(ui, cui_dock_group_id(workspace, left)),
+             b = cui_bounds(ui, cui_dock_group_id(workspace, right));
+    cui_rect content_a = cui_bounds(ui, 980), content_b = cui_bounds(ui, 981);
+    assert(content_a.w > a.w && content_b.w > b.w);
+    assert(a.w == 320 && b.w == 320 && a.x + a.w <= b.x + .001f);
+    pointer(CUI_EVENT_POINTER_DOWN, b.x + 8, b.y + 80);
+    frame();
+    assert(!oversized_hit[0] && oversized_hit[1]);
+    pointer(CUI_EVENT_POINTER_UP, b.x + 8, b.y + 80);
+    frame();
+    panels[0].render = panels[1].render = content;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -614,6 +653,7 @@ int main(void) {
     test_policy_preview();
     test_zoom_toolbar();
     test_edge_regions();
+    test_oversized_content();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

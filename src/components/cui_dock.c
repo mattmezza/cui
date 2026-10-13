@@ -517,7 +517,8 @@ static void render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache *cach
     }
     float content_height = fmaxf(0, h - s->options.tab_height - toolbar_height);
     cui_begin_box(s->ui, dock_part(s->id, info.id, UINT64_C(0x3721baf9de47c631)),
-                  (cui_box){.width = -1,
+                  (cui_box){.width = w,
+                            .max_width = w,
                             .height = content_height,
                             .fixed_height = content_height == 0,
                             .clip = true,

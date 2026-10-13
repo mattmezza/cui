@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_editor.h"
+#include "cui_textarea_geometry.h"
 #include <math.h>
 #include <string.h>
 bool cui_editor_state_init(cui_editor_state *s, cui_edit *edit, cui_textarea_line *lines,
@@ -179,12 +180,8 @@ static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor, cu
                                 at = cui_grapheme_next(text, at);
                                 position++;
                             }
-                            next[i].x = cui_measure_text_ex(
-                                            ui,
-                                            (cui_str){text.data + editor->view.lines[row].start,
-                                                      at - editor->view.lines[row].start},
-                                            font, style)
-                                            .width;
+                            next[i].x = cui_textarea_visual_x(ui,text,editor->view.lines[row],at,
+                                                               font,style,CUI_TEXT_DOWNSTREAM);
                             if (position < columns[j].column)
                                 next[i].x +=
                                     (columns[j].column - position) *

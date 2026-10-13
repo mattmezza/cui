@@ -367,6 +367,21 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch,
             (float[]){g->x / (float)ATLAS, g->y / (float)ATLAS, w / (float)ATLAS, h / (float)ATLAS},
             16);
 }
+static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
+                         const unsigned char *data, cui_color color) {
+    cui_sdl_gpu *r = user;
+    r->ink = color;
+    glyph(user,x,y,w,h,pitch,data);
+}
+static bool text_draw(cui_sdl_gpu *r, const cui_draw_command *c) {
+    if (c->text_color_count)
+        return cui_font_draw_context_line_colored(r->font,c->text_source,c->font_size,
+            c->text_style,c->bounds.x,c->bounds.y,c->color,c->text_colors,c->text_color_count,
+            color_glyph,r);
+    return cui_font_draw_context_line(r->font,c->text,c->text_source,c->font_size,c->text_style,
+                                      c->bounds.x,c->bounds.y,glyph,r);
+}
+
 static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
     SDL_Rect stack[CLIPS];
     size_t depth = 0;
@@ -432,8 +447,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
         } break;
         case CUI_DRAW_TEXT:
             r->ink = c->color;
-            if (!r->font || !cui_font_draw_styled(r->font, c->text, c->font_size, c->text_style,
-                                                  c->bounds.x, c->bounds.y, glyph, r))
+            if (!r->font || !text_draw(r, c))
                 return false;
             break;
         case CUI_DRAW_CLIP_PUSH: {

@@ -223,6 +223,21 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
             blend(r, x + i, y + j, c);
         }
 }
+static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
+                         const unsigned char *data, cui_color color) {
+    cui_software *r = user;
+    r->ink = color;
+    glyph(user,x,y,w,h,pitch,data);
+}
+static bool text_draw(cui_software *r, const cui_draw_command *c) {
+    if (c->text_color_count)
+        return cui_font_draw_context_line_colored(r->font,c->text_source,c->font_size,
+            c->text_style,c->bounds.x,c->bounds.y,c->color,c->text_colors,c->text_color_count,
+            color_glyph,r);
+    return cui_font_draw_context_line(r->font,c->text,c->text_source,c->font_size,c->text_style,
+                                      c->bounds.x,c->bounds.y,glyph,r);
+}
+
 #endif
 bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list || (!list->commands && list->count))
@@ -272,8 +287,7 @@ bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color c
         case CUI_DRAW_TEXT:
 #ifdef CUI_HAS_TEXT
             r->ink = c->color;
-            if (!r->font || !cui_font_draw_styled(r->font, c->text, c->font_size, c->text_style,
-                                                  c->bounds.x, c->bounds.y, glyph, r))
+            if (!r->font || !text_draw(r, c))
                 return false;
 #else
             return false;

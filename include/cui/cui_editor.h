@@ -48,6 +48,10 @@ typedef struct {
     float column_font_size, column_wrap_width;
     float column_pointer_x, column_pointer_y;
     bool column_dragged;
+    const cui_edit *gutter_model; /* Identity only; never dereferenced after rebinding. */
+    uint64_t gutter_revision;
+    size_t gutter_line_count;
+    bool gutter_valid;
 
 } cui_editor_state;
 typedef struct {

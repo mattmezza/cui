@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "app.h"
 #include "cui/cui_components.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -247,6 +248,58 @@ static void metric(cui_context *ui, const cui_theme *t, const char *label, const
     text(ui, detail, 11, t->muted, false);
     cui_end_box(ui);
 }
+/* Size the scroll extent from the same text metrics used to lay out its cards.
+ * A fixed desktop height compressed wrapped headings into their next row. */
+static float paragraph_height(cui_context *ui, const char *value, float size, bool bold,
+                              float width) {
+    cui_text_style style = {.weight = bold ? CUI_TEXT_WEIGHT_BOLD : CUI_TEXT_WEIGHT_NORMAL};
+    const char *line = value, *word = value;
+    unsigned rows = 1;
+    while (*word) {
+        const char *end = strchr(word, ' ');
+        if (!end)
+            end = word + strlen(word);
+        cui_str span = {line, (size_t)(end - line)};
+        if (word > line && cui_measure_text_ex(ui, span, size, style).width > width) {
+            ++rows;
+            line = word;
+        }
+        word = *end ? end + 1 : end;
+    }
+    return rows * size * 1.35f;
+}
+static float overview_height(cui_context *ui, const composed_app *a, const cui_theme *t,
+                             float width) {
+    bool stack = width < 650;
+    float padding = stack ? 24 : 32, hero_width = width - 2 * padding;
+    float button_height = 32 * t->font_size / 16;
+    float hero = 2 * padding + 48 + button_height +
+                 paragraph_height(ui, "BUILD SOMETHING GREAT, TOGETHER", 11, true, hero_width) +
+                 paragraph_height(ui, "A calmer place to do your best work.", stack ? 30 : 42, true,
+                                  hero_width) +
+                 paragraph_height(
+                     ui, "Keep your projects, people and next steps in one thoughtful workspace.",
+                     15, false, hero_width);
+    const char *labels[] = {"Active projects", "Teammates", "Weekly progress"};
+    const char *values[] = {"12", "8", "84%"};
+    const char *details[] = {"Sample workspace activity", "A small team, a shared direction",
+                             "Illustrative demo metrics"};
+    float card_width = (stack ? width : (width - 32) / 3) - 40;
+    float metrics = stack ? 32 : 0;
+    for (unsigned i = 0; i < 3; ++i) {
+        float card = 56 + paragraph_height(ui, labels[i], 12, false, card_width) +
+                     paragraph_height(ui, values[i], 30, true, card_width) +
+                     paragraph_height(ui, details[i], 11, false, card_width);
+        metrics = stack ? metrics + card : fmaxf(metrics, card);
+    }
+    float callout =
+        90 + button_height + paragraph_height(ui, "Your next chapter", 20, true, width - 48) +
+        paragraph_height(ui, "Make this workspace yours", 14, true, width - 48) +
+        paragraph_height(ui, "Choose a display name and decide which updates reach you.", 13, false,
+                         width - 48);
+    float notice = a->notice[0] ? 52 + paragraph_height(ui, a->notice, 13, false, width - 32) : 0;
+    return ceilf((a->narrow ? 32 : 64) + 40 + hero + metrics + callout + notice);
+}
 static void render_overview(cui_context *ui, composed_app *a, const cui_theme *t, float width) {
     bool stack = width < 650;
     cui_begin_box(ui, 30,
@@ -411,7 +464,7 @@ void composed_app_scene(cui_context *ui, composed_app *a, float width, float hei
     if (viewport_height < 1)
         viewport_height = 1;
     float inner_width = content_width - (a->narrow ? 32 : 64);
-    float content_height = a->page == APP_OVERVIEW  ? (inner_width < 650 ? 1030 : 640)
+    float content_height = a->page == APP_OVERVIEW  ? overview_height(ui, a, &t, inner_width)
                            : a->page == APP_PRICING ? (inner_width < 720 ? 1490 : 680)
                                                     : 660;
     cui_scroll_options scroll = {.width = content_width,

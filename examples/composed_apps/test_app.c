@@ -427,6 +427,35 @@ static int native_audit(int argc, char **argv) {
     return result;
 }
 #endif
+static void overview_wrapping(void) {
+    const float widths[] = {360, 760, 1000, 1200, 1500};
+    for (size_t n = 0; n < sizeof widths / sizeof widths[0]; ++n) {
+        width = widths[n];
+        height = 1100;
+        ui = cui_create((cui_config){.width = width, .height = height});
+        app = composed_app_create(NULL, NULL);
+        assert(ui && app);
+        frame();
+        cui_rect hero = cui_bounds(ui, 30), cards = cui_bounds(ui, 31);
+        assert(hero.h > 200 && cards.y >= hero.y + hero.h - .1f);
+        float headline_bottom = 0, description_top = INFINITY;
+        for (size_t i = 0; i < last_list.count; ++i) {
+            const cui_draw_command *command = &last_list.commands[i];
+            if (command->type != CUI_DRAW_TEXT || command->bounds.y < hero.y ||
+                command->bounds.y >= hero.y + hero.h)
+                continue;
+            if (command->font_size ==
+                (width - (width >= 760 ? 224 : 0) - (width < 760 ? 32 : 64) < 650 ? 30 : 42))
+                headline_bottom = fmaxf(headline_bottom, command->bounds.y + command->bounds.h);
+            if (command->font_size == 15)
+                description_top = fminf(description_top, command->bounds.y);
+        }
+        assert(headline_bottom > 0 && isfinite(description_top));
+        assert(description_top >= headline_bottom - .1f);
+        composed_app_destroy(app);
+        cui_destroy(ui);
+    }
+}
 int main(int argc, char **argv) {
 #ifdef APP_THEME_NATIVE
     if (argc > 1 && !strcmp(argv[1], "--native"))
@@ -435,6 +464,7 @@ int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
 #endif
+    overview_wrapping();
     workflow(NULL);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};

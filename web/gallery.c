@@ -3936,7 +3936,6 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                          cui_string("Keep workspace"),
                          (cui_surface_options){.viewport = {0, 0, width, height},
                                                .width = width > 520 ? 420 : width - 32,
-                                               .height = 220,
                                                .margin = 16,
                                                .decide = alert_decision,
                                                .decision_user = &alert_attempts});

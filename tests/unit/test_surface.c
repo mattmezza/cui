@@ -765,7 +765,36 @@ static void alert_wrapped_confirmation(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_SURFACE_BASE_ONLY
+static void alert_fits_measured_content(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    cui_theme t = cui_theme_light();
+    cui_surface_state state;
+    cui_surface_init(&state, 987, CUI_SURFACE_ALERT);
+    cui_surface_open(ui, &state, 0);
+    cui_surface_options o = {.viewport = {0, 0, 600, 400}, .width = 420, .margin = 16};
+    for (unsigned frame = 0; frame < 4; ++frame) {
+        assert(cui_begin_frame(ui, 600, 400, .016f));
+        cui_alert_dialog(ui, &t, &state, cui_string("Delete?"), cui_string("This can be undone."),
+                         cui_string("Delete"), cui_string("Cancel"), o);
+        cui_end_frame(ui);
+    }
+    cui_rect b = cui_bounds(ui, state.overlay.id);
+    assert(b.h < 200 && fabsf(b.h - state.body_content.h - 2 * t.padding) < .2f);
+    assert(fabsf(b.y + b.h / 2 - 200) < .2f);
+    o.height = 250;
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_alert_dialog(ui, &t, &state, cui_string("Delete?"), cui_string("This can be undone."),
+                     cui_string("Delete"), cui_string("Cancel"), o);
+    cui_end_frame(ui);
+    assert(fabsf(cui_bounds(ui, state.overlay.id).h - 250) < .2f);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifndef CUI_SURFACE_BASE_ONLY
+    alert_fits_measured_content();
+#endif
 #ifndef CUI_SURFACE_BASE_ONLY
     alert_wrapped_confirmation();
 #endif

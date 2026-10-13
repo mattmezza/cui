@@ -68,6 +68,14 @@ def walk(tokens):
             yield from walk(token.children)
 
 
+def website_text(value):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('site_language', Path(__file__).with_name('site_language.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.website_text(value)
+
+
 def render_document(path, root, slugs, output):
     parser = MarkdownIt('commonmark', {'html': False}).enable(['table', 'strikethrough'])
     tokens = parser.parse(path.read_text(encoding='utf-8'))
@@ -85,7 +93,7 @@ def render_document(path, root, slugs, output):
         anchor = base + (f'-{occurrence}' if occurrence else '')
         token.attrSet('id', 'doc-' + anchor)
         if not have_title and token.tag == 'h1':
-            title, have_title = content, True
+            title, have_title = website_text(content), True
 
     def rewrite(value, image=False):
         url = urlsplit(value)
@@ -112,6 +120,8 @@ def render_document(path, root, slugs, output):
         return result
 
     for token in walk(tokens):
+        if token.type in {'text', 'code_inline', 'fence', 'code_block'}:
+            token.content = website_text(token.content)
         if token.type == 'link_open':
             token.attrSet('href', rewrite(token.attrGet('href') or ''))
         elif token.type == 'image':
@@ -124,7 +134,7 @@ def render_document(path, root, slugs, output):
 
 def markdown_for_agents(path, root):
     """Keep code fences exact; make repository-relative prose links fetchable."""
-    text = path.read_text(encoding='utf-8')
+    text = website_text(path.read_text(encoding='utf-8'))
     lines = text.splitlines(keepends=True)
     parser = MarkdownIt('commonmark', {'html': False})
     protected = set()
@@ -160,7 +170,7 @@ def publish_agent_docs(root, output, paths, documents):
         '> Experimental portable C11 UI: immediate frame composition, persistent '
         'application models, themed components and independent host/renderer adapters.\n\n'
         'All 78 comparison entries remain in scope; gallery presence is not complete '
-        'GPUI Kit parity. Use catalog.json for feature status and limitations. '
+        'component parity. Use catalog.json for feature status and limitations. '
         'Public headers define the API; examples must state their tested host.\n')
     index = introduction
     bundle = introduction
@@ -186,7 +196,7 @@ def publish_agent_docs(root, output, paths, documents):
     manifest = root / 'docs/gpui-parity.json'
     if manifest.is_file():
         shutil.copyfile(manifest, output / 'catalog.json')
-        bundle += '\n\n## Current component feature manifest\n\n```json\n' + manifest.read_text(encoding='utf-8') + '\n```\n'
+        bundle += '\n\n## Current component feature manifest\n\n```json\n' + website_text(manifest.read_text(encoding='utf-8')) + '\n```\n'
     for name in ('llms.txt', 'llm.txt'):
         (output / name).write_text(index, encoding='utf-8')
     for name in ('llms-full.txt', 'llm-full.txt'):

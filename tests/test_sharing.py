@@ -60,7 +60,7 @@ class SharingTests(unittest.TestCase):
             if route['path']:
                 self.assertIn('<base href="../../">', markup)
             if route['path'].startswith('components/'):
-                self.assertIn('parity remains in progress', markup)
+                self.assertIn('coverage remains in progress', markup)
         image = (output / 'assets/cui-social.png').read_bytes()
         self.assertEqual(image[:8], b'\x89PNG\r\n\x1a\n')
         sitemap = ET.parse(output / 'sitemap.xml')

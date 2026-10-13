@@ -1,0 +1,30 @@
+Website feedback batch — 2026-10-13
+
+Based on 87018e7; actual portable source fingerprint at WASI validation:
+8de2dc1af1fc4c8e2ca649a34f2fd659f3b2ae619f686ab6e7c32adc5a4ccba6
+
+Changes: base is the default website size; the redundant inherited-size label
+and reference branding were removed. Shared-size families have one selector.
+Website documentation keeps existing heading/source links while using CUI
+wording. Required third-party license attribution remains in LICENSE.txt.
+Accordion chevrons are vertically centered in both states, including exact
+180-degree raster rotation. Unspecified AlertDialog height follows measured
+content; explicit heights and viewport overflow retain their contract.
+Northstar overview scroll extent follows actual wrapped text metrics, with
+regression checks at five widths. README capture is actual C/WASM output.
+
+Warning-enabled native CTest: 88/88 passed.
+ASAN/UBSAN portable CTest: 84/84 passed.
+Pinned Zig 0.16.0 / Wasmtime 49.0.0: 75/75 runtime suites passed.
+Real Chromium: 78 stories, 78 compilable usage excerpts, interactive controls,
+themes/search, 390px overflow, touch and /cui/ hosting passed.
+Site extensions: 78 usage guides, effects, typography, motion and Northstar
+CTA/account/edit/save/theme/mobile workflows passed.
+Documentation 5/5; component usage 5/5; sharing 3/3 passed.
+Formatting, distribution generation, manifest and dependency licenses passed.
+
+Initial local runs exposed exact-rotation rounding, obsolete inherited-size
+expectations and small-screen Button preview clipping; these were corrected
+and rerun. Compiler error in a new test type name was corrected before the
+passing native run. Logs retained under ~/.cache/cui-validation/feedback-*.
+This is a verified feedback batch, not complete family/platform parity.

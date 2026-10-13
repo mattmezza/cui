@@ -17,6 +17,23 @@ SPEC.loader.exec_module(DOCS)
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_website_wording_preserves_heading_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'README.md').write_text('# GPUI comparison\n\n[Jump](#gpui-comparison)\n\nCUI usage.\n')
+            pages = DOCS.build(root, root / 'output')
+            self.assertEqual(pages[0]['title'], 'upstream comparison')
+            self.assertIn('id="doc-gpui-comparison"', pages[0]['html'])
+            self.assertIn('href="#docs/getting-started/gpui-comparison"', pages[0]['html'])
+            self.assertNotIn('>GPUI', pages[0]['html'])
+
+    def test_website_language_keeps_source_urls(self):
+        text = DOCS.website_text('GPUI Kit parity; GPUI. https://gpui-kit.com/base/')
+        self.assertEqual(text, 'upstream kit parity; upstream. https://gpui-kit.com/base/')
+        self.assertEqual(DOCS.website_text('[Manifest](gpui-parity.json)'), '[Manifest](gpui-parity.json)')
+        self.assertEqual(DOCS.website_text('cui_begin_frame(ui, width, height, dt);'),
+                         'cui_begin_frame(ui, width, height, dt);')
+
     def test_render_links_and_assets(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'repo'

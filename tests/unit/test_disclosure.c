@@ -325,6 +325,9 @@ static void test_disclosure_chevron(void) {
             if (draw.commands[i].type == CUI_DRAW_IMAGE) {
                 cui_bitmap bitmap = draw.commands[i].bitmap.bitmap;
                 images++;
+                cui_rect trigger = cui_bounds(ui, item.id);
+                assert(fabsf(draw.commands[i].bounds.y + draw.commands[i].bounds.h / 2 - trigger.y -
+                             trigger.h / 2) < .1f);
                 assert(draw.commands[i].bitmap.tint.r == t.muted.r);
                 size_t length = bitmap.height * bitmap.stride;
                 assert(length <= sizeof(first));

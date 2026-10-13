@@ -2614,6 +2614,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                         .margin = 16,
                                                         .no_escape_dismiss = true,
                                                         .hide_close = true})) {
+                options.width = -1;
                 cui_command(ui, cui_id_from(ui, "command-preview"), &t, &command_state, entries,
                             sizeof(entries) / sizeof(entries[0]), options);
                 if (command_focus_pending) {

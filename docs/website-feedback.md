@@ -75,3 +75,24 @@ These changes and the composed overview wrapping correction are in `1f9ddda`.
 See [local regression checks](validation/website-feedback-new.txt) and
 [successful deployment and direct HTTPS checks](validation/published-1f9ddda.txt).
 The overall component parity scope remains in progress.
+
+## Additional feedback under active implementation
+
+The following remain open until release and direct website verification:
+
+- [ ] Wide-screen Resizable drag: responsive limits, both axes, actual pane geometry.
+- [ ] Pagination counter and Select placeholder/value vertical alignment at every design size.
+- [ ] Calendar/DatePicker locales and year/month grid selection for historical dates.
+- [ ] All remaining legacy four-size controls use genuine shared design metrics.
+- [ ] Sidebar nested icon/text clipping below fixed header/footer, including hidden-row hit tests.
+- [ ] Bounded Tabs Shift-wheel scrolling and properly sized SVG overflow controls on both axes.
+- [ ] TitleBar browser demonstration of native traffic lights, with explicit fullscreen behavior.
+- [ ] Toolbar Find example searches real visible content and reports matches.
+- [ ] Component switching preserves page and catalog scroll positions.
+- [ ] Command dialog search/results fill available content width.
+- [ ] Long DataTable scrolling matches panel pixel-based wheel behavior.
+- [ ] Plot opt-in Shift-drag pan, Ctrl-wheel zoom, touch pan and pinch-to-zoom.
+- [ ] Table alternating row colors and independently customizable header background.
+- [ ] Avatar stack example with profile images and overflow count.
+
+Focused local checks are evidence for individual fixes, not full parity.

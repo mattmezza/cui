@@ -156,7 +156,7 @@ bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page
     if (!t || !page)
         return false;
     bool changed = cui_base_pagination(ui, id, page, total, compact, disabled);
-    cui_begin_box(ui, id, (cui_box){.row = true, .gap = t->gap});
+    cui_begin_box(ui, id, (cui_box){.row = true, .gap = t->gap, .align_y = CUI_ALIGN_CENTER});
     cui_numeric_paint_button(ui, cui_numeric_part_id(id, 1), t, cui_string("First"),
                              disabled || *page <= 1);
     cui_numeric_paint_button(ui, cui_numeric_part_id(id, 2), t, cui_string("Previous"),

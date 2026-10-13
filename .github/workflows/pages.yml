@@ -39,6 +39,8 @@ jobs:
         run: uv run tests/web/test_touch_more.py
       - name: Verify mobile page swipe fallback and control ownership
         run: uv run tests/web/test_touch_page_navigation.py
+      - name: Verify visible pane resizing across desktop mobile and touch
+        run: uv run tests/web/test_resizable_drag.py --directory build/web
       - name: Verify interaction guides design controls and composed app
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions

@@ -200,8 +200,9 @@ typedef struct {
     cui_size minimum; /* Zero dimensions default to 64 center / 48 edge. */
 } cui_dock_region_content;
 typedef struct {
-    bool open[3];  /* left, right, bottom */
-    float size[3]; /* preferred logical pixels, retained when closed/constrained */
+    bool open[3];           /* left, right, bottom */
+    float size[3];          /* preferred logical pixels, retained when closed/constrained */
+    bool noncollapsible[3]; /* Zero preserves collapsible edges in existing snapshots. */
 } cui_dock_workspace_snapshot;
 typedef struct {
     cui_dock_region source_region, destination_region;
@@ -233,6 +234,8 @@ typedef struct {
 cui_dock_workspace *cui_dock_workspace_create(void);
 void cui_dock_workspace_destroy(cui_dock_workspace *);
 bool cui_dock_workspace_set_edge(cui_dock_workspace *, cui_dock_region, bool open, float size);
+/* Preserve open/size state; an open noncollapsible edge cannot be closed. */
+bool cui_dock_workspace_set_collapsible(cui_dock_workspace *, cui_dock_region, bool collapsible);
 bool cui_dock_workspace_save(const cui_dock_workspace *, cui_dock_workspace_snapshot *);
 bool cui_dock_workspace_restore(cui_dock_workspace *, const cui_dock_workspace_snapshot *);
 cui_id cui_dock_region_id(cui_id workspace, cui_dock_region);

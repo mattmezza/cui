@@ -1056,10 +1056,22 @@ bool cui_dock_workspace_set_edge(cui_dock_workspace *state, cui_dock_region edge
                                  float size) {
     if (!state || edge < CUI_DOCK_LEFT || edge > CUI_DOCK_BOTTOM || !isfinite(size) || size <= 0)
         return false;
+    if (!open && state->snapshot.noncollapsible[edge - 1] && state->snapshot.open[edge - 1])
+        return false;
     if (edge == CUI_DOCK_BOTTOM)
         state->bottom_gesture = false;
     state->snapshot.open[edge - 1] = open;
     state->snapshot.size[edge - 1] = size;
+    cui_resizable_clear(&state->resize[edge - 1]);
+    return true;
+}
+bool cui_dock_workspace_set_collapsible(cui_dock_workspace *state, cui_dock_region edge,
+                                        bool collapsible) {
+    if (!state || edge < CUI_DOCK_LEFT || edge > CUI_DOCK_BOTTOM)
+        return false;
+    state->snapshot.noncollapsible[edge - 1] = !collapsible;
+    if (edge == CUI_DOCK_BOTTOM)
+        state->bottom_gesture = false;
     cui_resizable_clear(&state->resize[edge - 1]);
     return true;
 }
@@ -1453,7 +1465,9 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
     float extent = horizontal ? width : height, cross = horizontal ? height : width;
     unsigned edge_slot = level == 0 ? 0 : 1;
     float natural_min = dock_region_minimum(s, level + 1, horizontal);
-    float edge_min = collapse ? fminf(29, natural_min) : natural_min;
+    bool can_close = !s->state->snapshot.noncollapsible[level];
+    float edge_min = collapse && (can_close || !s->state->snapshot.open[2]) ? fminf(29, natural_min)
+                                                                            : natural_min;
     float remaining_min = dock_region_minimum(s, 0, horizontal);
     if (horizontal && s->state->snapshot.open[2])
         remaining_min = fmaxf(remaining_min, dock_region_minimum(s, 3, true));
@@ -1540,9 +1554,11 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
         return;
     }
     if (collapse && (resize->dragging || completed || keyboard)) {
-        bool open = changed_size > edge_min;
+        bool open = !can_close || changed_size > edge_min;
+        if (!can_close)
+            changed_size = fmaxf(natural_min, changed_size);
         if (completed || keyboard) {
-            open = changed_size >= (edge_min + natural_min) / 2;
+            open = !can_close || changed_size >= (edge_min + natural_min) / 2;
             changed_size = open ? fmaxf(natural_min, changed_size) : edge_min;
             s->state->bottom_gesture = false;
         }

@@ -594,6 +594,50 @@ static void test_edge_regions(void) {
     edge_frame();
     edge_frame();
     assert(cui_dock_workspace_save(edges, &unchanged) && unchanged.open[2]);
+    /* Per-edge source collapsibility survives snapshots and rejects forbidden close. */
+    for (unsigned i = CUI_DOCK_LEFT; i <= CUI_DOCK_BOTTOM; ++i) {
+        assert(cui_dock_workspace_set_edge(edges, (cui_dock_region)i, true, 120));
+        assert(cui_dock_workspace_set_collapsible(edges, (cui_dock_region)i, false));
+        assert(cui_dock_workspace_save(edges, &saved) && saved.open[i - 1] &&
+               saved.noncollapsible[i - 1] && saved.size[i - 1] == 120);
+        assert(!cui_dock_workspace_set_edge(edges, (cui_dock_region)i, false, 80));
+        assert(cui_dock_workspace_save(edges, &unchanged) &&
+               !memcmp(&saved, &unchanged, sizeof saved));
+    }
+    edge_frame();
+    edge_frame();
+    cui_focus(ui, handle);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_END}));
+    edge_frame();
+    edge_frame();
+    assert(cui_dock_workspace_save(edges, &saved) && saved.open[2] &&
+           cui_bounds(ui, bottom_view).h >= 48);
+    cui_dock_workspace_snapshot invalid_fixed = saved;
+    invalid_fixed.size[1] = NAN;
+    assert(!cui_dock_workspace_restore(edges, &invalid_fixed));
+    assert(cui_dock_workspace_save(edges, &unchanged) && !memcmp(&saved, &unchanged, sizeof saved));
+    assert(cui_dock_workspace_restore(edges, &saved));
+    assert(cui_dock_workspace_save(edges, &unchanged) && !memcmp(&saved, &unchanged, sizeof saved));
+    /* Changing collapsibility alone preserves an already closed dock. */
+    cui_dock_workspace_snapshot closed_fixed = saved;
+    closed_fixed.open[2] = false;
+    assert(cui_dock_workspace_restore(edges, &closed_fixed));
+    assert(cui_dock_workspace_set_collapsible(edges, CUI_DOCK_BOTTOM, false));
+    edge_frame();
+    edge_frame();
+    assert(cui_bounds(ui, bottom_view).h == 29);
+    assert(cui_dock_workspace_save(edges, &unchanged) && !unchanged.open[2] &&
+           unchanged.noncollapsible[2]);
+    cui_focus(ui, cui_dock_tab_id(bottom_view, 3));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    edge_frame();
+    edge_frame();
+    assert(cui_dock_workspace_save(edges, &unchanged) && unchanged.open[2]);
+    assert(!cui_dock_workspace_set_collapsible(edges, CUI_DOCK_CENTER, false));
+    for (unsigned i = CUI_DOCK_LEFT; i <= CUI_DOCK_BOTTOM; ++i) {
+        assert(cui_dock_workspace_set_collapsible(edges, (cui_dock_region)i, true));
+        assert(cui_dock_workspace_set_edge(edges, (cui_dock_region)i, false, 120));
+    }
     panels[3].disabled = true;
     edge_options.collapsible_bottom = false;
     for (unsigned i = 0; i < 4; ++i) {

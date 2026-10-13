@@ -32,7 +32,8 @@ cui_plot_result cui_plot_truncate_text(cui_context *, cui_str, float font_size, 
                                        char *output, size_t capacity, size_t *required);
 #define CUI_PLOT_AXIS_LIMIT 256u
 /* Borrowed labels; font size zero selects 10px. START/CENTER/END alignment is
- * applied about tick (source left/center/right). Alpha zero uses theme muted. */
+ * applied about tick (source left/center/right). Alpha zero uses theme muted
+ * unless axis options select explicit_colors. */
 typedef struct {
     cui_str text;
     float tick, font_size;
@@ -47,6 +48,7 @@ typedef struct {
     const cui_plot_axis_text *x_labels, *y_labels;
     size_t x_count, y_count;
     cui_color stroke;
+    bool source_offsets, explicit_colors;
 } cui_plot_axis_options;
 typedef struct {
     cui_rect bounds;
@@ -55,10 +57,14 @@ typedef struct {
 } cui_plot_axis_label_geometry;
 /* Default x line shown, y line hidden; axes absent until has_x/has_y is set. */
 cui_plot_axis_options cui_plot_axis_defaults(float width, float height);
+/* Frozen base paint contract: fixed10px-derived offsets at every font size,
+ * explicit colors (including alpha zero) rather than theme fallback. */
+cui_plot_axis_options cui_plot_axis_source_defaults(float width, float height);
 float cui_plot_axis_gutter(float font_size);
 /* At default 10px, source offsets match; larger fonts scale the upper gap
  * and vertical centering: x end +6/start -(font+4), y end +2/start -2, vertically
- * centered by font/2. Geometry uses Core measurement and is transactional. */
+ * centered by font/2. source_offsets instead uses fixed x start=-14/y center=-5
+ * at every font size. Geometry uses Core measurement and is transactional. */
 cui_plot_result cui_plot_axis_layout(cui_context *, const cui_plot_axis_options *,
                                      cui_plot_axis_label_geometry *, size_t capacity,
                                      size_t *required);
@@ -94,6 +100,11 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
  * Alpha-zero stroke selects theme border. Preflight failures submit nothing. */
 cui_plot_result cui_plot_grid(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_grid_options *, cui_color stroke);
+/* explicit_color=true preserves source stroke verbatim, including transparent;
+ * false retains legacy alpha-zero theme fallback. Geometry unchanged. */
+cui_plot_result cui_plot_grid_ex(cui_context *, cui_id, const cui_theme *,
+                                 const cui_plot_grid_options *, cui_color stroke,
+                                 bool explicit_color);
 typedef struct {
     double size;
     cui_color fill, stroke;
@@ -175,6 +186,12 @@ cui_plot_result cui_plot_view(cui_context *, cui_id, const cui_theme *,
 cui_plot_axis_options cui_plot_axis_defaults(float width, float height) {
     return (cui_plot_axis_options){.width = width, .height = height, .x_line = true};
 }
+cui_plot_axis_options cui_plot_axis_source_defaults(float width, float height) {
+    cui_plot_axis_options options = cui_plot_axis_defaults(width, height);
+    options.source_offsets = true;
+    options.explicit_colors = true;
+    return options;
+}
 float cui_plot_axis_gutter(float size) {
     return isfinite(size) && size > 0 ? size + 8 : 0;
 }
@@ -217,8 +234,10 @@ cui_plot_result cui_plot_axis_layout(cui_context *ui, const cui_plot_axis_option
                 measured.height < 0 || measured.width > 16384 || measured.height > 16384)
                 return CUI_PLOT_INVALID;
             float x = k ? o->y + (o->y_side == CUI_PLOT_AXIS_START ? -2 : 2) : labels[i].tick;
-            float y = k ? labels[i].tick - size / 2
-                        : o->x + (o->x_side == CUI_PLOT_AXIS_START ? -(size + 4) : 6);
+            float y = k ? labels[i].tick - (o->source_offsets ? 5 : size / 2)
+                        : o->x + (o->x_side == CUI_PLOT_AXIS_START
+                                      ? (o->source_offsets ? -14 : -(size + 4))
+                                      : 6);
             if (labels[i].align == CUI_ALIGN_CENTER)
                 x -= measured.width / 2;
             if (labels[i].align == CUI_ALIGN_END)
@@ -240,7 +259,7 @@ static cui_color resolved(cui_color color, cui_color fallback) {
 static void axis_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                        const cui_plot_axis_options *o, const cui_plot_axis_label_geometry *geometry,
                        size_t count) {
-    cui_color stroke = resolved(o->stroke, theme->border);
+    cui_color stroke = o->explicit_colors ? o->stroke : resolved(o->stroke, theme->border);
     if (o->has_x && o->x_line) {
         cui_begin_absolute_box(ui, id ^ UINT64_C(0xa1), (cui_box){.background = stroke},
                                (cui_rect){0, o->x - .5f, o->width, 1});
@@ -256,8 +275,12 @@ static void axis_paint(cui_context *ui, cui_id id, const cui_theme *theme,
                                                                  : o->y_labels + geometry[i].index;
         cui_begin_absolute_box(ui, id ^ UINT64_C(0x789ae632a981c000) ^ (i + 1), (cui_box){0},
                                geometry[i].bounds);
-        cui_text(ui, label->text, label->font_size ? label->font_size : 10,
-                 resolved(label->color, theme->muted));
+        cui_color color = o->explicit_colors ? label->color : resolved(label->color, theme->muted);
+        if (o->source_offsets)
+            cui_text_line(ui, label->text, label->font_size ? label->font_size : 10, color,
+                          geometry[i].bounds.h, (cui_text_style){0});
+        else
+            cui_text(ui, label->text, label->font_size ? label->font_size : 10, color);
         cui_end_box(ui);
     }
 }
@@ -490,8 +513,9 @@ cui_plot_result cui_plot_view(cui_context *ui, cui_id id, const cui_theme *theme
     return painted ? CUI_PLOT_OK : CUI_PLOT_CAPACITY;
 }
 
-cui_plot_result cui_plot_grid(cui_context *ui, cui_id id, const cui_theme *theme,
-                              const cui_plot_grid_options *o, cui_color stroke) {
+cui_plot_result cui_plot_grid_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                                 const cui_plot_grid_options *o, cui_color stroke,
+                                 bool explicit_color) {
     if (!ui || !id || !theme)
         return CUI_PLOT_INVALID;
     cui_plot_rect quads[4096];
@@ -504,7 +528,8 @@ cui_plot_result cui_plot_grid(cui_context *ui, cui_id id, const cui_theme *theme
                             .height = (float)o->height,
                             .fixed_width = true,
                             .fixed_height = true});
-    stroke = resolved(stroke, theme->border);
+    if (!explicit_color)
+        stroke = resolved(stroke, theme->border);
     for (size_t i = 0; i < count; ++i) {
         cui_plot_rect q = quads[i];
         cui_begin_absolute_box(ui, id ^ UINT64_C(0x891ac3714f982000) ^ (i + 1),
@@ -805,6 +830,11 @@ cui_plot_result cui_plot_truncate_text(cui_context *ui, cui_str text, float size
         return CUI_PLOT_CAPACITY;
     memcpy(out, buffer, length + 1);
     return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_grid(cui_context *ui, cui_id id, const cui_theme *theme,
+                              const cui_plot_grid_options *options, cui_color stroke) {
+    return cui_plot_grid_ex(ui, id, theme, options, stroke, false);
 }
 
 #endif

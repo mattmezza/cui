@@ -3034,18 +3034,21 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_edit.c",
-        "tests/unit/test_editor.c"
+        "tests/unit/test_editor.c",
+        "tests/unit/test_textarea.c",
+        "tests/web/test_browser.py"
       ],
-      "status": "implemented",
+      "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
         "headless": "tested_partial",
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Styled multiline caret/selection/scroll, line numbers, host token colors, literal find, caller-owned folding and atomic host-supplied completion are headless tested.",
-        "Unicode 17 default grapheme keyboard editing and cluster-safe visual rows pass all 766 pinned conformance cases. Explicit scalar APIs remain compatible.",
-        "Language parsers/LSP, regex/replace search, multicursor and bidi remain incomplete; folds require host refresh after edits. Unicode word keyboard motions and atomic Ctrl/Alt deletion are conformance tested."
+        "Styled multiline caret/selection/scroll, gutter/wrap, host syntax colors, ASCII-insensitive retained search and atomic replacement, visible match highlights, caller-owned folding and completion have headless/browser tests.",
+        "Unicode17 grapheme and word keyboard editing passes pinned conformance fixtures; explicit scalar APIs remain compatible.",
+        "Language parsers/LSP, diagnostics, bidi and the multicursor styled adapter remain incomplete. Multi-selection editing/history is opt-in model behavior only; folds require host refresh after edits.",
+        "The200K-line performance obligation is not yet validated."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3061,18 +3064,30 @@
         },
         {
           "name": "undo/redo and multiline indentation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_editor.c",
+            "tests/unit/test_textarea.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "gutter/wrap/find/replace",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_editor.c",
+            "tests/unit/test_textarea.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "highlight/diagnostic/completion callbacks",
-          "status": "not_started",
-          "evidence": []
+          "status": "implemented",
+          "evidence": [
+            "Syntax and completion callbacks tested; diagnostic integration remains absent."
+          ]
         },
         {
           "name": "200K-line benchmark",

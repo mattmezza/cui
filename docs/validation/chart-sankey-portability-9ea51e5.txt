@@ -1,0 +1,17 @@
+Hotfix source:9ea51e5, parent published6a81c25.
+Original macOS CI38351906791 failed Chart/chart_base_only at test_chart.c2356
+on the pre-existing DBL_MAX Sankey fixture; Pages38351906825 succeeded.
+Actual HTTPS6a81c25 checks:195/195 artifact files byte-match; full78-story
+headless Chromium and full Chromium design/app extensions pass.
+Local reproduction uses GCC long-double64 with matching double libm wrappers,
+asserting double-width mantissa/exponent; original source fails, fix passes.
+Fix normalizes exceptional LINEAR geometry before shared solver delegation,
+including endpoint breadths; raw finite throughput remains DBL_MAX.
+Unit-value/extreme-value regression compares node and endpoint float geometry.
+Pure Plot strict overflow behavior is unchanged.
+Warning-enabled native88/88; ChartBaseOnly ASan/UBSan; four affected WASI suites
+pass. Worker stable source SHA256:
+2c0b68e91e640089f5e2270cc1755dd6ff6644a480586a94fc3e865113cf5140
+Root repeated native88/88. CTest JSON verifies all88 tests have the existing
+60-second timeout, now including late Base-only targets.
+Cross-platform CI and hotfix deployment not yet verified. Full parity incomplete.

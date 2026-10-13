@@ -106,11 +106,41 @@ typedef struct {
         toggled; /* Explicit checked/value metadata; selected remains paint-only. */
     bool custom_cursor;
     cui_cursor cursor; /* Applied with Core cursor-only setter; zero defaults unchanged. */
+    bool custom_corners, custom_border_edges;
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges; /* Finite nonnegative logical widths. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
+#include "cui_button_group.h"
+typedef struct {
+    cui_id id;
+    cui_str label;
+    cui_button_options options;
+} cui_button_group_styled_item;
+typedef struct {
+    cui_button_group_options behavior;
+    bool override_size, override_variant;
+    cui_control_size size;
+    cui_design_size design_size;
+    cui_button_variant variant;
+    bool compact, outline;
+    cui_box box; /* Orientation and zero segmented gap supplied by the group. */
+} cui_button_group_style_options;
+/* Bounded copied descriptor snapshot; borrowed Button states/content remain under
+ * existing Button lifetimes. Zero initialize; do not reuse during callbacks. */
+typedef struct {
+    cui_button_group_workspace behavior;
+    cui_button_group_styled_item items[CUI_BUTTON_GROUP_MAX_ITEMS];
+    cui_button_state passive_states[CUI_BUTTON_GROUP_MAX_ITEMS];
+    bool composing;
+} cui_button_group_style_workspace;
+bool cui_button_group_ex(cui_context *, cui_id, const cui_theme *,
+                         const cui_button_group_styled_item *, bool *selected, size_t count,
+                         cui_button_group_style_workspace *, cui_button_group_style_options,
+                         cui_button_group_result *result);
 /* Paint-only antialiased check glyph for composed selection indicators. */
 void cui_checkmark(cui_context *, float size, cui_color);
 /* Caller-owned, one stable state per Checkbox ID; no allocation or cleanup.
@@ -218,6 +248,21 @@ bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int 
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);
+/* Optional three disjoint caller-owned staging buffers; capacities include NUL.
+ * Keep descriptor/buffers unchanged and alive through context resource release.
+ * Every slot must fit the proposed scalar mask, otherwise edits fail atomically. */
+typedef struct {
+    char *buffers[3];
+    size_t capacities[3];
+} cui_input_mask_storage;
+/* Optional mask-buffer allocator pair (zero = malloc/free). Returned storage
+ * must be fresh/disjoint. User/callbacks live through retained resource release.
+ * Geometry sessions/cache copies use their normal host/system ownership. */
+typedef struct {
+    void *user;
+    void *(*allocate)(void *user, size_t bytes);
+    void (*release)(void *user, void *storage);
+} cui_input_mask_allocator;
 typedef struct {
     cui_input_behavior_state behavior;
     float scroll_x;
@@ -250,6 +295,10 @@ typedef struct {
     cui_edit_accept_fn validate;
     void *validate_user; /* See cui_edit_apply_checked: synchronous, nonretaining. */
     cui_edit_normalization normalization; /* Zero preserves legacy CR/LF rejection. */
+    bool masked;
+    cui_text_input_purpose content_type;
+    cui_input_mask_storage *mask_storage;
+    cui_input_mask_allocator mask_allocator;
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

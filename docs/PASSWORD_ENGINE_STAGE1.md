@@ -50,9 +50,11 @@ writes. IME UPDATE prepares the full prospective composed value, and COMMIT
 prepares once before document commit, with original UTF8 endpoint validation and
 normalization mapping unchanged. Failed preparation restores reused prior view
 bytes and frees only unbound engine grow storage. Preedit/document/session remain
-unchanged. START/CANCEL do not prepare: frontend must retain a safe committed-view
-representation before starting composition so cancel can publish it without a
-later allocation. Stage 1 does not implement that frontend lifecycle itself.
+unchanged. With NULL preparation, START retains its legacy bypass. With opt-in
+preparation, START now stages the exact prefix/suffix view around an empty preedit
+before mutating the session. Failed preparation preserves the prior session and
+selection. CANCEL publishes the retained committed view without another allocation.
+The styled Input lifecycle is described in [Password Input](PASSWORD_INPUT_STAGE2.md).
 Undo/Redo prepare the target recorded full value before saving history state or
 changing index/selection. They bypass acceptance/normalization as before. A hard
 budget may block replay with CAPACITY without discarding its history entry.

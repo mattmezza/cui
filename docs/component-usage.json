@@ -165,7 +165,8 @@
       "interaction": "Returns true on activation; invoke the application action in that branch.",
       "usage": "For Save, call save_document only when cui_button returns true. content is a composition callback, not an action handler.",
       "docs": [
-        "docs/BUTTON.md"
+        "docs/BUTTON.md",
+        "docs/BUTTON_GROUP.md"
       ],
       "callback_symbols": [
         "cui_button_content_fn"
@@ -902,7 +903,8 @@
       "docs": [
         "docs/INPUT.md",
         "docs/INPUT_ACCEPTANCE.md",
-        "docs/INPUT_NORMALIZATION.md"
+        "docs/INPUT_NORMALIZATION.md",
+        "docs/PASSWORD_INPUT_STAGE2.md"
       ],
       "callback_symbols": [
         "cui_edit_accept_fn"

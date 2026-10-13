@@ -5,12 +5,30 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef struct {
+    cui_rect bounds;        /* Logical placement, including pixel-grid covering. */
+    cui_rect covered_layer; /* Physical, integer covered UNBLURRED source bounds. */
+    unsigned width, height;
+    size_t bytes;
+} cui_drop_shadow_raster;
+/* Uniform physical transform: device = logical*scale + origin. Query validates
+ * all input before publishing. Empty collapsed spread has zero dimensions.
+ * Scale [1/65536,64]; positive physical sigma below 4*sqrt(FLT_MIN)
+ * is rejected atomically (source f32 division would underflow).
+ * Max 16384 per side, 16M pixels. Raster storage is caller owned. */
+bool cui_effect_drop_shadow_query(cui_drop_shadow_paint, float scale, float origin_x,
+                                  float origin_y, cui_drop_shadow_raster *out);
 /* Caller-owned writable straight-alpha RGBA8 storage; size includes padding. */
 typedef struct {
     unsigned char *pixels;
     unsigned width, height;
     size_t stride, size;
 } cui_effect_buffer;
+bool cui_effect_drop_shadow_raster(cui_drop_shadow_paint, float scale, float origin_x,
+                                   float origin_y, cui_effect_buffer output);
+/* Checked point sample in physical pixels, source f32 four-midpoint kernel. */
+bool cui_effect_drop_shadow_sample(cui_drop_shadow_paint, float scale, float origin_x,
+                                   float origin_y, float x, float y, float *out);
 typedef struct {
     float position; /* Strictly increasing, in [0,1]. */
     cui_color color;

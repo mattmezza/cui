@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl_gpu.h"
 #include "../software/cui_bitmap.h"
+#include "../software/cui_shadow.h"
 #include "shaders/generated.h"
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -18,6 +19,7 @@ typedef struct {
 typedef struct {
     gpu_params params;
     SDL_Rect clip;
+    bool shadow;
     SDL_GPUTexture *texture;
     Uint32 mesh_first, mesh_count;
 } gpu_draw;
@@ -30,9 +32,11 @@ typedef struct {
 typedef struct {
     SDL_GPUTexture *texture;
     cui_bitmap_key key;
+    bool shadow;
     uint64_t used, frame;
 } gpu_bitmap;
 struct cui_sdl_gpu {
+    cui_shadow_cache shadows;
     SDL_GPUDevice *device;
     SDL_Window *window;
     cui_font *font;
@@ -48,7 +52,7 @@ struct cui_sdl_gpu {
     gpu_glyph glyphs[GLYPHS];
     size_t glyph_count;
     gpu_bitmap bitmaps[BITMAPS];
-    size_t bitmap_bytes;
+    size_t bitmap_bytes, shadow_bytes;
     uint64_t frame, clock;
     gpu_draw *draws;
     size_t draw_count;
@@ -184,6 +188,7 @@ cui_sdl_gpu *cui_sdl_gpu_create(void *device, void *window, cui_font *font) {
 void cui_sdl_gpu_destroy(cui_sdl_gpu *r) {
     if (!r)
         return;
+    cui_shadow_destroy(&r->shadows);
     if (r->mesh_pipeline)
         SDL_ReleaseGPUGraphicsPipeline(r->device, r->mesh_pipeline);
     if (r->mesh_buffer)
@@ -231,6 +236,7 @@ static SDL_GPUTexture *bitmap_texture(cui_sdl_gpu *r, const cui_draw_command *c)
     size_t bytes = (size_t)key.width * key.height * 4;
     if (bytes > BITMAP_BUDGET)
         return NULL;
+    bool shadow = c->type == CUI_DRAW_DROP_SHADOW;
     gpu_bitmap *entry = NULL;
     for (size_t i = 0; i < BITMAPS; i++)
         if (r->bitmaps[i].texture && cui_bitmap_key_equal(&key, &r->bitmaps[i].key)) {
@@ -247,12 +253,15 @@ static SDL_GPUTexture *bitmap_texture(cui_sdl_gpu *r, const cui_draw_command *c)
                 else if (b->frame != r->frame && (!oldest || b->used < oldest->used))
                     oldest = b;
             }
-            if (empty && r->bitmap_bytes + bytes <= BITMAP_BUDGET) {
+            if (empty && r->bitmap_bytes + bytes <= BITMAP_BUDGET &&
+                (!shadow || r->shadow_bytes + bytes <= CUI_SHADOW_CACHE_BYTES)) {
                 entry = empty;
                 break;
             }
             if (!oldest)
                 return NULL;
+            if (oldest->shadow)
+                r->shadow_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
             r->bitmap_bytes -= (size_t)oldest->key.width * oldest->key.height * 4;
             SDL_ReleaseGPUTexture(r->device, oldest->texture);
             *oldest = (gpu_bitmap){0};
@@ -306,8 +315,10 @@ static SDL_GPUTexture *bitmap_texture(cui_sdl_gpu *r, const cui_draw_command *c)
             SDL_ReleaseGPUTexture(r->device, texture);
             return NULL;
         }
-        *entry = (gpu_bitmap){.texture = texture, .key = key};
+        *entry = (gpu_bitmap){.texture = texture, .key = key, .shadow = shadow};
         r->bitmap_bytes += bytes;
+        if (shadow)
+            r->shadow_bytes += bytes;
     }
     entry->used = ++r->clock;
     entry->frame = r->frame;
@@ -423,6 +434,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
             }
             break;
         }
+        case CUI_DRAW_DROP_SHADOW:
         case CUI_DRAW_IMAGE: {
             if (c->bounds.w <= 0 || c->bounds.h <= 0)
                 break;
@@ -434,6 +446,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
                        (cui_color){255, 255, 255, (uint8_t)lroundf(c->bitmap.opacity * 255)}, 0, 0);
             if (d) {
                 d->texture = texture;
+                d->shadow = c->type == CUI_DRAW_DROP_SHADOW;
                 d->params.shape[2] = -1;
             }
             break;
@@ -502,12 +515,19 @@ static SDL_GPUTexture *frame_surface(cui_sdl_gpu *r, Uint32 w, Uint32 h) {
 bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list || !isfinite(list->width) || !isfinite(list->height) || list->width <= 0 ||
         list->height <= 0 || list->width > 32768 || list->height > 32768 ||
-        (!list->commands && list->count) || !collect(r, list))
+        (!list->commands && list->count))
         return false;
     int physical_w, physical_h;
     if (!SDL_GetWindowSizeInPixels(r->window, &physical_w, &physical_h) || physical_w <= 0 ||
         physical_h <= 0)
         return false;
+    bool shadow_frame = cui_shadow_present(list);
+    cui_draw_list prepared;
+    if (!cui_shadow_prepare(&r->shadows, list, physical_w / list->width, physical_h / list->height,
+                            0, 0, &prepared) ||
+        !collect(r, &prepared))
+        return false;
+    list = &prepared;
     Uint32 w = (Uint32)physical_w, h = (Uint32)physical_h;
     SDL_GPUTexture *candidate = NULL;
     if (!r->surface || w != r->width || h != r->height) {
@@ -579,6 +599,21 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
             SDL_ReleaseGPUTexture(r->device, candidate);
         return true;
     }
+    if (shadow_frame && (w != (Uint32)physical_w || h != (Uint32)physical_h)) {
+        if (!cui_shadow_uniform(w / list->width, h / list->height)) {
+            if (candidate)
+                SDL_ReleaseGPUTexture(r->device, candidate);
+            return failed_acquired(r, cb, swap, w, h);
+        }
+        /* A changed scale needs fresh rasterization/upload before clear. */
+        if (!cui_shadow_prepare(&r->shadows, list, w / list->width, h / list->height, 0, 0,
+                                &prepared) ||
+            !collect(r, &prepared)) {
+            if (candidate)
+                SDL_ReleaseGPUTexture(r->device, candidate);
+            return failed_acquired(r, cb, swap, w, h);
+        }
+    }
     /* Drawable size can change between preflight and acquisition. */
     if (w != (Uint32)physical_w || h != (Uint32)physical_h) {
         if (candidate)
@@ -615,6 +650,17 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
         float sx = w / list->width, sy = h / list->height;
         SDL_Rect clip = {(int)floorf(d->clip.x * sx), (int)floorf(d->clip.y * sy),
                          (int)ceilf(d->clip.w * sx), (int)ceilf(d->clip.h * sy)};
+        if (d->shadow)
+            clip = (SDL_Rect){0, 0, (int)w, (int)h};
+        if (shadow_frame && !d->shadow) {
+            int left = (int)fmaxf(0, fminf((float)w, floorf(d->clip.x * sx)));
+            int top = (int)fmaxf(0, fminf((float)h, floorf(d->clip.y * sy)));
+            int right =
+                (int)fmaxf((float)left, fminf((float)w, ceilf((d->clip.x + d->clip.w) * sx)));
+            int bottom =
+                (int)fmaxf((float)top, fminf((float)h, ceilf((d->clip.y + d->clip.h) * sy)));
+            clip = (SDL_Rect){left, top, right - left, bottom - top};
+        }
         SDL_BindGPUGraphicsPipeline(pass, d->mesh_count ? r->mesh_pipeline : r->pipeline);
         if (d->mesh_count)
             SDL_BindGPUVertexBuffers(pass, 0, &(SDL_GPUBufferBinding){.buffer = r->mesh_buffer}, 1);
@@ -691,6 +737,7 @@ static void destroy(void *r) {
 cui_renderer cui_sdl_gpu_interface(cui_sdl_gpu *r) {
     return (cui_renderer){r, cui_sdl_gpu_driver(r),
                           (r && r->font ? CUI_RENDER_TEXT : 0) | CUI_RENDER_ROUNDED |
-                              CUI_RENDER_CLIP | CUI_RENDER_MESH,
+                              CUI_RENDER_CLIP | CUI_RENDER_IMAGE | CUI_RENDER_MESH |
+                              CUI_RENDER_DROP_SHADOW,
                           render, destroy};
 }

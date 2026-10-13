@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><title>CUI secure Input proof</title>
+<canvas width="500" height="150"></canvas><button id="blur">Blur</button>
+<script type="module">
+import {createSecureInputBridge} from './secure_input.js';
+const decoder=new TextDecoder(),canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');let e;
+const wasi={proc_exit:c=>{throw Error(c)},fd_close:()=>8,fd_seek:()=>8,fd_fdstat_get:()=>8,
+ fd_write:(fd,i,n,out)=>{new DataView(e.memory.buffer).setUint32(out,0,true);return 0},
+ environ_sizes_get:(n,b)=>{let d=new DataView(e.memory.buffer);d.setUint32(n,0,true);d.setUint32(b,0,true);return 0},environ_get:()=>0,
+ clock_time_get:(c,p,out)=>{new DataView(e.memory.buffer).setBigUint64(out,0n,true);return 0},random_get:(p,n)=>{new Uint8Array(e.memory.buffer,p,n).fill(1);return 0}};
+const result=await WebAssembly.instantiate(await (await fetch('./probe.wasm')).arrayBuffer(),{wasi_snapshot_preview1:wasi,host:{measure:(p,n,size)=>{ctx.font=`${size}px Arial`;return ctx.measureText(decoder.decode(new Uint8Array(e.memory.buffer,p,n))).width}}});
+e=result.instance.exports;e._initialize();if(!e.probe_init())throw Error('CUI init');
+let pending=false;
+function paint(){ctx.clearRect(0,0,500,150);ctx.fillStyle='white';ctx.fillRect(0,0,500,150);
+ for(let i=0;i<e.probe_count();i++){const v=Array.from({length:11},(_,f)=>e.probe_command(i,f));
+  ctx.fillStyle=ctx.strokeStyle=`rgba(${v[7]},${v[8]},${v[9]},${v[10]/255})`;
+  if(v[0]===0)ctx.fillRect(v[1],v[2],v[3],v[4]);
+  else if(v[0]===1){ctx.lineWidth=v[6];ctx.strokeRect(v[1],v[2],v[3],v[4]);}
+  else if(v[0]===2){ctx.font=`${v[5]}px Arial`;ctx.textBaseline='top';ctx.fillText(decoder.decode(new Uint8Array(e.memory.buffer,e.probe_draw(i),e.probe_draw_length(i))),v[1],v[2]);}
+  else if(v[0]===3){ctx.save();ctx.beginPath();ctx.rect(v[1],v[2],v[3],v[4]);ctx.clip();}
+  else if(v[0]===4)ctx.restore();}}
+function frame(){pending=false;e.probe_frame();paint();bridge.sync(e.probe_config(0)?{owner:e.probe_config(0),type:e.probe_config(1),purpose:e.probe_config(2),generation:e.probe_config(3),multiline:!!e.probe_config(4)}:null,{x:20,y:20,h:20});}
+function changed(){if(!pending){pending=true;requestAnimationFrame(frame);}}
+function payload(bytes,fn){let p=e.malloc(bytes.length+1);new Uint8Array(e.memory.buffer,p,bytes.length).set(bytes);try{fn(p,bytes.length)}finally{e.free(p)}}
+window.events=[];
+const bridge=createSecureInputBridge({parent:document.body,changed,
+ text:bytes=>payload(bytes,(p,n)=>e.probe_text(p,n)),
+ composition:(kind,bytes,a,c)=>{window.events.push([kind,decoder.decode(bytes),a,c]);payload(bytes,(p,n)=>e.probe_composition(['start','update','commit','cancel'].indexOf(kind),p,n,a,c))},
+ focusLost:()=>e.probe_focus(0),
+ key:event=>{let names=['a','z','ArrowLeft','ArrowRight','Backspace','c','x'],index=names.indexOf(event.key);if(index<0)return false;
+   if(index<2 || index>4){if(!event.ctrlKey && !event.metaKey)return false;}
+   let mods=(event.ctrlKey?2:0)|(event.shiftKey?1:0)|(event.altKey?4:0)|(event.metaKey?8:0);e.probe_key(e.probe_key_id(index),mods);return true;}});
+e.probe_frame();e.probe_focus(1);frame();
+window.proof={e,bridge,frame,multiline:v=>{e.probe_multiline(v);frame()},focus:()=>{e.probe_focus(1);frame()},options:(...v)=>{e.probe_options(...v);frame()},
+ value:()=>decoder.decode(new Uint8Array(e.memory.buffer,e.probe_value(),e.probe_length())),
+ draws:()=>Array.from({length:e.probe_count()},(_,i)=>decoder.decode(new Uint8Array(e.memory.buffer,e.probe_draw(i),e.probe_draw_length(i))))};
+</script>

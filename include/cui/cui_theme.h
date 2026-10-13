@@ -118,6 +118,9 @@ cui_theme cui_theme_dark(void);
 cui_theme cui_theme_high_contrast(void);
 /* Independent, square-cornered amber/ink design system using the same base. */
 cui_theme cui_theme_terminal(void);
+/* Source popover: ring, offset(0,4) sigma3 spread-1, offset(0,2) sigma2
+ * spread-2. Finite strength clamps [0,1]. Copies three values atomically. */
+bool cui_theme_popover_shadows(const cui_theme *, float strength, cui_drop_shadow out[3]);
 /* Named palette adaptations from the pinned GPUI Kit theme collection.
  * Invalid indices return an empty name/false and leave output unchanged. */
 size_t cui_theme_preset_count(void);

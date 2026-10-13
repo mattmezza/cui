@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_software.h"
+#include "cui_shadow.h"
 #include "cui_shape.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 struct cui_software {
+    cui_shadow_cache shadows;
     unsigned width, height;
     unsigned char *pixels;
     cui_font *font;
@@ -44,6 +46,7 @@ cui_software *cui_software_create(unsigned w, unsigned h, cui_font *f) {
 }
 void cui_software_destroy(cui_software *r) {
     if (r) {
+        cui_shadow_destroy(&r->shadows);
         free(r->pixels);
         free(r);
     }
@@ -242,6 +245,10 @@ static bool text_draw(cui_software *r, const cui_draw_command *c) {
 bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list || (!list->commands && list->count))
         return false;
+    cui_draw_list prepared;
+    if (!cui_shadow_prepare(&r->shadows, list, 1, 1, 0, 0, &prepared))
+        return false;
+    list = &prepared;
     /* Reject any invalid borrowed mesh before clearing or drawing the target. */
     for (size_t i = 0; i < list->count; i++)
         if (list->commands[i].type == CUI_DRAW_MESH && !cui_mesh_valid(list->commands[i].mesh))
@@ -265,6 +272,7 @@ bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color c
         case CUI_DRAW_MESH:
             mesh(r, &c->mesh);
             break;
+        case CUI_DRAW_DROP_SHADOW:
         case CUI_DRAW_IMAGE:
             if (!bitmap(r, c))
                 return false;
@@ -329,7 +337,8 @@ static void destroy(void *r) {
 }
 cui_renderer cui_software_interface(cui_software *r) {
     return (cui_renderer){r, "CUI deterministic software",
-                          CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE | CUI_RENDER_MESH
+                          CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE |
+                              CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW
 #ifdef CUI_HAS_TEXT
                               | (r && r->font ? CUI_RENDER_TEXT : 0)
 #endif

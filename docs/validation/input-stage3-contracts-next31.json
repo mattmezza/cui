@@ -1,0 +1,81 @@
+{
+  "cui_base": "3d8aa8b3d763f25dbfec54841e8b20b01051b6af",
+  "reference_pin": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "scope": "read-only proposal",
+  "production_modified": false,
+  "full_parity_claim": false,
+  "reference_dependencies": {
+    "regex": "1.13.1",
+    "regex-automata": "0.4.18",
+    "regex-syntax": "0.8.11"
+  },
+  "findings": [
+    {
+      "feature": "acceptance chain",
+      "evidence": "crates/base/src/input/base/state.rs:3534-3553,4109-4124,4265-4280",
+      "contract": "Empty bypass; validator then mask then regex; reject invalid candidate only if old visible value valid; replay bypass."
+    },
+    {
+      "feature": "format pattern",
+      "evidence": "crates/base/src/input/base/mask_pattern.rs:100-410; state.rs:3565-3598,4125-4198",
+      "status": "missing",
+      "contract": "ASCII9/A/#, scalar*, other literal; prefix validity; format accepted stored text only at committed replacement, whole-document atomic history on rewrite; IME update unformatted."
+    },
+    {
+      "feature": "numeric format",
+      "evidence": "crates/base/src/input/base/mask_pattern.rs:283-410,424-459; state.rs:3520-3531",
+      "status": "missing in generic Input",
+      "contract": "Conditional numeric Unicode normalization before CRLF/validation; configured separator controls grouping/fraction truncation; no padding; no-separator formatting identity."
+    },
+    {
+      "feature": "regex",
+      "evidence": "crates/base/src/input/base/state.rs:3549-3553,10539-10552; crates/story/src/stories/input_story.rs:94",
+      "status": "missing compiled regex facility",
+      "contract": "Already compiled Rust regex search matching; setter does not rewrite current value. CUI callback is not full regex parity."
+    },
+    {
+      "feature": "content type",
+      "evidence": "crates/component/src/input/content_type.rs:7-174; input.rs:27-96,328-335,689",
+      "status": "password/new-password subset integrated; remaining43 missing",
+      "contract": "45 semantic purposes, separate from masking/filtering; source native autofill macOS-only; dedicated roles for telephone/email/URL/password/DateTime/Birthdate."
+    }
+  ],
+  "recommended_first_slice": "opt-in pattern-token formatting plus composed Input/IME/history integration and pure bounded placeholder/unformat helpers",
+  "proposal": {
+    "format": "cui_edit_format {kind,pattern,separator,fraction_limited,fraction_digits}; append checked request format and caller-owned format_workspace; pure format_valid/format_text/format_placeholder/unformat_text",
+    "transaction": "Retain unformatted candidate in model scratch and formatted final in disjoint caller workspace; pure formatting then hard resource preparation then source predicate chain; commit final once; update unformatted; replay no formatter/predicate; reject multiselection atomically for nonzero format.",
+    "regex": "Standalone immutable caller-owned compiled portable C11 Thompson-NFA subset; caller match scratch and explicit unsupported syntax; execution resource errors hard, not predicate false; full Rust Unicode regex remains separate.",
+    "content_type": "Append Core purpose ordinals, finalize focused owner/generation, explicit supported host mappings, no filtering/value mutation; no invented native autofill guarantees."
+  },
+  "required_tests": [
+    "actual composed99-99paste/caret/overflow/UndoRedo",
+    "Unicode literals/scalarAny/placeholder/unformat",
+    "old-invalid healing/runtime policy replacement/exact chain counts",
+    "real IME update unformatted/commit formatted once/cancel/rejected lifecycle",
+    "numeric normalization/signs/dot/grouping/fraction/endpoint maps",
+    "anchored versus unanchored regex/resource/unsupported errors",
+    "forced capacity/allocator/factory/alias/reentry rollback",
+    "complete content enum-role mapping and supported native/browser properties"
+  ],
+  "validation": {
+    "configure": "PASS strict warnings",
+    "build": "BLOCKED baseline unregistered src/base/cui_button_group.c: example links undefined begin/end/item symbols",
+    "ctest": "not reached by build gate",
+    "global_files_modified": false,
+    "logs": [
+      "/home/matteo/.cache/cui-validation/input-stage3-config.log",
+      "/home/matteo/.cache/cui-validation/input-stage3-build.log"
+    ],
+    "root_confirmation": "Registration intentionally uncommitted in integration tree; root validates after integration."
+  },
+  "remaining_holes": [
+    "fullUnicode regex",
+    "number mask",
+    "43 additional content purposes/native autofill",
+    "event stream and blink lifecycle",
+    "platform shortcuts/palette",
+    "late clipboard transaction",
+    "formatting inline token policy",
+    "mask toggle/clear composed affordances"
+  ]
+}

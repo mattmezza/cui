@@ -107,11 +107,41 @@ typedef struct {
         toggled; /* Explicit checked/value metadata; selected remains paint-only. */
     bool custom_cursor;
     cui_cursor cursor; /* Applied with Core cursor-only setter; zero defaults unchanged. */
+    bool custom_corners, custom_border_edges;
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges; /* Finite nonnegative logical widths. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
+#include "cui_button_group.h"
+typedef struct {
+    cui_id id;
+    cui_str label;
+    cui_button_options options;
+} cui_button_group_styled_item;
+typedef struct {
+    cui_button_group_options behavior;
+    bool override_size, override_variant;
+    cui_control_size size;
+    cui_design_size design_size;
+    cui_button_variant variant;
+    bool compact, outline;
+    cui_box box; /* Orientation and zero segmented gap supplied by the group. */
+} cui_button_group_style_options;
+/* Bounded copied descriptor snapshot; borrowed Button states/content remain under
+ * existing Button lifetimes. Zero initialize; do not reuse during callbacks. */
+typedef struct {
+    cui_button_group_workspace behavior;
+    cui_button_group_styled_item items[CUI_BUTTON_GROUP_MAX_ITEMS];
+    cui_button_state passive_states[CUI_BUTTON_GROUP_MAX_ITEMS];
+    bool composing;
+} cui_button_group_style_workspace;
+bool cui_button_group_ex(cui_context *, cui_id, const cui_theme *,
+                         const cui_button_group_styled_item *, bool *selected, size_t count,
+                         cui_button_group_style_workspace *, cui_button_group_style_options,
+                         cui_button_group_result *result);
 /* Paint-only antialiased check glyph for composed selection indicators. */
 void cui_checkmark(cui_context *, float size, cui_color);
 /* Caller-owned, one stable state per Checkbox ID; no allocation or cleanup.
@@ -219,6 +249,21 @@ bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int 
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);
+/* Optional three disjoint caller-owned staging buffers; capacities include NUL.
+ * Keep descriptor/buffers unchanged and alive through context resource release.
+ * Every slot must fit the proposed scalar mask, otherwise edits fail atomically. */
+typedef struct {
+    char *buffers[3];
+    size_t capacities[3];
+} cui_input_mask_storage;
+/* Optional mask-buffer allocator pair (zero = malloc/free). Returned storage
+ * must be fresh/disjoint. User/callbacks live through retained resource release.
+ * Geometry sessions/cache copies use their normal host/system ownership. */
+typedef struct {
+    void *user;
+    void *(*allocate)(void *user, size_t bytes);
+    void (*release)(void *user, void *storage);
+} cui_input_mask_allocator;
 typedef struct {
     cui_input_behavior_state behavior;
     float scroll_x;
@@ -251,6 +296,10 @@ typedef struct {
     cui_edit_accept_fn validate;
     void *validate_user; /* See cui_edit_apply_checked: synchronous, nonretaining. */
     cui_edit_normalization normalization; /* Zero preserves legacy CR/LF rejection. */
+    bool masked;
+    cui_text_input_purpose content_type;
+    cui_input_mask_storage *mask_storage;
+    cui_input_mask_allocator mask_allocator;
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
@@ -481,6 +530,10 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #define CUI_RADIO_GROUP_IMPLEMENTATION
 #endif
 #include "cui_radio_group.h"
+#ifndef CUI_BUTTON_GROUP_IMPLEMENTATION
+#define CUI_BUTTON_GROUP_IMPLEMENTATION
+#endif
+#include "cui_button_group.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -570,10 +623,12 @@ static cui_str cui_button_label(cui_context *ui, cui_button_state *state, cui_st
     state->label[prefix + ellipsis.length] = 0;
     return (cui_str){state->label, prefix + ellipsis.length};
 }
+static bool cui_button_shape_valid(cui_button_options);
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state) {
     cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, o.design_size, &design))
+    if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
+        !cui_button_shape_valid(o))
         return;
     bool disabled = o.disabled;
     cui_box b = cui_components_control(t, disabled, false);
@@ -742,6 +797,10 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         b.border = t->focus;
         b.border_width = 2;
     }
+    b.custom_corners = o.custom_corners;
+    b.corner_radii = o.corner_radii;
+    b.custom_border_edges = o.custom_border_edges;
+    b.border_edges = o.border_edges;
     cui_begin_box(ui, id, b);
     cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
@@ -836,14 +895,22 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
         state.hovered = state.pressed = false;
     cui_button_paint_state(ui, id, t, name, o, state);
 }
-bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_button_options o) {
-    cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, o.design_size, &design))
-        return false;
+static bool cui_button_shape_valid(cui_button_options o) {
+    float radii[] = {o.corner_radii.top_left, o.corner_radii.top_right, o.corner_radii.bottom_left,
+                     o.corner_radii.bottom_right};
+    float edges[] = {o.border_edges.left, o.border_edges.right, o.border_edges.top,
+                     o.border_edges.bottom};
+    for (size_t i = 0; i < 4; i++)
+        if ((o.custom_corners && (!isfinite(radii[i]) || radii[i] < 0)) ||
+            (o.custom_border_edges && (!isfinite(edges[i]) || edges[i] < 0)))
+            return false;
+    return true;
+}
+static void cui_button_metadata(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                cui_button_options o, cui_interaction interaction) {
+    (void)t;
+    (void)name;
     bool inert = o.disabled || o.loading;
-    cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
-    cui_interaction interaction = cui_base_button(ui, id, accessible, inert);
     if (o.variant == CUI_BUTTON_LINK)
         (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
     cui_update_semantic(ui, id, o.toggle_semantics && o.toggled,
@@ -872,9 +939,10 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         o.state->initialized = true;
         o.state->next_wake_seconds = 0;
     }
-    if (interaction.activated && o.on_click)
-        o.on_click(o.action_user);
-    cui_button_paint_state(ui, id, t, name, o, interaction);
+}
+static void cui_button_tooltip(cui_context *ui, cui_id id, const cui_theme *t,
+                               cui_button_options o) {
+    bool inert = o.disabled || o.loading;
     if (o.state && o.tooltip.length) {
         cui_hover_options hover = o.tooltip_options;
         hover.trigger = id;
@@ -891,7 +959,180 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
             o.state->next_wake_seconds = now + 1.0 / 60;
     } else if (o.state)
         o.state->tooltip = (cui_hover_state){0};
-    return interaction.activated;
+}
+bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_button_options o) {
+    cui_design_metrics design;
+    if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
+        !cui_button_shape_valid(o))
+        return false;
+    bool inert = o.disabled || o.loading;
+    cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
+    cui_interaction interaction = cui_interact(
+        ui, id, o.variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON, accessible, inert,
+        o.toggle_semantics && o.toggled, o.toggle_semantics && o.toggled ? 1 : 0);
+    cui_button_metadata(ui, id, t, name, o, interaction);
+    bool activated = false;
+    size_t count = 0;
+    cui_frame_events(ui, &count);
+    for (size_t e = 0; e < count; e++)
+        if (cui_event_accepted_activation(ui, e) == id) {
+            activated = true;
+            if (o.on_click)
+                o.on_click(o.action_user);
+        }
+    cui_button_paint_state(ui, id, t, name, o, interaction);
+    cui_button_tooltip(ui, id, t, o);
+    return activated;
+}
+static bool cui_button_group_style_valid(cui_button_options o) {
+    cui_str strings[] = {o.leading,       o.trailing,     o.icon,
+                         o.trailing_icon, o.loading_icon, o.accessibility_label,
+                         o.tooltip};
+    for (size_t i = 0; i < sizeof strings / sizeof strings[0]; i++)
+        if (strings[i].length && !strings[i].data)
+            return false;
+    return o.variant >= CUI_BUTTON_PRIMARY && o.variant <= CUI_BUTTON_CUSTOM &&
+           o.size >= CUI_CONTROL_MEDIUM && o.size <= CUI_CONTROL_XSMALL && isfinite(o.width) &&
+           isfinite(o.height) && o.height >= 0 && isfinite(o.font_size) && o.font_size >= 0 &&
+           isfinite(o.icon_size) && o.icon_size >= 0 && isfinite(o.label_width) &&
+           o.label_width >= 0 && o.rounding >= CUI_BUTTON_ROUNDED_THEME &&
+           o.rounding <= CUI_BUTTON_ROUNDED_CUSTOM &&
+           (o.rounding != CUI_BUTTON_ROUNDED_CUSTOM || (isfinite(o.radius) && o.radius >= 0)) &&
+           cui_button_shape_valid(o);
+}
+bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                         const cui_button_group_styled_item *items, bool *selected, size_t count,
+                         cui_button_group_style_workspace *w,
+                         cui_button_group_style_options options, cui_button_group_result *out) {
+    if (out)
+        *out = (cui_button_group_result){0};
+    if (!ui || !id || !theme || !w || !cui_frame_is_submitting(ui) || w->behavior.active ||
+        w->composing || count > CUI_BUTTON_GROUP_MAX_ITEMS || (count && (!items || !selected)) ||
+        !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(theme->radius) ||
+        theme->radius < 0)
+        return false;
+    cui_theme snapshot = *theme;
+    const cui_theme *t = &snapshot;
+    cui_design_metrics metrics;
+    if (!cui_components_design(t, options.design_size, &metrics) ||
+        (options.override_size &&
+         (options.size < CUI_CONTROL_MEDIUM || options.size > CUI_CONTROL_XSMALL)) ||
+        (options.override_variant &&
+         (options.variant < CUI_BUTTON_PRIMARY || options.variant > CUI_BUTTON_CUSTOM)))
+        return false;
+    float box[] = {options.box.width, options.box.height, options.box.padding};
+    for (size_t i = 0; i < sizeof box / sizeof box[0]; i++)
+        if (!isfinite(box[i]) || (i == 2 && box[i] < 0))
+            return false;
+    uintptr_t a = (uintptr_t)w, b = (uintptr_t)selected;
+    if (count && b < a + sizeof *w && b + count * sizeof *selected > a)
+        return false;
+    if (count)
+        memmove(w->items, items, count * sizeof *items);
+    for (size_t i = 0; i < count; i++) {
+        cui_button_group_styled_item *child = &w->items[i];
+        cui_button_options *o = &child->options;
+        if (child->label.length && !child->label.data)
+            return false;
+        if (options.override_size)
+            o->size = options.size;
+        if (options.design_size != CUI_DESIGN_INHERIT)
+            o->design_size = options.design_size;
+        if (options.override_variant)
+            o->variant = options.variant;
+        o->compact |= options.compact;
+        o->outline |= options.outline;
+        o->disabled |= options.behavior.disabled;
+        o->selected = o->toggled = selected[i];
+        o->toggle_semantics = true;
+        if (!cui_button_group_style_valid(*o) ||
+            !cui_components_design(t, o->design_size, &metrics))
+            return false;
+        w->behavior.items[i] = (cui_button_group_item){
+            .id = child->id,
+            .label = o->accessibility_label.length ? o->accessibility_label : child->label,
+            .disabled = o->disabled,
+            .loading = o->loading,
+            .skip_tab = o->skip_tab,
+            .prevent_pointer_focus = o->prevent_pointer_focus,
+            .custom_cursor = o->custom_cursor,
+            .cursor = o->cursor,
+            .role = o->variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON,
+            .on_click = o->on_click,
+            .action_user = o->action_user};
+    }
+    w->composing = true;
+    bool passive = !cui_frame_sequence(ui) || options.box.inert || options.box.layout_only;
+    /* Begin semantics before opening the matching group layout box, as Button does. */
+    if (!passive && !cui_base_button_group_begin(ui, id, w->behavior.items, selected, count,
+                                                 &w->behavior, options.behavior)) {
+        if (w->behavior.active)
+            (void)cui_base_button_group_end(ui, &w->behavior);
+        w->composing = false;
+        return false;
+    }
+    cui_box box_options = options.box;
+    box_options.row = !options.behavior.vertical;
+    box_options.gap = 0;
+    cui_begin_box(ui, id, box_options);
+    for (size_t i = 0; i < count; i++) {
+        if (passive) {
+            w->behavior.interactions[i] = (cui_interaction){0};
+            continue;
+        }
+        cui_interaction interaction = cui_base_button_group_item(ui, &w->behavior, i);
+        cui_button_metadata(ui, w->items[i].id, t, w->items[i].label, w->items[i].options,
+                            interaction);
+    }
+    cui_button_group_result result = passive ? (cui_button_group_result){.valid = true}
+                                             : cui_base_button_group_end(ui, &w->behavior);
+    /* Freeze final controlled paint state before invoking any content callbacks. */
+    if (!passive)
+        for (size_t i = 0; i < count; i++)
+            w->items[i].options.selected = w->items[i].options.toggled = selected[i];
+    if (result.valid)
+        for (size_t i = 0; i < count; i++) {
+            cui_button_group_styled_item child = w->items[i];
+            cui_button_options o = child.options;
+            if (passive && o.state) {
+                w->passive_states[i] = *o.state;
+                o.state = &w->passive_states[i];
+            }
+            if (count > 1) {
+                float radius = o.rounding == CUI_BUTTON_ROUNDED_NONE     ? 0
+                               : o.rounding == CUI_BUTTON_ROUNDED_SMALL  ? t->radius * .5f
+                               : o.rounding == CUI_BUTTON_ROUNDED_LARGE  ? t->radius * 2
+                               : o.rounding == CUI_BUTTON_ROUNDED_CUSTOM ? o.radius
+                                                                         : t->radius;
+                bool first = i == 0, last = i + 1 == count, vertical = options.behavior.vertical;
+                o.custom_corners = true;
+                o.corner_radii =
+                    (cui_corner_radii){.top_left = first ? radius : 0,
+                                       .top_right = (vertical ? first : last) ? radius : 0,
+                                       .bottom_left = (vertical ? last : first) ? radius : 0,
+                                       .bottom_right = last ? radius : 0};
+                float width = w->behavior.interactions[i].focus_visible && !o.hide_focus_ring ? 2
+                              : o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK ||
+                                      o.variant == CUI_BUTTON_TEXT
+                                  ? 0
+                                  : 1;
+                o.custom_border_edges = true;
+                o.border_edges = (cui_border_edges){.left = (vertical || first) ? width : 0,
+                                                    .top = (!vertical || first) ? width : 0,
+                                                    .right = width,
+                                                    .bottom = width};
+            }
+            cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i]);
+            if (!passive)
+                cui_button_tooltip(ui, child.id, t, o);
+        }
+    cui_end_box(ui);
+    result.valid &= cui_last_error(ui) == CUI_OK;
+    w->composing = false;
+    if (out)
+        *out = result;
+    return result.valid;
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
     return cui_button_ex(ui, id, t, name, (cui_button_options){.disabled = disabled});
@@ -1956,13 +2197,15 @@ static void cui_input_visual_bind(cui_input_visual_cache *cache, const cui_edit 
     cache->model = edit;
     cache->revision = revision;
 }
-static bool cui_input_visual_acquire(cui_input_visual_cache *cache, cui_context *ui, cui_str text,
-                                     float size) {
-    if (!cache || text.length > 65535)
+static bool cui_input_visual_acquire_impl(cui_input_visual_cache *cache, cui_context *ui,
+                                          cui_str text, float size, bool staged_mask) {
+    if (!cache || text.length == SIZE_MAX)
         return false;
     if (cache->attempted && cache->size == size && cache->length == text.length &&
         (!text.length || !memcmp(cache->text, text.data, text.length)))
         return cache->valid;
+    if (!staged_mask && text.length > 65535)
+        return false;
     cui_input_visual_clear(cache);
     cache->text = malloc(text.length + 1);
     if (!cache->text)
@@ -1977,6 +2220,10 @@ static bool cui_input_visual_acquire(cui_input_visual_cache *cache, cui_context 
         cui_get_text_geometry(ui, (cui_str){cache->text, text.length}, size, (cui_text_style){0},
                               &cache->geometry) == CUI_TEXT_LAYOUT_OK;
     return cache->valid;
+}
+static bool cui_input_visual_acquire(cui_input_visual_cache *cache, cui_context *ui, cui_str text,
+                                     float size) {
+    return cui_input_visual_acquire_impl(cache, ui, text, size, false);
 }
 typedef struct {
     cui_input_hit_geometry measured;
@@ -2047,6 +2294,202 @@ static bool cui_input_visual_selection(const cui_text_geometry *geometry, size_t
     *count = needed;
     return true;
 }
+typedef struct {
+    char *bytes;
+    size_t capacity, length;
+    bool owned, ready;
+    cui_input_visual_cache visual;
+    uint64_t font_revision;
+} cui_input_mask_slot;
+typedef struct {
+    cui_input_mask_slot slots[3];
+    size_t committed, visible, stage;
+    bool valid, pending_provisional;
+    cui_context *ui;
+    float font_size, bound_font_size;
+    uintptr_t model;
+    uint64_t revision, font_revision;
+    cui_input_mask_storage *storage;
+    cui_input_mask_storage storage_snapshot;
+    cui_input_mask_allocator allocator;
+} cui_input_mask_cache;
+static void cui_input_mask_clear(void *payload) {
+    cui_input_mask_cache *m = payload;
+    for (size_t i = 0; i < 3; i++) {
+        cui_input_visual_clear(&m->slots[i].visual);
+        if (m->slots[i].owned) {
+            if (m->allocator.release)
+                m->allocator.release(m->allocator.user, m->slots[i].bytes);
+            else
+                free(m->slots[i].bytes);
+        }
+    }
+    *m = (cui_input_mask_cache){0};
+}
+static cui_input_mask_cache *cui_input_mask_resource(cui_context *ui, cui_id id) {
+    return cui_resource_get(ui, id, UINT64_C(0x731d52aae92865b1), sizeof(cui_input_mask_cache),
+                            NULL, cui_input_mask_clear);
+}
+static size_t cui_input_mask_stage(cui_input_mask_cache *m) {
+    for (size_t i = 0; i < 3; i++)
+        if (!m->valid || (i != m->visible && i != m->committed))
+            return i;
+    return 0;
+}
+static cui_edit_result cui_input_mask_prepare(void *payload, cui_str candidate, bool provisional) {
+    cui_input_mask_cache *m = payload;
+    size_t bytes;
+    cui_edit_result error = cui_edit_mask_offset(candidate, candidate.length, &bytes);
+    if (error != CUI_EDIT_OK)
+        return error;
+    if (bytes == SIZE_MAX)
+        return CUI_EDIT_CAPACITY;
+    m->stage = cui_input_mask_stage(m);
+    cui_input_mask_slot *slot = &m->slots[m->stage];
+    if (m->storage && bytes >= slot->capacity)
+        return CUI_EDIT_CAPACITY;
+    if (bytes >= slot->capacity) {
+        size_t needed = bytes + 1;
+        char *grown = m->allocator.allocate ? m->allocator.allocate(m->allocator.user, needed)
+                                            : malloc(needed);
+        if (!grown)
+            return CUI_EDIT_CAPACITY;
+        cui_input_visual_clear(&slot->visual);
+        if (slot->owned) {
+            if (m->allocator.release)
+                m->allocator.release(m->allocator.user, slot->bytes);
+            else
+                free(slot->bytes);
+        }
+        slot->bytes = grown;
+        slot->capacity = needed;
+        slot->owned = true;
+        slot->ready = false;
+    }
+    cui_str display;
+    error = cui_edit_mask_text(candidate, slot->bytes, slot->capacity, &display);
+    if (error != CUI_EDIT_OK)
+        return error;
+    uint64_t font_revision = cui_text_metrics_revision(m->ui);
+    if (slot->font_revision != font_revision)
+        cui_input_visual_clear(&slot->visual);
+    if (cui_has_text_geometry(m->ui) &&
+        !cui_input_visual_acquire_impl(&slot->visual, m->ui, display, m->font_size, true))
+        return CUI_EDIT_PRESENTATION;
+    if (!cui_has_text_geometry(m->ui)) {
+        float width = cui_measure_text(m->ui, display, m->font_size).width;
+        if (!isfinite(width) || width < 0)
+            return CUI_EDIT_PRESENTATION;
+    }
+    slot->length = display.length;
+    slot->ready = true;
+    slot->font_revision = font_revision;
+    m->pending_provisional = provisional;
+    return CUI_EDIT_OK;
+}
+static void cui_input_mask_complete(void *payload, bool prepared, bool applied) {
+    cui_input_mask_cache *m = payload;
+    if (!prepared || !applied)
+        return;
+    m->visible = m->stage;
+    if (!m->pending_provisional)
+        m->committed = m->stage;
+    m->valid = true;
+}
+static cui_edit_presentation cui_input_mask_presentation(cui_input_mask_cache *m) {
+    cui_edit_presentation p = {
+        .prepare = cui_input_mask_prepare, .user = m, .user_bytes = sizeof *m};
+    if (m->storage) {
+        p.caller_descriptor = (cui_edit_workspace){m->storage, sizeof *m->storage};
+        p.caller_workspace_count = 3;
+        for (size_t i = 0; i < 3; i++)
+            p.caller_workspaces[i] = (cui_edit_workspace){m->storage_snapshot.buffers[i],
+                                                          m->storage_snapshot.capacities[i]};
+    }
+    return p;
+}
+static cui_edit_result cui_input_mask_bind(cui_input_mask_cache *m, cui_context *ui, cui_edit *edit,
+                                           cui_edit_composition *composition, cui_input_options o,
+                                           float size, bool reset) {
+    if (!m || (!!o.mask_allocator.allocate != !!o.mask_allocator.release))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    bool rebind = reset || m->model != (uintptr_t)edit || m->storage != o.mask_storage ||
+                  m->allocator.user != o.mask_allocator.user ||
+                  m->allocator.allocate != o.mask_allocator.allocate ||
+                  m->allocator.release != o.mask_allocator.release;
+    if (o.mask_storage)
+        for (size_t i = 0; i < 3; i++)
+            rebind |= m->storage_snapshot.buffers[i] != o.mask_storage->buffers[i] ||
+                      m->storage_snapshot.capacities[i] != o.mask_storage->capacities[i];
+    if (rebind) {
+        cui_input_mask_clear(m);
+        m->model = (uintptr_t)edit;
+        m->storage = o.mask_storage;
+        m->allocator = o.mask_allocator;
+        if (o.mask_storage) {
+            m->storage_snapshot = *o.mask_storage;
+            size_t minimum = SIZE_MAX;
+            for (size_t i = 0; i < 3; i++)
+                if (o.mask_storage->capacities[i] < minimum)
+                    minimum = o.mask_storage->capacities[i];
+            for (size_t i = 0; i < 3; i++) {
+                m->slots[i].bytes = o.mask_storage->buffers[i];
+                m->slots[i].capacity = minimum;
+            }
+        }
+    }
+    m->ui = ui;
+    m->font_size = size;
+    uint64_t revision = cui_edit_get_state(edit).revision,
+             font_revision = cui_text_metrics_revision(ui);
+    if (m->valid && m->revision == revision && m->font_revision == font_revision &&
+        m->bound_font_size == size && (composition && composition->active))
+        return CUI_EDIT_OK;
+    if (m->valid && m->revision == revision && m->font_revision == font_revision &&
+        m->bound_font_size == size) {
+        if (!composition || !composition->active)
+            m->visible = m->committed;
+        return CUI_EDIT_OK;
+    }
+    size_t previous_visible = m->visible;
+    bool retain_preedit = m->valid && composition && composition->active;
+    cui_edit_request request = {.kind = CUI_EDIT_REQUEST_PRESENT,
+                                .presentation = cui_input_mask_presentation(m)};
+    cui_edit_checked_result result =
+        cui_edit_apply_checked(edit, request, (cui_edit_acceptance){0});
+    cui_input_mask_complete(m, result.presentation_prepared, result.presentation_applied);
+    if (result.error != CUI_EDIT_OK)
+        return result.error;
+    if (composition && composition->active) {
+        if (retain_preedit)
+            m->visible = previous_visible;
+        request.composition = composition;
+        result = cui_edit_apply_checked(edit, request, (cui_edit_acceptance){0});
+        cui_input_mask_complete(m, result.presentation_prepared, result.presentation_applied);
+        if (result.error != CUI_EDIT_OK)
+            return result.error;
+    }
+    m->revision = revision;
+    m->font_revision = font_revision;
+    m->bound_font_size = size;
+    return CUI_EDIT_OK;
+}
+typedef struct {
+    cui_input_cached_hit hit;
+    cui_input_mask_cache *mask;
+} cui_input_mask_hit;
+static size_t cui_input_mask_hit_test(void *payload, cui_str actual, float x, float y) {
+    cui_input_mask_hit *h = payload;
+    if (!h->mask->valid)
+        return SIZE_MAX;
+    cui_input_mask_slot *slot = &h->mask->slots[h->mask->committed];
+    cui_str display = {slot->bytes, slot->length};
+    h->hit.cache = slot->visual.valid ? &slot->visual : NULL;
+    size_t masked = cui_input_cached_hit_test(&h->hit, display, x, y), source = 0;
+    if (masked == SIZE_MAX || cui_edit_unmask_offset(actual, masked, &source) != CUI_EDIT_OK)
+        return SIZE_MAX;
+    return source;
+}
 void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_edit *edit,
                      cui_input_state *state, cui_input_options options) {
     (void)name;
@@ -2081,6 +2524,31 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .border_width = border});
     cui_str text = cui_edit_composition_view(edit, state->behavior.composition);
     cui_edit_state selection = cui_edit_composition_selection(edit, state->behavior.composition);
+    cui_input_mask_cache *mask = options.masked ? cui_input_mask_resource(ui, id) : NULL;
+    cui_str actual = text;
+    bool mask_ready = !options.masked;
+    if (options.masked) {
+        if (mask && mask->valid) {
+            if (!state->behavior.composition || !state->behavior.composition->active)
+                mask->visible = mask->committed;
+            cui_input_mask_slot *slot = &mask->slots[mask->visible];
+            text = (cui_str){slot->bytes, slot->length};
+            size_t expected;
+            mask_ready = cui_edit_mask_offset(actual, actual.length, &expected) == CUI_EDIT_OK &&
+                         expected == slot->length;
+            if (!mask_ready ||
+                cui_edit_mask_offset(actual, selection.anchor, &selection.anchor) != CUI_EDIT_OK ||
+                cui_edit_mask_offset(actual, selection.cursor, &selection.cursor) != CUI_EDIT_OK ||
+                selection.anchor > text.length || selection.cursor > text.length) {
+                text = (cui_str){0};
+                selection.anchor = selection.cursor = 0;
+                mask_ready = false;
+            }
+        } else {
+            text = (cui_str){0};
+            selection.anchor = selection.cursor = 0;
+        }
+    }
     if (multiline) {
         cui_text_with_line_height(ui, text.length ? text : cui_string(" "), metrics.font_size,
                                   foreground, metrics.line_height);
@@ -2091,7 +2559,10 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_id viewport_id = cui_input_viewport_id(id);
     float viewport_width = width > 0 ? fmaxf(0, width - 2 * inset) : cui_bounds(ui, viewport_id).w;
     float text_width = 0, caret = 0;
-    cui_input_visual_cache *cache = cui_input_visual_resource(ui, id);
+    cui_input_visual_cache *cache =
+        options.masked
+            ? (mask && mask->valid && mask_ready ? &mask->slots[mask->visible].visual : NULL)
+            : cui_input_visual_resource(ui, id);
     cui_input_visual_bind(cache, edit);
     cui_text_selection_rect *visual_selection = NULL, *visual_composition = NULL;
     size_t visual_count = 0, composition_count = 0;
@@ -2109,8 +2580,13 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                        &visual_count);
     if (visual && state->behavior.composition && state->behavior.composition->active) {
         cui_edit_composition *composition = state->behavior.composition;
-        visual = cui_input_visual_selection(&cache->geometry, composition->start,
-                                            composition->start + composition->length,
+        size_t marked_start = composition->start,
+               marked_end = composition->start + composition->length;
+        if (options.masked) {
+            (void)cui_edit_mask_offset(actual, marked_start, &marked_start);
+            (void)cui_edit_mask_offset(actual, marked_end, &marked_end);
+        }
+        visual = cui_input_visual_selection(&cache->geometry, marked_start, marked_end,
                                             &visual_composition, &composition_count);
     }
     if (visual)
@@ -2151,12 +2627,18 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .fixed_width = true,
                             .height = metrics.line_height,
                             .fixed_height = true});
-    if (!visual && focused && state->behavior.composition && state->behavior.composition->active) {
+    if (!visual && focused && mask_ready && state->behavior.composition &&
+        state->behavior.composition->active) {
         cui_edit_composition *c = state->behavior.composition;
-        float left = cui_measure_text(ui, (cui_str){text.data, c->start}, metrics.font_size).width;
+        size_t marked_start = c->start, marked_end = c->start + c->length;
+        if (options.masked) {
+            (void)cui_edit_mask_offset(actual, marked_start, &marked_start);
+            (void)cui_edit_mask_offset(actual, marked_end, &marked_end);
+        }
+        float left =
+            cui_measure_text(ui, (cui_str){text.data, marked_start}, metrics.font_size).width;
         float right =
-            cui_measure_text(ui, (cui_str){text.data, c->start + c->length}, metrics.font_size)
-                .width;
+            cui_measure_text(ui, (cui_str){text.data, marked_end}, metrics.font_size).width;
         cui_set_underlay(ui, (cui_rect){left, metrics.line_height - 1, right - left, 1}, t->caret,
                          (cui_corner_radii){0});
     }
@@ -2229,13 +2711,48 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
         options.text_align > CUI_ALIGN_END ||
         (options.placeholder.length && !options.placeholder.data))
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    if (options.content_type < CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED ||
+        options.content_type > CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD ||
+        ((options.masked || options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED) &&
+         (cui_edit_get_state(edit).multiline || cui_edit_get_content(edit).token_count)))
+        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_input_mask_cache *mask = NULL;
+    if (options.masked) {
+        cui_input_visual_cache *plain = cui_input_visual_resource(ui, id);
+        if (plain)
+            cui_input_visual_clear(plain);
+        mask = cui_input_mask_resource(ui, id);
+        state->behavior.composition = cui_base_composition(ui, id, state->behavior.composition,
+                                                           &state->behavior.composition_owned);
+        cui_edit_result prepared =
+            cui_input_mask_bind(mask, ui, edit, state->behavior.composition, options,
+                                metrics.font_size, !state->behavior.focus_initialized);
+        if (prepared != CUI_EDIT_OK) {
+            (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, true, false, 0);
+            cui_set_semantic_details(
+                ui, id,
+                (cui_semantic_details){.secret = true,
+                                       .password = options.content_type !=
+                                                   CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED,
+                                       .invalid = true,
+                                       .readonly = true});
+            cui_input_paint(ui, id, t, name, edit, state, options);
+            return (cui_input_result){.error = prepared};
+        }
+    }
     cui_id viewport_id = cui_input_viewport_id(id);
     cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), metrics.font_size,
                                   state->scroll_x};
     bool multiline = cui_edit_get_state(edit).multiline;
-    cui_input_cached_hit cached_hit = {hit, multiline ? NULL : cui_input_visual_resource(ui, id)};
+    cui_input_cached_hit cached_hit = {
+        hit, (multiline || options.masked) ? NULL : cui_input_visual_resource(ui, id)};
     cui_input_visual_bind(cached_hit.cache, edit);
     cui_str committed = cui_edit_get_text(edit);
+    if (options.masked) {
+        cui_input_mask_slot *slot = &mask->slots[mask->committed];
+        committed = (cui_str){slot->bytes, slot->length};
+        cached_hit.cache = slot->visual.valid ? &slot->visual : NULL;
+    }
     float text_width = cui_input_visual_acquire(cached_hit.cache, ui, committed, metrics.font_size)
                            ? cached_hit.cache->geometry.width
                            : cui_measure_text(ui, committed, metrics.font_size).width;
@@ -2245,19 +2762,33 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
                                                        &state->behavior.composition_owned);
     if (state->behavior.composition && state->behavior.composition_owned)
         state->behavior.composition->grow_view = true;
+    cui_input_mask_hit masked_hit = {cached_hit, mask};
     cui_input_result result = cui_base_input_ex(
         ui, id, name, edit, &state->behavior,
-        (cui_base_input_options){.disabled = options.disabled,
-                                 .readonly = options.readonly,
-                                 .required = options.required,
-                                 .invalid = options.invalid,
-                                 .clipboard = options.clipboard,
-                                 .validate = options.validate,
-                                 .validate_user = options.validate_user,
-                                 .normalization = options.normalization,
-                                 .delegate_up_down = options.delegate_up_down,
-                                 .hit_test = multiline ? NULL : cui_input_cached_hit_test,
-                                 .hit_test_user = &cached_hit});
+        (cui_base_input_options){
+            .disabled = options.disabled,
+            .readonly = options.readonly,
+            .required = options.required,
+            .invalid = options.invalid,
+            .clipboard = options.clipboard,
+            .validate = options.validate,
+            .validate_user = options.validate_user,
+            .normalization = options.normalization,
+            .masked = options.masked,
+            .content_type = options.content_type,
+            .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},
+            .presentation_complete = mask ? cui_input_mask_complete : NULL,
+            .presentation_user = mask,
+            .delegate_up_down = options.delegate_up_down,
+            .hit_test = multiline        ? NULL
+                        : options.masked ? cui_input_mask_hit_test
+                                         : cui_input_cached_hit_test,
+            .hit_test_user = options.masked ? (void *)&masked_hit : (void *)&cached_hit});
+    if (mask) {
+        mask->revision = cui_edit_get_state(edit).revision;
+        if (!state->behavior.composition || !state->behavior.composition->active)
+            mask->visible = mask->committed;
+    }
     options.invalid = options.invalid || result.error != CUI_EDIT_OK;
     cui_input_paint(ui, id, t, name, edit, state, options);
     return result;

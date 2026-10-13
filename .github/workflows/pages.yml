@@ -32,6 +32,12 @@ jobs:
         run: uv run tests/web/test_touch.py
       - name: Verify native IME composition in built-in text consumers
         run: uv run tests/web/test_ime.py
+      - name: Gallery source shadow pixels and atomic preflight
+        run: uv run tests/web/test_shadow_gallery.py
+      - name: Gallery controlled joined button collections
+        run: uv run tests/web/test_button_collection_gallery.py
+      - name: Gallery password modes and secure host bridge
+        run: uv run tests/web/test_password_gallery.py
       - name: Verify live Input whole-value acceptance and guide links
         run: uv run tests/web/test_input_acceptance_gallery.py
       - name: Verify numeric OTP and combobox native composition

@@ -119,6 +119,9 @@ cui_theme cui_theme_dark(void);
 cui_theme cui_theme_high_contrast(void);
 /* Independent, square-cornered amber/ink design system using the same base. */
 cui_theme cui_theme_terminal(void);
+/* Source popover: ring, offset(0,4) sigma3 spread-1, offset(0,2) sigma2
+ * spread-2. Finite strength clamps [0,1]. Copies three values atomically. */
+bool cui_theme_popover_shadows(const cui_theme *, float strength, cui_drop_shadow out[3]);
 /* Named palette adaptations from the pinned GPUI Kit theme collection.
  * Invalid indices return an empty name/false and leave output unchanged. */
 size_t cui_theme_preset_count(void);
@@ -5309,6 +5312,18 @@ bool cui_theme_preset_get(size_t index, cui_theme *output) {
     theme.chart_bearish = chart[6];
     theme.chart_grid = chart[7];
     *output = theme;
+    return true;
+}
+
+bool cui_theme_popover_shadows(const cui_theme *theme, float strength, cui_drop_shadow out[3]) {
+    if (!theme || !out || !isfinite(strength))
+        return false;
+    unsigned char alpha = (unsigned char)lroundf(25.5f * fminf(1, fmaxf(0, strength)));
+    cui_drop_shadow next[3] = {
+        {.spread = 1, .color = {theme->text.r, theme->text.g, theme->text.b, alpha}},
+        {.offset_y = 4, .sigma = 3, .spread = -1, .color = {0, 0, 0, alpha}},
+        {.offset_y = 2, .sigma = 2, .spread = -2, .color = {0, 0, 0, alpha}}};
+    memcpy(out, next, sizeof(next));
     return true;
 }
 

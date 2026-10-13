@@ -1,0 +1,7 @@
+Published source:5474ec705ef2a3bfce1d99c0784a4ff472db324d.
+Framework run38465963737:all6jobsSUCCESS (Windows/macOS/portableLinux/LinuxGCC/LinuxClang/distribution-style).
+Pages run38465963779:build+deploySUCCESS.
+Public HTTPS artifact comparison:411/411 files matched SHA256. Artifact and log preserved in private validation cache:release-5474ec7-artifact/artifact.tar;published-5474ec7-files.py;published-5474ec7-files.log.
+MAIN strict native build and CTest:132/132PASS, no compiler warnings. Logs:main-gpu-hotfix-configure.log;main-gpu-hotfix-build.log;main-gpu-hotfix-test.log.
+Actual Vulkan fault regression reproduced the user's exact acquired-swapchain Cancel assertion on the previous source. Fixed renderer passes with zero assertions and legal late-failure submission; see sdl-gpu-lifecycle-hotfix.txt for bounded claims and preserved first failures.
+This release changes native SDL_GPU cleanup. Full78-family parity remains unfinished. Previous interactive-gallery/Attachment proofs are preserved in published-3ffa19d.txt; no new full-family or physical-device certification is inferred from this hotfix.

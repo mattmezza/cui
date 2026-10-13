@@ -144,9 +144,13 @@ typedef struct {
     float row_gap, label_value_gap, swatch_gap, swatch_size;
     float radius, swatch_radius;
     cui_color background, foreground, muted_foreground, ring_color;
+    size_t shadow_count; /* <=8; zero preserves explicit style's sigma-zero ring. */
+    /* Copied values. ring_color overrides canonical zero-offset, sigma-zero,
+     * spread-one rings; other custom layers retain their supplied colors. */
+    cui_drop_shadow shadows[CUI_DROP_SHADOW_MAX];
 } cui_chart_tooltip_style;
 /* Checked atomic source projection: rem-relative metrics, Theme popover roles,
- * radius/half-radius; caller supplies resolved inherited line height. No Gaussian shadows. */
+ * radius/half-radius and three popover shadows; caller supplies resolved inherited line height. */
 bool cui_chart_tooltip_style_project(const cui_theme *, float rem_size, float inherited_line_height,
                                      cui_chart_tooltip_style *out);
 /* Transient copying builder: at most 32 rows, 4096 aggregate bytes, and

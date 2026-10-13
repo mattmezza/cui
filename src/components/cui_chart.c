@@ -755,6 +755,14 @@ static bool chart_tooltip_style_valid(const cui_chart_tooltip_style *s) {
     if (s->appearance < CUI_CHART_TOOLTIP_BOXED || s->appearance > CUI_CHART_TOOLTIP_BARE ||
         s->font_size <= 0 || s->line_height <= 0)
         return false;
+    if (s->shadow_count > CUI_DROP_SHADOW_MAX)
+        return false;
+    for (size_t i = 0; i < s->shadow_count; i++) {
+        cui_rect ignored;
+        if (!cui_drop_shadow_bounds(
+                (cui_drop_shadow_paint){.caster = {0, 0, 1, 1}, .layer = s->shadows[i]}, &ignored))
+            return false;
+    }
     const float dimensions[] = {s->font_size,   s->line_height, s->padding,         s->min_width,
                                 s->cursor_gap,  s->row_gap,     s->label_value_gap, s->swatch_gap,
                                 s->swatch_size, s->radius,      s->swatch_radius};
@@ -784,6 +792,9 @@ bool cui_chart_tooltip_style_project(const cui_theme *theme, float rem_size,
                                     .muted_foreground = theme->muted,
                                     .ring_color = theme->text};
     next.ring_color.a = (unsigned char)lroundf(255 * .1f);
+    next.shadow_count = 3;
+    if (!cui_theme_popover_shadows(theme, 1, next.shadows))
+        return false;
     if (!chart_tooltip_style_valid(&next))
         return false;
     *out = next;
@@ -1098,6 +1109,16 @@ static cui_rect chart_tooltip_placement(cui_rect bounds, const cui_chart_state *
                                                     : cy - style->cursor_gap - layout->height),
                       layout->width, layout->height};
 }
+/* Retain ring_color as the override for the canonical source ring. Custom
+ * layers with other geometry use their own colors; count0 uses legacy ring. */
+static cui_drop_shadow chart_tooltip_shadow(const cui_chart_tooltip_style *style, size_t index) {
+    cui_drop_shadow layer = style->shadow_count
+                                ? style->shadows[index]
+                                : (cui_drop_shadow){.spread = 1, .color = style->ring_color};
+    if (layer.sigma == 0 && layer.spread == 1 && layer.offset_x == 0 && layer.offset_y == 0)
+        layer.color = style->ring_color;
+    return layer;
+}
 static bool chart_tooltip_emit_styled(const cui_prepaint_info *info, cui_prepaint_writer *writer,
                                       const cui_chart_state *state, const cui_chart_options *o,
                                       const cui_chart_tooltip_builder *b,
@@ -1107,14 +1128,19 @@ static bool chart_tooltip_emit_styled(const cui_prepaint_info *info, cui_prepain
     float pad = bare ? 0 : style->padding;
     cui_rect rect = chart_tooltip_placement(info->bounds, state, style, layout);
     float alpha = state->tooltip_focus;
-    if (!bare &&
-        !chart_emit(writer,
-                    (cui_draw_command){.type = CUI_DRAW_RECT,
-                                       .bounds = {rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2},
-                                       .radius = style->radius,
-                                       .color = chart_alpha(style->ring_color, alpha)},
-                    true))
-        return false;
+    if (!bare) {
+        size_t count = style->shadow_count ? style->shadow_count : 1;
+        for (size_t i = 0; i < count; i++) {
+            cui_drop_shadow layer = chart_tooltip_shadow(style, i);
+            layer.color = chart_alpha(layer.color, alpha);
+            cui_drop_shadow_paint shadow = {
+                .caster = rect,
+                .radii = {style->radius, style->radius, style->radius, style->radius},
+                .layer = layer};
+            if (!cui_prepaint_drop_shadow(writer, &shadow, true))
+                return false;
+        }
+    }
     if (!bare && !chart_emit(writer,
                              (cui_draw_command){.type = CUI_DRAW_RECT,
                                                 .bounds = rect,
@@ -1200,21 +1226,6 @@ static void chart_tooltip_compose_styled(cui_context *ui, cui_id id, const cui_c
     float pad = bare ? 0 : style->padding;
     cui_rect rect = chart_tooltip_placement((cui_rect){state->bounds.x, state->bounds.y, w, h},
                                             state, style, layout);
-    if (!bare) {
-        /* Source sigma-zero shadow fills expanded bounds beneath the surface.
-         * Spread does not change its corner radii. Each layer carries progress. */
-        cui_begin_portal(ui, id ^ UINT64_C(0x7419919551190000),
-                         (cui_box){.width = rect.w + 2,
-                                   .height = rect.h + 2,
-                                   .fixed_width = true,
-                                   .fixed_height = true,
-                                   .radius = style->radius,
-                                   .background = style->ring_color,
-                                   .custom_opacity = true,
-                                   .opacity = state->tooltip_focus},
-                         (cui_rect){rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2}, 120);
-        cui_end_box(ui);
-    }
     cui_begin_portal(ui, id ^ UINT64_C(0xd8a736411cb50000),
                      (cui_box){.width = rect.w,
                                .height = rect.h,
@@ -1225,6 +1236,18 @@ static void chart_tooltip_compose_styled(cui_context *ui, cui_id id, const cui_c
                                .custom_opacity = true,
                                .opacity = state->tooltip_focus},
                      rect, 120);
+    if (!bare) {
+        cui_drop_shadow layers[CUI_DROP_SHADOW_MAX];
+        size_t count = style->shadow_count ? style->shadow_count : 1;
+        for (size_t i = 0; i < count; i++)
+            layers[i] = chart_tooltip_shadow(style, i);
+        if (!cui_set_drop_shadows(
+                ui, layers, count,
+                (cui_corner_radii){style->radius, style->radius, style->radius, style->radius})) {
+            cui_end_box(ui);
+            return;
+        }
+    }
     if (o->tooltip_content) {
         cui_begin_absolute_box(ui, id ^ UINT64_C(0x6c712ab004e9b669),
                                (cui_box){.width = rect.w - 2 * pad,
@@ -2001,7 +2024,8 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         .opacity = 1};
     bool ok;
     if (current) {
-        size_t budget = 80 + (size_t)ceilf(h / 6) + (payload.options.tooltip_build ? 96 : 0);
+        size_t budget = 80 + (size_t)ceilf(h / 6) + (payload.options.tooltip_build ? 96 : 0) +
+                        (payload.has_tooltip_style ? CUI_DROP_SHADOW_MAX : 0);
         ok = cui_set_prepaint(
             ui, (cui_prepaint_options){.callback = chart_prepaint,
                                        .payload = &payload,

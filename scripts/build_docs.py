@@ -12,6 +12,7 @@ import shutil
 from urllib.parse import quote, unquote, urlsplit
 
 from markdown_it import MarkdownIt
+from markdown_it.token import Token
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'https://github.com/mattmezza/cui/blob/main/'
@@ -23,7 +24,7 @@ DEVELOPMENT = {'NIGHTLY_REPORT', 'swarm-status', 'ROADMAP', 'DECISIONS',
                'MAINTAINER_ACTIONS', 'upstream-baseline'}
 GUIDES.update({'DESIGN_SIZES', 'DATE_LOCALE_YEAR', 'SIDEBAR_CLIPPING',
                'INPUT_VISUAL_GEOMETRY', 'NATIVE_ACCESSIBILITY', 'EXAMPLE_POLISH',
-               'PLOT_INTERACTIONS', 'CONTENT_STYLING', 'AVATAR_MESSAGE_EXAMPLES', 'SCROLLBAR_APPEARANCE', 'RADIO_GROUP', 'CHECKBOX_BEHAVIOR', 'CONTEXTUAL_NATIVE_TEXT', 'ALERT_BUBBLE_GUIDE', 'STATUS_MOTION_GUIDE', 'BUTTON_BEHAVIOR', 'TABLE_BEHAVIOR', 'CHART_APPEARANCE_HOVER', 'THEME_REGISTRY_GUIDE', 'SDL_SYSTEM_APPEARANCE', 'PLOT_CHART_OWNER_MOTION', 'INPUT_REFERENCE_CONTRACTS', 'CORE_PREPAINT', 'PLOT_CHART_CURRENT_FRAME', 'INPUT_ACCEPTANCE', 'CHART_SOURCE_POINT_AXIS', 'INPUT_NORMALIZATION', 'TABS_SCROLL_CHAINING', 'CHART_RADAR_TOOLTIP_TITLE', 'CHART_TYPED_TOOLTIP', 'BUTTON_ACTIVATION_BLOCKING', 'PASSWORD_ENGINE_STAGE1', 'CHART_TOOLTIP_APPEARANCE'})
+               'PLOT_INTERACTIONS', 'CONTENT_STYLING', 'AVATAR_MESSAGE_EXAMPLES', 'SCROLLBAR_APPEARANCE', 'RADIO_GROUP', 'CHECKBOX_BEHAVIOR', 'CONTEXTUAL_NATIVE_TEXT', 'ALERT_BUBBLE_GUIDE', 'STATUS_MOTION_GUIDE', 'BUTTON_BEHAVIOR', 'TABLE_BEHAVIOR', 'CHART_APPEARANCE_HOVER', 'THEME_REGISTRY_GUIDE', 'SDL_SYSTEM_APPEARANCE', 'PLOT_CHART_OWNER_MOTION', 'INPUT_REFERENCE_CONTRACTS', 'CORE_PREPAINT', 'PLOT_CHART_CURRENT_FRAME', 'INPUT_ACCEPTANCE', 'CHART_SOURCE_POINT_AXIS', 'INPUT_NORMALIZATION', 'TABS_SCROLL_CHAINING', 'CHART_RADAR_TOOLTIP_TITLE', 'CHART_TYPED_TOOLTIP', 'BUTTON_ACTIVATION_BLOCKING', 'PASSWORD_ENGINE_STAGE1', 'PASSWORD_INPUT_STAGE2', 'BUTTON_GROUP', 'DROP_SHADOW', 'CHART_TOOLTIP_APPEARANCE'})
 
 
 def slugify(value):
@@ -87,6 +88,7 @@ def render_document(path, root, slugs, output):
     headings = {}
     title = path.stem.replace('_', ' ').title()
     have_title = False
+    title_index = None
     for index, token in enumerate(tokens):
         if token.type != 'heading_open':
             continue
@@ -98,6 +100,16 @@ def render_document(path, root, slugs, output):
         token.attrSet('id', 'doc-' + anchor)
         if not have_title and token.tag == 'h1':
             title, have_title = website_text(content), True
+            title_index = index
+        elif token.tag == 'h1':
+            # The document shell owns the page's main heading.
+            token.tag = tokens[index + 2].tag = 'h2'
+
+    if title_index is not None:
+        # Keep source fragment links without repeating the shell's visible title.
+        anchor = Token('html_block', '', 0)
+        anchor.content = '<span id="' + tokens[title_index].attrGet('id') + '"></span>\n'
+        tokens[title_index:title_index + 3] = [anchor]
 
     def rewrite(value, image=False):
         url = urlsplit(value)

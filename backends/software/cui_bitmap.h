@@ -25,13 +25,16 @@ static bool cui_bitmap_key_make(const cui_draw_command *c, cui_bitmap_key *key) 
         return false;
     float radii[4], edges[4];
     cui_shape_values(c, radii, edges);
-    *key = (cui_bitmap_key){.bitmap = p->bitmap,
-                            .source = s,
-                            .radii = {radii[0], radii[1], radii[2], radii[3]},
-                            .width = (unsigned)ceilf(c->bounds.w),
-                            .height = (unsigned)ceilf(c->bounds.h),
-                            .grayscale = p->grayscale,
-                            .tint = p->custom_tint ? p->tint : (cui_color){255, 255, 255, 255}};
+    *key =
+        (cui_bitmap_key){.bitmap = p->bitmap,
+                         .source = s,
+                         .radii = {radii[0], radii[1], radii[2], radii[3]},
+                         .width = c->type == CUI_DRAW_DROP_SHADOW ? (unsigned)p->source.w
+                                                                  : (unsigned)ceilf(c->bounds.w),
+                         .height = c->type == CUI_DRAW_DROP_SHADOW ? (unsigned)p->source.h
+                                                                   : (unsigned)ceilf(c->bounds.h),
+                         .grayscale = p->grayscale,
+                         .tint = p->custom_tint ? p->tint : (cui_color){255, 255, 255, 255}};
     return true;
 }
 static bool cui_bitmap_key_equal(const cui_bitmap_key *a, const cui_bitmap_key *b) {

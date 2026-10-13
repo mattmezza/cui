@@ -82,10 +82,16 @@ def main():
                 for(let i=0;i<e.gallery_semantic_count();i++)if(e.gallery_semantic(i,0)===6)
                     return {x:r.left+e.gallery_semantic(i,1)+8,y:r.top+e.gallery_semantic(i,2)+8};}""")
             page.mouse.click(box['x'],box['y'])
-            page.wait_for_function('document.activeElement.id==="cui-ime-input"')
+            page.wait_for_function('document.activeElement.id==="preview"&&cuiGallery.exports.gallery_text_config(0)===0')
+            assert page.locator('#cui-ime-input').count() == 0
             readonly_before=page.evaluate('cuiGallery.exports.gallery_input_selection(2)')
-            session.send('Input.imeSetComposition',{'text':'読み','selectionStart':2,'selectionEnd':2})
-            session.send('Input.insertText',{'text':'読み'})
+            # The finalized readonly configuration stops host text input. A late
+            # host composition must still be rejected by the actual C reducer.
+            page.evaluate("""()=>{const e=cuiGallery.exports,b=new TextEncoder().encode('読み'),p=e.malloc(b.length);
+                new Uint8Array(e.memory.buffer,p,b.length).set(b);
+                e.gallery_composition(0,0,0,0,0);e.gallery_composition(1,p,b.length,2,2);
+                e.gallery_composition(2,p,b.length,2,2);e.free(p);}""")
+            page.mouse.move(box['x']+1, box['y']+1)
             page.wait_for_timeout(80)
             assert page.evaluate('cuiGallery.exports.gallery_input_selection(2)')==readonly_before
             page.locator('#input-mode').select_option('0')

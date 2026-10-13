@@ -85,10 +85,15 @@ typedef struct {
     bool composition_owned;              /* Internal default resource flag; initialize false. */
     uintptr_t bound_edit_identity;       /* Internal numeric identity; no retained model pointer. */
     bool focus_initialized, was_focused; /* Zero-init; focus/rebind splits typing history. */
+    bool secure_initialized, was_masked;
+    cui_text_input_purpose previous_content_type;
 } cui_input_behavior_state;
-/* Lazy bounded default session (4095 preedit / 65535 rendered bytes). */
+/* Lazy bounded default preedit (4095 bytes); model-owned rendered view grows. */
 cui_edit_composition *cui_base_composition(cui_context *, cui_id, cui_edit_composition *,
                                            bool *owned);
+/* Runs synchronously after the checked engine request has returned. Publish a
+ * prepared stage only when applied; callback side effects are outside rollback. */
+typedef void (*cui_input_presentation_complete_fn)(void *user, bool prepared, bool applied);
 typedef struct {
     bool disabled, readonly, required, invalid;
     const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */
@@ -99,6 +104,11 @@ typedef struct {
     cui_edit_accept_fn validate;          /* Optional source single-line whole-value predicate. */
     void *validate_user;                  /* Borrowed synchronously; no retained candidate text. */
     cui_edit_normalization normalization; /* Zero preserves legacy CR/LF rejection. */
+    bool masked;
+    cui_text_input_purpose content_type;
+    cui_edit_presentation presentation;
+    cui_input_presentation_complete_fn presentation_complete;
+    void *presentation_user;
 } cui_base_input_options;
 /* Reduce one frame event in queue order after registering the textbox with
  * cui_interact. Does not submit/paint semantics or replay other events. The

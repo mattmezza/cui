@@ -2951,7 +2951,7 @@ struct cui_edit {
     cui_edit_acceptance acceptance;
     cui_edit_normalization normalization;
     cui_edit_presentation presentation;
-    bool presentation_prepared, presentation_skip;
+    bool presentation_prepared, presentation_skip, masked_words;
     bool callback_active, acceptance_violation, acceptance_rejected, acceptance_skip;
 };
 static bool cui_edit_private_callback_guard(const cui_edit *e) {
@@ -3840,10 +3840,10 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
             p = cui_grapheme_next(cui_edit_get_text(e), p);
             break;
         case CUI_EDIT_UNICODE_WORD_PREVIOUS:
-            p = cui_edit_private_unicode_word_previous(e, p);
+            p = e->masked_words ? 0 : cui_edit_private_unicode_word_previous(e, p);
             break;
         case CUI_EDIT_UNICODE_WORD_NEXT:
-            p = cui_edit_private_unicode_word_next(e, p);
+            p = e->masked_words ? e->length : cui_edit_private_unicode_word_next(e, p);
             break;
         case CUI_EDIT_WORD_PREVIOUS:
             while (p && !cui_edit_private_word(e, cui_edit_private_previous(e, p)))
@@ -5214,8 +5214,13 @@ static cui_edit_result cui_edit_private_erase_word(cui_edit *edit, bool backward
         return cui_edit_private_erase_grapheme(edit, backwards);
     cui_str text = cui_edit_get_text(edit);
     size_t start =
-        backwards ? cui_edit_private_unicode_word_previous(edit, edit->cursor) : edit->cursor;
-    size_t end = backwards ? edit->cursor : cui_edit_private_unicode_word_next(edit, edit->cursor);
+        backwards
+            ? (edit->masked_words ? 0 : cui_edit_private_unicode_word_previous(edit, edit->cursor))
+            : edit->cursor;
+    size_t end =
+        backwards ? edit->cursor
+                  : (edit->masked_words ? edit->length
+                                        : cui_edit_private_unicode_word_next(edit, edit->cursor));
     if (!cui_grapheme_boundary(text, start))
         start = cui_grapheme_previous(text, start);
     if (!cui_grapheme_boundary(text, end))
@@ -5503,6 +5508,13 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
         cui_edit_private_model_overlap(e, c->buffer, c->capacity) ||
         (c->view_buffer && cui_edit_private_model_overlap(e, c->view_buffer, c->view_capacity)))
         return CUI_EDIT_INVALID_ARGUMENT;
+    if (e->presentation.prepare && v.type == CUI_EVENT_COMPOSITION_START && editable && c->active &&
+        (c->model_identity != (uintptr_t)e || c->revision != e->revision ||
+         c->document_anchor != e->anchor || c->document_cursor != e->cursor ||
+         c->start != (e->anchor < e->cursor ? e->anchor : e->cursor) ||
+         c->end != (e->anchor > e->cursor ? e->anchor : e->cursor) ||
+         (c->grow_view && e->composition_session != (uintptr_t)c)))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (c->grow_view && c->active && e->composition_session != (uintptr_t)c) {
         c->active = false;
         c->length = 0;
@@ -5537,6 +5549,8 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
     }
     if (!cui_edit_valid_utf8(text))
         return CUI_EDIT_INVALID_UTF8;
+    if (e->presentation.prepare && v.type == CUI_EVENT_COMPOSITION_START && text.length)
+        return CUI_EDIT_INVALID_ARGUMENT; /* Opt-in START is the empty prospective view. */
     bool strip = !state.multiline && e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
     if (!state.multiline && !strip)
         for (size_t i = 0; i < text.length; i++)
@@ -5581,6 +5595,15 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
             grown = malloc(grown_capacity);
             if (!grown)
                 return CUI_EDIT_CAPACITY;
+        }
+    }
+    if (e->presentation.prepare && v.type == CUI_EVENT_COMPOSITION_START && !state.multiline) {
+        cui_edit_private_compose_candidate(e, e->scratch, start, end, (cui_str){0});
+        cui_edit_result prepared =
+            cui_edit_private_present(e, (cui_str){e->scratch, remaining}, true);
+        if (prepared != CUI_EDIT_OK) {
+            free(grown);
+            return prepared;
         }
     }
     if ((e->acceptance.validate || e->presentation.prepare) && !state.multiline &&
@@ -5640,6 +5663,7 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
     c->anchor = v.composition_anchor;
     c->cursor = v.composition_cursor;
     c->revision = state.revision;
+    c->model_identity = (uintptr_t)e;
     c->active = true;
     c->document_anchor = state.anchor;
     c->document_cursor = state.cursor;
@@ -5740,8 +5764,16 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
     if (!request.event.text_data && request.kind != CUI_EDIT_REQUEST_INSERT)
         payload = (cui_str){request.event.text, sizeof request.event.text};
     cui_edit_composition *c =
-        request.kind == CUI_EDIT_REQUEST_COMPOSITION ? request.composition : NULL;
-    if (c && cui_edit_private_model_overlap(e, c, sizeof *c))
+        (request.kind == CUI_EDIT_REQUEST_COMPOSITION || request.kind == CUI_EDIT_REQUEST_PRESENT)
+            ? request.composition
+            : NULL;
+    if (c && (cui_edit_private_model_overlap(e, c, sizeof *c) ||
+              cui_edit_private_model_overlap(e, c->buffer, c->capacity) ||
+              cui_edit_private_model_overlap(e, c->view_buffer, c->view_capacity) ||
+              cui_edit_private_storage_overlap(c, sizeof *c, c->buffer, c->capacity) ||
+              cui_edit_private_storage_overlap(c, sizeof *c, c->view_buffer, c->view_capacity) ||
+              cui_edit_private_storage_overlap(c->buffer, c->capacity, c->view_buffer,
+                                               c->view_capacity)))
         return false;
     for (size_t i = 0; i < 5; i++) {
         cui_edit_workspace a = spans[i];
@@ -5763,12 +5795,56 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
 cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request request,
                                                cui_edit_acceptance acceptance) {
     if (!e || cui_edit_private_callback_guard(e) || request.kind < CUI_EDIT_REQUEST_EVENT ||
-        request.kind > CUI_EDIT_REQUEST_COMPOSITION ||
+        request.kind > CUI_EDIT_REQUEST_PRESENT ||
         request.normalization < CUI_EDIT_NORMALIZE_NONE ||
         request.normalization > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF ||
         !cui_edit_private_presentation_valid(e, request))
         return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
-    if ((!acceptance.validate && !request.presentation.prepare &&
+    if (request.kind == CUI_EDIT_REQUEST_PRESENT) {
+        cui_edit_composition *c = request.composition;
+        if (c && c->model_identity && c->model_identity != (uintptr_t)e)
+            return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+        cui_str value = cui_edit_get_text(e);
+        bool provisional = false;
+        if (c && c->active) {
+            cui_edit_state state = cui_edit_get_state(e);
+            if (c->model_identity != (uintptr_t)e || c->revision != state.revision ||
+                c->document_anchor != state.anchor || c->document_cursor != state.cursor ||
+                c->start > c->end || c->end > state.length ||
+                c->start != (state.anchor < state.cursor ? state.anchor : state.cursor) ||
+                c->end != (state.anchor > state.cursor ? state.anchor : state.cursor) ||
+                !c->buffer || c->length >= c->capacity || c->anchor > c->length ||
+                c->cursor > c->length || !cui_edit_valid_utf8((cui_str){c->buffer, c->anchor}) ||
+                !cui_edit_valid_utf8((cui_str){c->buffer, c->cursor}) ||
+                (c->grow_view && e->composition_session != (uintptr_t)c) ||
+                !cui_edit_valid_utf8((cui_str){c->buffer, c->length}))
+                return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+            size_t remaining = state.length - (c->end - c->start);
+            if (c->length > SIZE_MAX - remaining)
+                return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+            size_t length = remaining + c->length;
+            char *bytes = c->grow_view ? e->composition_view : c->view_buffer;
+            size_t capacity = c->grow_view ? e->composition_view_capacity : c->view_capacity;
+            size_t recorded = c->grow_view ? e->composition_view_length : c->view_length;
+            if (!c->view_valid || !bytes || length >= capacity || recorded != length ||
+                bytes[length] != 0 || !cui_edit_valid_utf8((cui_str){bytes, length}))
+                return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+            value = (cui_str){bytes, length};
+            provisional = true;
+        }
+        cui_edit saved = *e;
+        e->presentation = request.presentation;
+        e->presentation_skip = false;
+        e->presentation_prepared = false;
+        e->acceptance_violation = false;
+        cui_edit_result result = cui_edit_private_present(e, value, provisional);
+        bool prepared = e->presentation_prepared;
+        *e = saved;
+        return (cui_edit_checked_result){.error = result,
+                                         .presentation_prepared = prepared,
+                                         .presentation_applied = prepared && result == CUI_EDIT_OK};
+    }
+    if ((!acceptance.validate && !request.presentation.prepare && !request.masked_words &&
          request.normalization == CUI_EDIT_NORMALIZE_NONE) ||
         e->config.multiline) {
         cui_edit_result legacy;
@@ -5796,6 +5872,7 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
     e->acceptance = acceptance;
     e->normalization = request.normalization;
     e->presentation = request.presentation;
+    e->masked_words = request.masked_words;
     e->presentation_prepared = e->presentation_skip = false;
     e->acceptance_violation = e->acceptance_rejected = e->acceptance_skip = false;
     cui_edit_result result;
@@ -5826,6 +5903,7 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         e->acceptance = saved.acceptance;
         e->normalization = saved.normalization;
         e->presentation = saved.presentation;
+        e->masked_words = saved.masked_words;
         e->presentation_prepared = saved.presentation_prepared;
         e->presentation_skip = saved.presentation_skip;
         e->acceptance_violation = saved.acceptance_violation;

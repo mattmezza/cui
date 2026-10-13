@@ -66,7 +66,9 @@ def main():
             assert '#include "cui/cui_components.h"' in page.evaluate('navigator.clipboard.readText()')
             page.evaluate('location.hash="#docs/getting-started"')
             page.wait_for_function('document.querySelector("#docs-page")&&!document.querySelector("#docs-page").hidden')
-            assert page.locator('#docs-content h1').first.inner_text() == 'CUI'
+            assert page.locator('#docs-title').inner_text() == 'CUI'
+            assert page.locator('#docs-content h1').count() == 0
+            assert page.locator('#docs-content span#doc-cui').count() == 1
             assert page.get_by_role('link', name='View Markdown source').count() == 1
             assert page.locator('#docs-content a[href="#docs/api"]').count() >= 1
             assert page.locator('#docs-nav a').count() >= 40
@@ -134,7 +136,14 @@ def main():
                 if control == "control-size" and not page.locator("#design-size").is_hidden():
                     control, value = "design-size", {0:3,1:2,2:5,3:1}[int(value)]
                 before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
-                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
+                try:
+                    page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
+                except Exception:
+                    print('Control render failure', control, value, page.evaluate("""()=>({
+                        frame:cuiGallery.frame,component:cuiGallery.renderedComponent,
+                        note:document.querySelector('#preview-note').textContent,
+                        error:cuiGallery.exports.gallery_error(),visibility:document.visibilityState})"""), errors, flush=True)
+                    raise
             assert page.locator('#theme').input_value() == '3'
             assert page.evaluate('getComputedStyle(document.body).colorScheme') == 'light'
             light_canvas = page.evaluate('Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_command(0,i+5))')
@@ -2866,12 +2875,12 @@ def main():
             wait_semantic('Your note', 6)
             click_semantic('Your note', 6)
             page.wait_for_function('(index)=>cuiGallery.exports.gallery_semantic(index,7)===1', arg=semantic_index('Your note', 6))
-            page.evaluate('document.querySelector("canvas").dispatchEvent(new CompositionEvent("compositionstart",{bubbles:true}))')
+            page.evaluate('document.querySelector("#cui-ime-input").dispatchEvent(new CompositionEvent("compositionstart",{bubbles:true}))')
             before_composition = page.evaluate('cuiGallery.frame')
             page.evaluate('document.querySelector("canvas").dispatchEvent(new KeyboardEvent("keydown",{key:"e",isComposing:true,bubbles:true}))')
             page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before_composition)
             assert page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(12)') == 0
-            page.evaluate('document.querySelector("canvas").dispatchEvent(new CompositionEvent("compositionend",{data:"é",bubbles:true}))')
+            page.evaluate('document.querySelector("#cui-ime-input").dispatchEvent(new CompositionEvent("compositionend",{data:"é",bubbles:true}))')
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(12)===2')
             click_semantic('Submit', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(1)===1&&cuiGallery.exports.gallery_questionnaire_stats(6)===3')

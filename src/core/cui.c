@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui.h"
+#include "cui_drop_shadow_bounds_internal.h"
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -45,6 +46,9 @@ typedef struct {
     float outline_width;
     cui_color outline_color;
     cui_corner_radii outline_radii;
+    cui_drop_shadow shadows[CUI_DROP_SHADOW_MAX];
+    size_t shadow_count;
+    cui_corner_radii shadow_radii;
     cui_rect underlay_bounds;
     cui_underlay_layout underlay_layout;
     cui_color underlay_color;
@@ -135,6 +139,7 @@ struct cui_context {
     bool event_consumed[CUI_CORE_DISPATCH_MAX];
     cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
+    cui_id event_accepted_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_previous_focus[CUI_CORE_DISPATCH_MAX];
     size_t event_activation_slots[CUI_CORE_DISPATCH_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
@@ -153,8 +158,13 @@ struct cui_context {
         bool active, primary, dragging, blocked;
     } contacts[16];
     double frame_time;
+    uint64_t frame_sequence;
+    size_t measuring_depth;
+    bool resolving_layout;
     cui_id text_input_owner, composition_owner;
     cui_rect text_input_bounds;
+    cui_text_input_state text_input_state;
+    bool text_input_exhausted;
     cui_id text_geometry_ime_owner;
     cui_rect text_geometry_ime_bounds;
     float text_geometry_ime_height;
@@ -224,10 +234,12 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         !cui_core_text_style_valid(style))
         return (cui_size){0};
     size = fminf(size, 65535);
+    ++ui->measuring_depth;
     cui_size result = ui->config.measure_styled
                           ? ui->config.measure_styled(ui->config.measure_user, text, size, style)
                       : ui->config.measure ? ui->config.measure(ui->config.measure_user, text, size)
                                            : (cui_size){text.length * size * .6f, size * 1.3f};
+    --ui->measuring_depth;
     if (!isfinite(result.width) || !isfinite(result.height) || result.width < 0 ||
         result.height < 0)
         return (cui_size){0};
@@ -1072,6 +1084,44 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
     ui->dirty = true;
     return true;
 }
+static void cui_core_finalize_text_input(cui_context *ui) {
+    cui_text_input_state next = {0};
+    for (size_t i = 0; i < ui->semantic_count; i++) {
+        const cui_semantic *s = &ui->semantics[i];
+        if (s->id == ui->focus && s->role == CUI_ROLE_TEXTBOX && !s->disabled &&
+            !s->details.readonly &&
+            (!s->details.text_input_configured ||
+             (s->details.text_input_config.type >= CUI_TEXT_INPUT_TEXT &&
+              s->details.text_input_config.type <= CUI_TEXT_INPUT_PASSWORD_VISIBLE &&
+              s->details.text_input_config.purpose >= CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED &&
+              s->details.text_input_config.purpose <= CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD)) &&
+            (!s->details.multiline || !s->details.text_input_configured ||
+             (s->details.text_input_config.type == CUI_TEXT_INPUT_TEXT &&
+              s->details.text_input_config.purpose == CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED)) &&
+            cui_core_focusable(s) &&
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
+            next.owner = s->id;
+            next.multiline = s->details.multiline;
+            next.explicit_config = s->details.text_input_configured;
+            next.config = s->details.text_input_configured ? s->details.text_input_config
+                                                           : (cui_text_input_config){0};
+            break;
+        }
+    }
+    cui_text_input_state old = ui->text_input_state;
+    next.generation = old.generation;
+    if (old.owner != next.owner || old.config.type != next.config.type ||
+        old.config.purpose != next.config.purpose || old.explicit_config != next.explicit_config ||
+        old.multiline != next.multiline) {
+        if (old.generation == UINT64_MAX)
+            ui->text_input_exhausted = true;
+        else
+            next.generation++;
+    }
+    if (ui->text_input_exhausted)
+        next.owner = 0;
+    ui->text_input_state = next;
+}
 bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     if (!cui_core_mutation(ui))
         return false;
@@ -1129,6 +1179,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
     ui->activation_count = 0;
+    memset(ui->event_accepted_activations, 0, sizeof ui->event_accepted_activations);
     cui_id touch_cancellations[CUI_CORE_DISPATCH_MAX] = {0};
     for (size_t i = 0; i < ui->event_count; i++) {
         cui_event e = ui->events[i];
@@ -1406,6 +1457,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->config.height = h;
     ui->dt = dt;
     ui->in_frame = true;
+    if (!++ui->frame_sequence)
+        ++ui->frame_sequence;
     ui->dirty = false;
     return true;
 }
@@ -1650,6 +1703,30 @@ bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box bo
     }
     cui_end_box(ui);
     return ok;
+}
+bool cui_drop_shadow_bounds(cui_drop_shadow_paint p, cui_rect *out) {
+    return cui_drop_shadow_bounds_checked(p, out);
+}
+bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t count,
+                          cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
+        count > CUI_DROP_SHADOW_MAX || (count && !layers))
+        return false;
+    cui_rect ignored;
+    for (size_t i = 0; i < count; i++)
+        if (!cui_drop_shadow_bounds(
+                (cui_drop_shadow_paint){.caster = {0, 0, 1, 1}, .radii = radii, .layer = layers[i]},
+                &ignored))
+            return false;
+    cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    if (count)
+        memcpy(node->shadows, layers, count * sizeof(*layers));
+    node->shadow_count = count;
+    node->shadow_radii = radii;
+    Clay__GetOpenLayoutElement()->config.custom.customData = node;
+    return true;
 }
 bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
@@ -2062,6 +2139,10 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
                     }
                 }
             out.activated |= allowed;
+            if (allowed)
+                for (size_t e = 0; e < ui->event_count; e++)
+                    if (ui->event_activation_slots[e] == i)
+                        ui->event_accepted_activations[e] = id;
             ui->activations[i] = 0;
         }
     ui->semantic_scopes[ui->semantic_count] =
@@ -2213,8 +2294,9 @@ static bool cui_core_prepaint_rect(cui_rect r) {
            r.h >= 0 && isfinite(r.x + r.w) && isfinite(r.y + r.h);
 }
 static bool cui_core_prepaint_command(cui_draw_command *c) {
-    if (!cui_core_prepaint_rect(c->bounds) || c->type < CUI_DRAW_RECT || c->type > CUI_DRAW_MESH ||
-        c->type == CUI_DRAW_CLIP_PUSH || c->type == CUI_DRAW_CLIP_POP)
+    if (!cui_core_prepaint_rect(c->bounds) || c->type < CUI_DRAW_RECT ||
+        c->type > CUI_DRAW_DROP_SHADOW || c->type == CUI_DRAW_CLIP_PUSH ||
+        c->type == CUI_DRAW_CLIP_POP)
         return false;
     if (!isfinite(c->radius) || c->radius < 0 || !isfinite(c->stroke) || c->stroke < 0)
         return false;
@@ -2232,6 +2314,8 @@ static bool cui_core_prepaint_command(cui_draw_command *c) {
             if (!isfinite(edges[i]) || edges[i] < 0)
                 return false;
     }
+    if (c->type == CUI_DRAW_DROP_SHADOW)
+        return cui_drop_shadow_bounds(c->shadow, &c->bounds);
     if (c->type == CUI_DRAW_IMAGE)
         return cui_core_bitmap_paint_valid(&c->bitmap);
     if (c->type == CUI_DRAW_MESH)
@@ -2259,6 +2343,13 @@ static bool cui_core_prepaint_command(cui_draw_command *c) {
                c->text_color_count)
         return false;
     return true;
+}
+bool cui_prepaint_drop_shadow(cui_prepaint_writer *writer, const cui_drop_shadow_paint *paint,
+                              bool deferred) {
+    if (!paint)
+        return cui_prepaint_emit(writer, NULL, deferred);
+    cui_draw_command command = {.type = CUI_DRAW_DROP_SHADOW, .shadow = *paint};
+    return cui_prepaint_emit(writer, &command, deferred);
 }
 bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *command,
                        bool deferred) {
@@ -2479,6 +2570,8 @@ static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool
             cui_draw_command c = ui->prepaint_commands[p->offset + i];
             if (c.type == CUI_DRAW_IMAGE)
                 c.bitmap.opacity *= p->info.opacity;
+            else if (c.type == CUI_DRAW_DROP_SHADOW)
+                c.shadow.layer.color.a = (uint8_t)(c.shadow.layer.color.a * p->info.opacity);
             else if (c.type == CUI_DRAW_MESH) {
                 c.mesh.color.r *= p->info.opacity;
                 c.mesh.color.g *= p->info.opacity;
@@ -2530,6 +2623,7 @@ static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray 
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
+    ui->resolving_layout = true;
     if (ui->depth || ui->overflow_depth || ui->scope_count || ui->focus_depth)
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     ui->overflow_depth = 0;
@@ -2603,11 +2697,25 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
             background.a = (uint8_t)(background.a * opacity);
             size_t needed = (node->has_underlay ? 3 : 0) + (background.a ? 1 : 0) +
-                            (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0);
+                            (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0) +
+                            node->shadow_count;
             if (needed > ui->config.max_commands - ui->count) {
                 cui_core_fail(ui, CUI_ERROR_CAPACITY);
                 ui->count = 0;
                 goto cui_core_commands_done;
+            }
+            for (size_t shadow = 0; shadow < node->shadow_count; shadow++) {
+                cui_draw_command command = {.type = CUI_DRAW_DROP_SHADOW,
+                                            .shadow = {.caster = d.bounds,
+                                                       .radii = node->shadow_radii,
+                                                       .layer = node->shadows[shadow]}};
+                command.shadow.layer.color.a = (uint8_t)(command.shadow.layer.color.a * opacity);
+                if (!cui_drop_shadow_bounds(command.shadow, &command.bounds)) {
+                    cui_core_fail(ui, CUI_ERROR_LAYOUT);
+                    ui->count = 0;
+                    goto cui_core_commands_done;
+                }
+                ui->commands[ui->count++] = command;
             }
             if (node->outline_width > 0) {
                 float w = node->outline_width;
@@ -2959,7 +3067,9 @@ cui_core_commands_done:
     ui->previous_count = ui->semantic_count;
     if (ui->composition_owner != ui->focus)
         ui->composition_owner = 0;
+    cui_core_finalize_text_input(ui);
     ui->in_frame = false;
+    ui->resolving_layout = false;
     return (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
 }
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
@@ -3002,8 +3112,16 @@ void cui_focus(cui_context *ui, cui_id id) {
                     if (ui->previous[i].id == id && ui->previous[i].details.no_focus)
                         return;
         }
-        if (ui->focus != id)
+        if (ui->focus != id) {
             ui->composition_owner = 0;
+            if (!ui->in_frame) {
+                if (ui->text_input_state.generation == UINT64_MAX)
+                    ui->text_input_exhausted = true;
+                else
+                    ui->text_input_state.generation++;
+                ui->text_input_state.owner = 0;
+            }
+        }
         ui->focus = id;
         ui->focus_visible = true;
         ui->dirty = true;
@@ -3139,6 +3257,36 @@ bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {
 
 cui_id cui_event_activation(cui_context *ui, size_t index) {
     return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_activations[index] : 0;
+}
+uint64_t cui_frame_sequence(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && !cui_core_inert(ui) && !cui_core_layout_only(ui)
+               ? ui->frame_sequence
+               : 0;
+}
+bool cui_frame_is_submitting(const cui_context *ui) {
+    return ui && ui->in_frame && !ui->prepainting && !ui->resolving_layout &&
+           !ui->measuring_depth && !cui_core_paint_context;
+}
+cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
+    if (!cui_frame_sequence(ui) || index >= ui->event_count || ui->error != CUI_OK)
+        return 0;
+    cui_id id = ui->event_accepted_activations[index];
+    for (size_t n = 0; id && n < ui->semantic_count; n++) {
+        const cui_semantic *s = &ui->semantics[n];
+        if (s->id != id || s->disabled)
+            continue;
+        if (!cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
+            return 0;
+        if (ui->events[index].type != CUI_EVENT_ACCESSIBILITY_ACTION)
+            return id;
+        if (ui->event_consumed[index] || !cui_core_accessibility_activate(s) ||
+            !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
+            return 0;
+        for (size_t p = 0; p < ui->previous_count; p++)
+            if (ui->previous[p].id == id && ui->previous[p].role == s->role)
+                return id;
+    }
+    return 0;
 }
 
 bool cui_event_consumed(cui_context *ui, size_t index) {
@@ -3612,6 +3760,43 @@ bool cui_pointer_position(const cui_context *ui, float *x, float *y) {
     return true;
 }
 
+bool cui_set_text_input_config(cui_context *ui, cui_id owner, cui_text_input_config config) {
+    if (!ui || !ui->in_frame || !owner || !cui_core_mutation(ui) ||
+        config.type < CUI_TEXT_INPUT_TEXT || config.type > CUI_TEXT_INPUT_PASSWORD_VISIBLE ||
+        config.purpose < CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED ||
+        config.purpose > CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD)
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == owner && ui->semantics[i].role == CUI_ROLE_TEXTBOX) {
+            if (ui->semantics[i].details.multiline &&
+                (config.type != CUI_TEXT_INPUT_TEXT ||
+                 config.purpose != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED))
+                return false;
+            ui->semantics[i].details.text_input_configured = true;
+            ui->semantics[i].details.text_input_config = config;
+            ui->semantics[i].details.secret = config.type == CUI_TEXT_INPUT_PASSWORD_HIDDEN ||
+                                              config.purpose != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+            ui->semantics[i].details.password =
+                config.purpose != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+            return true;
+        }
+    return false;
+}
+bool cui_get_text_input_config(const cui_context *ui, cui_text_input_state *out) {
+    if (!ui || !out || ui->in_frame || ui->text_input_exhausted || !ui->text_input_state.owner ||
+        ui->focus != ui->text_input_state.owner)
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++) {
+        const cui_semantic *s = &ui->semantics[i];
+        if (s->id == ui->focus && s->role == CUI_ROLE_TEXTBOX && !s->disabled &&
+            !s->details.readonly && cui_core_focusable(s) &&
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
+            *out = ui->text_input_state;
+            return true;
+        }
+    }
+    return false;
+}
 void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
     if (!cui_core_mutation(ui))
         return;

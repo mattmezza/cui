@@ -18,6 +18,10 @@ typedef enum {
     CUI_CHART_SANKEY
 } cui_chart_kind;
 typedef enum { CUI_CHART_LAYOUT_LEGACY, CUI_CHART_LAYOUT_SOURCE_POINT } cui_chart_layout_mode;
+typedef enum {
+    CUI_CHART_RADAR_TOOLTIP_TITLE_LEGACY,
+    CUI_CHART_RADAR_TOOLTIP_TITLE_SOURCE_LABEL
+} cui_chart_radar_tooltip_title_mode;
 typedef struct {
     cui_str label;
     double value, open, high, low, close;
@@ -245,6 +249,10 @@ typedef struct {
     /* SOURCE_POINT opts Line/Area into the pinned 18px axis gutter and clamps
      * point_count to at least count. Zero retains legacy 20px/error behavior. */
     cui_chart_layout_mode layout_mode;
+    /* SOURCE_LABEL suppresses automatic Radar tooltip titles for paired custom
+     * label callbacks. Explicit tooltip_title/custom content retain precedence.
+     * Zero keeps legacy titles; nonzero is valid only for Radar. */
+    cui_chart_radar_tooltip_title_mode radar_tooltip_title_mode;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */

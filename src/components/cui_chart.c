@@ -167,6 +167,21 @@ static bool cui_chart_sankey_label_lines(const cui_chart_options *o,
     *count = n;
     return true;
 }
+static bool chart_radar_title_valid(const cui_chart_options *o) {
+    return o && o->radar_tooltip_title_mode >= CUI_CHART_RADAR_TOOLTIP_TITLE_LEGACY &&
+           o->radar_tooltip_title_mode <= CUI_CHART_RADAR_TOOLTIP_TITLE_SOURCE_LABEL &&
+           (o->radar_tooltip_title_mode == CUI_CHART_RADAR_TOOLTIP_TITLE_LEGACY ||
+            o->kind == CUI_CHART_RADAR);
+}
+static cui_str chart_tooltip_fallback_title(const cui_chart_options *o,
+                                            const cui_chart_datum *datum) {
+    if (o->kind == CUI_CHART_PIE || (o->kind == CUI_CHART_SANKEY && !o->sankey_show_labels) ||
+        (o->kind == CUI_CHART_RADAR &&
+         o->radar_tooltip_title_mode == CUI_CHART_RADAR_TOOLTIP_TITLE_SOURCE_LABEL &&
+         o->radar_label_measure && o->radar_label_paint))
+        return (cui_str){0};
+    return datum->label;
+}
 static float chart_point_gutter(const cui_chart_options *o) {
     size_t slots;
     float gutter;
@@ -383,7 +398,8 @@ cui_chart_options cui_chart_theme(cui_chart_options o, const cui_theme *theme) {
 }
 cui_plot_result cui_chart_render_animated(cui_context *ui, cui_chart_state *state,
                                           const cui_chart_options *options) {
-    if (!ui || !state || !options || options->layout_mode < CUI_CHART_LAYOUT_LEGACY ||
+    if (!ui || !state || !chart_radar_title_valid(options) ||
+        options->layout_mode < CUI_CHART_LAYOUT_LEGACY ||
         options->layout_mode > CUI_CHART_LAYOUT_SOURCE_POINT ||
         (options->layout_mode == CUI_CHART_LAYOUT_SOURCE_POINT && options->kind != CUI_CHART_LINE &&
          options->kind != CUI_CHART_AREA) ||
@@ -751,11 +767,7 @@ static bool chart_paint_tooltip(const cui_prepaint_info *info, cui_prepaint_writ
     float tooltip_width = 150;
     if (!o->tooltip_content) {
         title = o->tooltip_title ? o->tooltip_title(datum, tooltip_index, o->tooltip_user)
-                                 : datum->label;
-        if (!o->tooltip_title && o->kind == CUI_CHART_PIE)
-            title = (cui_str){0};
-        if (!o->tooltip_title && o->kind == CUI_CHART_SANKEY && !o->sankey_show_labels)
-            title = (cui_str){0};
+                                 : chart_tooltip_fallback_title(o, datum);
         if (title.data && title.length)
             tooltip_width =
                 fmaxf(tooltip_width,
@@ -1095,7 +1107,8 @@ static bool chart_prepaint(const cui_prepaint_info *info, const void *data,
 }
 bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_chart_options *o,
                cui_str name) {
-    if (!ui || !id || !state || !o || o->layout_mode < CUI_CHART_LAYOUT_LEGACY ||
+    if (!ui || !id || !state || !chart_radar_title_valid(o) ||
+        o->layout_mode < CUI_CHART_LAYOUT_LEGACY ||
         o->layout_mode > CUI_CHART_LAYOUT_SOURCE_POINT ||
         (o->layout_mode == CUI_CHART_LAYOUT_SOURCE_POINT && o->kind != CUI_CHART_LINE &&
          o->kind != CUI_CHART_AREA) ||
@@ -1773,11 +1786,7 @@ bool cui_chart(cui_context *ui, cui_id id, cui_chart_state *state, const cui_cha
         float tooltip_width = 150;
         if (!o->tooltip_content) {
             title = o->tooltip_title ? o->tooltip_title(datum, tooltip_index, o->tooltip_user)
-                                     : datum->label;
-            if (!o->tooltip_title && o->kind == CUI_CHART_PIE)
-                title = (cui_str){0};
-            if (!o->tooltip_title && o->kind == CUI_CHART_SANKEY && !o->sankey_show_labels)
-                title = (cui_str){0};
+                                     : chart_tooltip_fallback_title(o, datum);
             if (title.data && title.length)
                 tooltip_width =
                     fmaxf(tooltip_width,

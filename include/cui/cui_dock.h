@@ -368,6 +368,38 @@ cui_dock_view_result cui_dock_view_render(cui_context *, cui_id view_id, const c
                                           size_t panel_count, cui_dock_view_options);
 /* Independently retained edge docks around an ordinary center model/view. */
 typedef enum { CUI_DOCK_CENTER, CUI_DOCK_LEFT, CUI_DOCK_RIGHT, CUI_DOCK_BOTTOM } cui_dock_region;
+typedef struct {
+    cui_dock_schema_node panel;
+    cui_dock_region placement;
+    double size;
+    bool open;
+} cui_dock_schema_edge;
+typedef struct {
+    bool has_version;
+    size_t version;
+    cui_dock_schema_node center;
+    bool edge_present[3]; /* Optional left_dock, right_dock, bottom_dock fields. */
+    cui_dock_schema_edge edges[3];
+} cui_dock_schema_area;
+typedef struct {
+    cui_dock_schema_node *nodes;
+    size_t node_capacity;
+    double *sizes;
+    size_t size_capacity, node_count, size_count;
+} cui_dock_schema_buffer;
+cui_dock_schema_area cui_dock_schema_area_default(void);
+/* All four model pointers must be distinct/non-null. Missing edges are cleared.
+ * Center is pinned; edges are unconstrained. Pure callbacks run before publication. */
+cui_dock_result cui_dock_schema_area_import_models(cui_dock *const models[4],
+                                                   const cui_dock_schema_area *,
+                                                   cui_dock_schema_key_fn, void *);
+/* metadata supplies version/presence/placement/size/open, not panel trees.
+ * All buffer writes and output publication are atomic; counts publish on valid query. */
+cui_dock_result cui_dock_schema_area_export_models(const cui_dock *const models[4],
+                                                   const cui_dock_schema_area *metadata,
+                                                   cui_dock_schema_dump_fn, void *,
+                                                   cui_dock_schema_buffer buffers[4],
+                                                   cui_dock_schema_area *output);
 typedef struct cui_dock_workspace cui_dock_workspace;
 typedef struct {
     cui_dock *model;
@@ -415,6 +447,18 @@ bool cui_dock_workspace_set_edge(cui_dock_workspace *, cui_dock_region, bool ope
 bool cui_dock_workspace_set_collapsible(cui_dock_workspace *, cui_dock_region, bool collapsible);
 bool cui_dock_workspace_save(const cui_dock_workspace *, cui_dock_workspace_snapshot *);
 bool cui_dock_workspace_restore(cui_dock_workspace *, const cui_dock_workspace_snapshot *);
+/* Version/presence belong to typed area persistence, separate from legacy snapshots. */
+void cui_dock_workspace_set_version(cui_dock_workspace *, bool has_version, size_t version);
+bool cui_dock_workspace_version(const cui_dock_workspace *, size_t *version);
+cui_dock_result cui_dock_workspace_schema_import(cui_dock_workspace *,
+                                                 const cui_dock_region_content regions[4],
+                                                 const cui_dock_schema_area *,
+                                                 cui_dock_schema_key_fn, void *);
+cui_dock_result cui_dock_workspace_schema_export(const cui_dock_workspace *,
+                                                 const cui_dock_region_content regions[4],
+                                                 cui_dock_schema_dump_fn, void *,
+                                                 cui_dock_schema_buffer buffers[4],
+                                                 cui_dock_schema_area *output);
 cui_id cui_dock_region_id(cui_id workspace, cui_dock_region);
 cui_id cui_dock_edge_resize_id(cui_id workspace, cui_dock_region);
 /* regions are CENTER, LEFT, RIGHT, BOTTOM; configured regions require distinct models/views.

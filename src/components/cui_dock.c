@@ -1467,6 +1467,8 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
 
 struct cui_dock_workspace {
     cui_dock_workspace_snapshot snapshot;
+    bool schema_present[3], has_version;
+    size_t version;
     cui_resizable_state resize[3];
     cui_resizable_slot slots[3][2];
     cui_id id;
@@ -1499,6 +1501,7 @@ bool cui_dock_workspace_set_edge(cui_dock_workspace *state, cui_dock_region edge
         return false;
     if (edge == CUI_DOCK_BOTTOM)
         state->bottom_gesture = false;
+    state->schema_present[edge - 1] = true;
     state->snapshot.open[edge - 1] = open;
     state->snapshot.size[edge - 1] = size;
     cui_resizable_clear(&state->resize[edge - 1]);
@@ -1528,12 +1531,96 @@ bool cui_dock_workspace_restore(cui_dock_workspace *state,
         if (!isfinite(saved->size[i]) || saved->size[i] <= 0)
             return false;
     state->snapshot = *saved;
+    for (size_t i = 0; i < 3; i++)
+        state->schema_present[i] |= saved->open[i];
     state->bottom_gesture = false;
     state->dragging = false;
     state->pending_focus = false;
     for (size_t i = 0; i < 3; ++i)
         cui_resizable_clear(&state->resize[i]);
     return true;
+}
+/* Internal base transaction adds renderer-capacity preflight before publication. */
+extern cui_dock_result cui_dock_private_schema_area_import_models(cui_dock *const models[4],
+                                                                  const cui_dock_schema_area *,
+                                                                  cui_dock_schema_key_fn, void *,
+                                                                  const size_t node_limits[4],
+                                                                  const size_t panel_limits[4]);
+void cui_dock_workspace_set_version(cui_dock_workspace *state, bool has_version, size_t version) {
+    if (state) {
+        state->has_version = has_version;
+        state->version = version;
+    }
+}
+bool cui_dock_workspace_version(const cui_dock_workspace *state, size_t *version) {
+    if (!state || !state->has_version)
+        return false;
+    if (version)
+        *version = state->version;
+    return true;
+}
+cui_dock_result cui_dock_workspace_schema_import(cui_dock_workspace *state,
+                                                 const cui_dock_region_content regions[4],
+                                                 const cui_dock_schema_area *area,
+                                                 cui_dock_schema_key_fn key, void *user) {
+    if (!state || !regions || !area)
+        return CUI_DOCK_INVALID;
+    cui_dock_workspace_snapshot snapshot = {.size = {200, 200, 160}};
+    bool present[3] = {false};
+    for (size_t i = 0; i < 3; i++) {
+        if (!area->edge_present[i])
+            continue;
+        const cui_dock_schema_edge *edge = &area->edges[i];
+        if (edge->placement < CUI_DOCK_LEFT || edge->placement > CUI_DOCK_BOTTOM ||
+            !isfinite(edge->size) || edge->size <= 0 || edge->size > 1e9)
+            return CUI_DOCK_INVALID;
+        size_t target = (size_t)edge->placement - 1;
+        snapshot.open[target] = edge->open;
+        snapshot.size[target] = (float)edge->size;
+        present[target] = true;
+    }
+    cui_dock *models[4];
+    size_t node_limits[4], panel_limits[4];
+    for (size_t i = 0; i < 4; i++) {
+        models[i] = regions[i].model;
+        node_limits[i] = regions[i].view ? regions[i].view->node_capacity : SIZE_MAX;
+        panel_limits[i] = regions[i].view ? regions[i].view->panel_capacity : SIZE_MAX;
+        if (regions[i].view)
+            for (size_t j = 0; j < i; j++)
+                if (regions[i].view == regions[j].view)
+                    return CUI_DOCK_INVALID;
+    }
+    cui_dock_result result = cui_dock_private_schema_area_import_models(models, area, key, user,
+                                                                        node_limits, panel_limits);
+    if (result != CUI_DOCK_OK)
+        return result;
+    cui_dock_workspace_restore(state, &snapshot);
+    memcpy(state->schema_present, present, sizeof present);
+    state->has_version = area->has_version;
+    state->version = area->version;
+    for (size_t i = 0; i < 4; i++)
+        if (regions[i].view)
+            cui_dock_view_reset(regions[i].view);
+    return CUI_DOCK_OK;
+}
+cui_dock_result cui_dock_workspace_schema_export(const cui_dock_workspace *state,
+                                                 const cui_dock_region_content regions[4],
+                                                 cui_dock_schema_dump_fn dump, void *user,
+                                                 cui_dock_schema_buffer buffers[4],
+                                                 cui_dock_schema_area *output) {
+    if (!state || !regions)
+        return CUI_DOCK_INVALID;
+    const cui_dock *models[4];
+    cui_dock_schema_area metadata = {.has_version = state->has_version, .version = state->version};
+    for (size_t i = 0; i < 4; i++)
+        models[i] = regions[i].model;
+    for (size_t i = 0; i < 3; i++) {
+        metadata.edge_present[i] = state->schema_present[i];
+        metadata.edges[i] = (cui_dock_schema_edge){.placement = (cui_dock_region)(i + 1),
+                                                   .size = state->snapshot.size[i],
+                                                   .open = state->snapshot.open[i]};
+    }
+    return cui_dock_schema_area_export_models(models, &metadata, dump, user, buffers, output);
 }
 cui_id cui_dock_region_id(cui_id workspace, cui_dock_region region) {
     if (region < CUI_DOCK_CENTER || region > CUI_DOCK_BOTTOM)
@@ -2072,6 +2159,7 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
             s->state->bottom_gesture = false;
         }
         if (open != s->state->snapshot.open[2]) {
+            s->state->schema_present[2] = true;
             s->state->snapshot.open[2] = open;
             s->result.opened |= open;
             cui_invalidate(s->ui);
@@ -2185,6 +2273,7 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                     dock_panel_visible(options.view, regions[3].model, panel->key) &&
                     cui_event_target(ui, e) == tab &&
                     cui_dock_panel_find(regions[3].model, panel->key, NULL, NULL)) {
+                    state->schema_present[2] = true;
                     state->snapshot.open[2] = true;
                     cui_resizable_clear(&state->resize[2]);
                     scene.result.opened = true;
@@ -2263,7 +2352,8 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
                 scene.result.destination_region = request->destination_region;
                 request->destination = destination;
                 if (request->opens_edge)
-                    state->snapshot.open[request->destination_region - 1] = true;
+                    state->schema_present[request->destination_region - 1] = true;
+                state->snapshot.open[request->destination_region - 1] = true;
                 state->pending_focus = true;
                 state->focus_region = request->destination_region;
                 state->focus_key = request->panel;

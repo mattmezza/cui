@@ -1919,3 +1919,220 @@ cui_dock_result cui_dock_schema_export(const cui_dock *model, cui_dock_schema_du
     free(writer.sizes);
     return writer.error;
 }
+
+cui_dock_schema_area cui_dock_schema_area_default(void) {
+    return (cui_dock_schema_area){
+        .center = {.kind = CUI_DOCK_SCHEMA_PANEL, .payload = {"null", 4}}};
+}
+static cui_dock_result cui_dock_private_area_routes(const cui_dock_schema_area *area,
+                                                    const cui_dock_schema_node *nodes[4],
+                                                    const cui_dock_schema_edge *edges[3]) {
+    if (!area)
+        return CUI_DOCK_INVALID;
+    nodes[0] = &area->center;
+    for (size_t i = 0; i < 3; i++) {
+        nodes[i + 1] = NULL;
+        edges[i] = NULL;
+    }
+    for (size_t i = 0; i < 3; i++) {
+        if (!area->edge_present[i])
+            continue;
+        const cui_dock_schema_edge *edge = &area->edges[i];
+        if (edge->placement < CUI_DOCK_LEFT || edge->placement > CUI_DOCK_BOTTOM ||
+            !isfinite(edge->size) || edge->size <= 0 || edge->size > CUI_DOCK_PRIVATE_MAX_DIMENSION)
+            return CUI_DOCK_INVALID;
+        size_t index = (size_t)edge->placement;
+        nodes[index] = &edge->panel;
+        edges[index - 1] = edge;
+    }
+    return CUI_DOCK_OK;
+}
+static bool cui_dock_private_area_distinct(const cui_dock *const models[4]) {
+    if (!models)
+        return false;
+    for (size_t i = 0; i < 4; i++) {
+        if (!models[i])
+            return false;
+        for (size_t j = 0; j < i; j++)
+            if (models[i] == models[j])
+                return false;
+    }
+    return true;
+}
+static cui_dock_result cui_dock_private_area_keys(const cui_dock *const models[4],
+                                                  const bool present[4]) {
+    for (size_t i = 0; i < 4; i++) {
+        if (!present[i])
+            continue;
+        for (size_t p = 0; p < models[i]->config.panel_capacity; p++) {
+            if (!models[i]->state.panels[p].used)
+                continue;
+            for (size_t j = 0; j < i; j++)
+                if (present[j] &&
+                    cui_dock_private_find_panel(models[j], &models[j]->state,
+                                                models[i]->state.panels[p].key) != SIZE_MAX)
+                    return CUI_DOCK_DUPLICATE_PANEL;
+        }
+    }
+    return CUI_DOCK_OK;
+}
+cui_dock_result cui_dock_private_schema_area_import_models(cui_dock *const models[4],
+                                                           const cui_dock_schema_area *area,
+                                                           cui_dock_schema_key_fn key, void *user,
+                                                           const size_t node_limits[4],
+                                                           const size_t panel_limits[4]) {
+    if (!cui_dock_private_area_distinct((const cui_dock *const *)models))
+        return CUI_DOCK_INVALID;
+    const cui_dock_schema_node *nodes[4];
+    const cui_dock_schema_edge *edges[3];
+    cui_dock_result result = cui_dock_private_area_routes(area, nodes, edges);
+    if (result != CUI_DOCK_OK)
+        return result;
+    cui_dock *staged[4] = {0};
+    bool present[4] = {true, true, true, true};
+    for (size_t i = 0; i < 4; i++) {
+        staged[i] = cui_dock_create_with_root(models[i]->config,
+                                              i ? CUI_DOCK_ROOT_ANY : CUI_DOCK_ROOT_SPLIT);
+        if (!staged[i]) {
+            result = CUI_DOCK_CAPACITY;
+            break;
+        }
+        staged[i]->generation = models[i]->generation;
+        if (nodes[i]) {
+            result = cui_dock_schema_import(staged[i], nodes[i], key, user);
+            if (result != CUI_DOCK_OK)
+                break;
+        } else {
+            if (staged[i]->generation == UINT32_MAX) {
+                result = CUI_DOCK_CAPACITY;
+                break;
+            }
+            staged[i]->state.nodes[staged[i]->state.root].generation = ++staged[i]->generation;
+        }
+    }
+    if (result == CUI_DOCK_OK && node_limits && panel_limits)
+        for (size_t i = 0; i < 4; i++) {
+            size_t nodes_used = 0, panels_used = 0;
+            for (size_t n = 0; n < staged[i]->config.node_capacity; n++)
+                nodes_used += staged[i]->state.nodes[n].used;
+            for (size_t p = 0; p < staged[i]->config.panel_capacity; p++)
+                panels_used += staged[i]->state.panels[p].used;
+            if (nodes_used > node_limits[i] || panels_used > panel_limits[i]) {
+                result = CUI_DOCK_CAPACITY;
+                break;
+            }
+        }
+    if (result == CUI_DOCK_OK)
+        result = cui_dock_private_area_keys((const cui_dock *const *)staged, present);
+    if (result == CUI_DOCK_OK)
+        for (size_t i = 0; i < 4; i++) {
+            cui_dock_private_state old = models[i]->state;
+            models[i]->state = staged[i]->state;
+            staged[i]->state = old;
+            models[i]->generation = staged[i]->generation;
+            models[i]->nary_edits = true;
+        }
+    for (size_t i = 0; i < 4; i++)
+        cui_dock_destroy(staged[i]);
+    return result;
+}
+cui_dock_result cui_dock_schema_area_import_models(cui_dock *const models[4],
+                                                   const cui_dock_schema_area *area,
+                                                   cui_dock_schema_key_fn key, void *user) {
+    return cui_dock_private_schema_area_import_models(models, area, key, user, NULL, NULL);
+}
+cui_dock_result cui_dock_schema_area_export_models(const cui_dock *const models[4],
+                                                   const cui_dock_schema_area *metadata,
+                                                   cui_dock_schema_dump_fn dump, void *user,
+                                                   cui_dock_schema_buffer buffers[4],
+                                                   cui_dock_schema_area *output) {
+    if (!cui_dock_private_area_distinct(models) || !metadata || !buffers || !output)
+        return CUI_DOCK_INVALID;
+    const cui_dock_schema_node *ignored[4];
+    const cui_dock_schema_edge *edges[3];
+    cui_dock_result result = cui_dock_private_area_routes(metadata, ignored, edges);
+    if (result != CUI_DOCK_OK)
+        return result;
+    bool present[4] = {true, edges[0] != NULL, edges[1] != NULL, edges[2] != NULL};
+    result = cui_dock_private_area_keys(models, present);
+    if (result != CUI_DOCK_OK)
+        return result;
+    cui_dock_schema_buffer staged[4] = {0};
+    bool query = buffers[0].nodes == NULL;
+    for (size_t i = 0; i < 4 && result == CUI_DOCK_OK; i++) {
+        if (!present[i])
+            continue;
+        if ((buffers[i].nodes == NULL) != query) {
+            result = CUI_DOCK_INVALID;
+            break;
+        }
+        staged[i].node_capacity =
+            models[i]->config.node_capacity + models[i]->config.panel_capacity;
+        staged[i].size_capacity = models[i]->config.node_capacity;
+        staged[i].nodes = calloc(staged[i].node_capacity, sizeof(*staged[i].nodes));
+        staged[i].sizes = calloc(staged[i].size_capacity, sizeof(*staged[i].sizes));
+        if (!staged[i].nodes || !staged[i].sizes) {
+            result = CUI_DOCK_CAPACITY;
+            break;
+        }
+        result = cui_dock_schema_export(
+            models[i], dump, user, staged[i].nodes, staged[i].node_capacity, staged[i].sizes,
+            staged[i].size_capacity, &staged[i].node_count, &staged[i].size_count);
+    }
+    bool short_output = false;
+    if (result == CUI_DOCK_OK) {
+        for (size_t i = 0; i < 4; i++) {
+            buffers[i].node_count = staged[i].node_count;
+            buffers[i].size_count = staged[i].size_count;
+            if (present[i] && !query &&
+                (buffers[i].node_capacity < staged[i].node_count ||
+                 buffers[i].size_capacity < staged[i].size_count ||
+                 (staged[i].size_count && !buffers[i].sizes)))
+                short_output = true;
+        }
+        if (short_output)
+            result = CUI_DOCK_CAPACITY;
+        else if (!query) {
+            cui_dock_schema_area value = {.has_version = metadata->has_version,
+                                          .version = metadata->version};
+            for (size_t i = 0; i < 4; i++) {
+                if (!present[i])
+                    continue;
+                uintptr_t start = (uintptr_t)staged[i].nodes;
+                uintptr_t end = start + staged[i].node_count * sizeof(*staged[i].nodes);
+                for (size_t j = 0; j < staged[i].node_count; j++) {
+                    cui_dock_schema_node node = staged[i].nodes[j];
+                    uintptr_t pointer = (uintptr_t)node.children;
+                    if (pointer >= start && pointer < end)
+                        node.children =
+                            &buffers[i].nodes[(pointer - start) / sizeof(*staged[i].nodes)];
+                    start = (uintptr_t)staged[i].sizes;
+                    end = start + staged[i].size_count * sizeof(*staged[i].sizes);
+                    pointer = (uintptr_t)node.sizes;
+                    if (pointer >= start && pointer < end)
+                        node.sizes =
+                            &buffers[i].sizes[(pointer - start) / sizeof(*staged[i].sizes)];
+                    buffers[i].nodes[j] = node;
+                    start = (uintptr_t)staged[i].nodes;
+                    end = start + staged[i].node_count * sizeof(*staged[i].nodes);
+                }
+                if (staged[i].size_count)
+                    memcpy(buffers[i].sizes, staged[i].sizes,
+                           staged[i].size_count * sizeof(*buffers[i].sizes));
+                if (!i)
+                    value.center = buffers[i].nodes[0];
+                else {
+                    value.edge_present[i - 1] = true;
+                    value.edges[i - 1] = *edges[i - 1];
+                    value.edges[i - 1].panel = buffers[i].nodes[0];
+                }
+            }
+            *output = value;
+        }
+    }
+    for (size_t i = 0; i < 4; i++) {
+        free(staged[i].nodes);
+        free(staged[i].sizes);
+    }
+    return result;
+}

@@ -1215,6 +1215,121 @@ static bool scene_schema_dump(void *user, uint64_t key, cui_dock_schema_node *ou
     *out = ((cui_dock_schema_node *)user)[key];
     return true;
 }
+static bool area_scene_key(void *user, const cui_dock_schema_node *state, uint64_t *key) {
+    (void)user;
+    if (state->payload.length != 1 || state->payload.data[0] < '0' || state->payload.data[0] > '3')
+        return false;
+    *key = (uint64_t)(state->payload.data[0] - '0');
+    return true;
+}
+static bool area_scene_dump(void *user, uint64_t key, cui_dock_schema_node *out) {
+    if (key > 3)
+        return false;
+    *out = ((cui_dock_schema_node *)user)[key];
+    return true;
+}
+static void test_area_schema_scene(void) {
+    cui_dock_schema_node leaves[4];
+    const char *keys[] = {"0", "1", "2", "3"};
+    bool disabled[4];
+    edges = cui_dock_workspace_create();
+    edge_options = (cui_dock_workspace_options){.view = cui_dock_view_options_default()};
+    edge_options.view.width = 640;
+    edge_options.view.height = 480;
+    edge_options.view.reduced_motion = true;
+    for (size_t i = 0; i < 4; i++) {
+        leaves[i] = (cui_dock_schema_node){.kind = CUI_DOCK_SCHEMA_PANEL,
+                                           .panel_name = {"UnknownHostPanel", 16},
+                                           .payload = {keys[i], 1}};
+        disabled[i] = panels[i].disabled;
+        panels[i].disabled = false;
+        regions[i] = (cui_dock_region_content){.model = cui_dock_create((cui_dock_config){0}),
+                                               .view = cui_dock_view_create(0, 0),
+                                               .panels = panels,
+                                               .panel_count = 5};
+        assert(regions[i].model && regions[i].view);
+    }
+    assert(edges);
+    cui_dock_schema_area area = {.center = leaves[0],
+                                 .edge_present = {true, true, true},
+                                 .has_version = true,
+                                 .version = 17};
+    const double sizes[] = {120, 140, 100};
+    for (size_t i = 0; i < 3; i++)
+        area.edges[i] =
+            (cui_dock_schema_edge){leaves[i + 1], (cui_dock_region)(i + 1), sizes[i], true};
+    assert(cui_dock_workspace_schema_import(edges, regions, &area, area_scene_key, NULL) ==
+           CUI_DOCK_OK);
+    size_t version = 999;
+    assert(cui_dock_workspace_version(edges, &version) && version == 17);
+    edge_frame();
+    edge_frame();
+    assert(cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT)).w == 120 &&
+           cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_RIGHT)).w == 140 &&
+           cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_BOTTOM)).h == 100);
+    assert(cui_dock_view_set_zoom(regions[0].view, regions[0].model, 0, true));
+    cui_dock_workspace_snapshot before, after;
+    assert(cui_dock_workspace_save(edges, &before));
+    char snapshots[4][2048], current[2048];
+    size_t length;
+    for (size_t i = 0; i < 4; i++)
+        assert(cui_dock_serialize(regions[i].model, snapshots[i], sizeof snapshots[i], &length) ==
+               CUI_DOCK_OK);
+    area.version = 99;
+    area.edges[2].size = NAN;
+    assert(cui_dock_workspace_schema_import(edges, regions, &area, area_scene_key, NULL) ==
+           CUI_DOCK_INVALID);
+    area.edges[2].size = 100;
+    cui_dock_view *large = regions[0].view;
+    regions[0].view = cui_dock_view_create(1, 1);
+    assert(cui_dock_workspace_schema_import(edges, regions, &area, area_scene_key, NULL) ==
+           CUI_DOCK_CAPACITY);
+    cui_dock_view_destroy(regions[0].view);
+    regions[0].view = large;
+    assert(cui_dock_workspace_save(edges, &after) && !memcmp(&before, &after, sizeof before));
+    assert(cui_dock_workspace_version(edges, &version) && version == 17 &&
+           cui_dock_view_zoomed(large, NULL));
+    for (size_t i = 0; i < 4; i++) {
+        assert(cui_dock_serialize(regions[i].model, current, sizeof current, &length) ==
+               CUI_DOCK_OK);
+        assert(!strcmp(current, snapshots[i]));
+    }
+    cui_dock_schema_node exported_nodes[4][8];
+    double exported_sizes[4][8];
+    cui_dock_schema_buffer buffers[4];
+    cui_dock_schema_area exported;
+    for (size_t i = 0; i < 4; i++)
+        buffers[i] = (cui_dock_schema_buffer){exported_nodes[i], 8, exported_sizes[i], 8, 0, 0};
+    assert(cui_dock_workspace_set_edge(edges, CUI_DOCK_BOTTOM, false, 100));
+    assert(cui_dock_workspace_schema_export(edges, regions, area_scene_dump, leaves, buffers,
+                                            &exported) == CUI_DOCK_OK);
+    assert(exported.has_version && exported.version == 17 && exported.edge_present[2] &&
+           !exported.edges[2].open);
+    area.has_version = false;
+    area.edge_present[1] = false;
+    assert(cui_dock_workspace_set_collapsible(edges, CUI_DOCK_LEFT, false));
+    assert(cui_dock_workspace_schema_import(edges, regions, &area, area_scene_key, NULL) ==
+           CUI_DOCK_OK);
+    assert(!cui_dock_workspace_version(edges, &version) && version == 17 &&
+           !cui_dock_view_zoomed(large, NULL));
+    assert(cui_dock_workspace_save(edges, &after) && !after.noncollapsible[0]);
+    unsigned right_before = rendered[2];
+    edge_frame();
+    edge_frame();
+    assert(cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_RIGHT)).w == 0 &&
+           rendered[2] == right_before);
+    assert(cui_dock_workspace_schema_export(edges, regions, area_scene_dump, leaves, buffers,
+                                            &exported) == CUI_DOCK_OK &&
+           !exported.edge_present[1]);
+    cui_dock_workspace_set_version(edges, true, 0);
+    assert(cui_dock_workspace_version(edges, &version) && version == 0);
+    for (size_t i = 0; i < 4; i++) {
+        cui_dock_view_destroy(regions[i].view);
+        cui_dock_destroy(regions[i].model);
+        panels[i].disabled = disabled[i];
+    }
+    cui_dock_workspace_destroy(edges);
+}
 static void test_schema_scene(void) {
     cui_dock_schema_node leaves[] = {
         {.kind = CUI_DOCK_SCHEMA_PANEL, .panel_name = {"Editor", 6}, .payload = {"0", 1}},
@@ -2424,6 +2539,7 @@ int main(void) {
     test_title_palette();
     test_pinned_root_scene();
     test_schema_scene();
+    test_area_schema_scene();
     test_group_constraints();
     test_workspace_constraints();
     test_dynamic_visibility();

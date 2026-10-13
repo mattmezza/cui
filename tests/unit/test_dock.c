@@ -583,6 +583,7 @@ typedef struct {
     const cui_dock_schema_node *leaves[32];
     size_t count;
     bool reject, duplicate;
+    uint64_t reject_key;
 } schema_source;
 static bool schema_key(void *user, const cui_dock_schema_node *state, uint64_t *key) {
     schema_source *source = user;
@@ -591,13 +592,13 @@ static bool schema_key(void *user, const cui_dock_schema_node *state, uint64_t *
     for (size_t i = 0; i < source->count; i++)
         if (source->leaves[i] == state) {
             *key = source->duplicate ? 1 : i + 1;
-            return true;
+            return !source->reject_key || *key != source->reject_key;
         }
     return false;
 }
 static bool schema_dump(void *user, uint64_t key, cui_dock_schema_node *out) {
     schema_source *source = user;
-    if (source->reject || !key || key > source->count)
+    if (source->reject || key == source->reject_key || !key || key > source->count)
         return false;
     *out = *source->leaves[key - 1];
     return true;
@@ -771,6 +772,149 @@ static void test_schema_conversion(void) {
     assert(cui_dock_schema_import(restored, &outer, schema_key, &source) == CUI_DOCK_CAPACITY);
     serialize(restored, after, sizeof after);
     assert(!strcmp(before, after));
+    /* Complete shipped outer envelope: optional version absent; all three docks. */
+    leaves[0].panel_name = (cui_str){"StoryContainer", 14};
+    leaves[0].children = NULL;
+    leaves[0].child_count = 0;
+    state.axis = 1;
+    state.child_count = 2;
+    state.size_count = 2;
+    input_sizes[0] = 704;
+    const char *edge_payloads[] = {
+        "{\"story_klass\":\"ListStory\"}", "{\"story_klass\":\"ImageStory\"}",
+        "{\"story_klass\":\"TextStory\"}", "{\"story_klass\":\"IconStory\"}"};
+    cui_dock_schema_node edge_leaves[4];
+    for (size_t i = 0; i < 4; i++) {
+        edge_leaves[i] = (cui_dock_schema_node){.kind = CUI_DOCK_SCHEMA_PANEL,
+                                                .panel_name = {"StoryContainer", 14},
+                                                .payload = dock_test_string(edge_payloads[i])};
+        source.leaves[source.count++] = &edge_leaves[i];
+    }
+    cui_dock_schema_area area = {.center = state, .edge_present = {true, true, true}};
+    const double edge_sizes[] = {350, 320, 200};
+    for (size_t i = 0; i < 3; i++)
+        area.edges[i] = (cui_dock_schema_edge){.placement = (cui_dock_region)(i + 1),
+                                               .size = edge_sizes[i],
+                                               .open = true,
+                                               .panel = {.panel_name = {"TabPanel", 8},
+                                                         .kind = CUI_DOCK_SCHEMA_TABS,
+                                                         .children = &edge_leaves[i],
+                                                         .child_count = i == 2 ? 2 : 1}};
+    cui_dock_schema_area defaults = cui_dock_schema_area_default();
+    assert(!defaults.has_version && !defaults.edge_present[0] &&
+           defaults.center.kind == CUI_DOCK_SCHEMA_PANEL && defaults.center.payload.length == 4);
+    cui_dock *models[4];
+    for (size_t i = 0; i < 4; i++) {
+        models[i] = make();
+        assert(cui_dock_insert(models[i], cui_dock_root(models[i]), 100 + i, 0) == CUI_DOCK_OK);
+    }
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) == CUI_DOCK_OK);
+    const cui_dock *readonly[4] = {models[0], models[1], models[2], models[3]};
+    assert(cui_dock_root_policy(models[0]) == CUI_DOCK_ROOT_SPLIT &&
+           cui_dock_root_policy(models[1]) == CUI_DOCK_ROOT_ANY);
+    cui_dock_schema_node area_nodes[4][64], old_nodes[4][64];
+    double area_sizes[4][32], old_area_sizes[4][32];
+    cui_dock_schema_buffer buffers[4] = {0};
+    cui_dock_schema_area exported_area, old_area;
+    memset(&exported_area, 0x5a, sizeof exported_area);
+    memcpy(&old_area, &exported_area, sizeof old_area);
+    assert(cui_dock_schema_area_export_models(readonly, &area, schema_dump, &source, buffers,
+                                              &exported_area) == CUI_DOCK_OK);
+    assert(buffers[0].node_count == 19 && buffers[1].node_count == 2 &&
+           buffers[2].node_count == 2 && buffers[3].node_count == 3);
+    assert(!memcmp(&exported_area, &old_area, sizeof old_area));
+    memset(area_nodes, 0x5a, sizeof area_nodes);
+    memcpy(old_nodes, area_nodes, sizeof old_nodes);
+    memset(area_sizes, 0x4a, sizeof area_sizes);
+    memcpy(old_area_sizes, area_sizes, sizeof old_area_sizes);
+    for (size_t i = 0; i < 4; i++)
+        buffers[i] = (cui_dock_schema_buffer){area_nodes[i], 64, area_sizes[i], 32, 0, 0};
+    buffers[3].node_capacity = 1;
+    assert(cui_dock_schema_area_export_models(readonly, &area, schema_dump, &source, buffers,
+                                              &exported_area) == CUI_DOCK_CAPACITY);
+    assert(!memcmp(area_nodes, old_nodes, sizeof old_nodes) &&
+           !memcmp(area_sizes, old_area_sizes, sizeof old_area_sizes) &&
+           !memcmp(&exported_area, &old_area, sizeof old_area));
+    buffers[3].node_capacity = 64;
+    source.reject_key = 20;
+    assert(cui_dock_schema_area_export_models(readonly, &area, schema_dump, &source, buffers,
+                                              &exported_area) == CUI_DOCK_INVALID);
+    assert(!memcmp(area_nodes, old_nodes, sizeof old_nodes) &&
+           !memcmp(&exported_area, &old_area, sizeof old_area));
+    source.reject_key = 0;
+    assert(cui_dock_schema_area_export_models(readonly, &area, schema_dump, &source, buffers,
+                                              &exported_area) == CUI_DOCK_OK);
+    assert(!exported_area.has_version && exported_area.edges[0].size == 350 &&
+           exported_area.edges[1].size == 320 && exported_area.edges[2].size == 200);
+    assert(exported_area.center.children == &area_nodes[0][1] &&
+           exported_area.edges[2].panel.children == &area_nodes[3][1]);
+    schema_source area_exported = {0};
+    for (size_t i = 0; i < 16; i++)
+        area_exported.leaves[area_exported.count++] = &area_nodes[0][3 + i];
+    area_exported.leaves[area_exported.count++] = &area_nodes[1][1];
+    area_exported.leaves[area_exported.count++] = &area_nodes[2][1];
+    area_exported.leaves[area_exported.count++] = &area_nodes[3][1];
+    area_exported.leaves[area_exported.count++] = &area_nodes[3][2];
+    char snapshots[4][8192];
+    for (size_t i = 0; i < 4; i++)
+        serialize(models[i], snapshots[i], sizeof snapshots[i]);
+    assert(cui_dock_schema_area_import_models(models, &exported_area, schema_key, &area_exported) ==
+           CUI_DOCK_OK);
+    for (size_t i = 0; i < 4; i++) {
+        serialize(models[i], after, sizeof after);
+        assert(!strcmp(after, snapshots[i]));
+    }
+    source.reject_key = 20;
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) ==
+           CUI_DOCK_INVALID);
+    source.reject_key = 0;
+    for (size_t i = 0; i < 4; i++)
+        serialize(models[i], snapshots[i], sizeof snapshots[i]);
+    const cui_dock_schema_node *old_children = area.edges[0].panel.children;
+    area.edges[0].panel.children = &leaves[0];
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) ==
+           CUI_DOCK_DUPLICATE_PANEL);
+    area.edges[0].panel.children = old_children;
+    area.edges[2].size = NAN;
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) ==
+           CUI_DOCK_INVALID);
+    area.edges[2].size = 200;
+    area.edges[2].placement = CUI_DOCK_CENTER;
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) ==
+           CUI_DOCK_INVALID);
+    area.edges[2].placement = CUI_DOCK_BOTTOM;
+    for (size_t i = 0; i < 4; i++) {
+        serialize(models[i], after, sizeof after);
+        assert(!strcmp(after, snapshots[i]));
+    }
+    cui_dock *old_bottom = models[3];
+    models[3] = small;
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) ==
+           CUI_DOCK_CAPACITY);
+    models[3] = old_bottom;
+    for (size_t i = 0; i < 4; i++) {
+        serialize(models[i], after, sizeof after);
+        assert(!strcmp(after, snapshots[i]));
+    }
+    /* Source placement routing and later-field overwrite, not field-name routing. */
+    area.edges[0].placement = CUI_DOCK_RIGHT;
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) == CUI_DOCK_OK);
+    assert(!cui_dock_panel_find(models[1], 17, NULL, NULL) &&
+           cui_dock_panel_find(models[2], 18, NULL, NULL));
+    assert(cui_dock_node_get(models[1], cui_dock_root(models[1]), &info) && !info.child_count);
+    /* Absent edges ignore invalid unused descriptors and clear former contents. */
+    area.edge_present[0] = area.edge_present[1] = area.edge_present[2] = false;
+    area.edges[0].size = NAN;
+    area.has_version = true;
+    area.version = 17;
+    assert(cui_dock_schema_area_import_models(models, &area, schema_key, &source) == CUI_DOCK_OK);
+    assert(cui_dock_schema_area_export_models(readonly, &area, schema_dump, &source, buffers,
+                                              &exported_area) == CUI_DOCK_OK);
+    assert(exported_area.has_version && exported_area.version == 17 &&
+           !exported_area.edge_present[0] && !exported_area.edge_present[1] &&
+           !exported_area.edge_present[2]);
+    for (size_t i = 0; i < 4; i++)
+        cui_dock_destroy(models[i]);
     cui_dock_destroy(small);
     cui_dock_destroy(restored);
     cui_dock_destroy(d);

@@ -41,6 +41,9 @@ typedef struct {
     double last_value;
     bool initialized, was_focused, invalid;
     float scroll_x;
+    cui_edit_composition *composition; /* Optional caller session; borrowed during use. */
+    bool composition_stale; /* Internal cancellation guard until the next preedit update. */
+    bool composition_owned; /* Internal default UI resource; leave false for caller storage. */
 } cui_number_state;
 typedef struct {
     bool changed, submitted, invalid;
@@ -295,7 +298,8 @@ static bool cui_numeric_prefix(const char *s, size_t n, bool exponent) {
     }
     return i == n;
 }
-static cui_edit_result cui_numeric_insert(cui_edit *edit, cui_str text, bool exponent) {
+static cui_edit_result cui_numeric_insert(cui_edit *edit, cui_str text, bool exponent,
+                                          cui_edit_composition *composition) {
     char normalized[128];
     size_t n = 0;
     for (size_t i = 0; i < text.length;) {
@@ -338,6 +342,12 @@ static cui_edit_result cui_numeric_insert(cui_edit *edit, cui_str text, bool exp
     memcpy(candidate + begin + n, old.data + end, old.length - end);
     if (!cui_numeric_prefix(candidate, length, exponent))
         return CUI_EDIT_INVALID_ARGUMENT;
+    if (composition)
+        return cui_edit_composition_event(edit, composition,
+                                          (cui_event){.type = CUI_EVENT_COMPOSITION_COMMIT,
+                                                      .text_data = normalized,
+                                                      .text_length = n},
+                                          true);
     return cui_edit_insert(edit, (cui_str){normalized, n});
 }
 static double cui_numeric_clamp(double value, cui_number_options o) {
@@ -360,6 +370,34 @@ static void cui_numeric_try_step(cui_number_state *s, double *value, int directi
             result->error = error;
     }
 }
+static cui_edit_composition *cui_numeric_composition(cui_context *ui, cui_id id,
+                                                     cui_number_state *s) {
+    if (s->composition && !s->composition_owned)
+        return s->composition;
+    bool needed = s->composition_owned;
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count && !needed; i++)
+        needed = cui_event_target(ui, i) == id && events[i].type >= CUI_EVENT_COMPOSITION_START &&
+                 events[i].type <= CUI_EVENT_COMPOSITION_COMMIT;
+    if (!needed)
+        return NULL;
+    typedef struct {
+        cui_edit_composition session;
+        char text[4096];
+    } storage;
+    storage *r =
+        cui_resource_get(ui, id, UINT64_C(0x8ec3f32cbd7a9510), sizeof(storage), NULL, NULL);
+    if (!r)
+        return NULL;
+    if (!r->session.buffer) {
+        r->session.buffer = r->text;
+        r->session.capacity = sizeof(r->text);
+        r->session.grow_view = true;
+    }
+    s->composition_owned = true;
+    return &r->session;
+}
 cui_number_result cui_base_number_input(cui_context *ui, cui_id id, cui_str name,
                                         cui_number_state *s, double *value, cui_number_options o) {
     cui_number_result result = {0};
@@ -379,29 +417,101 @@ cui_number_result cui_base_number_input(cui_context *ui, cui_id id, cui_str name
     }
     double original = *value;
     bool editable = !o.disabled && !o.readonly;
+    s->composition = cui_numeric_composition(ui, id, s);
+    if (s->composition_owned && s->composition)
+        s->composition->grow_view = true;
+    if (s->composition) {
+        bool active = s->composition->active;
+        (void)cui_edit_composition_event(s->edit, s->composition,
+                                         (cui_event){.type = CUI_EVENT_GESTURE}, true);
+        if (active && !s->composition->active)
+            s->composition_stale = true;
+        if (!editable || !focused) {
+            s->composition_stale |= s->composition->active;
+            (void)cui_edit_composition_event(
+                s->edit, s->composition, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
+        }
+    }
     size_t count = 0;
     const cui_event *events = cui_frame_events(ui, &count);
     bool commit = s->was_focused && !focused && editable;
     for (size_t i = 0; i < count && editable; ++i) {
         cui_id activation = cui_event_activation(ui, i);
         if (activation == cui_numeric_part_id(id, 1) || activation == cui_numeric_part_id(id, 2)) {
+            if (s->composition && s->composition->active) {
+                s->composition_stale = true;
+                (void)cui_edit_composition_event(s->edit, s->composition,
+                                                 (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL},
+                                                 true);
+            }
             cui_numeric_try_step(s, value, activation == cui_numeric_part_id(id, 2) ? 1 : -1, o,
                                  &result);
             commit = false;
             continue;
         }
         const cui_event *e = &events[i];
-        if (cui_event_target(ui, i) != id)
+        if (cui_event_target(ui, i) != id || cui_event_consumed(ui, i))
             continue;
+        if (e->type == CUI_EVENT_KEY_DOWN && e->ime_composing)
+            continue;
+        if (e->type == CUI_EVENT_CANCEL ||
+            (e->type >= CUI_EVENT_COMPOSITION_START && e->type <= CUI_EVENT_COMPOSITION_CANCEL)) {
+            cui_edit_result r =
+                e->type == CUI_EVENT_CANCEL || e->type == CUI_EVENT_COMPOSITION_CANCEL
+                    ? CUI_EDIT_OK
+                    : CUI_EDIT_CAPACITY;
+            if (s->composition) {
+                if (e->type == CUI_EVENT_COMPOSITION_COMMIT && s->composition_stale) {
+                    cui_consume_event(ui, i);
+                    continue;
+                }
+                if (e->type == CUI_EVENT_COMPOSITION_COMMIT) {
+                    size_t n = 0;
+                    while (n < sizeof(e->text) && e->text[n])
+                        ++n;
+                    cui_str text = e->text_data ? (cui_str){e->text_data, e->text_length}
+                                                : (cui_str){e->text, n};
+                    r = cui_numeric_insert(s->edit, text, o.allow_exponent, s->composition);
+                } else
+                    r = cui_edit_composition_event(s->edit, s->composition, *e, true);
+                if (r == CUI_EDIT_OK && e->type == CUI_EVENT_COMPOSITION_COMMIT)
+                    s->composition_stale = true;
+                if (r == CUI_EDIT_OK && (e->type == CUI_EVENT_COMPOSITION_START ||
+                                         e->type == CUI_EVENT_COMPOSITION_UPDATE))
+                    s->composition_stale = false;
+            }
+            if (result.error == CUI_EDIT_OK)
+                result.error = r;
+            cui_consume_event(ui, i);
+            continue;
+        }
+        if (s->composition && s->composition->active) {
+            if (e->type == CUI_EVENT_KEY_DOWN || e->type == CUI_EVENT_TEXT)
+                continue;
+            if (e->type == CUI_EVENT_POINTER_DOWN) {
+                s->composition_stale = true;
+                (void)cui_edit_composition_event(s->edit, s->composition,
+                                                 (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL},
+                                                 true);
+            }
+        }
         cui_edit_result error = CUI_EDIT_OK;
         if (e->type == CUI_EVENT_TEXT) {
             size_t n = 0;
             while (n < sizeof(e->text) && e->text[n])
                 ++n;
-            error = cui_numeric_insert(s->edit, (cui_str){e->text, n}, o.allow_exponent);
+            error = cui_numeric_insert(s->edit,
+                                       e->text_data ? (cui_str){e->text_data, e->text_length}
+                                                    : (cui_str){e->text, n},
+                                       o.allow_exponent, NULL);
         } else if (e->type == CUI_EVENT_KEY_DOWN) {
             bool extend = (e->modifiers & CUI_MOD_SHIFT) != 0;
-            if (e->key == CUI_KEY_ENTER) {
+            if (e->key == CUI_KEY_Z && (e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))
+                error =
+                    e->modifiers & CUI_MOD_SHIFT ? cui_edit_redo(s->edit) : cui_edit_undo(s->edit);
+            else if (e->key == CUI_KEY_Y && (e->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))
+                error = cui_edit_redo(s->edit);
+            else if (e->key == CUI_KEY_ENTER) {
                 commit = true;
                 result.submitted = true;
             } else if (e->key == CUI_KEY_UP || e->key == CUI_KEY_DOWN)
@@ -744,7 +854,7 @@ cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *
                                  cui_measure_text(ui, o.prefix, metrics.font_size).width -
                                  cui_measure_text(ui, o.suffix, metrics.font_size).width)
                   : -1;
-    cui_input_state input = {.scroll_x = s->scroll_x};
+    cui_input_state input = {.behavior = {.composition = s->composition}, .scroll_x = s->scroll_x};
     cui_input_paint(ui, id, t, name, s->edit, &input,
                     (cui_input_options){.size = (cui_input_size)o.size,
                                         .design_size = o.design_size,

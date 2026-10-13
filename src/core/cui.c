@@ -76,6 +76,7 @@ struct cui_context {
     cui_config config;
     cui_core_text_style *text_styles;
     size_t text_style_count, text_style_capacity;
+    uint64_t text_metrics_revision;
     cui_draw_command *commands;
     size_t count;
     cui_core_box_node *nodes;
@@ -175,7 +176,12 @@ void cui_text_metrics_changed(cui_context *ui) {
         return;
     cui_core_select_context(ui);
     Clay_ResetMeasureTextCache();
+    if (++ui->text_metrics_revision == 0)
+        ui->text_metrics_revision = 1;
     cui_invalidate(ui);
+}
+uint64_t cui_text_metrics_revision(const cui_context *ui) {
+    return ui ? ui->text_metrics_revision : 0;
 }
 static Clay_Dimensions cui_core_measure(Clay_StringSlice s, Clay_TextElementConfig *c, void *u) {
     cui_context *ui = u;
@@ -276,6 +282,7 @@ cui_context *cui_create(cui_config config) {
         return NULL;
     }
     ui->config = config;
+    ui->text_metrics_revision = 1;
     ui->dirty = true;
     ui->top_modal = ui->previous_top_modal = SIZE_MAX;
     ui->text_style_capacity = config.max_elements > 32767 ? 65535 : config.max_elements * 2;

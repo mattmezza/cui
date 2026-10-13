@@ -199,3 +199,10 @@ Hosts may supply `cui_event.click_count` on pointer events. Zero and one preserv
 `cui_pointer_position` returns the latest Move/Down/Up coordinates processed by `cui_begin_frame`; queued events wait until then, idle frames retain the position and a new context starts at `(0,0)`. It does not infer pointer visibility, hover, clipping or occlusion. Invalid/nonfinite values preserve both output variables. Use the accessor for host-driven plot cursors; current-layout prepaint callbacks remain a separate missing Core seam.
 
 Portable shortcut identities include `[` and `]` for Editor block-indent bindings. They are appended enum values, preserving existing host key numbers, and round-trip through `cui_key_from_character`/`cui_key_character`. Browser and SDL ASCII fallback mappings use these helpers. Character/IME text input remains separate from shortcut identity.
+
+Retained text layout can cache `cui_text_metrics_revision(ui)` with its document,
+width and complete text style. The context starts at generation1; a successful
+`cui_text_metrics_changed` outside a frame resets Clay measurement and changes
+this generation. Calls inside a frame are ignored. Null returns0. Compare by
+equality: generations wrap while skipping0. Hosts must announce changes to font
+registries or measurement policy before the next frame. Contexts are independent.

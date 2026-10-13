@@ -408,6 +408,10 @@ cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
 cui_size cui_measure_text_ex(cui_context *, cui_str text, float font_size, cui_text_style);
 /* Call after changing a host font registry or styled measurement policy. */
 void cui_text_metrics_changed(cui_context *);
+/* Context-local font measurement generation, initially1; null returns0.
+ * Changes only on accepted text_metrics_changed calls outside a frame.
+ * Cache by equality, not ordering; wrap skips0. */
+uint64_t cui_text_metrics_revision(const cui_context *);
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value);
 /* Update the controlled value of a semantic already submitted this frame. */

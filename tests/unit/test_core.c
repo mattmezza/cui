@@ -2549,7 +2549,26 @@ static void test_pointer_click_metadata(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+static void test_metrics_revision(void) {
+    cui_context *a = make(), *b = make();
+    assert(cui_text_metrics_revision(NULL) == 0);
+    assert(cui_text_metrics_revision(a) == 1 && cui_text_metrics_revision(b) == 1);
+    cui_text_metrics_changed(NULL);
+    cui_text_metrics_changed(a);
+    assert(cui_text_metrics_revision(a) == 2 && cui_text_metrics_revision(b) == 1);
+    begin(a);
+    cui_text_metrics_changed(a);
+    assert(cui_text_metrics_revision(a) == 2);
+    (void)cui_end_frame(a);
+    assert(cui_text_metrics_revision(a) == 2);
+    cui_text_metrics_changed(a);
+    cui_text_metrics_changed(a);
+    assert(cui_text_metrics_revision(a) == 4);
+    cui_destroy(a);
+    cui_destroy(b);
+}
 int main(void) {
+    test_metrics_revision();
     test_pointer_click_metadata();
     test_unpainted_semantic_does_not_own_ancestor();
     test_semantic_parent_query();

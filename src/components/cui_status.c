@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_status.h"
+#include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 static cui_color cui_status_alpha(cui_color c, float opacity) {
@@ -7,10 +8,10 @@ static cui_color cui_status_alpha(cui_color c, float opacity) {
     return c;
 }
 bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_tag_style *out) {
-    if (!t || !out || o.variant > CUI_TAG_PALETTE || o.variant < CUI_TAG_SECONDARY ||
-        o.size > CUI_STATUS_LARGE || o.size < CUI_STATUS_MEDIUM || !isfinite(o.radius) ||
-        o.radius < 0 || !isfinite(t->radius) || t->radius < 0 || !isfinite(t->font_size) ||
-        t->font_size <= 0)
+    if (!t || !out || !cui_design_valid(o.design_size) || o.variant > CUI_TAG_PALETTE ||
+        o.variant < CUI_TAG_SECONDARY || o.size > CUI_STATUS_LARGE || o.size < CUI_STATUS_MEDIUM ||
+        !isfinite(o.radius) || o.radius < 0 || !isfinite(t->radius) || t->radius < 0 ||
+        !isfinite(t->font_size) || t->font_size <= 0)
         return false;
     cui_color bg = t->secondary, fg = o.outline ? t->muted : t->secondary_foreground,
               border = t->border;
@@ -63,6 +64,14 @@ bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_ta
                                  : o.custom_radius ? o.radius
                                  : small           ? t->radius / 2
                                                    : t->radius};
+    if (o.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(o.design_size, t->font_size / 16, &d))
+            return false;
+        s.font_size = d.font_size;
+        s.padding_y = d.padding_y;
+        s.padding_x = fmaxf(d.padding_x, d.padding_y);
+    }
     if (!isfinite(s.font_size) || !isfinite(s.radius))
         return false;
     if (hovered) {
@@ -765,7 +774,7 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                           2 * t->padding * .8f + 12
                     : 0;
             float content_width =
-                fmaxf(1, e->motion_width - 32 - (has_icon ? 28 : 0) - action_width);
+                fmaxf(1, e->motion_width - 32 - (has_icon ? 28 : 0) - action_width - 24);
             cui_begin_box(ui, cui_status_child_id(card, 302),
                           (cui_box){.width = content_width, .gap = 4, .clip = true});
             if (n.title.length)
@@ -785,6 +794,11 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                                                         .variant = CUI_BUTTON_PRIMARY}) &&
                      n.on_action)
                 n.on_action(n.user, n.id);
+            /* Keep action content clear of the independent close hit target.
+             * Reserve this lane even when Close is hidden to avoid hover reflow. */
+            cui_begin_box(ui, cui_status_child_id(card, 316),
+                          (cui_box){.width = 24, .height = 1});
+            cui_end_box(ui);
             cui_end_box(ui);
             cui_status_spacer(ui, cui_status_child_id(card, 312), 2);
             bool close = false;

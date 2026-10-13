@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
+#include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 static bool cui_components_design(const cui_theme *theme, cui_design_size size,
                                   cui_design_metrics *metrics) {
@@ -812,10 +814,14 @@ cui_badge_options cui_badge_defaults(void) {
 }
 bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_options o,
                   cui_button_content_fn content, void *user) {
-    if (!ui || !id || !t || o.variant < CUI_BADGE_COUNT || o.variant > CUI_BADGE_ICON ||
-        o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
+    if (!ui || !id || !t || !cui_design_valid(o.design_size) || o.variant < CUI_BADGE_COUNT ||
+        o.variant > CUI_BADGE_ICON || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
         (o.name.length && !o.name.data) || (o.icon.length && !o.icon.data))
         return false;
+    cui_design_metrics dm = {0};
+    if (o.design_size && !cui_design_resolve(o.design_size, t->font_size / 16, &dm))
+        return false;
+    float badge_font = o.design_size ? dm.font_size * .75f : 10;
     char number[3 * sizeof(size_t) + 3];
     if (o.count > o.maximum)
         snprintf(number, sizeof(number), "%zu+", o.maximum);
@@ -827,6 +833,8 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
         content(ui, user);
     if (visible) {
         float extent = o.size == CUI_CONTROL_LARGE ? 24 : o.size == CUI_CONTROL_MEDIUM ? 16 : 10;
+        if (o.design_size)
+            extent = dm.indicator_size;
         float x = o.variant != CUI_BADGE_COUNT ? 0
                                                : (o.size == CUI_CONTROL_LARGE    ? 1
                                                   : o.size == CUI_CONTROL_MEDIUM ? 3
@@ -848,10 +856,14 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
                         .align_x = CUI_ALIGN_CENTER,
                         .align_y = CUI_ALIGN_CENTER};
         if (o.variant == CUI_BADGE_COUNT) {
-            mark.height = 14;
-            mark.width = fmaxf(14, cui_measure_text(ui, cui_string(number), 10).width + 4);
+            mark.height = o.design_size ? dm.line_height * .75f + dm.padding_y : 14;
+            mark.width =
+                fmaxf(mark.height, cui_measure_text(ui, cui_string(number), badge_font).width +
+                                       (o.design_size ? dm.padding_x : 4));
         } else {
-            mark.width = mark.height = o.variant == CUI_BADGE_DOT ? 6 : extent;
+            mark.width = mark.height = o.variant == CUI_BADGE_DOT
+                                           ? (o.design_size ? dm.indicator_size * .375f : 6)
+                                           : extent;
             if (o.variant == CUI_BADGE_ICON) {
                 mark.border = t->background;
                 mark.border_width = 1;
@@ -867,8 +879,8 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
                                  (cui_semantic_details){.parent = id, .no_focus = true});
         cui_set_tab_stop(ui, indicator, false);
         if (o.variant == CUI_BADGE_COUNT)
-            cui_text_with_line_height(ui, cui_string(number), 10, (cui_color){255, 255, 255, 255},
-                                      10);
+            cui_text_with_line_height(ui, cui_string(number), badge_font,
+                                      (cui_color){255, 255, 255, 255}, badge_font);
         else if (o.variant == CUI_BADGE_ICON)
             cui_icon_named(ui, indicator ^ UINT64_C(0x2c38f42991a75e63), t, o.icon,
                            (cui_icon_options){.custom_size = extent - 2,
@@ -886,8 +898,11 @@ cui_progress_options cui_progress_defaults(void) {
 }
 bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width,
                      cui_progress_options o) {
-    if (!ui || !id || !t || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
-        (o.name.length && !o.name.data))
+    if (!ui || !id || !t || !cui_design_valid(o.design_size) || o.size < CUI_CONTROL_MEDIUM ||
+        o.size > CUI_CONTROL_XSMALL || (o.name.length && !o.name.data))
+        return false;
+    cui_design_metrics dm = {0};
+    if (o.design_size && !cui_design_resolve(o.design_size, t->font_size / 16, &dm))
         return false;
     bool reduced = o.reduced_motion || cui_reduced_motion(ui);
     cui_progress_geometry geometry =
@@ -908,6 +923,8 @@ bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fract
                    : o.size == CUI_CONTROL_SMALL      ? 6
                    : o.size == CUI_CONTROL_LARGE      ? 10
                                                       : 8;
+    if (o.design_size && !(isfinite(o.height) && o.height > 0))
+        height = dm.control_height * .25f;
     cui_color color = o.custom_color ? o.color : t->primary;
     cui_color track = color;
     track.a = (uint8_t)(track.a * .2f);
@@ -1099,6 +1116,137 @@ static float cui_input_alignment(float available, float text, cui_align align) {
     float extra = fmaxf(0, available - text);
     return align == CUI_ALIGN_CENTER ? extra * .5f : align == CUI_ALIGN_END ? extra : 0;
 }
+/* Optional visual session is owned by a UI resource, shared by reduction and
+ * paint in this frame. Collection refreshes it even when a host changes its
+ * font registrations without changing the editor bytes. */
+typedef struct {
+    cui_text_geometry geometry;
+    char *text;
+    size_t length;
+    float size;
+    bool attempted, valid;
+    const cui_edit *model;
+    uint64_t revision;
+    size_t caret_byte;
+    cui_text_affinity affinity;
+    bool affinity_valid;
+} cui_input_visual_cache;
+static void cui_input_visual_clear(void *payload) {
+    cui_input_visual_cache *cache = payload;
+    cui_release_text_geometry(&cache->geometry);
+    free(cache->text);
+    cache->geometry = (cui_text_geometry){0};
+    cache->text = NULL;
+    cache->attempted = cache->valid = false;
+    cache->length = 0;
+    cache->size = 0;
+}
+static cui_input_visual_cache *cui_input_visual_resource(cui_context *ui, cui_id id) {
+    if (!cui_has_text_geometry(ui))
+        return NULL;
+    return cui_resource_get(ui, id, UINT64_C(0x290fa458736bc921), sizeof(cui_input_visual_cache),
+                            cui_input_visual_clear, cui_input_visual_clear);
+}
+static void cui_input_visual_bind(cui_input_visual_cache *cache, const cui_edit *edit) {
+    if (!cache)
+        return;
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    if (cache->model != edit || cache->revision != revision)
+        cache->affinity_valid = false;
+    cache->model = edit;
+    cache->revision = revision;
+}
+static bool cui_input_visual_acquire(cui_input_visual_cache *cache, cui_context *ui, cui_str text,
+                                     float size) {
+    if (!cache || text.length > 65535)
+        return false;
+    if (cache->attempted && cache->size == size && cache->length == text.length &&
+        (!text.length || !memcmp(cache->text, text.data, text.length)))
+        return cache->valid;
+    cui_input_visual_clear(cache);
+    cache->text = malloc(text.length + 1);
+    if (!cache->text)
+        return false;
+    if (text.length)
+        memcpy(cache->text, text.data, text.length);
+    cache->text[text.length] = 0;
+    cache->length = text.length;
+    cache->size = size;
+    cache->attempted = true;
+    cache->valid =
+        cui_get_text_geometry(ui, (cui_str){cache->text, text.length}, size, (cui_text_style){0},
+                              &cache->geometry) == CUI_TEXT_LAYOUT_OK;
+    return cache->valid;
+}
+typedef struct {
+    cui_input_hit_geometry measured;
+    cui_input_visual_cache *cache;
+} cui_input_cached_hit;
+static size_t cui_input_cached_hit_test(void *payload, cui_str text, float x, float y) {
+    cui_input_cached_hit *hit = payload;
+    if (hit->cache && hit->cache->model)
+        cui_input_visual_bind(hit->cache, hit->cache->model);
+    if (cui_input_visual_acquire(hit->cache, hit->measured.ui, text, hit->measured.font_size)) {
+        cui_input_visual_hit_geometry visual = {hit->measured, &hit->cache->geometry,
+                                                &hit->cache->affinity};
+        size_t byte = cui_base_input_visual_hit_test(&visual, text, x, y);
+        if (byte != SIZE_MAX) {
+            hit->cache->caret_byte = byte;
+            hit->cache->affinity_valid = true;
+            return byte;
+        }
+    }
+    return cui_base_input_measured_hit_test(&hit->measured, text, x, y);
+}
+static bool cui_input_visual_caret(const cui_text_geometry *geometry, size_t byte,
+                                   cui_text_affinity preferred, float *x) {
+    cui_text_caret carets[2];
+    size_t count;
+    if (geometry->ops->carets(geometry->session, byte, carets, 2, &count) != CUI_TEXT_LAYOUT_OK ||
+        !count || count > 2)
+        return false;
+    size_t chosen = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (carets[i].byte_offset != byte || !isfinite(carets[i].x) || !isfinite(carets[i].y) ||
+            !isfinite(carets[i].height) || carets[i].height < 0 ||
+            (unsigned)carets[i].affinity > CUI_TEXT_DOWNSTREAM)
+            return false;
+        if (carets[i].affinity == preferred)
+            chosen = i;
+    }
+    *x = carets[chosen].x;
+    return true;
+}
+static bool cui_input_visual_selection(const cui_text_geometry *geometry, size_t start, size_t end,
+                                       cui_text_selection_rect **rects, size_t *count) {
+    size_t needed;
+    if (geometry->ops->selection(geometry->session, start, end, NULL, 0, &needed) !=
+            CUI_TEXT_LAYOUT_OK ||
+        needed > 4096)
+        return false;
+    cui_text_selection_rect *result = needed ? malloc(needed * sizeof *result) : NULL;
+    if (needed && !result)
+        return false;
+    size_t written;
+    if (geometry->ops->selection(geometry->session, start, end, result, needed, &written) !=
+            CUI_TEXT_LAYOUT_OK ||
+        written != needed) {
+        free(result);
+        return false;
+    }
+    for (size_t i = 0; i < needed; ++i) {
+        cui_rect bounds = result[i].bounds;
+        if (!isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) ||
+            !isfinite(bounds.h) || bounds.w < 0 || bounds.h < 0 || result[i].byte_start < start ||
+            result[i].byte_end > end || result[i].byte_start > result[i].byte_end) {
+            free(result);
+            return false;
+        }
+    }
+    *rects = result;
+    *count = needed;
+    return true;
+}
 void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_edit *edit,
                      cui_input_state *state, cui_input_options options) {
     (void)name;
@@ -1142,9 +1290,43 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     float inset = metrics.padding_x + border;
     cui_id viewport_id = cui_input_viewport_id(id);
     float viewport_width = width > 0 ? fmaxf(0, width - 2 * inset) : cui_bounds(ui, viewport_id).w;
-    float text_width = cui_measure_text(ui, text, metrics.font_size).width;
-    float caret =
-        cui_measure_text(ui, (cui_str){text.data, selection.cursor}, metrics.font_size).width;
+    float text_width = 0, caret = 0;
+    cui_input_visual_cache *cache = cui_input_visual_resource(ui, id);
+    cui_input_visual_bind(cache, edit);
+    cui_text_selection_rect *visual_selection = NULL, *visual_composition = NULL;
+    size_t visual_count = 0, composition_count = 0;
+    size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
+    size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    bool visual = cui_input_visual_acquire(cache, ui, text, metrics.font_size);
+    if (visual)
+        visual =
+            cui_input_visual_caret(&cache->geometry, selection.cursor,
+                                   cache->affinity_valid && cache->caret_byte == selection.cursor
+                                       ? cache->affinity
+                                       : CUI_TEXT_DOWNSTREAM,
+                                   &caret) &&
+            cui_input_visual_selection(&cache->geometry, first, last, &visual_selection,
+                                       &visual_count);
+    if (visual && state->behavior.composition && state->behavior.composition->active) {
+        cui_edit_composition *composition = state->behavior.composition;
+        visual = cui_input_visual_selection(&cache->geometry, composition->start,
+                                            composition->start + composition->length,
+                                            &visual_composition, &composition_count);
+    }
+    if (visual)
+        text_width = cache->geometry.width;
+    else {
+        free(visual_selection);
+        visual_selection = NULL;
+        visual_count = 0;
+        free(visual_composition);
+        visual_composition = NULL;
+        composition_count = 0;
+        text_width = cui_measure_text(ui, text, metrics.font_size).width;
+        caret =
+            cui_measure_text(ui, (cui_str){text.data, selection.cursor}, metrics.font_size).width;
+    }
+
     float total = text_width + (focused ? 1 : 0);
     if (!isfinite(state->scroll_x) || state->scroll_x < 0)
         state->scroll_x = 0;
@@ -1169,9 +1351,7 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .fixed_width = true,
                             .height = metrics.line_height,
                             .fixed_height = true});
-    size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
-    size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
-    if (focused && state->behavior.composition && state->behavior.composition->active) {
+    if (!visual && focused && state->behavior.composition && state->behavior.composition->active) {
         cui_edit_composition *c = state->behavior.composition;
         float left = cui_measure_text(ui, (cui_str){text.data, c->start}, metrics.font_size).width;
         float right =
@@ -1180,20 +1360,46 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
         cui_set_underlay(ui, (cui_rect){left, metrics.line_height - 1, right - left, 1}, t->caret,
                          (cui_corner_radii){0});
     }
-    if (focused && first != last) {
+    if (!visual && focused && first != last) {
         float left = cui_measure_text(ui, (cui_str){text.data, first}, metrics.font_size).width;
         float right = cui_measure_text(ui, (cui_str){text.data, last}, metrics.font_size).width;
         cui_set_underlay(ui, (cui_rect){left, 0, right - left, metrics.line_height}, t->selection,
                          (cui_corner_radii){0});
     }
-    if (text.length)
-        cui_text_with_line_height(ui, text, metrics.font_size, foreground, metrics.line_height);
-    else if (options.placeholder.length) {
+    if (visual && focused) {
+        for (size_t i = 0; i < visual_count; ++i) {
+            cui_rect bounds = visual_selection[i].bounds;
+            bounds.y = 0;
+            bounds.h = metrics.line_height;
+            cui_begin_absolute_box(ui, 0, (cui_box){.background = t->selection}, bounds);
+            cui_end_box(ui);
+        }
+        for (size_t i = 0; i < composition_count; ++i) {
+            cui_rect bounds = visual_composition[i].bounds;
+            bounds.y = metrics.line_height - 1;
+            bounds.h = 1;
+            cui_begin_absolute_box(ui, 0, (cui_box){.background = t->caret}, bounds);
+            cui_end_box(ui);
+        }
+    }
+    free(visual_selection);
+    free(visual_composition);
+    if (text.length) {
+        if (visual)
+            cui_text_line(ui, text, metrics.font_size, foreground, metrics.line_height,
+                          (cui_text_style){0});
+        else
+            cui_text_with_line_height(ui, text, metrics.font_size, foreground, metrics.line_height);
+    } else if (options.placeholder.length) {
         cui_color placeholder = t->muted;
         if (options.disabled)
             placeholder.a = (uint8_t)lroundf(placeholder.a * .5f);
-        cui_text_with_line_height(ui, options.placeholder, metrics.font_size, placeholder,
-                                  metrics.line_height);
+        if (visual)
+            cui_text_line(ui, options.placeholder, metrics.font_size, placeholder,
+                          metrics.line_height, (cui_text_style){0});
+        else
+            cui_text_with_line_height(ui, options.placeholder, metrics.font_size, placeholder,
+                                      metrics.line_height);
     }
     if (focused) {
         cui_rect viewport = cui_bounds(ui, viewport_id);
@@ -1205,6 +1411,9 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                (cui_box){.background = t->caret},
                                (cui_rect){caret, (metrics.line_height - height) * .5f, 1, height});
         cui_end_box(ui);
+        if (visual)
+            (void)cui_set_text_input_geometry_rect(ui, id, id ^ UINT64_C(0xb1642b97583fbd65),
+                                                   metrics.line_height);
     }
     cui_end_box(ui);
     cui_end_box(ui);
@@ -1223,14 +1432,19 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
     cui_id viewport_id = cui_input_viewport_id(id);
     cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport_id), metrics.font_size,
                                   state->scroll_x};
-    hit.viewport.x += cui_input_alignment(
-        hit.viewport.w, cui_measure_text(ui, cui_edit_get_text(edit), metrics.font_size).width,
-        options.text_align);
+    bool multiline = cui_edit_get_state(edit).multiline;
+    cui_input_cached_hit cached_hit = {hit, multiline ? NULL : cui_input_visual_resource(ui, id)};
+    cui_input_visual_bind(cached_hit.cache, edit);
+    cui_str committed = cui_edit_get_text(edit);
+    float text_width = cui_input_visual_acquire(cached_hit.cache, ui, committed, metrics.font_size)
+                           ? cached_hit.cache->geometry.width
+                           : cui_measure_text(ui, committed, metrics.font_size).width;
+    cached_hit.measured.viewport.x +=
+        cui_input_alignment(hit.viewport.w, text_width, options.text_align);
     state->behavior.composition = cui_base_composition(ui, id, state->behavior.composition,
                                                        &state->behavior.composition_owned);
     if (state->behavior.composition && state->behavior.composition_owned)
         state->behavior.composition->grow_view = true;
-    bool multiline = cui_edit_get_state(edit).multiline;
     cui_input_result result = cui_base_input_ex(
         ui, id, name, edit, &state->behavior,
         (cui_base_input_options){.disabled = options.disabled,
@@ -1239,8 +1453,8 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
                                  .invalid = options.invalid,
                                  .clipboard = options.clipboard,
                                  .delegate_up_down = options.delegate_up_down,
-                                 .hit_test = multiline ? NULL : cui_base_input_hit_test,
-                                 .hit_test_user = &hit});
+                                 .hit_test = multiline ? NULL : cui_input_cached_hit_test,
+                                 .hit_test_user = &cached_hit});
     options.invalid = options.invalid || result.error != CUI_EDIT_OK;
     cui_input_paint(ui, id, t, name, edit, state, options);
     return result;
@@ -1264,8 +1478,12 @@ bool cui_progress_circle(cui_context *ui, cui_id id, const cui_theme *theme, flo
                          cui_progress_circle_state *state, cui_progress_circle_options options,
                          cui_button_content_fn content, void *user) {
     cui_progress_options p = options.progress;
-    if (!ui || !id || !theme || !state || p.size < CUI_CONTROL_MEDIUM ||
-        p.size > CUI_CONTROL_XSMALL || (p.name.length && !p.name.data))
+    if (!ui || !id || !theme || !cui_design_valid(p.design_size) || !state ||
+        p.size < CUI_CONTROL_MEDIUM || p.size > CUI_CONTROL_XSMALL ||
+        (p.name.length && !p.name.data))
+        return false;
+    cui_design_metrics dm = {0};
+    if (p.design_size && !cui_design_resolve(p.design_size, theme->font_size / 16, &dm))
         return false;
     bool reduced = p.reduced_motion || cui_reduced_motion(ui);
     cui_progress_geometry progress =
@@ -1286,6 +1504,8 @@ bool cui_progress_circle(cui_context *ui, cui_id id, const cui_theme *theme, flo
                                               : p.size == CUI_CONTROL_LARGE ? 20
                                                                             : 16)
                                            : options.diameter;
+    if (p.design_size && options.diameter == 0)
+        diameter = dm.control_height;
     cui_progress_circle_geometry geometry;
     cui_bitmap bitmap;
     if (!cui_progress_circle_measure(progress, diameter, &geometry) ||

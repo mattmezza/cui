@@ -108,7 +108,43 @@ static void layout(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+
+static void design_sizes(void) {
+    cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1800});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_description_item item = {.id = 100, .label = {"Owner", 5}, .value = {"Ada", 3}};
+    for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+        cui_design_metrics m;
+        assert(cui_design_measure((cui_design_size)n, 1, &m));
+        cui_begin_frame(ui, 1800, 1800, .016f);
+        assert(cui_description_list(
+            ui, 2, &theme, &item, 1,
+            (cui_description_options){.width = 1600, .design_size = (cui_design_size)n}));
+        cui_draw_list draw = cui_end_frame(ui);
+        bool value = false, label = false;
+        for (size_t i = 0; i < draw.count; i++) {
+            cui_draw_command c = draw.commands[i];
+            if (c.type == CUI_DRAW_TEXT && c.text.length == 3 && !memcmp(c.text.data, "Ada", 3)) {
+                value = true;
+                near(c.font_size, m.font_size);
+            }
+            if (c.type == CUI_DRAW_TEXT && c.text.length == 5 && !memcmp(c.text.data, "Owner", 5)) {
+                label = true;
+                near(c.font_size, m.font_size * .875f);
+            }
+        }
+        assert(value && label && cui_last_error(ui) == CUI_OK);
+    }
+    cui_begin_frame(ui, 1800, 1800, .016f);
+    assert(!cui_description_list(ui, 2, &theme, &item, 1,
+                                 (cui_description_options){.design_size = (cui_design_size)99}));
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    design_sizes();
     grouping();
     layout();
     return 0;

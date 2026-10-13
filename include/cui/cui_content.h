@@ -20,6 +20,8 @@ typedef struct {
     /* Optional controlled visibility; false omits layout and semantics. */
     bool *visible;
     bool dismissible;
+    /* Named SVG; empty selects the kind's default. Legacy icon text overrides it. */
+    cui_str icon_name;
 } cui_alert_options;
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options);
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
@@ -32,7 +34,11 @@ typedef enum {
     CUI_BUBBLE_TINTED,
     CUI_BUBBLE_OUTLINE,
     CUI_BUBBLE_GHOST,
-    CUI_BUBBLE_DESTRUCTIVE
+    CUI_BUBBLE_DESTRUCTIVE,
+    CUI_BUBBLE_INFO,
+    CUI_BUBBLE_SUCCESS,
+    CUI_BUBBLE_WARNING,
+    CUI_BUBBLE_ERROR
 } cui_bubble_variant;
 /* Composable surface. Alignment and wrapping belong to the parent layout. */
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *theme,
@@ -68,13 +74,21 @@ typedef struct {
     cui_popup_side side;
     float width, height, gap, dt, open_delay, close_delay;
     bool disabled;
+    /* HoverCard only: height<=0 fits children; positive max_height bounds the
+     * intrinsic panel. Increment revision when arbitrary child content changes
+     * without a width change so collision placement receives a measured redraw. */
+    float max_height;
+    uint64_t content_revision;
 } cui_hover_options;
 /* Trigger must already have been submitted. State is persistent/application-owned.
  * Explicit dimensions clip content, flip at viewport edges, and bound placement. */
 bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_state *state,
                  cui_str text, cui_hover_options options);
 /* Pair end only when begin returns true; accepts arbitrary children without a
- * modal focus trap. Hover/focus inside the open card extends its lifetime. */
+ * modal focus trap. Hover/focus inside the open card extends its lifetime.
+ * Default height fits children and is bounded by the viewport. Collision
+ * placement settles after the retained measurement redraw; explicit positive
+ * height remains fixed. Context owns measurement storage, not the caller. */
 bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *theme,
                           cui_hover_state *state, cui_str name, cui_hover_options options);
 void cui_end_hover_card(cui_context *ui);

@@ -105,6 +105,82 @@ static cui_draw_list hover_scene(cui_context *ui, const cui_theme *t, cui_hover_
     assert(cui_last_error(ui) == CUI_OK);
     return list;
 }
+static void intrinsic_hover_scene(cui_context *ui, const cui_theme *t, cui_hover_state *state,
+                                  float width, float height, float maximum, uint64_t revision,
+                                  float anchor_y, bool long_text) {
+    assert(cui_begin_frame(ui, 300, 180, .016f));
+    cui_begin_box(ui, 80, (cui_box){.width = 300, .height = 180});
+    cui_begin_absolute_box(ui, 81, (cui_box){0}, (cui_rect){250, anchor_y, 40, 24});
+    cui_interact(ui, 81, CUI_ROLE_BUTTON, cui_string("Profile"), false, false, 0);
+    cui_end_box(ui);
+    if (cui_begin_hover_card(ui, 82, t, state, cui_string("Profile card"),
+                             (cui_hover_options){.trigger = 81,
+                                                 .viewport = {0, 0, 300, 180},
+                                                 .width = width,
+                                                 .height = height,
+                                                 .max_height = maximum,
+                                                 .content_revision = revision,
+                                                 .side = CUI_POPUP_BELOW,
+                                                 .gap = 4})) {
+        cui_label(ui, t, cui_string("Alex Morgan"));
+        cui_label(
+            ui, t,
+            cui_string(long_text
+                           ? "A composable floating card with useful profile details that reflow."
+                           : "Two lines."));
+        cui_end_hover_card(ui);
+    }
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void hover_intrinsic(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_theme t = cui_theme_light();
+    cui_hover_state state = {0};
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, 5, false);
+    cui_focus(ui, 81);
+    for (unsigned i = 0; i < 3; i++)
+        intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, 5, false);
+    cui_rect small = cui_bounds(ui, 82);
+    assert(state.open && small.h > 30 && small.h < 100);
+    assert(small.x >= 0 && small.x + small.w <= 300);
+    assert(!cui_needs_redraw(ui));
+    /* The first estimate fits below, but the real card must flip above. Track
+     * unclipped content height rather than learning the temporary clipped cap. */
+    cui_context *edge = cui_create((cui_config){.max_elements = 256});
+    assert(edge);
+    cui_hover_state edge_state = {0};
+    intrinsic_hover_scene(edge, &t, &edge_state, 200, 0, 0, 0, 100, false);
+    cui_focus(edge, 81);
+    for (unsigned i = 0; i < 3; i++)
+        intrinsic_hover_scene(edge, &t, &edge_state, 200, 0, 0, 0, 100, false);
+    cui_rect middle = cui_bounds(edge, 82);
+    assert(fabsf(middle.h - small.h) < .02f && middle.y + middle.h <= 100);
+    cui_destroy(edge);
+    for (unsigned i = 0; i < 3; i++)
+        intrinsic_hover_scene(ui, &t, &state, 220, 0, 0, 1, 145, true);
+    cui_rect wrapped = cui_bounds(ui, 82);
+    assert(wrapped.h > small.h && wrapped.y >= 0 && wrapped.y + wrapped.h <= 180);
+    assert(wrapped.y + wrapped.h <= cui_bounds(ui, 81).y + .02f);
+    for (unsigned i = 0; i < 3; i++)
+        intrinsic_hover_scene(ui, &t, &state, 160, 0, 0, 1, 145, true);
+    cui_rect narrow = cui_bounds(ui, 82);
+    assert(narrow.h > wrapped.h && narrow.y >= 0 && narrow.y + narrow.h <= 180);
+    for (unsigned i = 0; i < 3; i++)
+        intrinsic_hover_scene(ui, &t, &state, 200, 0, 50, 2, 5, false);
+    assert(cui_bounds(ui, 82).h <= 50.02f);
+    intrinsic_hover_scene(ui, &t, &state, 200, 90, 30, 3, 5, false);
+    assert(fabsf(cui_bounds(ui, 82).h - 90) < .02f);
+    /* Closed/omitted content does not retain caller storage or pin resources. */
+    cui_focus(ui, 0);
+    state.open = false;
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 4, 5, false);
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 4, 5, false);
+    assert(cui_bounds(ui, 82).w == 0);
+    cui_destroy(ui);
+}
 static void hover_panels(void) {
     cui_theme t = cui_theme_light();
     for (unsigned card = 0; card < 2; ++card) {
@@ -162,8 +238,52 @@ static void hover_panels(void) {
     }
 }
 
+static void semantic_colors(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark()};
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    for (size_t theme = 0; theme < 2; theme++) {
+        const cui_theme *t = &themes[theme];
+        cui_color accents[] = {t->info, t->success, t->warning, t->danger};
+        cui_color bubble_colors[4];
+        for (unsigned kind = 0; kind < 4; kind++) {
+            cui_begin_frame(ui, 500, 300, .016f);
+            cui_alert(ui, 100, t, (cui_alert_options){.kind = (cui_alert_kind)kind,
+                                                    .message = cui_string("Status"), .width = 400});
+            cui_draw_list draw = cui_end_frame(ui);
+            bool border = false, svg = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                if (draw.commands[i].type == CUI_DRAW_BORDER &&
+                    draw.commands[i].bounds.w == 400) {
+                    assert(!memcmp(&draw.commands[i].color, &accents[kind], sizeof(cui_color)));
+                    border = true;
+                }
+                svg |= draw.commands[i].type == CUI_DRAW_IMAGE;
+            }
+            assert(border && svg);
+            cui_begin_frame(ui, 500, 300, .016f);
+            cui_begin_bubble(ui, 101, t, (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), 400);
+            cui_text(ui, cui_string("Status"), t->font_size, t->text);
+            cui_end_bubble(ui);
+            draw = cui_end_frame(ui);
+            bool found = false;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 400) {
+                    bubble_colors[kind] = draw.commands[i].color;
+                    found = true;
+                }
+            assert(found);
+        }
+        for (unsigned a = 0; a < 4; a++)
+            for (unsigned b = a + 1; b < 4; b++)
+                assert(memcmp(&bubble_colors[a], &bubble_colors[b], sizeof(cui_color)));
+    }
+    cui_destroy(ui);
+}
 int main(void) {
+    semantic_colors();
     hover_panels();
+    hover_intrinsic();
     models();
     cui_context *ui = cui_create((cui_config){.width = 800, .height = 1000});
     assert(ui);

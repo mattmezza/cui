@@ -2,6 +2,7 @@
 #include "cui/cui_components.h"
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 static char clipboard[128];
@@ -528,6 +529,222 @@ static void size_metrics_and_centering(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+/* Portable host contract test: a deliberately reversed ASCII geometry isolates
+ * widget routing/lifetime from fonts. Native integration tests use real glyphs. */
+typedef struct {
+    unsigned creates, releases;
+    int mode;
+    const char *editor_buffer;
+} visual_host;
+typedef struct {
+    visual_host *host;
+    size_t length;
+    float unit;
+    char *text;
+} visual_session;
+static cui_text_layout_status host_carets(const void *user, size_t byte, cui_text_caret *out,
+                                          size_t capacity, size_t *count) {
+    const visual_session *session = user;
+    if (!count || byte > session->length || (session->host->mode == 3 && byte == 1))
+        return CUI_TEXT_LAYOUT_INVALID;
+    size_t needed = byte && byte < session->length ? 2 : session->length ? 1 : 2;
+    if (!out && !capacity) {
+        *count = needed;
+        return CUI_TEXT_LAYOUT_OK;
+    }
+    if (!out || capacity < needed)
+        return CUI_TEXT_LAYOUT_CAPACITY;
+    for (size_t i = 0; i < needed; ++i)
+        out[i] =
+            (cui_text_caret){byte,
+                             0,
+                             byte == session->length || i ? CUI_TEXT_UPSTREAM : CUI_TEXT_DOWNSTREAM,
+                             (session->length - byte) * session->unit,
+                             0,
+                             20};
+    *count = needed;
+    return CUI_TEXT_LAYOUT_OK;
+}
+static cui_text_layout_status host_hit(const void *user, float x, float y,
+                                       cui_text_affinity preferred, cui_text_caret *out) {
+    const visual_session *session = user;
+    if (!out || !isfinite(x) || !isfinite(y))
+        return CUI_TEXT_LAYOUT_INVALID;
+    size_t byte = x <= 0 ? session->length
+                  : x >= session->length * session->unit
+                      ? 0
+                      : (size_t)lroundf(session->length - x / session->unit);
+    *out = (cui_text_caret){byte, 0, preferred, (session->length - byte) * session->unit, 0, 20};
+    if (session->host->mode == 5)
+        out->x = NAN;
+    return CUI_TEXT_LAYOUT_OK;
+}
+static cui_text_layout_status host_selection(const void *user, size_t start, size_t end,
+                                             cui_text_selection_rect *out, size_t capacity,
+                                             size_t *count) {
+    const visual_session *session = user;
+    if (!count || start > end || end > session->length ||
+        (session->host->mode == 3 && (start == 1 || end == 1)))
+        return CUI_TEXT_LAYOUT_INVALID;
+    size_t needed = start == end ? 0 : session->host->mode == 4 ? 5000 : 1;
+    if (!out && !capacity) {
+        *count = needed;
+        return CUI_TEXT_LAYOUT_OK;
+    }
+    if (capacity < needed)
+        return CUI_TEXT_LAYOUT_CAPACITY;
+    if (needed)
+        out[0] = (cui_text_selection_rect){
+            {(session->length - end) * session->unit, 0, (end - start) * session->unit, 20},
+            start,
+            end,
+            0};
+    *count = needed;
+    return CUI_TEXT_LAYOUT_OK;
+}
+static void host_release(void *user) {
+    visual_session *session = user;
+    ++session->host->releases;
+    free(session->text);
+    free(session);
+}
+static cui_text_layout_status host_factory(void *user, cui_str text, float size,
+                                           cui_text_style style, cui_text_geometry *out) {
+    visual_host *host = user;
+    ++host->creates;
+    if (host->editor_buffer)
+        assert(text.data != host->editor_buffer);
+    assert(style.weight == CUI_TEXT_WEIGHT_NORMAL && !style.italic && !style.family);
+    static const cui_text_geometry_ops ops = {host_carets, host_hit, host_selection, host_release};
+    visual_session *session = calloc(1, sizeof *session);
+    assert(session);
+    session->host = host;
+    session->length = text.length;
+    session->unit = size * .5f;
+    session->text = malloc(text.length + 1);
+    assert(session->text);
+    if (text.length)
+        memcpy(session->text, text.data, text.length);
+    session->text[text.length] = 0;
+    *out = (cui_text_geometry){session, &ops, text.length * session->unit, 20, text.length};
+    if (host->mode == 1)
+        out->width = NAN;
+    if (host->mode == 2)
+        return CUI_TEXT_LAYOUT_CAPACITY; /* Defensive partial factory cleanup. */
+    return CUI_TEXT_LAYOUT_OK;
+}
+static cui_size visual_measure(void *user, cui_str text, float size) {
+    (void)user;
+    return (cui_size){text.length * size * .5f, 20};
+}
+static void visual_host_contract(void) {
+    visual_host host = {0};
+    cui_context *ui = cui_create((cui_config){
+        .measure = visual_measure, .measure_user = &host, .text_geometry = host_factory});
+    assert(ui);
+    cui_text_geometry geometry, before;
+    memset(&geometry, 0x37, sizeof geometry);
+    before = geometry;
+    host.mode = 1;
+    assert(cui_get_text_geometry(ui, cui_string("abc"), 14, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(!memcmp(&geometry, &before, sizeof geometry) && host.creates == 1 && host.releases == 1);
+    host.mode = 2;
+    assert(cui_get_text_geometry(ui, cui_string("abc"), 14, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_CAPACITY);
+    assert(!memcmp(&geometry, &before, sizeof geometry) && host.creates == 2 && host.releases == 2);
+    assert(cui_get_text_geometry(ui, cui_string("abc"), INFINITY, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(host.creates == 2 && host.releases == 2);
+    host.mode = 0;
+    assert(cui_get_text_geometry(ui, cui_string(""), 14, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_OK);
+    cui_release_text_geometry(&geometry);
+    cui_release_text_geometry(&geometry);
+    assert(host.creates == 3 && host.releases == 3);
+    char a[32] = "abc", b[32] = "wxy";
+    cui_edit *first = cui_edit_create((cui_edit_config){.buffer = a, .capacity = sizeof a});
+    cui_edit *second = cui_edit_create((cui_edit_config){.buffer = b, .capacity = sizeof b});
+    assert(first && second);
+    assert(cui_edit_select_atomic(first, 0, 0) == CUI_EDIT_OK);
+    assert(cui_edit_select_atomic(second, 0, 0) == CUI_EDIT_OK);
+    cui_input_state state = {0};
+    cui_theme theme = cui_theme_light();
+    for (unsigned frame = 0; frame < 4; ++frame) {
+        cui_edit *edit = frame < 2 ? first : second;
+        host.editor_buffer = frame < 2 ? a : b;
+        if (frame)
+            cui_focus(ui, 1);
+        if (frame == 3)
+            theme.font_size = 32;
+        unsigned previous = host.creates;
+        assert(cui_begin_frame(ui, 400, 100, .016f));
+        assert(cui_input_ex(ui, 1, &theme, cui_string("Visual"), edit, &state,
+                            (cui_input_options){.width = 200})
+                   .error == CUI_EDIT_OK);
+        cui_end_frame(ui);
+        assert(host.creates == previous + 1 && host.releases + 1 == host.creates);
+        if (frame) {
+            cui_rect ime, viewport = cui_bounds(ui, cui_input_viewport_id(1));
+            assert(cui_text_input_rect(ui, &ime));
+            assert(fabsf(ime.x - viewport.x + state.scroll_x -
+                         strlen(frame < 2 ? a : b) * 7 * theme.font_size / 16) < .01f);
+        }
+    }
+    /* A shaped-interior failure preserves logical editing selection; the entire
+     * line uses legacy geometry, rather than silently changing the byte offset. */
+    host.mode = 3;
+    assert(cui_edit_select_atomic(second, 1, 1) == CUI_EDIT_OK);
+    assert(cui_begin_frame(ui, 400, 100, .016f));
+    cui_input_ex(ui, 1, &theme, cui_string("Visual"), second, &state,
+                 (cui_input_options){.width = 200});
+    cui_end_frame(ui);
+    assert(cui_edit_get_state(second).cursor == 1);
+    cui_rect ime, viewport = cui_bounds(ui, cui_input_viewport_id(1));
+    assert(cui_text_input_rect(ui, &ime));
+    assert(fabsf(ime.x - viewport.x + state.scroll_x - 14) < .01f);
+    host.mode = 4;
+    assert(cui_edit_select_atomic(second, 0, 2) == CUI_EDIT_OK);
+    assert(cui_begin_frame(ui, 400, 100, .016f));
+    cui_input_ex(ui, 1, &theme, cui_string("Visual"), second, &state,
+                 (cui_input_options){.width = 200});
+    cui_end_frame(ui);
+    assert(cui_edit_get_state(second).anchor == 0 && cui_edit_get_state(second).cursor == 2);
+    host.mode = 5;
+    cui_text_geometry invalid_hit;
+    host.editor_buffer = NULL;
+    assert(cui_get_text_geometry(ui, cui_string(b), 28, (cui_text_style){0}, &invalid_hit) ==
+           CUI_TEXT_LAYOUT_OK);
+    cui_text_affinity affinity = CUI_TEXT_UPSTREAM;
+    cui_input_visual_hit_geometry hit = {{.ui = ui, .font_size = 28}, &invalid_hit, &affinity};
+    assert(cui_base_input_visual_hit_test(&hit, cui_string(b), 0, 0) == SIZE_MAX);
+    assert(affinity == CUI_TEXT_UPSTREAM);
+    cui_release_text_geometry(&invalid_hit);
+    host.editor_buffer = b;
+    host.mode = 0;
+    viewport = cui_bounds(ui, cui_input_viewport_id(1));
+    pointer(ui, CUI_EVENT_POINTER_DOWN, viewport.x + .01f, viewport.y + 2, 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
+    pointer(ui, CUI_EVENT_POINTER_UP, viewport.x + .01f, viewport.y + 2, 0);
+    unsigned creates = host.creates;
+    assert(cui_begin_frame(ui, 400, 100, .016f));
+    assert(cui_input_ex(ui, 1, &theme, cui_string("Visual"), second, &state,
+                        (cui_input_options){.width = 200})
+               .error == CUI_EDIT_OK);
+    cui_end_frame(ui);
+    assert(!strcmp(b, "wxyz") && cui_edit_get_state(second).cursor == 4);
+    assert(host.creates == creates + 2 && host.releases + 1 == host.creates);
+    for (unsigned omitted = 0; omitted < 2; ++omitted) {
+        assert(cui_begin_frame(ui, 400, 100, .016f));
+        cui_end_frame(ui);
+        assert(host.creates == host.releases);
+    }
+    /* Context destructor owns final session; models/state require no geometry cleanup. */
+    cui_edit_destroy(first);
+    cui_edit_destroy(second);
+    cui_destroy(ui);
+    assert(host.creates == host.releases);
+}
 #endif
 int main(void) {
     single_event_reduction();
@@ -542,6 +759,7 @@ int main(void) {
 #ifndef CUI_INPUT_BASE_ONLY
     paint_only_reduction();
     styled_selection();
+    visual_host_contract();
 #endif
     return 0;
 }

@@ -3315,6 +3315,49 @@ static void test_accessibility_capture_preservation(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void test_floating_ancestral_clips(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 128});
+    assert(ui);
+    cui_begin_frame(ui, 200, 160, .016f);
+    cui_begin_box(ui, 9800, (cui_box){.width = 80, .height = 80, .clip = true});
+    cui_begin_absolute_box(ui, 9801, (cui_box){.clip = true}, (cui_rect){0, -30, 80, 120});
+    cui_begin_absolute_box(ui, 9802, (cui_box){.background = {17, 0, 0, 255}},
+                           (cui_rect){0, 0, 20, 120});
+    cui_end_box(ui);
+    cui_begin_portal(ui, 9803, (cui_box){.clip = true}, (cui_rect){100, 10, 40, 40}, 4);
+    cui_begin_absolute_box(ui, 9804, (cui_box){.background = {23, 0, 0, 255}},
+                           (cui_rect){0, 0, 40, 40});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    cui_rect clips[64] = {{0, 0, 200, 160}};
+    size_t depth = 0;
+    bool nested = false, detached = false;
+    for (size_t i = 0; i < draw.count; i++) {
+        const cui_draw_command *d = &draw.commands[i];
+        if (d->type == CUI_DRAW_CLIP_PUSH) {
+            assert(depth + 1 < 64);
+            cui_rect a = clips[depth], b = d->bounds;
+            float x = fmaxf(a.x, b.x), y = fmaxf(a.y, b.y);
+            clips[++depth] = (cui_rect){x, y, fmaxf(0, fminf(a.x + a.w, b.x + b.w) - x),
+                                        fmaxf(0, fminf(a.y + a.h, b.y + b.h) - y)};
+        } else if (d->type == CUI_DRAW_CLIP_POP) {
+            assert(depth);
+            depth--;
+        } else if (d->type == CUI_DRAW_RECT && d->color.r == 17) {
+            assert(clips[depth].y == 0 && clips[depth].h == 80);
+            nested = true;
+        } else if (d->type == CUI_DRAW_RECT && d->color.r == 23) {
+            assert(clips[depth].x == 100 && clips[depth].w == 40);
+            assert(clips[depth].y == 10 && clips[depth].h == 40);
+            detached = true;
+        }
+    }
+    assert(!depth && nested && detached);
+    cui_destroy(ui);
+}
 int main(void) {
     test_accessibility_actions();
     test_accessibility_eligibility();
@@ -3390,6 +3433,7 @@ int main(void) {
     test_creation_overflow();
     test_focus_scopes();
     test_portals();
+    test_floating_ancestral_clips();
     test_child_alignment();
     test_invalid_portal_at_depth_limit();
     test_scope_dismissal();

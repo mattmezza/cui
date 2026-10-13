@@ -33,6 +33,7 @@ typedef struct {
     float width, label_width;
     bool custom_label_width, label_width_percent;
     cui_str name;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_description_options;
 cui_description_options cui_description_options_default(void);
 /* Columns clamp to 1..10 (zero chooses 3). Separators occupy isolated rows.
@@ -100,6 +101,37 @@ float cui_description_fraction(const cui_description_row *row, unsigned span, un
 /* src/components/cui_description.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
+
 #include <math.h>
 static cui_id cui_description_part(cui_id id, unsigned part) {
     return id ^ (UINT64_C(0x918c45e73f120a61) * (part + 1));
@@ -141,8 +173,9 @@ static void cui_description_content(cui_context *ui, cui_id id, const cui_theme 
 bool cui_description_list(cui_context *ui, cui_id id, const cui_theme *theme,
                           const cui_description_item *items, size_t count,
                           cui_description_options options) {
-    if (!ui || !id || !theme || (!items && count) || !isfinite(options.width) ||
-        options.width < -1 || !isfinite(theme->font_size) || theme->font_size <= 0 ||
+    if (!ui || !id || !theme || !cui_design_valid(options.design_size) || (!items && count) ||
+        !isfinite(options.width) || options.width < -1 || !isfinite(theme->font_size) ||
+        theme->font_size <= 0 ||
         (options.custom_label_width && (!isfinite(options.label_width) || options.label_width < 0)))
         return false;
     for (size_t i = 0; i < count; ++i) {
@@ -161,6 +194,18 @@ bool cui_description_list(cui_context *ui, cui_id id, const cui_theme *theme,
         px = 12;
         py = 6;
         gap = 8;
+    }
+    cui_theme scaled;
+    if (options.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(options.design_size, theme->font_size / 16, &d))
+            return false;
+        scaled = *theme;
+        scaled.font_size = d.font_size;
+        theme = &scaled;
+        px = d.padding_x;
+        py = d.padding_y;
+        gap = d.gap;
     }
     if (!bordered)
         px = py = 0;

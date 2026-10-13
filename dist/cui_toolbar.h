@@ -18,6 +18,7 @@ typedef struct {
     cui_toolbar_size size;
     float custom_size;
     float height, padding, gap, font_size, control_height;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_toolbar_metrics;
 /* Large resolves to Medium. Custom preserves its value for hosted controls,
  * but uses the source's Medium bar and Small wrapper height. */
@@ -40,7 +41,8 @@ typedef struct {
     bool disabled; /* Suppresses navigation only; owner disables child controls. */
     cui_str label;
     bool custom_box;
-    cui_box box; /* Complete layout/style replacement when custom_box is true. */
+    cui_box box;                 /* Complete layout/style replacement when custom_box is true. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_toolbar_options;
 cui_toolbar_options cui_toolbar_default(void);
 /* Sized-command renderer. Accessible name is independent of the visible label.
@@ -151,6 +153,37 @@ void cui_base_toolbar_group_end(cui_context *ui) {
 /* src/components/cui_toolbar.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
+
 #include <math.h>
 static bool cui_toolbar_items_valid(cui_id id, const cui_toolbar_item *items, size_t count) {
     if (!id || count > CUI_TOOLBAR_ITEM_LIMIT || (count && !items))
@@ -173,8 +206,19 @@ static bool cui_toolbar_render_items(cui_context *ui, cui_id id, const cui_theme
                                      cui_toolbar_options o, bool group) {
     cui_toolbar_metrics metrics;
     if (!ui || !theme || !cui_toolbar_items_valid(id, items, count) ||
-        !cui_toolbar_measure(o.size, o.custom_size, &metrics))
+        !cui_design_valid(o.design_size) || !cui_toolbar_measure(o.size, o.custom_size, &metrics))
         return false;
+    if (o.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(o.design_size, theme->font_size / 16, &d))
+            return false;
+        metrics.design_size = o.design_size;
+        metrics.height = d.control_height + 2 * d.padding_y;
+        metrics.padding = d.padding_y;
+        metrics.gap = d.gap;
+        metrics.font_size = d.font_size;
+        metrics.control_height = d.control_height;
+    }
     cui_box box = o.custom_box ? o.box
                                : (cui_box){.row = true,
                                            .align_y = CUI_ALIGN_CENTER,
@@ -213,11 +257,13 @@ bool cui_toolbar_group(cui_context *ui, cui_id id, const cui_theme *theme,
 void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
                                 const cui_toolbar_presentation *p, void *user) {
     cui_toolbar_command *c = user;
-    if (!ui || !theme || !p || !c || !c->id || (!c->label.data && c->label.length) ||
+    if (!ui || !theme || !p || !c || !cui_design_valid(p->metrics.design_size) || !c->id ||
+        (!c->label.data && c->label.length) ||
         (!c->accessible_name.data && c->accessible_name.length))
         return;
     cui_toolbar_presentation normalized = *p;
-    if (!cui_toolbar_measure(p->metrics.size, p->metrics.custom_size, &normalized.metrics))
+    if (!p->metrics.design_size &&
+        !cui_toolbar_measure(p->metrics.size, p->metrics.custom_size, &normalized.metrics))
         return;
     p = &normalized;
     cui_str name = c->accessible_name.length ? c->accessible_name : c->label;
@@ -248,8 +294,15 @@ void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
                       : p->metrics.size == CUI_TOOLBAR_SMALL  ? 14
                                                               : 16;
     float font_size = p->metrics.size == CUI_TOOLBAR_CUSTOM ? 16 : p->metrics.font_size;
+    if (p->metrics.design_size) {
+        icon_size = p->metrics.font_size;
+        font_size = p->metrics.font_size;
+        padding = p->metrics.gap;
+    }
     float gap =
         p->metrics.size == CUI_TOOLBAR_SMALL || p->metrics.size == CUI_TOOLBAR_XSMALL ? 4 : 8;
+    if (p->metrics.design_size)
+        gap = p->metrics.gap;
     cui_box box = {.height = height,
                    .row = true,
                    .align_x = CUI_ALIGN_CENTER,

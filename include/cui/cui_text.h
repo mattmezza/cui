@@ -40,6 +40,9 @@ bool cui_font_register_fallbacks(cui_font *font, const char *const *paths, size_
 bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font_metrics *out);
 cui_size cui_font_measure(void *font, cui_str text, float size);
 cui_size cui_font_measure_styled(void *font, cui_str text, float size, cui_text_style style);
+/* Optional owned visual session factory for cui_config.text_geometry; shares font user. */
+cui_text_layout_status cui_font_text_geometry(void *font, cui_str text, float size,
+                                              cui_text_style style, cui_text_geometry *out);
 bool cui_font_draw(cui_font *font, cui_str text, float size, float x, float y, cui_glyph_fn emit,
                    void *user);
 bool cui_font_draw_styled(cui_font *font, cui_str text, float size, cui_text_style style, float x,
@@ -65,16 +68,6 @@ typedef struct {
     size_t byte_start, byte_end, run_index, glyph_start, glyph_count;
     float left, right;
 } cui_text_cluster;
-typedef enum { CUI_TEXT_UPSTREAM, CUI_TEXT_DOWNSTREAM } cui_text_affinity;
-typedef struct {
-    size_t byte_offset, run_index;
-    cui_text_affinity affinity;
-    float x, y, height;
-} cui_text_caret;
-typedef struct {
-    cui_rect bounds;
-    size_t byte_start, byte_end, run_index;
-} cui_text_selection_rect;
 typedef struct {
     const cui_text_glyph *glyphs;
     const cui_text_run *runs;
@@ -86,14 +79,6 @@ typedef struct {
     const cui_text_cluster *clusters; /* Visual left-to-right order; zero spans retained. */
     size_t cluster_count, byte_start, byte_end;
 } cui_text_layout_view;
-typedef enum {
-    CUI_TEXT_LAYOUT_OK,
-    CUI_TEXT_LAYOUT_INVALID,
-    CUI_TEXT_LAYOUT_MEMORY,
-    CUI_TEXT_LAYOUT_UNAVAILABLE,
-    CUI_TEXT_LAYOUT_MISSING_GLYPH,
-    CUI_TEXT_LAYOUT_CAPACITY
-} cui_text_layout_status;
 /* Analyze a full paragraph, shape one caller-selected scalar line. SIZE_MAX
  * length means through paragraph end. Empty ranges return paragraph metrics.
  * Choose complete grapheme/shaping cluster

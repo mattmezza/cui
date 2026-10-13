@@ -4,12 +4,19 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 int main(void) {
     cui_text_layout *sentinel = (cui_text_layout *)(void *)&sentinel;
     cui_text_layout *before = sentinel;
     assert(cui_font_layout_line(NULL, (cui_str){0}, 0, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 0, 0,
                                 NULL, &sentinel) == CUI_TEXT_LAYOUT_UNAVAILABLE);
     assert(sentinel == before);
+    cui_text_geometry unavailable, original_geometry;
+    memset(&unavailable, 0x37, sizeof unavailable);
+    original_geometry = unavailable;
+    assert(cui_font_text_geometry(NULL, (cui_str){0}, 24, (cui_text_style){0}, &unavailable) ==
+           CUI_TEXT_LAYOUT_UNAVAILABLE);
+    assert(!memcmp(&unavailable, &original_geometry, sizeof unavailable));
     size_t unchanged = 123;
     cui_text_caret caret = {0}, original = caret;
     assert(cui_text_layout_carets(NULL, 0, &caret, 1, &unchanged) == CUI_TEXT_LAYOUT_UNAVAILABLE);
@@ -587,6 +594,70 @@ static void arabic_clusters(void) {
     printf("Arabic joining/mark raster passed using %s\n", path);
 }
 
+static void visual_factory_contract(const char *primary, const char *arabic) {
+    cui_font *font = cui_font_open(primary);
+    assert(font);
+    const char *paths[] = {arabic};
+    assert(cui_font_register_fallbacks(font, paths, 1));
+    char original[] = "السَّلَامُ";
+    cui_text_geometry geometry, untouched;
+    memset(&geometry, 0x37, sizeof geometry);
+    untouched = geometry;
+    assert(cui_font_text_geometry(font, string("a\n b"), 24, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(!memcmp(&geometry, &untouched, sizeof geometry));
+    assert(cui_font_text_geometry(font, string("a b"), 24, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(!memcmp(&geometry, &untouched, sizeof geometry));
+    assert(cui_font_text_geometry(font, string(original), NAN, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(!memcmp(&geometry, &untouched, sizeof geometry));
+    cui_text_style style = {.weight = CUI_TEXT_WEIGHT_BOLD, .italic = true};
+    assert(cui_font_text_geometry(font, string(original), 24, style, &geometry) ==
+           CUI_TEXT_LAYOUT_OK);
+    cui_size measured = cui_font_measure_styled(font, string(original), 24, style);
+    close_float(geometry.width, measured.width);
+    close_float(geometry.height, measured.height);
+    size_t byte_length = strlen(original);
+    memset(original, 'x', byte_length);
+    assert(cui_font_register_fallbacks(font, NULL, 0));
+    cui_font_close(font);
+    /* Querying the retained geometry never calls the now-closed host font. */
+    cui_text_caret edge, before;
+    memset(&edge, 0x51, sizeof edge);
+    before = edge;
+    size_t count = 991;
+    assert(geometry.ops->carets(geometry.session, 0, &edge, 0, &count) == CUI_TEXT_LAYOUT_CAPACITY);
+    assert(count == 991 && !memcmp(&edge, &before, sizeof edge));
+    assert(geometry.ops->carets(geometry.session, 1, &edge, 1, &count) == CUI_TEXT_LAYOUT_INVALID);
+    assert(count == 991 && !memcmp(&edge, &before, sizeof edge));
+    assert(geometry.ops->carets(geometry.session, 0, &edge, 1, &count) == CUI_TEXT_LAYOUT_OK);
+    close_float(edge.x, geometry.width);
+    cui_text_selection_rect selected, prior;
+    memset(&selected, 0x51, sizeof selected);
+    prior = selected;
+    count = 991;
+    assert(geometry.ops->selection(geometry.session, 0, byte_length, &selected, 0, &count) ==
+           CUI_TEXT_LAYOUT_CAPACITY);
+    assert(count == 991 && !memcmp(&selected, &prior, sizeof selected));
+    before = edge;
+    assert(geometry.ops->hit_test(geometry.session, INFINITY, 0, CUI_TEXT_DOWNSTREAM, &edge) ==
+           CUI_TEXT_LAYOUT_INVALID);
+    assert(!memcmp(&edge, &before, sizeof edge));
+    cui_release_text_geometry(&geometry);
+    cui_release_text_geometry(&geometry);
+    font = cui_font_open(primary);
+    assert(font);
+    assert(cui_font_text_geometry(font, string(""), 24, (cui_text_style){0}, &geometry) ==
+           CUI_TEXT_LAYOUT_OK);
+    cui_text_caret empty[2];
+    assert(geometry.ops->carets(geometry.session, 0, empty, 2, &count) == CUI_TEXT_LAYOUT_OK &&
+           count == 2);
+    assert(empty[0].x == 0 && empty[1].x == 0 && geometry.byte_length == 0);
+    cui_font_close(font);
+    cui_release_text_geometry(&geometry);
+}
+
 static void geometry(cui_font *font) {
     cui_text_layout *layout = NULL;
     cui_text_layout_view view;
@@ -748,6 +819,7 @@ int main(void) {
     assert(cui_font_set_fallbacks(font, fallbacks, fallback_reference_count));
     fallback_contracts(path, fallbacks, fallback_reference_count, fallback_paths[0]);
     geometry(font);
+    visual_factory_contract(path, fallback_paths[0]);
     if (!FT_Get_Char_Index(face, 0x627)) {
         cui_font *without = cui_font_open(path);
         cui_text_layout *missing = NULL;

@@ -25,14 +25,19 @@ void cui_table_begin(cui_context *ui, cui_id id, const cui_theme *t, float width
 }
 void cui_table_begin_row(cui_context *ui, cui_id id, const cui_theme *t, float height,
                          bool header) {
+    cui_table_begin_row_ex(ui, id, t, (cui_table_row_options){.height = height, .header = header});
+}
+void cui_table_begin_row_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                            cui_table_row_options o) {
     if (!ui || !t)
         return;
-    cui_interact(ui, id, CUI_ROLE_ROW, cui_string(header ? "Header" : "Row"), false, false, 0);
+    cui_interact(ui, id, CUI_ROLE_ROW, cui_string(o.header ? "Header" : "Row"), false, false, 0);
     cui_set_tab_stop(ui, id, false);
     cui_begin_box(ui, id,
-                  (cui_box){.height = height,
+                  (cui_box){.height = o.height,
                             .row = true,
-                            .background = header ? t->background : t->surface});
+                            .background = o.custom_background ? o.background
+                                          : o.header ? t->background : t->surface});
 }
 void cui_table_begin_cell(cui_context *ui, cui_id id, float width, float height,
                           cui_table_align a) {

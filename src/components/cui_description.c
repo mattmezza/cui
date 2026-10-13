@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_description.h"
+#include "../base/cui_design_metrics.h"
 #include <math.h>
 static cui_id cui_description_part(cui_id id, unsigned part) {
     return id ^ (UINT64_C(0x918c45e73f120a61) * (part + 1));
@@ -41,8 +42,9 @@ static void cui_description_content(cui_context *ui, cui_id id, const cui_theme 
 bool cui_description_list(cui_context *ui, cui_id id, const cui_theme *theme,
                           const cui_description_item *items, size_t count,
                           cui_description_options options) {
-    if (!ui || !id || !theme || (!items && count) || !isfinite(options.width) ||
-        options.width < -1 || !isfinite(theme->font_size) || theme->font_size <= 0 ||
+    if (!ui || !id || !theme || !cui_design_valid(options.design_size) || (!items && count) ||
+        !isfinite(options.width) || options.width < -1 || !isfinite(theme->font_size) ||
+        theme->font_size <= 0 ||
         (options.custom_label_width && (!isfinite(options.label_width) || options.label_width < 0)))
         return false;
     for (size_t i = 0; i < count; ++i) {
@@ -61,6 +63,18 @@ bool cui_description_list(cui_context *ui, cui_id id, const cui_theme *theme,
         px = 12;
         py = 6;
         gap = 8;
+    }
+    cui_theme scaled;
+    if (options.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(options.design_size, theme->font_size / 16, &d))
+            return false;
+        scaled = *theme;
+        scaled.font_size = d.font_size;
+        theme = &scaled;
+        px = d.padding_x;
+        py = d.padding_y;
+        gap = d.gap;
     }
     if (!bordered)
         px = py = 0;

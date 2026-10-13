@@ -298,6 +298,27 @@ void cui_sdl3_size(cui_sdl3 *s, float *w, float *h) {
     *h = (float)y;
     SDL_SetRenderLogicalPresentation(s->renderer, x, y, SDL_LOGICAL_PRESENTATION_STRETCH);
 }
+bool cui_sdl3_accessibility_window(cui_sdl3 *s, cui_accessibility_window *out) {
+    if (!s || !out)
+        return false;
+    int width = 0, height = 0, x = 0, y = 0, top = 0, left = 0, bottom = 0, right = 0;
+    if (!SDL_GetWindowSize(s->window, &width, &height))
+        return false;
+    const char *driver = SDL_GetCurrentVideoDriver();
+    bool screen = driver && strcmp(driver, "x11") == 0 && SDL_GetWindowPosition(s->window, &x, &y);
+    if (screen)
+        SDL_GetWindowBordersSize(s->window, &top, &left, &bottom, &right);
+    const char *title = SDL_GetWindowTitle(s->window);
+    cui_accessibility_window result = {
+        .outer = {(float)x - left, (float)y - top, (float)width + left + right,
+                  (float)height + top + bottom},
+        .inner = {(float)x, (float)y, (float)width, (float)height},
+        .title = {title, title ? strlen(title) : 0},
+        .focused = (SDL_GetWindowFlags(s->window) & SDL_WINDOW_INPUT_FOCUS) != 0,
+        .has_screen_position = screen};
+    *out = result;
+    return true;
+}
 static bool fill_span(cui_sdl3 *s, const cui_draw_command *c, float left, float right, float y,
                       float height) {
     float x0 = ceilf(c->bounds.x + left - .5f);

@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
+#include "../../src/base/cui_design_metrics.h"
 #include "cui/cui_components.h"
+#include "cui/cui_media.h"
+#include "cui/cui_status.h"
 #include "cui/cui_textarea.h"
 #include <assert.h>
 #include <math.h>
@@ -1405,7 +1408,100 @@ static void test_source_separator(void) {
     assert(!list.count && cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+
+static void additional_design_scale(void) {
+    static unsigned char circle_pixels[1056 * 1056 * 4];
+    cui_progress_circle_state circle = {circle_pixels, sizeof circle_pixels, 0};
+    const float densities[] = {1, .875f, 2};
+    for (size_t k = 0; k < 3; k++) {
+        cui_theme theme = cui_theme_light();
+        theme.font_size = 16 * densities[k];
+        for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+            cui_design_size size = (cui_design_size)n;
+            cui_design_metrics expected, private_metrics;
+            assert(cui_design_measure(size, densities[k], &expected));
+            assert(cui_design_resolve(size, densities[k], &private_metrics));
+            assert(!memcmp(&expected, &private_metrics, sizeof(expected)));
+            cui_tag_style style;
+            assert(cui_tag_resolve(&theme, (cui_tag_options){.design_size = size}, false, &style));
+            assert(style.font_size == expected.font_size);
+            assert(style.padding_y == expected.padding_y);
+            cui_tag_style before = style;
+            assert(!cui_tag_resolve(&theme, (cui_tag_options){.design_size = (cui_design_size)99},
+                                    false, &style));
+            assert(!memcmp(&before, &style, sizeof(style)));
+            cui_attachment_model model = cui_attachment_model_default();
+            model.design_size = size;
+            model.root_font_size = theme.font_size;
+            cui_attachment_plan plan;
+            assert(cui_base_attachment(model, &plan));
+            assert(plan.metrics.text == expected.font_size);
+            assert(plan.metrics.height == expected.control_height);
+            assert(plan.metrics.glyph == expected.indicator_size);
+            cui_attachment_plan original = plan;
+            model.design_size = (cui_design_size)99;
+            assert(!cui_base_attachment(model, &plan));
+            assert(!memcmp(&original, &plan, sizeof(plan)));
+            cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1800});
+            assert(ui);
+            unsigned badge_calls = 0;
+            for (int frame = 0; frame < 2; frame++) {
+                assert(cui_begin_frame(ui, 1800, 1800, .016f));
+                cui_begin_box(ui, 800, (cui_box){.width = 1800, .height = 1800});
+                cui_progress_ex(ui, 801, &theme, .5f, 1000,
+                                (cui_progress_options){.design_size = size});
+                cui_progress_circle(
+                    ui, 803, &theme, .5f, &circle,
+                    (cui_progress_circle_options){.progress = {.design_size = size}}, NULL, NULL);
+                assert(cui_badge_ex(
+                    ui, 804, &theme,
+                    (cui_badge_options){.design_size = size, .count = 7, .maximum = 99},
+                    badge_content, &badge_calls));
+                assert(cui_tag(ui, 802, &theme, cui_string("Sized tag"),
+                               (cui_tag_options){.design_size = size}));
+                cui_end_box(ui);
+                cui_draw_list draw = cui_end_frame(ui);
+                assert(cui_last_error(ui) == CUI_OK);
+                assert(cui_bounds(ui, 801).h == expected.control_height * .25f);
+                assert(cui_bounds(ui, 803).h == expected.control_height);
+                cui_rect badge = cui_bounds(ui, 804 ^ UINT64_C(0x2780a7c4f39251db));
+                assert(badge.h == expected.line_height * .75f + expected.padding_y);
+                bool text = false;
+                for (size_t j = 0; j < draw.count; j++)
+                    if (draw.commands[j].type == CUI_DRAW_TEXT &&
+                        draw.commands[j].text.length == 9 &&
+                        !memcmp(draw.commands[j].text.data, "Sized tag", 9)) {
+                        text = true;
+                        assert(draw.commands[j].font_size == expected.font_size);
+                    }
+                assert(text);
+            }
+            assert(badge_calls == 2);
+            assert(cui_begin_frame(ui, 1800, 1800, .016f));
+            assert(!cui_badge_ex(ui, 804, &theme,
+                                 (cui_badge_options){.design_size = (cui_design_size)99},
+                                 badge_content, &badge_calls));
+            assert(badge_calls == 2);
+            cui_progress_ex(ui, 900, &theme, .5f, 1000,
+                            (cui_progress_options){.design_size = (cui_design_size)99});
+            assert(!cui_tag(ui, 901, &theme, cui_string("Invalid"),
+                            (cui_tag_options){.design_size = (cui_design_size)99}));
+            cui_end_frame(ui);
+            size_t count;
+            cui_semantics(ui, &count);
+            assert(count == 0 && cui_last_error(ui) == CUI_OK);
+            cui_destroy(ui);
+        }
+    }
+    cui_design_metrics sentinel = {1, 2, 3, 4, 5, 6, 7}, result = sentinel;
+    assert(!cui_design_resolve(CUI_DESIGN_INHERIT, 1, &result));
+    assert(!cui_design_resolve((cui_design_size)99, 1, &result));
+    assert(!cui_design_resolve(CUI_DESIGN_XL, NAN, &result));
+    assert(!memcmp(&result, &sentinel, sizeof(result)));
+}
+
 int main(void) {
+    additional_design_scale();
     test_source_separator();
     design_scale();
     test_badge_variants();

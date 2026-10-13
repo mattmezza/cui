@@ -399,6 +399,44 @@ typedef struct {
 } cui_font_metrics;
 typedef bool (*cui_font_metrics_fn)(void *user, float font_size, cui_text_style style,
                                     cui_font_metrics *out);
+typedef enum { CUI_TEXT_UPSTREAM, CUI_TEXT_DOWNSTREAM } cui_text_affinity;
+typedef struct {
+    size_t byte_offset, run_index;
+    cui_text_affinity affinity;
+    float x, y, height;
+} cui_text_caret;
+typedef struct {
+    cui_rect bounds;
+    size_t byte_start, byte_end, run_index;
+} cui_text_selection_rect;
+typedef enum {
+    CUI_TEXT_LAYOUT_OK,
+    CUI_TEXT_LAYOUT_INVALID,
+    CUI_TEXT_LAYOUT_MEMORY,
+    CUI_TEXT_LAYOUT_UNAVAILABLE,
+    CUI_TEXT_LAYOUT_MISSING_GLYPH,
+    CUI_TEXT_LAYOUT_CAPACITY
+} cui_text_layout_status;
+/* Owned, immutable single-line geometry. Factory consumes borrowed text only
+ * synchronously; session must retain everything its queries need. Queries use
+ * original UTF-8 offsets. Invalid/capacity failures preserve buffers/counts.
+ * At most two caret affinities per boundary. No interior-ligature/GDEF promise. */
+typedef struct cui_text_geometry_ops {
+    cui_text_layout_status (*carets)(const void *, size_t, cui_text_caret *, size_t, size_t *);
+    cui_text_layout_status (*hit_test)(const void *, float, float, cui_text_affinity,
+                                       cui_text_caret *);
+    cui_text_layout_status (*selection)(const void *, size_t, size_t, cui_text_selection_rect *,
+                                        size_t, size_t *);
+    void (*release)(void *);
+} cui_text_geometry_ops;
+typedef struct {
+    void *session;
+    const cui_text_geometry_ops *ops; /* Must remain valid until release. */
+    float width, height;
+    size_t byte_length;
+} cui_text_geometry;
+typedef cui_text_layout_status (*cui_text_geometry_fn)(void *, cui_str, float, cui_text_style,
+                                                       cui_text_geometry *);
 typedef struct {
     float width, height;
     size_t max_elements, max_commands, frame_bytes;
@@ -410,6 +448,8 @@ typedef struct {
     size_t max_resources, resource_bytes;
     size_t event_text_bytes;          /* Aggregate queued payload bound; zero = 65536. */
     cui_font_metrics_fn font_metrics; /* Optional; shares measure_user. */
+    cui_text_geometry_fn
+        text_geometry; /* Optional single-line visual factory; shares measure_user. */
 } cui_config;
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
@@ -469,6 +509,12 @@ void cui_text_line(cui_context *, cui_str, float font_size, cui_color, float lin
 /* Uses the same configured font measurement as layout; no frame allocation. */
 /* Returns false without a provider or for invalid arguments/results. Failure
  * preserves out; no approximate baseline is fabricated from text height. */
+/* Factory failure preserves out. Successful sessions require exactly one release.
+ * No callback returns UNAVAILABLE. Helper rejects nonfinite/malformed metadata. */
+cui_text_layout_status cui_get_text_geometry(cui_context *, cui_str, float, cui_text_style,
+                                             cui_text_geometry *out);
+void cui_release_text_geometry(cui_text_geometry *);
+bool cui_has_text_geometry(const cui_context *);
 bool cui_measure_font_metrics(cui_context *, float font_size, cui_text_style,
                               cui_font_metrics *out);
 cui_size cui_measure_text(cui_context *, cui_str text, float font_size);
@@ -583,6 +629,9 @@ float cui_frame_delta(cui_context *);
 double cui_frame_time(cui_context *);
 /* Host candidate-window rectangle, logical pixels, last painted focused caret. */
 void cui_set_text_input_rect(cui_context *, cui_id, cui_rect);
+/* Resolve a painted caret child's final layout bounds for the IME line box.
+ * Call during the frame; query text_input_rect after end_frame. */
+bool cui_set_text_input_geometry_rect(cui_context *, cui_id owner, cui_id caret, float line_height);
 bool cui_text_input_rect(const cui_context *, cui_rect *);
 bool cui_reduced_motion(cui_context *);
 void cui_set_reduced_motion(cui_context *, bool);

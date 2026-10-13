@@ -106,6 +106,7 @@ typedef struct {
     float progress, root_font_size, custom_density, width, media_aspect;
     bool title_status_override, description_status_override;
     cui_attachment_status title_status, description_status;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_attachment_model;
 typedef struct {
     cui_attachment_metrics metrics;

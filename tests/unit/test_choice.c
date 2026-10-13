@@ -1952,8 +1952,10 @@ static void test_tab_overflow_menu(void) {
     bool caret = false;
     for (size_t i = 0; i < dropdown_draw.count; i++)
         caret |= dropdown_draw.commands[i].type == CUI_DRAW_IMAGE &&
-                 dropdown_draw.commands[i].bitmap.bitmap.width == 12;
+                 dropdown_draw.commands[i].bitmap.bitmap.width == 16;
     assert(caret);
+    cui_rect hit = cui_bounds(ui, 3101);
+    assert(hit.w == hit.h && hit.w >= 32);
     click(ui, 3101);
     tab_overflow_scene(ui, &scroll, &overflow, &value, 110, 3);
     assert(overflow.menu.overlay.open);
@@ -4361,8 +4363,84 @@ static void test_select_trigger_center(void) {
         }
     }
 }
+
+static void test_tabs_dropdown_design_scale(void) {
+    const float densities[] = {1, .875f, 2};
+    for (size_t d = 0; d < 3; d++) {
+        cui_theme theme = cui_theme_light();
+        theme.font_size = 16 * densities[d];
+        for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+            cui_design_size size = (cui_design_size)n;
+            cui_design_metrics m;
+            assert(cui_design_measure(size, densities[d], &m));
+            cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1800});
+            assert(ui);
+            cui_menu_tree_state menu;
+            cui_menu_tree_init(&menu, 2010);
+            cui_id action = 0;
+            dropdown_scene(ui, &menu, &action, &theme,
+                           (cui_dropdown_button_options){.design_size = size});
+            assert(cui_bounds(ui, 2001).h == m.control_height);
+            assert(cui_bounds(ui, 2002).h == m.control_height);
+            assert(cui_begin_frame(ui, 1800, 1800, .016f));
+            cui_tabs(ui, 1, &theme, items, 3, &selected, (cui_tabs_options){.design_size = size},
+                     NULL, NULL);
+            cui_end_frame(ui);
+            assert(cui_bounds(ui, 10).h == m.control_height);
+            cui_id saved = selected;
+            assert(cui_begin_frame(ui, 1800, 1800, .016f));
+            assert(!cui_tabs(ui, 1, &theme, items, 3, &selected,
+                             (cui_tabs_options){.design_size = (cui_design_size)99}, NULL, NULL));
+            cui_end_frame(ui);
+            size_t count;
+            cui_semantics(ui, &count);
+            assert(count == 0 && selected == saved && cui_last_error(ui) == CUI_OK);
+            cui_destroy(ui);
+        }
+    }
+}
+
+static void test_tab_overflow_square_both_axes(void) {
+    for (int axis = 0; axis < 2; axis++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        cui_tab_scroll_state scroll = {0};
+        cui_tab_overflow overflow;
+        cui_menu_entry scratch[3];
+        cui_tab_overflow_init(&overflow, 3100, 3101, scratch, 3);
+        cui_id value = 10;
+        cui_begin_frame(ui, 640, 480, .016f);
+        cui_tabs(ui, 1, &theme, items, 3, &value,
+                 (cui_tabs_options){.scroll = &scroll,
+                                    .bar_extent = 20,
+                                    .max_width = 100,
+                                    .overflow = &overflow,
+                                    .vertical = axis != 0,
+                                    .design_size = CUI_DESIGN_XS,
+                                    .density = .875f},
+                 NULL, NULL);
+        cui_draw_list draw = cui_end_frame(ui);
+        cui_rect button = cui_bounds(ui, 3101);
+        assert(overflow.visible && button.w == 32 && button.h == 32 &&
+               cui_last_error(ui) == CUI_OK);
+        bool centered = false;
+        for (size_t i = 0; i < draw.count; i++) {
+            cui_draw_command c = draw.commands[i];
+            if (c.type == CUI_DRAW_IMAGE)
+                centered |=
+                    fabsf(c.bounds.x + c.bounds.w * .5f - button.x - button.w * .5f) < .1f &&
+                    fabsf(c.bounds.y + c.bounds.h * .5f - button.y - button.h * .5f) < .1f;
+        }
+        assert(centered);
+        cui_destroy(ui);
+    }
+}
+
 int main(void) {
     test_select_trigger_center();
+    test_tab_overflow_square_both_axes();
+    test_tabs_dropdown_design_scale();
     test_design_scale_rows_and_triggers();
     test_menu_popup_paint_composition();
     test_dropdown_real_artwork();

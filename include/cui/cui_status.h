@@ -59,6 +59,7 @@ typedef struct {
     float radius;
     cui_color background, foreground, border;
     cui_tag_palette palette;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_tag_options;
 typedef struct {
     cui_color background, foreground, border;

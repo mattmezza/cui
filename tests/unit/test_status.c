@@ -741,8 +741,63 @@ static void notification_intent_artwork(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_STATUS_BASE_ONLY
+static void notification_separate_actions(void) {
+    float widths[] = {260, 320, 390};
+    for (size_t width = 0; width < 3; width++) {
+        cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+        assert(ui);
+        cui_notification_entry entries[1];
+        cui_notification_state state;
+        notification_counts counts = {0};
+        cui_notification_settings settings = cui_notification_settings_default();
+        settings.width = widths[width];
+        settings.reduced_motion = true;
+        assert(cui_notification_init(&state, entries, 1, settings, (cui_notification_host){0}));
+        cui_notification n = cui_notification_default();
+        n.id = (cui_notification_id){99, 1};
+        n.kind = CUI_NOTIFICATION_WARNING;
+        n.title = cui_string("A longer workspace update title");
+        n.message = cui_string("Tasks are ready for review.");
+        n.action_label = cui_string("Review");
+        n.on_action = activate_notification;
+        n.on_close = close_notification;
+        n.user = &counts;
+        n.autohide = false;
+        assert(cui_notification_push(&state, n, 0));
+        notification_frame(ui, &state, .4);
+        notification_frame(ui, &state, .5);
+        cui_rect card = entries[0].bounds;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                               .x = card.x + 30, .y = card.y + 30}));
+        notification_frame(ui, &state, .6);
+        notification_frame(ui, &state, .7);
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        cui_rect action = {0}, close = {0};
+        for (size_t i = 0; i < count; i++) {
+            if (sem[i].name.length == 6 && !memcmp(sem[i].name.data, "Review", 6))
+                action = sem[i].bounds;
+            if (sem[i].name.length == 5 && !memcmp(sem[i].name.data, "Close", 5))
+                close = sem[i].bounds;
+        }
+        assert(action.w > 0 && close.w > 0);
+        assert(action.x + action.w <= close.x || close.x + close.w <= action.x ||
+               action.y + action.h <= close.y || close.y + close.h <= action.y);
+        pointer_notification(ui, action, CUI_POINTER_PRIMARY);
+        notification_frame(ui, &state, .8);
+        assert(counts.activated == 1 && counts.closed == 0);
+        pointer_notification(ui, close, CUI_POINTER_PRIMARY);
+        notification_frame(ui, &state, .9);
+        notification_frame(ui, &state, 1.1);
+        assert(counts.activated == 1 && counts.closed == 1);
+        cui_destroy(ui);
+    }
+}
+#endif
 int main(void) {
 #ifndef CUI_STATUS_BASE_ONLY
+    notification_separate_actions();
     notification_intent_artwork();
 #endif
     marker_models();

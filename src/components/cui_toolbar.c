@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_toolbar.h"
+#include "../base/cui_design_metrics.h"
 #include <math.h>
 static bool cui_toolbar_items_valid(cui_id id, const cui_toolbar_item *items, size_t count) {
     if (!id || count > CUI_TOOLBAR_ITEM_LIMIT || (count && !items))
@@ -22,8 +23,19 @@ static bool cui_toolbar_render_items(cui_context *ui, cui_id id, const cui_theme
                                      cui_toolbar_options o, bool group) {
     cui_toolbar_metrics metrics;
     if (!ui || !theme || !cui_toolbar_items_valid(id, items, count) ||
-        !cui_toolbar_measure(o.size, o.custom_size, &metrics))
+        !cui_design_valid(o.design_size) || !cui_toolbar_measure(o.size, o.custom_size, &metrics))
         return false;
+    if (o.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(o.design_size, theme->font_size / 16, &d))
+            return false;
+        metrics.design_size = o.design_size;
+        metrics.height = d.control_height + 2 * d.padding_y;
+        metrics.padding = d.padding_y;
+        metrics.gap = d.gap;
+        metrics.font_size = d.font_size;
+        metrics.control_height = d.control_height;
+    }
     cui_box box = o.custom_box ? o.box
                                : (cui_box){.row = true,
                                            .align_y = CUI_ALIGN_CENTER,
@@ -62,11 +74,13 @@ bool cui_toolbar_group(cui_context *ui, cui_id id, const cui_theme *theme,
 void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
                                 const cui_toolbar_presentation *p, void *user) {
     cui_toolbar_command *c = user;
-    if (!ui || !theme || !p || !c || !c->id || (!c->label.data && c->label.length) ||
+    if (!ui || !theme || !p || !c || !cui_design_valid(p->metrics.design_size) || !c->id ||
+        (!c->label.data && c->label.length) ||
         (!c->accessible_name.data && c->accessible_name.length))
         return;
     cui_toolbar_presentation normalized = *p;
-    if (!cui_toolbar_measure(p->metrics.size, p->metrics.custom_size, &normalized.metrics))
+    if (!p->metrics.design_size &&
+        !cui_toolbar_measure(p->metrics.size, p->metrics.custom_size, &normalized.metrics))
         return;
     p = &normalized;
     cui_str name = c->accessible_name.length ? c->accessible_name : c->label;
@@ -97,8 +111,15 @@ void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
                       : p->metrics.size == CUI_TOOLBAR_SMALL  ? 14
                                                               : 16;
     float font_size = p->metrics.size == CUI_TOOLBAR_CUSTOM ? 16 : p->metrics.font_size;
+    if (p->metrics.design_size) {
+        icon_size = p->metrics.font_size;
+        font_size = p->metrics.font_size;
+        padding = p->metrics.gap;
+    }
     float gap =
         p->metrics.size == CUI_TOOLBAR_SMALL || p->metrics.size == CUI_TOOLBAR_XSMALL ? 4 : 8;
+    if (p->metrics.design_size)
+        gap = p->metrics.gap;
     cui_box box = {.height = height,
                    .row = true,
                    .align_x = CUI_ALIGN_CENTER,

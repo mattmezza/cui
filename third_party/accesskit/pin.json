@@ -1,0 +1,13 @@
+{
+  "version": "0.23.0",
+  "commit": "0824c4a1e3a4d13ce5582df20e394fba49485a15",
+  "archive_url": "https://codeload.github.com/AccessKit/accesskit-c/tar.gz/0824c4a1e3a4d13ce5582df20e394fba49485a15",
+  "archive_sha256": "19c3ecda791acb100b43442adb8738e245dd14ad641de5fa2b494ac52a9f11a9",
+  "cargo_lock_sha256": "20d2800d223fee92c5679ae3bb5ce8f1e47fcfeaffcad43cc94436bc81dd70cf",
+  "rust_source_commit": "42e53b0d829e7a0b34dc8803bb06012db2e80cc6",
+  "rust_notice_sha256": {
+    "LICENSE-Rust-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "LICENSE-Rust-APACHE": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+    "LICENSE-Rust-chromium": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308"
+  }
+}

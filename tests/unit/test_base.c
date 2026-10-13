@@ -238,6 +238,27 @@ static void progress_circle_geometry_and_pixels(void) {
                                       &bitmap));
     for (size_t j = 3; j < bitmap.stride * bitmap.height; j += 4)
         assert(pixels[j] == 0);
+
+    /* Enlarged design sizes need no hidden allocation. Insufficient caller
+       capacity leaves both bitmap metadata and pixel bytes untouched. */
+    cui_progress_circle_geometry enlarged;
+    assert(cui_progress_circle_measure(cui_progress_measure(.5f, false, true, 0, false), 264,
+                                       &enlarged));
+    cui_bitmap previous = bitmap;
+    unsigned char original[sizeof pixels];
+    memcpy(original, pixels, sizeof pixels);
+    assert(!cui_progress_circle_raster(enlarged, (cui_color){10, 20, 30, 255}, 2, pixels,
+                                       sizeof pixels, &bitmap));
+    assert(!memcmp(&bitmap, &previous, sizeof(bitmap)) && !memcmp(pixels, original, sizeof pixels));
+    assert(cui_progress_circle_measure(cui_progress_measure(.5f, false, true, 0, false), 4096,
+                                       &enlarged));
+    cui_progress_circle_geometry limit = enlarged;
+    assert(!cui_progress_circle_measure(cui_progress_measure(.5f, false, true, 0, false), 4097,
+                                        &enlarged));
+    assert(!memcmp(&limit, &enlarged, sizeof(limit)));
+    assert(!cui_progress_circle_raster(limit, (cui_color){10, 20, 30, 255}, 4, pixels,
+                                       sizeof pixels, &bitmap));
+    assert(!memcmp(&bitmap, &previous, sizeof(bitmap)) && !memcmp(pixels, original, sizeof pixels));
     cui_progress_circle_geometry saved = g;
     assert(
         !cui_progress_circle_measure((cui_progress_geometry){.start = .9f, .length = .2f}, 16, &g));

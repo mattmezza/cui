@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_icon.h"
+#include "../base/cui_design_metrics.h"
 #include <math.h>
 #include <string.h>
 cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_icon_state *state,
                         cui_icon_options options) {
     if (!ui || !id || !theme || !state || options.size < CUI_ICON_INHERITED ||
-        options.size > CUI_ICON_CUSTOM)
+        options.size > CUI_ICON_CUSTOM || !cui_design_valid(options.design_size))
         return CUI_ICON_INVALID;
     float size = options.size == CUI_ICON_XSMALL   ? 12
                  : options.size == CUI_ICON_SMALL  ? 14
@@ -17,6 +18,12 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     if (options.size >= CUI_ICON_XSMALL && options.size <= CUI_ICON_LARGE &&
         isfinite(theme->font_size) && theme->font_size > 0)
         size *= theme->font_size / 16;
+    if (options.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(options.design_size, theme->font_size / 16, &d))
+            return CUI_ICON_INVALID;
+        size = d.indicator_size;
+    }
     bool styled = options.custom_width || options.custom_height;
     float width = options.size != CUI_ICON_INHERITED || !styled ? size
                   : options.custom_width                        ? options.width
@@ -91,7 +98,10 @@ static bool cui_icon_name_equal(cui_str first, cui_str second) {
 }
 cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                               cui_icon_options options) {
-    if (!ui || !id || !theme || !name.data || !name.length)
+    if (!ui || !id || !theme || !name.data || !name.length ||
+        !cui_design_valid(options.design_size) ||
+        (options.design_size &&
+         (!isfinite(theme->font_size) || theme->font_size <= 0 || theme->font_size / 16 > 32)))
         return CUI_ICON_INVALID;
     size_t index = SIZE_MAX;
     for (size_t i = 0; i < cui_icon_catalog_count(); i++)
@@ -120,7 +130,9 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
 }
 cui_icon_error cui_icon_spinner(cui_context *ui, cui_id id, const cui_theme *theme,
                                 cui_icon_options options) {
-    if (!ui || !id || !theme)
+    if (!ui || !id || !theme || !cui_design_valid(options.design_size) ||
+        (options.design_size &&
+         (!isfinite(theme->font_size) || theme->font_size <= 0 || theme->font_size / 16 > 32)))
         return CUI_ICON_INVALID;
     cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0x81f69ad695af247d));
     if (!resource)

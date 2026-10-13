@@ -126,9 +126,12 @@ def main():
             page.wait_for_timeout(100)
             position=page.evaluate('window.scrollY')
             assert position>100, position
+            catalog_position=page.evaluate('()=>{const nav=document.querySelector("#catalog");nav.scrollTop=300;return nav.scrollTop;}')
+            assert catalog_position > 100
             story('Checkbox')
             page.wait_for_timeout(100)
             assert abs(page.evaluate('window.scrollY')-position)<1, 'Component navigation reset page scroll'
+            assert abs(page.evaluate('document.querySelector("#catalog").scrollTop')-catalog_position)<1, 'Component navigation reset catalog scroll'
             browser.close()
             print('PASS: Marker, Pagination/Stepper/Select centering, Rating, Image, Shift-wheel Tabs, pixel DataTable wheel, preserved navigation scroll')
     finally:

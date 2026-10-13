@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "../base/cui_design_metrics.h"
 #include "cui/cui_base.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
@@ -393,7 +394,7 @@ static void cui_tab_overflow_artwork(cui_context *ui, const cui_choice_item *ite
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
               cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
-    if (!theme || !items || !selected)
+    if (!theme || !items || !selected || !cui_design_valid(options.design_size))
         return false;
     cui_id viewport_id = container ^ UINT64_C(0x739b1b53a6cef421);
     const cui_theme *supplied_theme = theme;
@@ -402,6 +403,18 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     if (!isfinite(density) || density <= 0)
         density = 1;
     cui_tab_metrics metrics = cui_tab_size_metrics(options.variant, options.size, density);
+    if (options.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(options.design_size, density, &d))
+            return false;
+        metrics = (cui_tab_metrics){.height = d.control_height,
+                                    .inner_height = d.control_height,
+                                    .padding_x = d.padding_x,
+                                    .font_size = d.font_size,
+                                    .icon_size = d.indicator_size,
+                                    .gap = d.gap,
+                                    .part_gap = d.gap};
+    }
     if (isfinite(options.height) && options.height > 0) {
         metrics.inner_height *= options.height / metrics.height;
         metrics.height = options.height;
@@ -652,11 +665,25 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         options.suffix(ui, options.content_user);
     if (options.overflow && options.overflow->visible) {
         cui_tab_overflow *overflow = options.overflow;
-        cui_choice_item trigger = {.id = overflow->trigger, .label = {"All tabs", 8}};
-        cui_tab_overflow_icon icon = {theme, overflow->menu.overlay.open, 12 * density};
-        cui_choice_draw_ex(ui, &trigger, theme, overflow->menu.overlay.open,
-                           options.disabled || overflow->options.popup.disabled, CUI_TAB_DEFAULT,
-                           cui_tab_overflow_artwork, 0, &icon, 0, NULL, NULL, NULL);
+        cui_choice_item trigger = {.id = overflow->trigger,
+                                   .label = {"All tabs", 8},
+                                   .disabled =
+                                       options.disabled || overflow->options.popup.disabled};
+        float side = fmaxf(32, metrics.height);
+        cui_tab_overflow_icon icon = {theme, overflow->menu.overlay.open,
+                                      fmaxf(16 * density, metrics.icon_size)};
+        cui_begin_box(ui, trigger.id,
+                      (cui_box){.width = side,
+                                .height = side,
+                                .fixed_width = true,
+                                .fixed_height = true,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER,
+                                .radius = theme->radius,
+                                .background = overflow->menu.overlay.open ? theme->accent
+                                                                          : theme->secondary});
+        cui_tab_overflow_artwork(ui, &trigger, 0, &icon);
+        cui_end_box(ui);
         cui_set_semantic_details(ui, overflow->trigger, (cui_semantic_details){.parent = list_id});
         overflow->menu.row_height = theme->control_height;
         overflow->menu.padding = theme->padding;
@@ -1862,11 +1889,11 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                                cui_id *menu_action, cui_menu_tree_state *state,
                                                cui_dropdown_button_options options) {
     cui_dropdown_button_result result = {0};
-    if (!ui || !theme || !state || !state->overlay.id || !menu_action || (!items && count) ||
-        !container || (options.hide_action && options.hide_menu) ||
-        (!options.hide_action && !action_id) || (!options.hide_menu && !trigger_id) ||
-        action_id == trigger_id || container == action_id || container == trigger_id ||
-        !isfinite(theme->control_height) || theme->control_height <= 0 ||
+    if (!ui || !theme || !state || !cui_design_valid(options.design_size) || !state->overlay.id ||
+        !menu_action || (!items && count) || !container ||
+        (options.hide_action && options.hide_menu) || (!options.hide_action && !action_id) ||
+        (!options.hide_menu && !trigger_id) || action_id == trigger_id || container == action_id ||
+        container == trigger_id || !isfinite(theme->control_height) || theme->control_height <= 0 ||
         !isfinite(theme->padding) || theme->padding < 0 || !isfinite(options.width))
         return result;
     if (options.inherit_action_variant)
@@ -1874,6 +1901,18 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     if (options.inherit_action_size)
         options.size = options.action_size;
     options.selected = options.selected || (!options.hide_action && options.action_selected);
+    float density =
+        isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16;
+    cui_dropdown_button_metrics metrics = cui_dropdown_button_size_metrics(options.size, density);
+    if (!cui_design_valid(options.design_size))
+        return (cui_dropdown_button_result){0};
+    if (options.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(options.design_size, density, &d))
+            return (cui_dropdown_button_result){0};
+        metrics = (cui_dropdown_button_metrics){d.control_height, d.padding_x, d.font_size, d.gap,
+                                                d.indicator_size};
+    }
     state->drag_scroll = options.menu.drag_scroll;
     result = cui_base_dropdown_button(
         ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
@@ -1892,9 +1931,6 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                          (!options.hide_action && cui_hovered(ui, action_id)) ||
                          (!options.hide_menu && cui_hovered(ui, trigger_id));
     cui_color trigger_foreground, action_foreground;
-    float density =
-        isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16;
-    cui_dropdown_button_metrics metrics = cui_dropdown_button_size_metrics(options.size, density);
     bool no_padding =
         options.variant == CUI_DROPDOWN_BUTTON_LINK || options.variant == CUI_DROPDOWN_BUTTON_TEXT;
     float padding = no_padding ? 0 : metrics.padding_x;
@@ -1922,9 +1958,11 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                 (void)cui_icon_spinner(
                     ui, action_id ^ UINT64_C(0x4aef702b79ab3181), theme,
                     (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                       .custom_size = options.size == CUI_DROPDOWN_BUTTON_LARGE
-                                                          ? 24 * theme->font_size / 16
-                                                          : metrics.caret_size,
+                                       .custom_size =
+                                           !options.design_size &&
+                                                   options.size == CUI_DROPDOWN_BUTTON_LARGE
+                                               ? 24 * theme->font_size / 16
+                                               : metrics.caret_size,
                                        .custom_color = true,
                                        .color = action_foreground});
             else if (options.leading.length)

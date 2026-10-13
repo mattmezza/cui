@@ -293,6 +293,37 @@ cui_plot_result cui_plot_nice(cui_plot_scale *, size_t desired_count);
  * Factor >1 zooms in, keeping the data at anchor_pixel fixed. */
 cui_plot_result cui_plot_pan(cui_plot_scale *, double delta_pixels);
 cui_plot_result cui_plot_zoom(cui_plot_scale *, double factor, double anchor_pixel);
+/* Explicit caller-owned viewport. Limits are transformed domain units (log10
+ * for log scales); zero span limits are unconstrained. Both axes commit together. */
+typedef struct {
+    double minimum, maximum, min_span, max_span;
+    bool bounded;
+} cui_plot_viewport_limit;
+typedef struct {
+    bool enabled, disabled, pan_x, pan_y, zoom_x, zoom_y;
+    cui_plot_viewport_limit x_limit, y_limit;
+} cui_plot_viewport_options;
+typedef struct {
+    cui_plot_scale x, y, initial_x, initial_y;
+    double pointer_x, pointer_y;
+    bool initialized, dragging;
+} cui_plot_viewport;
+cui_plot_viewport_options cui_plot_viewport_defaults(void);
+cui_plot_result cui_plot_viewport_init(cui_plot_viewport *, cui_plot_scale x, cui_plot_scale y);
+cui_plot_result cui_plot_viewport_reset(cui_plot_viewport *);
+/* Pan precedes zoom at the new center; a pinch preserves data under the old
+ * center at the moved center. Positive factor >1 zooms in. */
+cui_plot_result cui_plot_viewport_transform(cui_plot_viewport *, cui_plot_viewport_options,
+                                            double dx, double dy, double factor,
+                                            cui_plot_point anchor);
+struct cui_context;
+/* Reduce before projecting, bind after submitting cui_plot_view. Shift-primary
+ * mouse drag, Ctrl-scroll (precise pixels, legacy steps*32), Core touch gestures.
+ * Hosts preserve modifiers and deliver CANCEL on capture loss. */
+cui_plot_result cui_plot_viewport_reduce(struct cui_context *, uint64_t id, cui_plot_viewport *,
+                                         cui_plot_viewport_options);
+bool cui_plot_viewport_bind(struct cui_context *, uint64_t id, const cui_plot_viewport *,
+                            cui_plot_viewport_options);
 cui_plot_result cui_plot_clip_line(cui_plot_line, cui_plot_rect viewport, cui_plot_line *out);
 cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_scale *y,
                                       cui_plot_point a, cui_plot_point b, cui_plot_rect viewport,

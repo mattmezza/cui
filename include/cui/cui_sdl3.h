@@ -2,6 +2,7 @@
 #ifndef CUI_SDL3_H
 #define CUI_SDL3_H
 #include "cui_platform.h"
+#include "cui_accessibility.h"
 #include "cui_renderer.h"
 #include "cui_text.h"
 #ifdef __cplusplus
@@ -20,6 +21,10 @@ bool cui_sdl3_poll(cui_sdl3 *backend, cui_context *ui);
  * frame hint. Returns false if the host driver does not support system cursors. */
 bool cui_sdl3_set_cursor(cui_sdl3 *backend, cui_cursor cursor);
 void cui_sdl3_size(cui_sdl3 *backend, float *width, float *height);
+/* Optional native-a11y metadata only; no Rust/backend linkage required.
+ * Main thread. title is borrowed until host title change/destruction; update
+ * copies it. Only X11 supplies screen position; Wayland reports false. */
+bool cui_sdl3_accessibility_window(cui_sdl3 *, cui_accessibility_window *out);
 bool cui_sdl3_render(cui_sdl3 *backend, const cui_draw_list *list, cui_color clear);
 /* Capture before presenting, when the framebuffer contents are defined. */
 bool cui_sdl3_render_capture(cui_sdl3 *backend, const cui_draw_list *list, cui_color clear,

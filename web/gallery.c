@@ -176,7 +176,7 @@ int gallery_theme_channel(int field, int channel) {
 static bool redraw, reduced_motion, compact_density;
 static bool progress_indeterminate;
 static int progress_shape;
-static unsigned char progress_circle_pixels[128 * 128 * 4];
+static unsigned char progress_circle_pixels[1056 * 1056 * 4];
 static cui_progress_circle_state progress_circle_state = {progress_circle_pixels,
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
@@ -604,6 +604,30 @@ static unsigned toolbar_activations[4];
 static char toolbar_query_buffer[64] = "find";
 static cui_edit *toolbar_query;
 static cui_input_state toolbar_query_state;
+static unsigned toolbar_query_changes;
+static const char *const toolbar_document[] = {"Find a quiet place to write.",
+                                               "Save your draft before sharing it.",
+                                               "Find collaborators in the workspace."};
+static bool toolbar_contains(const char *line, cui_str query) {
+    if (!query.length)
+        return false;
+    size_t length = strlen(line);
+    for (size_t i = 0; i + query.length <= length; i++) {
+        size_t j = 0;
+        for (; j < query.length; j++) {
+            unsigned char a = (unsigned char)line[i + j], b = (unsigned char)query.data[j];
+            if (a >= 'A' && a <= 'Z')
+                a += 'a' - 'A';
+            if (b >= 'A' && b <= 'Z')
+                b += 'a' - 'A';
+            if (a != b)
+                break;
+        }
+        if (j == query.length)
+            return true;
+    }
+    return false;
+}
 static int sidebar_mode, sidebar_side, sidebar_collapsed;
 static int sidebar_selected;
 static unsigned sidebar_actions;
@@ -701,7 +725,7 @@ static cui_title_bar_state title_state;
 static cui_window_info title_query(void *user) {
     (void)user;
     return (cui_window_info){.decoration = (cui_window_decoration)title_decoration,
-                             .actions = title_decoration == CUI_WINDOW_CLIENT_DECORATED ? 127 : 0,
+                             .actions = title_decoration != CUI_WINDOW_BROWSER && !title_fullscreen ? 127 : 0,
                              .maximized = title_maximized,
                              .fullscreen = title_fullscreen != 0};
 }
@@ -730,13 +754,53 @@ static void toolbar_activate(void *user) {
 }
 static void toolbar_query_render(cui_context *context, const cui_theme *theme,
                                  const cui_toolbar_presentation *presentation, void *user) {
-    (void)presentation;
     (void)user;
-    cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme, cui_string("Find"),
-                 toolbar_query, &toolbar_query_state,
-                 (cui_input_options){.width = 112,
-                                     .placeholder = cui_string("Find"),
-                                     .disabled = toolbar_disabled});
+    cui_input_result result = cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme,
+                                           cui_string("Find"), toolbar_query, &toolbar_query_state,
+                                           (cui_input_options){.width = 112,
+                                                               .design_size = presentation->metrics.design_size,
+                                                               .placeholder = cui_string("Find"),
+                                                               .disabled = toolbar_disabled});
+    if (result.changed)
+        toolbar_query_changes++;
+}
+static void title_simulated_controls(cui_context *context, const cui_theme *theme, bool disabled) {
+    static const char *const names[] = {"Simulated close", "Simulated minimize",
+                                        "Simulated maximize"};
+    const cui_color colors[] = {{255, 95, 87, 255}, {254, 188, 46, 255}, {40, 200, 64, 255}};
+    const cui_window_action actions[] = {CUI_WINDOW_CLOSE, CUI_WINDOW_MINIMIZE,
+                                         title_maximized ? CUI_WINDOW_RESTORE
+                                                         : CUI_WINDOW_MAXIMIZE};
+    cui_begin_absolute_box(context, cui_id_from(context, "title-simulated-controls"),
+                           (cui_box){.row = true, .align_y = CUI_ALIGN_CENTER, .gap = 2},
+                           (cui_rect){8, 0, 68, 34});
+    for (unsigned i = 0; i < 3; i++) {
+        cui_id id = cui_id_from(context, names[i]);
+        const char *name = i == 2 && title_maximized ? "Simulated restore" : names[i];
+        cui_interaction input =
+            cui_interact(context, id, CUI_ROLE_BUTTON, cui_string(name), disabled, false, 0);
+        cui_begin_box(context, id,
+                      (cui_box){.width = 20,
+                                .height = 24,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
+        cui_begin_box(context, 0,
+                      (cui_box){.width = 12,
+                                .height = 12,
+                                .radius = 6,
+                                .background = disabled ? theme->muted : colors[i],
+                                .border = input.focused ? theme->text : colors[i],
+                                .border_width = input.focused ? 2 : 0});
+        cui_end_box(context);
+        cui_end_box(context);
+        if (input.activated) {
+            if (!i && title_override)
+                title_close(NULL);
+            else
+                title_perform(NULL, actions[i], 0, 0);
+        }
+    }
+    cui_end_box(context);
 }
 static void toolbar_group_render(cui_context *context, const cui_theme *theme,
                                  const cui_toolbar_presentation *presentation, void *user) {
@@ -751,6 +815,7 @@ static void toolbar_group_render(cui_context *context, const cui_theme *theme,
                                   .user = &commands[1]}};
     cui_toolbar_group(context, cui_id_from(context, "toolbar-format-group"), theme, items, 2,
                       (cui_toolbar_options){.size = presentation->metrics.size,
+                                            .design_size = presentation->metrics.design_size,
                                             .label = cui_string("Formatting")});
 }
 static void resizable_content(cui_context *context, void *user) {
@@ -948,7 +1013,8 @@ static void gallery_attachment_actions(cui_context *context, cui_id id, void *us
     (void)width;
     (void)height;
     if (cui_button_ex(context, id, &current_theme, cui_string("Open"),
-                      (cui_button_options){.size = CUI_CONTROL_XSMALL, .width = 64}))
+                      (cui_button_options){
+                          .size = CUI_CONTROL_XSMALL, .width = 64, .design_size = design_size}))
         attachment_actions++;
 }
 static void gallery_attachment_cards(cui_context *context, cui_id id, void *user, float width,
@@ -970,6 +1036,7 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
         options.model.status =
             index ? CUI_ATTACHMENT_COMPLETE : (cui_attachment_status)attachment_status;
         options.model.size = (cui_media_size)gallery_xsmall_second_size();
+        options.model.design_size = design_size;
         options.model.width = 260;
         options.model.vertical = attachment_vertical != 0;
         options.model.identified = true;
@@ -1138,6 +1205,7 @@ static bool dock_disabled;
 static unsigned dock_refreshes[12];
 static cui_date date = {2026, 10, 12};
 static cui_calendar_state calendar;
+static int date_locale = -1;
 static cui_date_selection date_selection = {{2026, 10, 12}, {0}};
 static cui_date_picker_state date_picker;
 static cui_time time_value = {9, 30, 0};
@@ -1145,12 +1213,12 @@ static cui_time_state time_state;
 static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
-static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
+static cui_plot_viewport plot_viewport;
 static unsigned char plot_pixels[640 * 180 * 4];
 static cui_plot_numeric_tick plot_x_ticks[16], plot_y_ticks[16];
 static cui_plot_axis_text plot_x_labels[16], plot_y_labels[16];
 static uint64_t plot_revision;
-static cui_plot_scale plot_cached_scale;
+static cui_plot_scale plot_cached_scale, plot_cached_y;
 static cui_color plot_cached_primary, plot_cached_surface;
 static unsigned plot_cached_width;
 static int plot_mode, plot_cached_mode = -1;
@@ -2284,6 +2352,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.size = (cui_description_size)description_size;
         options.width = width - 48;
         options.name = cui_string("Project details");
+        options.design_size = design_size;
         cui_description_list(ui, cui_id_from(ui, "description-list"), &t, items, 5, options);
         break;
     }
@@ -2354,7 +2423,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_icon_set_name(&icon_state, cui_string(names[icon_choice]), NULL, NULL);
             icon_loaded = icon_choice;
         }
-        cui_icon_options options = {.size = (cui_icon_size)icon_size};
+        cui_icon_options options = {.size = (cui_icon_size)icon_size, .design_size = design_size};
         if (icon_rotate) {
             options.custom_transform = true;
             options.transform = cui_icon_rotation(.785398163f);
@@ -2369,6 +2438,20 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 68: {
         toolbar_disabled = disabled != 0;
+        size_t event_count = 0;
+        const cui_event *events = cui_frame_events(ui, &event_count);
+        if (!toolbar_disabled && toolbar_show_input)
+            for (size_t i = 0; i < event_count; i++) {
+                const cui_event *event = &events[i];
+                if (event->type == CUI_EVENT_KEY_DOWN && !event->repeat && !event->ime_composing &&
+                    !event->prefer_character_input &&
+                    !(event->modifiers & (CUI_MOD_ALT | CUI_MOD_SHIFT)) &&
+                    (event->modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
+                    event->key == cui_key_from_character('F') && !cui_event_consumed(ui, i)) {
+                    cui_consume_event(ui, i);
+                    cui_focus(ui, cui_id_from(ui, "toolbar-query"));
+                }
+            }
         const char *labels[] = {"Save", "Undo", "Bold", "Italic"};
         cui_toolbar_command commands[4];
         for (unsigned i = 0; i < 4; i++)
@@ -2400,20 +2483,68 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             items[count++] = (cui_toolbar_item){.render = toolbar_query_render};
         cui_toolbar(ui, cui_id_from(ui, "toolbar-preview"), &t, items, count,
                     (cui_toolbar_options){.size = (cui_toolbar_size)toolbar_size,
+                                          .design_size = design_size,
                                           .custom_size = 20,
                                           .label = cui_string("Editing toolbar"),
                                           .disabled = disabled != 0});
+        cui_str query = cui_edit_get_text(toolbar_query);
+        unsigned matches = 0;
+        for (unsigned i = 0; i < 3; i++)
+            matches += toolbar_contains(toolbar_document[i], query);
+        char summary[128];
+        if (query.length)
+            snprintf(summary, sizeof summary, "Find: %u matching %s", matches,
+                     matches == 1 ? "line" : "lines");
+        else
+            snprintf(summary, sizeof summary, "Find: enter a search term");
+        cui_label(ui, &t, cui_string(summary));
+        if (query.length && !matches)
+            cui_label(ui, &t, cui_string("No results in this document."));
+        cui_label(ui, &t, cui_string("Document"));
+        if (toolbar_show_input)
+            cui_label(ui, &t, cui_string("Ctrl/Cmd+F focuses Find while the preview has focus."));
+        for (unsigned i = 0; i < 3; i++) {
+            bool matched = toolbar_contains(toolbar_document[i], query);
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = width - 48,
+                                    .fixed_width = true,
+                                    .padding = 6,
+                                    .background = matched ? t.secondary : t.surface});
+            char line[160];
+            snprintf(line, sizeof line, "%s%s", matched ? "Match: " : "", toolbar_document[i]);
+            cui_label(ui, &t, cui_string(line));
+            cui_end_box(ui);
+        }
         break;
     }
     case 69: {
         cui_chrome_item items[] = {
             {.id = cui_id_from(ui, "title-workspace"), .text = cui_string("CUI workspace")},
             {.id = cui_id_from(ui, "title-document"), .text = cui_string("Untitled document")}};
+        cui_begin_box(ui, cui_id_from(ui, "title-simulation-wrapper"),
+                      (cui_box){.width = width - 48, .height = 34});
         cui_title_bar(ui, cui_id_from(ui, "title-preview"), &t, &title_state, items, 2,
                       (cui_title_bar_options){.width = width - 48,
                                               .name = cui_string("Window title bar"),
                                               .host = &title_host,
                                               .on_close = title_override ? title_close : NULL});
+        if (title_decoration == CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS && !title_fullscreen)
+            title_simulated_controls(ui, &t, disabled != 0);
+        cui_end_box(ui);
+        cui_label(
+            ui, &t,
+            cui_string(
+                title_decoration == CUI_WINDOW_NATIVE_TRAFFIC_LIGHTS
+                    ? title_fullscreen
+                          ? "Browser simulation: native controls hidden in fullscreen."
+                          : "Browser simulation of OS traffic lights; actions affect this preview."
+                    : "Window actions are simulated in this browser preview."));
+        char status[160];
+        snprintf(status, sizeof status,
+                 "Preview: %s; minimized %u; close requests %u; overrides %u",
+                 title_maximized ? "maximized" : "normal", title_actions[CUI_WINDOW_MINIMIZE],
+                 title_actions[CUI_WINDOW_CLOSE], title_closed);
+        cui_label(ui, &t, cui_string(status));
         break;
     }
     case 70: {
@@ -2539,6 +2670,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.height = height - 48;
         options.sidebar_width = 220;
         options.size = (cui_settings_size)settings_size;
+        options.design_size = design_size;
         options.variant = (cui_settings_variant)settings_variant;
         settings_result = cui_settings(ui, cui_id_from(ui, "settings-preview"), &t, pages, 2,
                                        &settings_state, options);
@@ -2709,12 +2841,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string("Scripted provider demo — no microphone access"));
         (void)cui_speech_button(ui, cui_id_from(ui, "speech-toggle"), &t, &speech_state,
                                 (cui_speech_button_options){.size = (cui_speech_size)speech_size,
+                                                            .design_size = design_size,
                                                             .disabled = disabled != 0,
                                                             .show_when_unsupported = true},
                                 host_seconds);
         (void)cui_speech_waveform(
             ui, cui_id_from(ui, "speech-waveform"), &t, &speech_state,
             (cui_speech_waveform_options){.size = (cui_speech_size)speech_size,
+                                          .design_size = design_size,
                                           .width = 260,
                                           .reduced_motion = reduced_motion},
             host_seconds);
@@ -2766,6 +2900,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 79: {
         cui_questionnaire_options options = {.size = (cui_questionnaire_size)questionnaire_size,
+                                             .design_size = design_size,
                                              .width = width > 520 ? 480 : width - 40,
                                              .disabled = disabled,
                                              .numeric_shortcuts = questionnaire_numbers != 0};
@@ -3079,6 +3214,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 56: {
         cui_tag_options options = {.variant = (cui_tag_variant)tag_variant,
                                    .size = (cui_status_size)gallery_xsmall_second_size(),
+                                   .design_size = design_size,
                                    .outline = tag_outline,
                                    .pill = tag_pill,
                                    .background = {29, 100, 220, 255},
@@ -3089,7 +3225,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                               &options.palette);
         cui_tag(ui, cui_id_from(ui, "workspace-tag"), &t, cui_string("Workspace"), options);
         cui_tag(ui, cui_id_from(ui, "reviewed-tag"), &t, cui_string("Reviewed"),
-                (cui_tag_options){.variant = CUI_TAG_SUCCESS, .outline = true});
+                (cui_tag_options){
+                    .variant = CUI_TAG_SUCCESS, .outline = true, .design_size = design_size});
         cui_tag_style style;
         cui_id rich_id = cui_id_from(ui, "rich-tag");
         if (cui_begin_tag(ui, rich_id, &t, options, &style)) {
@@ -3267,6 +3404,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         for (unsigned i = 0; i < 5; i++) {
             cui_badge_options options = cui_badge_defaults();
             options.size = (cui_control_size)control_size;
+            options.design_size = design_size;
             options.count = i == 0 ? badge_count : i == 1 ? 125 : 0;
             options.variant = i == 2 ? CUI_BADGE_DOT : i == 3 ? CUI_BADGE_ICON : CUI_BADGE_COUNT;
             options.icon = cui_string("check");
@@ -3281,11 +3419,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.reduced_motion = reduced_motion;
         options.now_seconds = host_seconds;
         options.size = (cui_control_size)control_size;
+        options.design_size = design_size;
         options.motion = &progress_motion;
         if (progress_shape) {
             cui_progress_circle_options circle = cui_progress_circle_defaults();
             circle.progress = options;
             circle.diameter = progress_shape == 2 ? 64 : 0;
+            if (design_size && progress_shape == 2) {
+                cui_design_metrics metrics;
+                if (cui_design_measure(design_size, t.font_size / 16, &metrics))
+                    circle.diameter = 2 * metrics.control_height;
+            }
             cui_progress_circle(ui, cui_id_from(ui, "progress"), &t, slider / 100,
                                 &progress_circle_state, circle,
                                 progress_shape == 2 ? gallery_progress_content : NULL, &slider);
@@ -3386,25 +3530,40 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
 
         break;
     }
-    case 12:
-        cui_alert(ui, cui_id_from(ui, "alert"), &t,
-                  (cui_alert_options){.kind = CUI_ALERT_INFO,
-                                      .title = cui_string("Your changes are saved"),
-                                      .message = cui_string("You can keep working."),
-                                      .width = width - 48,
-                                      .visible = &alert_visible,
-                                      .dismissible = true});
+    case 12: {
+        static const char *const titles[] = {"Workspace update", "Your changes are saved",
+                                            "Storage is almost full", "Upload failed"};
+        static const char *const messages[] = {"A new version is available.", "You can keep working.",
+                                               "Archive unused projects to free space.",
+                                               "Check your connection and try again."};
+        for (unsigned kind = 0; kind < 4; kind++)
+            cui_alert(ui, cui_id_from(ui, titles[kind]), &t,
+                      (cui_alert_options){.kind = (cui_alert_kind)kind,
+                                          .title = cui_string(titles[kind]),
+                                          .message = cui_string(messages[kind]),
+                                          .width = width - 48,
+                                          .visible = kind == 1 ? &alert_visible : NULL,
+                                          .dismissible = kind == 1});
         if (cui_button(ui, cui_id_from(ui, "reset-alert"), &t, cui_string("Show alert"), disabled))
             alert_visible = true;
         break;
+    }
     case 13:
         cui_avatar(ui, cui_id_from(ui, "avatar"), &t, cui_string("Alex Morgan"), 56);
         break;
-    case 14:
-        cui_begin_bubble(ui, cui_id_from(ui, "bubble"), &t, CUI_BUBBLE_TINTED, width - 48);
-        cui_label(ui, &t, cui_string("A composed message surface."));
-        cui_end_bubble(ui);
+    case 14: {
+        static const char *const messages[] = {"Info: a new version is available.",
+                                               "Success: your changes are saved.",
+                                               "Warning: storage is almost full.",
+                                               "Error: upload failed. Please retry."};
+        for (unsigned kind = 0; kind < 4; kind++) {
+            cui_begin_bubble(ui, cui_id_from(ui, messages[kind]), &t,
+                              (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), width - 48);
+            cui_label(ui, &t, cui_string(messages[kind]));
+            cui_end_bubble(ui);
+        }
         break;
+    }
     case 15:
         cui_empty(ui, cui_id_from(ui, "empty"), &t, cui_string("No items yet"),
                   cui_string("Add your first item to get started."), width - 48);
@@ -3528,6 +3687,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                  (cui_tabs_options){.disabled = disabled,
                                     .variant = (cui_tab_variant)tabs_variant,
                                     .size = (cui_tab_size)tabs_size,
+                                    .design_size = design_size,
                                     .vertical = tabs_mode == 2,
                                     .manual_activation = tabs_manual,
                                     .scroll = tabs_mode ? &tabs_scroll : NULL,
@@ -3547,7 +3707,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .viewport = {0, 0, width, height},
                                      .side = CUI_POPUP_BELOW,
                                      .width = width > 360 ? 280 : width - 48,
-                                     .height = 100,
+                                     .height = story == 23 ? 100 : 0,
                                      .gap = 8,
                                      .dt = host_dt,
                                      .open_delay = .25f,
@@ -3717,48 +3877,59 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 28: {
         float plot_width = fminf(640, fmaxf(80, width - 48));
-        plot_scale.range_start = 28;
-        plot_scale.range_end = plot_width - 12;
+        if (!plot_viewport.initialized)
+            cui_plot_viewport_init(
+                &plot_viewport,
+                (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 28, plot_width - 12, false},
+                (cui_plot_scale){CUI_PLOT_LINEAR, -1.2, 1.2, 142, 12, false});
+        plot_viewport.x.range_start = 28;
+        plot_viewport.x.range_end = plot_width - 12;
         cui_id plot_id = cui_id_from(ui, "plot-wave");
-        cui_rect plot_bounds = cui_bounds(ui, plot_id);
-        size_t touch_count;
-        const cui_event *touch_events = cui_frame_events(ui, &touch_count);
-        for (size_t i = 0; i < touch_count && !disabled; i++)
-            if (touch_events[i].type == CUI_EVENT_GESTURE && cui_event_target(ui, i) == plot_id &&
-                !cui_event_consumed(ui, i)) {
-                cui_plot_pan(&plot_scale, touch_events[i].dx);
-                cui_plot_zoom(&plot_scale, touch_events[i].gesture_scale,
-                              touch_events[i].x - plot_bounds.x);
-                cui_consume_event(ui, i);
-            }
-        float plot_anchor = (float)(plot_scale.range_start + plot_scale.range_end) / 2;
-        cui_text(ui, cui_string("sin(x / 12), sampled through the CUI plot scale"), 14, t.text);
+        cui_plot_viewport_options navigation = cui_plot_viewport_defaults();
+        navigation.disabled = disabled != 0;
+        navigation.x_limit = (cui_plot_viewport_limit){
+            .bounded = true, .minimum = -100, .maximum = 200, .min_span = 10, .max_span = 300};
+        navigation.y_limit = (cui_plot_viewport_limit){
+            .bounded = true, .minimum = -5, .maximum = 5, .min_span = .1, .max_span = 10};
+        cui_plot_viewport_reduce(ui, plot_id, &plot_viewport, navigation);
+        float plot_anchor = (float)(plot_viewport.x.range_start + plot_viewport.x.range_end) / 2;
+        cui_text(ui,
+                 cui_string("Shift-drag to pan; Ctrl-wheel or pinch to zoom; touch-drag to pan"),
+                 14, t.text);
         cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
         if (cui_button(ui, cui_id_from(ui, "plot-zoom"), &t, cui_string("Zoom in"), disabled))
-            cui_plot_zoom(&plot_scale, 1.5, plot_anchor);
+            cui_plot_viewport_transform(&plot_viewport, navigation, 0, 0, 1.5,
+                                        (cui_plot_point){plot_anchor, 77});
         if (cui_button(ui, cui_id_from(ui, "plot-zoom-out"), &t, cui_string("Zoom out"), disabled))
-            cui_plot_zoom(&plot_scale, 1 / 1.5, plot_anchor);
+            cui_plot_viewport_transform(&plot_viewport, navigation, 0, 0, 1 / 1.5,
+                                        (cui_plot_point){plot_anchor, 77});
         if (cui_button(ui, cui_id_from(ui, "plot-reset"), &t, cui_string("Reset"), disabled))
-            plot_scale = (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 28, plot_width - 12, false};
+            cui_plot_viewport_reset(&plot_viewport);
         cui_end_box(ui);
         cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
         if (cui_button(ui, cui_id_from(ui, "plot-left"), &t, cui_string("Pan left"), disabled))
-            cui_plot_pan(&plot_scale, plot_width * .15);
+            cui_plot_viewport_transform(&plot_viewport, navigation, plot_width * .15, 0, 1,
+                                        (cui_plot_point){plot_anchor, 77});
         if (cui_button(ui, cui_id_from(ui, "plot-right"), &t, cui_string("Pan right"), disabled))
-            cui_plot_pan(&plot_scale, -plot_width * .15);
+            cui_plot_viewport_transform(&plot_viewport, navigation, -plot_width * .15, 0, 1,
+                                        (cui_plot_point){plot_anchor, 77});
         cui_end_box(ui);
         unsigned pw = (unsigned)plot_width;
-        bool pixels_changed = !plot_revision || plot_cached_width != pw ||
-                              plot_cached_mode != plot_mode ||
-                              memcmp(&plot_cached_scale, &plot_scale, sizeof(plot_scale)) ||
-                              memcmp(&plot_cached_primary, &t.primary, sizeof(t.primary)) ||
-                              memcmp(&plot_cached_surface, &t.surface, sizeof(t.surface));
+        bool pixels_changed =
+            !plot_revision || plot_cached_width != pw || plot_cached_mode != plot_mode ||
+            memcmp(&plot_cached_scale, &plot_viewport.x, sizeof(plot_viewport.x)) ||
+            memcmp(&plot_cached_y, &plot_viewport.y, sizeof(plot_viewport.y)) ||
+            memcmp(&plot_cached_primary, &t.primary, sizeof(t.primary)) ||
+            memcmp(&plot_cached_surface, &t.surface, sizeof(t.surface));
         if (pixels_changed) {
             cui_plot_sample samples[33];
             for (size_t i = 0; i < 33; i++) {
                 double x = 28 + (plot_width - 40) * i / 32, value;
-                cui_plot_inverse(&plot_scale, x, &value);
-                samples[i] = (cui_plot_sample){x, 142, 77 - sin(value / 12) * 54, true};
+                cui_plot_inverse(&plot_viewport.x, x, &value);
+                double y, baseline;
+                cui_plot_map(&plot_viewport.y, sin(value / 12), &y);
+                cui_plot_map(&plot_viewport.y, 0, &baseline);
+                samples[i] = (cui_plot_sample){x, baseline, y, true};
             }
             cui_plot_path_command commands[256];
             size_t command_count = 0;
@@ -3771,8 +3942,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 result = cui_plot_radial_path(radial, 12, CUI_PLOT_GAPS_SKIP, true, true, false,
                                               commands, 256, &command_count);
                 for (size_t i = 0; i < command_count; i++) {
-                    commands[i].point.x += plot_width / 2;
-                    commands[i].point.y += 77;
+                    double data_x, data_y;
+                    cui_plot_scale initial_x = plot_viewport.initial_x;
+                    initial_x.range_start = plot_viewport.x.range_start;
+                    initial_x.range_end = plot_viewport.x.range_end;
+                    cui_plot_inverse(&initial_x, commands[i].point.x + plot_width / 2, &data_x);
+                    cui_plot_inverse(&plot_viewport.initial_y, commands[i].point.y + 77, &data_y);
+                    cui_plot_map(&plot_viewport.x, data_x, &commands[i].point.x);
+                    cui_plot_map(&plot_viewport.y, data_y, &commands[i].point.y);
                 }
             } else if (plot_mode == 5 || plot_mode == 6) {
                 /* The same projected samples feed source rounded bars/dot geometry.
@@ -3799,6 +3976,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     result =
                         cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, cross, band, baseline, value, radii,
                                           commands + command_count, 256 - command_count, &written);
+                    /* Zero-valued bars have no geometry, not a failed frame. */
+                    if (result == CUI_PLOT_EMPTY)
+                        result = CUI_PLOT_OK;
                     if (result == CUI_PLOT_OK)
                         command_count += written;
                 }
@@ -3820,7 +4000,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 cui_plot_raster(plot_pixels, pw, 180, pw * 4, sizeof(plot_pixels), &shape, 1,
                                 t.surface) == CUI_PLOT_OK) {
                 plot_cached_width = pw;
-                plot_cached_scale = plot_scale;
+                plot_cached_scale = plot_viewport.x;
+                plot_cached_y = plot_viewport.y;
                 plot_cached_mode = plot_mode;
                 plot_cached_primary = t.primary;
                 plot_cached_surface = t.surface;
@@ -3828,8 +4009,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             }
         }
         size_t nx = 0, ny = 0;
-        cui_plot_axis_ticks(&plot_scale, 5, plot_x_ticks, 16, &nx);
-        cui_plot_scale y_scale = {CUI_PLOT_LINEAR, -1.2, 1.2, 142, 12, false};
+        cui_plot_axis_ticks(&plot_viewport.x, 5, plot_x_ticks, 16, &nx);
+        cui_plot_scale y_scale = plot_viewport.y;
         cui_plot_axis_ticks(&y_scale, 5, plot_y_ticks, 16, &ny);
         for (size_t i = 0; i < nx; i++)
             plot_x_labels[i] = plot_x_ticks[i].label;
@@ -3851,20 +4032,20 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                       .name = cui_string("Projected sine wave"),
                                       .disabled = disabled != 0};
         cui_plot_view(ui, plot_id, &t, &view);
-        cui_set_gestures(ui, plot_id, true, true);
-        cui_set_cursor(ui, plot_id, CUI_CURSOR_GRAB);
+        cui_plot_viewport_bind(ui, plot_id, &plot_viewport, navigation);
         double ticks[32];
         size_t count = 0;
-        cui_plot_ticks(&plot_scale, 5, ticks, 32, &count);
+        cui_plot_ticks(&plot_viewport.x, 5, ticks, 32, &count);
         char text[128];
-        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; %zu scale ticks", plot_scale.domain_min,
-                 plot_scale.domain_max, count);
+        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; %zu scale ticks",
+                 plot_viewport.x.domain_min, plot_viewport.x.domain_max, count);
         cui_text(ui, cui_string(text), 14, t.muted);
         break;
     }
     case 29: {
         cui_calendar(ui, cui_id_from(ui, "calendar"), &t, &calendar, &date_selection,
                      (cui_calendar_options){.disabled = disabled,
+                                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale),
                                             .first_weekday = 1,
                                             .cell_size = width > 360 ? 32 : 28});
         char text[64];
@@ -3956,7 +4137,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          (cui_semantic_details){.parent = table_id});
             }
             cui_id row_id = table_id + r + 1;
-            cui_table_begin_row(ui, row_id, &t, 40, r == 0);
+            cui_table_begin_row_ex(ui, row_id, &t,
+                                   (cui_table_row_options){.height = 40, .header = r == 0,
+                                      .custom_background = true,
+                                      .background = r == 0 ? t.accent : r % 2 ? t.surface : t.background});
             cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = section_id});
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;
@@ -4156,6 +4340,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                               .variant =
                                                   (cui_dropdown_button_variant)dropdown_variant,
                                               .size = (cui_dropdown_button_size)dropdown_size,
+                                              .design_size = design_size,
                                               .outline = dropdown_outline,
                                               .selected = dropdown_selected,
                                               .action_disabled = dropdown_action == 1,
@@ -4347,7 +4532,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 40:
         cui_date_picker(ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
                         &date_selection,
-                        (cui_date_picker_options){.calendar = {.first_weekday = 1, .cell_size = 28},
+                        (cui_date_picker_options){.calendar = {.first_weekday = 1, .cell_size = 28,
+                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale)},
                                                   .viewport = {0, 0, width, height},
                                                   .disabled = disabled,
                                                   .width = width > 360 ? 280 : width - 48});
@@ -4481,6 +4667,12 @@ void gallery_status_options(int right, int custom) {
     status_right = right != 0;
     status_custom = custom != 0;
 }
+void gallery_date_locale(int locale) {
+    date_locale = locale >= -1 && locale <= CUI_DATE_LOCALE_JA ? locale : -1;
+}
+unsigned gallery_date_value(void) {
+    return (unsigned)(date_selection.start.year * 10000 + date_selection.start.month * 100 + date_selection.start.day);
+}
 void gallery_resizable_options(int vertical, int disabled) {
     if (resizable_vertical != (vertical != 0))
         cui_resizable_clear(&resizable_state);
@@ -4530,7 +4722,7 @@ void gallery_toolbar_options(int size, int grouped, int show_input) {
     toolbar_show_input = show_input != 0;
 }
 unsigned gallery_toolbar_activations(unsigned index) {
-    return index < 4 ? toolbar_activations[index] : 0;
+    return index < 4 ? toolbar_activations[index] : index == 4 ? toolbar_query_changes : 0;
 }
 unsigned gallery_toolbar_cursor(void) {
     return toolbar_query ? (unsigned)cui_edit_get_state(toolbar_query).cursor : 0;
@@ -5010,7 +5202,11 @@ static void gallery_progress_content(cui_context *ui, void *user) {
     float value = *(float *)user;
     char text[16];
     snprintf(text, sizeof text, "%.0f%%", (double)value);
-    cui_text_with_line_height(ui, cui_string(text), 14, current_theme.text, 14);
+    float font = 14;
+    cui_design_metrics metrics;
+    if (design_size && cui_design_measure(design_size, current_theme.font_size / 16, &metrics))
+        font = metrics.font_size;
+    cui_text_with_line_height(ui, cui_string(text), font, current_theme.text, font);
 }
 void gallery_progress_shape(int shape) {
     progress_shape = shape >= 0 && shape <= 2 ? shape : 0;
@@ -5204,4 +5400,20 @@ double gallery_conversation(unsigned field) {
     default:
         return 0;
     }
+}
+
+/* Host wheel claim is Plot-only. Core performs the authoritative hit/consumption
+ * during dispatch; the browser preflight follows the topmost semantic surface. */
+void gallery_plot_wheel(float x, float y, float delta) {
+    if (ui)
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                        .x = x,
+                                        .y = y,
+                                        .dy = -delta,
+                                        .scroll_precise = true,
+                                        .modifiers = CUI_MOD_CTRL});
+}
+double gallery_plot_domain(int axis, int end) {
+    const cui_plot_scale *s = axis ? &plot_viewport.y : &plot_viewport.x;
+    return end ? s->domain_max : s->domain_min;
 }

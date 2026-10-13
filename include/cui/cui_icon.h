@@ -75,6 +75,7 @@ typedef struct {
     bool custom_opacity;
     cui_icon_transform transform;
     bool custom_transform;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_icon_options;
 /* Paint-only component: no role, focus stop or hit target. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */

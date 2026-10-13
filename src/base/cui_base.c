@@ -396,7 +396,43 @@ cui_input_result cui_base_input(cui_context *ui, cui_id id, cui_str name, cui_ed
                              (cui_base_input_options){.disabled = disabled});
 }
 
+size_t cui_base_input_visual_hit_test(void *user, cui_str text, float x, float y) {
+    cui_input_visual_hit_geometry *hit = user;
+    if (!hit || !hit->visual || !hit->visual->ops || !hit->visual->ops->hit_test ||
+        (!text.data && text.length) || text.length != hit->visual->byte_length || !isfinite(x) ||
+        !isfinite(y))
+        return SIZE_MAX;
+    cui_text_caret caret;
+    if (hit->visual->ops->hit_test(
+            hit->visual->session, x - hit->measured.viewport.x + hit->measured.scroll_x,
+            y - hit->measured.viewport.y, CUI_TEXT_DOWNSTREAM, &caret) != CUI_TEXT_LAYOUT_OK ||
+        caret.byte_offset > text.length || !isfinite(caret.x) || !isfinite(caret.y) ||
+        !isfinite(caret.height) || caret.height < 0 ||
+        (unsigned)caret.affinity > CUI_TEXT_DOWNSTREAM ||
+        (caret.byte_offset < text.length &&
+         ((unsigned char)text.data[caret.byte_offset] & 0xc0) == 0x80))
+        return SIZE_MAX;
+    if (hit->affinity)
+        *hit->affinity = caret.affinity;
+    return caret.byte_offset;
+}
 size_t cui_base_input_hit_test(void *user, cui_str text, float x, float y) {
+    cui_input_hit_geometry *hit = user;
+    if (!hit || !hit->ui || !isfinite(x) || !isfinite(y) || !isfinite(hit->font_size) ||
+        hit->font_size <= 0 || !cui_edit_valid_utf8(text))
+        return SIZE_MAX;
+    cui_text_geometry visual;
+    if (cui_get_text_geometry(hit->ui, text, hit->font_size, (cui_text_style){0}, &visual) ==
+        CUI_TEXT_LAYOUT_OK) {
+        cui_input_visual_hit_geometry geometry = {*hit, &visual, NULL};
+        size_t byte = cui_base_input_visual_hit_test(&geometry, text, x, y);
+        cui_release_text_geometry(&visual);
+        if (byte != SIZE_MAX)
+            return byte;
+    }
+    return cui_base_input_measured_hit_test(user, text, x, y);
+}
+size_t cui_base_input_measured_hit_test(void *user, cui_str text, float x, float y) {
     (void)y;
     cui_input_hit_geometry *hit = user;
     if (!hit || !hit->ui || !isfinite(x) || !isfinite(hit->font_size) || hit->font_size <= 0 ||
@@ -431,7 +467,7 @@ size_t cui_base_input_hit_test(void *user, cui_str text, float x, float y) {
 
 bool cui_progress_circle_measure(cui_progress_geometry progress, float diameter,
                                  cui_progress_circle_geometry *out) {
-    if (!out || !isfinite(diameter) || diameter < 1 || diameter > 256 ||
+    if (!out || !isfinite(diameter) || diameter < 1 || diameter > 4096 ||
         !isfinite(progress.start) || !isfinite(progress.length) || progress.start < 0 ||
         progress.length < 0 || progress.start + progress.length > 1)
         return false;
@@ -448,7 +484,7 @@ bool cui_progress_circle_raster(cui_progress_circle_geometry geometry, cui_color
                                 unsigned char *pixels, size_t capacity, cui_bitmap *out) {
     const float tau = 6.28318530718f;
     if (!out || !pixels || !isfinite(scale) || scale <= 0 || scale > 4 ||
-        !isfinite(geometry.diameter) || geometry.diameter < 1 || geometry.diameter > 256 ||
+        !isfinite(geometry.diameter) || geometry.diameter < 1 || geometry.diameter > 4096 ||
         !isfinite(geometry.inner_radius) || !isfinite(geometry.outer_radius) ||
         geometry.inner_radius < 0 || geometry.outer_radius > geometry.diameter * .5f ||
         geometry.outer_radius <= geometry.inner_radius || !isfinite(geometry.start_angle) ||
@@ -456,7 +492,7 @@ bool cui_progress_circle_raster(cui_progress_circle_geometry geometry, cui_color
         geometry.end_angle < geometry.start_angle || geometry.end_angle > tau)
         return false;
     unsigned extent = (unsigned)ceilf(geometry.diameter * scale);
-    if (extent > 512 || capacity < (size_t)extent * extent * 4)
+    if (extent > 16384 || extent > SIZE_MAX / extent / 4 || capacity < (size_t)extent * extent * 4)
         return false;
     float alpha = color.a / 255.f;
     float track = alpha * .2f;

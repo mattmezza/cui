@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui.h"
 #include "cui/cui_plot.h"
 #include <assert.h>
 #include <float.h>
@@ -1999,7 +2000,215 @@ static void dashed_stroke_meshes(void) {
                                        &bounds) == CUI_PLOT_CAPACITY);
     assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
 }
+static void viewport_models(void) {
+    cui_plot_viewport v;
+    cui_plot_scale x = {CUI_PLOT_LINEAR, 0, 100, 0, 200, false};
+    cui_plot_scale y = {CUI_PLOT_LINEAR, -10, 10, 100, 0, false};
+    cui_plot_viewport_options o = cui_plot_viewport_defaults();
+    assert(cui_plot_viewport_init(&v, x, y) == CUI_PLOT_OK);
+    double ax, ay;
+    cui_plot_inverse(&v.x, 40, &ax);
+    cui_plot_inverse(&v.y, 60, &ay);
+    assert(cui_plot_viewport_transform(&v, o, 0, 0, 2, (cui_plot_point){40, 60}) == CUI_PLOT_OK);
+    double value;
+    cui_plot_inverse(&v.x, 40, &value);
+    assert(close(value, ax));
+    cui_plot_inverse(&v.y, 60, &value);
+    assert(close(value, ay));
+    assert(close(v.x.domain_max - v.x.domain_min, 50));
+    assert(cui_plot_viewport_reset(&v) == CUI_PLOT_OK);
+    assert(cui_plot_viewport_transform(&v, o, 20, -10, 2, (cui_plot_point){60, 50}) == CUI_PLOT_OK);
+    cui_plot_inverse(&v.x, 60, &value);
+    assert(close(value, ax));
+    cui_plot_inverse(&v.y, 50, &value);
+    assert(close(value, ay));
+    assert(cui_plot_viewport_reset(&v) == CUI_PLOT_OK);
+    o.x_limit = (cui_plot_viewport_limit){
+        .bounded = true, .minimum = 0, .maximum = 100, .min_span = 10, .max_span = 80};
+    assert(cui_plot_viewport_transform(&v, o, 1000, 0, 100, (cui_plot_point){100, 50}) ==
+           CUI_PLOT_OK);
+    assert(v.x.domain_min == 0 && close(v.x.domain_max, 10));
+    assert(cui_plot_viewport_transform(&v, o, -2000, 0, .001, (cui_plot_point){100, 50}) ==
+           CUI_PLOT_OK);
+    assert(close(v.x.domain_min, 20) && v.x.domain_max == 100);
+    cui_plot_viewport saved = v;
+    o.y_limit.min_span = NAN;
+    assert(cui_plot_viewport_transform(&v, o, 10, 10, 2, (cui_plot_point){50, 50}) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    o = cui_plot_viewport_defaults();
+    o.x_limit =
+        (cui_plot_viewport_limit){.bounded = true, .minimum = 0, .maximum = 5, .min_span = 10};
+    assert(cui_plot_viewport_transform(&v, o, 0, 0, 2, (cui_plot_point){50, 50}) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    o = cui_plot_viewport_defaults();
+    assert(cui_plot_viewport_transform(&v, o, 0, 0, INFINITY, (cui_plot_point){50, 50}) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    o.disabled = true;
+    assert(cui_plot_viewport_transform(&v, o, 20, 20, 2, (cui_plot_point){50, 50}) == CUI_PLOT_OK);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    v.x.range_end = 400;
+    v.y.range_start = 200;
+    assert(cui_plot_viewport_reset(&v) == CUI_PLOT_OK);
+    assert(v.x.domain_min == 0 && v.x.domain_max == 100 && v.x.range_end == 400);
+    assert(v.y.domain_min == -10 && v.y.domain_max == 10 && v.y.range_start == 200);
+    x = (cui_plot_scale){CUI_PLOT_LOG10, 1, 1000, 200, 0, false};
+    assert(cui_plot_viewport_init(&v, x, y) == CUI_PLOT_OK);
+    o = cui_plot_viewport_defaults();
+    cui_plot_inverse(&v.x, 80, &ax);
+    assert(cui_plot_viewport_transform(&v, o, 0, 0, 3, (cui_plot_point){80, 50}) == CUI_PLOT_OK);
+    cui_plot_inverse(&v.x, 80, &value);
+    assert(relative(value, ax));
+    assert(close(log10(v.x.domain_max) - log10(v.x.domain_min), 1));
+    saved = v;
+    assert(cui_plot_viewport_transform(&v, o, DBL_MAX, DBL_MAX, DBL_MIN,
+                                       (cui_plot_point){DBL_MAX, DBL_MAX}) != CUI_PLOT_OK);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+}
+static void viewport_frame(cui_context *ui, cui_plot_viewport *v, cui_plot_viewport_options o,
+                           bool modal) {
+    assert(cui_begin_frame(ui, 240, 160, .016f));
+    assert(cui_plot_viewport_reduce(ui, 91, v, o) == CUI_PLOT_OK);
+    cui_begin_box(
+        ui, 91, (cui_box){.width = 200, .height = 100, .fixed_width = true, .fixed_height = true});
+    cui_interact(ui, 91, CUI_ROLE_IMAGE, cui_string("Plot"), o.disabled, false, 0);
+    assert(cui_plot_viewport_bind(ui, 91, v, o));
+    cui_end_box(ui);
+    if (modal) {
+        assert(cui_begin_focus_scope(ui, 92, true));
+        cui_begin_portal(ui, 92, (cui_box){0}, (cui_rect){0, 0, 240, 160}, 2);
+        cui_interact(ui, 92, CUI_ROLE_DIALOG, cui_string("Modal"), false, false, 0);
+        cui_end_box(ui);
+        cui_end_focus_scope(ui);
+    }
+    cui_end_frame(ui);
+}
+static void viewport_inputs(void) {
+    cui_context *ui = cui_create((cui_config){.width = 240, .height = 160});
+    assert(ui);
+    cui_plot_viewport v;
+    cui_plot_viewport_options o = cui_plot_viewport_defaults();
+    assert(cui_plot_viewport_init(&v, (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 0, 200, false},
+                                  (cui_plot_scale){CUI_PLOT_LINEAR, -10, 10, 100, 0, false}) ==
+           CUI_PLOT_OK);
+    viewport_frame(ui, &v, o, false);
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 50, .y = 50, .modifiers = CUI_MOD_SHIFT});
+    viewport_frame(ui, &v, o, false);
+    assert(v.dragging);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 250, .y = 70});
+    viewport_frame(ui, &v, o, false);
+    assert(close(v.x.domain_min, -100) && close(v.y.domain_min, -6));
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL});
+    viewport_frame(ui, &v, o, false);
+    assert(!v.dragging);
+    cui_plot_viewport saved = v;
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 100, .y = 50});
+    viewport_frame(ui, &v, o, false);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 50, .modifiers = CUI_MOD_SHIFT});
+    viewport_frame(ui, &v, o, false);
+    assert(v.dragging);
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 40, .y = 50, .modifiers = CUI_MOD_SHIFT});
+    viewport_frame(ui, &v, o, false);
+    assert(!v.dragging && cui_event_activation(ui, 0) == 0);
+    cui_plot_viewport_reset(&v);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                    .x = 40,
+                                    .y = 60,
+                                    .dy = 100,
+                                    .scroll_precise = true,
+                                    .modifiers = CUI_MOD_CTRL});
+    viewport_frame(ui, &v, o, false);
+    double value;
+    cui_plot_inverse(&v.x, 40, &value);
+    assert(close(value, 20));
+    assert(close(v.x.domain_max - v.x.domain_min, 100 / exp(.2)));
+    saved = v;
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_SCROLL, .x = 40, .y = 60, .dy = 100, .scroll_precise = true});
+    viewport_frame(ui, &v, o, false);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    cui_plot_viewport_reset(&v);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                    .x = 40,
+                                    .y = 50,
+                                    .pointer_type = CUI_POINTER_TOUCH,
+                                    .pointer_id = 1});
+    viewport_frame(ui, &v, o, false);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                    .x = 60,
+                                    .y = 50,
+                                    .pointer_type = CUI_POINTER_TOUCH,
+                                    .pointer_id = 1});
+    viewport_frame(ui, &v, o, false);
+    assert(close(v.x.domain_min, -10));
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                    .x = 140,
+                                    .y = 50,
+                                    .pointer_type = CUI_POINTER_TOUCH,
+                                    .pointer_id = 2});
+    viewport_frame(ui, &v, o, false);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                    .x = 160,
+                                    .y = 50,
+                                    .pointer_type = CUI_POINTER_TOUCH,
+                                    .pointer_id = 2});
+    viewport_frame(ui, &v, o, false);
+    assert(close(v.x.domain_max - v.x.domain_min, 80));
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_CANCEL, .pointer_type = CUI_POINTER_TOUCH, .pointer_id = 1});
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_CANCEL, .pointer_type = CUI_POINTER_TOUCH, .pointer_id = 2});
+    viewport_frame(ui, &v, o, false);
+    saved = v;
+    o.disabled = true;
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                    .x = 40,
+                                    .y = 60,
+                                    .dy = 100,
+                                    .scroll_precise = true,
+                                    .modifiers = CUI_MOD_CTRL});
+    viewport_frame(ui, &v, o, false);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    o = (cui_plot_viewport_options){0};
+    viewport_frame(ui, &v, o, false);
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 50, .modifiers = CUI_MOD_SHIFT});
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 60, .y = 50, .modifiers = CUI_MOD_SHIFT});
+    cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 60, .y = 50, .modifiers = CUI_MOD_SHIFT});
+    viewport_frame(ui, &v, o, false);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    o = cui_plot_viewport_defaults();
+    viewport_frame(ui, &v, o, true);
+    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                    .x = 40,
+                                    .y = 60,
+                                    .dy = 100,
+                                    .scroll_precise = true,
+                                    .modifiers = CUI_MOD_CTRL});
+    viewport_frame(ui, &v, o, true);
+    assert(memcmp(&v, &saved, sizeof v) == 0);
+    cui_destroy(ui);
+}
 int main(void) {
+    viewport_models();
+    viewport_inputs();
     dashed_stroke_meshes();
     extended_stroke_meshes();
     complex_fill_meshes();

@@ -510,6 +510,133 @@ static void test_section_and_text(void) {
         cui_destroy(ui);
     }
 }
+/* Sample real SVG icon alpha under the same intersecting clip-stack contract
+ * used by renderers. Rect-only checks miss separately painted floating roots. */
+static void clipped_menu(cui_context *ui, const cui_theme *t, bool collapsed, void *user) {
+    cui_sidebar_menu_item *items = user;
+    assert(cui_sidebar_menu(ui, 710, t, items, 10, collapsed));
+}
+static cui_draw_list clipping_frame(cui_context *ui, const cui_theme *t, cui_sidebar_state *s,
+                                    cui_sidebar_entry *entry, cui_sidebar_options o) {
+    cui_begin_frame(ui, 300, 180, .016f);
+    cui_begin_box(ui, 700, (cui_box){.width = 255, .height = 180});
+    assert(cui_sidebar(ui, 701, t, s, entry, 1, o));
+    cui_end_box(ui);
+    return cui_end_frame(ui);
+}
+static cui_rect intersect_clip(cui_rect a, cui_rect b) {
+    float x = fmaxf(a.x, b.x), y = fmaxf(a.y, b.y);
+    return (cui_rect){x, y, fmaxf(0, fminf(a.x + a.w, b.x + b.w) - x),
+                      fmaxf(0, fminf(a.y + a.h, b.y + b.h) - y)};
+}
+static void check_sidebar_pixels(cui_draw_list draw, cui_rect viewport) {
+    cui_rect clips[256] = {{0, 0, 300, 180}};
+    size_t depth = 0, pixels = 0, hidden = 0, text = 0;
+    for (size_t i = 0; i < draw.count; i++) {
+        const cui_draw_command *d = &draw.commands[i];
+        if (d->type == CUI_DRAW_CLIP_PUSH) {
+            assert(depth + 1 < 256);
+            clips[depth + 1] = intersect_clip(clips[depth], d->bounds);
+            depth++;
+        } else if (d->type == CUI_DRAW_CLIP_POP) {
+            assert(depth);
+            depth--;
+        } else if (d->type == CUI_DRAW_IMAGE) {
+            const cui_bitmap *b = &d->bitmap.bitmap;
+            assert(b->pixels && b->width && b->height);
+            for (unsigned y = 0; y < b->height; y++)
+                for (unsigned x = 0; x < b->width; x++) {
+                    if (!b->pixels[y * b->stride + x * 4 + 3])
+                        continue;
+                    float px = d->bounds.x + (x + .5f) * d->bounds.w / b->width;
+                    float py = d->bounds.y + (y + .5f) * d->bounds.h / b->height;
+                    if (px < clips[depth].x || px >= clips[depth].x + clips[depth].w ||
+                        py < clips[depth].y || py >= clips[depth].y + clips[depth].h) {
+                        hidden++;
+                        continue;
+                    }
+                    assert(px >= viewport.x && px < viewport.x + viewport.w);
+                    assert(py >= viewport.y && py < viewport.y + viewport.h);
+                    pixels++;
+                }
+        } else if (d->type == CUI_DRAW_TEXT) {
+            cui_rect visible = intersect_clip(clips[depth], d->bounds);
+            if (visible.w > 0 && visible.h > 0) {
+                assert(visible.y >= viewport.y &&
+                       visible.y + visible.h <= viewport.y + viewport.h + .02f);
+                text++;
+            }
+        }
+    }
+    assert(depth == 0 && pixels > 0 && hidden > 0);
+    (void)text;
+}
+static void test_icon_clipping(void) {
+    for (unsigned collapsed = 0; collapsed < 2; collapsed++) {
+        cui_context *ui = cui_create((cui_config){.max_elements = 1024, .max_commands = 4096});
+        assert(ui);
+        cui_theme t = cui_theme_light();
+        cui_sidebar_state s;
+        cui_sidebar_cache cache[1];
+        assert(cui_sidebar_state_init(&s, cache, 1));
+        cui_sidebar_menu_item items[10] = {0};
+        cui_sidebar_item_state expanded = {.open = true, .initialized = true};
+        cui_sidebar_menu_item nested = {
+            .id = 740, .label = cui_string("Nested"), .icon = cui_string("folder")};
+        for (unsigned i = 0; i < 10; i++)
+            items[i] = (cui_sidebar_menu_item){.id = 720 + i,
+                                               .label = cui_string("Folder"),
+                                               .icon = cui_string("folder"),
+                                               .on_activate = activate,
+                                               .user = &clicks};
+        items[2].children = &nested;
+        items[2].child_count = 1;
+        items[2].state = &expanded;
+        cui_sidebar_entry entry = {
+            .id = 711, .render = clipped_menu, .user = items, .estimated_height = 330};
+        content_state header = {.height = 30}, footer = {.height = 30};
+        cui_sidebar_options o = cui_sidebar_default();
+        o.height = 180;
+        o.header = content;
+        o.header_user = &header;
+        o.footer = content;
+        o.footer_user = &footer;
+        o.collapse = CUI_SIDEBAR_ICON;
+        o.collapsed = collapsed;
+        o.reduced_motion = true;
+        clipping_frame(ui, &t, &s, &entry, o);
+        clipping_frame(ui, &t, &s, &entry, o);
+        for (unsigned scroll = 0; scroll < 2; scroll++) {
+            s.scroll.y = scroll ? 95 : 28;
+            cui_draw_list draw = clipping_frame(ui, &t, &s, &entry, o);
+            check_sidebar_pixels(draw, s.viewport);
+            clicks = 0;
+            cui_rect hidden = cui_bounds(ui, 720);
+            assert(hidden.y < s.viewport.y);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                   .x = hidden.x + 10,
+                                                   .y = s.viewport.y - 2}));
+            clipping_frame(ui, &t, &s, &entry, o);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                                   .x = hidden.x + 10,
+                                                   .y = s.viewport.y - 2}));
+            clipping_frame(ui, &t, &s, &entry, o);
+            assert(clicks == 0);
+            cui_rect bottom = cui_bounds(ui, 729);
+            assert(bottom.y > s.viewport.y + s.viewport.h);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                   .x = bottom.x + 10,
+                                                   .y = s.viewport.y + s.viewport.h + 2}));
+            clipping_frame(ui, &t, &s, &entry, o);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                                   .x = bottom.x + 10,
+                                                   .y = s.viewport.y + s.viewport.h + 2}));
+            clipping_frame(ui, &t, &s, &entry, o);
+            assert(clicks == 0);
+        }
+        cui_destroy(ui);
+    }
+}
 static void test_menu(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);
@@ -562,6 +689,7 @@ int main(void) {
 #ifndef CUI_SIDEBAR_BASE_ONLY
     test_layout();
     test_menu();
+    test_icon_clipping();
     test_virtual_and_animation();
     test_toggle();
     test_composition();

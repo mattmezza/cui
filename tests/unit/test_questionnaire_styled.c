@@ -1019,6 +1019,25 @@ int main(void) {
                                                                 .choices = &selected,
                                                                 .choice_capacity = 1},
                                   NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+
+    for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+        for (int d = 0; d < 2; d++) {
+            float density = d ? .875f : 1;
+            cui_design_metrics m;
+            assert(cui_design_measure((cui_design_size)n, density, &m));
+            frame(ui, &s,
+                  (cui_questionnaire_options){
+                      .width = 300, .design_size = (cui_design_size)n, .density = density});
+            assert(cui_bounds(ui, 12).h >= m.control_height);
+            assert(cui_bounds(ui, 18).h == m.control_height);
+        }
+    }
+    cui_begin_frame(ui, 400, 300, .016f);
+    cui_theme invalid_theme = cui_theme_light();
+    assert(
+        !cui_questionnaire_begin(ui, 10, &invalid_theme, &s,
+                                 (cui_questionnaire_options){.design_size = (cui_design_size)99}));
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
     for (int size = 0; size < 4; size++) {
         cui_questionnaire_options o = {.size = (cui_questionnaire_size)size, .width = 300};
         cui_str description = choice.description;

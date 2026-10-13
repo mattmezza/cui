@@ -122,6 +122,9 @@ struct cui_context {
     double frame_time;
     cui_id text_input_owner, composition_owner;
     cui_rect text_input_bounds;
+    cui_id text_geometry_ime_owner;
+    cui_rect text_geometry_ime_bounds;
+    float text_geometry_ime_height;
     bool reduced_motion;
     cui_core_resource *resources;
     size_t resource_bytes;
@@ -169,6 +172,38 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         result.height < 0)
         return (cui_size){0};
     return result;
+}
+bool cui_has_text_geometry(const cui_context *ui) {
+    return ui && ui->config.text_geometry;
+}
+void cui_release_text_geometry(cui_text_geometry *geometry) {
+    if (geometry && geometry->ops && geometry->ops->release)
+        geometry->ops->release(geometry->session);
+    if (geometry)
+        *geometry = (cui_text_geometry){0};
+}
+cui_text_layout_status cui_get_text_geometry(cui_context *ui, cui_str text, float size,
+                                             cui_text_style style, cui_text_geometry *out) {
+    if (!ui || !out || (!text.data && text.length) || !isfinite(size) || size <= 0 ||
+        !cui_core_text_style_valid(style))
+        return CUI_TEXT_LAYOUT_INVALID;
+    if (!ui->config.text_geometry)
+        return CUI_TEXT_LAYOUT_UNAVAILABLE;
+    cui_text_geometry result = {0};
+    cui_text_layout_status status =
+        ui->config.text_geometry(ui->config.measure_user, text, fminf(size, 65535), style, &result);
+    if (status != CUI_TEXT_LAYOUT_OK) {
+        cui_release_text_geometry(&result);
+        return status;
+    }
+    if (!result.ops || !result.ops->carets || !result.ops->hit_test || !result.ops->selection ||
+        !result.ops->release || !isfinite(result.width) || !isfinite(result.height) ||
+        result.width < 0 || result.height < 0 || result.byte_length != text.length) {
+        cui_release_text_geometry(&result);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
+    *out = result;
+    return CUI_TEXT_LAYOUT_OK;
 }
 bool cui_measure_font_metrics(cui_context *ui, float size, cui_text_style style,
                               cui_font_metrics *out) {
@@ -1726,6 +1761,47 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
 static cui_color cui_core_color(Clay_Color c) {
     return (cui_color){(uint8_t)c.r, (uint8_t)c.g, (uint8_t)c.b, (uint8_t)c.a};
 }
+/* Clay emits floating-root scissor commands with NULL userData and only the
+ * nearest clipping ancestor. That root is painted outside its parent's draw
+ * stack, so restore the complete CUI clip ancestry before renderer conversion.
+ * Detached portals have parent == SIZE_MAX and retain their escape semantics. */
+static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderCommand *command,
+                                        cui_rect bounds) {
+    uint32_t clip_id = command->id;
+    if (!command->userData) {
+        clip_id = 0;
+        for (int32_t i = 0; i < ui->clay->layoutElementTreeRoots.length; i++) {
+            const Clay__LayoutElementTreeRoot *root =
+                &ui->clay->layoutElementTreeRoots.internalArray[i];
+            const Clay_LayoutElement *element =
+                &ui->clay->layoutElements.internalArray[root->layoutElementIndex];
+            if (root->clipElementId &&
+                Clay__HashNumber(element->id, element->children.length + 10).id == command->id) {
+                clip_id = root->clipElementId;
+                break;
+            }
+        }
+    }
+    for (size_t i = 0; i < ui->node_count; i++) {
+        if (ui->nodes[i].clay_id != clip_id)
+            continue;
+        for (size_t n = i; n != SIZE_MAX; n = ui->nodes[n].parent) {
+            if (!ui->nodes[n].clip)
+                continue;
+            Clay_ElementData data =
+                Clay_GetElementData((Clay_ElementId){.id = ui->nodes[n].clay_id});
+            if (!data.found)
+                continue;
+            float left = fmaxf(bounds.x, data.boundingBox.x);
+            float top = fmaxf(bounds.y, data.boundingBox.y);
+            float right = fminf(bounds.x + bounds.w, data.boundingBox.x + data.boundingBox.width);
+            float bottom = fminf(bounds.y + bounds.h, data.boundingBox.y + data.boundingBox.height);
+            bounds = (cui_rect){left, top, fmaxf(0, right - left), fmaxf(0, bottom - top)};
+        }
+        break;
+    }
+    return bounds;
+}
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
@@ -1887,6 +1963,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.color = cui_core_color(c->renderData.text.textColor);
             break;
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START:
+            d.bounds = cui_core_ancestral_clip(ui, c, d.bounds);
             d.type = CUI_DRAW_CLIP_PUSH;
             break;
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END:
@@ -2685,10 +2762,28 @@ void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
         return;
     ui->text_input_owner = owner;
     ui->text_input_bounds = bounds;
+    ui->text_geometry_ime_owner = 0;
+}
+bool cui_set_text_input_geometry_rect(cui_context *ui, cui_id owner, cui_id caret, float height) {
+    if (!ui || !ui->in_frame || !owner || !caret || !isfinite(height) || height < 0 ||
+        !cui_track_bounds(ui, caret, &ui->text_geometry_ime_bounds))
+        return false;
+    ui->text_input_owner = owner;
+    ui->text_geometry_ime_owner = owner;
+    ui->text_geometry_ime_height = height;
+    return true;
 }
 bool cui_text_input_rect(const cui_context *ui, cui_rect *out) {
     if (!ui || !out || !ui->focus || ui->focus != ui->text_input_owner)
         return false;
-    *out = ui->text_input_bounds;
+    if (ui->text_geometry_ime_owner == ui->focus && !ui->in_frame) {
+        cui_rect bounds = ui->text_geometry_ime_bounds;
+        cui_rect result = {bounds.x, bounds.y - (ui->text_geometry_ime_height - bounds.h) * .5f, 1,
+                           ui->text_geometry_ime_height};
+        if (!isfinite(result.x) || !isfinite(result.y) || !isfinite(result.h))
+            return false;
+        *out = result;
+    } else
+        *out = ui->text_input_bounds;
     return true;
 }

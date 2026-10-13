@@ -73,7 +73,7 @@ Use the [copyable agent setup prompt](AI_AGENTS.md). The website also publishes 
 
 ## Build with another language
 
-Try the runnable [Go, Rust, JavaScript and TypeScript examples](LANGUAGE_BINDINGS.md).
+Try the runnable [Python, Go, Rust, JavaScript and TypeScript examples](LANGUAGE_BINDINGS.md).
 They use a small C host ABI and real CUI controls with synchronous callbacks.
 The guide includes headless checks, native-window commands and the observed
 Linux support limits; these examples are a starting point for bindings.

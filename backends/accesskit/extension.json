@@ -1,0 +1,5 @@
+{
+  "shim_sha256": "c0059a0de841688da28355e134fd76768753f90a6b322a311c55d2d4193732b1",
+  "lib_rs_sha256": "3e7c148f4c431c15e48eb951063c7bf5b5b075418e73481d5a7343b4324387d2",
+  "entry_point_append": "mod cui_lifetime;"
+}

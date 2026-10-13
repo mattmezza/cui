@@ -185,6 +185,14 @@ void cui_table_caption(cui_context *, cui_id, const cui_theme *, cui_str);
 /* Stateless composable Table: caller determines section/cell hierarchy and content. */
 void cui_table_begin(cui_context *, cui_id, const cui_theme *, float width);
 void cui_table_begin_row(cui_context *, cui_id, const cui_theme *, float height, bool header);
+typedef struct {
+    float height;
+    bool header, custom_background;
+    cui_color background;
+} cui_table_row_options;
+/* Set the background independently for each header/body row. Alternating rows
+ * are application-controlled: use the model row index, not the visible index. */
+void cui_table_begin_row_ex(cui_context *, cui_id, const cui_theme *, cui_table_row_options);
 void cui_table_begin_cell(cui_context *, cui_id, float width, float height, cui_table_align);
 void cui_table_end(cui_context *);
 #ifdef __cplusplus

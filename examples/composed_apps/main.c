@@ -86,6 +86,7 @@ int main(int argc, char **argv) {
         }
         config.measure = cui_font_measure;
         config.measure_styled = cui_font_measure_styled;
+        config.text_geometry = cui_font_text_geometry;
         config.font_metrics = cui_font_get_metrics;
         config.measure_user = font;
         backend = cui_sdl3_create("Northstar / CUI composed app", width, height, font);

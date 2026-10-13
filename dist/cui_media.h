@@ -107,6 +107,7 @@ typedef struct {
     float progress, root_font_size, custom_density, width, media_aspect;
     bool title_status_override, description_status_override;
     cui_attachment_status title_status, description_status;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_attachment_model;
 typedef struct {
     cui_attachment_metrics metrics;
@@ -216,6 +217,37 @@ cui_attachment_group_result cui_attachment_group(cui_context *, cui_id,
 #define CUI_MEDIA_IMPLEMENTATION_ONCE
 /* src/base/cui_media.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
 
 #include <float.h>
 #include <math.h>
@@ -407,6 +439,24 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
     cui_attachment_plan p = {0};
     if (!cui_attachment_metrics_resolve(m.size, m.root_font_size, m.custom_density, &p.metrics))
         return false;
+    if (!cui_design_valid(m.design_size))
+        return false;
+    if (m.design_size) {
+        cui_design_metrics d;
+        float density = m.size == CUI_MEDIA_CUSTOM ? m.custom_density : m.root_font_size / 16;
+        if (!cui_design_resolve(m.design_size, density, &d))
+            return false;
+        p.metrics = (cui_attachment_metrics){.height = d.control_height,
+                                             .chip_width = 8 * d.font_size,
+                                             .media = d.control_height,
+                                             .glyph = d.indicator_size,
+                                             .padding_start = d.padding_x,
+                                             .padding_end = d.padding_x,
+                                             .card_padding = d.padding_x,
+                                             .gap = d.gap,
+                                             .text = d.font_size,
+                                             .description = d.font_size * .875f};
+    }
     p.flush = m.vertical && !m.content;
     p.overhang = m.identified && m.remove ? 6 : 0;
     p.remove_visible = p.overhang && (m.touch || m.hovered);
@@ -437,7 +487,8 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
                                   p.metrics.padding_end;
         p.media_width = p.media_height = m.media ? p.metrics.media : 0;
     } else {
-        p.width = p.flush ? p.metrics.height : 7.5f * m.root_font_size;
+        p.width =
+            p.flush ? p.metrics.height : 7.5f * (m.design_size ? p.metrics.text : m.root_font_size);
         if (m.width)
             p.width = m.width;
         p.media_width = m.media ? p.width - (p.flush ? 2 : 2 * p.metrics.card_padding) : 0;
@@ -469,6 +520,37 @@ cui_attachment_group_options cui_attachment_group_options_default(void) {
 
 /* src/components/cui_media.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
 
 
 #include <math.h>
@@ -748,7 +830,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                 return r;
         }
     }
-    o.model.root_font_size = t->font_size / .875f;
+    o.model.root_font_size = o.model.design_size ? t->font_size : t->font_size / .875f;
     o.model.content = o.child_count > 0;
     o.model.actions = o.actions != NULL;
     o.model.image = o.image_state && o.image_loader;

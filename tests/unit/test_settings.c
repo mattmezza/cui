@@ -450,7 +450,41 @@ static void test_dropdown_menu_and_reset_tooltip(void) {
     assert(legacy.overlay.open);
     cui_destroy(ui);
 }
+
+static void test_design_sizes(void) {
+    cui_context *ui = cui_create((cui_config){.width = 1000, .height = 600});
+    assert(ui);
+    char text_buffer[64] = "Ada";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = text_buffer, .capacity = sizeof(text_buffer)});
+    cui_input_state input = {0};
+    cui_setting_item item = {
+        .title = {"Name", 4}, .kind = CUI_SETTING_INPUT, .edit = edit, .input_state = &input};
+    cui_setting_group group = {.items = &item, .count = 1};
+    cui_setting_page page = {.title = {"General", 7}, .groups = &group, .count = 1};
+    cui_settings_page_state workspace[1];
+    cui_settings_state state;
+    assert(edit && cui_settings_state_init(&state, workspace, 1, NULL));
+    for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+        cui_settings_options options = cui_settings_default();
+        options.width = 1000;
+        options.height = 600;
+        options.design_size = (cui_design_size)n;
+        cui_design_metrics m;
+        assert(cui_design_measure((cui_design_size)n, 1, &m));
+        assert(!frame(ui, &page, 1, &state, options).invalid);
+        assert(cui_bounds(ui, cui_settings_part_id(11, 0, 0, 0, 24)).h == m.control_height);
+    }
+    cui_settings_state previous = state;
+    assert(frame(ui, &page, 1, &state, (cui_settings_options){.design_size = (cui_design_size)99})
+               .invalid);
+    assert(!memcmp(&previous, &state, sizeof(state)) && drawing.count == 0);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_design_sizes();
     test_input_number_and_sizes();
     test_search_reset_resize_scroll();
     test_filter();

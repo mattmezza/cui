@@ -34,8 +34,8 @@ typedef struct {
 } cui_progress_circle_geometry;
 bool cui_progress_circle_measure(cui_progress_geometry, float diameter,
                                  cui_progress_circle_geometry *);
-/* Allocation-free4x4 antialiased RGBA raster into caller storage. Diameter1..256,
- * scale(0,4], at most512px per side. Failure preserves pixels and output.
+/* Allocation-free4x4 antialiased RGBA raster into caller storage. Diameter1..4096,
+ * scale(0,4], at most16384px per side. Failure preserves pixels and output.
  * Pixels must remain alive and unmodified through renderer completion. */
 bool cui_progress_circle_raster(cui_progress_circle_geometry, cui_color, float scale,
                                 unsigned char *pixels, size_t capacity, cui_bitmap *);
@@ -66,8 +66,17 @@ typedef struct {
     cui_rect viewport;
     float font_size, scroll_x;
 } cui_input_hit_geometry;
-/* Reusable measured scalar hit test. Invalid input returns SIZE_MAX. */
+/* Optional visual host geometry, otherwise measured scalar hit test. */
 size_t cui_base_input_hit_test(void *geometry, cui_str, float x, float y);
+/* Explicit measurement-only legacy path; never calls optional geometry factory. */
+size_t cui_base_input_measured_hit_test(void *geometry, cui_str, float x, float y);
+/* Borrowed immutable visual session plus existing viewport/scroll mapping. */
+typedef struct {
+    cui_input_hit_geometry measured;
+    const cui_text_geometry *visual;
+    cui_text_affinity *affinity; /* Optional output, preserved on failed hit. */
+} cui_input_visual_hit_geometry;
+size_t cui_base_input_visual_hit_test(void *geometry, cui_str, float x, float y);
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;

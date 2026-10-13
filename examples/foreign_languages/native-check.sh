@@ -7,12 +7,18 @@ label=$2
 shift 2
 example_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 CUI_EXAMPLE_CAPTURE="$example_dir/build/$label-native.bmp" \
-    "$@" "$font" 120 >"$example_dir/build/$label-native.log" 2>&1 &
+    "$@" "$font" 300 >"$example_dir/build/$label-native.log" 2>&1 &
 client=$!
 window=''
 attempt=0
 while [ "$attempt" -lt 100 ]; do
     window=$(xdotool search --name '^CUI language example$' 2>/dev/null || true)
+    # Bare Xvfb has no window manager/client list. Some xdotool versions miss
+    # SDL3 windows there; inspect the actual X window tree as a fallback.
+    if [ -z "$window" ]; then
+        window=$(xwininfo -root -tree 2>/dev/null |
+            awk '/"CUI language example":/ { print $1; exit }')
+    fi
     [ -z "$window" ] || break
     sleep 0.05
     attempt=$((attempt+1))

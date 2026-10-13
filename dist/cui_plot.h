@@ -301,6 +301,51 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+/* Geometry consumed by the frozen sankey_link_path function. source_x is the
+ * source node's right edge, target_x the target node's left edge. End widths
+ * are independent (tapered ribbons); y coordinates are their centerlines. */
+typedef struct {
+    double source_x, target_x, source_y, target_y, source_width, target_width;
+} cui_plot_sankey_ribbon;
+/* Move/Cubic/Line/Cubic/Close, midpoint-X controls, explicit origin offset.
+ * Each end width=max(width,min_width), all widths finite/nonnegative. Zero
+ * widths still emit a closed degenerate contour. Exactly5 commands; errors
+ * preserve output, capacity queries report5. No topology/layout solver. */
+cui_plot_result cui_plot_sankey_link_path(const cui_plot_sankey_ribbon *, double min_width,
+                                          cui_plot_point origin, cui_plot_path_command *,
+                                          size_t capacity, size_t *required);
+/* PlotElement's cursor visibility gate, separated from platform event routing.
+ * Zero initialize. Global positions are finite; bounds are a positive finite
+ * rectangle. Application supplies occlusion-aware hovered/default-prevented
+ * decisions and detected long-press phases. Desktop refreshes each frame;
+ * touch tracking begins only on accepted long press and ends on lift/cancel. */
+typedef struct {
+    cui_plot_point relative;
+    bool visible;
+} cui_plot_cursor_memory;
+typedef struct {
+    bool changed, request_frame, prevent_default;
+} cui_plot_cursor_update;
+typedef enum {
+    CUI_PLOT_LONG_PRESS_STARTED,
+    CUI_PLOT_LONG_PRESS_MOVED,
+    CUI_PLOT_LONG_PRESS_ENDED,
+    CUI_PLOT_LONG_PRESS_CANCELLED
+} cui_plot_long_press_phase;
+cui_plot_result cui_plot_cursor_mouse(cui_plot_cursor_memory *, cui_plot_rect bounds,
+                                      cui_plot_point global_position, bool hovered,
+                                      cui_plot_cursor_update *);
+cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *, cui_plot_rect bounds,
+                                           cui_plot_point global_position,
+                                           cui_plot_long_press_phase, bool hovered,
+                                           bool default_prevented, cui_plot_cursor_update *);
+/* Resolve from LIVE global position and CURRENT bounds, using memory only as
+ * visibility gate, as source prepaint does. Suppress during appearance. On no
+ * cursor, resolved=false and relative output unchanged; invalid leaves all
+ * outputs untouched. Bounds contain left/top, exclude right/bottom (Core rule). */
+cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *, cui_plot_rect bounds,
+                                        cui_plot_point live_global_position, bool appearing,
+                                        cui_plot_point *relative, bool *resolved);
 /* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
  * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
  * Zero initialize. Invalid input leaves memory unchanged. */
@@ -1632,6 +1677,133 @@ cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, doub
                                      size_t *required) {
     return cui_plot_arc_flatten_ex(arc, inner, outer, segments, CUI_PLOT_ARC_SEAMLESS, out,
                                    capacity, required);
+}
+
+static bool cui_plot_cursor_valid(cui_plot_rect b, cui_plot_point p) {
+    return isfinite(b.x_min) && isfinite(b.x_max) && isfinite(b.y_min) && isfinite(b.y_max) &&
+           b.x_min < b.x_max && b.y_min < b.y_max && isfinite(p.x) && isfinite(p.y);
+}
+static bool cui_plot_cursor_inside(cui_plot_rect b, cui_plot_point p) {
+    return p.x >= b.x_min && p.x < b.x_max && p.y >= b.y_min && p.y < b.y_max;
+}
+static cui_plot_result cui_plot_cursor_relative(cui_plot_rect b, cui_plot_point p,
+                                                cui_plot_point *relative) {
+    cui_plot_point next;
+    cui_plot_result result = cui_plot_number((long double)p.x - b.x_min, &next.x);
+    if (result != CUI_PLOT_OK)
+        return result;
+    result = cui_plot_number((long double)p.y - b.y_min, &next.y);
+    if (result != CUI_PLOT_OK)
+        return result;
+    *relative = next;
+    return CUI_PLOT_OK;
+}
+static bool cui_plot_cursor_changed(cui_plot_cursor_memory a, cui_plot_cursor_memory b) {
+    return a.visible != b.visible ||
+           (b.visible && (a.relative.x != b.relative.x || a.relative.y != b.relative.y));
+}
+cui_plot_result cui_plot_cursor_mouse(cui_plot_cursor_memory *memory, cui_plot_rect bounds,
+                                      cui_plot_point global, bool hovered,
+                                      cui_plot_cursor_update *update) {
+    if (!memory || !update || !cui_plot_cursor_valid(bounds, global))
+        return CUI_PLOT_INVALID;
+    cui_plot_cursor_memory next = *memory;
+    next.visible = hovered && cui_plot_cursor_inside(bounds, global);
+    if (next.visible) {
+        cui_plot_result result = cui_plot_cursor_relative(bounds, global, &next.relative);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    *update = (cui_plot_cursor_update){.changed = cui_plot_cursor_changed(*memory, next),
+                                       .request_frame = memory->visible != next.visible};
+    *memory = next;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *memory, cui_plot_rect bounds,
+                                           cui_plot_point global, cui_plot_long_press_phase phase,
+                                           bool hovered, bool prevented,
+                                           cui_plot_cursor_update *update) {
+    if (!memory || !update || !cui_plot_cursor_valid(bounds, global) ||
+        phase < CUI_PLOT_LONG_PRESS_STARTED || phase > CUI_PLOT_LONG_PRESS_CANCELLED)
+        return CUI_PLOT_INVALID;
+    cui_plot_cursor_memory next = *memory;
+    bool accepted = false;
+    if (phase == CUI_PLOT_LONG_PRESS_STARTED) {
+        if (!prevented && hovered && cui_plot_cursor_inside(bounds, global)) {
+            next.visible = true;
+            accepted = true;
+        }
+    } else if (phase == CUI_PLOT_LONG_PRESS_ENDED || phase == CUI_PLOT_LONG_PRESS_CANCELLED)
+        next.visible = false;
+    if ((phase == CUI_PLOT_LONG_PRESS_MOVED && memory->visible) || accepted) {
+        cui_plot_result result = cui_plot_cursor_relative(bounds, global, &next.relative);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    bool changed = cui_plot_cursor_changed(*memory, next);
+    *update = (cui_plot_cursor_update){changed, changed, accepted};
+    *memory = next;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *memory, cui_plot_rect bounds,
+                                        cui_plot_point global, bool appearing,
+                                        cui_plot_point *relative, bool *resolved) {
+    if (!memory || !relative || !resolved || !cui_plot_cursor_valid(bounds, global))
+        return CUI_PLOT_INVALID;
+    bool visible = memory->visible && !appearing && cui_plot_cursor_inside(bounds, global);
+    if (visible) {
+        cui_plot_point next;
+        cui_plot_result result = cui_plot_cursor_relative(bounds, global, &next);
+        if (result != CUI_PLOT_OK)
+            return result;
+        *relative = next;
+    }
+    *resolved = visible;
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_sankey_link_path(const cui_plot_sankey_ribbon *link, double min_width,
+                                          cui_plot_point origin, cui_plot_path_command *out,
+                                          size_t capacity, size_t *required) {
+    if (!link || !required || (!out && capacity) || !isfinite(min_width) || min_width < 0 ||
+        !isfinite(origin.x) || !isfinite(origin.y) || !isfinite(link->source_x) ||
+        !isfinite(link->target_x) || !isfinite(link->source_y) || !isfinite(link->target_y) ||
+        !isfinite(link->source_width) || !isfinite(link->target_width) || link->source_width < 0 ||
+        link->target_width < 0)
+        return CUI_PLOT_INVALID;
+    long double sx = link->source_x, tx = link->target_x, mx = sx / 2 + tx / 2;
+    long double sh = fmax(link->source_width, min_width) / 2;
+    long double th = fmax(link->target_width, min_width) / 2;
+    long double xs[] = {sx, tx, mx};
+    long double ys[] = {link->source_y - sh, link->target_y - th, link->source_y + sh,
+                        link->target_y + th};
+    double x[3], y[4];
+    for (size_t i = 0; i < 3; ++i) {
+        cui_plot_result result = cui_plot_number(xs[i] + origin.x, x + i);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    for (size_t i = 0; i < 4; ++i) {
+        cui_plot_result result = cui_plot_number(ys[i] + origin.y, y + i);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    cui_plot_path_command path[5] = {{.kind = CUI_PLOT_PATH_MOVE, .point = {x[0], y[0]}},
+                                     {.kind = CUI_PLOT_PATH_CUBIC,
+                                      .point = {x[1], y[1]},
+                                      .control1 = {x[2], y[0]},
+                                      .control2 = {x[2], y[1]}},
+                                     {.kind = CUI_PLOT_PATH_LINE, .point = {x[1], y[3]}},
+                                     {.kind = CUI_PLOT_PATH_CUBIC,
+                                      .point = {x[0], y[2]},
+                                      .control1 = {x[2], y[3]},
+                                      .control2 = {x[2], y[2]}},
+                                     {.kind = CUI_PLOT_PATH_CLOSE}};
+    *required = 5;
+    if (capacity < 5)
+        return CUI_PLOT_CAPACITY;
+    memcpy(out, path, sizeof path);
+    return CUI_PLOT_OK;
 }
 
 #endif

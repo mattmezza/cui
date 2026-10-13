@@ -409,9 +409,9 @@ API: `cui_pagination`. [Public header](../include/cui/cui_numeric.h); [guide](NU
 
 **Interaction:** Presentation only; the extended return reports whether another animation frame is needed.
 
-**Usage:** Submit the controlled fraction each frame; use cui_progress_defaults for the source loading cycle and retain motion state for smooth value changes.
+**Usage:** Submit the controlled fraction each frame; use cui_progress_defaults for the source loading cycle and retain motion state for smooth value changes. Circles need caller-owned pixel storage retained through rendering.
 
-API: `cui_progress_defaults`, `cui_progress`, `cui_progress_ex`. [Public header](../include/cui/cui_components.h); [guide](PROGRESS.md).
+API: `cui_progress_defaults`, `cui_progress`, `cui_progress_ex`, `cui_progress_circle_defaults`, `cui_progress_circle`. [Public header](../include/cui/cui_components.h); [guide](PROGRESS.md).
 
 ## Radio
 

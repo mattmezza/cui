@@ -111,6 +111,19 @@ cui_edit_result cui_edit_set_content(cui_edit *, cui_edit_content);
 /* Annotation-only attachment preserves text/selection/history. Any subsequent
  * document revision (including undo/redo) detaches spans; the host must refresh.
  * No metadata allocation, incremental remapping or token history is supplied. */
+/* Atomic borrowed-token insertion/replacement. Original endpoints must be grapheme
+ * boundaries; overlapping atoms expand the replacement. Output storage must be
+ * disjoint from attached spans, token strings, and model storage, and remains
+ * borrowed until detached. Count and output are untouched on failure. Exact
+ * token/range no-ops preserve selection/history but adopt the copied output.
+ * Undo restores text only and detaches tokens; metadata-only edits add no history. */
+cui_edit_result cui_edit_replace_range_with_token(cui_edit *, size_t start, size_t end,
+                                                  cui_edit_inline_token,
+                                                  cui_edit_token_span *output, size_t capacity,
+                                                  size_t *count);
+cui_edit_result cui_edit_replace_with_token(cui_edit *, cui_edit_inline_token,
+                                            cui_edit_token_span *output, size_t capacity,
+                                            size_t *count);
 cui_edit_result cui_edit_set_tokens(cui_edit *, const cui_edit_token_span *, size_t count);
 /* Token-safe view selection: nonempty ranges expand outward, collapsed cursors
  * snap left. The legacy exact scalar selection function below remains available. */
@@ -3959,6 +3972,132 @@ static bool cui_edit_private_token_alias(cui_edit *edit, cui_str text) {
     uintptr_t address = (uintptr_t)text.data, buffer = (uintptr_t)edit->config.buffer;
     return address >= buffer ? address - buffer < edit->config.capacity
                              : buffer - address < text.length;
+}
+static bool cui_edit_private_storage_overlap(const void *a, size_t an, const void *b, size_t bn) {
+    if (!an || !bn)
+        return false;
+    uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+    return x >= y ? x - y < bn : y - x < an;
+}
+static bool cui_edit_private_string_equal(cui_str a, cui_str b) {
+    return a.length == b.length && (!a.length || !memcmp(a.data, b.data, a.length));
+}
+cui_edit_result cui_edit_replace_range_with_token(cui_edit *edit, size_t start, size_t end,
+                                                  cui_edit_inline_token token,
+                                                  cui_edit_token_span *output, size_t capacity,
+                                                  size_t *count) {
+    if (!edit || !output || !count || capacity > SIZE_MAX / sizeof(*output) ||
+        !cui_edit_content_valid(cui_edit_get_content(edit)) ||
+        !cui_edit_private_token_string(token.id, true) ||
+        !cui_edit_private_token_string(token.text, false) ||
+        !cui_edit_private_token_string(token.label, false))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str text = cui_edit_get_text(edit);
+    if (start > end || !cui_grapheme_boundary(text, start) || !cui_grapheme_boundary(text, end))
+        return CUI_EDIT_BOUNDARY;
+    size_t first, last;
+    cui_edit_result result =
+        cui_edit_normalize_token_range(cui_edit_get_content(edit), start, end, &first, &last);
+    if (result != CUI_EDIT_OK)
+        return result;
+    start = first;
+    end = last;
+    size_t remaining = edit->length - (end - start);
+    if (token.text.length > edit->config.capacity - 1 - remaining)
+        return CUI_EDIT_CAPACITY;
+    if (!cui_edit_private_accepted(edit, token.text))
+        return CUI_EDIT_LINE_BREAK;
+    const cui_edit_token_span *old = edit->tokens;
+    size_t old_count = edit->token_count, needed = 1;
+    bool identical = false;
+    for (size_t i = 0; i < old_count; ++i) {
+        const cui_edit_token_span *span = &old[i];
+        if (!(span->start < end && start < span->end))
+            ++needed;
+        else if (span->start == start && span->end == end &&
+                 cui_edit_private_string_equal(span->token.id, token.id) &&
+                 cui_edit_private_string_equal(span->token.text, token.text) &&
+                 cui_edit_private_string_equal(span->token.label, token.label))
+            identical = true;
+    }
+    if (needed > 65536 || needed > capacity)
+        return CUI_EDIT_CAPACITY;
+    size_t bytes = capacity * sizeof(*output);
+    if (cui_edit_private_storage_overlap(output, bytes, old, old_count * sizeof(*old)) ||
+        cui_edit_private_storage_overlap(output, bytes, edit->config.buffer,
+                                         edit->config.capacity) ||
+        cui_edit_private_storage_overlap(count, sizeof(*count), output, bytes) ||
+        cui_edit_private_storage_overlap(count, sizeof(*count), old, old_count * sizeof(*old)) ||
+        cui_edit_private_storage_overlap(count, sizeof(*count), edit->config.buffer,
+                                         edit->config.capacity))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    /* Metadata must remain valid after mutation and after writing output. */
+    for (size_t i = 0; i <= old_count; ++i) {
+        cui_edit_inline_token t = i == old_count ? token : old[i].token;
+        cui_str strings[3] = {t.id, t.text, t.label};
+        for (size_t j = 0; j < 3; ++j)
+            if (cui_edit_private_token_alias(edit, strings[j]) ||
+                cui_edit_private_storage_overlap(strings[j].data, strings[j].length, output,
+                                                 bytes) ||
+                cui_edit_private_storage_overlap(strings[j].data, strings[j].length, count,
+                                                 sizeof(*count)))
+                return CUI_EDIT_INVALID_ARGUMENT;
+    }
+    memcpy(edit->scratch, text.data, start);
+    memcpy(edit->scratch + start, token.text.data, token.text.length);
+    memcpy(edit->scratch + start + token.text.length, text.data + end, text.length - end);
+    cui_str candidate = {edit->scratch, remaining + token.text.length};
+    if (!cui_grapheme_boundary(candidate, start) ||
+        !cui_grapheme_boundary(candidate, start + token.text.length))
+        return CUI_EDIT_BOUNDARY;
+    for (size_t i = 0; i < old_count; ++i) {
+        cui_edit_token_span span = old[i];
+        if (span.start < end && start < span.end)
+            continue;
+        if (span.start >= end) {
+            span.start = span.start - (end - start) + token.text.length;
+            span.end = span.end - (end - start) + token.text.length;
+        }
+        if (!cui_grapheme_boundary(candidate, span.start) ||
+            !cui_grapheme_boundary(candidate, span.end))
+            return CUI_EDIT_BOUNDARY;
+    }
+    if (!identical) {
+        result = cui_edit_private_replace(edit, token.text, start, end);
+        if (result != CUI_EDIT_OK)
+            return result;
+    }
+    size_t n = 0;
+    bool inserted = false;
+    for (size_t i = 0; i < old_count; ++i) {
+        cui_edit_token_span span = old[i];
+        if (span.start < end && start < span.end)
+            continue;
+        if (!inserted && span.start >= end) {
+            output[n++] = (cui_edit_token_span){start, start + token.text.length, token};
+            inserted = true;
+        }
+        if (span.start >= end) {
+            span.start = span.start - (end - start) + token.text.length;
+            span.end = span.end - (end - start) + token.text.length;
+        }
+        output[n++] = span;
+    }
+    if (!inserted)
+        output[n++] = (cui_edit_token_span){start, start + token.text.length, token};
+    edit->tokens = output;
+    edit->token_count = n;
+    *count = n;
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_replace_with_token(cui_edit *edit, cui_edit_inline_token token,
+                                            cui_edit_token_span *output, size_t capacity,
+                                            size_t *count) {
+    if (!edit)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    return cui_edit_replace_range_with_token(
+        edit, edit->anchor < edit->cursor ? edit->anchor : edit->cursor,
+        edit->anchor > edit->cursor ? edit->anchor : edit->cursor, token, output, capacity, count);
 }
 cui_edit_result cui_edit_set_content(cui_edit *edit, cui_edit_content content) {
     if (!edit || !cui_edit_content_valid(content))

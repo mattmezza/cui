@@ -29,6 +29,17 @@ typedef struct {
  * preserves the legacy1.6s fixed-width CUI cycle. */
 cui_progress_geometry cui_progress_measure(float fraction, bool indeterminate, bool source_motion,
                                            double now_seconds, bool reduced_motion);
+/* Circle canvas geometry in logical pixels, clockwise from12 o'clock. */
+typedef struct {
+    float diameter, stroke_width, inner_radius, outer_radius, start_angle, end_angle;
+} cui_progress_circle_geometry;
+bool cui_progress_circle_measure(cui_progress_geometry, float diameter,
+                                 cui_progress_circle_geometry *);
+/* Allocation-free4x4 antialiased RGBA raster into caller storage. Diameter1..256,
+ * scale(0,4], at most512px per side. Failure preserves pixels and output.
+ * Pixels must remain alive and unmodified through renderer completion. */
+bool cui_progress_circle_raster(cui_progress_circle_geometry, cui_color, float scale,
+                                unsigned char *pixels, size_t capacity, cui_bitmap *);
 /* Submit inside a box with this id; paints nothing. Controlled normalized
  * fraction, numeric0..1 semantics, indeterminate busy/unknown value and no focus. */
 float cui_base_progress(cui_context *, cui_id, cui_str name, float fraction, bool indeterminate);
@@ -506,6 +517,67 @@ size_t cui_base_input_hit_test(void *user, cui_str text, float x, float y) {
     float left = cui_measure_text(hit->ui, (cui_str){text.data, low}, hit->font_size).width;
     float right = cui_measure_text(hit->ui, (cui_str){text.data, next}, hit->font_size).width;
     return target < (left + right) * .5f ? low : next;
+}
+
+bool cui_progress_circle_measure(cui_progress_geometry progress, float diameter,
+                                 cui_progress_circle_geometry *out) {
+    if (!out || !isfinite(diameter) || diameter < 1 || diameter > 256 ||
+        !isfinite(progress.start) || !isfinite(progress.length) || progress.start < 0 ||
+        progress.length < 0 || progress.start + progress.length > 1)
+        return false;
+    float stroke = fminf(diameter * .15f, 5);
+    *out = (cui_progress_circle_geometry){diameter,
+                                          stroke,
+                                          diameter * .5f - stroke,
+                                          diameter * .5f,
+                                          progress.start * 6.28318530718f,
+                                          (progress.start + progress.length) * 6.28318530718f};
+    return true;
+}
+bool cui_progress_circle_raster(cui_progress_circle_geometry geometry, cui_color color, float scale,
+                                unsigned char *pixels, size_t capacity, cui_bitmap *out) {
+    const float tau = 6.28318530718f;
+    if (!out || !pixels || !isfinite(scale) || scale <= 0 || scale > 4 ||
+        !isfinite(geometry.diameter) || geometry.diameter < 1 || geometry.diameter > 256 ||
+        !isfinite(geometry.inner_radius) || !isfinite(geometry.outer_radius) ||
+        geometry.inner_radius < 0 || geometry.outer_radius > geometry.diameter * .5f ||
+        geometry.outer_radius <= geometry.inner_radius || !isfinite(geometry.start_angle) ||
+        !isfinite(geometry.end_angle) || geometry.start_angle < 0 ||
+        geometry.end_angle < geometry.start_angle || geometry.end_angle > tau)
+        return false;
+    unsigned extent = (unsigned)ceilf(geometry.diameter * scale);
+    if (extent > 512 || capacity < (size_t)extent * extent * 4)
+        return false;
+    float alpha = color.a / 255.f;
+    float track = alpha * .2f;
+    float filled = alpha + track * (1 - alpha);
+    for (unsigned y = 0; y < extent; y++) {
+        for (unsigned x = 0; x < extent; x++) {
+            float sum = 0;
+            for (unsigned sy = 0; sy < 4; sy++) {
+                for (unsigned sx = 0; sx < 4; sx++) {
+                    float dx = (x + (sx + .5f) / 4) / scale - geometry.diameter * .5f;
+                    float dy = (y + (sy + .5f) / 4) / scale - geometry.diameter * .5f;
+                    float radius = sqrtf(dx * dx + dy * dy);
+                    if (radius < geometry.inner_radius || radius > geometry.outer_radius)
+                        continue;
+                    float angle = atan2f(dy, dx) + tau * .25f;
+                    if (angle < 0)
+                        angle += tau;
+                    bool in_arc = geometry.end_angle > geometry.start_angle &&
+                                  angle >= geometry.start_angle && angle <= geometry.end_angle;
+                    sum += in_arc ? filled : track;
+                }
+            }
+            size_t offset = ((size_t)y * extent + x) * 4;
+            pixels[offset] = color.r;
+            pixels[offset + 1] = color.g;
+            pixels[offset + 2] = color.b;
+            pixels[offset + 3] = (unsigned char)lroundf(sum * 255 / 16);
+        }
+    }
+    *out = (cui_bitmap){pixels, extent, extent, (size_t)extent * 4, 1};
+    return true;
 }
 
 /* src/base/cui_models.c */

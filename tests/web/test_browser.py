@@ -788,6 +788,25 @@ def main():
             control_change('progress-mode', '0')
             assert page.locator('#accessible [role=progressbar][aria-busy=true]').count() == 0
             page.emulate_media(reduced_motion='no-preference')
+            control_change('progress-shape', '1')
+            for size, diameter in [('0',16),('1',12),('2',20),('3',8)]:
+                control_change('control-size', size)
+                circle = page.evaluate('''diameter=>{const e=cuiGallery.exports;
+                    const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>
+                        e.gallery_command(i,0)===5&&e.gallery_command(i,3)===diameter);
+                    if(i===undefined)return null;
+                    const w=e.gallery_bitmap(i,0),stride=e.gallery_bitmap(i,2);
+                    const pixels=new Uint8Array(e.memory.buffer,e.gallery_bitmap_pixels(i),stride*w);
+                    return {w,center:pixels[Math.floor(w/2)*stride+Math.floor(w/2)*4+3],
+                        painted:Array.from(pixels).filter((v,j)=>j%4===3&&v>0).length};
+                }''', diameter)
+                assert circle and circle['w']==diameter*2 and circle['center']==0 and circle['painted']>0
+            control_change('progress-shape', '2')
+            assert page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>
+                e.gallery_command(i,0)===5&&e.gallery_command(i,3)===64);}''')
+            assert page.locator('#accessible [role=progressbar]').count()==1
+            control_change('control-size','0')
+            control_change('progress-shape','0')
             page.evaluate('location.hash="Speech"')
             page.wait_for_function('cuiGallery.renderedComponent==="Speech"')
             assert semantic_index('Start dictation', 1) is not None

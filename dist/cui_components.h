@@ -238,6 +238,22 @@ cui_progress_options cui_progress_defaults(void);
  * owns the fraction and clock; reduced motion shows a static centered segment. */
 bool cui_progress_ex(cui_context *, cui_id, const cui_theme *, float fraction, float width,
                      cui_progress_options);
+typedef struct {
+    unsigned char *pixels;
+    size_t capacity;
+    uint64_t revision;
+} cui_progress_circle_state;
+typedef struct {
+    cui_progress_options progress;
+    float diameter, raster_scale; /* Zero diameter uses8/12/16/20px by control size. */
+} cui_progress_circle_options;
+cui_progress_circle_options cui_progress_circle_defaults(void);
+/* Caller owns pixel storage; no resource allocation. Returns animation demand.
+ * Optional child callback composes centered content. Invalid arguments submit
+ * no UI, do not invoke children and preserve motion/buffer/state. */
+bool cui_progress_circle(cui_context *, cui_id, const cui_theme *, float fraction,
+                         cui_progress_circle_state *, cui_progress_circle_options,
+                         cui_button_content_fn, void *user);
 void cui_progress(cui_context *, cui_id, const cui_theme *, float fraction, float width);
 void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #ifdef __cplusplus
@@ -1548,6 +1564,65 @@ cui_input_result cui_input(cui_context *ui, cui_id id, const cui_theme *t, cui_s
                            cui_edit *edit, bool disabled) {
     cui_input_state state = {0};
     return cui_input_ex(ui, id, t, name, edit, &state, (cui_input_options){.disabled = disabled});
+}
+
+cui_progress_circle_options cui_progress_circle_defaults(void) {
+    return (cui_progress_circle_options){.progress = cui_progress_defaults(), .raster_scale = 2};
+}
+bool cui_progress_circle(cui_context *ui, cui_id id, const cui_theme *theme, float fraction,
+                         cui_progress_circle_state *state, cui_progress_circle_options options,
+                         cui_button_content_fn content, void *user) {
+    cui_progress_options p = options.progress;
+    if (!ui || !id || !theme || !state || p.size < CUI_CONTROL_MEDIUM ||
+        p.size > CUI_CONTROL_XSMALL || (p.name.length && !p.name.data))
+        return false;
+    bool reduced = p.reduced_motion || cui_reduced_motion(ui);
+    cui_progress_geometry progress =
+        cui_progress_measure(fraction, p.indeterminate, true, p.now_seconds, reduced);
+    bool moving = progress.animating;
+    cui_progress_motion staged = {0};
+    if (!p.indeterminate && p.motion) {
+        staged = *p.motion;
+        cui_progress_motion_result transition;
+        if (!cui_progress_animate(&staged, progress.fraction, p.now_seconds,
+                                  p.duration == 0 ? .18f : p.duration, reduced, &transition))
+            return false;
+        progress.length = transition.value;
+        moving = transition.active;
+    }
+    float diameter = options.diameter == 0 ? (p.size == CUI_CONTROL_XSMALL  ? 8
+                                              : p.size == CUI_CONTROL_SMALL ? 12
+                                              : p.size == CUI_CONTROL_LARGE ? 20
+                                                                            : 16)
+                                           : options.diameter;
+    cui_progress_circle_geometry geometry;
+    cui_bitmap bitmap;
+    if (!cui_progress_circle_measure(progress, diameter, &geometry) ||
+        !cui_progress_circle_raster(geometry, p.custom_color ? p.color : theme->primary,
+                                    options.raster_scale == 0 ? 2 : options.raster_scale,
+                                    state->pixels, state->capacity, &bitmap))
+        return false;
+    if (!p.indeterminate && p.motion)
+        *p.motion = staged;
+    if (++state->revision == 0)
+        ++state->revision;
+    bitmap.revision = state->revision;
+    cui_begin_box(ui, id,
+                  (cui_box){.width = diameter,
+                            .height = diameter,
+                            .fixed_height = true,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER});
+    cui_base_progress(ui, id, p.name, fraction, p.indeterminate);
+    cui_set_bitmap_underlay(ui, (cui_underlay_layout){.grow_width = true, .grow_height = true},
+                            (cui_bitmap_paint){.bitmap = bitmap, .opacity = 1},
+                            (cui_corner_radii){0});
+    if (content)
+        content(ui, user);
+    cui_end_box(ui);
+    if (moving)
+        cui_invalidate(ui);
+    return moving;
 }
 
 #endif

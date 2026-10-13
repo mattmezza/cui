@@ -518,15 +518,18 @@
       "api_symbols": [
         "cui_progress_defaults",
         "cui_progress",
-        "cui_progress_ex"
+        "cui_progress_ex",
+        "cui_progress_circle_defaults",
+        "cui_progress_circle"
       ],
       "state_types": [
         "cui_progress_options",
-        "cui_progress_motion"
+        "cui_progress_motion",
+        "cui_progress_circle_state"
       ],
       "state_ownership": "Caller owns the target fraction, host clock and optional zero-initialized cui_progress_motion.",
       "interaction": "Presentation only; the extended return reports whether another animation frame is needed.",
-      "usage": "Submit the controlled fraction each frame; use cui_progress_defaults for the source loading cycle and retain motion state for smooth value changes.",
+      "usage": "Submit the controlled fraction each frame; use cui_progress_defaults for the source loading cycle and retain motion state for smooth value changes. Circles need caller-owned pixel storage retained through rendering.",
       "docs": [
         "docs/PROGRESS.md"
       ],

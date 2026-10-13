@@ -1843,7 +1843,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "ProgressCircle is not implemented; full Progress family parity is incomplete.",
+        "ProgressCircle supports bounded caller-owned antialiased RGBA rendering; arbitrary vector/style refinement and the subpixel source path seam are not reproduced.",
         "Arbitrary easing and theme motion-token overrides remain unsupported."
       ],
       "owner": "integrator",

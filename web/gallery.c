@@ -113,6 +113,7 @@ double gallery_editor_stat(int field) {
 }
 static cui_context *ui;
 static cui_theme current_theme;
+static void gallery_progress_content(cui_context *, void *);
 static int gallery_preset_index = -1;
 static uint32_t typography_family;
 static float typography_size = 24;
@@ -137,6 +138,10 @@ int gallery_theme_channel(int field, int channel) {
 }
 static bool redraw, reduced_motion, compact_density;
 static bool progress_indeterminate;
+static int progress_shape;
+static unsigned char progress_circle_pixels[128 * 128 * 4];
+static cui_progress_circle_state progress_circle_state = {progress_circle_pixels,
+                                                          sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
@@ -3139,8 +3144,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.now_seconds = host_seconds;
         options.size = (cui_control_size)control_size;
         options.motion = &progress_motion;
-        cui_progress_ex(ui, cui_id_from(ui, "progress"), &t, slider / 100,
-                        width > 360 ? 300 : width - 48, options);
+        if (progress_shape) {
+            cui_progress_circle_options circle = cui_progress_circle_defaults();
+            circle.progress = options;
+            circle.diameter = progress_shape == 2 ? 64 : 0;
+            cui_progress_circle(ui, cui_id_from(ui, "progress"), &t, slider / 100,
+                                &progress_circle_state, circle,
+                                progress_shape == 2 ? gallery_progress_content : NULL, &slider);
+        } else {
+            cui_progress_ex(ui, cui_id_from(ui, "progress"), &t, slider / 100,
+                            width > 360 ? 300 : width - 48, options);
+        }
         cui_slider(ui, cui_id_from(ui, "progress-control"), &t, cui_string("Progress"), &slider, 0,
                    100, 1, disabled);
         break;
@@ -4801,6 +4815,15 @@ uint64_t gallery_semantic_labelled_by(unsigned i) {
     return i < semantic_count ? semantics[i].details.labelled_by : 0;
 }
 
+static void gallery_progress_content(cui_context *ui, void *user) {
+    float value = *(float *)user;
+    char text[16];
+    snprintf(text, sizeof text, "%.0f%%", (double)value);
+    cui_text_with_line_height(ui, cui_string(text), 14, current_theme.text, 14);
+}
+void gallery_progress_shape(int shape) {
+    progress_shape = shape >= 0 && shape <= 2 ? shape : 0;
+}
 void gallery_progress_mode(int mode) {
     progress_indeterminate = mode != 0;
 }

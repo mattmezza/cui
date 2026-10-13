@@ -126,7 +126,7 @@ cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *
                                  cui_measure_text(ui, o.prefix, metrics.font_size).width -
                                  cui_measure_text(ui, o.suffix, metrics.font_size).width)
                   : -1;
-    cui_input_state input = {.scroll_x = s->scroll_x};
+    cui_input_state input = {.behavior = {.composition = s->composition}, .scroll_x = s->scroll_x};
     cui_input_paint(ui, id, t, name, s->edit, &input,
                     (cui_input_options){.size = (cui_input_size)o.size,
                                         .design_size = o.design_size,

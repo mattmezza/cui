@@ -30,7 +30,21 @@ cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_s
     size_t per_group = s->length ? (s->length + groups - 1) / groups : 1;
     cui_str value = cui_otp_value(s);
     size_t offset = 0, cell = 0, filled = cui_otp_count(s);
-    size_t cursor = s->length ? (filled < s->length ? filled : s->length - 1) : 0;
+    cui_otp_composition *composition = s->composition;
+    bool composing = composition && composition->active;
+    size_t preedit_length = 0, preedit_offset = 0;
+    if (composing && composition->length) {
+        unsigned char first = (unsigned char)composition->buffer[0];
+        bool digit = first >= '0' && first <= '9';
+        bool fullwidth = composition->length >= 3 && first == 0xef &&
+                         (unsigned char)composition->buffer[1] == 0xbc &&
+                         (unsigned char)composition->buffer[2] >= 0x90 &&
+                         (unsigned char)composition->buffer[2] <= 0x99;
+        preedit_length = digit ? 1 : fullwidth ? 3 : 0;
+    }
+    size_t cursor_count = preedit_length && composition->cursor ? 1 : 0;
+    size_t cursor = filled + cursor_count;
+    cursor = s->length ? (cursor < s->length ? cursor : s->length - 1) : 0;
     cui_begin_box(ui, id,
                   (cui_box){.row = true,
                             .gap = o.group_gap > 0 ? o.group_gap : 20,
@@ -59,6 +73,26 @@ cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_s
                          s->masked ? cui_string("*") : (cui_str){value.data + offset, end - offset},
                          font, o.disabled ? t->muted : t->text);
                 offset = end;
+            } else if (composing && preedit_offset < preedit_length) {
+                size_t end = preedit_offset + 1;
+                while (end < preedit_length &&
+                       ((unsigned char)composition->buffer[end] & 0xc0) == 0x80)
+                    end++;
+                cui_text(ui,
+                         s->masked ? cui_string("*")
+                                   : (cui_str){composition->buffer + preedit_offset,
+                                               end - preedit_offset},
+                         font, t->text);
+                size_t first = composition->anchor < composition->cursor ? composition->anchor
+                                                                         : composition->cursor;
+                size_t last = composition->anchor > composition->cursor ? composition->anchor
+                                                                        : composition->cursor;
+                cui_set_underlay(ui, (cui_rect){2, size - 3, size - 4, 1}, t->caret,
+                                 (cui_corner_radii){0});
+                if (preedit_offset < last && end > first)
+                    cui_set_underlay(ui, (cui_rect){2, 2, size - 4, size - 4}, t->selection,
+                                     (cui_corner_radii){0});
+                preedit_offset = end;
             } else if (s->focused && cell == cursor && s->cursor_visible) {
                 cui_begin_box(
                     ui, 0,
@@ -73,5 +107,12 @@ cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_s
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    if (s->focused && !o.disabled && s->length) {
+        cui_rect cell_bounds = cui_bounds(ui, cui_otp_cell_id(id, cursor));
+        cui_set_text_input_rect(ui, id,
+                                (cui_rect){cell_bounds.x + cell_bounds.w * .5f,
+                                           cell_bounds.y + cell_bounds.h * .25f, 1,
+                                           cell_bounds.h * .5f});
+    }
     return out;
 }

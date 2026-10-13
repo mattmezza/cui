@@ -40,6 +40,9 @@ typedef struct {
     double last_value;
     bool initialized, was_focused, invalid;
     float scroll_x;
+    cui_edit_composition *composition; /* Optional caller session; borrowed during use. */
+    bool composition_stale; /* Internal cancellation guard until the next preedit update. */
+    bool composition_owned; /* Internal default UI resource; leave false for caller storage. */
 } cui_number_state;
 typedef struct {
     bool changed, submitted, invalid;

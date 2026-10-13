@@ -8,11 +8,23 @@
 extern "C" {
 #endif
 typedef enum { CUI_OTP_MEDIUM, CUI_OTP_XSMALL, CUI_OTP_SMALL, CUI_OTP_LARGE } cui_otp_size;
+/* Optional caller-owned bounded UTF-8 preedit. Zero-initialize all fields except
+ * buffer/capacity; keep storage alive and disjoint from the OTP value/state.
+ * Default UI-owned session holds 4095 preedit bytes. No OTP undo history. */
+typedef struct {
+    char *buffer;
+    size_t capacity, length, anchor, cursor, document_length;
+    const char *document;
+    uint64_t document_hash;
+    bool active, stale;
+} cui_otp_composition;
 typedef struct {
     char *buffer;
     size_t capacity, length;
     bool masked, focused, cursor_visible;
     double blink_epoch;
+    cui_otp_composition *composition;
+    bool composition_owned; /* Internal UI resource; false for caller storage. */
 } cui_otp_state;
 typedef struct {
     cui_str name;

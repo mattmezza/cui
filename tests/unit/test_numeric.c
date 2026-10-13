@@ -599,7 +599,115 @@ static void design_number_sizes(void) {
         }
 }
 #endif
+static void number_composition(void) {
+    cui_context *ui = cui_create((cui_config){.width = 800, .height = 600});
+    char buffer[128] = "";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof(buffer),
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 16});
+    assert(ui && edit);
+    cui_number_state state = {.edit = edit};
+    cui_theme theme = {0};
+#ifndef CUI_NUMERIC_BASE_ONLY
+    theme = cui_theme_light();
+#endif
+    double value = 5;
+    cui_number_options options = {0};
+    number_scene(ui, &theme, &state, &value, options);
+    cui_focus(ui, 2);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    assert(number_scene(ui, &theme, &state, &value, options).error == CUI_EDIT_OK);
+    assert(!state.composition);
+    assert(cui_edit_select(edit, 0, 1) == CUI_EDIT_OK);
+    cui_event update = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                        .text_data = "５７",
+                        .text_length = 6,
+                        .composition_anchor = 3,
+                        .composition_cursor = 6};
+    assert(cui_queue_event(ui, update));
+    cui_number_result r = number_scene(ui, &theme, &state, &value, options);
+    assert(r.error == CUI_EDIT_OK && !r.changed && value == 5 && !strcmp(buffer, "5"));
+    assert(state.composition_owned && state.composition->active);
+    assert(cui_edit_composition_view(edit, state.composition).length == 6);
+    key(ui, CUI_KEY_UP, 0);
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    r = number_scene(ui, &theme, &state, &value, options);
+    assert(!r.changed && value == 5 && state.composition->active);
+    cui_event commit = {
+        .type = CUI_EVENT_COMPOSITION_COMMIT, .text_data = "５７", .text_length = 6};
+    assert(cui_queue_event(ui, commit));
+    r = number_scene(ui, &theme, &state, &value, options);
+    assert(r.changed && r.error == CUI_EDIT_OK && value == 57 && !strcmp(buffer, "57"));
+    assert(cui_queue_event(ui, commit));
+    assert(!number_scene(ui, &theme, &state, &value, options).changed && value == 57);
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    r = number_scene(ui, &theme, &state, &value, options);
+    assert(r.changed && value == 5 && !strcmp(buffer, "5"));
+    key(ui, CUI_KEY_Y, CUI_MOD_CTRL);
+    assert(number_scene(ui, &theme, &state, &value, options).changed && value == 57);
+    assert(cui_edit_select(edit, 0, 2) == CUI_EDIT_OK);
+    assert(cui_queue_event(ui, update));
+    number_scene(ui, &theme, &state, &value, options);
+    commit.text_data = "5x";
+    commit.text_length = 2;
+    assert(cui_queue_event(ui, commit));
+    r = number_scene(ui, &theme, &state, &value, options);
+    assert(r.error == CUI_EDIT_INVALID_ARGUMENT && state.composition->active && value == 57);
+    char oversized[4096];
+    memset(oversized, '1', sizeof(oversized));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                                           .text_data = oversized,
+                                           .text_length = sizeof(oversized)}));
+    assert(number_scene(ui, &theme, &state, &value, options).error == CUI_EDIT_CAPACITY);
+    assert(state.composition->active && state.composition->length == 6 && value == 57);
+    options.readonly = true;
+    number_scene(ui, &theme, &state, &value, options);
+    assert(!state.composition->active && value == 57);
+    options.readonly = false;
+    assert(cui_queue_event(ui, update));
+    number_scene(ui, &theme, &state, &value, options);
+    value = 12; /* Controlled-source change cancels before accepting a stale commit. */
+    commit.text_data = "99";
+    commit.text_length = 2;
+    assert(cui_queue_event(ui, commit));
+    number_scene(ui, &theme, &state, &value, options);
+    assert(value == 12 && !strcmp(buffer, "12") && !state.composition->active);
+    assert(cui_queue_event(ui, update));
+    number_scene(ui, &theme, &state, &value, options);
+    cui_focus(ui, 0);
+    number_scene(ui, &theme, &state, &value, options);
+    assert(!state.composition->active && value == 12);
+    cui_focus(ui, 2);
+    assert(cui_queue_event(ui, update));
+    number_scene(ui, &theme, &state, &value, options);
+    options.disabled = true;
+    number_scene(ui, &theme, &state, &value, options);
+    assert(!state.composition->active && value == 12);
+    options.disabled = false;
+    cui_focus(ui, 2);
+    assert(cui_queue_event(ui, update));
+    number_scene(ui, &theme, &state, &value, options);
+    char replacement[128] = "12";
+    cui_edit_destroy(edit);
+    edit = cui_edit_create((cui_edit_config){.buffer = replacement,
+                                             .capacity = sizeof(replacement),
+                                             .history_bytes = 1024,
+                                             .max_history_steps = 4});
+    assert(edit);
+    state.edit = edit;
+    assert(cui_queue_event(ui, commit));
+    number_scene(ui, &theme, &state, &value, options);
+    assert(!state.composition->active && !strcmp(replacement, "12") && value == 12);
+    update.composition_target = 99; /* Stale host focus must not create a session. */
+    assert(cui_queue_event(ui, update));
+    number_scene(ui, &theme, &state, &value, options);
+    assert(!state.composition->active && value == 12);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    number_composition();
 #ifndef CUI_NUMERIC_BASE_ONLY
     design_number_sizes();
     number_sizes_and_icons();

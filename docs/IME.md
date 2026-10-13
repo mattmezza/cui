@@ -83,6 +83,44 @@ bytes, commits `compositionend` once and excludes composing key shortcuts.
 The host receives the preceding frame's caret rectangle; candidate presentation
 and virtual keyboard behavior remain browser/OS dependent.
 
+Numeric uses an optional `cui_number_state.composition` caller session or a lazy
+UI-owned default with 4095 preedit bytes and model-owned rendered storage. It
+renders arbitrary valid preedit without changing the numeric draft/value. Commit
+uses the existing normalization (ASCII plus the already-supported fullwidth
+digits/signs/decimal point and ideographic decimal point), existing prefix grammar
+and 127-byte draft bound. Invalid commit leaves the previous preedit and draft
+intact. One successful composition commit is one edit history transaction;
+Ctrl/Meta-Z, Shift-Z and Y support Undo/Redo. Existing Enter/blur clamping remains
+in effect. Read-only/disabled/focus loss and controlled-source or edit-model
+replacement cancel composition, and stale commits remain suppressed until a new
+start/update. Caller sessions keep the reusable edit-session lifetime rules above.
+
+OTP uses `cui_otp_state.composition`, optionally pointing to a zero-initialized
+caller-owned `cui_otp_composition` with `buffer`/`capacity` (including NUL). Keep
+both alive and disjoint from the OTP value/state during use. Otherwise it lazily
+retains a UI-owned default with 4095 preedit bytes, accounted in `resource_bytes`.
+The default pointer is internal to the UI resource lifetime; do not dereference
+it after UI destruction or retain it outside the widget state. Each frame renews
+the resource, so omitted-widget collection cannot leave a dereferenced old
+resource. Caller-owned sessions and buffers remain caller-owned.
+
+OTP deliberately preserves its existing first-scalar filtering: only the first
+ASCII or fullwidth digit in a commit is normalized and appended. Trailing scalars
+are ignored (`"34"` appends `3`, `"2x"` appends `2`); an invalid first scalar
+(`"x3"`) is ignored. Multi-digit composition commits are therefore limited to one
+digit, as in the pinned reference `crates/base/src/otp_input.rs`, `edit_value`
+(`chars().next()`). Preedit paints only the first eligible proposed scalar in the
+next cell; masked preedit reuses the existing `*` rendering and never draws raw
+preedit digits. Selected ranges use UTF-8 byte boundaries; the cell caret is
+clamped to that proposed scalar and published for the host candidate rectangle.
+Full OTP targets ignore further input. Buffer exhaustion reports `CUI_EDIT_CAPACITY`
+before any append/callback and preserves preedit. A successful append reports one
+change and, when it fills the target, one completion. OTP has no Undo history.
+Cancel, disabled/focus loss, and document pointer/length/content fingerprint
+changes discard preedit without modifying the value. Normal composing shortcuts
+yield; stale commits after source replacement or a successful commit are ignored
+until the next start/update. OTP has no read-only option.
+
 Reference behavior was inspected in the frozen GPUI source
 `crates/base/src/input/base/state.rs` (`marked_text_range`, `unmark_text`,
 `replace_text_in_range`, `replace_and_mark_text_in_range`). GPUI may mutate marked
@@ -95,6 +133,10 @@ failure, large caller buffers, cancellation, external drift, single undo and
 multiple-selection rejection. Large-document tests cover more than 200000 bytes,
 owned allocation growth, idle reuse, scrolling, commit/Undo and model rebinding. `tests/web/test_ime.py` uses Chromium CDP native
 `Input.imeSetComposition` and `Input.insertText` for all four text consumers;
-it also checks read-only and blur/disabled cancellation. SDL injected preedit
+it also checks read-only and blur/disabled cancellation.
+`tests/web/test_ime_additional.py` covers Numeric/OTP/Combobox through real CDP
+composition, Numeric Undo, masked OTP first-scalar commit, cancel and disable.
+Native headless Numeric/OTP tests cover filtering, trailing payload, callback
+counts, caller capacity, source replacement and stale-focus rejection. SDL injected preedit
 checks scalar-to-byte conversion with an emoji and an accented scalar. Linux and
 Chromium are exercised here; macOS/Windows native IME UI remains unverified.

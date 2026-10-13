@@ -613,6 +613,54 @@ cui_plot_result cui_plot_cubic_flatten(cui_plot_point start, cui_plot_point cont
 cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *, size_t count, double width,
                                      double miter_limit, cui_plot_mesh_vertex *, size_t capacity,
                                      size_t *required, cui_plot_rect *bounds);
+/* Extended strokes are a non-overlapping union of segment, join and cap
+ * polygons, tessellated by fill_mesh_contours. 2..64 points (closed >=3);
+ * repeated closing endpoint accepted. Width0: EMPTY/count0/bounds0. Default
+ * Butt/Miter retains the old width/miter policy; the old API remains unchanged.
+ * Round circles use round_segments_per_turn (4..64) inscribed chords. Closed
+ * strokes ignore caps. MiterClip uses pinned Lyon's clipping distance policy.
+ * Generated polygon vertices are bounded to256; exceeding that internal budget
+ * returns CAPACITY with required unchanged. Workspace follows fill_mesh_contours
+ * (reserve32896 events/256 indices to cover any accepted generated stroke).
+ * Output capacity errors publish exact required and preserve mesh/bounds.
+ * All other errors preserve output/count/bounds. Inputs/output/workspace must
+ * be disjoint. Coordinates within +/-16384, width0..1024, miter_limit1..64;
+ * generated coordinates outside range return OVERFLOW. No automatic curve or
+ * dash flattening; no exact Lyon topology/variable-width attributes. */
+typedef enum { CUI_PLOT_CAP_BUTT, CUI_PLOT_CAP_SQUARE, CUI_PLOT_CAP_ROUND } cui_plot_line_cap;
+typedef enum {
+    CUI_PLOT_JOIN_MITER,
+    CUI_PLOT_JOIN_BEVEL,
+    CUI_PLOT_JOIN_ROUND,
+    CUI_PLOT_JOIN_MITER_CLIP
+} cui_plot_line_join;
+typedef struct {
+    double width, miter_limit;
+    cui_plot_line_cap start_cap, end_cap;
+    cui_plot_line_join join;
+    size_t round_segments_per_turn;
+    bool closed;
+} cui_plot_stroke_options;
+cui_plot_stroke_options cui_plot_stroke_defaults(void);
+cui_plot_result cui_plot_stroke_mesh_ex(const cui_plot_point *, size_t count,
+                                        cui_plot_stroke_options, cui_plot_fill_workspace *,
+                                        cui_plot_mesh_vertex *, size_t capacity, size_t *required,
+                                        cui_plot_rect *bounds);
+/* Pinned GPUI dash-array policy for already flattened polylines: alternating
+ * draw/gap distances, odd arrays repeated twice, no phase offset. Closed paths
+ * include their closing segment; each drawn run has the selected start/end
+ * caps, including runs at the closed seam (no automatic seam merge). Patterns
+ * have1..64 finite strictly positive entries; zero/negative entries are rejected
+ * to prevent the source's nonadvancing measurement loop. Maximum1024 splitting
+ * steps/64 points per run/256 generated primitive vertices; internal CAPACITY
+ * preserves required. Nonadvancing positive distances return DEGENERATE.
+ * Other contracts match stroke_mesh_ex. Lengths are exact linear-segment lengths,
+ * not source curved-path measurements at tolerance0.01. */
+cui_plot_result cui_plot_stroke_mesh_dashed(const cui_plot_point *, size_t count,
+                                            cui_plot_stroke_options, const double *dashes,
+                                            size_t dash_count, cui_plot_fill_workspace *,
+                                            cui_plot_mesh_vertex *, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds);
 /* Pinned path fragment coverage: ST and its screen-space derivatives; output
  * preserved on invalid/overflow. Constant S derivatives (<.001 norm) are solid.
  * This is analytic quadratic coverage, not generic triangle-edge antialiasing. */

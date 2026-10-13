@@ -1378,3 +1378,66 @@ triangle coverage oracles exercise overlapping and crossing contours, shared
 endpoints, repeated closure and nearby crossing bands. Capacity failures and
 extreme/nonfinite inputs verify output preservation. Native warning builds,
 ASan/UBSan and actual WASI execution exercise the portable path.
+
+### Closed, capped, joined and dashed triangle strokes
+
+`cui_plot_stroke_mesh_ex` supplies closed contour strokes, independent Butt,
+Square and Round endpoint caps, and Miter, Bevel, Round and MiterClip joins.
+`cui_plot_stroke_defaults()` selects width1, miter limit4, Butt caps and Miter
+joins, matching the pinned source defaults. The source RadialLine closes its
+stroke for more than2 points; closed CUI inputs require at least3 points and
+may repeat their first point at the end. Caps are ignored for closed strokes.
+The existing `cui_plot_stroke_mesh` retains its original strict contract.
+
+Stroke geometry is the NonZero union of consistently oriented segment quads,
+join wedges and cap polygons, passed through the multi-contour arrangement
+backend. The resulting triangles avoid repeated coverage at joins and self
+crossings, including overlapping square dash caps. Closed loops retain their
+interior hole. Miter-limit comparisons use offset-length/stroke-width, matching
+`lyon_tessellation=1.0.21 src/stroke.rs:2316..2319`; over-limit Miter joins bevel.
+MiterClip follows the pinned source clip line at `miter_limit*half_width`
+(`src/stroke.rs:1722..1726,2277..2306`). Exact reversal uses the segment union
+seam for bevel/miter variants and a disk for round joins; source tessellator
+vertex ordering and precision are not reproduced.
+
+Round disks are inscribed regular polygons with an explicit4..64 segments per
+turn (default32); their radial chord error is at most
+`half_width*(1-cos(pi/segments))`. This explicit tessellation budget differs
+from Lyon's default curve tolerance0.1. Points are bounded to64, width0..1024,
+miter limit1..64 and finite input/generated coordinates within +/-16384.
+Generated primitives may total no more than256 points/85 polygons. A round
+stroke with many corners can exceed this budget even with valid input; internal
+CAPACITY preserves count, mesh and bounds. Generated geometry outside the
+coordinate bound returns OVERFLOW. Duplicate consecutive points return
+DEGENERATE. Width0 returns EMPTY with zero count and bounds after validation.
+
+The caller supplies the fill workspace; reserving32896 events and256 edge
+indices covers the generated-primitive limit. Output size queries and output
+capacity failures publish the exact vertex count without writing mesh or bounds.
+Workspace shortages preserve count. Input, workspace and output buffers must
+be disjoint. No allocations, platform types or renderer dependency are added.
+
+`cui_plot_stroke_mesh_dashed` implements the pinned GPUI
+`PathBuilder::dash_array` alternating draw/gap policy for flattened polylines.
+Inspected `gpui-pre=0.3.8 src/path_builder.rs:108..119` repeats odd arrays twice;
+`:276..304` splits measured draw ranges into separate stroked subpaths. The CUI
+implementation preserves joins inside a run and applies caps at each run end.
+Closed input includes its closing edge, but drawn ranges at the beginning and
+end are distinct capped runs, following source range splitting. Source Plot
+Line itself exposes no dash setter; this API covers its underlying path builder.
+
+Patterns require1..64 finite strictly positive distances. Source zero/negative
+patterns can fail to advance its loop; CUI rejects them. Splitting is bounded
+to1024 steps and64 points per drawn run, with the same256 generated primitive
+point budget. Nonadvancing positive distances return DEGENERATE; budget failures
+return CAPACITY preserving all output metadata. Polyline arclength is exact
+segment length rather than the source curved-path measurement tolerance0.01.
+No phase offset is introduced because the source API supplies none.
+
+Headless checks verify cap areas/bounds, closed seam continuity and holes,
+reversed contour orientation, each join variant, old default area compatibility,
+self-crossing round-stroke distance/triangle-coverage oracles, and dash phase,
+odd repetition, corner joins and unmerged closed seams. Tests also exercise
+output/workspace/internal budgets, nonfinite patterns and generated overflow.
+Exact Lyon triangle topology, automatic path-command curve routing,
+variable-width attributes and source curve sampling remain outside these APIs.

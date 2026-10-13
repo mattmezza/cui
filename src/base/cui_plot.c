@@ -2765,3 +2765,264 @@ cui_plot_result cui_plot_fill_mesh_contours(const cui_plot_contour *contours, si
     *bounds = box;
     return CUI_PLOT_OK;
 }
+
+cui_plot_stroke_options cui_plot_stroke_defaults(void) {
+    return (cui_plot_stroke_options){
+        1, 4, CUI_PLOT_CAP_BUTT, CUI_PLOT_CAP_BUTT, CUI_PLOT_JOIN_MITER, 32, false};
+}
+typedef struct {
+    cui_plot_point points[256];
+    cui_plot_contour contours[85];
+    size_t point_count, contour_count;
+} plot_stroke_polygons;
+static cui_plot_result plot_stroke_polygon(plot_stroke_polygons *polygons,
+                                           const cui_plot_point *points, size_t count) {
+    if (count > 256 - polygons->point_count || polygons->contour_count == 85)
+        return CUI_PLOT_CAPACITY;
+    long double area = 0;
+    for (size_t i = 0; i < count; i++) {
+        if (!mesh_point_valid(points[i]))
+            return CUI_PLOT_OVERFLOW;
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        area += (long double)a.x * b.y - (long double)b.x * a.y;
+    }
+    if (area == 0)
+        return CUI_PLOT_OK;
+    cui_plot_point *out = polygons->points + polygons->point_count;
+    for (size_t i = 0; i < count; i++)
+        out[i] = points[area > 0 ? i : count - 1 - i];
+    polygons->contours[polygons->contour_count++] = (cui_plot_contour){out, count};
+    polygons->point_count += count;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result plot_stroke_disk(plot_stroke_polygons *polygons, cui_plot_point center,
+                                        double radius, size_t segments) {
+    cui_plot_point circle[64];
+    for (size_t i = 0; i < segments; i++) {
+        double angle = 6.28318530717958647692 * (double)i / (double)segments;
+        circle[i] =
+            (cui_plot_point){center.x + radius * cos(angle), center.y + radius * sin(angle)};
+    }
+    return plot_stroke_polygon(polygons, circle, segments);
+}
+static cui_plot_result plot_stroke_add(const cui_plot_point *points, size_t count,
+                                       cui_plot_stroke_options options,
+                                       plot_stroke_polygons *polygons) {
+    size_t segments = options.closed ? count : count - 1;
+    cui_plot_point direction[64];
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        double dx = b.x - a.x, dy = b.y - a.y, length = hypot(dx, dy);
+        if (length == 0)
+            return CUI_PLOT_DEGENERATE;
+        direction[i] = (cui_plot_point){dx / length, dy / length};
+    }
+    double half = options.width / 2;
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count], d = direction[i];
+        if (!options.closed && i == 0 && options.start_cap == CUI_PLOT_CAP_SQUARE) {
+            a.x -= half * d.x;
+            a.y -= half * d.y;
+        }
+        if (!options.closed && i + 1 == segments && options.end_cap == CUI_PLOT_CAP_SQUARE) {
+            b.x += half * d.x;
+            b.y += half * d.y;
+        }
+        cui_plot_point quad[4] = {{a.x - half * d.y, a.y + half * d.x},
+                                  {a.x + half * d.y, a.y - half * d.x},
+                                  {b.x + half * d.y, b.y - half * d.x},
+                                  {b.x - half * d.y, b.y + half * d.x}};
+        cui_plot_result result = plot_stroke_polygon(polygons, quad, 4);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    size_t first = options.closed ? 0 : 1, last = options.closed ? count : count - 1;
+    for (size_t i = first; i < last; i++) {
+        cui_plot_point p = points[i], prev = direction[(i + segments - 1) % segments],
+                       next = direction[i % segments];
+        double cross = prev.x * next.y - prev.y * next.x, dot = prev.x * next.x + prev.y * next.y;
+        if (cross == 0 && dot > 0)
+            continue;
+        if (options.join == CUI_PLOT_JOIN_ROUND) {
+            cui_plot_result result =
+                plot_stroke_disk(polygons, p, half, options.round_segments_per_turn);
+            if (result != CUI_PLOT_OK)
+                return result;
+            continue;
+        }
+        if (cross == 0)
+            continue; /* Reversal: segment union supplies the bevel/butt seam. */
+        double sign = cross > 0 ? -1 : 1;
+        cui_plot_point n0 = {-sign * prev.y, sign * prev.x}, n1 = {-sign * next.y, sign * next.x};
+        cui_plot_point join[5] = {p, {p.x + half * n0.x, p.y + half * n0.y}};
+        size_t join_count = 2;
+        double denominator = 1 + dot;
+        cui_plot_point m = {denominator > 0 ? (n0.x + n1.x) / denominator : 0,
+                            denominator > 0 ? (n0.y + n1.y) / denominator : 0};
+        double length = denominator > 0 ? hypot(m.x, m.y) : INFINITY;
+        if (options.join != CUI_PLOT_JOIN_BEVEL && length <= 2 * options.miter_limit) {
+            join[join_count++] = (cui_plot_point){p.x + half * m.x, p.y + half * m.y};
+        } else if (options.join == CUI_PLOT_JOIN_MITER_CLIP && denominator > 0 &&
+                   isfinite(length)) {
+            cui_plot_point unit = {m.x / length, m.y / length};
+            double projection = unit.x * n0.x + unit.y * n0.y;
+            /* Clip against a line normal to the bisector at limit*half_width,
+             * reproducing pinned Lyon's clip-distance convention. */
+            double target = options.miter_limit;
+            double t0 = (target - projection) / (unit.x * prev.x + unit.y * prev.y);
+            double t1 = (target - projection) / (unit.x * next.x + unit.y * next.y);
+            join[join_count++] = (cui_plot_point){p.x + half * (n0.x + t0 * prev.x),
+                                                  p.y + half * (n0.y + t0 * prev.y)};
+            join[join_count++] = (cui_plot_point){p.x + half * (n1.x + t1 * next.x),
+                                                  p.y + half * (n1.y + t1 * next.y)};
+        }
+        join[join_count++] = (cui_plot_point){p.x + half * n1.x, p.y + half * n1.y};
+        cui_plot_result result = plot_stroke_polygon(polygons, join, join_count);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (!options.closed) {
+        for (size_t end = 0; end < 2; end++) {
+            cui_plot_line_cap cap = end ? options.end_cap : options.start_cap;
+            if (cap != CUI_PLOT_CAP_ROUND)
+                continue;
+            cui_plot_result result = plot_stroke_disk(polygons, points[end ? count - 1 : 0], half,
+                                                      options.round_segments_per_turn);
+            if (result != CUI_PLOT_OK)
+                return result;
+        }
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_stroke_mesh_ex(const cui_plot_point *points, size_t count,
+                                        cui_plot_stroke_options options,
+                                        cui_plot_fill_workspace *workspace,
+                                        cui_plot_mesh_vertex *out, size_t capacity,
+                                        size_t *required, cui_plot_rect *bounds) {
+    if (!points || !workspace || !required || !bounds || count < 2 || count > 64 ||
+        (capacity && !out) || !isfinite(options.width) || options.width < 0 ||
+        options.width > 1024 || !isfinite(options.miter_limit) || options.miter_limit < 1 ||
+        options.miter_limit > 64 || options.start_cap < CUI_PLOT_CAP_BUTT ||
+        options.start_cap > CUI_PLOT_CAP_ROUND || options.end_cap < CUI_PLOT_CAP_BUTT ||
+        options.end_cap > CUI_PLOT_CAP_ROUND || options.join < CUI_PLOT_JOIN_MITER ||
+        options.join > CUI_PLOT_JOIN_MITER_CLIP || options.round_segments_per_turn < 4 ||
+        options.round_segments_per_turn > 64)
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < count; i++)
+        if (!mesh_point_valid(points[i]))
+            return CUI_PLOT_INVALID;
+    if (options.closed && points[0].x == points[count - 1].x && points[0].y == points[count - 1].y)
+        --count;
+    if (options.closed && count < 3)
+        return CUI_PLOT_INVALID;
+    size_t segments = options.closed ? count : count - 1;
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        double dx = b.x - a.x, dy = b.y - a.y, length = hypot(dx, dy);
+        if (length == 0)
+            return CUI_PLOT_DEGENERATE;
+    }
+    if (options.width == 0) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    plot_stroke_polygons polygons = {0};
+    cui_plot_result result = plot_stroke_add(points, count, options, &polygons);
+    if (result != CUI_PLOT_OK)
+        return result;
+    if (!polygons.contour_count) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    return cui_plot_fill_mesh_contours(polygons.contours, polygons.contour_count,
+                                       CUI_PLOT_FILL_NON_ZERO, workspace, out, capacity, required,
+                                       bounds);
+}
+
+cui_plot_result cui_plot_stroke_mesh_dashed(const cui_plot_point *points, size_t count,
+                                            cui_plot_stroke_options options, const double *dashes,
+                                            size_t dash_count, cui_plot_fill_workspace *workspace,
+                                            cui_plot_mesh_vertex *out, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds) {
+    if (!isfinite(options.width) || options.width < 0 || options.width > 1024 || !dashes ||
+        !dash_count || dash_count > 64 || !required || !bounds || (capacity && !out))
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < dash_count; i++)
+        if (!isfinite(dashes[i]) || dashes[i] <= 0)
+            return CUI_PLOT_INVALID;
+    cui_plot_stroke_options check = options;
+    check.width = 0;
+    size_t ignored;
+    cui_plot_rect ignored_bounds;
+    cui_plot_result result = cui_plot_stroke_mesh_ex(points, count, check, workspace, NULL, 0,
+                                                     &ignored, &ignored_bounds);
+    if (result != CUI_PLOT_EMPTY)
+        return result;
+    if (options.width == 0) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    if (options.closed && points[0].x == points[count - 1].x && points[0].y == points[count - 1].y)
+        --count;
+    size_t segments = options.closed ? count : count - 1,
+           pattern_count = dash_count * (dash_count % 2 ? 2 : 1);
+    size_t dash_index = 0, run_count = 0, steps = 0;
+    double remaining = dashes[0];
+    cui_plot_point run[64];
+    plot_stroke_polygons polygons = {0};
+    cui_plot_stroke_options run_options = options;
+    run_options.closed = false;
+    for (size_t i = 0; i < segments; i++) {
+        cui_plot_point a = points[i], b = points[(i + 1) % count];
+        double dx = b.x - a.x, dy = b.y - a.y, length = hypot(dx, dy), position = 0;
+        while (position < length) {
+            if (++steps > 1024)
+                return CUI_PLOT_CAPACITY;
+            double distance = fmin(remaining, length - position), next = position + distance;
+            if (!(next > position))
+                return CUI_PLOT_DEGENERATE;
+            bool drawing = dash_index % 2 == 0;
+            cui_plot_point start = position == 0 ? a
+                                                 : (cui_plot_point){a.x + dx * (position / length),
+                                                                    a.y + dy * (position / length)};
+            cui_plot_point end = next == length ? b
+                                                : (cui_plot_point){a.x + dx * (next / length),
+                                                                   a.y + dy * (next / length)};
+            if (drawing) {
+                if (!run_count)
+                    run[run_count++] = start;
+                if (run_count == 64)
+                    return CUI_PLOT_CAPACITY;
+                run[run_count++] = end;
+            }
+            position = next;
+            remaining -= distance;
+            if (remaining == 0) {
+                if (drawing) {
+                    result = plot_stroke_add(run, run_count, run_options, &polygons);
+                    if (result != CUI_PLOT_OK)
+                        return result;
+                    run_count = 0;
+                }
+                dash_index = (dash_index + 1) % pattern_count;
+                remaining = dashes[dash_index % dash_count];
+            }
+        }
+    }
+    if (run_count) {
+        result = plot_stroke_add(run, run_count, run_options, &polygons);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    if (!polygons.contour_count) {
+        *required = 0;
+        *bounds = (cui_plot_rect){0};
+        return CUI_PLOT_EMPTY;
+    }
+    return cui_plot_fill_mesh_contours(polygons.contours, polygons.contour_count,
+                                       CUI_PLOT_FILL_NON_ZERO, workspace, out, capacity, required,
+                                       bounds);
+}

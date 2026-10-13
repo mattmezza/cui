@@ -1759,7 +1759,249 @@ static void complex_fill_meshes(void) {
                                        large, 4096, &needed, &bounds) == CUI_PLOT_INVALID);
     assert(needed == saved_needed);
 }
+static size_t stroke_mesh_point_coverage(const cui_plot_mesh_vertex *mesh, size_t count,
+                                         cui_plot_point p) {
+    size_t covered = 0;
+    for (size_t i = 0; i < count; i += 3) {
+        double cross[3];
+        for (size_t j = 0; j < 3; j++) {
+            cui_plot_point a = mesh[i + j].xy, b = mesh[i + (j + 1) % 3].xy;
+            cross[j] = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+        }
+        if ((cross[0] > 0 && cross[1] > 0 && cross[2] > 0) ||
+            (cross[0] < 0 && cross[1] < 0 && cross[2] < 0))
+            ++covered;
+    }
+    return covered;
+}
+static void extended_stroke_meshes(void) {
+    static long double events[32896];
+    static size_t order[256];
+    cui_plot_fill_workspace workspace = {events, 32896, order, 256};
+    static cui_plot_mesh_vertex mesh[20000], saved[20000];
+    size_t needed = 999;
+    cui_plot_rect bounds = {9, 8, 7, 6};
+    cui_plot_stroke_options options = cui_plot_stroke_defaults();
+    assert(options.width == 1 && options.miter_limit == 4 && options.join == CUI_PLOT_JOIN_MITER &&
+           options.start_cap == CUI_PLOT_CAP_BUTT && options.end_cap == CUI_PLOT_CAP_BUTT &&
+           !options.closed);
+    options.width = 2;
+    cui_plot_point line[] = {{0, 0}, {10, 0}};
+    memset(mesh, 0x7a, sizeof mesh);
+    memcpy(saved, mesh, sizeof mesh);
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, NULL, 0, &needed, &bounds) ==
+           CUI_PLOT_CAPACITY);
+    assert(needed == 6 && bounds.x_min == 9);
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, needed - 1, &needed,
+                                   &bounds) == CUI_PLOT_CAPACITY);
+    assert(memcmp(mesh, saved, sizeof mesh) == 0 && bounds.x_min == 9);
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 20));
+    assert(bounds.x_min == 0 && bounds.x_max == 10 && bounds.y_min == -1 && bounds.y_max == 1);
+    options.start_cap = options.end_cap = CUI_PLOT_CAP_SQUARE;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 24));
+    assert(bounds.x_min == -1 && bounds.x_max == 11);
+    options.end_cap = CUI_PLOT_CAP_BUTT;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 22));
+    options.start_cap = options.end_cap = CUI_PLOT_CAP_ROUND;
+    options.round_segments_per_turn = 64;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    double circle_area = 32 * sin(6.28318530717958647692 / 64);
+    assert(close(complex_mesh_area(mesh, needed), 20 + circle_area));
+    options.start_cap = options.end_cap = CUI_PLOT_CAP_BUTT;
+    options.closed = true;
+    cui_plot_point square[] = {{0, 0}, {10, 0}, {10, 10}, {0, 10}, {0, 0}};
+    assert(cui_plot_stroke_mesh_ex(square, 5, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 80));
+    assert(bounds.x_min == -1 && bounds.x_max == 11 && bounds.y_min == -1 && bounds.y_max == 11);
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){5.173, 5.291}) == 0);
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){-.173, -.291}) == 1);
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){-.173, .291}) == 1);
+    cui_plot_point reverse_square[] = {{0, 10}, {10, 10}, {10, 0}, {0, 0}};
+    assert(cui_plot_stroke_mesh_ex(reverse_square, 4, options, &workspace, mesh, 20000, &needed,
+                                   &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 80));
+    options.join = CUI_PLOT_JOIN_BEVEL;
+    assert(cui_plot_stroke_mesh_ex(square, 4, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 78));
+    options.join = CUI_PLOT_JOIN_ROUND;
+    options.round_segments_per_turn = 16;
+    assert(cui_plot_stroke_mesh_ex(square, 4, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 76 + 8 * sin(6.28318530717958647692 / 16)));
+    options.closed = false;
+    options.join = CUI_PLOT_JOIN_MITER;
+    cui_plot_point corner[] = {{0, 0}, {10, 0}, {10, 10}};
+    cui_plot_mesh_vertex old[32];
+    size_t old_count;
+    cui_plot_rect old_bounds;
+    assert(cui_plot_stroke_mesh(corner, 3, 2, 4, old, 32, &old_count, &old_bounds) == CUI_PLOT_OK);
+    assert(cui_plot_stroke_mesh_ex(corner, 3, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), complex_mesh_area(old, old_count)));
+    options.join = CUI_PLOT_JOIN_BEVEL;
+    assert(cui_plot_stroke_mesh_ex(corner, 3, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 39.5));
+    options.join = CUI_PLOT_JOIN_MITER_CLIP;
+    options.miter_limit = 1;
+    cui_plot_point acute[] = {{0, 0}, {10, 0}, {0, 2}};
+    assert(cui_plot_stroke_mesh_ex(acute, 3, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    assert(bounds.x_max > 10.2 && bounds.x_max < 12);
+    /* Round self-crossing strokes match distance-to-segment union away from
+     * chord tolerance and triangle boundaries, without transparent overdraw. */
+    options.join = CUI_PLOT_JOIN_ROUND;
+    options.start_cap = options.end_cap = CUI_PLOT_CAP_ROUND;
+    options.round_segments_per_turn = 32;
+    cui_plot_point bow[] = {{0, 0}, {10, 10}, {0, 10}, {10, 0}};
+    assert(cui_plot_stroke_mesh_ex(bow, 4, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OK);
+    for (int y = -2; y < 13; y++)
+        for (int x = -2; x < 13; x++) {
+            cui_plot_point p = {x + .173, y + .291};
+            double distance = DBL_MAX;
+            for (size_t i = 0; i < 3; i++) {
+                cui_plot_point a = bow[i], b = bow[i + 1];
+                double dx = b.x - a.x, dy = b.y - a.y;
+                double t =
+                    fmax(0, fmin(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
+                distance = fmin(distance, hypot(p.x - a.x - t * dx, p.y - a.y - t * dy));
+            }
+            size_t coverage = stroke_mesh_point_coverage(mesh, needed, p);
+            assert(coverage <= 1);
+            if (distance < .99)
+                assert(coverage == 1);
+            if (distance > 1.01)
+                assert(coverage == 0);
+        }
+    memcpy(saved, mesh, sizeof mesh);
+    size_t saved_needed = needed;
+    cui_plot_rect saved_bounds = bounds;
+    options.width = NAN;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_INVALID);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0 &&
+           memcmp(&bounds, &saved_bounds, sizeof bounds) == 0);
+    options.width = 2;
+    line[1].x = 16384;
+    options.end_cap = CUI_PLOT_CAP_SQUARE;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_OVERFLOW);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
+    line[1] = line[0];
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_DEGENERATE);
+    line[1] = (cui_plot_point){10, 0};
+    options.width = 0;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_EMPTY);
+    assert(needed == 0 && bounds.x_max == 0);
+    options.width = 2;
+    options.closed = true;
+    options.round_segments_per_turn = 64;
+    cui_plot_point pentagon[] = {{0, 0}, {5, -5}, {10, 0}, {10, 10}, {0, 10}};
+    needed = 777;
+    memcpy(saved, mesh, sizeof mesh);
+    assert(cui_plot_stroke_mesh_ex(pentagon, 5, options, &workspace, mesh, 20000, &needed,
+                                   &bounds) == CUI_PLOT_CAPACITY);
+    assert(needed == 777 && memcmp(mesh, saved, sizeof mesh) == 0);
+}
+static void dashed_stroke_meshes(void) {
+    static long double events[32896];
+    static size_t order[256];
+    cui_plot_fill_workspace workspace = {events, 32896, order, 256};
+    static cui_plot_mesh_vertex mesh[20000], saved[20000];
+    cui_plot_stroke_options options = cui_plot_stroke_defaults();
+    options.width = 2;
+    cui_plot_point line[] = {{0, 0}, {10, 0}};
+    double dashes[] = {2, 1};
+    size_t needed = 999;
+    cui_plot_rect bounds = {9, 8, 7, 6};
+    memset(mesh, 0x6b, sizeof mesh);
+    memcpy(saved, mesh, sizeof mesh);
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, dashes, 2, &workspace, NULL, 0, &needed,
+                                       &bounds) == CUI_PLOT_CAPACITY);
+    assert(needed == 24 && bounds.x_min == 9);
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, dashes, 2, &workspace, mesh, needed - 1,
+                                       &needed, &bounds) == CUI_PLOT_CAPACITY);
+    assert(memcmp(mesh, saved, sizeof mesh) == 0);
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, dashes, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 14));
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){2.173, .291}) == 0);
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){3.173, .291}) == 1);
+    /* Odd [2] repeats to draw2/gap2: six drawn units on this line. */
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, dashes, 1, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 12));
+    options.start_cap = options.end_cap = CUI_PLOT_CAP_SQUARE;
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, dashes, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 24));
+    /* Overlapping square dash caps form a single coverage union. */
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){2.173, .291}) == 1);
+    options.start_cap = options.end_cap = CUI_PLOT_CAP_ROUND;
+    options.round_segments_per_turn = 16;
+    options.width = 1;
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, dashes, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 7 + 8 * sin(6.28318530717958647692 / 16)));
+    options = cui_plot_stroke_defaults();
+    options.width = 2;
+    options.closed = true;
+    cui_plot_point square[] = {{0, 0}, {10, 0}, {10, 10}, {0, 10}};
+    double corner_dashes[] = {15, 5};
+    assert(cui_plot_stroke_mesh_dashed(square, 4, options, corner_dashes, 2, &workspace, mesh,
+                                       20000, &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 60));
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){10.173, -.291}) == 1);
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){10.173, 7.291}) == 0);
+    double seam_dashes[] = {12, 1};
+    assert(cui_plot_stroke_mesh_dashed(square, 4, options, seam_dashes, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(stroke_mesh_point_coverage(mesh, needed, (cui_plot_point){-.173, -.291}) == 0);
+    memcpy(saved, mesh, sizeof mesh);
+    size_t saved_needed = needed;
+    cui_plot_rect saved_bounds = bounds;
+    double invalid[] = {0, 1};
+    assert(cui_plot_stroke_mesh_dashed(square, 4, options, invalid, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_INVALID);
+    invalid[0] = -1;
+    assert(cui_plot_stroke_mesh_dashed(square, 4, options, invalid, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_INVALID);
+    invalid[0] = INFINITY;
+    assert(cui_plot_stroke_mesh_dashed(square, 4, options, invalid, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_INVALID);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0 &&
+           memcmp(&bounds, &saved_bounds, sizeof bounds) == 0);
+    options.closed = false;
+    double nonadvancing[] = {1, DBL_TRUE_MIN};
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, nonadvancing, 2, &workspace, mesh, 20000,
+                                       &needed, &bounds) == CUI_PLOT_DEGENERATE);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
+    workspace.order_capacity = 0;
+    assert(cui_plot_stroke_mesh_ex(line, 2, options, &workspace, mesh, 20000, &needed, &bounds) ==
+           CUI_PLOT_CAPACITY);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
+    workspace.order_capacity = 256;
+    double tiny[] = {1e-8, 1e-8};
+    options.closed = false;
+    assert(cui_plot_stroke_mesh_dashed(line, 2, options, tiny, 2, &workspace, mesh, 20000, &needed,
+                                       &bounds) == CUI_PLOT_CAPACITY);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
+}
 int main(void) {
+    dashed_stroke_meshes();
+    extended_stroke_meshes();
     complex_fill_meshes();
     adaptive_strokes();
     fill_meshes();

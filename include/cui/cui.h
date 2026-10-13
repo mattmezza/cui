@@ -265,6 +265,11 @@ typedef struct {
     /* Preserve keyboard/programmatic focus while refusing pointer focus.
      * Set pointer_activatable as well to retain pointer activation/capture. */
     bool no_pointer_focus;
+    /* Opt-in previous-frame hit barrier for pointer activation/focus only.
+     * A topmost clipped/modal-eligible barrier denies activation beneath it,
+     * including release, without cancelling existing capture or blocking scroll.
+     * Hover, cursor and current-prepaint occlusion remain independent. */
+    bool blocks_pointer_activation;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

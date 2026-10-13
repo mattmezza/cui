@@ -665,12 +665,19 @@ static bool cui_core_above(cui_context *ui, size_t candidate, size_t current) {
 static cui_id cui_core_hit(cui_context *ui, float x, float y) {
     size_t hit = SIZE_MAX;
     for (size_t i = 0; i < ui->previous_count; i++)
-        if ((cui_core_pointer_focus_target(ui, i) ||
+        if ((ui->previous[i].details.blocks_pointer_activation ||
+             cui_core_pointer_focus_target(ui, i) ||
              (!ui->previous[i].disabled && ui->previous[i].details.pointer_activatable)) &&
             cui_core_previous_allowed(ui, i) && cui_core_inside(ui->previous_hits[i], x, y) &&
             cui_core_above(ui, i, hit))
             hit = i;
     return hit == SIZE_MAX ? 0 : ui->previous[hit].id;
+}
+static bool cui_core_pointer_blocked(const cui_context *ui, cui_id hit) {
+    for (size_t i = 0; hit && i < ui->previous_count; i++)
+        if (ui->previous[i].id == hit)
+            return ui->previous[i].details.blocks_pointer_activation;
+    return false;
 }
 cui_cursor cui_pointer_cursor(cui_context *ui) {
     if (!ui)
@@ -1234,7 +1241,9 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         if (e.type == CUI_EVENT_COMPOSITION_START || e.type == CUI_EVENT_COMPOSITION_UPDATE)
             ui->composition_owner = ui->focus;
         else if (e.type == CUI_EVENT_COMPOSITION_COMMIT || e.type == CUI_EVENT_COMPOSITION_CANCEL ||
-                 e.type == CUI_EVENT_CANCEL || e.type == CUI_EVENT_POINTER_DOWN)
+                 e.type == CUI_EVENT_CANCEL ||
+                 (e.type == CUI_EVENT_POINTER_DOWN &&
+                  !cui_core_pointer_blocked(ui, cui_core_hit(ui, e.x, e.y))))
             ui->composition_owner = 0;
         if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) && ui->composition_owner &&
             ui->composition_owner == ui->focus) {
@@ -1272,6 +1281,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
+            bool blocked = cui_core_pointer_blocked(ui, hit);
             bool pointer_only = false, pointer_activation = false;
             for (size_t n = 0; n < ui->previous_count; n++)
                 if (ui->previous[n].id == hit) {
@@ -1280,8 +1290,11 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                     pointer_only = !target && pointer_activation;
                     break;
                 }
-            ui->capture = pointer_activation || target == hit ? hit : 0;
-            if (!pointer_only) {
+            if (blocked)
+                ui->event_consumed[i] = true;
+            else
+                ui->capture = pointer_activation || target == hit ? hit : 0;
+            if (!blocked && !pointer_only) {
                 if (hit || ui->previous_top_modal == SIZE_MAX)
                     ui->focus = target;
                 ui->focus_visible = false;
@@ -1293,7 +1306,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                     if (ui->contacts[n].id == e.pointer_id &&
                         ui->contacts[n].device == e.pointer_device)
                         touch_drag |= ui->contacts[n].dragging;
-            if (!touch_drag && ui->capture == cui_core_hit(ui, e.x, e.y))
+            cui_id hit = cui_core_hit(ui, e.x, e.y);
+            if (!touch_drag && !cui_core_pointer_blocked(ui, hit) && ui->capture == hit)
                 cui_core_activate(ui, ui->capture);
             ui->capture = 0;
         } else if (e.type == CUI_EVENT_CANCEL && !touch_cancellations[i]) {
@@ -3195,8 +3209,9 @@ bool cui_event_hit_within_scope(cui_context *ui, size_t index, cui_id scope) {
     size_t hit = SIZE_MAX;
     for (size_t i = 0; i < ui->previous_count; ++i) {
         const cui_semantic *s = &ui->previous[i];
-        if (!s->disabled &&
-            (cui_core_focusable(s) || s->details.pointer_activatable || s->details.scrollable) &&
+        if ((s->details.blocks_pointer_activation ||
+             (!s->disabled && (cui_core_focusable(s) || s->details.pointer_activatable ||
+                               s->details.scrollable))) &&
             cui_core_previous_allowed(ui, i) && cui_core_inside(ui->previous_hits[i], e.x, e.y) &&
             cui_core_above(ui, i, hit))
             hit = i;

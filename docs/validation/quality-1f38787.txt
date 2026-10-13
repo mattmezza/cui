@@ -1,0 +1,9 @@
+Source: 1f38787
+Scope: repeated Down keeps the final textarea row painted inside the field; Home restores the first row. Scroll translation is applied to the clipped viewport. Old component fails the draw-position regression.
+python scripts/check_manifest.py
+78 unique components: {'not_started': 0, 'scaffolded': 0, 'implemented': 5, 'tested': 73, 'verified': 0}
+python scripts/check_licenses.py
+Pinned dependency hashes and license files match
+python scripts/theme_presets.py --check
+python scripts/format.py --check
+python scripts/amalgamate.py --check

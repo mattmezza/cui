@@ -1,0 +1,3 @@
+Source: 1f38787
+Scope: repeated Down keeps the final textarea row painted inside the field; Home restores the first row. Scroll translation is applied to the clipped viewport. Old component fails the draw-position regression.
+textarea-old-regression: tests/unit/test_textarea.c:382: assert_visible_line: Assertion `command->bounds.y + command->bounds.h <= state->viewport.y + state->viewport.h + 1' failed.

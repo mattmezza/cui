@@ -1,24 +1,24 @@
 {
-  "source": "bc9d062",
-  "compiled_source": "bc9d062",
+  "source": "13c851f0ce33bff5c8c521e1c436314dff9edfff",
+  "compiled_source": "13c851f0ce33bff5c8c521e1c436314dff9edfff",
   "published_source": "0b667d07b258cbcb74cc8c279328027c1b69f71c",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published next20 passes six CI jobs, Pages, all325 HTTPS file hashes and actual public alignment/scrolling/Python/Node clipboard checks. Next21 integrates avatar image stacks, compact message examples and optional relocatable accessibility packaging; warning native101/101 pass. Shared scrollbar appearance and RadioGroup validation are active. Complete family verification remains0/78.",
+  "summary": "Next21 integrates intrinsic attachment sizing, responsive content, controlled radio groups, avatar stacks, compact conversations, configurable shared scrollbars and optional Linux accessibility packaging. Native103, sanitizer103, WASI83, browser78, Attachment62, touch42+16+19 and responsive checks pass. Published source remains0b667d0 pending new deployment. Full family verification remains0/78.",
   "checks": [
     {
       "name": "native",
-      "passed": 97,
-      "total": 97
+      "passed": 103,
+      "total": 103
     },
     {
       "name": "sanitizers",
-      "passed": 97,
-      "total": 97
+      "passed": 103,
+      "total": 103
     },
     {
       "name": "WASI",
-      "passed": 80,
-      "total": 80
+      "passed": 83,
+      "total": 83
     },
     {
       "name": "browser_stories",
@@ -54,8 +54,23 @@
       "name": "touch_page_cases",
       "passed": 19,
       "total": 19
+    },
+    {
+      "name": "attachment_size_containment",
+      "passed": 62,
+      "total": 62
+    },
+    {
+      "name": "avatar_message",
+      "passed": 9,
+      "total": 9
+    },
+    {
+      "name": "radio_group",
+      "passed": 5,
+      "total": 5
     }
   ],
-  "portable_test_source": "56f82b6",
-  "portable_source_sha256": "fc800ff6b3345909b9769683ac6dd95efd35afc4deca9cb425cc70aafe62bbf2"
+  "portable_test_source": "e663032a22cb3ee3c394698c08075c5f78930326 plus exact generated headers committed13c851f",
+  "portable_source_sha256": "e983aafb4da0f0ca983a14e8b84a3995e5adb77ac5367daa1b17fa0ed523c2ff"
 }

@@ -17,13 +17,13 @@ const type=e.gallery_command(i,0),b=[1,2,3,4].map(f=>e.gallery_command(i,f));
 if(type===3){clips.push(b);continue;}if(type===4){clips.pop();continue;}
 if(type===2)out.push({b,text:d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))),clips:clips.map(c=>c.slice())});}return out;}'''
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--directory',type=Path,default=Path('build/web'));p.add_argument('--chromium');p.add_argument('--report',type=Path,default=Path(tempfile.gettempdir())/'cui-attachment-sizes.json');args=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--directory',type=Path,default=Path('build/web'));p.add_argument('--chromium');p.add_argument('--url',help='Optional published gallery URL');p.add_argument('--report',type=Path,default=Path(tempfile.gettempdir())/'cui-attachment-sizes.json');args=p.parse_args()
  class Handler(SimpleHTTPRequestHandler):
   def log_message(self,*args):pass
  server=ThreadingHTTPServer(('127.0.0.1',0),partial(Handler,directory=str(args.directory.resolve())));threading.Thread(target=server.serve_forever,daemon=True).start()
  try:
   with sync_playwright()as pw:
-   browser=pw.chromium.launch(headless=True,**({'executable_path':args.chromium}if args.chromium else{}));a=Audit(browser,f'http://127.0.0.1:{server.server_port}');a.route('Attachment');a.page.set_viewport_size({'width':3000,'height':4000});a.page.evaluate("document.querySelector('main').style.maxWidth='none'")
+   browser=pw.chromium.launch(headless=True,**({'executable_path':args.chromium}if args.chromium else{}));a=Audit(browser,args.url.rstrip('/') if args.url else f'http://127.0.0.1:{server.server_port}');a.route('Attachment');a.page.set_viewport_size({'width':3000,'height':4000});a.page.evaluate("document.querySelector('main').style.maxWidth='none'")
    def containment():
     card=a.target('Attachment 1',9);x,y,w,h=card['f'][1:5]
     paints=a.page.evaluate(PAINT)

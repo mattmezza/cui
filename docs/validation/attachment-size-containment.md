@@ -13,3 +13,7 @@ Validation: warning-enabled native build; 95/96 CTest checks pass, with only the
 Run the browser proof with `uv run tests/web/test_attachment_sizes.py --chromium /path/to/chrome-headless-shell --report /path/to/report.json`. The report's sibling PNG captures the compact Base card at 390px. The test defaults to strict failure reporting.
 
 The optional existing `test_touch_components.py` sweep renders all 78 stories and passes 39/42 cases on this branch. Its Button, Checkbox and Sheet cases fail the helper's viewport-placement check before contact dispatch; no Attachment case fails. This audit does not certify those unrelated interactions.
+
+Integrator source `13c851f` regenerates the distribution headers and passes all 103 native and 103 sanitizer tests. Rebuilt Attachment browser checks pass 62/62. The shared touch fixture now accounts for integer browser scroll offsets while retaining DOM visibility checks; all 42 cases pass. These integrated results supersede the isolated branch's distribution and viewport-helper failures above. Publication verification is still pending.
+
+The same integration makes narrow Settings navigation stack above its content, caps default Description List label allocation, and measures the Button preview's full rows. Extreme mobile font sizes preserve the requested typography and provide CUI horizontal scrolling rather than shrinking text; ordinary Small, Base and XL layouts fit the responsive viewport.

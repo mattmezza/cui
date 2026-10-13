@@ -2,9 +2,9 @@
 
 ## Current priorities — 13 October
 
-Next19 gallery polish passes native96, sanitizer96, WASI80, browser78, actual Resizable24, touch42+16, page-touch19 and IME checks. Select/Pagination alignment, Shift-wheel Tabs, pixel DataTable wheel, Command width and retained page scroll have targeted browser regressions. Publication pending. Native starter release ddd0ae3 is deployed: six CI jobs and Pages pass,301 exact HTTPS artifact files and actual public guide screenshots/clipboard checked. Full family verification remains0/78; remaining user feedback and full ecosystem acceptance stay active. See [next19 checks](validation/gallery-polish-next19.txt) and [public starter verification](validation/published-ddd0ae3.txt).
+Published source `0b667d0` passes all six framework CI jobs and Pages; all 325 HTTPS artifact files match. Next21 source `13c851f` integrates attachment intrinsic sizing, responsive Settings and Description List layouts, complete design-size Button preview heights, controlled RadioGroup, image avatar stacks, compact conversations, shared scrollbar appearance and optional relocatable Linux accessibility packaging. Strict native and sanitizer suites pass 103/103 each. Attachment passes 62/62 browser checks; catalog touch passes 42/42 and responsive content checks pass. The combined browser suite passes all 78 stories and WASI passes 83/83; public deployment verification is pending.
 
-Workers continue Input visual geometry, optional native AccessKit, DatePicker locale/year selection and remaining controls. Only root integrates; no user dependency installation required.
+The feature ledger records 265 tested subsets, four implemented subsets and 52 not started features; full family verification remains 0/78. Next22 workers continue contextual native text geometry and Checkbox motion, wrapped labels and tooltip behavior in isolated worktrees. Only root integrates. No dependency installation is required from the user.
 
 ## Historical checkpoints
 

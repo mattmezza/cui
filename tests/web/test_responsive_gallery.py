@@ -16,6 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
     parser.add_argument('--chromium')
+    parser.add_argument('--url', help='Optional published gallery URL')
     args = parser.parse_args()
 
     class Handler(SimpleHTTPRequestHandler):
@@ -30,7 +31,7 @@ def main():
             browser = playwright.chromium.launch(
                 headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
             page = browser.new_page(viewport={'width': 1280, 'height': 950})
-            page.goto(f'http://127.0.0.1:{server.server_port}/#Button')
+            page.goto((args.url.rstrip('/') if args.url else f'http://127.0.0.1:{server.server_port}') + '/#Button')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="Button"')
             for width in (390, 1280):
                 page.set_viewport_size({'width': width, 'height': 950})

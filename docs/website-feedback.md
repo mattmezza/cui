@@ -111,4 +111,4 @@ Additional open feedback: Alert/Bubble semantic styles; intrinsic HoverCard; reu
 
 Python and Node JavaScript/TypeScript startup examples are now published and verified, including both actual Copy-button recipes; native pointer callbacks are documented in validation/python-node-native.txt. This is a small example host ABI, not complete cross-language component bindings.
 
-- [ ] Attachment design sizes: horizontal base-height cards clip subtitle/action content; card and auto group heights must fit contents across all14 sizes and both densities. Screenshot reproduced13October; isolated correction in progress.
+- [ ] Attachment design sizes: horizontal base-height cards clip subtitle/action content; card and auto group heights must fit contents across all14 sizes and both densities. Screenshot reproduced 13 October; intrinsic card/group sizing integrated in `13c851f`. Rebuilt browser checks pass 62/62 including mobile subtitle pixels and real touch access to offscreen Open. Native and sanitizer suites pass 103/103. Public deployment verification pending.

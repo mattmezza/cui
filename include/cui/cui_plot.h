@@ -566,6 +566,33 @@ typedef struct {
 cui_plot_result cui_plot_fill_mesh(const cui_plot_point *contour, size_t count,
                                    cui_plot_mesh_vertex *out, size_t capacity, size_t *required,
                                    cui_plot_rect *bounds);
+/* Multi-contour polygon fill, implicit closure, total 3..256 points. Supports
+ * holes, overlap, coincident edges and self crossings. No curve commands: flatten
+ * curves first. Finite coordinates within +/-16384. Contours need >=3 points;
+ * duplicate/collinear points are accepted. Scan bands split at edge crossings,
+ * using long-double predicates; topology is not guaranteed for nearly coincident
+ * geometry and does not reproduce Lyon triangle topology or analytic curve ST.
+ * Workspace is scratch (may change on any result), and all buffers must be
+ * disjoint. events_capacity must be >=n+n*(n-1)/2, order_capacity >=n where n
+ * is total point count. Smaller workspace returns CAPACITY without publishing
+ * required. Output CAPACITY publishes exact vertex count and preserves mesh/
+ * bounds. Other errors preserve output/count/bounds. Empty fill succeeds with
+ * required=0 and zero bounds. Each emitted triangle has ST=(0,1). */
+typedef enum { CUI_PLOT_FILL_EVEN_ODD, CUI_PLOT_FILL_NON_ZERO } cui_plot_fill_rule;
+typedef struct {
+    const cui_plot_point *points;
+    size_t count;
+} cui_plot_contour;
+typedef struct {
+    long double *events;
+    size_t events_capacity;
+    size_t *order;
+    size_t order_capacity;
+} cui_plot_fill_workspace;
+cui_plot_result cui_plot_fill_mesh_contours(const cui_plot_contour *, size_t contour_count,
+                                            cui_plot_fill_rule, cui_plot_fill_workspace *,
+                                            cui_plot_mesh_vertex *, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds);
 /* Adaptive cubic polyline (includes start/end), original conservative
  * de Casteljau subdivision, max4097 points/depth24. Coordinates+controls within
  * +/-16384, finite tolerance1e-6..16384. Every accepted chord is within tolerance

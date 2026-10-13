@@ -1591,7 +1591,176 @@ static void adaptive_strokes(void) {
            CUI_PLOT_OK);
     assert(required > 6 && bounds.x_min < 0 && bounds.x_max > 8 && bounds.y_max > 6);
 }
+static double complex_mesh_area(const cui_plot_mesh_vertex *mesh, size_t count) {
+    double area = 0;
+    for (size_t i = 0; i < count; i += 3) {
+        cui_plot_point a = mesh[i].xy, b = mesh[i + 1].xy, c = mesh[i + 2].xy;
+        area += fabs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) / 2;
+        assert(mesh[i].st.x == 0 && mesh[i].st.y == 1);
+    }
+    return area;
+}
+/* Independent ray winding and triangle coverage oracle at off-grid samples. */
+static void complex_fill_oracle(const cui_plot_contour *contours, size_t count,
+                                cui_plot_fill_rule rule, cui_plot_fill_workspace *workspace) {
+    cui_plot_mesh_vertex mesh[4096];
+    size_t needed = 0;
+    cui_plot_rect bounds;
+    assert(cui_plot_fill_mesh_contours(contours, count, rule, workspace, mesh, 4096, &needed,
+                                       &bounds) == CUI_PLOT_OK);
+    for (int row = -2; row < 14; row++)
+        for (int column = -2; column < 14; column++) {
+            cui_plot_point p = {column + .173, row + .291};
+            int winding = 0;
+            for (size_t k = 0; k < count; k++)
+                for (size_t i = 0; i < contours[k].count; i++) {
+                    cui_plot_point a = contours[k].points[i],
+                                   b = contours[k].points[(i + 1) % contours[k].count];
+                    double cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+                    if (a.y <= p.y && b.y > p.y && cross > 0)
+                        winding++;
+                    if (b.y <= p.y && a.y > p.y && cross < 0)
+                        winding--;
+                }
+            bool expected = rule == CUI_PLOT_FILL_NON_ZERO ? winding != 0 : winding % 2 != 0;
+            size_t coverage = 0;
+            for (size_t i = 0; i < needed; i += 3) {
+                double cross[3];
+                for (size_t j = 0; j < 3; j++) {
+                    cui_plot_point a = mesh[i + j].xy, b = mesh[i + (j + 1) % 3].xy;
+                    cross[j] = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+                }
+                if ((cross[0] > 0 && cross[1] > 0 && cross[2] > 0) ||
+                    (cross[0] < 0 && cross[1] < 0 && cross[2] < 0))
+                    coverage++;
+            }
+            assert(coverage == (size_t)expected);
+        }
+}
+static void complex_fill_meshes(void) {
+    long double events[40];
+    size_t order[8];
+    cui_plot_fill_workspace workspace = {events, 40, order, 8};
+    cui_plot_point outer[] = {{0, 0}, {10, 0}, {10, 10}, {0, 10}};
+    cui_plot_point inner[] = {{2, 2}, {8, 2}, {8, 8}, {2, 8}};
+    cui_plot_contour contours[] = {{outer, 4}, {inner, 4}};
+    cui_plot_mesh_vertex mesh[128], saved[128];
+    memset(mesh, 0x65, sizeof mesh);
+    memcpy(saved, mesh, sizeof mesh);
+    size_t needed = 999;
+    cui_plot_rect bounds = {-1, -2, -3, -4};
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace, NULL, 0,
+                                       &needed, &bounds) == CUI_PLOT_CAPACITY);
+    assert(needed > 0 && bounds.x_min == -1);
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace, mesh,
+                                       needed - 1, &needed, &bounds) == CUI_PLOT_CAPACITY);
+    assert(memcmp(mesh, saved, sizeof mesh) == 0);
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 64));
+    assert(bounds.x_min == 0 && bounds.y_max == 10);
+    /* Hole interior has no triangle centroid: checks coverage, not only area. */
+    for (size_t i = 0; i < needed; i += 3) {
+        double x = (mesh[i].xy.x + mesh[i + 1].xy.x + mesh[i + 2].xy.x) / 3;
+        double y = (mesh[i].xy.y + mesh[i + 1].xy.y + mesh[i + 2].xy.y) / 3;
+        assert(!(x > 2 && x < 8 && y > 2 && y < 8));
+    }
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 100));
+    for (size_t i = 0; i < 2; i++) {
+        cui_plot_point tmp = inner[i];
+        inner[i] = inner[3 - i];
+        inner[3 - i] = tmp;
+    }
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 64));
+    cui_plot_point bow[] = {{0, 0}, {10, 10}, {0, 10}, {10, 0}};
+    contours[0] = (cui_plot_contour){bow, 4};
+    for (int rule = 0; rule < 2; rule++) {
+        assert(cui_plot_fill_mesh_contours(contours, 1, (cui_plot_fill_rule)rule, &workspace, mesh,
+                                           128, &needed, &bounds) == CUI_PLOT_OK);
+        assert(close(complex_mesh_area(mesh, needed), 50));
+    }
+    contours[0] = (cui_plot_contour){outer, 4};
+    contours[1] = contours[0];
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(needed == 0 && bounds.x_max == 0);
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_OK);
+    assert(close(complex_mesh_area(mesh, needed), 100));
+    cui_plot_point overlap[] = {{5, -1}, {12, -1}, {12, 6}, {5, 6}};
+    contours[1] = (cui_plot_contour){overlap, 4};
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace);
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace);
+    contours[0] = (cui_plot_contour){bow, 4};
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace);
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace);
+    /* Shared endpoints, collinear edges and repeated closure are valid. */
+    cui_plot_point touching[] = {{10, 0}, {12, 0}, {12, 2}, {10, 2}, {10, 0}};
+    size_t wide_order[9];
+    long double wide_events[45];
+    cui_plot_fill_workspace wide = {wide_events, 45, wide_order, 9};
+    contours[0] = (cui_plot_contour){outer, 4};
+    contours[1] = (cui_plot_contour){touching, 5};
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &wide);
+    /* Nearby exact binary crossing heights exercise separate scan bands. */
+    cui_plot_point near_bow[] = {{0, 0}, {10, 10 + 0x1p-20}, {0, 10 + 0x1p-20}, {10, 0}};
+    contours[0] = (cui_plot_contour){bow, 4};
+    contours[1] = (cui_plot_contour){near_bow, 4};
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_EVEN_ODD, &workspace);
+    complex_fill_oracle(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace);
+    contours[0] = (cui_plot_contour){outer, 4};
+    contours[1] = contours[0];
+    memcpy(saved, mesh, sizeof mesh);
+    cui_plot_rect saved_bounds = bounds;
+    size_t saved_needed = needed;
+    workspace.events_capacity = 0;
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_CAPACITY);
+    assert(needed == saved_needed && memcmp(&bounds, &saved_bounds, sizeof bounds) == 0);
+    workspace.events_capacity = 40;
+    outer[0].x = DBL_MAX;
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_INVALID);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
+    outer[0].x = NAN;
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_INVALID);
+    outer[0].x = 0;
+    workspace.order_capacity = 7;
+    assert(cui_plot_fill_mesh_contours(contours, 2, CUI_PLOT_FILL_NON_ZERO, &workspace, mesh, 128,
+                                       &needed, &bounds) == CUI_PLOT_CAPACITY);
+    assert(needed == saved_needed && memcmp(mesh, saved, sizeof mesh) == 0);
+    static long double max_events[32896];
+    static size_t max_order[256];
+    cui_plot_fill_workspace max_workspace = {max_events, 32896, max_order, 256};
+    cui_plot_point ring[256];
+    cui_plot_mesh_vertex large[4096];
+    double area = 0;
+    for (size_t i = 0; i < 256; i++) {
+        double angle = 6.28318530717958647692 * (double)i / 256;
+        ring[i] = (cui_plot_point){16384 * cos(angle), 16384 * sin(angle)};
+    }
+    for (size_t i = 0; i < 256; i++) {
+        cui_plot_point a = ring[i], b = ring[(i + 1) % 256];
+        area += a.x * b.y - b.x * a.y;
+    }
+    cui_plot_contour max_contour = {ring, 256};
+    assert(cui_plot_fill_mesh_contours(&max_contour, 1, CUI_PLOT_FILL_EVEN_ODD, &max_workspace,
+                                       large, 4096, &needed, &bounds) == CUI_PLOT_OK);
+    assert(fabs(complex_mesh_area(large, needed) - area / 2) < 1e-5);
+    assert(bounds.x_min == -16384 && bounds.x_max == 16384);
+    max_contour.count = 257;
+    saved_needed = needed;
+    assert(cui_plot_fill_mesh_contours(&max_contour, 1, CUI_PLOT_FILL_EVEN_ODD, &max_workspace,
+                                       large, 4096, &needed, &bounds) == CUI_PLOT_INVALID);
+    assert(needed == saved_needed);
+}
 int main(void) {
+    complex_fill_meshes();
     adaptive_strokes();
     fill_meshes();
     first_paint_clocks();

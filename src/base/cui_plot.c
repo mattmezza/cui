@@ -2620,3 +2620,148 @@ cui_plot_result cui_plot_stroke_mesh(const cui_plot_point *p, size_t n, double w
             return CUI_PLOT_OVERFLOW;
     return cui_plot_fill_mesh(contour, count, out, capacity, required, bounds);
 }
+
+/* A horizontal arrangement decomposition: every endpoint and proper crossing
+ * is a band boundary. Edge order is constant inside each open band. */
+typedef struct {
+    cui_plot_point a, b;
+} plot_fill_edge;
+/* In-place heapsort: unlike libc qsort, scratch allocation is never hidden. */
+static void plot_fill_event_sift(long double *events, size_t root, size_t count) {
+    while (root < count / 2) {
+        size_t child = root * 2 + 1;
+        if (child + 1 < count && events[child] < events[child + 1])
+            ++child;
+        if (events[root] >= events[child])
+            return;
+        long double value = events[root];
+        events[root] = events[child];
+        events[child] = value;
+        root = child;
+    }
+}
+static void plot_fill_event_sort(long double *events, size_t count) {
+    for (size_t root = count / 2; root;)
+        plot_fill_event_sift(events, --root, count);
+    for (size_t end = count; end > 1;) {
+        long double value = events[0];
+        events[0] = events[--end];
+        events[end] = value;
+        plot_fill_event_sift(events, 0, end);
+    }
+}
+static long double plot_fill_x(plot_fill_edge e, long double y) {
+    return e.a.x + (y - e.a.y) * ((long double)e.b.x - e.a.x) / ((long double)e.b.y - e.a.y);
+}
+static void plot_fill_triangle(cui_plot_point a, cui_plot_point b, cui_plot_point c,
+                               cui_plot_mesh_vertex *out, size_t *used, cui_plot_rect *box) {
+    long double cross = ((long double)b.x - a.x) * ((long double)c.y - a.y) -
+                        ((long double)b.y - a.y) * ((long double)c.x - a.x);
+    if (cross == 0)
+        return;
+    cui_plot_point p[3] = {a, b, c};
+    for (size_t i = 0; i < 3; i++) {
+        if (*used == 0)
+            *box = (cui_plot_rect){p[i].x, p[i].y, p[i].x, p[i].y};
+        box->x_min = fmin(box->x_min, p[i].x);
+        box->x_max = fmax(box->x_max, p[i].x);
+        box->y_min = fmin(box->y_min, p[i].y);
+        box->y_max = fmax(box->y_max, p[i].y);
+        if (out)
+            out[*used] = (cui_plot_mesh_vertex){p[i], {0, 1}};
+        ++*used;
+    }
+}
+cui_plot_result cui_plot_fill_mesh_contours(const cui_plot_contour *contours, size_t count,
+                                            cui_plot_fill_rule rule,
+                                            cui_plot_fill_workspace *workspace,
+                                            cui_plot_mesh_vertex *out, size_t capacity,
+                                            size_t *required, cui_plot_rect *bounds) {
+    if (!contours || !count || count > 85 || !workspace || !required || !bounds ||
+        (capacity && !out) || (rule != CUI_PLOT_FILL_EVEN_ODD && rule != CUI_PLOT_FILL_NON_ZERO))
+        return CUI_PLOT_INVALID;
+    plot_fill_edge edges[256];
+    size_t n = 0;
+    for (size_t c = 0; c < count; c++) {
+        if (!contours[c].points || contours[c].count < 3 || contours[c].count > 256 - n)
+            return CUI_PLOT_INVALID;
+        for (size_t i = 0; i < contours[c].count; i++) {
+            cui_plot_point a = contours[c].points[i];
+            if (!mesh_point_valid(a))
+                return CUI_PLOT_INVALID;
+            edges[n++] = (plot_fill_edge){a, contours[c].points[(i + 1) % contours[c].count]};
+        }
+    }
+    if (!workspace->events || !workspace->order ||
+        workspace->events_capacity < n + n * (n - 1) / 2 || workspace->order_capacity < n)
+        return CUI_PLOT_CAPACITY;
+    long double *events = workspace->events;
+    size_t events_count = 0;
+    for (size_t i = 0; i < n; i++)
+        events[events_count++] = edges[i].a.y;
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = i + 1; j < n; j++) {
+            plot_fill_edge a = edges[i], b = edges[j];
+            long double ax = (long double)a.b.x - a.a.x, ay = (long double)a.b.y - a.a.y;
+            long double bx = (long double)b.b.x - b.a.x, by = (long double)b.b.y - b.a.y;
+            long double dx = (long double)b.a.x - a.a.x, dy = (long double)b.a.y - a.a.y;
+            long double det = ax * by - ay * bx;
+            if (det == 0)
+                continue;
+            long double t = (dx * by - dy * bx) / det, u = (dx * ay - dy * ax) / det;
+            if (t > 0 && t < 1 && u > 0 && u < 1)
+                events[events_count++] = (double)(a.a.y + t * ay);
+        }
+    plot_fill_event_sort(events, events_count);
+    size_t unique = 0;
+    for (size_t i = 0; i < events_count; i++)
+        if (!unique || events[i] != events[unique - 1])
+            events[unique++] = events[i];
+    size_t needed = 0;
+    cui_plot_rect box = {0};
+    for (unsigned pass = 0; pass < 2; pass++) {
+        size_t used = 0;
+        box = (cui_plot_rect){0};
+        for (size_t band = 1; band < unique; band++) {
+            long double lo = events[band - 1], hi = events[band], mid = lo + (hi - lo) / 2;
+            size_t active = 0;
+            for (size_t e = 0; e < n; e++) {
+                if (edges[e].a.y == edges[e].b.y || lo < fmin(edges[e].a.y, edges[e].b.y) ||
+                    hi > fmax(edges[e].a.y, edges[e].b.y))
+                    continue;
+                long double x = plot_fill_x(edges[e], mid);
+                size_t j = active;
+                while (j && plot_fill_x(edges[workspace->order[j - 1]], mid) > x) {
+                    workspace->order[j] = workspace->order[j - 1];
+                    --j;
+                }
+                workspace->order[j] = e;
+                ++active;
+            }
+            int winding = 0;
+            for (size_t i = 0; i + 1 < active; i++) {
+                plot_fill_edge left = edges[workspace->order[i]],
+                               right = edges[workspace->order[i + 1]];
+                winding += left.b.y > left.a.y ? 1 : -1;
+                if (!(rule == CUI_PLOT_FILL_NON_ZERO ? winding != 0 : winding % 2 != 0))
+                    continue;
+                cui_plot_point a = {(double)plot_fill_x(left, lo), (double)lo};
+                cui_plot_point b = {(double)plot_fill_x(right, lo), (double)lo};
+                cui_plot_point c = {(double)plot_fill_x(right, hi), (double)hi};
+                cui_plot_point d = {(double)plot_fill_x(left, hi), (double)hi};
+                plot_fill_triangle(a, b, c, pass ? out : NULL, &used, &box);
+                plot_fill_triangle(a, c, d, pass ? out : NULL, &used, &box);
+            }
+        }
+        if (!pass) {
+            needed = used;
+            if (needed && (!out || capacity < needed)) {
+                *required = needed;
+                return CUI_PLOT_CAPACITY;
+            }
+        }
+    }
+    *required = needed;
+    *bounds = box;
+    return CUI_PLOT_OK;
+}

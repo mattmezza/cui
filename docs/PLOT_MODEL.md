@@ -1326,3 +1326,55 @@ Stroke uses the fill mesh transaction contract, with at most252 outline points
 and750 expanded vertices. Input/output buffers must remain stable and disjoint.
 Retaining meshes, moving XY/bounds, clipping, triangle edge coverage and paint
 submission belong to the host/Core integration.
+
+
+### Multi-contour fill rules and arrangement triangles
+
+`cui_plot_fill_mesh_contours` adds implicitly closed polygon contours with
+EvenOdd and NonZero rules. The frozen Area, Arc and filled RadialLine call
+`PathBuilder::fill()`. Inspected published `gpui-pre=0.3.8`
+`src/path_builder.rs:75..97` selects `FillOptions::default()`;
+Cargo.lock pins `lyon_tessellation=1.0.21`, whose `src/lib.rs:476..490`
+defaults to EvenOdd, tolerance0.1 and intersection handling enabled. Select
+`CUI_PLOT_FILL_EVEN_ODD` for that source fill rule. NonZero is an explicit
+extension for callers supplying oriented contours.
+
+The implementation decomposes the polygon arrangement into horizontal bands
+at every vertex and proper edge intersection. Inside each band edges have a
+stable horizontal order; parity or signed winding selects filled intervals,
+which become trapezoids split into non-indexed triangles. Holes, crossing
+contours, self intersections, coincident edges, repeated closing vertices and
+collinear vertices are supported. Horizontal and zero-length edges contribute
+no winding. Triangle ST is `(0,1)` and bounds cover emitted fill geometry.
+Empty or cancelled geometry succeeds with zero vertices and zero bounds.
+
+Total input points are bounded to256, with at least3 per contour. Coordinates
+must be finite within +/-16384. Caller scratch consists of `long double`
+events and `size_t` edge-order arrays. For n input points reserve at least
+`n+n*(n-1)/2` events and n indices (32896 events and256 indices at the limit).
+Scratch may change on every result and must be disjoint from inputs, outputs,
+bounds and count. Workspace shortage returns CAPACITY preserving count;
+mesh shortage returns CAPACITY publishing its exact required vertex count.
+Both preserve mesh and bounds. A NULL mesh/zero capacity queries the count.
+Validation errors preserve all output data. Two traversal passes avoid partial
+output, without allocating or retaining input data.
+
+This is an original arrangement tessellator, not Lyon triangle topology.
+Predicates use `long double` but do not require extended precision; nearly
+coincident events can round together on platforms where it equals `double`.
+Intersection event heights are rounded to output `double` precision before
+sorting, preventing extra scratch precision from creating invisible bands.
+Band endpoint tests avoid requiring a representable interior midpoint. No exact
+predicate arithmetic, configurable snapping tolerance, source f32 rounding or source curve
+approximation is claimed. Flatten curves explicitly before using this API.
+The old `cui_plot_fill_mesh` keeps its stricter simple-contour contract.
+Complex source stroke joins/dashes, direct curved ST patches and automatic
+path-command/renderer routing remain separate gaps. Input and generated
+triangle limits remain bounded CUI extensions rather than full Lyon parity.
+
+Headless tests compare donut and bowtie areas, hole interior coverage, contour
+orientation and coincident-contour cancellation. Independent ray winding and
+triangle coverage oracles exercise overlapping and crossing contours, shared
+endpoints, repeated closure and nearby crossing bands. Capacity failures and
+extreme/nonfinite inputs verify output preservation. Native warning builds,
+ASan/UBSan and actual WASI execution exercise the portable path.

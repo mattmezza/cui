@@ -32,6 +32,77 @@ static cui_input_result base_frame(cui_context *ui, cui_edit *edit, cui_input_be
     assert(cui_last_error(ui) == CUI_OK);
     return result;
 }
+static void single_event_reduction(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[128] = "abc";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_behavior_state state = {0};
+    cui_base_input_options options = {0};
+    assert(ui && edit);
+    base_frame(ui, edit, &state, options);
+    cui_focus(ui, 1);
+    key(ui, CUI_KEY_A, CUI_MOD_CTRL);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "fresh"}));
+    key(ui, CUI_KEY_ENTER, 0);
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 40});
+    cui_interact(ui, 1, CUI_ROLE_TEXTBOX, cui_string("Input"), false, false, 3);
+    cui_input_result event = cui_base_input_reduce_event(ui, 1, edit, &state, options, 0);
+    assert(!event.changed && !event.submitted && event.error == CUI_EDIT_OK);
+    event = cui_base_input_reduce_event(ui, 1, edit, &state, options, 1);
+    assert(event.changed && !event.submitted && !strcmp(buffer, "fresh"));
+    event = cui_base_input_reduce_event(ui, 1, edit, &state, options, 2);
+    assert(!event.changed && event.submitted);
+    state.dragging = true;
+    cui_edit_state before = cui_edit_get_state(edit);
+    cui_input_result invalid[] = {
+        cui_base_input_reduce_event(NULL, 1, edit, &state, options, 0),
+        cui_base_input_reduce_event(ui, 0, edit, &state, options, 0),
+        cui_base_input_reduce_event(ui, 1, NULL, &state, options, 0),
+        cui_base_input_reduce_event(ui, 1, edit, NULL, options, 0),
+        cui_base_input_reduce_event(ui, 1, edit, &state, options, 3),
+        cui_base_input_reduce_event(ui, 1, edit, &state, (cui_base_input_options){.disabled = true},
+                                    SIZE_MAX)};
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i)
+        assert(invalid[i].error == CUI_EDIT_INVALID_ARGUMENT && !invalid[i].changed &&
+               !invalid[i].submitted);
+    assert(state.dragging && cui_edit_get_state(edit).revision == before.revision &&
+           cui_edit_get_state(edit).cursor == before.cursor && !strcmp(buffer, "fresh"));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    /* Delegated vertical/Home/End keys remain unconsumed and leave the editor
+     * unchanged, while ordinary caret movement keeps its previous ownership. */
+    key(ui, CUI_KEY_UP, 0);
+    key(ui, CUI_KEY_DOWN, 0);
+    key(ui, CUI_KEY_HOME, 0);
+    key(ui, CUI_KEY_END, 0);
+    assert(cui_begin_frame(ui, 400, 200, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 40});
+    cui_interact(ui, 1, CUI_ROLE_TEXTBOX, cui_string("Input"), false, false, 5);
+    options.delegate_up_down = options.delegate_home_end = true;
+    for (size_t i = 0; i < 4; ++i) {
+        event = cui_base_input_reduce_event(ui, 1, edit, &state, options, i);
+        assert(!event.changed && !cui_event_consumed(ui, i) &&
+               cui_edit_get_state(edit).cursor == before.cursor);
+    }
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    /* Existing readonly, IME and repeat guards remain in the shared reducer. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "ignored"}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .ime_composing = true}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                           .key = CUI_KEY_ENTER,
+                                           .prefer_character_input = true}));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .repeat = true}));
+    cui_input_result result =
+        base_frame(ui, edit, &state, (cui_base_input_options){.readonly = true});
+    assert(!result.changed && !result.submitted && !strcmp(buffer, "fresh"));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 static void clipboard_and_readonly(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     char buffer[128] = "caf\xc3\xa9";
@@ -424,6 +495,7 @@ static void size_metrics_and_centering(void) {
 }
 #endif
 int main(void) {
+    single_event_reduction();
 #ifndef CUI_INPUT_BASE_ONLY
     size_metrics_and_centering();
     grow_resize_and_alignment();

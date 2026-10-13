@@ -112,6 +112,86 @@ static bool cui_input_readonly_event(cui_event event) {
            event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END ||
            (event.key == CUI_KEY_A && (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)));
 }
+cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edit *edit,
+                                             cui_input_behavior_state *state,
+                                             cui_base_input_options options, size_t i) {
+    cui_input_result result = {.error = CUI_EDIT_OK};
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    if (!ui || !id || !edit || !state || !events || i >= count) {
+        result.error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    cui_edit_state before = cui_edit_get_state(edit);
+    if (options.disabled)
+        state->dragging = false;
+    cui_event event = events[i];
+    if (event.type == CUI_EVENT_CANCEL)
+        state->dragging = false;
+    if (cui_event_consumed(ui, i) && event.type == CUI_EVENT_POINTER_UP &&
+        event.pointer_button == CUI_POINTER_PRIMARY)
+        state->dragging = false;
+    if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
+        (event.type == CUI_EVENT_KEY_DOWN && (event.ime_composing || event.prefer_character_input)))
+        return result;
+    if (options.delegate_up_down && event.type == CUI_EVENT_KEY_DOWN &&
+        (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN))
+        return result;
+    if (options.delegate_home_end && event.type == CUI_EVENT_KEY_DOWN &&
+        (event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
+        return result;
+    if (event.type == CUI_EVENT_KEY_DOWN &&
+        (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_UP ||
+         event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
+        cui_consume_event(ui, i);
+    cui_edit_result error = CUI_EDIT_OK;
+    bool primary = event.pointer_button == CUI_POINTER_PRIMARY;
+    if (primary && event.type == CUI_EVENT_POINTER_DOWN)
+        state->dragging = true;
+    if (options.hit_test && primary &&
+        (event.type == CUI_EVENT_POINTER_DOWN ||
+         ((state->dragging || cui_pressed(ui, id)) &&
+          (event.type == CUI_EVENT_POINTER_MOVE || event.type == CUI_EVENT_POINTER_UP)))) {
+        cui_edit_state current = cui_edit_get_state(edit);
+        size_t cursor =
+            options.hit_test(options.hit_test_user, cui_edit_get_text(edit), event.x, event.y);
+        size_t anchor = event.type == CUI_EVENT_POINTER_DOWN && !(event.modifiers & CUI_MOD_SHIFT)
+                            ? cursor
+                            : current.anchor;
+        error = cui_edit_select(edit, anchor, cursor);
+    } else if (event.type == CUI_EVENT_KEY_DOWN &&
+               (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
+               (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V)) {
+        const cui_platform *host = options.clipboard;
+        cui_edit_state current = cui_edit_get_state(edit);
+        size_t start = current.anchor < current.cursor ? current.anchor : current.cursor;
+        size_t end = current.anchor > current.cursor ? current.anchor : current.cursor;
+        bool paste = event.key == CUI_KEY_V;
+        if ((paste && !options.readonly) || (!paste && start != end)) {
+            if (!host || !(host->capabilities & CUI_PLATFORM_CLIPBOARD) ||
+                (paste ? !host->clipboard_get : !host->clipboard_set))
+                error = CUI_EDIT_CLIPBOARD_UNAVAILABLE;
+            else if (paste)
+                error = cui_edit_insert(edit, host->clipboard_get(host->user));
+            else {
+                cui_str text = cui_edit_get_text(edit);
+                if (!host->clipboard_set(host->user, (cui_str){text.data + start, end - start}))
+                    error = CUI_EDIT_CLIPBOARD_UNAVAILABLE;
+                else if (event.key == CUI_KEY_X && !options.readonly)
+                    error = cui_edit_delete(edit);
+            }
+        }
+    } else if (!options.readonly || cui_input_readonly_event(event))
+        error = cui_edit_apply_event(edit, event);
+    if (primary && event.type == CUI_EVENT_POINTER_UP)
+        state->dragging = false;
+    if (!before.multiline && event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ENTER &&
+        !event.repeat)
+        result.submitted = true;
+    result.error = error;
+    result.changed = before.revision != cui_edit_get_state(edit).revision;
+    return result;
+}
 cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
                                    cui_input_behavior_state *state,
                                    cui_base_input_options options) {
@@ -121,80 +201,17 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
         return result;
     }
     cui_edit_state before = cui_edit_get_state(edit);
-    cui_interaction interaction =
-        cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, options.disabled, false, (float)before.length);
-    size_t count;
-    const cui_event *events = cui_frame_events(ui, &count);
+    (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, options.disabled, false,
+                       (float)before.length);
+    size_t count = 0;
+    (void)cui_frame_events(ui, &count);
     if (options.disabled)
         state->dragging = false;
     for (size_t i = 0; i < count; ++i) {
-        cui_event event = events[i];
-        if (event.type == CUI_EVENT_CANCEL)
-            state->dragging = false;
-        if (cui_event_consumed(ui, i) && event.type == CUI_EVENT_POINTER_UP &&
-            event.pointer_button == CUI_POINTER_PRIMARY)
-            state->dragging = false;
-        if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
-            (event.type == CUI_EVENT_KEY_DOWN &&
-             (event.ime_composing || event.prefer_character_input)))
-            continue;
-        if (options.delegate_up_down && event.type == CUI_EVENT_KEY_DOWN &&
-            (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN))
-            continue;
-        if (options.delegate_home_end && event.type == CUI_EVENT_KEY_DOWN &&
-            (event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
-            continue;
-        if (event.type == CUI_EVENT_KEY_DOWN &&
-            (event.key == CUI_KEY_LEFT || event.key == CUI_KEY_RIGHT || event.key == CUI_KEY_UP ||
-             event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
-            cui_consume_event(ui, i);
-        cui_edit_result error = CUI_EDIT_OK;
-        bool primary = event.pointer_button == CUI_POINTER_PRIMARY;
-        if (primary && event.type == CUI_EVENT_POINTER_DOWN)
-            state->dragging = true;
-        if (options.hit_test && primary &&
-            (event.type == CUI_EVENT_POINTER_DOWN ||
-             ((state->dragging || interaction.pressed) &&
-              (event.type == CUI_EVENT_POINTER_MOVE || event.type == CUI_EVENT_POINTER_UP)))) {
-            cui_edit_state current = cui_edit_get_state(edit);
-            size_t cursor =
-                options.hit_test(options.hit_test_user, cui_edit_get_text(edit), event.x, event.y);
-            size_t anchor =
-                event.type == CUI_EVENT_POINTER_DOWN && !(event.modifiers & CUI_MOD_SHIFT)
-                    ? cursor
-                    : current.anchor;
-            error = cui_edit_select(edit, anchor, cursor);
-        } else if (event.type == CUI_EVENT_KEY_DOWN &&
-                   (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
-                   (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V)) {
-            const cui_platform *host = options.clipboard;
-            cui_edit_state current = cui_edit_get_state(edit);
-            size_t start = current.anchor < current.cursor ? current.anchor : current.cursor;
-            size_t end = current.anchor > current.cursor ? current.anchor : current.cursor;
-            bool paste = event.key == CUI_KEY_V;
-            if ((paste && !options.readonly) || (!paste && start != end)) {
-                if (!host || !(host->capabilities & CUI_PLATFORM_CLIPBOARD) ||
-                    (paste ? !host->clipboard_get : !host->clipboard_set))
-                    error = CUI_EDIT_CLIPBOARD_UNAVAILABLE;
-                else if (paste)
-                    error = cui_edit_insert(edit, host->clipboard_get(host->user));
-                else {
-                    cui_str text = cui_edit_get_text(edit);
-                    if (!host->clipboard_set(host->user, (cui_str){text.data + start, end - start}))
-                        error = CUI_EDIT_CLIPBOARD_UNAVAILABLE;
-                    else if (event.key == CUI_KEY_X && !options.readonly)
-                        error = cui_edit_delete(edit);
-                }
-            }
-        } else if (!options.readonly || cui_input_readonly_event(event))
-            error = cui_edit_apply_event(edit, event);
-        if (primary && event.type == CUI_EVENT_POINTER_UP)
-            state->dragging = false;
-        if (!before.multiline && event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ENTER &&
-            !event.repeat)
-            result.submitted = true;
-        if (result.error == CUI_EDIT_OK && error != CUI_EDIT_OK)
-            result.error = error;
+        cui_input_result event = cui_base_input_reduce_event(ui, id, edit, state, options, i);
+        result.submitted |= event.submitted;
+        if (result.error == CUI_EDIT_OK && event.error != CUI_EDIT_OK)
+            result.error = event.error;
     }
     cui_edit_state after = cui_edit_get_state(edit);
     result.changed = before.revision != after.revision;

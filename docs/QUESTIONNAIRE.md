@@ -60,4 +60,39 @@ Focused answer cards now tint their existing border with the focus token and pai
 
 Questionnaire parts now inherit the root size through a context-owned, bounded 128-entry state-address table. Non-medium part sizes remain explicit overrides; `custom_size` permits an explicit Medium override. Parts outside a registered root use Medium. Publishing a 129th distinct root clears the bounded table before recording the new root, matching the source cache policy. Separate contexts do not share sizes. Draw-list tests compare all parts across all four sizes and verify overrides, context isolation and cache eviction; the same tests fail against the previous implementation. Root capture and basic cross-item focus routing are implemented below; full event/callback coverage remains incomplete.
 
-The root now captures unconsumed keys before child reducers using the preceding frame’s submitted part bindings. It handles answer/radio arrows, item navigation, alphabetic/numeric shortcuts, filled-answer Enter and Ctrl/Meta+Enter, while respecting input focus, unrelated modifiers, repeats, IME and preferred character input. Parts publish bindings through bounded context resources; the current list replaces the previous list each frame so omitted controls are reclaimed safely. Root numeric mode supplies part shortcut labels. Navigation restores the new Item focus; failed confirmation prefers the invalid item’s filled input/selected choice, then the first enabled answer. Native tests cover automatic composition without helper calls, cross-item focus, event guards, input cursor ownership, disabled roots, invalid confirmation, omission/reintroduction and resource-capacity failure. The regression fails against the previous root. Batched text/key ordering, nested roots and comprehensive callback choreography still need source-level verification.
+The root now captures unconsumed keys before child reducers using the preceding frame’s submitted part bindings. It handles answer/radio arrows, item navigation, alphabetic/numeric shortcuts, filled-answer Enter and Ctrl/Meta+Enter, while respecting input focus, unrelated modifiers, repeats, IME and preferred character input. Parts publish bindings through bounded context resources; the current list replaces the previous list each frame so omitted controls are reclaimed safely. Root numeric mode supplies part shortcut labels. Navigation restores the new Item focus; failed confirmation prefers the invalid item’s filled input/selected choice, then the first enabled answer. Native tests cover automatic composition without helper calls, cross-item focus, event guards, input cursor ownership, disabled roots, invalid confirmation, omission/reintroduction and resource-capacity failure. The regression fails against the previous root. Nested roots and comprehensive callback choreography still need source-level verification.
+
+
+## Ordered input batches
+
+Questionnaire input now reduces queued events in order. A `TEXT` or clipboard
+paste followed by Enter in one frame synchronizes the new answer before
+confirmation. Enter followed by text confirms the answer that existed at Enter;
+remaining events targeted at the old input do not edit either the old answer or
+the next item. Completing the last item likewise stops the old input batch.
+Selection replacement and multiple text events each emit their answer change
+before the current-item/completion event. An empty Enter does not retroactively
+confirm text arriving later in the queue.
+
+Automatic root capture defers focused-input keys to this ordered path. An
+explicit confirm helper used inside the root also leaves focused-input Enter to
+`cui_questionnaire_input_control`. Filled-input arrows remain editor-owned;
+empty-input navigation keeps the root behavior. IME composition, preferred
+character input and repeated Enter do not confirm; disabled roots/inputs do not
+edit or confirm. Reduced motion does not reorder input events.
+
+`cui_base_input_reduce_event` exposes the shared single-event reducer for other
+composite controls. Register the textbox with `cui_interact` first, call the
+reducer once per event in increasing queue order, aggregate errors, then publish
+final semantics and paint. It does not submit semantics or process other queue
+entries. Borrowed clipboard and hit-test geometry are used synchronously. Invalid
+indices/NULL arguments leave editor, drag state and events unchanged. The ordinary
+`cui_base_input_ex` uses the same reducer and retains readonly, pointer selection,
+clipboard, IME, repeat, and delegated navigation behavior.
+
+Headless regressions cover text/paste plus confirmation, confirmation plus later
+text, empty Enter plus text, select-all replacement plus multiple edits, callback
+ordering, final completion, old-item event isolation, disabled/reduced-motion
+behavior, and single-event invalid/delegated-key handling. The text-plus-Enter
+regression fails against the previous Questionnaire component implementation.
+This fixes batch ordering; it does not establish full Questionnaire parity.

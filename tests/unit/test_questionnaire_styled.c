@@ -744,6 +744,139 @@ static cui_draw_list automatic_frame(cui_context *ui, cui_questionnaire_state *s
     assert(cui_last_error(ui) == CUI_OK);
     return draw;
 }
+static cui_str batch_paste(void *user) {
+    return cui_string((const char *)user);
+}
+static void batch_frame(cui_context *ui, cui_questionnaire_state *s,
+                        cui_questionnaire_input_state views[2], const cui_platform *clipboard,
+                        cui_questionnaire_options options) {
+    assert(cui_begin_frame(ui, 400, 500, 0));
+    cui_theme theme = cui_theme_light();
+    assert(cui_questionnaire_begin(ui, 10, &theme, s, options));
+    for (size_t item = 0; item < 2; ++item) {
+        if (!cui_questionnaire_item_begin(ui, 100 + item, s, item, options))
+            continue;
+        assert(cui_questionnaire_input_control(ui, 300 + item, &theme, s, item, &views[item],
+                                               clipboard, options) == CUI_QUESTIONNAIRE_OK);
+        cui_questionnaire_part_end(ui);
+    }
+    cui_questionnaire_end(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+typedef struct {
+    cui_questionnaire_event_kind events[16];
+    char answers[16][64];
+    size_t count;
+} batch_trace;
+static void batch_event(const cui_questionnaire_state *s, cui_questionnaire_event event,
+                        void *user) {
+    batch_trace *trace = user;
+    assert(trace->count < 16);
+    cui_str answer = cui_questionnaire_freeform(s, 0);
+    trace->events[trace->count] = event.kind;
+    if (answer.length)
+        memcpy(trace->answers[trace->count], answer.data, answer.length);
+    trace->answers[trace->count][answer.length] = 0;
+    ++trace->count;
+}
+static void batched_input_confirmation(void) {
+    for (unsigned scenario = 0; scenario < 11; ++scenario) {
+        cui_context *ui = cui_create((cui_config){.max_elements = 256});
+        char buffers[2][64] = {{0}};
+        cui_edit *edits[2];
+        for (size_t i = 0; i < 2; ++i)
+            edits[i] = cui_edit_create((cui_edit_config){.buffer = buffers[i], .capacity = 64});
+        cui_questionnaire_item items[2] = {
+            {.name = cui_string("first"), .input = edits[0], .required = true},
+            {.name = cui_string("second"), .input = edits[1], .required = true}};
+        cui_questionnaire_item_runtime runtime[2];
+        char answers[384];
+        cui_questionnaire_state state = {0};
+        batch_trace trace = {0};
+        assert(ui && edits[0] && edits[1]);
+        assert(cui_questionnaire_init(&state, items, 2,
+                                      (cui_questionnaire_workspace){.items = runtime,
+                                                                    .item_capacity = 2,
+                                                                    .text = answers,
+                                                                    .text_capacity = sizeof answers,
+                                                                    .max_answer_bytes = 63},
+                                      batch_event, &trace) == CUI_QUESTIONNAIRE_OK);
+        cui_questionnaire_input_state views[2] = {{0}};
+        cui_platform host = {
+            .capabilities = CUI_PLATFORM_CLIPBOARD, .clipboard_get = batch_paste, .user = "pasted"};
+        cui_questionnaire_options options = {0};
+        if (scenario == 10)
+            cui_set_reduced_motion(ui, true);
+        batch_frame(ui, &state, views, &host, options);
+        cui_focus(ui, 300);
+        options.disabled = scenario == 8;
+        items[0].input_disabled = scenario == 9;
+        if (scenario == 2) {
+            assert(cui_questionnaire_set_input(&state, 0, cui_string("old")) ==
+                   CUI_QUESTIONNAIRE_OK);
+        }
+        trace.count = 0;
+        if (scenario != 1 && scenario != 2 && scenario != 3)
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "fresh"}));
+        if (scenario == 1)
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_V,
+                                                   .modifiers = CUI_MOD_CTRL}));
+        if (scenario == 4) {
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_A,
+                                                   .modifiers = CUI_MOD_CTRL}));
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "new"}));
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = " answer"}));
+        }
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                               .key = CUI_KEY_ENTER,
+                                               .ime_composing = scenario == 5,
+                                               .prefer_character_input = scenario == 6,
+                                               .repeat = scenario == 7}));
+        if (scenario <= 3)
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "later"}));
+        batch_frame(ui, &state, views, &host, options);
+        const char *expected = scenario == 1                    ? "pasted"
+                               : scenario == 2                  ? "old"
+                               : scenario == 3                  ? "later"
+                               : scenario == 8 || scenario == 9 ? ""
+                               : scenario == 4                  ? "new answer"
+                                                                : "fresh";
+        assert(!strcmp(buffers[0], expected));
+        assert(cui_questionnaire_freeform(&state, 0).length == strlen(expected));
+        if (expected[0])
+            assert(!memcmp(cui_questionnaire_freeform(&state, 0).data, expected, strlen(expected)));
+        assert(!buffers[1][0]);
+        assert(state.current == (scenario == 3 || (scenario >= 5 && scenario <= 9) ? 0 : 1));
+        size_t answer_events = scenario == 2 || scenario == 8 || scenario == 9 ? 0
+                               : scenario == 4                                 ? 3
+                                                                               : 1;
+        size_t total_events = answer_events + (state.current == 1 ? 1 : 0);
+        assert(trace.count == total_events);
+        for (size_t i = 0; i < answer_events; ++i)
+            assert(trace.events[i] == CUI_QUESTIONNAIRE_ANSWER_CHANGED);
+        if (state.current == 1) {
+            assert(trace.events[trace.count - 1] == CUI_QUESTIONNAIRE_CURRENT_CHANGED);
+            assert(!strcmp(trace.answers[trace.count - 1], expected));
+        }
+        batch_frame(ui, &state, views, &host, options);
+        assert(!strcmp(buffers[0], expected) && !buffers[1][0]);
+        if (scenario == 0) {
+            cui_focus(ui, 301);
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "final"}));
+            assert(
+                cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "ignored"}));
+            batch_frame(ui, &state, views, &host, options);
+            assert(state.complete && !strcmp(buffers[1], "final"));
+        }
+        for (size_t i = 0; i < 2; ++i)
+            cui_edit_destroy(edits[i]);
+        cui_destroy(ui);
+    }
+}
 static void automatic_key(cui_context *ui, cui_questionnaire_state *s,
                           cui_questionnaire_input_state *input, cui_key key, unsigned mods) {
     assert(cui_queue_event(ui,
@@ -860,6 +993,7 @@ static void automatic_capacity_failure(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    batched_input_confirmation();
     automatic_root_keyboard();
     automatic_capacity_failure();
     inherited_sizes();

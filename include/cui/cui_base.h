@@ -41,6 +41,14 @@ typedef struct {
     bool delegate_up_down;  /* Composite popup owns vertical navigation. */
     bool delegate_home_end; /* Composite popup owns these keys; editor leaves them untouched. */
 } cui_base_input_options;
+/* Reduce one frame event in queue order after registering the textbox with
+ * cui_interact. Does not submit/paint semantics or replay other events. The
+ * caller aggregates errors and publishes final semantic state. Invalid event
+ * indices/NULL arguments return INVALID_ARGUMENT without mutating state. Hit
+ * geometry and clipboard user data are borrowed synchronously for this call. */
+cui_input_result cui_base_input_reduce_event(cui_context *, cui_id, cui_edit *,
+                                             cui_input_behavior_state *, cui_base_input_options,
+                                             size_t event_index);
 cui_input_result cui_base_input_ex(cui_context *, cui_id, cui_str, cui_edit *,
                                    cui_input_behavior_state *, cui_base_input_options);
 /* Text is owned by the editor; changed concerns text, not cursor movement. */

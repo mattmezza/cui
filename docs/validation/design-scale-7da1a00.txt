@@ -1,0 +1,66 @@
+Designscale7da1a00: opt-in shared sizes XS..9XL; existing zeroINHERIT metrics preserved.
+Styled11families: Button/Checkbox/Radio/Switch/Toggle/Input/Textarea/List/Select/Menu/Combobox.
+All14sizes/fourthemes native geometry/activation; browserXS..4XL centeredink plus radius/spacing.
+No complete GPUI parity claim. Forms/numeric/OTP/fontregistry/backgrounds remain separate work.
+
+design-final-native.log
+73/75 Test #73: text_view_base_only ..............   Passed    0.01 sec
+      Start 74: chart_base_only
+74/75 Test #74: chart_base_only ..................   Passed    0.06 sec
+      Start 75: speech_base_only
+75/75 Test #75: speech_base_only .................   Passed    0.00 sec
+
+100% tests passed out of 75
+
+Total Test time (real) =   3.30 sec
+
+design-scale-asan-tests.log
+73/75 Test #73: text_view_base_only ..............   Passed    0.07 sec
+      Start 74: chart_base_only
+74/75 Test #74: chart_base_only ..................   Passed    0.21 sec
+      Start 75: speech_base_only
+75/75 Test #75: speech_base_only .................   Passed    0.02 sec
+
+100% tests passed out of 75
+
+Total Test time (real) =  11.25 sec
+
+design-scale-wasi.log
+PASS implementation_embedding (5.01s)
+unstyled frame 0: 3 commands, checked=0
+unstyled frame 1: 3 commands, checked=1
+PASS example_unstyled (0.37s)
+settings: 36 draw commands
+PASS example_styled_settings (0.39s)
+PASS distribution_single (26.87s)
+PASS distribution_multi (26.47s)
+WASI runtime suites: 67/67 passed
+
+design-space-browser.log
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+Alert second confirmation: {'attempts': 2, 'open': 0, 'pointers': [1, 1, 143, 143], 'canvas': [339, 371.390625], 'semantics': [{'name': 'Delete workspace', 'role': 1, 'bounds': [24, 24, 136.73153686523438, 32], 'focused': 1, 'scroll': 0, 'maximum': 0}]}
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+
+design-final-quality.log
+python scripts/check_manifest.py
+78 unique components: {'not_started': 0, 'scaffolded': 0, 'implemented': 5, 'tested': 73, 'verified': 0}
+python scripts/check_licenses.py
+Pinned dependency hashes and license files match
+python scripts/theme_presets.py --check
+python scripts/format.py --check
+python scripts/amalgamate.py --check
+
+design-final-docs.log
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.608s
+
+OK
+
+design-final-sharing.log
+...
+----------------------------------------------------------------------
+Ran 3 tests in 1.452s
+
+OK
+Prerendered metadata and no-JavaScript content for 148 shareable pages.

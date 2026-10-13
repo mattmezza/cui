@@ -2923,6 +2923,9 @@ struct cui_edit {
     cui_edit_private_snapshot *states;
     size_t slots, count, index;
     uint64_t revision;
+    size_t change_start;
+    uint64_t change_revision;
+    bool change_valid;
     const cui_edit_token_span *tokens;
     size_t token_count;
     cui_edit_selection *selections;
@@ -3564,6 +3567,10 @@ cui_edit_state cui_edit_get_state(const cui_edit *e) {
                                 e->config.multiline}
              : (cui_edit_state){0};
 }
+cui_edit_change cui_edit_get_change(const cui_edit *e) {
+    return e ? (cui_edit_change){e->change_revision, e->change_start, e->change_valid}
+             : (cui_edit_change){0};
+}
 cui_str cui_edit_get_text(const cui_edit *e) {
     return e ? (cui_str){e->config.buffer, e->length} : (cui_str){0};
 }
@@ -3799,6 +3806,9 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     cui_edit_private_collapse_selections(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = start;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     cui_edit_private_record(e);
     return CUI_EDIT_OK;
 }
@@ -4003,6 +4013,9 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
     } else
         memcpy(sorted, input, count * sizeof(*sorted));
     cui_edit_private_sort_selections(sorted, count);
+    size_t dirty_start = count ? (sorted[0].anchor < sorted[0].cursor ? sorted[0].anchor
+                                                                      : sorted[0].cursor)
+                               : 0;
     size_t removed = 0;
     cui_str original = cui_edit_get_text(edit);
     for (size_t i = 0; i < count; ++i) {
@@ -4074,6 +4087,9 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
     edit->preferred_column_valid = false;
     if (changes) {
         edit->revision++;
+        edit->change_start = dirty_start;
+        edit->change_revision = edit->revision;
+        edit->change_valid = true;
         cui_edit_private_record(edit);
     } else
         cui_edit_private_save_state(edit);
@@ -4447,6 +4463,9 @@ static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t an
     cui_edit_private_collapse_selections(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = 0;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     cui_edit_private_record(e);
 }
 cui_edit_result cui_edit_indent_selections(cui_edit *e, bool outdent, bool block, size_t tab_size,
@@ -4612,22 +4631,46 @@ cui_edit_result cui_edit_backspace(cui_edit *e) {
 cui_edit_result cui_edit_delete(cui_edit *e) {
     return cui_edit_private_erase(e, false);
 }
+/* Edit buffers are already valid UTF-8. Two adjacent ASCII scalars have a
+ * grapheme boundary except CR/LF, so common editing never scans the prefix. */
+static bool cui_edit_private_boundary_valid(cui_str text, size_t at) {
+    if (!at || at == text.length)
+        return true;
+    const unsigned char *bytes = (const unsigned char *)text.data;
+    if (bytes[at - 1] < 0x80 && bytes[at] < 0x80)
+        return bytes[at - 1] != '\r' || bytes[at] != '\n';
+    return cui_grapheme_boundary(text, at);
+}
+static size_t cui_edit_private_previous_valid(cui_str text, size_t at) {
+    const unsigned char *bytes = (const unsigned char *)text.data;
+    if (at && bytes[at - 1] < 0x80 && (at == 1 || bytes[at - 2] < 0x80))
+        return at >= 2 && bytes[at - 2] == '\r' && bytes[at - 1] == '\n' ? at - 2 : at - 1;
+    return cui_grapheme_previous(text, at);
+}
+static size_t cui_edit_private_next_valid(cui_str text, size_t at) {
+    const unsigned char *bytes = (const unsigned char *)text.data;
+    if (at < text.length && bytes[at] < 0x80 &&
+        (at + 1 == text.length || bytes[at + 1] < 0x80))
+        return at + (bytes[at] == '\r' && at + 1 < text.length && bytes[at + 1] == '\n' ? 2
+                                                                                           : 1);
+    return cui_grapheme_next(text, at);
+}
 static cui_edit_result cui_edit_private_erase_grapheme(cui_edit *e, bool backwards) {
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     cui_str text = cui_edit_get_text(e);
     size_t start = e->anchor < e->cursor ? e->anchor : e->cursor;
     size_t end = e->anchor > e->cursor ? e->anchor : e->cursor;
-    if (start == end && cui_grapheme_boundary(text, start)) {
+    if (start == end && cui_edit_private_boundary_valid(text, start)) {
         if (backwards)
-            start = cui_grapheme_previous(text, start);
+            start = cui_edit_private_previous_valid(text, start);
         else
-            end = cui_grapheme_next(text, end);
+            end = cui_edit_private_next_valid(text, end);
     } else {
-        if (!cui_grapheme_boundary(text, start))
-            start = cui_grapheme_previous(text, start);
-        if (!cui_grapheme_boundary(text, end))
-            end = cui_grapheme_next(text, end);
+        if (!cui_edit_private_boundary_valid(text, start))
+            start = cui_edit_private_previous_valid(text, start);
+        if (!cui_edit_private_boundary_valid(text, end))
+            end = cui_edit_private_next_valid(text, end);
     }
     return cui_edit_private_replace(e, (cui_str){0}, start, end);
 }
@@ -4686,6 +4729,9 @@ cui_edit_result cui_edit_undo(cui_edit *e) {
     cui_edit_private_restore(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = 0;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_redo(cui_edit *e) {
@@ -4698,6 +4744,9 @@ cui_edit_result cui_edit_redo(cui_edit *e) {
     cui_edit_private_restore(e);
     cui_edit_private_detach_tokens(e);
     e->revision++;
+    e->change_start = 0;
+    e->change_revision = e->revision;
+    e->change_valid = true;
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {

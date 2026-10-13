@@ -507,24 +507,30 @@ call `cui_text_metrics_changed` after changing that provider.
 
 Textarea and Editor accept documents beyond 64 KiB when the caller supplies
 enough visual rows. A headless test exercises selection, scrolling, and editing
-near the end of 200,000 LF rows. Layout stores the complete display-row set,
-then reuses measured rows while document revision, style, width, wrap mode,
-and font metrics remain unchanged. Caret lookup uses binary search. Edits
-still rebuild all rows, and attached folds or inline tokens disable this
-fast path. There is no 60 Hz performance claim for edited frames.
+near the end of 200,000 LF rows. Layout stores the complete display-row set
+and reuses measured rows while document revision, style, width, wrap mode,
+and font metrics remain unchanged. The Edit model reports the earliest changed
+byte for each revision. A single ordinary edit retains preceding hard lines
+and rebuilds the affected logical line and suffix; wrapped lines rebuild from
+their logical-line start. Caret and dirty-row lookup use binary search.
+Undo/Redo, indentation, skipped revisions, attached folds, and inline tokens
+conservatively rebuild the full layout. Edits at the document start rebuild
+all rows; the caller still owns storage for all visual rows.
 
 The reproducible headless benchmark is `tests/bench_editor_200k.c`. Build the
 portable library with CMake at `-O2`, then compile the benchmark with
 `cc -std=c11 -O2 -UNDEBUG -Iinclude tests/bench_editor_200k.c build/libcui.a
 build/libcui_software.a -lm -o bench_editor_200k`. It prints process CPU time,
-text measurement calls, and draw commands for cold, unchanged, tail-caret, and
-tail-edit frames. On an Intel Core Ultra 5 235U, Linux x86_64, GCC 16.2.1,
-headless software command generation, one release run measured 18.3 ms cold
-with 400,003 measurements, 0.030 ms unchanged with zero measurements, 0.025 ms
-for a tail-caret move with two measurements, and 15.6 ms after a one-byte tail
-edit with 400,007 measurements. The caller-owned row array occupied 6,400,032
-bytes, plus 400,000 document bytes. These are single-run CPU measurements; host font
-providers, document content, and load change the results.
+text measurement calls, and draw commands for cold, unchanged, tail-caret,
+tail insert, tail removal, and middle insert frames. On an Intel Core Ultra 5
+235U, Linux x86_64, GCC 16.2.1, headless software command generation, one
+release run measured 18.6 ms cold/400,003 measurements, 0.024 ms unchanged/0,
+0.022 ms tail caret/2, 0.022 ms tail insert/9, 0.463 ms tail removal/5, and
+6.82 ms middle insert/200,007. Tail removal still copies document/history
+bytes in the Edit model. The caller-owned row array occupied 6,400,032 bytes,
+plus 400,000 document bytes. These are single-run CPU measurements; host font
+providers, document content, and load change the results. No 60 Hz guarantee
+follows from this headless workload.
 
 This slice does not implement typing-history coalescing or multiple IME
 composition ranges. Preferred columns remain view metadata rather

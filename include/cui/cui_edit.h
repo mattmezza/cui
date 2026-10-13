@@ -28,6 +28,15 @@ typedef struct {
     uint64_t revision;
     bool multiline;
 } cui_edit_state;
+/* Earliest byte that may differ after the most recent document revision.
+ * Valid only for that revision; a consumer that skips revisions must rebuild.
+ * Undo/Redo and complex indentation conservatively report byte zero. */
+typedef struct {
+    uint64_t revision;
+    size_t first_byte;
+    bool valid;
+} cui_edit_change;
+cui_edit_change cui_edit_get_change(const cui_edit *);
 #define CUI_EDIT_MAX_SELECTIONS 64
 /* Active selection is index0. IDs are caller-defined and must be unique.
  * Anchor/cursor preserve orientation; offsets remain UTF-8 bytes. */

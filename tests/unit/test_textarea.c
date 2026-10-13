@@ -906,22 +906,77 @@ static void test_atomic_inline_tokens(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void compare_incremental_rows(cui_context *ui, cui_edit *edit, cui_textarea_state *cached,
+                                     float width) {
+    cui_textarea_line fresh_lines[128];
+    cui_textarea_state fresh;
+    assert(cui_textarea_state_init(&fresh, fresh_lines, 128));
+    cui_textarea_metrics metrics = {14, 20, 0, 0};
+    assert(cui_textarea_layout(ui, edit, cached, metrics, width, true) == CUI_TEXTAREA_OK);
+    assert(cui_textarea_layout(ui, edit, &fresh, metrics, width, true) == CUI_TEXTAREA_OK);
+    assert(cached->count == fresh.count);
+    for (size_t i = 0; i < fresh.count; ++i)
+        assert(cached->lines[i].start == fresh.lines[i].start &&
+               cached->lines[i].end == fresh.lines[i].end &&
+               cached->lines[i].next == fresh.lines[i].next &&
+               cached->lines[i].width == fresh.lines[i].width &&
+               cached->lines[i].hard_break == fresh.lines[i].hard_break);
+}
+static void test_incremental_wrap_reflow(void) {
+    styled_probe probe = {.width = 5};
+    cui_context *ui = cui_create((cui_config){.width = 400,
+                                               .height = 300,
+                                               .measure_styled = styled_measure,
+                                               .measure_user = &probe});
+    char buffer[256] = "one two three four five\nabcde fg hij\nZ";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 1024,
+                                                      .max_history_steps = 4});
+    cui_textarea_line lines[128];
+    cui_textarea_state cached;
+    assert(ui && edit && cui_textarea_state_init(&cached, lines, 128));
+    compare_incremental_rows(ui, edit, &cached, 35);
+    assert(cui_edit_replace_range(edit, 4, 4, cui_string("wide ")) == CUI_EDIT_OK);
+    compare_incremental_rows(ui, edit, &cached, 35);
+    assert(cui_edit_replace_range(edit, 5, 5, cui_string("\n")) == CUI_EDIT_OK);
+    compare_incremental_rows(ui, edit, &cached, 35);
+    assert(cui_edit_replace_range(edit, 0, 3, cui_string("A")) == CUI_EDIT_OK);
+    compare_incremental_rows(ui, edit, &cached, 35);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    compare_incremental_rows(ui, edit, &cached, 35);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK);
+    compare_incremental_rows(ui, edit, &cached, 35);
+    assert(cui_edit_replace_range(edit, 2, 2, cui_string("x")) == CUI_EDIT_OK);
+    assert(cui_edit_replace_range(edit, 3, 3, cui_string("y")) == CUI_EDIT_OK);
+    compare_incremental_rows(ui, edit, &cached, 35);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 static void test_large_document_viewport(void) {
     const size_t rows = 200000, bytes = rows * 2;
     styled_probe probe = {.width = 5};
     char *buffer = malloc(bytes + 64);
-    cui_textarea_line *lines = malloc((rows + 1) * sizeof(*lines));
+    cui_textarea_line *lines = malloc((rows + 4) * sizeof(*lines));
     assert(buffer && lines);
     for (size_t i = 0; i < rows; ++i) {
         buffer[2 * i] = 'a';
         buffer[2 * i + 1] = '\n';
     }
     buffer[bytes] = 0;
-    cui_edit *edit = editor(buffer, bytes + 64);
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = bytes + 64,
+                                                      .multiline = true,
+                                                      .history_bytes = 4 * (bytes + 64),
+                                                      .max_history_steps = 4});
+    assert(edit);
     cui_textarea_state state;
-    assert(cui_textarea_state_init(&state, lines, rows + 1));
-    cui_context *ui = cui_create((cui_config){
-        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
+    assert(cui_textarea_state_init(&state, lines, rows + 4));
+    cui_context *ui = cui_create((cui_config){.width = 400,
+                                               .height = 300,
+                                               .measure_styled = styled_measure,
+                                               .measure_user = &probe});
     assert(ui);
     cui_focus(ui, 10);
     cui_textarea_options options = {.width = 180, .height = 80};
@@ -946,14 +1001,36 @@ static void test_large_document_viewport(void) {
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(probe.calls - initial_calls >= rows);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
+    initial_calls = probe.calls;
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(buffer[bytes - 2] == 'z' && buffer[bytes - 1] == 'a');
+    assert(probe.calls - initial_calls < 1000);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                           .key = CUI_KEY_BACKSPACE}));
+    initial_calls = probe.calls;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(buffer[bytes - 2] == 'a' && probe.calls - initial_calls < 1000);
+    assert(cui_edit_replace_range(edit, bytes - 2, bytes - 2, cui_string("z\n")) == CUI_EDIT_OK);
+    initial_calls = probe.calls;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.count == rows + 2 && probe.calls - initial_calls < 1000);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.count == rows + 1);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.count == rows + 2);
+    assert(cui_edit_replace_range(edit, bytes / 2, bytes / 2, cui_string("Q")) == CUI_EDIT_OK);
+    initial_calls = probe.calls;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(probe.calls - initial_calls > rows / 2 && probe.calls - initial_calls < rows * 2);
     cui_destroy(ui);
     cui_edit_destroy(edit);
     free(lines);
     free(buffer);
 }
 int main(void) {
+    test_incremental_wrap_reflow();
     test_large_document_viewport();
     test_atomic_inline_tokens();
     test_vertical_selection_collapse();

@@ -44,6 +44,8 @@ typedef struct {
     size_t layout_fold_count, layout_token_count;
     cui_textarea_line *layout_lines;
     size_t layout_capacity;
+    size_t widest_row;
+    float widest_width;
     cui_textarea_fold *folds;
     size_t fold_count;
     uint64_t fold_revision;

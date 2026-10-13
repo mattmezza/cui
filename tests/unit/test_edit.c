@@ -1031,7 +1031,43 @@ static void test_multi_indent_and_clipboard(void) {
            !strcmp(tiny, "abcd"));
     cui_edit_destroy(edit);
 }
+static void test_change_span_metadata(void) {
+    char buffer[64] = "aa\nbb\ncc";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 256,
+                                                      .max_history_steps = 4});
+    assert(edit && !cui_edit_get_change(edit).valid);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_edit_select(edit, 7, 7) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).revision == revision && !cui_edit_get_change(edit).valid);
+    assert(cui_edit_replace_range(edit, 7, 7, cui_string("X")) == CUI_EDIT_OK);
+    cui_edit_change change = cui_edit_get_change(edit);
+    assert(change.valid && change.revision == cui_edit_get_state(edit).revision &&
+           change.first_byte == 7);
+    revision = change.revision;
+    assert(cui_edit_replace_range(edit, 7, 8, cui_string("X")) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).revision == revision);
+    assert(cui_edit_replace_range(
+               edit, 7, 8,
+               cui_string("too much text for the buffer capacity and then much more text indeed")) ==
+           CUI_EDIT_CAPACITY);
+    assert(cui_edit_get_state(edit).revision == revision &&
+           cui_edit_get_change(edit).first_byte == 7);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && cui_edit_get_change(edit).first_byte == 0);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK && cui_edit_get_change(edit).first_byte == 0);
+    cui_edit_selection selections[4];
+    cui_edit_selection_snapshot history[5];
+    assert(cui_edit_attach_selections(edit, selections, 4, history, 5) == CUI_EDIT_OK);
+    cui_edit_selection cursors[] = {{7, 7, 7}, {3, 3, 3}};
+    assert(cui_edit_select_many(edit, cursors, 2) == CUI_EDIT_OK);
+    assert(cui_edit_replace_selections(edit, cui_string("!")) == CUI_EDIT_OK);
+    assert(cui_edit_get_change(edit).first_byte == 3);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_change_span_metadata();
     test_multi_indent_and_clipboard();
     test_multi_motion_and_erasure();
     test_multiple_selections();

@@ -3,8 +3,9 @@
 `cui_editor` is a retained multiline editing model with an immediate styled
 view. Create a multiline `cui_edit`, then initialize `cui_editor_state` with that
 borrowed model and a caller-owned `cui_textarea_line` workspace. Both must outlive
-the state. The editor adds no allocations to drawing or search; edit history
-allocation remains controlled by `cui_edit_config`.
+the state. The retained editor model and search add no allocations; edit history
+allocation remains controlled by `cui_edit_config`. Fold chevrons use the
+existing context-owned SVG icon cache, which prepares masks on demand.
 
 ```c
 cui_editor_state state;

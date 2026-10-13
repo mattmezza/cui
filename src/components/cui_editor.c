@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_editor.h"
 #include "cui/cui_components.h"
+#include "cui/cui_icon.h"
 #include <math.h>
 #include <stdio.h>
 static cui_id cui_editor_child(cui_id id, size_t row, unsigned part) {
@@ -174,8 +175,13 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                             (cui_semantic_details){.parent = id, .expanded = !fold.collapsed});
                         if (interaction.activated && !options.disabled)
                             toggle_fold = f;
-                        cui_text_line(ui, cui_string(fold.collapsed ? "+" : "-"), metrics.font_size,
-                                      theme->muted, metrics.line_height, options.text_style);
+                        (void)cui_icon_named(
+                            ui, control ^ UINT64_C(0xe2b452217c9631d0), theme,
+                            cui_string(fold.collapsed ? "chevron-right" : "chevron-down"),
+                            (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                               .custom_size = 14,
+                                               .custom_color = true,
+                                               .color = theme->muted});
                         cui_end_box(ui);
                         break;
                     }

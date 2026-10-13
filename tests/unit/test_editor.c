@@ -254,12 +254,20 @@ static void folding(void) {
     assert(!strcmp(buffer, "open\none\ninner\ntwo\nend\nclose\ntail"));
     assert(cui_textarea_hit_test(ui, edit, &state.view, state.view.viewport.x + 1,
                                  state.view.viewport.y + 21) == 23);
-    bool closing_number = false;
+    bool closing_number = false, fold_image = false;
     for (size_t i = 0; i < commands.count; ++i)
         if (commands.commands[i].type == CUI_DRAW_TEXT && commands.commands[i].text.length == 1 &&
             commands.commands[i].text.data[0] == '6')
             closing_number = true;
-    assert(closing_number);
+    for (size_t i = 0; i < commands.count; ++i) {
+        if (commands.commands[i].type == CUI_DRAW_IMAGE)
+            fold_image = true;
+        if (commands.commands[i].type == CUI_DRAW_TEXT)
+            assert(commands.commands[i].text.length != 1 ||
+                   (commands.commands[i].text.data[0] != '+' &&
+                    commands.commands[i].text.data[0] != '-'));
+    }
+    assert(closing_number && fold_image);
     size_t semantic_count;
     const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
     cui_id expand = 0;

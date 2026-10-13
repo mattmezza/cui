@@ -135,6 +135,7 @@ struct cui_context {
     bool event_consumed[CUI_CORE_DISPATCH_MAX];
     cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
+    cui_id event_accepted_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_previous_focus[CUI_CORE_DISPATCH_MAX];
     size_t event_activation_slots[CUI_CORE_DISPATCH_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
@@ -153,6 +154,9 @@ struct cui_context {
         bool active, primary, dragging, blocked;
     } contacts[16];
     double frame_time;
+    uint64_t frame_sequence;
+    size_t measuring_depth;
+    bool resolving_layout;
     cui_id text_input_owner, composition_owner;
     cui_rect text_input_bounds;
     cui_id text_geometry_ime_owner;
@@ -224,10 +228,12 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         !cui_core_text_style_valid(style))
         return (cui_size){0};
     size = fminf(size, 65535);
+    ++ui->measuring_depth;
     cui_size result = ui->config.measure_styled
                           ? ui->config.measure_styled(ui->config.measure_user, text, size, style)
                       : ui->config.measure ? ui->config.measure(ui->config.measure_user, text, size)
                                            : (cui_size){text.length * size * .6f, size * 1.3f};
+    --ui->measuring_depth;
     if (!isfinite(result.width) || !isfinite(result.height) || result.width < 0 ||
         result.height < 0)
         return (cui_size){0};
@@ -1129,6 +1135,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
     ui->activation_count = 0;
+    memset(ui->event_accepted_activations, 0, sizeof ui->event_accepted_activations);
     cui_id touch_cancellations[CUI_CORE_DISPATCH_MAX] = {0};
     for (size_t i = 0; i < ui->event_count; i++) {
         cui_event e = ui->events[i];
@@ -1406,6 +1413,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->config.height = h;
     ui->dt = dt;
     ui->in_frame = true;
+    if (!++ui->frame_sequence)
+        ++ui->frame_sequence;
     ui->dirty = false;
     return true;
 }
@@ -2062,6 +2071,10 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
                     }
                 }
             out.activated |= allowed;
+            if (allowed)
+                for (size_t e = 0; e < ui->event_count; e++)
+                    if (ui->event_activation_slots[e] == i)
+                        ui->event_accepted_activations[e] = id;
             ui->activations[i] = 0;
         }
     ui->semantic_scopes[ui->semantic_count] =
@@ -2530,6 +2543,7 @@ static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray 
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
+    ui->resolving_layout = true;
     if (ui->depth || ui->overflow_depth || ui->scope_count || ui->focus_depth)
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
     ui->overflow_depth = 0;
@@ -2960,6 +2974,7 @@ cui_core_commands_done:
     if (ui->composition_owner != ui->focus)
         ui->composition_owner = 0;
     ui->in_frame = false;
+    ui->resolving_layout = false;
     return (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
 }
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
@@ -3139,6 +3154,36 @@ bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {
 
 cui_id cui_event_activation(cui_context *ui, size_t index) {
     return ui && !cui_core_inert(ui) && index < ui->event_count ? ui->event_activations[index] : 0;
+}
+uint64_t cui_frame_sequence(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && !cui_core_inert(ui) && !cui_core_layout_only(ui)
+               ? ui->frame_sequence
+               : 0;
+}
+bool cui_frame_is_submitting(const cui_context *ui) {
+    return ui && ui->in_frame && !ui->prepainting && !ui->resolving_layout &&
+           !ui->measuring_depth && !cui_core_paint_context;
+}
+cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
+    if (!cui_frame_sequence(ui) || index >= ui->event_count || ui->error != CUI_OK)
+        return 0;
+    cui_id id = ui->event_accepted_activations[index];
+    for (size_t n = 0; id && n < ui->semantic_count; n++) {
+        const cui_semantic *s = &ui->semantics[n];
+        if (s->id != id || s->disabled)
+            continue;
+        if (!cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
+            return 0;
+        if (ui->events[index].type != CUI_EVENT_ACCESSIBILITY_ACTION)
+            return id;
+        if (ui->event_consumed[index] || !cui_core_accessibility_activate(s) ||
+            !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
+            return 0;
+        for (size_t p = 0; p < ui->previous_count; p++)
+            if (ui->previous[p].id == id && ui->previous[p].role == s->role)
+                return id;
+    }
+    return 0;
 }
 
 bool cui_event_consumed(cui_context *ui, size_t index) {

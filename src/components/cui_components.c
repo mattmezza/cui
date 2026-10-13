@@ -56,10 +56,12 @@ static cui_str cui_button_label(cui_context *ui, cui_button_state *state, cui_st
     state->label[prefix + ellipsis.length] = 0;
     return (cui_str){state->label, prefix + ellipsis.length};
 }
+static bool cui_button_shape_valid(cui_button_options);
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state) {
     cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, o.design_size, &design))
+    if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
+        !cui_button_shape_valid(o))
         return;
     bool disabled = o.disabled;
     cui_box b = cui_components_control(t, disabled, false);
@@ -228,6 +230,10 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         b.border = t->focus;
         b.border_width = 2;
     }
+    b.custom_corners = o.custom_corners;
+    b.corner_radii = o.corner_radii;
+    b.custom_border_edges = o.custom_border_edges;
+    b.border_edges = o.border_edges;
     cui_begin_box(ui, id, b);
     cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
@@ -322,14 +328,22 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
         state.hovered = state.pressed = false;
     cui_button_paint_state(ui, id, t, name, o, state);
 }
-bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_button_options o) {
-    cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, o.design_size, &design))
-        return false;
+static bool cui_button_shape_valid(cui_button_options o) {
+    float radii[] = {o.corner_radii.top_left, o.corner_radii.top_right, o.corner_radii.bottom_left,
+                     o.corner_radii.bottom_right};
+    float edges[] = {o.border_edges.left, o.border_edges.right, o.border_edges.top,
+                     o.border_edges.bottom};
+    for (size_t i = 0; i < 4; i++)
+        if ((o.custom_corners && (!isfinite(radii[i]) || radii[i] < 0)) ||
+            (o.custom_border_edges && (!isfinite(edges[i]) || edges[i] < 0)))
+            return false;
+    return true;
+}
+static void cui_button_metadata(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                cui_button_options o, cui_interaction interaction) {
+    (void)t;
+    (void)name;
     bool inert = o.disabled || o.loading;
-    cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
-    cui_interaction interaction = cui_base_button(ui, id, accessible, inert);
     if (o.variant == CUI_BUTTON_LINK)
         (void)cui_set_semantic_role(ui, id, CUI_ROLE_LINK);
     cui_update_semantic(ui, id, o.toggle_semantics && o.toggled,
@@ -358,9 +372,10 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         o.state->initialized = true;
         o.state->next_wake_seconds = 0;
     }
-    if (interaction.activated && o.on_click)
-        o.on_click(o.action_user);
-    cui_button_paint_state(ui, id, t, name, o, interaction);
+}
+static void cui_button_tooltip(cui_context *ui, cui_id id, const cui_theme *t,
+                               cui_button_options o) {
+    bool inert = o.disabled || o.loading;
     if (o.state && o.tooltip.length) {
         cui_hover_options hover = o.tooltip_options;
         hover.trigger = id;
@@ -377,7 +392,180 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
             o.state->next_wake_seconds = now + 1.0 / 60;
     } else if (o.state)
         o.state->tooltip = (cui_hover_state){0};
-    return interaction.activated;
+}
+bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_button_options o) {
+    cui_design_metrics design;
+    if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
+        !cui_button_shape_valid(o))
+        return false;
+    bool inert = o.disabled || o.loading;
+    cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
+    cui_interaction interaction = cui_interact(
+        ui, id, o.variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON, accessible, inert,
+        o.toggle_semantics && o.toggled, o.toggle_semantics && o.toggled ? 1 : 0);
+    cui_button_metadata(ui, id, t, name, o, interaction);
+    bool activated = false;
+    size_t count = 0;
+    cui_frame_events(ui, &count);
+    for (size_t e = 0; e < count; e++)
+        if (cui_event_accepted_activation(ui, e) == id) {
+            activated = true;
+            if (o.on_click)
+                o.on_click(o.action_user);
+        }
+    cui_button_paint_state(ui, id, t, name, o, interaction);
+    cui_button_tooltip(ui, id, t, o);
+    return activated;
+}
+static bool cui_button_group_style_valid(cui_button_options o) {
+    cui_str strings[] = {o.leading,       o.trailing,     o.icon,
+                         o.trailing_icon, o.loading_icon, o.accessibility_label,
+                         o.tooltip};
+    for (size_t i = 0; i < sizeof strings / sizeof strings[0]; i++)
+        if (strings[i].length && !strings[i].data)
+            return false;
+    return o.variant >= CUI_BUTTON_PRIMARY && o.variant <= CUI_BUTTON_CUSTOM &&
+           o.size >= CUI_CONTROL_MEDIUM && o.size <= CUI_CONTROL_XSMALL && isfinite(o.width) &&
+           isfinite(o.height) && o.height >= 0 && isfinite(o.font_size) && o.font_size >= 0 &&
+           isfinite(o.icon_size) && o.icon_size >= 0 && isfinite(o.label_width) &&
+           o.label_width >= 0 && o.rounding >= CUI_BUTTON_ROUNDED_THEME &&
+           o.rounding <= CUI_BUTTON_ROUNDED_CUSTOM &&
+           (o.rounding != CUI_BUTTON_ROUNDED_CUSTOM || (isfinite(o.radius) && o.radius >= 0)) &&
+           cui_button_shape_valid(o);
+}
+bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                         const cui_button_group_styled_item *items, bool *selected, size_t count,
+                         cui_button_group_style_workspace *w,
+                         cui_button_group_style_options options, cui_button_group_result *out) {
+    if (out)
+        *out = (cui_button_group_result){0};
+    if (!ui || !id || !theme || !w || !cui_frame_is_submitting(ui) || w->behavior.active ||
+        w->composing || count > CUI_BUTTON_GROUP_MAX_ITEMS || (count && (!items || !selected)) ||
+        !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(theme->radius) ||
+        theme->radius < 0)
+        return false;
+    cui_theme snapshot = *theme;
+    const cui_theme *t = &snapshot;
+    cui_design_metrics metrics;
+    if (!cui_components_design(t, options.design_size, &metrics) ||
+        (options.override_size &&
+         (options.size < CUI_CONTROL_MEDIUM || options.size > CUI_CONTROL_XSMALL)) ||
+        (options.override_variant &&
+         (options.variant < CUI_BUTTON_PRIMARY || options.variant > CUI_BUTTON_CUSTOM)))
+        return false;
+    float box[] = {options.box.width, options.box.height, options.box.padding};
+    for (size_t i = 0; i < sizeof box / sizeof box[0]; i++)
+        if (!isfinite(box[i]) || (i == 2 && box[i] < 0))
+            return false;
+    uintptr_t a = (uintptr_t)w, b = (uintptr_t)selected;
+    if (count && b < a + sizeof *w && b + count * sizeof *selected > a)
+        return false;
+    if (count)
+        memmove(w->items, items, count * sizeof *items);
+    for (size_t i = 0; i < count; i++) {
+        cui_button_group_styled_item *child = &w->items[i];
+        cui_button_options *o = &child->options;
+        if (child->label.length && !child->label.data)
+            return false;
+        if (options.override_size)
+            o->size = options.size;
+        if (options.design_size != CUI_DESIGN_INHERIT)
+            o->design_size = options.design_size;
+        if (options.override_variant)
+            o->variant = options.variant;
+        o->compact |= options.compact;
+        o->outline |= options.outline;
+        o->disabled |= options.behavior.disabled;
+        o->selected = o->toggled = selected[i];
+        o->toggle_semantics = true;
+        if (!cui_button_group_style_valid(*o) ||
+            !cui_components_design(t, o->design_size, &metrics))
+            return false;
+        w->behavior.items[i] = (cui_button_group_item){
+            .id = child->id,
+            .label = o->accessibility_label.length ? o->accessibility_label : child->label,
+            .disabled = o->disabled,
+            .loading = o->loading,
+            .skip_tab = o->skip_tab,
+            .prevent_pointer_focus = o->prevent_pointer_focus,
+            .custom_cursor = o->custom_cursor,
+            .cursor = o->cursor,
+            .role = o->variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON,
+            .on_click = o->on_click,
+            .action_user = o->action_user};
+    }
+    w->composing = true;
+    bool passive = !cui_frame_sequence(ui) || options.box.inert || options.box.layout_only;
+    /* Begin semantics before opening the matching group layout box, as Button does. */
+    if (!passive && !cui_base_button_group_begin(ui, id, w->behavior.items, selected, count,
+                                                 &w->behavior, options.behavior)) {
+        if (w->behavior.active)
+            (void)cui_base_button_group_end(ui, &w->behavior);
+        w->composing = false;
+        return false;
+    }
+    cui_box box_options = options.box;
+    box_options.row = !options.behavior.vertical;
+    box_options.gap = 0;
+    cui_begin_box(ui, id, box_options);
+    for (size_t i = 0; i < count; i++) {
+        if (passive) {
+            w->behavior.interactions[i] = (cui_interaction){0};
+            continue;
+        }
+        cui_interaction interaction = cui_base_button_group_item(ui, &w->behavior, i);
+        cui_button_metadata(ui, w->items[i].id, t, w->items[i].label, w->items[i].options,
+                            interaction);
+    }
+    cui_button_group_result result = passive ? (cui_button_group_result){.valid = true}
+                                             : cui_base_button_group_end(ui, &w->behavior);
+    /* Freeze final controlled paint state before invoking any content callbacks. */
+    if (!passive)
+        for (size_t i = 0; i < count; i++)
+            w->items[i].options.selected = w->items[i].options.toggled = selected[i];
+    if (result.valid)
+        for (size_t i = 0; i < count; i++) {
+            cui_button_group_styled_item child = w->items[i];
+            cui_button_options o = child.options;
+            if (passive && o.state) {
+                w->passive_states[i] = *o.state;
+                o.state = &w->passive_states[i];
+            }
+            if (count > 1) {
+                float radius = o.rounding == CUI_BUTTON_ROUNDED_NONE     ? 0
+                               : o.rounding == CUI_BUTTON_ROUNDED_SMALL  ? t->radius * .5f
+                               : o.rounding == CUI_BUTTON_ROUNDED_LARGE  ? t->radius * 2
+                               : o.rounding == CUI_BUTTON_ROUNDED_CUSTOM ? o.radius
+                                                                         : t->radius;
+                bool first = i == 0, last = i + 1 == count, vertical = options.behavior.vertical;
+                o.custom_corners = true;
+                o.corner_radii =
+                    (cui_corner_radii){.top_left = first ? radius : 0,
+                                       .top_right = (vertical ? first : last) ? radius : 0,
+                                       .bottom_left = (vertical ? last : first) ? radius : 0,
+                                       .bottom_right = last ? radius : 0};
+                float width = w->behavior.interactions[i].focus_visible && !o.hide_focus_ring ? 2
+                              : o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK ||
+                                      o.variant == CUI_BUTTON_TEXT
+                                  ? 0
+                                  : 1;
+                o.custom_border_edges = true;
+                o.border_edges = (cui_border_edges){.left = (vertical || first) ? width : 0,
+                                                    .top = (!vertical || first) ? width : 0,
+                                                    .right = width,
+                                                    .bottom = width};
+            }
+            cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i]);
+            if (!passive)
+                cui_button_tooltip(ui, child.id, t, o);
+        }
+    cui_end_box(ui);
+    result.valid &= cui_last_error(ui) == CUI_OK;
+    w->composing = false;
+    if (out)
+        *out = result;
+    return result.valid;
 }
 bool cui_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool disabled) {
     return cui_button_ex(ui, id, t, name, (cui_button_options){.disabled = disabled});

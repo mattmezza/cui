@@ -106,11 +106,41 @@ typedef struct {
         toggled; /* Explicit checked/value metadata; selected remains paint-only. */
     bool custom_cursor;
     cui_cursor cursor; /* Applied with Core cursor-only setter; zero defaults unchanged. */
+    bool custom_corners, custom_border_edges;
+    cui_corner_radii corner_radii;
+    cui_border_edges border_edges; /* Finite nonnegative logical widths. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
+#include "cui_button_group.h"
+typedef struct {
+    cui_id id;
+    cui_str label;
+    cui_button_options options;
+} cui_button_group_styled_item;
+typedef struct {
+    cui_button_group_options behavior;
+    bool override_size, override_variant;
+    cui_control_size size;
+    cui_design_size design_size;
+    cui_button_variant variant;
+    bool compact, outline;
+    cui_box box; /* Orientation and zero segmented gap supplied by the group. */
+} cui_button_group_style_options;
+/* Bounded copied descriptor snapshot; borrowed Button states/content remain under
+ * existing Button lifetimes. Zero initialize; do not reuse during callbacks. */
+typedef struct {
+    cui_button_group_workspace behavior;
+    cui_button_group_styled_item items[CUI_BUTTON_GROUP_MAX_ITEMS];
+    cui_button_state passive_states[CUI_BUTTON_GROUP_MAX_ITEMS];
+    bool composing;
+} cui_button_group_style_workspace;
+bool cui_button_group_ex(cui_context *, cui_id, const cui_theme *,
+                         const cui_button_group_styled_item *, bool *selected, size_t count,
+                         cui_button_group_style_workspace *, cui_button_group_style_options,
+                         cui_button_group_result *result);
 /* Paint-only antialiased check glyph for composed selection indicators. */
 void cui_checkmark(cui_context *, float size, cui_color);
 /* Caller-owned, one stable state per Checkbox ID; no allocation or cleanup.

@@ -583,7 +583,8 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied."
+        "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied.",
+        "Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -649,6 +650,17 @@
             "tests/web/test_button_activation_blocker.py",
             "tests/web/test_button_blocker_scroll_scope.py",
             "docs/BUTTON_ACTIVATION_BLOCKING.md"
+          ]
+        },
+        {
+          "name": "bounded controlled joined button collections with ordered callbacks and finalized semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_group_base.c",
+            "tests/unit/test_button_group.c",
+            "tests/unit/test_button_callback_events.c",
+            "tests/integration/test_button_group_sdl.c",
+            "tests/web/test_button_collection_gallery.py"
           ]
         }
       ],
@@ -3420,7 +3432,8 @@
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
         "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
-        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Regex, formatting masks, password presentation and full content-type/lifecycle behavior remain incomplete; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md."
+        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Regex, formatting masks and full content-type/lifecycle behavior remain incomplete; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
+        "Opt-in hidden/revealed password and new-password purposes, scalar-bullet presentation, guarded clipboard, finalized focus generations, native SDL input hints and transient secure browser proxy pass headless/native/browser tests. Actual window-blur handler clears preedit DOM data. Physical OS autofill/privacy, all content purposes and complete accessibility remain unverified; see docs/PASSWORD_INPUT_STAGE2.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3504,6 +3517,18 @@
             "tests/unit/test_input_normalization.c",
             "docs/INPUT_NORMALIZATION.md",
             "tests/web/test_input_acceptance_gallery.py"
+          ]
+        },
+        {
+          "name": "bounded secure password presentation and finalized host configuration generations",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_password_input.c",
+            "tests/unit/test_secure_focus.c",
+            "tests/unit/test_secure_focus_generation.c",
+            "tests/integration/test_password_native.c",
+            "tests/integration/test_password_sdl3.c",
+            "tests/web/test_password_gallery.py"
           ]
         }
       ],
@@ -5934,9 +5959,10 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Seven chart families, bounded geometry, Sankey topology, measured axes, theme colors and current-frame hover have scoped tests. Full source layout, Gaussian shadows, arbitrary current-frame child layout and native mobile long-press remain unfinished; see docs/CHART.md.",
-        "Copied typed title/rows and opt-in appearance pass both consumers: rem typography, inherited line boxes, popover roles, mixed/transparent slots, boxed/bare placement and filled sigma-zero outside ring. The gallery exposes choices and copied callback usage. Gaussian shadow layers, arbitrary retained current-frame content, source wrapping and mobile long-press remain incomplete.",
-        "Value-owned motion and independent pointer clocks pass headless and actual WASM tests. Existing zero/AUTO Chart options retain legacy manual-hover compatibility; explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks. Legacy composition remains available; this does not certify complete layout/tooltip parity."
+        "Seven chart families, bounded geometry, Sankey topology, measured axes, theme colors and current-frame hover have scoped tests. Full source layout, inset shadows, arbitrary current-frame child layout and native mobile long-press remain unfinished; see docs/CHART.md.",
+        "Copied typed title/rows and opt-in appearance pass both consumers: rem typography, inherited line boxes, popover roles, mixed/transparent slots, boxed/bare placement and filled sigma-zero outside ring. The gallery exposes choices and copied callback usage. Inset shadows, arbitrary retained current-frame content, source wrapping and mobile long-press remain incomplete.",
+        "Value-owned motion and independent pointer clocks pass headless and actual WASM tests. Existing zero/AUTO Chart options retain legacy manual-hover compatibility; explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks. Legacy composition remains available; this does not certify complete layout/tooltip parity.",
+        "Bounded source-derived three-layer boxed-tooltip drop shadows pass both tooltip consumers and all five renderer consumers, including physical fractional clip masks and original corner radii. Uniform physical scales only for shadow frames; inset and native platform shader pixel identity are outside this proof. See docs/DROP_SHADOW.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -6036,6 +6062,17 @@
             "tests/web/test_chart_tooltip_appearance.py",
             "tests/web/test_chart_appearance_gallery.py",
             "docs/CHART_TOOLTIP_APPEARANCE.md"
+          ]
+        },
+        {
+          "name": "bounded layered boxed-tooltip drop shadows with atomic renderer preflight and physical clip masks",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_drop_shadow.c",
+            "tests/distribution/drop_shadow_effects.c",
+            "tests/integration/test_drop_shadow_adapters.c",
+            "tests/web/test_drop_shadow_canvas.py",
+            "tests/web/test_shadow_gallery.py"
           ]
         }
       ],

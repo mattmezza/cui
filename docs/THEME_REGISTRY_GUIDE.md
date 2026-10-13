@@ -101,8 +101,11 @@ unchanged. Revision overflow rejects. These are UI-thread APIs, not a concurrent
 registry: transaction atomicity does not imply cross-thread synchronization.
 
 Limits are explicit: 64 KiB JSON, 4096 parser nodes, depth 16, 127 UTF-8 bytes per
-owned name/font, eight shadows per elevation. Parsing stack is bounded (under
-2 MiB on usual 64-bit ABIs); avoid invoking it from a tiny host thread stack.
+owned name/font, eight shadows per elevation. Parsing uses one shared 64 KiB decode workspace and bounded node storage,
+with small recursive frames. An unoptimized GCC 64-bit build measures about
+232 KiB for the importer plus at most 17 parser frames; the full registry test
+passes with a 512 KiB stack. ABI/compiler overhead varies; avoid invoking imports
+from a tiny host thread stack. Windows default-stack Debug testing is required.
 Use caller heap/long-lived storage for large entry arrays and scratch. Geometry
 values are bounded to 1e6, text size/line height to 4096 and weight to 1..1000.
 These stricter CUI bounds reject atomically instead of truncating. The new module

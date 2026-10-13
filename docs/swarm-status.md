@@ -93,3 +93,8 @@ Combined native77, Chromium78, targeted visual checks, docs3 and quality gates p
 ### Validated component feedback batch cf11f39
 
 Native77, sanitizer75, WASI67, Chromium78, targeted visuals and quality pass. Portable source matches593bbb1. Stepper, calendar/date picker, choice/Command width, InputGroup, Message fixture and AlertDialog fixes are integrated. Public e6a5395 remains HTTPS78/fifteen-file verified until this batch is deployed and checked. Full parity remains incomplete; DataTable ordering/header polish is isolated work in progress.
+
+
+### Verified publication0b667d0 and active next21
+
+All six framework CI jobs and Pages pass. Direct HTTPS checks match all325 artifact files; public alignment, wheel scrolling, route position, all14 legacy design sizes, Sidebar clipping, HoverCard/Toolbar/TitleBar and Python/Node clipboard recipes pass. DatePicker locale/year selection passes28/28. Next21 warning native101/101 includes optional installed accessibility packaging, photo Avatar stacks and compact Message examples. Control audit promotes13 narrowly tested features; ledger is263 tested,4 implemented,54 not started, with0/78 verified families. Shared scrollbar appearance and RadioGroup are active isolated workers; contextual international text editing remains pending.

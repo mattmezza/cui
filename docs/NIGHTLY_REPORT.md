@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `2d291fe9741addc322a6e107e15d03bf97e0d650`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Published `main` source `0b667d07b258cbcb74cc8c279328027c1b69f71c`; all six framework CI jobs and Pages succeed, and all325 deployed files match the artifact. Active integration branch `integration/next21`, checkpoint `27063af`, passes warning native101/101. Avatar stacks, compact Message and optional accessibility packaging are integrated there; scrollbar appearance and RadioGroup remain isolated pending handoff. See [publication evidence](validation/published-0b667d0.txt) and the machine-readable checkpoint. No full family certification is claimed.
 
 ## Working architecture
 

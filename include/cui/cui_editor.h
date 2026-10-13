@@ -11,8 +11,19 @@ extern "C" {
 typedef size_t (*cui_editor_highlight_fn)(void *user, cui_str language, cui_str document,
                                           size_t start, size_t line_end, cui_color *color);
 typedef struct {
+    cui_str label, detail, insert_text;
+} cui_editor_completion_item;
+typedef struct {
+    const cui_editor_completion_item *items; /* Borrowed until close. */
+    size_t count, selected, replace_start, replace_end;
+    size_t cursor, anchor; /* Selection captured when the proposal was opened. */
+    uint64_t revision;
+    bool open;
+} cui_editor_completion_state;
+typedef struct {
     cui_edit *edit; /* Borrowed, must outlive this state. */
     cui_textarea_state view;
+    cui_editor_completion_state completion;
 } cui_editor_state;
 typedef struct {
     cui_textarea_options textarea;
@@ -20,8 +31,21 @@ typedef struct {
     cui_str language; /* Borrowed for the draw call. */
     cui_editor_highlight_fn highlight;
     void *highlight_user;
+    float completion_width; /* Maximum popup width; zero defaults to 320. */
+    size_t completion_rows; /* Zero defaults to eight; maximum 32 visible rows. */
 } cui_editor_options;
 bool cui_editor_state_init(cui_editor_state *, cui_edit *, cui_textarea_line *, size_t capacity);
+/* Host supplies validated UTF-8 items and one original document byte range.
+ * No copying/filtering/provider calls. Empty count closes the menu. Invalid
+ * input preserves both existing menu and document. Item bytes remain immutable
+ * and alive until the menu closes. Later document revisions dismiss it. */
+cui_edit_result cui_editor_show_completions(cui_editor_state *, const cui_editor_completion_item *,
+                                            size_t count, size_t replace_start, size_t replace_end);
+void cui_editor_cancel_completion(cui_editor_state *);
+cui_id cui_editor_completion_item_id(cui_id editor_id, size_t index);
+/* One atomic replace/history step. Failure preserves text/selection/history
+ * and leaves the current menu open, except that stale revisions dismiss it. */
+cui_edit_result cui_editor_accept_completion(cui_editor_state *);
 typedef cui_textarea_fold cui_editor_fold;
 /* Attach caller-owned ranges; edits detach them, requiring host refresh. */
 bool cui_editor_set_folds(cui_editor_state *, cui_editor_fold *, size_t count);

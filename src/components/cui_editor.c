@@ -41,6 +41,117 @@ static float cui_editor_gutter(cui_context *ui, cui_str document, float font, cu
     return cui_measure_text_ex(ui, (cui_str){digits, (size_t)length}, font, style).width + 16 +
            (fold_count ? 16 : 0);
 }
+static cui_edit_result cui_editor_completion_popup(cui_context *ui, cui_id id,
+                                                   const cui_theme *theme, cui_editor_state *editor,
+                                                   cui_editor_options options,
+                                                   cui_textarea_metrics metrics) {
+    cui_editor_completion_state *menu = &editor->completion;
+    cui_textarea_state *view = &editor->view;
+    if (!menu->open || cui_focused(ui) != id || options.textarea.disabled ||
+        options.textarea.readonly)
+        return CUI_EDIT_OK;
+    float row_height = metrics.line_height + 8;
+    if (view->viewport.w <= 0 || view->viewport.h < row_height + 4)
+        return CUI_EDIT_OK;
+    size_t rows = options.completion_rows ? options.completion_rows : 8;
+    size_t fitting = (size_t)floorf((view->viewport.h - 4) / row_height);
+    if (rows > fitting)
+        rows = fitting;
+    size_t first = menu->selected >= rows ? menu->selected - rows + 1 : 0;
+    size_t count = menu->count - first < rows ? menu->count - first : rows;
+    float width =
+        fminf(view->viewport.w, options.completion_width > 0 ? options.completion_width : 320);
+    float height = count * row_height + 4;
+    cui_edit_state caret = cui_edit_get_state(editor->edit);
+    cui_str text = cui_edit_get_text(editor->edit);
+    cui_textarea_line line = view->lines[view->caret_line];
+    float x = view->viewport.x +
+              cui_editor_prefix(ui, text, line, caret.cursor, metrics.font_size,
+                                options.textarea.text_style) -
+              view->scroll_x;
+    x = fmaxf(view->viewport.x, fminf(x, view->viewport.x + view->viewport.w - width));
+    float caret_y = view->viewport.y + view->caret_line * metrics.line_height - view->scroll_y;
+    float y = caret_y + metrics.line_height + 4;
+    if (y + height > view->viewport.y + view->viewport.h &&
+        caret_y - height - 4 >= view->viewport.y)
+        y = caret_y - height - 4;
+    y = fmaxf(view->viewport.y, fminf(y, view->viewport.y + view->viewport.h - height));
+    cui_id popup = id ^ UINT64_C(0x2b31c8fa65700394);
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    for (size_t i = 0; i < semantic_count; ++i)
+        if (semantics[i].id == id) {
+            cui_semantic_details details = semantics[i].details;
+            details.controls = popup;
+            details.expanded = true;
+            cui_set_semantic_details(ui, id, details);
+            break;
+        }
+    cui_begin_portal(ui, popup,
+                     (cui_box){.background = theme->surface,
+                               .border = theme->border,
+                               .border_width = 1,
+                               .radius = theme->radius,
+                               .padding = 2,
+                               .clip = true},
+                     (cui_rect){x, y, width, height}, 30);
+    cui_interact(ui, popup, CUI_ROLE_LISTBOX, cui_string("Code completions"), false, false, 0);
+    cui_set_semantic_details(ui, popup, (cui_semantic_details){.parent = id, .no_focus = true});
+    size_t accepted = SIZE_MAX;
+    for (size_t i = first; i < first + count; ++i) {
+        const cui_editor_completion_item *item = &menu->items[i];
+        cui_id row = cui_editor_completion_item_id(id, i);
+        cui_begin_box(
+            ui, row,
+            (cui_box){.width = -1,
+                      .height = row_height,
+                      .fixed_height = true,
+                      .row = true,
+                      .padding = 4,
+                      .gap = 8,
+                      .clip = true,
+                      .background = i == menu->selected ? theme->selection : (cui_color){0}});
+        cui_interaction interaction =
+            cui_interact(ui, row, CUI_ROLE_OPTION, item->label, false, i == menu->selected, 0);
+        cui_set_semantic_details(ui, row,
+                                 (cui_semantic_details){.parent = popup,
+                                                        .selected = i == menu->selected,
+                                                        .pos_in_set = (unsigned)i + 1,
+                                                        .set_size = (unsigned)menu->count,
+                                                        .no_focus = true,
+                                                        .pointer_activatable = true});
+        cui_set_tab_stop(ui, row, false);
+        if (interaction.activated)
+            accepted = i;
+        cui_begin_box(ui, row ^ UINT64_C(0x0eacf3958b100cea),
+                      (cui_box){.width = -1, .height = metrics.line_height, .clip = true});
+        cui_text_line(ui, item->label, metrics.font_size, theme->text, metrics.line_height,
+                      options.textarea.text_style);
+        cui_end_box(ui);
+        if (item->detail.length) {
+            float detail_width =
+                fminf(width * .45f, cui_measure_text_ex(ui, item->detail, metrics.font_size,
+                                                        options.textarea.text_style)
+                                        .width);
+            cui_begin_box(
+                ui, row ^ UINT64_C(0x3a84e1f926792cb5),
+                (cui_box){.width = detail_width, .height = metrics.line_height, .clip = true});
+            cui_text_line(ui, item->detail, metrics.font_size, theme->muted, metrics.line_height,
+                          options.textarea.text_style);
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    if (accepted != SIZE_MAX) {
+        menu->selected = accepted;
+        cui_edit_result result = cui_editor_accept_completion(editor);
+        cui_focus(ui, id);
+        cui_invalidate(ui);
+        return result;
+    }
+    return CUI_EDIT_OK;
+}
 cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                cui_editor_state *editor, cui_editor_options config) {
     if (!editor || !editor->edit || (config.language.length && !config.language.data))
@@ -48,12 +159,15 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     cui_edit *edit = editor->edit;
     cui_textarea_state *state = &editor->view;
     cui_textarea_options options = config.textarea;
+    bool had_bounds = state->initialized;
     cui_textarea_result result = {.error = CUI_TEXTAREA_INVALID};
     cui_textarea_metrics metrics;
     if (!ui || !id || !theme || !edit || !state ||
         !cui_textarea_measure(options, theme->font_size, &metrics) || !isfinite(options.width) ||
         !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
         options.rows > 65536 || options.min_rows > 65536 || options.max_rows > 65536 ||
+        !isfinite(config.completion_width) || config.completion_width < 0 ||
+        config.completion_width > 1000000 || config.completion_rows > 32 ||
         (options.placeholder.length && !options.placeholder.data))
         return result;
     if (options.design_size != CUI_DESIGN_INHERIT) {
@@ -85,7 +199,7 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         return result;
     state->viewport.w = width;
     state->viewport.h = fmaxf(0, height - 2 * py);
-    result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
+    result = cui_base_editor(ui, id, name, editor, config, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
     document = cui_edit_get_text(edit);
@@ -306,6 +420,20 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         result.selection_changed |= before_toggle.cursor != after_toggle.cursor ||
                                     before_toggle.anchor != after_toggle.anchor;
         cui_invalidate(ui); /* The next draw rebuilds the projected rows. */
+    }
+    if (editor->completion.open) {
+        if (had_bounds) {
+            cui_edit_state before_completion = cui_edit_get_state(edit);
+            cui_edit_result completion_error =
+                cui_editor_completion_popup(ui, id, theme, editor, config, metrics);
+            cui_edit_state after_completion = cui_edit_get_state(edit);
+            result.changed |= before_completion.revision != after_completion.revision;
+            result.selection_changed |= before_completion.cursor != after_completion.cursor ||
+                                        before_completion.anchor != after_completion.anchor;
+            if (completion_error != CUI_EDIT_OK)
+                result.edit_error = completion_error;
+        } else
+            cui_invalidate(ui); /* Anchor uses the first completed layout. */
     }
     return result;
 }

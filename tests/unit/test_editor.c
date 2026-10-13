@@ -377,7 +377,176 @@ static void narrow_editor_clipping(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void completion_model(void) {
+    char buffer[32] = "épr()";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 1024,
+                                                       .max_history_steps = 8});
+    cui_textarea_line lines[16];
+    cui_editor_state state;
+    assert(cui_editor_state_init(&state, edit, lines, 16));
+    cui_editor_completion_item items[] = {
+        {cui_string("print"), cui_string("function"), cui_string("print")}};
+    cui_edit_select(edit, 2, 4);
+    assert(cui_editor_show_completions(&state, items, 1, 2, 4) == CUI_EDIT_OK);
+    cui_editor_completion_state saved = state.completion;
+    assert(cui_editor_show_completions(&state, items, 1, 1, 4) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(!memcmp(&saved, &state.completion, sizeof saved));
+    cui_editor_completion_item invalid[] = {{cui_string("bad"), {0}, {"\x80", 1}}};
+    assert(cui_editor_show_completions(&state, invalid, 1, 2, 4) == CUI_EDIT_INVALID_UTF8);
+    assert(!memcmp(&saved, &state.completion, sizeof saved));
+    assert(cui_editor_accept_completion(&state) == CUI_EDIT_OK && !state.completion.open);
+    assert(!strcmp(buffer, "éprint()") && cui_edit_get_state(edit).cursor == 7);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "épr()"));
+    assert(cui_edit_get_state(edit).anchor == 2 && cui_edit_get_state(edit).cursor == 4);
+    assert(cui_editor_show_completions(&state, items, 1, 2, 4) == CUI_EDIT_OK);
+    assert(cui_edit_insert(edit, cui_string("changed")) == CUI_EDIT_OK);
+    char changed[32];
+    strcpy(changed, buffer);
+    assert(cui_editor_accept_completion(&state) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(!state.completion.open && !strcmp(buffer, changed));
+    cui_editor_completion_item large[] = {
+        {cui_string("large"),
+         {0},
+         cui_string("this completion replacement cannot fit into thirty two bytes")}};
+    assert(cui_editor_show_completions(&state, large, 1, 2, 9) == CUI_EDIT_OK);
+    cui_edit_state before = cui_edit_get_state(edit);
+    assert(cui_editor_accept_completion(&state) == CUI_EDIT_CAPACITY);
+    cui_edit_state after = cui_edit_get_state(edit);
+    assert(state.completion.open && before.revision == after.revision &&
+           before.cursor == after.cursor && before.anchor == after.anchor &&
+           before.can_undo == after.can_undo && before.can_redo == after.can_redo &&
+           !strcmp(buffer, changed));
+    cui_editor_cancel_completion(&state);
+    assert(!state.completion.items && !state.completion.count);
+    cui_edit_destroy(edit);
+}
+static void completion_popup(void) {
+    char buffer[256] = "pri()";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096,
+                                                       .max_history_steps = 16});
+    cui_textarea_line lines[32];
+    cui_editor_state state;
+    assert(cui_editor_state_init(&state, edit, lines, 32));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_editor_options o = cui_editor_default();
+    o.textarea.width = 300;
+    o.textarea.height = 200;
+    o.textarea.text_style.family = 7;
+    o.completion_rows = 3;
+    o.completion_width = 240;
+    cui_draw_list commands;
+    draw(ui, &state, o, &commands);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 3, 3);
+    char labels[10][16];
+    cui_editor_completion_item items[10];
+    for (size_t i = 0; i < 10; ++i) {
+        snprintf(labels[i], sizeof labels[i], "print%zu", i);
+        items[i] = (cui_editor_completion_item){cui_string(labels[i]), cui_string("function"),
+                                                cui_string(labels[i])};
+    }
+    assert(cui_editor_show_completions(&state, items, 10, 0, 3) == CUI_EDIT_OK);
+    draw(ui, &state, o, &commands);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    unsigned options = 0;
+    bool list = false;
+    for (size_t i = 0; i < count; ++i) {
+        if (sem[i].role == CUI_ROLE_OPTION) {
+            ++options;
+            assert(sem[i].details.set_size == 10 && sem[i].details.no_focus);
+        }
+        if (sem[i].role == CUI_ROLE_LISTBOX) {
+            list = true;
+            cui_rect bounds = cui_bounds(ui, sem[i].id);
+            assert(bounds.x >= state.view.viewport.x && bounds.y >= state.view.viewport.y &&
+                   bounds.x + bounds.w <= state.view.viewport.x + state.view.viewport.w &&
+                   bounds.y + bounds.h <= state.view.viewport.y + state.view.viewport.h);
+        }
+    }
+    assert(options == 3 && list && state.completion.selected == 0);
+    o.textarea.width = 180;
+    draw(ui, &state, o, &commands);
+    assert(state.completion.open);
+    sem = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (sem[i].role == CUI_ROLE_LISTBOX)
+            assert(cui_bounds(ui, sem[i].id).w <= state.view.viewport.w);
+    o.textarea.width = 300;
+    draw(ui, &state, o, &commands);
+
+    for (size_t i = 0; i < commands.count; ++i)
+        if (commands.commands[i].type == CUI_DRAW_TEXT)
+            assert(commands.commands[i].text_style.family == 7);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_UP}));
+    draw(ui, &state, o, &commands);
+    assert(state.completion.selected == 9 && cui_edit_get_state(edit).cursor == 3);
+    assert(cui_bounds(ui, cui_editor_completion_item_id(10, 9)).h > 0);
+    assert(cui_bounds(ui, cui_editor_completion_item_id(10, 0)).h == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    draw(ui, &state, o, &commands);
+    assert(state.completion.selected == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_DOWN}));
+    draw(ui, &state, o, &commands);
+    assert(state.completion.selected == 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    cui_textarea_result r = draw(ui, &state, o, &commands);
+    assert(r.changed && !state.completion.open && !strcmp(buffer, "print1()"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "pri()"));
+    assert(cui_editor_show_completions(&state, items, 10, 0, 3) == CUI_EDIT_OK);
+    draw(ui, &state, o, &commands);
+    cui_rect second = cui_bounds(ui, cui_editor_completion_item_id(10, 1));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = second.x + 8,
+                                           .y = second.y + 8,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    draw(ui, &state, o, &commands);
+    assert(state.completion.open && cui_focused(ui) == 10);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = second.x + 8,
+                                           .y = second.y + 8,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    r = draw(ui, &state, o, &commands);
+    assert(r.changed && !strcmp(buffer, "print1()") && !state.completion.open);
+    cui_edit_undo(edit);
+    cui_editor_show_completions(&state, items, 10, 0, 3);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+    draw(ui, &state, o, &commands);
+    assert(!state.completion.open && !strcmp(buffer, "pri()"));
+    cui_editor_show_completions(&state, items, 10, 0, 3);
+    cui_edit_select(edit, 2, 2);
+    draw(ui, &state, o, &commands);
+    assert(!state.completion.open);
+    cui_edit_select(edit, 3, 3);
+    cui_editor_show_completions(&state, items, 10, 0, 3);
+    o.textarea.readonly = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    draw(ui, &state, o, &commands);
+    assert(state.completion.open && !strcmp(buffer, "pri()"));
+    o.textarea.readonly = false;
+    o.completion_width = NAN;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(draw(ui, &state, o, &commands).error == CUI_TEXTAREA_INVALID);
+    assert(state.completion.open && !strcmp(buffer, "pri()"));
+    o.completion_width = 240;
+    draw(ui, &state, o, &commands);
+    cui_focus(ui, 10);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "x"}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    draw(ui, &state, o, &commands);
+    assert(!state.completion.open && !strcmp(buffer, "prix\n()"));
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    completion_model();
+    completion_popup();
     narrow_editor_clipping();
     folding();
     find_panel();

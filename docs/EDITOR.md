@@ -105,3 +105,48 @@ persistent range tracking is supplied. Array memory stays caller-owned and must
 remain alive and unmodified except for `collapsed` until detached. Selection
 motion remains scalar-based, and styled syntax callbacks receive original byte
 ranges of visible document rows.
+
+
+Host completions
+----------------
+
+`cui_editor_show_completions` borrows immutable UTF-8 label/detail/insertion
+items and one validated document byte replacement range. It selects the first
+item and opens the popup; zero items cancel it. The host owns fetching, language
+analysis, ranking, and filtering. No provider or LSP connection runs implicitly.
+The styled popup is shown while the editor owns focus. Up/Down cycle suggestions, primary Enter accepts,
+and Escape cancels. Tab retains the existing indentation behavior; it does not
+accept a suggestion. Pointer activation also accepts. Readonly/disabled views
+suppress the popup and acceptance without changing document text.
+
+The popup displays at most eight suggestions by default, keeping the selected
+one in view; `completion_rows` allows up to 32 and `completion_width` defaults
+to 320 pixels. It exposes a listbox with selected option semantics and retains
+editor focus during pointer selection. Labels and details use the complete
+configured code font. Positioning uses the last completed viewport layout;
+opening before the first layout requests another frame to obtain an anchor.
+The popup prefers below the caret and flips above when it fits inside the editor
+viewport. Width, visible-row count, and position are bounded to that viewport;
+a very small viewport without room for one item suppresses popup drawing while
+keyboard acceptance remains available. If neither side fits, the popup may
+cover the caret while staying inside the viewport. Global screen-edge placement
+outside the editor is not supplied.
+
+Acceptance uses `cui_edit_replace_range` as one atomic history step. Undo restores
+the original selection as well as text. Capacity or validation failure preserves
+text/selection/history and leaves the current menu open. Document revisions
+cancel stale suggestions; normal editing, cursor movement, focus moving to another
+control, or an outside pointer press also dismisses them. A host may refresh suggestions after those edits.
+Earlier queued text/navigation events run before any later acceptance attempt,
+so an old proposal cannot replace a newly typed prefix in that queue.
+Borrowed items must remain alive and unchanged until cancellation or acceptance;
+`cui_editor_cancel_completion` releases the references. A programmatic accept
+operates on the attached edit model independently of styled readonly settings,
+just like direct edit-model mutations.
+
+Verified completion scope includes UTF-8 range/item rejection, undo selection,
+capacity failure, stale revisions, bounded popup windows, code-style propagation,
+Up/Down wrap, keyboard and actual pointer acceptance, Escape, readonly behavior,
+invalid sizing, and queued typing followed by Enter. The frozen reference also
+supports asynchronous provider resolution, richer completion documentation,
+snippets, additional edits, and inline suggestions; these are not implemented.

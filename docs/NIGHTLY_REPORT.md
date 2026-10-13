@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Published `badef388` passes all six framework CI jobs and Pages after an unchanged-source retry for a Chromium startup crash. All379 public files match the artifact; Attachment62/62 passes across all14 sizes, densities, orientations, mobile pixels and real touch actions. See [publication evidence](validation/published-badef38.txt).
+Published `6b433362` passes all six framework CI jobs and Pages. All385 public files match the artifact; Attachment62/62 passes across all14 sizes, densities, orientations, mobile pixels and real touch actions. See [publication evidence](validation/published-6b43336.txt). The previous Chromium startup failure and unchanged-source retry remain recorded in [the older checkpoint](validation/published-badef38.txt).
 
 Frozen Next27 production `6e36b5a` passes native127/127, sanitizer122/122, WASI103/103, the complete78-story browser run and78 snippet compilations. Native includes the five GPU/Sokol/accessibility tests absent from this sanitizer configuration. Expanded sizes, Attachment62/62, source point-axis pixels, nested Tabs wheel/touch ownership, Chart real/controlled timing and existing native browser IME pass. New validated Input example passes desktop/390px typing, Unicode, rejected IME/cancel/recovery and text containment. Preserved first-run failures and corrected scheduling/focus/documentation assertions are described in [Next27 evidence](validation/gallery-next27.txt); production remains frozen throughout proof.
 

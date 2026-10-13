@@ -1,0 +1,10 @@
+Published source:6b433362a292362ed5aa910082b69d4bd5b53333
+Framework CI38453592998:all six jobs SUCCESS, including real macOS/Windows portable builds and Linux GCC/Clang native checks.
+Pages38453592819:SUCCESS, all deployment browser gates completed.
+Public URL:https://matteo.merola.co/cui/
+All385/385 HTTPS artifact files SHA256 match the deployed github-pages artifact.
+Published Attachment62/62 PASS:all14 design sizes, both densities/orientations, 390px containment, and actual Chromium touch pan/tap reaching the offscreen Open action.
+MAIN warning build/CTest124/124 PASS before push. The larger frozen isolated Next27 proof is described in gallery-next27.txt and tied to its exact production source.
+This publication does not certify full component parity or native physical touch hardware.
+Logs:/home/matteo/.cache/cui-validation/{ci,pages}-6b43336.json;published-6b43336-{files,attachment}.log;published-6b43336-attachment.json.
+Downloaded artifact:/home/matteo/.cache/cui-validation/release-6b43336-artifact/artifact.tar.

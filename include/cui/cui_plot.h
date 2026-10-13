@@ -300,6 +300,79 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+#define CUI_PLOT_SANKEY_NODE_LIMIT 256u
+#define CUI_PLOT_SANKEY_LINK_LIMIT 1024u
+typedef enum {
+    CUI_PLOT_SANKEY_JUSTIFY,
+    CUI_PLOT_SANKEY_LEFT,
+    CUI_PLOT_SANKEY_RIGHT,
+    CUI_PLOT_SANKEY_CENTER
+} cui_plot_sankey_align;
+typedef enum { CUI_PLOT_SANKEY_LINEAR, CUI_PLOT_SANKEY_SQRT } cui_plot_sankey_value_scale;
+typedef struct {
+    size_t source, target;
+    double value;
+} cui_plot_sankey_link;
+typedef struct {
+    size_t index, depth, height, layer, source_count, target_count;
+    double value, x0, y0, x1, y1;
+} cui_plot_sankey_node;
+typedef struct {
+    size_t index, source, target;
+    double value, y0, y1, width, source_width, target_width;
+} cui_plot_sankey_link_layout;
+typedef struct {
+    cui_plot_sankey_node *nodes;
+    cui_plot_sankey_link_layout *links;
+    size_t node_count, link_count, node_capacity, link_capacity;
+} cui_plot_sankey_graph;
+typedef struct {
+    cui_plot_rect extent;
+    double node_width, node_padding;
+    unsigned iterations;
+    cui_plot_sankey_align align;
+    cui_plot_sankey_value_scale value_scale;
+} cui_plot_sankey_options;
+typedef enum {
+    CUI_PLOT_SANKEY_NO_ERROR,
+    CUI_PLOT_SANKEY_MISSING_NODE,
+    CUI_PLOT_SANKEY_CIRCULAR_LINK
+} cui_plot_sankey_error_kind;
+typedef struct {
+    cui_plot_sankey_error_kind kind;
+    size_t node;
+} cui_plot_sankey_error;
+/* Source defaults24px width,8px padding,Justify,6 iterations,Linear,[0,0,1,1].
+ * Explicit zero width/padding/iterations are honored. Bounds finite with positive
+ * height/nonnegative width, coordinates<=16384; iterations<=100. */
+cui_plot_sankey_options cui_plot_sankey_defaults(void);
+/* Caller supplies output arrays/capacities; count metadata set only on success.
+ * No borrowed input after topology. Values finite/nonnegative; topology scales
+ * once, preserving scaled values in graph. Missing/cycle errors populate detail;
+ * every failure preserves graph and arrays. CAPACITY when bounded counts or
+ * caller storage insufficient. Empty graphs supported. */
+cui_plot_result cui_plot_sankey_topology(cui_plot_sankey_graph *, size_t node_count,
+                                         const cui_plot_sankey_link *, size_t link_count,
+                                         const cui_plot_sankey_options *, cui_plot_sankey_error *);
+/* Complete geometry from unmodified topology, reusing ranks/scaled values.
+ * value_scale is ignored here, as source layout_from does not rescale graph.
+ * Relayout may change extent/alignment/width/padding/iterations. Transactional. */
+cui_plot_result cui_plot_sankey_layout_from(cui_plot_sankey_graph *,
+                                            const cui_plot_sankey_options *);
+cui_plot_result cui_plot_sankey_layout(cui_plot_sankey_graph *, size_t node_count,
+                                       const cui_plot_sankey_link *, size_t link_count,
+                                       const cui_plot_sankey_options *, cui_plot_sankey_error *);
+/* Shared end-breadth calculation for adapters with caller-positioned nodes.
+ * Updates link y0/y1/source_width/target_width from current node y0/y1 and
+ * scaled values; nominal width and topology remain unchanged. Transactional.
+ * Models source compute_link_breadths, not an additional frozen public export. */
+cui_plot_result cui_plot_sankey_link_breadths(cui_plot_sankey_graph *);
+size_t cui_plot_sankey_layer_count(const cui_plot_sankey_graph *);
+/* Query adjacency in opposite-node y0 order with input-index ties, matching
+ * layout link ordering; topology coordinates y0=0 preserve input order. */
+cui_plot_result cui_plot_sankey_node_links(const cui_plot_sankey_graph *, size_t node,
+                                           bool outgoing, size_t *, size_t capacity,
+                                           size_t *required);
 /* Geometry consumed by the frozen sankey_link_path function. source_x is the
  * source node's right edge, target_x the target node's left edge. End widths
  * are independent (tapered ribbons); y coordinates are their centerlines. */

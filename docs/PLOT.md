@@ -410,3 +410,9 @@ Chart node/link geometry through `cui_plot_raster`. It preserves independent end
 widths, minimum painted width and source midpoint-X cubic controls. See the
 [source ribbon contract](PLOT_MODEL.md#source-sankey-ribbon-paths); this adds a
 path builder without a second graph/layout solver or renderer cache.
+
+The [shared Base Sankey graph model](PLOT_MODEL.md#shared-base-sankey-graph-model)
+now supplies topology, alignment and relayout independently of Chart. Use
+source-default options for standalone Plot; Chart adapters must preserve their
+own defaults and raw throughput reporting when migrating. The graph and tapered
+ribbon path are caller-owned math outputs, not an automatic styled Sankey widget.

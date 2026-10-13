@@ -452,12 +452,12 @@ exposes caller-owned Sankey node/link geometry via
 [`cui_chart.h`](../include/cui/cui_chart.h), with Chart options for alignment,
 linear/sqrt value scale and relaxation iterations. See
 [`CHART.md`](CHART.md) for the current Chart implementation and limits.
-Those APIs belong to the Chart layer and depend on its data/options contracts;
-the pure `cui_plot.h` module does not duplicate them or claim a standalone
-Sankey topology generator. The pure `cui_plot_sankey_link_path` now supplies the
-source ribbon path separately (see below). Adding another solver here would require a
-separate ownership/API decision rather than counting the existing Chart solver
-as full Plot parity.
+The pure model now exposes a shared Base graph solver plus the source ribbon
+path separately; see [the shared graph contract](#shared-base-sankey-graph-model).
+The original CUI Chart solver's math was extracted and audited against frozen
+Plot Sankey. Chart migration to the shared seam is coordinated by the integrator;
+until that adapter lands, callers may opt into the pure model directly. This
+avoids counting the older Chart API itself as standalone Plot parity.
 
 
 ## Bar alignments and grid quads
@@ -590,7 +590,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; no cache/Background |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
-| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | Pure `cui_plot_sankey_link_path` tapered ribbon builder available; no independent pure Plot graph/topology solver; Chart-specific options/data contracts are not automatically Plot parity |
+| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | Shared pure topology/layout/layout_from, adjacency queries, source defaults, scaled values and tapered ribbon path available; bounded capacities/strict finite nonnegative values and checked doubles differ; Chart migration coordinated separately |
 | `PlotAxis`, `AxisText`, `AxisLabelSide`, `AXIS_GAP`, `axis_gutter` | Axis defaults/layout/paint/ticks/gutter | Line visibility, default offsets/alignment/theme paint covered; font-scaled nondefault offsets differ; alpha-zero fallback differs from explicit source colors; dynamic Backgrounds absent |
 | `AxisLabelPlacement::{Outside,Inside}` | Application places labels/reserves gutters; Chart has its own layer | No standalone Plot placement enum or automatic gutter allocation; source PlotAxis itself only records position/side |
 | `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
@@ -815,6 +815,82 @@ int main(void) {
     assert(cui_plot_sankey_link_path(&link,1,(cui_plot_point){0,0},
                                     commands,5,&required)==CUI_PLOT_OK);
     assert(required==5 && commands[4].kind==CUI_PLOT_PATH_CLOSE);
+    return 0;
+}
+```
+
+## Shared Base Sankey graph model
+
+`cui_plot_sankey_topology`, `cui_plot_sankey_layout_from` and
+`cui_plot_sankey_layout` expose the frozen exported graph workflow without Core,
+Chart or platform dependencies. The implementation extracts the original CUI
+Chart C solver math into Base, with source-specific public contracts. This is
+shared solver provenance rather than a second independently invented layout
+algorithm. Chart adapter migration must preserve its existing defaults and raw
+throughput reporting; the pure model uses source defaults and scaled values.
+
+Caller graph storage contains node/link arrays and capacities. Inputs use node
+indices; topology copies and scales link values once, computes max(incoming,
+outgoing) node values, longest-path depth/height, structural adjacency counts,
+alignment and x coordinates. `cui_plot_sankey_link_breadths` factors the source
+internal end-width calculation for adapters that already have positioned nodes;
+it updates centers/end widths transactionally without changing nominal widths
+or topology. This is a shared Base operation, not an extra frozen export claim.
+Missing endpoints return INVALID with optional
+`CUI_PLOT_SANKEY_MISSING_NODE` and the missing index; cycles (including self links
+and zero-valued cycles) return INVALID with `CUI_PLOT_SANKEY_CIRCULAR_LINK`.
+Zero-valued links still count as edges. All graph arrays/counts remain unchanged
+on failure. Input buffers and the graph's two output arrays must be disjoint.
+
+Layout_from accepts an unmodified graph from topology/layout and reuses its
+ranks and already-scaled values, avoiding another topology sort. It recomputes
+alignment and geometry for the current extent/options. It does not rescale if
+value_scale changes, matching the frozen source. Node/source/target indices and
+rank consistency are checked; arbitrary edits to graph topology/value metadata
+are unsupported. `cui_plot_sankey_layer_count` returns zero for empty/invalid
+graphs. `cui_plot_sankey_node_links` queries incoming/outgoing link indices sorted
+by opposite node y0 with input-index ties; topology y0 zero gives input order.
+It replaces the source's allocated per-node vectors with bounded caller output.
+
+Defaults are node width 24px, padding 8px, Justify, six relaxation iterations,
+Linear scaling and extent[0,0,1,1]. Explicit zero width/padding/iterations stay
+zero, unlike the older Chart adapter's zero-selects-default policies. Alignment
+supports Left, Right, Center and Justify, including source structural-edge rules
+for isolated/zero-value nodes. Relaxation sorts neighbors, resolves collisions,
+centers each column, and alternates a .15-height stagger for equal-height
+single-node columns when slack permits. End widths independently fill each
+node side proportionally, including imbalanced and sqrt-scaled graphs. Nominal
+link width remains the global value-to-height scale, not a minimum painted width;
+apply that minimum through the ribbon path helper. Coordinates/indices/scaled
+values remain explicit in output, with no element tree or renderer cache.
+
+Bounds are 256 nodes/1024 links/100 iterations, finite nonnegative values and
+width/padding<=16384. Extent coordinates have absolute value<=16384, positive
+height and nonnegative width; node width may exceed the extent width, as with
+source defaults in its unit extent. Empty/all-zero/isolated graphs are supported.
+Sqrt scales once during topology. Negative/NaN/infinite values are rejected
+rather than inheriting unchecked source arithmetic. Checked double/long-double
+math may differ from source f32 rounding; unrepresentable totals/intermediates
+return OVERFLOW transactionally. Large per-call fixed scratch is stack-owned
+(approximately 300KiB at the deepest layout call); no allocations occur. Caller
+storage stays live while queried/drawn. No full Sankey widget or source-error
+formatting/owned-vector API equivalence is claimed.
+
+```c
+#include <assert.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    cui_plot_sankey_node nodes[3];
+    cui_plot_sankey_link_layout links[2];
+    cui_plot_sankey_graph graph={nodes,links,0,0,3,2};
+    const cui_plot_sankey_link input[]={{0,1,9},{1,2,4}};
+    cui_plot_sankey_options options=cui_plot_sankey_defaults();
+    options.value_scale=CUI_PLOT_SANKEY_SQRT;
+    assert(cui_plot_sankey_topology(&graph,3,input,2,&options,0)==CUI_PLOT_OK);
+    /* Measure labels against graph layers, then fix the available extent. */
+    options.extent=(cui_plot_rect){0,0,200,100};
+    assert(cui_plot_sankey_layout_from(&graph,&options)==CUI_PLOT_OK);
+    assert(graph.nodes[1].value==3 && graph.links[1].value==2);
     return 0;
 }
 ```

@@ -688,6 +688,146 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_sankey_large_chain(void) {
+    cui_plot_sankey_node nodes[256];
+    cui_plot_sankey_link_layout links[255];
+    cui_plot_sankey_link input[255];
+    for (size_t i = 0; i < 255; ++i)
+        input[i] = (cui_plot_sankey_link){i, i + 1, 1};
+    cui_plot_sankey_graph graph = {nodes, links, 0, 0, 256, 255};
+    cui_plot_sankey_options o = cui_plot_sankey_defaults();
+    o.extent = (cui_plot_rect){0, 0, 512, 128};
+    o.node_width = 2;
+    assert(cui_plot_sankey_layout(&graph, 256, input, 255, &o, NULL) == CUI_PLOT_OK);
+    assert(cui_plot_sankey_layer_count(&graph) == 256);
+    assert(nodes[0].height == 255 && nodes[255].depth == 255 && nodes[255].x1 == 512);
+    for (size_t i = 0; i < 255; ++i) {
+        assert(links[i].source == i && links[i].target == i + 1);
+        assert(close(links[i].source_width, 128) && close(links[i].target_width, 128));
+    }
+}
+static void test_sankey_graph(void) {
+    cui_plot_sankey_node nodes[8], old_nodes[8];
+    cui_plot_sankey_link_layout links[8], old_links[8];
+    memset(nodes, 0x5a, sizeof nodes);
+    memset(links, 0x5a, sizeof links);
+    cui_plot_sankey_graph graph = {nodes, links, 0, 0, 8, 8};
+    cui_plot_sankey_options o = cui_plot_sankey_defaults();
+    assert(o.node_width == 24 && o.node_padding == 8 && o.iterations == 6 &&
+           o.align == CUI_PLOT_SANKEY_JUSTIFY && o.value_scale == CUI_PLOT_SANKEY_LINEAR);
+    o.extent = (cui_plot_rect){10, 20, 110, 120};
+    o.node_width = 10;
+    cui_plot_sankey_link input[] = {{0, 1, 5}, {1, 2, 5}};
+    cui_plot_sankey_error error;
+    assert(cui_plot_sankey_topology(&graph, 3, input, 2, &o, &error) == CUI_PLOT_OK);
+    assert(graph.node_count == 3 && graph.link_count == 2 &&
+           error.kind == CUI_PLOT_SANKEY_NO_ERROR);
+    assert(nodes[0].depth == 0 && nodes[1].depth == 1 && nodes[2].depth == 2);
+    assert(nodes[0].height == 2 && nodes[2].height == 0 && nodes[1].value == 5);
+    assert(nodes[0].x0 == 10 && nodes[1].x0 == 55 && nodes[2].x0 == 100);
+    assert(nodes[0].source_count == 1 && nodes[1].target_count == 1);
+    assert(nodes[1].y0 == 0 && links[0].width == 0 && cui_plot_sankey_layer_count(&graph) == 3);
+    input[0].value = 999; /* topology owns copied values */
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_OK);
+    assert(nodes[0].y0 == 20 && nodes[0].y1 == 120 && links[0].source_width == 100);
+    assert(links[0].y0 == 70 && links[0].target_width == 100 && links[0].width == 100);
+    size_t order[8], required;
+    assert(cui_plot_sankey_node_links(&graph, 1, false, order, 8, &required) == CUI_PLOT_OK &&
+           required == 1 && order[0] == 0);
+    o.extent = (cui_plot_rect){0, 0, 200, 200};
+    o.align = CUI_PLOT_SANKEY_RIGHT;
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_OK);
+    assert(nodes[2].x0 == 190 && nodes[0].value == 5 && nodes[0].y1 == 200);
+    memcpy(old_nodes, nodes, sizeof nodes);
+    memcpy(old_links, links, sizeof links);
+    cui_plot_sankey_graph before = graph;
+    cui_plot_sankey_link cycle[] = {{0, 1, 1}, {1, 0, 1}};
+    assert(cui_plot_sankey_layout(&graph, 2, cycle, 2, &o, &error) == CUI_PLOT_INVALID);
+    assert(error.kind == CUI_PLOT_SANKEY_CIRCULAR_LINK);
+    assert(memcmp(nodes, old_nodes, sizeof nodes) == 0 &&
+           memcmp(links, old_links, sizeof links) == 0 &&
+           memcmp(&graph, &before, sizeof graph) == 0);
+    cui_plot_sankey_link missing[] = {{0, 9, 1}};
+    assert(cui_plot_sankey_topology(&graph, 3, missing, 1, &o, &error) == CUI_PLOT_INVALID &&
+           error.kind == CUI_PLOT_SANKEY_MISSING_NODE && error.node == 9);
+    assert(memcmp(nodes, old_nodes, sizeof nodes) == 0);
+    assert(cui_plot_sankey_layout(&graph, 9, NULL, 0, &o, &error) == CUI_PLOT_CAPACITY);
+    assert(memcmp(nodes, old_nodes, sizeof nodes) == 0);
+    o.iterations = 0;
+    o.node_padding = 0;
+    o.value_scale = CUI_PLOT_SANKEY_SQRT;
+    cui_plot_sankey_link split[] = {{0, 1, 9}, {0, 2, 16}, {1, 3, 4}, {2, 3, 25}};
+    assert(cui_plot_sankey_layout(&graph, 4, split, 4, &o, &error) == CUI_PLOT_OK);
+    assert(links[0].value == 3 && links[1].value == 4 && nodes[0].value == 7);
+    assert(nodes[1].value == 3 && nodes[2].value == 5 && nodes[3].value == 7);
+    assert(close(links[0].source_width + links[1].source_width, nodes[0].y1 - nodes[0].y0));
+    assert(close(links[0].target_width, nodes[1].y1 - nodes[1].y0));
+    assert(close(links[2].source_width, nodes[1].y1 - nodes[1].y0));
+    assert(close(links[2].target_width + links[3].target_width, nodes[3].y1 - nodes[3].y0));
+    double scaled = links[0].value;
+    o.value_scale = CUI_PLOT_SANKEY_LINEAR;
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_OK && links[0].value == scaled);
+    assert(cui_plot_sankey_node_links(&graph, 0, true, NULL, 0, &required) == CUI_PLOT_CAPACITY &&
+           required == 2);
+    assert(cui_plot_sankey_node_links(&graph, 0, true, order, 8, &required) == CUI_PLOT_OK);
+    assert(order[0] == 0 && order[1] == 1);
+    o.node_padding = 100;
+    o.iterations = 6;
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_OK);
+    assert(nodes[1].y1 <= nodes[2].y0 || nodes[2].y1 <= nodes[1].y0);
+    for (size_t i = 0; i < 4; ++i)
+        assert(nodes[i].y0 >= 0 && nodes[i].y1 <= 200);
+
+    double nominal = links[0].width;
+    nodes[0].y0 = 10;
+    nodes[0].y1 = 110;
+    assert(cui_plot_sankey_link_breadths(&graph) == CUI_PLOT_OK);
+    assert(close(links[0].source_width + links[1].source_width, 100) && links[0].width == nominal);
+    assert(close(links[0].y0, 10 + links[0].source_width / 2));
+    memcpy(old_links, links, sizeof links);
+    nodes[0].y1 = 0;
+    assert(cui_plot_sankey_link_breadths(&graph) == CUI_PLOT_INVALID);
+    assert(memcmp(old_links, links, sizeof links) == 0);
+    nodes[0].y1 = 110;
+    o.node_width = 0;
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_OK && nodes[0].x0 == nodes[0].x1);
+    cui_plot_sankey_link zeros[] = {{0, 1, 0}};
+    assert(cui_plot_sankey_layout(&graph, 3, zeros, 1, &o, &error) == CUI_PLOT_OK);
+    assert(nodes[0].layer == 0 && nodes[1].layer == 1 && nodes[2].layer == 1);
+    assert(links[0].source_width == 0 && links[0].target_width == 0);
+
+    cui_plot_sankey_link branch[] = {{0, 1, 1}, {1, 2, 1}, {0, 3, 1}};
+    const size_t expected[4][4] = {{0, 1, 2, 2}, {0, 1, 2, 1}, {0, 1, 2, 2}, {0, 1, 2, 1}};
+    for (size_t align = 0; align < 4; ++align) {
+        o.align = (cui_plot_sankey_align)align;
+        assert(cui_plot_sankey_topology(&graph, 4, branch, 3, &o, &error) == CUI_PLOT_OK);
+        for (size_t node = 0; node < 4; ++node)
+            assert(nodes[node].layer == expected[align][node]);
+    }
+    o.align = CUI_PLOT_SANKEY_JUSTIFY;
+    o.iterations = 0;
+    o.node_padding = 0;
+    o.node_width = 10;
+    cui_plot_sankey_link crossing[] = {{0, 2, 1}, {0, 3, 9}, {1, 2, 9}, {1, 3, 1}};
+    assert(cui_plot_sankey_layout(&graph, 4, crossing, 4, &o, &error) == CUI_PLOT_OK);
+    double initial = nodes[0].y0;
+    o.iterations = 6;
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_OK);
+    assert(fabs(nodes[0].y0 - initial) > 1e-4 || fabs(nodes[1].y0 - 100) > 1e-4);
+    memcpy(old_nodes, nodes, sizeof nodes);
+    memcpy(old_links, links, sizeof links);
+    cui_plot_sankey_link huge[] = {{0, 1, DBL_MAX}, {0, 2, DBL_MAX}};
+    assert(cui_plot_sankey_layout(&graph, 3, huge, 2, &o, &error) == CUI_PLOT_OVERFLOW);
+    assert(memcmp(nodes, old_nodes, sizeof nodes) == 0 &&
+           memcmp(links, old_links, sizeof links) == 0);
+    cui_plot_sankey_graph empty = {0};
+    assert(cui_plot_sankey_layout(&empty, 0, NULL, 0, &o, &error) == CUI_PLOT_OK);
+    assert(cui_plot_sankey_layer_count(&empty) == 0);
+    o.extent.y_max = NAN;
+    memcpy(old_nodes, nodes, sizeof nodes);
+    assert(cui_plot_sankey_layout_from(&graph, &o) == CUI_PLOT_INVALID);
+    assert(memcmp(nodes, old_nodes, sizeof nodes) == 0);
+}
 static void test_sankey_ribbon(void) {
     cui_plot_sankey_ribbon link = {10, 50, 20, 30, 4, 12};
     cui_plot_path_command path[5], old[5];
@@ -985,6 +1125,8 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
 int main(void) {
+    test_sankey_large_chain();
+    test_sankey_graph();
     test_sankey_ribbon();
     test_tooltip_cursor();
     test_source_arc_padding();

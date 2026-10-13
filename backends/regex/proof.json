@@ -1,0 +1,156 @@
+{
+  "kind": "optional_regex_production_proof",
+  "base": "e87ca88",
+  "portable_engine_commit": "d2165ff",
+  "source": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "default_rust_dependency": false,
+  "global_build_edits": false,
+  "full_input_claim": false,
+  "rust": "1.85.1",
+  "oracle": {
+    "compiled": 385,
+    "compile_rejections": 63,
+    "comparisons": 58520,
+    "per_match_allocations": 0,
+    "cache_failure_positions": 7,
+    "session_failure_positions": 8,
+    "source_admission_limit_guard": true
+  },
+  "native_consumer_ctest": {
+    "passed": 3,
+    "total": 3
+  },
+  "asan_ubsan": "C Core/engine/provider/control and leaks pass; Rust not sanitizer-instrumented",
+  "wasi": {
+    "zig": "0.16.0",
+    "target": "wasm32-wasi reactor + Rust wasm32-wasip1",
+    "wasmtime": "49.0.0",
+    "initialize": "_initialize; no _start",
+    "actual_composed_input": true
+  },
+  "browser": {
+    "chromium_revision": 1208,
+    "version": "145.0.7632.6",
+    "playwright": "1.58.0",
+    "actual_core_input_provider": true,
+    "real_cdp_ime": true,
+    "finalized_core_configuration": true
+  },
+  "limitations": [
+    "global optional OFF registration/install/amalgamation/CI integrator-owned",
+    "Linux native receipt only",
+    "parser/compile/Arc OOM process-fatal",
+    "WASI panic recovery unsupported",
+    "native default panic hook may print before catch",
+    "caller pointers/thread synchronization required",
+    "single-line/single-selection matcher integration",
+    "PikeVM runtime work not deadline bounded"
+  ],
+  "artifacts": {
+    "backends/regex/pin.json": {
+      "sha256": "87386064d6a2c7c08ffff263c77463bd1de90921eaa4f5463745007bc0adb7da"
+    },
+    "backends/regex/Cargo.lock": {
+      "sha256": "11ae843960fc449146894854d3ac2ee57c2410a3e35406ca45514b5357a11c11"
+    },
+    "backends/regex/cache.patch": {
+      "sha256": "9230e33b37e44fcfb1e6ae1fa0a425b7a7b76146f6c3537efed38364d4a172cb"
+    },
+    "backends/regex/src/lib.rs": {
+      "sha256": "f3e1d61d4ce4cc31f775f7c99d88565315a75670fbb6997f275dbae9aa263a03"
+    },
+    "backends/regex/src/tests.rs": {
+      "sha256": "49ff08a951b121a6a9b06bf642ab2fcbdbbd9625f08f7452fc40ebe70947f9fe"
+    },
+    "tests/integration/test_input_regex_control.c": {
+      "sha256": "a9ad6a5f7fd329ff57c7405995e464c4f34853344a362b16bfbacaf9ac4c7a7a"
+    },
+    "tests/unit/test_regex_provider.c": {
+      "sha256": "792d2b9f9c65953d088ce9c8e01a965215476415f117a8981600720e3eb91354"
+    },
+    "tests/web/fixtures/regex/index.html": {
+      "sha256": "ae83007768a5575446c8f1624483ce1d9bebb798c0b33e56b27e53326f045317"
+    },
+    "regex-provider-native-build.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-provider-native-build.log",
+      "sha256": "9afb0c212032d5d63da487ab58e781d9e02780ea0433c2fcacc2e5da33299a0c"
+    },
+    "regex-provider-wasi-build.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-provider-wasi-build.log",
+      "sha256": "864a403c7e4019c57865f1e520d32917837ead78abd6df5b8adf6739c7626f62"
+    },
+    "regex-provider-oracle.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-provider-oracle.log",
+      "sha256": "2439434f78c1e390f468c8640cd59f1da98a6a05dee0a21280304c5bced39875"
+    },
+    "regex-provider-browser-build.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-provider-browser-build.log",
+      "sha256": "6d7c4d154e0b846df10b896bf3b9db6da508e82996f1ca02991e7532114ad8fb"
+    },
+    "regex-provider-browser-test.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-provider-browser-test.log",
+      "sha256": "7cc68da260936fe1dbea09c1eba6d213635894ec6484158f06b2d2bf4e53a470"
+    },
+    "regex-provider-wasmtime-test.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-provider-wasmtime-test.log",
+      "sha256": "5bb5e74a90e453dd6d76f0b9b64fdc534e78f5778e0e467a4963be04670a7efe"
+    },
+    "regex-harness-config.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-harness-config.log",
+      "sha256": "c2094a1f5d2ccf5e42df3fe12d01c191d3a2afd1773e69476f6de4bf49d407c5"
+    },
+    "regex-harness-build.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-harness-build.log",
+      "sha256": "b0d10983814ae1bc4acbab11e56d4bf0cc638dbdebd6aeac01192f690c0d9a42"
+    },
+    "regex-harness-ctest.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-harness-ctest.log",
+      "sha256": "2bbd619adfc1a7eaad00e28fe4d0869f58868142b46725a026521b786f781797"
+    },
+    "actual_input_reactor": {
+      "path": "/dev/shm/cui-regex-production/browser/regex.wasm",
+      "bytes": 7978294,
+      "sha256": "f41e1b82830441bbc6ae7e2355c1732e300d2ac99ac34a52b7cc660eb3ac8a9e"
+    },
+    "regex-harness-asan-config.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-harness-asan-config.log",
+      "sha256": "ee0fc2485bd2697d7970612066f2ad4e9236e4dc467469b14abb33221cbae1ea"
+    },
+    "regex-harness-asan-build.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-harness-asan-build.log",
+      "sha256": "42e8ab5cf2ddefc026e0d561b4ba49b867bb9151f46f8037f660cf87203ffc89"
+    },
+    "regex-harness-asan-ctest.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-harness-asan-ctest.log",
+      "sha256": "d808e48b6aee48637ce9b0e9f41e366ed00128a38e6873da1cda89e08e2b61b4"
+    },
+    "regex-final-ctest.log": {
+      "path": "/home/matteo/.cache/cui-validation/regex-final-ctest.log",
+      "sha256": "65c65aab058b1794aeef31895c9cbc639e73797dec36c24e50cb6bd4e09dd5e9"
+    },
+    "scripts/build_regex.py": {
+      "sha256": "8fc3f5f0e48c59cedb2311ad807270ae7d83c3b0a1c3df382fc3e12969d5d1ea"
+    },
+    "include/cui/cui_regex.h": {
+      "sha256": "c97de0a5305afd807b71d764f8f880da1f9b0d64828476c517192952125260b5"
+    },
+    "tests/web/build_regex_fixture.py": {
+      "sha256": "4f66eb5eb138b093415ab6e6f7d7cc982fb01e3eccbb8dcc058d46136df90261"
+    },
+    "tests/web/test_input_regex.py": {
+      "sha256": "c89c12261c9b5ec2ca3f2cc2837ce170b7de10badb990eccaa2b29366c1ad865"
+    },
+    "tests/integration/test_regex_wasi.py": {
+      "sha256": "48abc05d0ddbbb3cdb531f1668f213bb746c6193b9d855241316293cde2ab33e"
+    }
+  },
+  "full_ctest": {
+    "passed": 155,
+    "total": 156,
+    "failure": "distribution: generated headers stale, integrator-owned"
+  },
+  "sanitizer_consumer_ctest": {
+    "passed": 3,
+    "total": 3
+  }
+}

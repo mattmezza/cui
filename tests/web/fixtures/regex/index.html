@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Actual CUI regex Input fixture</title>
+<canvas width="500" height="160"></canvas><pre id="state"></pre>
+<script type="module">
+import {createSecureInputBridge} from './secure_input.js';
+let memory, bridge;const dv=()=>new DataView(memory.buffer);
+const wasi={proc_exit:c=>{throw Error('WASI exit '+c)},fd_close:()=>8,fd_seek:()=>8,fd_fdstat_get:()=>8,
+ fd_write:(fd,vs,n,out)=>{let length=0;for(let i=0;i<n;i++)length+=dv().getUint32(vs+i*8+4,true);dv().setUint32(out,length,true);return 0},
+ environ_sizes_get:(a,b)=>{dv().setUint32(a,0,true);dv().setUint32(b,0,true);return 0},environ_get:()=>0,
+ random_get:(p,n)=>{crypto.getRandomValues(new Uint8Array(memory.buffer,p,n));return 0},
+ clock_time_get:(id,precision,out)=>{dv().setBigUint64(out,BigInt(Math.round(performance.now()*1e6)),true);return 0}};
+const module=await WebAssembly.compile(await(await fetch('regex.wasm')).arrayBuffer());
+const instance=await WebAssembly.instantiate(module,{wasi_snapshot_preview1:wasi});const e=instance.exports;memory=e.memory;e._initialize();
+if(e.regex_probe_run()!==0)throw Error('composed C fixture');e.regex_probe_init();
+const decode=(p,n)=>new TextDecoder().decode(new Uint8Array(memory.buffer,p,n));
+const withBytes=(bytes,fn)=>{const p=e.regex_probe_alloc(bytes.length+1);new Uint8Array(memory.buffer,p,bytes.length).set(bytes);dv().setUint8(p+bytes.length,0);try{return fn(p,bytes.length)}finally{e.regex_probe_free(p)}};
+const withText=(s,fn)=>withBytes(new TextEncoder().encode(s),fn);
+let error=0,lastKind='',events=[];
+const update=()=>{const value=decode(e.regex_probe_text(),e.regex_probe_length());document.querySelector('#state').textContent=JSON.stringify({value,error,flags:e.regex_probe_flags()});};
+bridge=createSecureInputBridge({parent:document.body,text:(bytes)=>{error=withBytes(bytes,(p,n)=>e.regex_probe_event(0,p,n,0,0));events.push('text');},composition:(kind,bytes,a,c)=>{lastKind=kind;events.push(kind);error=withBytes(bytes,(p,n)=>e.regex_probe_event(({start:1,update:2,commit:3,cancel:4})[kind],p,n,a,c));},key:event=>{let k=-1;if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z')k=event.shiftKey?1:0;else if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='y')k=1;else if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='a')k=6;else if(event.key==='Backspace')k=4;else if(event.key==='Delete')k=5;if(k<0)return false;error=e.regex_probe_key(k);return true;},focusLost:()=>{},changed:update});
+const sync=()=>bridge.sync({owner:e.regex_probe_config(0),generation:e.regex_probe_generation(),type:e.regex_probe_config(1),purpose:e.regex_probe_config(2),multiline:!!e.regex_probe_config(3)},{x:20,y:20,w:1,h:20});
+sync();update();
+window.probe={value:()=>decode(e.regex_probe_text(),e.regex_probe_length()),flags:()=>e.regex_probe_flags(),events:()=>events.slice(),error:()=>error,painted:s=>withText(s,p=>e.regex_probe_painted(p)),seed:s=>{withText(s,p=>e.regex_probe_seed(p));update()},pattern:s=>withText(s,p=>e.regex_probe_pattern(p)),selectAll:()=>e.regex_probe_select_all(),readonly:v=>{e.regex_probe_readonly(v);sync();update()},masked:v=>{e.regex_probe_masked(v);sync();update()},ready:true};
+</script>

@@ -1,0 +1,53 @@
+{
+  "source_reference": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "toolchain": {
+    "manifest_sha256": "1e7dae690cd12e27405a97e64704917489a27c650201bf47780a936055d67909",
+    "date": "2025-03-18",
+    "artifacts": {
+      "host": {
+        "url": "https://static.rust-lang.org/dist/2025-03-18/rust-1.85.1-x86_64-unknown-linux-gnu.tar.xz",
+        "sha256": "912c76f602f5f630138fca2388b2688c2c1aabcf823d71890b2b9155f743792e"
+      },
+      "wasi": {
+        "url": "https://static.rust-lang.org/dist/2025-03-18/rust-std-1.85.1-wasm32-wasip1.tar.xz",
+        "sha256": "98c0d9c141170c1cd26650fb853dba3fa08d454f1a440bc86073180d0fed4422"
+      }
+    }
+  },
+  "cache_patch_sha256": "9230e33b37e44fcfb1e6ae1fa0a425b7a7b76146f6c3537efed38364d4a172cb",
+  "crates": [
+    {
+      "name": "regex",
+      "version": "1.13.1",
+      "sha256": "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d",
+      "url": "https://static.crates.io/crates/regex/regex-1.13.1.crate"
+    },
+    {
+      "name": "regex-automata",
+      "version": "0.4.18",
+      "sha256": "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2",
+      "url": "https://static.crates.io/crates/regex-automata/regex-automata-0.4.18.crate"
+    },
+    {
+      "name": "regex-syntax",
+      "version": "0.8.11",
+      "sha256": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4",
+      "url": "https://static.crates.io/crates/regex-syntax/regex-syntax-0.8.11.crate"
+    },
+    {
+      "name": "aho-corasick",
+      "version": "1.1.5",
+      "sha256": "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba",
+      "url": "https://static.crates.io/crates/aho-corasick/aho-corasick-1.1.5.crate"
+    },
+    {
+      "name": "memchr",
+      "version": "2.8.3",
+      "sha256": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+      "url": "https://static.crates.io/crates/memchr/memchr-2.8.3.crate"
+    }
+  ],
+  "cargo_lock_sha256": "11ae843960fc449146894854d3ac2ee57c2410a3e35406ca45514b5357a11c11",
+  "rustc_commit": "4eb161250e340c8f48f66e2b929ef4a5bed7c181",
+  "license_choice": "MIT for crates with alternate licenses; Rust std/toolchain MIT/Apache notices and COPYRIGHT retained"
+}

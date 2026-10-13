@@ -97,8 +97,14 @@ xvfb-run -a build/system_theme --font /usr/share/fonts/noto/NotoSans-Regular.ttf
 `tests/integration/test_system_theme_app.c` compiles the same original example
 state/frame functions with its native entry point disabled. It tests actual
 Core button activation, palette changes, unknown/stale/invalid observations,
-explicit modes and bounded revision failure. Link it to `cui`; SDL headers are
-required because it includes the native example, but SDL runtime linkage is not
-required by this headless test. Native Xvfb smoke verifies the compiled renderer
+explicit modes and bounded revision failure. Link it only to `cui`; the headless translation excludes SDL headers and
+native entry-point code, so it remains portable and can run under WASI. Native Xvfb smoke verifies the compiled renderer
 and actual font capture; a physical desktop preference event remains outside this
 validation. The adapter's queued SDL notification test covers the notification path.
+
+At the adapter revision saturation boundary, the example still accepts a changed
+appearance with the same UINT64_MAX observation revision. Identical saturated
+observations remain idle. The separate application preference revision is checked
+before every transition; if that sequence itself reaches UINT64_MAX, further
+changes reject atomically and the native entry point exits with its update error.
+Repeated equal appearances at saturation cannot reveal distinct OS notifications.

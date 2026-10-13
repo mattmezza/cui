@@ -3,7 +3,9 @@
 #include "cui/cui_sdl3.h"
 #include "cui/cui_sidebar.h"
 #include "cui/cui_theme_registry.h"
+#ifndef CUI_SYSTEM_THEME_TEST
 #include <SDL3/SDL.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +50,8 @@ static bool app_observe(system_theme_app *app, cui_platform_appearance observati
         !(observation.capabilities & CUI_APPEARANCE_SYSTEM_THEME) || !observation.revision ||
         observation.revision < app->observation_revision)
         return false;
-    if (observation.revision == app->observation_revision)
+    if (observation.revision == app->observation_revision &&
+        (observation.revision != UINT64_MAX || observation.appearance == app->observed))
         return true;
     if (app->preferences.revision == UINT64_MAX)
         return false;

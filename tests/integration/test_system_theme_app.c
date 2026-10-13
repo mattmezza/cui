@@ -45,11 +45,19 @@ int main(void) {
     assert(app_observe(&app, observation(CUI_SYSTEM_APPEARANCE_DARK, 7)));
     list = app_frame(ui, &app, 900, 540, 0);
     assert(app.resolved.theme.dark && list.count && cui_last_error(ui) == CUI_OK);
+    /* A saturated adapter revision still exposes new appearance values. */
+    assert(app_observe(&app, observation(CUI_SYSTEM_APPEARANCE_LIGHT, UINT64_MAX)) &&
+           !app.resolved.theme.dark && app.observation_revision == UINT64_MAX);
+    revision = app.preferences.revision;
+    assert(app_observe(&app, observation(CUI_SYSTEM_APPEARANCE_LIGHT, UINT64_MAX)) &&
+           app.preferences.revision == revision);
+    assert(app_observe(&app, observation(CUI_SYSTEM_APPEARANCE_DARK, UINT64_MAX)) &&
+           app.resolved.theme.dark && app.preferences.revision == revision + 1);
     app.preferences.revision = UINT64_MAX;
     assert(!app_choose(&app, CUI_THEME_FORCE_LIGHT) &&
            app.selection.mode == CUI_THEME_FOLLOW_SYSTEM);
-    assert(!app_observe(&app, observation(CUI_SYSTEM_APPEARANCE_LIGHT, 8)) &&
-           app.observation_revision == 7);
+    assert(!app_observe(&app, observation(CUI_SYSTEM_APPEARANCE_LIGHT, UINT64_MAX)) &&
+           app.observation_revision == UINT64_MAX);
     cui_destroy(ui);
     return 0;
 }

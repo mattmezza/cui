@@ -143,7 +143,45 @@ static void design_sizes(void) {
     cui_destroy(ui);
 }
 
+static void narrow_default_label(void) {
+    cui_context *ui = cui_create((cui_config){.width = 390, .height = 600});
+    cui_theme theme = cui_theme_light();
+    cui_description_item item = {
+        .id = 100, .label = {"Created", 7}, .value = {"12 October 2026", 15}};
+    cui_description_options options = cui_description_options_default();
+    options.width = 272;
+    options.columns = 1;
+    options.design_size = CUI_DESIGN_XL;
+    assert(ui && cui_begin_frame(ui, 390, 600, .016f));
+    assert(cui_description_list(ui, 2, &theme, &item, 1, options));
+    cui_draw_list draw = cui_end_frame(ui);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    cui_rect label = {0}, value = {0};
+    for (size_t i = 0; i < count; i++) {
+        if (semantics[i].name.length == 7 && !memcmp(semantics[i].name.data, "Created", 7))
+            label = semantics[i].bounds;
+        if (semantics[i].name.length == 15 &&
+            !memcmp(semantics[i].name.data, "12 October 2026", 15))
+            value = semantics[i].bounds;
+    }
+    assert(label.w > 0 && label.w <= 120 && value.w > 0);
+    assert(value.x >= label.x + label.w && value.x + value.w <= 272);
+    assert(value.h > theme.font_size);
+    assert(draw.count > 0 && cui_last_error(ui) == CUI_OK);
+    options.width = 180;
+    assert(cui_begin_frame(ui, 390, 600, .016f));
+    assert(cui_description_list(ui, 2, &theme, &item, 1, options));
+    cui_end_frame(ui);
+    semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].name.length == 7 && !memcmp(semantics[i].name.data, "Created", 7))
+            assert(semantics[i].bounds.w < 90);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    narrow_default_label();
     design_sizes();
     grouping();
     layout();

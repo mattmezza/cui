@@ -196,6 +196,7 @@ static const cui_semantic *semantics;
 static size_t semantic_count;
 static bool checked, enabled = true, toggled;
 static int description_columns = 3, description_vertical, description_plain, description_size;
+static cui_scroll_state description_preview_scroll;
 static int status_right = 1, status_custom;
 static int resizable_vertical, resizable_disabled;
 static unsigned resizable_document;
@@ -206,6 +207,7 @@ static cui_carousel_geometry carousel_geometry[4];
 static unsigned carousel_changes;
 static int carousel_axis, carousel_looping;
 static cui_settings_state settings_state;
+static cui_scroll_state settings_preview_scroll;
 static cui_settings_page_state settings_pages_state[2];
 static char settings_search_buffer[96], settings_name_buffer[96] = "Ada";
 static char settings_number_buffer[64] = "15";
@@ -2419,6 +2421,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         composed_app_scene(ui, gallery_app, width, height);
         break;
     case 64: {
+        cui_design_metrics metrics;
+        bool scaled = design_size != CUI_DESIGN_INHERIT &&
+                      cui_design_measure(design_size, t.font_size / 16, &metrics);
+        float font = scaled ? metrics.font_size : t.font_size;
+        float padding = scaled ? metrics.padding_x : 8;
+        float label_need = cui_measure_text(ui, cui_string("Created"), font * .875f).width;
+        float value_need = fmaxf(cui_measure_text(ui, cui_string("October"), font).width,
+                                 cui_measure_text(ui, cui_string("Lovelace"), font).width);
+        float inner_width = fmaxf(width, fmaxf(label_need, value_need) + 2 * padding + 48);
+        bool pan = inner_width > width + 1;
+        cui_id pan_id = cui_id_from(ui, "description-horizontal-preview");
+        cui_scroll_options pan_options = {.width = width - 48,
+                                          .height = height - 48,
+                                          .content_width = inner_width - 48,
+                                          .content_height = height - 48,
+                                          .horizontal = true,
+                                          .wheel_step = 32,
+                                          .bar_thickness = 8};
+        if (pan && !cui_scrollable_begin(ui, pan_id, &t, &description_preview_scroll, pan_options))
+            break;
         cui_description_item items[] = {
             {.id = cui_id_from(ui, "description-owner"),
              .label = cui_string("Owner"),
@@ -2438,10 +2460,27 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.vertical = description_vertical != 0;
         options.unbordered = description_plain != 0;
         options.size = (cui_description_size)description_size;
-        options.width = width - 48;
+        options.width = inner_width - 48;
         options.name = cui_string("Project details");
         options.design_size = design_size;
+        if (options.width > 0) {
+            static const float design_fonts[] = {16, 12, 14, 16, 16, 18, 20, 24,
+                                                 30, 36, 48, 60, 72, 96, 128};
+            float font = design_fonts[design_size >= CUI_DESIGN_XS && design_size <= CUI_DESIGN_9XL
+                                          ? design_size
+                                          : 0] *
+                         t.font_size / 16;
+            unsigned fitting = (unsigned)(options.width / (font * 8 + 32));
+            if (fitting < 1)
+                fitting = 1;
+            if (options.columns > fitting)
+                options.columns = fitting;
+            if (font * 6 + 120 > options.width)
+                options.vertical = true;
+        }
         cui_description_list(ui, cui_id_from(ui, "description-list"), &t, items, 5, options);
+        if (pan)
+            cui_scrollable_end(ui, pan_id, &t, &description_preview_scroll, pan_options);
         break;
     }
     case 65: {
@@ -2694,6 +2733,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 72: {
+        cui_design_metrics metrics;
+        float font = design_size != CUI_DESIGN_INHERIT &&
+                             cui_design_measure(design_size, t.font_size / 16, &metrics)
+                         ? metrics.font_size
+                         : t.font_size;
+        float required =
+            fmaxf(cui_measure_text(ui, cui_string("Preferences"), font).width,
+                  cui_measure_text(ui, cui_string("Receive updates"), font * .875f).width);
+        float inner_width = fmaxf(width, required + 48 + font * 4);
+        bool pan = inner_width > width + 1;
+        cui_id pan_id = cui_id_from(ui, "settings-horizontal-preview");
+        cui_scroll_options pan_options = {.width = width - 48,
+                                          .height = height - 48,
+                                          .content_width = inner_width - 48,
+                                          .content_height = height - 48,
+                                          .horizontal = true,
+                                          .wheel_step = 32,
+                                          .bar_thickness = 8};
+        if (pan && !cui_scrollable_begin(ui, pan_id, &t, &settings_preview_scroll, pan_options))
+            break;
         cui_choice_item modes[] = {
             {cui_id_from(ui, "settings-standard"), cui_string("Standard"), false},
             {cui_id_from(ui, "settings-focused"), cui_string("Focused"), false},
@@ -2754,14 +2813,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .groups = &privacy_group,
                                      .count = 1}};
         cui_settings_options options = cui_settings_default();
-        options.width = width - 48;
+        options.width = inner_width - 48;
         options.height = height - 48;
-        options.sidebar_width = 220;
+        options.sidebar_width = options.width < 400 ? 160 : 220;
         options.size = (cui_settings_size)settings_size;
         options.design_size = design_size;
         options.variant = (cui_settings_variant)settings_variant;
         settings_result = cui_settings(ui, cui_id_from(ui, "settings-preview"), &t, pages, 2,
                                        &settings_state, options);
+        if (pan)
+            cui_scrollable_end(ui, pan_id, &t, &settings_preview_scroll, pan_options);
         break;
     }
     case 73: {

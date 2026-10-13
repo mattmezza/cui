@@ -263,13 +263,60 @@ function attachmentPreviewHeight(designScale){
   :Math.max(media,metadata);
  return Math.max(420,Math.ceil(card+6+8+48));
 }
+function buttonPreviewHeight(width, controlHeight){
+ const rows=width<600?6:3;
+ const spacing=Number($('design-spacing').value);
+ const gap=spacing<0?16:spacing*4;
+ // Preview padding, primary control, counter label, variant rows, and their gaps.
+ return Math.max(260,48+(rows+1)*controlHeight+26+(rows+1)*gap+16);
+}
+function descriptionPreviewHeight(width, scale, density){
+ if(!scale)return 360;
+ const fonts=[0,12,14,16,16,18,20,24,30,36,48,60,72,96,128];
+ const heights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
+ const lines=[0,16,20,24,24,28,28,32,36,40,48,60,72,96,128];
+ const paddings=[0,4,8,10,10,12,16,20,24,28,32,40,48,56,64];
+ const font=fonts[scale]*density,px=paddings[scale]*density,py=(heights[scale]-lines[scale])*density/2;
+ const available=Math.max(1,width-48),requested=Number($('description-columns').value);
+ const columns=Math.max(1,Math.min(requested,Math.floor(available/(font*8+32))));
+ const vertical=Boolean($('description-vertical').checked)||font*6+120>available;
+ const cell=Math.max(1,available/columns-2*px-2);
+ const lineCount=(value,size,space)=>{
+  ctx.font=canvasFont(size,400,false,false,0);
+  let lines=1,run='';
+  for(const word of value.split(' ')){
+   const next=run?`${run} ${word}`:word;
+   if(run&&ctx.measureText(next).width>space){lines++;run=word}else run=next;
+  }
+  return lines;
+ };
+ const item=(label,value)=>{
+  const labelSpace=vertical?cell:Math.max(1,Math.min(120,cell/2)-2*px);
+  const valueSpace=vertical?cell:Math.max(1,cell-Math.min(120,cell/2)-2*px);
+  const labelHeight=lineCount(label,font*.875,labelSpace)*font*.875*1.618;
+  const valueHeight=lineCount(value,font,valueSpace)*font*1.618;
+  return (vertical?labelHeight+valueHeight:Math.max(labelHeight,valueHeight))+4*py+2;
+ };
+ const entries=[['Owner','Ada Lovelace'],['Team','Core UI'],['Status','In progress'],['Created','12 October 2026']];
+ const row=(a,b)=>columns===1?item(...entries[a])+item(...entries[b]):Math.max(item(...entries[a]),item(...entries[b]));
+ return Math.max(360,48+row(0,1)+8+row(2,3)+32);
+}
+function settingsPreviewHeight(scale,density){
+ if(!scale)return 640;
+ const fonts=[0,12,14,16,16,18,20,24,30,36,48,60,72,96,128];
+ const heights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
+ const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
+ const font=fonts[scale]*density;
+ // Search, two page entries, selected header, group heading, first setting and scroll room.
+ return Math.max(640,48+2*heights[scale]*density+12*font+8*gaps[scale]*density);
+}
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
  canvas.style.minWidth=selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.example?840:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+124):selected.name==='Alert'?540:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.example?840:selected.name==='Button'&&designScale>0?buttonPreviewHeight(width,designHeights[designScale]):selected.name==='Alert'?540:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);

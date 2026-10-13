@@ -1238,3 +1238,44 @@ at a nonconstant-S point is DEGENERATE; nonfinite arithmetic is OVERFLOW.
 Core mesh submission, background shaders, clipping, triangle-edge sampling and
 adapter resource caching remain integrator-owned renderer work. The software
 segment cache and this mesh preparation are separate representations.
+
+### Source Hsla and premultiplied path output
+
+`cui_plot_hsla_background` and `cui_plot_hsla_background_sample` provide the
+pinned path shader's separate color contract. Hsla fields are normalized finite
+float0..1. The source hue/chroma/lightness conversion produces RGB that the
+shader interprets as **linear**, unlike the existing encoded `cui_color` byte
+contract. Solid and pattern backgrounds use that linear RGB directly. A two-stop
+SRGB gradient encodes each endpoint, mixes encoded RGB and independent alpha,
+then decodes RGB. An Oklab gradient converts the linear endpoints to Lab, mixes
+Lab/alpha independently and converts back to linear RGB. Transparent endpoint
+RGB participates before final premultiplication; interpolation is not performed
+on premultiplied Lab values. Reversed stops and the checked equal-stop hard edge
+retain the existing portable rules.
+
+The sampler returns `cui_plot_linear_rgba` with RGB multiplied by both resulting
+alpha and explicit coverage0..1. This matches `fs_path_rasterization`, which
+always emits premultiplied path fragments. It performs no byte quantization,
+display transfer or gamut clipping: small out-of-gamut Oklab results remain
+visible to the consuming renderer. CPU double geometry/transforms with float
+output preserve the source equations, not GPU f32 instruction-level rounding.
+For black/white midpoint, opaque SRGB is approximately.214041 linear RGB and
+Oklab is.125; transparent black/opaque white also produces alpha.5 and therefore
+premultiplied RGB.107021/.0625 respectively. These differ intentionally from the
+encoded RGBA8 sampler's128/99 byte results.
+
+`cui_plot_raster_hsla` uses the same cached segment geometry, fill/stroke order,
+round-segment stroke coverage and bounded work as the byte rasterizer, but writes
+caller-owned **linear premultiplied float RGBA** pixels. Stride and capacity are
+in RGBA pixels (not bytes). Its clear input is already premultiplied, with finite
+RGB0..alpha and alpha0..1. Compositing uses `above + below*(1-above.alpha)` for
+both RGB and alpha. Gradient/Lab endpoint preparation happens once per shape;
+patterns preserve fractional alpha without intermediate byte rounding. All
+validation/capacity errors preserve the entire pixel output. Padding beyond the
+active width remains untouched. Input/geometry/background/output buffers must
+remain stable and disjoint during the call.
+
+This float route is usable preparation/reference output for native adapters,
+not a display buffer or automatic native Background command. Consumers choose
+their target transfer/format. It does not add Lyon curve tolerance, stroke
+joins/dashes, triangle-edge antialiasing or renderer resource caches.

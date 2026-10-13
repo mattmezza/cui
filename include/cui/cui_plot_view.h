@@ -181,6 +181,47 @@ cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned widt
                                             size_t stride, size_t capacity_bytes,
                                             const cui_plot_background_shape *, size_t count,
                                             cui_color clear);
+/* Shader-source color seam, distinct from encoded cui_color bytes. Hsla inputs
+ * are normalized0..1; source conversion interprets their RGB as linear. */
+typedef struct {
+    float h, s, l, a;
+} cui_plot_hsla;
+typedef struct {
+    float r, g, b, a;
+} cui_plot_linear_rgba;
+typedef struct {
+    cui_plot_hsla color;
+    double position;
+} cui_plot_hsla_stop;
+typedef struct {
+    cui_plot_background_kind kind;
+    cui_plot_color_space color_space;
+    cui_plot_hsla solid;
+    double angle;
+    cui_plot_hsla_stop from, to;
+    double pattern_width, pattern_interval, pattern_size;
+} cui_plot_hsla_background;
+/* Source short-axis projection, pattern rules and checked bounds as above.
+ * Coverage0..1 multiplies alpha. Output is linear premultiplied RGB, preserving
+ * shader out-of-gamut values without byte encoding/clamping. Not bit-identical
+ * GPU floating arithmetic. Invalid inputs preserve output. */
+cui_plot_result cui_plot_hsla_background_sample(const cui_plot_hsla_background *,
+                                                cui_plot_rect frame, cui_plot_point position,
+                                                double coverage, cui_plot_linear_rgba *out);
+typedef struct {
+    cui_plot_cached_path path;
+    cui_plot_rect background_frame;
+    cui_plot_hsla_background fill, stroke;
+    float stroke_width;
+} cui_plot_hsla_shape;
+/* Caller linear premultiplied float pixels, stride/capacity in RGBA pixels.
+ * Same geometry/work bounds as raster_backgrounds, fill then stroke source-over.
+ * Clear is already premultiplied, finite RGB0..alpha and alpha0..1. No encoding,
+ * display transfer, byte rounding, retained rendering or triangle-edge AA.
+ * Buffers stable/disjoint; errors preserve all pixels. */
+cui_plot_result cui_plot_raster_hsla(cui_plot_linear_rgba *pixels, unsigned width, unsigned height,
+                                     size_t stride, size_t capacity, const cui_plot_hsla_shape *,
+                                     size_t count, cui_plot_linear_rgba clear);
 /* Caller RGBA8 storage, straight alpha. Rasterizer accepts Move/Line/Cubic/Close;
  * use arc_flatten for ARC commands. Cubics use 16 uniform parameter chords.
  * Each shape <=4096 flattened segments, <=64 shapes, dimensions1..1024,

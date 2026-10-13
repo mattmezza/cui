@@ -1286,7 +1286,112 @@ static void source_backgrounds(void) {
            CUI_PLOT_INVALID);
     assert(memcmp(before, pixels, sizeof pixels) == 0 && builder.builds == 1);
 }
+static void hsla_backgrounds(void) {
+    cui_plot_rect frame = {0, 0, 8, 8};
+    cui_plot_hsla_background bg = {.solid = {0, 1, .5f, .5f}};
+    cui_plot_linear_rgba c, saved;
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){4, 4}, .5, &c) ==
+           CUI_PLOT_OK);
+    assert(fabs(c.r - .25) < 1e-6 && c.g == 0 && c.b == 0 && c.a == .25f);
+    bg.solid = (cui_plot_hsla){1.f / 3, 1, .5f, 1};
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){4, 4}, 1, &c) ==
+           CUI_PLOT_OK);
+    assert(fabs(c.g - 1) < 1e-6 && fabs(c.r) < 1e-6 && fabs(c.b) < 1e-6);
+    bg = (cui_plot_hsla_background){.kind = CUI_PLOT_BACKGROUND_LINEAR,
+                                    .angle = 90,
+                                    .from = {{0, 0, 0, 0}, 0},
+                                    .to = {{0, 0, 1, 1}, 1}};
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){4, 4}, 1, &c) ==
+           CUI_PLOT_OK);
+    /* Source: linear Hsla endpoints -> encoded sRGB mix -> linear premultiplied. */
+    assert(fabs(c.r - .1070205702) < 1e-6 && c.r == c.g && c.g == c.b && c.a == .5f);
+    bg.color_space = CUI_PLOT_COLOR_OKLAB;
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){4, 4}, 1, &c) ==
+           CUI_PLOT_OK);
+    assert(fabs(c.r - .0625) < 1e-6 && fabs(c.g - .0625) < 1e-6 && fabs(c.b - .0625) < 1e-6 &&
+           c.a == .5f);
+    bg.from.color = (cui_plot_hsla){0, 1, .5f, 0};
+    bg.to.color = (cui_plot_hsla){2.f / 3, 1, .5f, 1};
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){4, 4}, 1, &c) ==
+           CUI_PLOT_OK);
+    assert(fabs(c.r - .13186714) < 1e-5 && fabs(c.g - .04328584) < 1e-5 &&
+           fabs(c.b - .18141216) < 1e-5 && c.a == .5f);
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){0, 4}, 1, &c) ==
+           CUI_PLOT_OK);
+    assert(c.r == 0 && c.g == 0 && c.b == 0 && c.a == 0);
+    bg = (cui_plot_hsla_background){
+        .kind = CUI_PLOT_BACKGROUND_CHECKERBOARD, .solid = {0, 0, .5f, .123f}, .pattern_size = 2};
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){2.5, .5}, 1, &c) ==
+           CUI_PLOT_OK);
+    assert(fabs(c.r - .0615) < 1e-7 && fabs(c.a - .123) < 1e-7);
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){.5, .5}, 1, &c) ==
+               CUI_PLOT_OK &&
+           c.a == 0 && c.r == 0);
+    bg.kind = CUI_PLOT_BACKGROUND_SLASH;
+    bg.pattern_width = 2;
+    bg.pattern_interval = 2;
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){1, 0}, 1, &c) ==
+           CUI_PLOT_OK);
+    assert(c.a > .060 && c.a < .063 && fabs(c.r - c.a / 2) < 1e-7);
+    saved = c;
+    bg.solid.h = NAN;
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){1, 0}, 1, &c) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&c, &saved, sizeof c) == 0);
+    bg.solid.h = 0;
+    assert(cui_plot_hsla_background_sample(&bg, frame, (cui_plot_point){1, 0}, -1, &c) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(&c, &saved, sizeof c) == 0);
+    cui_plot_path_segment segments[] = {{{{0, 0}, {8, 0}}, true},
+                                        {{{8, 0}, {8, 8}}, true},
+                                        {{{8, 8}, {0, 8}}, true},
+                                        {{{0, 8}, {0, 0}}, true}};
+    cui_plot_hsla_shape shape = {.path = {segments, 4, {0, 0}},
+                                 .background_frame = frame,
+                                 .fill = {.solid = {0, 1, .5f, .5f}},
+                                 .stroke = {.solid = {2.f / 3, 1, .5f, .5f}},
+                                 .stroke_width = 2};
+    cui_plot_linear_rgba pixels[8 * 8], before[8 * 8];
+    assert(cui_plot_raster_hsla(pixels, 8, 8, 8, 64, &shape, 1, (cui_plot_linear_rgba){0}) ==
+           CUI_PLOT_OK);
+    assert(fabs(pixels[0].r - .25) < 1e-6 && fabs(pixels[0].b - .5) < 1e-6 && pixels[0].a == .75f);
+    assert(pixels[4 * 8 + 4].r == .5f && pixels[4 * 8 + 4].b == 0 && pixels[4 * 8 + 4].a == .5f);
+    shape.stroke_width = 0;
+    assert(cui_plot_raster_hsla(pixels, 8, 8, 8, 64, &shape, 1,
+                                (cui_plot_linear_rgba){0, 0, 1, 1}) == CUI_PLOT_OK);
+    assert(pixels[0].r == .5f && pixels[0].b == .5f && pixels[0].a == 1);
+    shape.fill = (cui_plot_hsla_background){.kind = CUI_PLOT_BACKGROUND_LINEAR,
+                                            .angle = 90,
+                                            .color_space = CUI_PLOT_COLOR_OKLAB,
+                                            .from = {{0, 0, 0, 1}, 0},
+                                            .to = {{0, 0, 1, 1}, 1}};
+    assert(cui_plot_raster_hsla(pixels, 8, 8, 8, 64, &shape, 1, (cui_plot_linear_rgba){0}) ==
+           CUI_PLOT_OK);
+    assert(fabs(pixels[4].r - pow(.5625, 3)) < 1e-6);
+    memcpy(before, pixels, sizeof pixels);
+    shape.fill.from.position = NAN;
+    assert(cui_plot_raster_hsla(pixels, 8, 8, 8, 64, &shape, 1, (cui_plot_linear_rgba){0}) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(before, pixels, sizeof pixels) == 0);
+    cui_plot_linear_rgba padded[6];
+    for (size_t i = 0; i < 6; i++)
+        padded[i] = (cui_plot_linear_rgba){.25f, .25f, .25f, .5f};
+    assert(cui_plot_raster_hsla(padded, 2, 2, 3, 6, NULL, 0, (cui_plot_linear_rgba){0}) ==
+           CUI_PLOT_OK);
+    assert(padded[0].a == 0 && padded[1].a == 0 && padded[3].a == 0 && padded[4].a == 0);
+    assert(padded[2].a == .5f && padded[5].r == .25f);
+    assert(cui_plot_raster_hsla(padded, 1, 2, SIZE_MAX / 2, SIZE_MAX, NULL, 0,
+                                (cui_plot_linear_rgba){0}) == CUI_PLOT_INVALID);
+    shape.fill.from.position = 0;
+    assert(cui_plot_raster_hsla(pixels, 8, 8, 8, 63, &shape, 1, (cui_plot_linear_rgba){0}) ==
+           CUI_PLOT_CAPACITY);
+    assert(memcmp(before, pixels, sizeof pixels) == 0);
+    assert(cui_plot_raster_hsla(pixels, 8, 8, 8, 64, &shape, 1,
+                                (cui_plot_linear_rgba){1, 0, 0, 0}) == CUI_PLOT_INVALID);
+    assert(memcmp(before, pixels, sizeof pixels) == 0);
+}
 int main(void) {
+    hsla_backgrounds();
     source_backgrounds();
     software_backgrounds();
     styled_appearance();

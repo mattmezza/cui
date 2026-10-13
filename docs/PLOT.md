@@ -608,3 +608,16 @@ pinned analytic quadratic coverage formula for renderers receiving ST derivative
 Neither API submits UI or promises all Lyon stroke/fill behavior. See the
 [native contract](PLOT_MODEL.md#native-triangle-preparation-and-coverage) for
 transaction rules, bounds, coverage semantics and remaining renderer work.
+
+## Shader-source float colors
+
+Use `cui_plot_hsla_background_sample` when matching the source path shader's
+linear premultiplied color output. Its normalized Hsla inputs are converted to
+linear RGB; SRGB gradients encode/mix/decode, while Oklab gradients mix Lab.
+Alpha and supplied coverage multiply RGB only after color interpolation.
+`cui_plot_raster_hsla` applies those backgrounds to cached fill/stroke geometry
+and writes a caller-owned linear premultiplied float buffer. Stride/capacity are
+measured in RGBA pixels. The encoded byte rasterizer remains a separate route;
+choose a display transfer/format explicitly when consuming the float output.
+See the [source color contract](PLOT_MODEL.md#source-hsla-and-premultiplied-path-output)
+for transparent colors, checked bounds and compositing semantics.

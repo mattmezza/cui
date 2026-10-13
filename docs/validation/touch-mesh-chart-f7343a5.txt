@@ -1,0 +1,21 @@
+Portable source freeze: f7343a5f1650eda6cd539ea568c0ba412261ace7
+Portable SHA256: e877a784efc403a4b75d9f6b68f718d5e2f17d9925c63ba699f41ba9d9f237fb
+Runner-only finite fuel adjustment follows as a949b1c; C source fingerprint unchanged.
+
+Native warning build + CTest90/90 PASS; actual Intel Vulkan and Mesa OpenGL pixel readback included.
+ASan/UBSan90/90 PASS, including native GPU; ASAN_OPTIONS=detect_leaks=0 for driver lifetime allocations. This does not establish leak detection for this profile.
+WASI initial74/75: Choice exhausted30B fuel during repeated context creation.
+Identical Choice module measured30,484,390,481 instructions and passed finite60B diagnostic run.
+All75 identical frozen modules subsequently PASS at the new finite40B default, all assertions preserved, no filesystem/environment grants.
+Chromium full78stories +78compiled excerpts PASS.
+Real CDP touchscreen suite PASS: taps/drag cancellation, exact pixel pan and two-contact opt-in zoom.
+Extensions78guides/effects/typography/motion/composed app PASS.
+Docs5, usage5, sharing3, format/distribution/manifest/license/theme/shader checks PASS.
+
+Preserved logs: /home/matteo/.cache/cui-validation/next15-final-{native-build,native-test,asan-config,asan-build,asan-test,wasi,web-build,touch,browser,extensions}.log
+Fuel evidence: next15-wasi-choice-fuel.log and next15-wasi-runtime40.log.
+Static checks: next15-{docs,usage,sharing,quality,shaders}-final.log.
+
+Core contact/device routing, queue-bound cancellation, nested scroll handoff, divider/slider/scrollbar/Dock drag priority and state/cursor hooks are tested subsets. Physical-device and complete78family touch coverage, inertia and custom RGBA cursors remain absent.
+Native/software mesh paint is uniform and byte-domain composited; gradient/native styled path routing and linear-light targets remain incomplete. Bounded complex fill/stroke geometry is not exact Lyon topology.
+Whole-family verification remains0/78. Publication pending at this checkpoint.

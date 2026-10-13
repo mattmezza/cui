@@ -897,12 +897,16 @@
         "cui_input_state"
       ],
       "state_ownership": "Caller retains cui_edit and its backing buffer; cui_input_ex additionally uses caller-owned cui_input_state.",
-      "interaction": "cui_input_result reports input changes and submission.",
+      "interaction": "cui_input_result reports changed, submitted, rejected and errors. Optional whole-value validate callback decides whether a proposed edit is accepted.",
       "usage": "Create an editor once; submit it each frame and perform application submission only on the result event.",
       "docs": [
-        "docs/INPUT.md"
+        "docs/INPUT.md",
+        "docs/INPUT_ACCEPTANCE.md",
+        "docs/INPUT_NORMALIZATION.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_edit_accept_fn"
+      ],
       "scope": "styled frame component",
       "name": "Input",
       "public_header": "include/cui/cui_components.h",

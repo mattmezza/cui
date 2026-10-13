@@ -2949,6 +2949,7 @@ struct cui_edit {
     size_t column_capacity, column_count;
     cui_edit_column_snapshot *column_history;
     cui_edit_acceptance acceptance;
+    cui_edit_normalization normalization;
     bool callback_active, acceptance_violation, acceptance_rejected, acceptance_skip;
 };
 static bool cui_edit_private_callback_guard(const cui_edit *e) {
@@ -3902,6 +3903,48 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
     }
     return result;
 }
+static bool cui_edit_private_storage_overlap(const void *, size_t, const void *, size_t);
+/* Counting/removal operates on ASCII bytes only after UTF-8 validation. */
+static size_t cui_edit_private_normal_length(cui_str text, size_t end, bool strip) {
+    if (!strip)
+        return end;
+    size_t n = 0;
+    for (size_t i = 0; i < end; i++)
+        n += !strip || (text.data[i] != '\r' && text.data[i] != '\n');
+    return n;
+}
+static void cui_edit_private_normal_copy(char *destination, cui_str text, bool strip) {
+    if (!strip) {
+        if (text.length)
+            memcpy(destination, text.data, text.length);
+        return;
+    }
+    size_t n = 0;
+    for (size_t i = 0; i < text.length; i++)
+        if (!strip || (text.data[i] != '\r' && text.data[i] != '\n'))
+            destination[n++] = text.data[i];
+}
+cui_edit_result cui_edit_normalize_text(cui_str source, cui_edit_normalization policy,
+                                        char *destination, size_t capacity, cui_str *normalized) {
+    if (!destination || !normalized || !capacity || policy < CUI_EDIT_NORMALIZE_NONE ||
+        policy > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_storage_overlap(destination, capacity, source.data, source.length) ||
+        cui_edit_private_storage_overlap(destination, capacity, normalized, sizeof *normalized) ||
+        cui_edit_private_storage_overlap(source.data, source.length, normalized,
+                                         sizeof *normalized))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_valid_utf8(source))
+        return CUI_EDIT_INVALID_UTF8;
+    bool strip = policy == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    size_t length = cui_edit_private_normal_length(source, source.length, strip);
+    if (length >= capacity)
+        return CUI_EDIT_CAPACITY;
+    cui_edit_private_normal_copy(destination, source, strip);
+    destination[length] = 0;
+    *normalized = (cui_str){destination, length};
+    return CUI_EDIT_OK;
+}
 static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_t start,
                                                 size_t end) {
     if (e->token_count) {
@@ -3915,27 +3958,50 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     }
     if (!cui_edit_valid_utf8(text))
         return CUI_EDIT_INVALID_UTF8;
-    if (!cui_edit_private_accepted(e, text))
+    bool strip = !e->config.multiline && e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    if (!strip && !cui_edit_private_accepted(e, text))
         return CUI_EDIT_LINE_BREAK;
+    size_t length = cui_edit_private_normal_length(text, text.length, strip);
     size_t remaining = e->length - (end - start);
-    if (text.length > e->config.capacity - 1 - remaining)
+    if (length > e->config.capacity - 1 - remaining)
         return CUI_EDIT_CAPACITY;
-    if (!text.length && start == end)
+    if (!length && start == end)
         return CUI_EDIT_OK;
-    if (e->acceptance.validate && !e->config.multiline && !e->acceptance_skip) {
+    if (strip || (e->acceptance.validate && !e->config.multiline && !e->acceptance_skip)) {
         /* The opaque engine knows its entire workspace extent. */
         uintptr_t source = (uintptr_t)text.data, work = (uintptr_t)e->scratch;
         if (text.length &&
             (source >= work ? source - work < e->config.capacity : work - source < text.length))
             return CUI_EDIT_INVALID_ARGUMENT;
         memcpy(e->scratch, e->config.buffer, start);
-        if (text.length)
-            memcpy(e->scratch + start, text.data, text.length);
-        memcpy(e->scratch + start + text.length, e->config.buffer + end, e->length - end + 1);
+        cui_edit_private_normal_copy(e->scratch + start, text, strip);
+        memcpy(e->scratch + start + length, e->config.buffer + end, e->length - end + 1);
         cui_edit_result accepted = cui_edit_private_accept_value(
-            e, (cui_str){e->scratch, remaining + text.length}, cui_edit_get_text(e));
+            e, (cui_str){e->scratch, remaining + length}, cui_edit_get_text(e));
         if (accepted != CUI_EDIT_OK)
             return accepted;
+    }
+    if (strip) {
+        e->preferred_column_valid = false;
+        if (length == end - start &&
+            (!length || !memcmp(e->config.buffer + start, e->scratch + start, length))) {
+            e->cursor = e->anchor = start + length;
+            cui_edit_private_collapse_selections(e);
+            cui_edit_private_save_state(e);
+            return CUI_EDIT_OK;
+        }
+        cui_edit_private_save_state(e);
+        memcpy(e->config.buffer, e->scratch, remaining + length + 1);
+        e->length = remaining + length;
+        e->cursor = e->anchor = start + length;
+        cui_edit_private_collapse_selections(e);
+        cui_edit_private_detach_tokens(e);
+        e->revision++;
+        e->change_start = start;
+        e->change_revision = e->revision;
+        e->change_valid = true;
+        cui_edit_private_record(e);
+        return CUI_EDIT_OK;
     }
     e->preferred_column_valid = false;
     if (text.length == end - start &&
@@ -4342,8 +4408,10 @@ cui_edit_result cui_edit_type_selections(cui_edit *edit, cui_str text) {
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (!text.length || (text.data && memchr(text.data, '\n', text.length)) ||
-        (text.data && memchr(text.data, '\r', text.length))) {
+    bool strip =
+        !edit->config.multiline && edit->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    if (!text.length || (!strip && ((text.data && memchr(text.data, '\n', text.length)) ||
+                                    (text.data && memchr(text.data, '\r', text.length))))) {
         cui_edit_break_coalescing(edit);
         return cui_edit_replace_selections(edit, text);
     }
@@ -4744,8 +4812,10 @@ cui_edit_result cui_edit_type(cui_edit *edit, cui_str text) {
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (!text.length || (text.data && memchr(text.data, '\n', text.length)) ||
-        (text.data && memchr(text.data, '\r', text.length))) {
+    bool strip =
+        !edit->config.multiline && edit->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    if (!text.length || (!strip && ((text.data && memchr(text.data, '\n', text.length)) ||
+                                    (text.data && memchr(text.data, '\r', text.length))))) {
         cui_edit_break_coalescing(edit);
         return cui_edit_insert(edit, text);
     }
@@ -5254,9 +5324,10 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
 static void cui_edit_private_compose_candidate(cui_edit *e, char *work, size_t start, size_t end,
                                                cui_str text) {
     memcpy(work, e->config.buffer, start);
-    if (text.length)
-        memcpy(work + start, text.data, text.length);
-    memcpy(work + start + text.length, e->config.buffer + end, e->length - end + 1);
+    bool strip = !e->config.multiline && e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    size_t length = cui_edit_private_normal_length(text, text.length, strip);
+    cui_edit_private_normal_copy(work + start, text, strip);
+    memcpy(work + start + length, e->config.buffer + end, e->length - end + 1);
 }
 static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit_composition *c,
                                                            cui_str text, size_t start, size_t end,
@@ -5264,7 +5335,11 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
                                                            bool commit) {
     if (!e->acceptance.validate || e->config.multiline)
         return CUI_EDIT_OK;
-    size_t length = e->length - (end - start) + text.length;
+    size_t length =
+        e->length - (end - start) +
+        cui_edit_private_normal_length(text, text.length,
+                                       !e->config.multiline &&
+                                           e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF);
     if (!work || length >= capacity)
         return CUI_EDIT_CAPACITY;
     if (cui_edit_private_storage_overlap(text.data, text.length, work, capacity))
@@ -5352,7 +5427,8 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
     }
     if (!cui_edit_valid_utf8(text))
         return CUI_EDIT_INVALID_UTF8;
-    if (!state.multiline)
+    bool strip = !state.multiline && e->normalization == CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF;
+    if (!state.multiline && !strip)
         for (size_t i = 0; i < text.length; i++)
             if (text.data[i] == '\n' || text.data[i] == '\r')
                 return CUI_EDIT_LINE_BREAK;
@@ -5364,13 +5440,18 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
         return CUI_EDIT_BOUNDARY;
     if (text.length >= c->capacity)
         return CUI_EDIT_CAPACITY;
+    size_t length = cui_edit_private_normal_length(text, text.length, strip);
+    v.composition_anchor = cui_edit_private_normal_length(text, v.composition_anchor, strip);
+    v.composition_cursor = cui_edit_private_normal_length(text, v.composition_cursor, strip);
     size_t start =
         c->active ? c->start : (state.anchor < state.cursor ? state.anchor : state.cursor);
     size_t end = c->active ? c->end : (state.anchor > state.cursor ? state.anchor : state.cursor);
+    if (start > end || end > state.length)
+        return CUI_EDIT_BOUNDARY;
     size_t remaining = state.length - (end - start);
-    if (remaining > SIZE_MAX - text.length - 1)
+    if (remaining > SIZE_MAX - length - 1)
         return CUI_EDIT_CAPACITY;
-    size_t needed = remaining + text.length + 1;
+    size_t needed = remaining + length + 1;
     char *grown = NULL;
     size_t grown_capacity = 0;
     if (v.type != CUI_EVENT_COMPOSITION_COMMIT) {
@@ -5439,8 +5520,11 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
         e->composition_view = grown;
         e->composition_view_capacity = grown_capacity;
     }
-    c->buffer[text.length] = 0;
-    c->length = text.length;
+    if (strip) {
+        cui_edit_private_normal_copy(c->buffer, (cui_str){c->buffer, text.length}, true);
+    }
+    c->buffer[length] = 0;
+    c->length = length;
     c->start = start;
     c->end = end;
     c->anchor = v.composition_anchor;
@@ -5520,9 +5604,12 @@ cui_edit_state cui_edit_composition_selection(const cui_edit *e, const cui_edit_
 cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request request,
                                                cui_edit_acceptance acceptance) {
     if (!e || cui_edit_private_callback_guard(e) || request.kind < CUI_EDIT_REQUEST_EVENT ||
-        request.kind > CUI_EDIT_REQUEST_COMPOSITION)
+        request.kind > CUI_EDIT_REQUEST_COMPOSITION ||
+        request.normalization < CUI_EDIT_NORMALIZE_NONE ||
+        request.normalization > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF)
         return (cui_edit_checked_result){CUI_EDIT_INVALID_ARGUMENT, false};
-    if (!acceptance.validate || e->config.multiline) {
+    if ((!acceptance.validate && request.normalization == CUI_EDIT_NORMALIZE_NONE) ||
+        e->config.multiline) {
         cui_edit_result legacy;
         switch (request.kind) {
         case CUI_EDIT_REQUEST_EVENT:
@@ -5546,6 +5633,7 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
     }
     cui_edit saved = *e;
     e->acceptance = acceptance;
+    e->normalization = request.normalization;
     e->acceptance_violation = e->acceptance_rejected = e->acceptance_skip = false;
     cui_edit_result result;
     switch (request.kind) {
@@ -5571,6 +5659,7 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         *e = saved;
     else {
         e->acceptance = saved.acceptance;
+        e->normalization = saved.normalization;
         e->acceptance_violation = saved.acceptance_violation;
         e->acceptance_rejected = saved.acceptance_rejected;
         e->acceptance_skip = saved.acceptance_skip;

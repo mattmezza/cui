@@ -2408,8 +2408,11 @@ def main():
             settled = page.evaluate('''()=>({frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))})''')
             after = page.evaluate('''async()=>{for(let i=0;i<4;i++)await new Promise(resolve=>requestAnimationFrame(resolve));return {frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))};}''')
             assert after == settled, (settled, after)
+            before_resume = page.evaluate('''()=>({frame:cuiGallery.frame,signature:JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))})''')
             page.emulate_media(reduced_motion='no-preference')
-            page.wait_for_function('cuiGallery.exports.gallery_redraw()===1')
+            # Loading motion is scheduled by next_wake, with no continuous redraw.
+            # Require a completed host-preference frame and actual changed paint.
+            page.wait_for_function('''before=>cuiGallery.frame>before.frame&&cuiGallery.renderedReducedMotion===false&&cuiGallery.exports.gallery_next_wake()>0&&JSON.stringify(Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>Array.from({length:12},(_,f)=>cuiGallery.exports.gallery_command(i,f))))!==before.signature''', arg=before_resume)
             page.evaluate('location.hash="Clipboard"')
             page.wait_for_function('document.querySelector("#name").textContent==="Clipboard" && cuiGallery.renderedComponent==="Clipboard"')
             page.wait_for_timeout(80)

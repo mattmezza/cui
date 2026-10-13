@@ -3403,7 +3403,7 @@
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
         "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
-        "Composed Input history, grapheme navigation, retained-state blur/rebind grouping and single-line Up/Down delegation have tests. Whole-value edit acceptance callbacks remain absent; explicit invalid semantics do not replace validation. See docs/INPUT_REFERENCE_CONTRACTS.md."
+        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Regex, formatting masks, password presentation and full content-type/lifecycle behavior remain incomplete; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3478,6 +3478,15 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_input.c"
+          ]
+        },
+        {
+          "name": "bounded opt-in single-line CR/LF normalization before acceptance with original IME endpoint mapping",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input_normalization.c",
+            "docs/INPUT_NORMALIZATION.md",
+            "tests/web/test_input_acceptance_gallery.py"
           ]
         }
       ],
@@ -5411,6 +5420,15 @@
             "tests/unit/test_choice.c",
             "docs/validation/gcc-tabs-scrollbar.txt"
           ]
+        },
+        {
+          "name": "accepted wheel/touch delta consumption and refused-delta ancestor deferral",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c",
+            "tests/web/test_tabs_scroll_chaining.py",
+            "docs/TABS_SCROLL_CHAINING.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5892,8 +5910,8 @@
       },
       "limitations": [
         "Basic rendering for seven chart families, bounded geometry, explicit Sankey topology, theme colors and pointer hover are tested. Source-complete axes, legends, tooltips, gradients, layout refinement and animation remain unfinished; see docs/CHART.md.",
-        "Chart appearance gates new tooltip entry by linear timeline completion and resumes a valid stationary pointer. Current-frame origin/occlusion, arbitrary tooltip layout and complete source owner motion remain unfinished; see docs/CHART_APPEARANCE_HOVER.md and docs/validation/core-prepaint-contract-next23.md.",
-        "Explicit value-owned appearance/enter/exit policies and independent owner pointer clocks have headless and actual WASM pixel tests. Legacy defaults remain; automatic current-frame geometry and arbitrary layout tooltip consumption are separate gaps."
+        "Appearance gates tooltip entry by linear completion and resumes stationary hover. Explicit CURRENT_FRAME consumes current layout, clipping and occlusion with deferred paint-only tooltips. Source point-axis geometry is opt-in for Line/Area. Complete typed/custom tooltip composition, native mobile long-press lifecycle and full source chart behavior remain incomplete; see docs/PLOT_CHART_CURRENT_FRAME.md and docs/CHART_SOURCE_POINT_AXIS.md.",
+        "Value-owned motion and independent pointer clocks pass headless and actual WASM tests. Existing zero/AUTO Chart options retain legacy manual-hover compatibility; explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks. Legacy composition remains available; this does not certify complete layout/tooltip parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5955,6 +5973,15 @@
             "tests/unit/test_plot_chart_prepaint.c",
             "tests/web/test_plot_chart_prepaint.py",
             "docs/PLOT_CHART_CURRENT_FRAME.md"
+          ]
+        },
+        {
+          "name": "opt-in source Line/Area point slots and shared18px axis geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart_source_point_axis.c",
+            "tests/web/test_chart_source_point_axis.py",
+            "docs/CHART_SOURCE_POINT_AXIS.md"
           ]
         }
       ],

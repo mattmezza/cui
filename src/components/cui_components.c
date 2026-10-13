@@ -1739,6 +1739,7 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
                                  .clipboard = options.clipboard,
                                  .validate = options.validate,
                                  .validate_user = options.validate_user,
+                                 .normalization = options.normalization,
                                  .delegate_up_down = options.delegate_up_down,
                                  .hit_test = multiline ? NULL : cui_input_cached_hit_test,
                                  .hit_test_user = &cached_hit});

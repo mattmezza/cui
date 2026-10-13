@@ -47,6 +47,15 @@ typedef struct {
     cui_edit_accept_fn validate;
     void *user;
 } cui_edit_acceptance;
+/* Opt-in source single-line CR/LF removal; zero preserves raw input. */
+typedef enum {
+    CUI_EDIT_NORMALIZE_NONE = 0,
+    CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF
+} cui_edit_normalization;
+/* Pure bounded seed helper. Disjoint source/destination/output storage required.
+ * Success appends NUL and borrows destination in normalized; failure writes none. */
+cui_edit_result cui_edit_normalize_text(cui_str source, cui_edit_normalization policy,
+                                        char *destination, size_t capacity, cui_str *normalized);
 typedef enum {
     CUI_EDIT_REQUEST_EVENT,
     CUI_EDIT_REQUEST_INSERT,
@@ -59,6 +68,7 @@ typedef struct {
     cui_str text;
     cui_edit_composition *composition;
     bool editable;
+    cui_edit_normalization normalization;
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;

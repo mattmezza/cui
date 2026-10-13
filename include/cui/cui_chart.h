@@ -17,6 +17,7 @@ typedef enum {
     CUI_CHART_CANDLESTICK,
     CUI_CHART_SANKEY
 } cui_chart_kind;
+typedef enum { CUI_CHART_LAYOUT_LEGACY, CUI_CHART_LAYOUT_SOURCE_POINT } cui_chart_layout_mode;
 typedef struct {
     cui_str label;
     double value, open, high, low, close;
@@ -241,6 +242,9 @@ typedef struct {
      * immutable pointer visibility. Rejects layout tooltip callbacks. Pure
      * formatter callbacks/user and state/data/pixels remain live through paint. */
     cui_plot_interaction_mode interaction_mode;
+    /* SOURCE_POINT opts Line/Area into the pinned 18px axis gutter and clamps
+     * point_count to at least count. Zero retains legacy 20px/error behavior. */
+    cui_chart_layout_mode layout_mode;
 } cui_chart_options;
 typedef struct {
     unsigned char *pixels; /* caller-owned RGBA8, width*height*4 bytes */
@@ -296,6 +300,12 @@ typedef struct {
     cui_str label;
     double value;
 } cui_chart_hit;
+/* Pure Line/Area layout metadata query. Count 1..4096, point_count <= 1000000.
+ * Legacy rejects nonzero point_count < count; source clamps. hide_x_axis gives
+ * gutter 0; otherwise 20 legacy/18 source. No data access or pointer retention.
+ * Invalid preserves both outputs; caller supplies disjoint output storage. */
+cui_plot_result cui_chart_point_axis_layout(const cui_chart_options *,
+                                            size_t *effective_point_count, float *x_axis_gutter);
 /* Validates all data and storage before mutating any pixel or state. */
 cui_plot_result cui_chart_render(cui_chart_state *, const cui_chart_options *);
 /* Styled one-second ease-out-quart appear using core frame time and reduced motion. */

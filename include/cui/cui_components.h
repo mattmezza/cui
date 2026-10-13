@@ -249,6 +249,7 @@ typedef struct {
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
     cui_edit_accept_fn validate;
     void *validate_user; /* See cui_edit_apply_checked: synchronous, nonretaining. */
+    cui_edit_normalization normalization; /* Zero preserves legacy CR/LF rejection. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

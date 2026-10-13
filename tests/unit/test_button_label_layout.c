@@ -101,6 +101,40 @@ int main(void) {
                 assert(cui_last_error(ui) == CUI_OK);
                 contained(d, cui_bounds(ui, 10), true);
             }
+    /* FIT widths are derived from the measured label plus padding. Tiny
+     * representable layout adjustments must not turn a whole short label
+     * into an ellipsis, including the Attachment Open action. */
+    for (unsigned density = 0; density < 2; ++density)
+        for (unsigned size = 0; size < 18; ++size) {
+            cui_theme fit_theme = cui_theme_light();
+            if (density)
+                fit_theme.font_size = 14;
+            cui_button_options fit = {.size = (cui_control_size)(size < 4 ? size : 0),
+                                      .design_size = size < 4 ? CUI_DESIGN_INHERIT
+                                                              : (cui_design_size)(size - 3)};
+            cui_draw_list fitted =
+                scene(ui, &fit_theme, 6000, cui_string("Open"), fit, false, false);
+            assert(cui_last_error(ui) == CUI_OK);
+            contained(fitted, cui_bounds(ui, 10), false);
+            bool whole = false;
+            for (size_t i = 0; i < fitted.count; ++i)
+                if (fitted.commands[i].type == CUI_DRAW_TEXT &&
+                    fitted.commands[i].text.length == 4 &&
+                    !memcmp(fitted.commands[i].text.data, "Open", 4))
+                    whole = true;
+            assert(whole);
+            fit.width = cui_bounds(ui, 10).w;
+            fitted = scene(ui, &fit_theme, 6000, cui_string("Open"), fit, false, false);
+            assert(cui_last_error(ui) == CUI_OK);
+            contained(fitted, cui_bounds(ui, 10), false);
+            whole = false;
+            for (size_t i = 0; i < fitted.count; ++i)
+                if (fitted.commands[i].type == CUI_DRAW_TEXT &&
+                    fitted.commands[i].text.length == 4 &&
+                    !memcmp(fitted.commands[i].text.data, "Open", 4))
+                    whole = true;
+            assert(whole);
+        }
     theme = cui_theme_light();
     cui_button_options o = {.width = 80, .on_click = clicked, .action_user = &clicks};
     cui_draw_list d = scene(ui, &theme, 80, long_name, o, false, false);

@@ -155,7 +155,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 
 | Frozen exports / presentation | CUI coverage and precise limits |
 | --- | --- |
-| `DockLayout`, `PaneTree`, `PaneNode`, `PaneRef`, `NodeId`, `PanelId`, `RootKind`, `InsertTarget`, `EditResult` | Bounded model, stable keys, node inspection, insert/move/split/reorder/remove/activate, transactional restore and normalization. Binary splits replace Rust n-ary children; no identical builder or optional measured-size vector API. |
+| `DockLayout`, `PaneTree`, `PaneNode`, `PaneRef`, `NodeId`, `PanelId`, `RootKind`, `InsertTarget`, `EditResult` | Bounded model, stable keys, node inspection, insert/move/split/reorder/remove/activate, transactional restore and normalization. Binary splits replace Rust n-ary storage; same-axis slot inspection/concrete measured sizing are available. No identical builder or optional unknown-size vector API. |
 | `DockArea`, `DockAreaRenderer`, `DockContext`, `DockEvent` | Styled view and workspace own no panels; callbacks compose ordinary CUI controls, region handles and post-edit notifications. No arbitrary renderer trait override per chrome element. |
 | `Dock`, `DockSizing`, `DockPlacement` | Retained left/right/bottom open flags and preferred sizes, bounds/minima clamping and pointer/keyboard resizing. Frozen component deliberately does not re-export base `Dock`. Opt-in bottom collapse includes its strip/live-size snapping. Per-edge collapsibility is retained and guards closing and bottom drag snapping. |
 | `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
@@ -271,3 +271,21 @@ options.visibility_user = &show_inspector;
 The styled adapter uses that same fallback, omits hidden tab/title/content callbacks and semantics, and moves focus from a hidden tab to the displayed panel. Showing the original active panel restores its presentation unless the user explicitly selected another panel. Auto mode uses the visible count; the optional inner-padding rule retains the frozen source's total group-member count. Filtered reordering maps visible anchors back to model indices, retaining hidden members. Close-all and close-others affect visible panels only, and preserve-last protects the displayed visible member. A group with no visible members displays an empty-state caption; an all-hidden zoomed group restores the normal layout.
 
 Workspace transfers evaluate visibility against each region's model. Hiding a dragged source cancels the gesture; hiding the incoming key at the destination rejects release with `CUI_DOCK_INVALID`. Both layouts remain unchanged on rejection. Hosts should update visibility between frames, including after a drop preview. Headless tests exercise fallback, focus, unchanged serialization, Auto mode, visible-count protection, filtered reorder, bulk close, zoom restoration and real queued cross-region gestures.
+
+
+### Concrete multi-slot sizing
+
+The frozen `layout/node.rs` exposes n-ary split children and optional pixel sizes; `layout/edit.rs::set_sizes` rejects a vector whose length differs from the child count. CUI offers a concrete measured-size subset while preserving its binary topology and v1 persistence format.
+
+`cui_dock_split_slots(model, split, slots, capacity, &count)` flattens descendants with the same axis in visual order. A tab group or opposite-axis subtree is one slot. Pass null output to query the count; insufficient capacity reports the required count and leaves output untouched. Tab nodes reject the query.
+
+`cui_dock_set_slot_sizes(model, split, sizes, count, gap)` atomically converts positive finite slot extents into the existing split ratios, including internal gaps. The vector must match the projected slot count. Invalid nodes, dimensions, counts or unrepresentable ratios leave the serialized layout unchanged. It preserves node IDs, active panels, topology and opposite-axis ratios. No host callback or view wiring is needed: the existing layout, styled adapter and splitter handles consume those ratios.
+
+```c
+/* Three same-axis slots, with four pixels between adjacent slots. */
+const double sizes[] = {100, 200, 300};
+cui_dock_result result = cui_dock_set_slot_sizes(model, split, sizes, 3, 4);
+/* At an axis extent of 608, these widths are exact if minima allow them. */
+```
+
+At the measured extent `sum(sizes) + (count - 1) * gap`, layout reproduces the requested sizes unless minima constrain them. At other extents the existing binary ratios govern resizing; use the same gap and adopt new measured sizes when appropriate. This is not absolute-size storage, optional unknown-size distribution or a true n-ary tree. Persisted ratios round-trip through the existing v1 format and older layouts still restore unchanged. Headless tests cover three slots with an opposite-axis subtree, gap geometry, minima precedence, query output on insufficient capacity, invalid-vector rollback and persistence.

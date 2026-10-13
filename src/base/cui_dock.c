@@ -457,6 +457,75 @@ cui_dock_result cui_dock_set_ratio(cui_dock *d, cui_dock_node id, double ratio) 
     d->state.nodes[n].ratio = ratio;
     return CUI_DOCK_OK;
 }
+static size_t cui_dock_private_slot_count(const cui_dock_private_state *s, size_t n,
+                                          cui_dock_kind axis) {
+    if (s->nodes[n].kind != axis)
+        return 1;
+    return cui_dock_private_slot_count(s, s->nodes[n].a, axis) +
+           cui_dock_private_slot_count(s, s->nodes[n].b, axis);
+}
+static void cui_dock_private_slots(const cui_dock_private_state *s, size_t n, cui_dock_kind axis,
+                                   cui_dock_node *out, size_t *i) {
+    if (s->nodes[n].kind != axis) {
+        out[(*i)++] = cui_dock_private_id(s, n);
+        return;
+    }
+    cui_dock_private_slots(s, s->nodes[n].a, axis, out, i);
+    cui_dock_private_slots(s, s->nodes[n].b, axis, out, i);
+}
+cui_dock_result cui_dock_split_slots(const cui_dock *d, cui_dock_node id, cui_dock_node *out,
+                                     size_t capacity, size_t *count) {
+    if (!d || !count)
+        return CUI_DOCK_INVALID;
+    size_t n = cui_dock_private_node_index(d, id);
+    if (n == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock_kind axis = d->state.nodes[n].kind;
+    if (axis == CUI_DOCK_TABS)
+        return CUI_DOCK_INVALID;
+    size_t needed = cui_dock_private_slot_count(&d->state, n, axis);
+    *count = needed;
+    if (!out)
+        return CUI_DOCK_OK;
+    if (capacity < needed)
+        return CUI_DOCK_CAPACITY;
+    size_t i = 0;
+    cui_dock_private_slots(&d->state, n, axis, out, &i);
+    return CUI_DOCK_OK;
+}
+static double cui_dock_private_adopt_sizes(cui_dock_private_state *s, size_t n, cui_dock_kind axis,
+                                           const double *sizes, size_t *i, double gap) {
+    if (s->nodes[n].kind != axis)
+        return sizes[(*i)++];
+    double a = cui_dock_private_adopt_sizes(s, s->nodes[n].a, axis, sizes, i, gap);
+    double b = cui_dock_private_adopt_sizes(s, s->nodes[n].b, axis, sizes, i, gap);
+    s->nodes[n].ratio = a / (a + b);
+    return a + b + gap;
+}
+cui_dock_result cui_dock_set_slot_sizes(cui_dock *d, cui_dock_node id, const double *sizes,
+                                        size_t count, double gap) {
+    if (!d || !sizes || !cui_dock_private_dimension(gap))
+        return CUI_DOCK_INVALID;
+    size_t n = cui_dock_private_node_index(d, id);
+    if (n == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock_kind axis = d->state.nodes[n].kind;
+    if (axis == CUI_DOCK_TABS || count != cui_dock_private_slot_count(&d->state, n, axis))
+        return CUI_DOCK_INVALID;
+    for (size_t i = 0; i < count; i++)
+        if (!cui_dock_private_dimension(sizes[i]) || sizes[i] <= 0)
+            return CUI_DOCK_INVALID;
+    cui_dock trial = cui_dock_private_stage(d);
+    size_t i = 0;
+    cui_dock_private_adopt_sizes(&trial.state, n, axis, sizes, &i, gap);
+    /* Extremely disparate finite sizes may round a ratio to one. */
+    for (size_t j = 0; j < d->config.node_capacity; j++)
+        if (trial.state.nodes[j].used && trial.state.nodes[j].kind != CUI_DOCK_TABS &&
+            !cui_dock_private_ratio(trial.state.nodes[j].ratio))
+            return CUI_DOCK_INVALID;
+    cui_dock_private_commit(d, &trial);
+    return CUI_DOCK_OK;
+}
 cui_dock_result cui_dock_set_minimum(cui_dock *d, cui_dock_node id, double w, double h) {
     if (!d || !cui_dock_private_dimension(w) || !cui_dock_private_dimension(h))
         return CUI_DOCK_INVALID;

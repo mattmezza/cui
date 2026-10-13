@@ -70,6 +70,15 @@ cui_dock_result cui_dock_remove_many(cui_dock *, const uint64_t *panels, size_t 
 cui_dock_result cui_dock_remove(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_activate(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_set_ratio(cui_dock *dock, cui_dock_node split, double ratio);
+/* Flatten only descendants sharing split's axis, in visual order. NULL slots
+ * queries count. Insufficient capacity leaves output untouched. */
+cui_dock_result cui_dock_split_slots(const cui_dock *, cui_dock_node split, cui_dock_node *slots,
+                                     size_t capacity, size_t *count);
+/* Adopt concrete positive slot extents and gap into existing binary ratios.
+ * Count must match split_slots. Atomic; IDs/topology/v1 format stay unchanged.
+ * Exact extents apply at sum(sizes)+(count-1)*gap, subject to minima. */
+cui_dock_result cui_dock_set_slot_sizes(cui_dock *, cui_dock_node split, const double *sizes,
+                                        size_t count, double gap);
 cui_dock_result cui_dock_set_minimum(cui_dock *dock, cui_dock_node node, double width,
                                      double height);
 /* One rectangle per tab node. NULL output queries count. Minima that cannot

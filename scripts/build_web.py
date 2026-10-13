@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = ['src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
+SOURCES = ['src/effects/cui_effects.c', 'src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
            'src/base/cui_chart.c', 'src/components/cui_chart.c',
            'src/base/cui_text_view.c', 'src/components/cui_text_view.c',
            'src/base/cui_root.c', 'src/components/cui_root.c',

@@ -3985,7 +3985,19 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     (cui_text_style){.monospace = true});
         cui_button(ui, cui_id_from(ui, "theme-button"), &t, cui_string("Primary action"), disabled);
         cui_badge(ui, cui_id_from(ui, "theme-badge"), &t, cui_string("Surface / primary"));
+        cui_begin_box(ui, cui_id_from(ui, "shape-samples"),
+                      (cui_box){.width = width - 48, .height = 64, .row = true, .gap = 24});
         cui_begin_box(ui, cui_id_from(ui, "shape-sample"),
+                      (cui_box){.width = 120,
+                                .height = 64,
+                                .background = {29, 100, 220, 255},
+                                .border = {240, 150, 20, 255},
+                                .custom_corners = true,
+                                .corner_radii = {24, 0, 0, 18},
+                                .custom_border_edges = true,
+                                .border_edges = {0, 8, 4, 0}});
+        cui_end_box(ui);
+        cui_begin_box(ui, cui_id_from(ui, "shadow-shape-sample"),
                       (cui_box){.width = 120,
                                 .height = 64,
                                 .background = {29, 100, 220, 255},
@@ -4000,6 +4012,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {.layer = {.offset_y = 1, .sigma = 2, .spread = 2, .color = {0, 0, 0, 96}},
              .kind = CUI_BOX_SHADOW_INSET}};
         cui_set_box_shadows(ui, shape_depth, 2, (cui_corner_radii){24, 0, 0, 18});
+        cui_end_box(ui);
         cui_end_box(ui);
         for (unsigned focusable = 0; focusable < 2; focusable++) {
             cui_id id = cui_id_from(ui, focusable ? "focusable-log" : "passive-log");

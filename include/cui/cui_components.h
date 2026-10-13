@@ -70,6 +70,14 @@ bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_b
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 /* Paint-only antialiased check glyph for composed selection indicators. */
 void cui_checkmark(cui_context *, float size, cui_color);
+/* Caller-owned, one stable state per Checkbox ID; no allocation or cleanup.
+ * Zero initialization snaps to the initial logical value. Retain through end_frame. */
+typedef struct {
+    cui_id id;
+    cui_disclosure_motion checked, mixed;
+    cui_hover_state tooltip;
+    double next_wake_seconds; /* Absolute Core frame time; zero when quiescent. */
+} cui_checkbox_state;
 typedef struct {
     cui_control_size size;
     bool disabled, required, invalid, skip_tab, hide_focus_ring;
@@ -77,6 +85,12 @@ typedef struct {
     cui_button_content_fn content;
     void *content_user;
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
+    /* Checkbox-only extensions; cui_radio_options aliases this struct but ignores these fields. */
+    cui_checkbox_state *state; /* Optional spring mark/tooltip storage; NULL keeps legacy paint. */
+    float width; /* Checkbox: positive bounds wrapped labels/custom content; zero fits. */
+    cui_str tooltip;
+    cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled are supplied. */
+    bool reduced_motion;
 } cui_checkbox_options;
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);

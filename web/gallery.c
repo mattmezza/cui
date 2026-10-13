@@ -922,7 +922,18 @@ static void gallery_carousel_pagination(cui_context *context, const cui_theme *t
     cui_carousel_pagination_end(context);
 }
 static cui_check_state check_state;
+static cui_checkbox_state checkbox_motion;
+static cui_scroll_state checkbox_scroll;
+
 static cui_design_size design_size;
+static void gallery_checkbox_detail(cui_context *ui, void *user) {
+    const cui_theme *theme = user;
+    cui_design_metrics metrics;
+    float font = theme->font_size * .875f;
+    if (design_size && cui_design_measure(design_size, theme->font_size / 16, &metrics))
+        font = metrics.font_size * .875f;
+    cui_text(ui, cui_string("Email alerts for releases and replies."), font, theme->muted);
+}
 static int design_radius = -1;
 static float design_spacing = -1;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
@@ -3155,16 +3166,48 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         break;
     }
-    case 1:
-        cui_checkbox_ex(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"),
-                        &check_state,
-                        (cui_checkbox_options){.size = (cui_control_size)control_size,
-                                               .design_size = design_size,
-                                               .disabled = disabled,
-                                               .required = choice_required != 0,
-                                               .invalid = choice_invalid != 0,
-                                               .skip_tab = choice_skip_tab != 0});
+    case 1: {
+        cui_design_metrics metrics;
+        float font = t.font_size * .875f, indicator = t.font_size;
+        if (design_size && cui_design_measure(design_size, t.font_size / 16, &metrics)) {
+            font = metrics.font_size;
+            indicator = metrics.indicator_size;
+        }
+        float control_width = fmaxf(width - 48, indicator + 8 * t.font_size / 16 + 8 * font);
+        cui_id owner = cui_id_from(ui, "checkbox-label-scroll");
+        cui_scroll_options scroll = {.width = width - 48,
+                                     .height = height - 48,
+                                     .content_width = control_width,
+                                     .horizontal = true,
+                                     .hide_scrollbars = true};
+        bool began = cui_scrollable_begin(ui, owner, &t, &checkbox_scroll, scroll);
+        cui_checkbox_ex(
+            ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"), &check_state,
+            (cui_checkbox_options){.size = (cui_control_size)control_size,
+                                   .design_size = design_size,
+                                   .disabled = disabled,
+                                   .required = choice_required != 0,
+                                   .invalid = choice_invalid != 0,
+                                   .skip_tab = choice_skip_tab != 0,
+                                   .state = &checkbox_motion,
+                                   .width = control_width,
+                                   .content = gallery_checkbox_detail,
+                                   .content_user = &t,
+                                   .tooltip = cui_string("Change email notification preferences"),
+                                   .tooltip_options = {.viewport = {0, 0, width, height},
+                                                       .width = fminf(300, width - 48),
+                                                       .height = 80,
+                                                       .open_delay = .2f,
+                                                       .close_delay = .1f},
+                                   .reduced_motion = reduced_motion});
+        if (began)
+            cui_scrollable_end_ex(ui, owner, &t, &checkbox_scroll, scroll);
+        next_wake =
+            checkbox_motion.next_wake_seconds > 0
+                ? host_seconds + fmax(0, checkbox_motion.next_wake_seconds - cui_frame_time(ui))
+                : 0;
         break;
+    }
     case 2: {
         cui_switch_options options = cui_switch_options_default();
         options.size = (cui_control_size)control_size;

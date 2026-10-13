@@ -1268,7 +1268,77 @@ static void transition_clocks(void) {
     assert(cui_plot_transition_step(&clock, 0, 16, policy, false, &value) == CUI_PLOT_INVALID);
     assert(memcmp(&clock, &before, sizeof clock) == 0);
 }
+static void pointer_springs(void) {
+    cui_plot_spring_policy policy = cui_plot_spring_defaults(1);
+    assert(policy.damping == 1 && policy.epsilon == .001 && policy.travel);
+    cui_plot_spring_clock clock = {0};
+    cui_plot_spring_value value = {0};
+    assert(cui_plot_spring_step(&clock, -10, 0, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(value.value == -10 && value.velocity == 0 && !value.request_frame);
+    assert(cui_plot_spring_step(&clock, -10, 100, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(clock.updated_at == 0); /* resting does not refresh its clock */
+    assert(cui_plot_spring_step(&clock, 0, 100, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(value.value == -10 && value.velocity == 0 && value.request_frame);
+    assert(cui_plot_spring_step(&clock, 0, 100.25, policy, false, false, &value) == CUI_PLOT_OK);
+    double omega = 6.28318530717958647692;
+    double expected = -10 * (1 + omega * .25) * exp(-omega * .25);
+    assert(close(value.value, expected) && value.velocity > 0);
+    cui_plot_spring_clock old = clock, same = clock;
+    cui_plot_spring_value continuous;
+    assert(cui_plot_spring_step(&same, 0, 100.5, policy, false, false, &continuous) == CUI_PLOT_OK);
+    assert(cui_plot_spring_step(&clock, -20, 100.5, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, continuous.value) && close(value.velocity, continuous.velocity));
+    assert(clock.target == -20); /* retarget keeps momentum until the next elapsed step */
+    assert(cui_plot_spring_step(&clock, -20, 100.5, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, continuous.value) && close(value.velocity, continuous.velocity));
+    assert(cui_plot_spring_step(&clock, -20, 99, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, continuous.value));
+    assert(cui_plot_spring_step(&clock, -20, 110, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(value.value == -20 && value.velocity == 0 && !value.request_frame);
+    assert(cui_plot_spring_step(&clock, 7, 111, policy, false, true, &value) == CUI_PLOT_OK);
+    assert(value.value == 7 && value.velocity == 0 && !value.request_frame);
+    assert(cui_plot_spring_step(&clock, 8, 111, policy, true, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 8);
+    policy.travel = false;
+    assert(cui_plot_spring_step(&clock, 9, 111, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 9);
+    policy = cui_plot_spring_defaults(0);
+    assert(cui_plot_spring_step(&clock, 10, 111, policy, false, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 10);
+    /* Under/overdamped axes preserve their actual oscillator behavior. */
+    policy = cui_plot_spring_defaults(1);
+    for (size_t i = 0; i < 3; ++i) {
+        policy.damping = i == 0 ? 0 : i == 1 ? .5 : 2;
+        clock = (cui_plot_spring_clock){0};
+        assert(cui_plot_spring_step(&clock, 0, 0, policy, false, false, &value) == CUI_PLOT_OK);
+        assert(cui_plot_spring_step(&clock, 1, 0, policy, false, false, &value) == CUI_PLOT_OK);
+        assert(cui_plot_spring_step(&clock, 1, .5, policy, false, false, &value) == CUI_PLOT_OK);
+        assert(i < 2 ? value.value > 1 : value.value > 0 && value.value < 1);
+    }
+    old = clock;
+    cui_plot_spring_value saved = value;
+    policy.epsilon = 0;
+    assert(cui_plot_spring_step(&clock, 0, 1, policy, false, false, &value) == CUI_PLOT_INVALID);
+    assert(memcmp(&clock, &old, sizeof clock) == 0 && memcmp(&value, &saved, sizeof value) == 0);
+    policy = cui_plot_spring_defaults(1);
+    policy.damping = NAN;
+    assert(cui_plot_spring_step(&clock, 0, 1, policy, false, false, &value) == CUI_PLOT_INVALID);
+    policy = cui_plot_spring_defaults(1);
+    assert(cui_plot_spring_step(&clock, INFINITY, 1, policy, false, false, &value) ==
+           CUI_PLOT_INVALID);
+    assert(cui_plot_spring_step(&clock, 0, -1, policy, false, false, &value) == CUI_PLOT_INVALID);
+    assert(cui_plot_spring_step(NULL, 0, 1, policy, false, false, &value) == CUI_PLOT_INVALID);
+    assert(cui_plot_spring_step(&clock, 0, 1, policy, false, false, NULL) == CUI_PLOT_INVALID);
+    clock.velocity = NAN;
+    assert(cui_plot_spring_step(&clock, 0, 1, policy, false, false, &value) == CUI_PLOT_INVALID);
+    clock = (cui_plot_spring_clock){1, 1, 0, 0, true};
+    old = clock;
+    policy.response = DBL_TRUE_MIN;
+    assert(cui_plot_spring_step(&clock, 0, 1, policy, false, false, &value) == CUI_PLOT_OVERFLOW);
+    assert(memcmp(&clock, &old, sizeof clock) == 0);
+}
 int main(void) {
+    pointer_springs();
     transition_clocks();
     test_sankey_large_chain();
     test_sankey_graph();

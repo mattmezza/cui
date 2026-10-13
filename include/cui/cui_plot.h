@@ -450,6 +450,28 @@ typedef struct {
 cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *, double target, double now,
                                          cui_plot_transition_policy, bool reduced_motion,
                                          cui_plot_motion_value *);
+/* Scalar pointer glide: source PlotHover.glide targets one Pixels channel.
+ * The host owns one zero-initialized state per channel and supplies seconds.
+ * Elapsed time advances toward the PREVIOUS target before retargeting. */
+typedef struct {
+    double response, damping, epsilon;
+    bool travel;
+} cui_plot_spring_policy;
+typedef struct {
+    double position, velocity, target, updated_at;
+    bool initialized;
+} cui_plot_spring_clock;
+typedef struct {
+    double value, velocity;
+    bool request_frame;
+} cui_plot_spring_value;
+/* Source default damping=1, epsilon=.001, travel=true; response zero snaps. */
+cui_plot_spring_policy cui_plot_spring_defaults(double response);
+/* entering implements PlotHover.is_entering's temporary travel=false policy.
+ * Invalid inputs/state and numeric overflow preserve clock and output. */
+cui_plot_result cui_plot_spring_step(cui_plot_spring_clock *, double target, double now,
+                                     cui_plot_spring_policy, bool reduced_motion, bool entering,
+                                     cui_plot_spring_value *);
 /* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
  * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
  * Zero initialize. Invalid input leaves memory unchanged. */

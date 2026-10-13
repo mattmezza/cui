@@ -596,9 +596,9 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults and explicit-color paint covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
 | `Text`, `PlotLabel`, text width/truncation helpers | Caller-owned PlotLabel collection/layout/paint and measured UTF-8 ellipsis helper | No automatic tooltip content/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
 | `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned commands/bitmap revision | No origin-translated tessellation cache, keyed state slots/pairs or source hash key contract; source `is_warm` means a key exists, including after an initial empty build |
-| `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clock seam available; no automatic theme projection, keyed renderer clock, pointer spring glide or appearance first-paint driver |
+| `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clocks and scalar pointer glide available; no automatic theme projection, keyed renderer clock or appearance first-paint driver |
 | `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Caller-owned completed-generation slot/registry and linear stagger clock | Bounded multi-plot completed map with explicit consecutive-frame lifetime; no implicit frame/scope tree, first-paint clock or scheduler; easing/reduced motion remain explicit |
-| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | No projected pointer spring, scope lookup, tooltip rendering or event-to-datum routing |
+| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Caller-owned index/dots/crosshair memory with lingering exit state | Explicit caller-owned scalar pointer glide available; no implicit scope lookup, tooltip rendering or event-to-datum routing |
 | `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | `cui_plot_view` fixed bitmap+axes and activation | No generic prepaint children/tooltip overlay driver, identity-driven motion/cache contract or custom trait-equivalent lifecycle |
 | `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; explicit caller-owned desktop/long-press cursor gate now covers visibility/coordinate transitions; no automatic OS gesture routing, occlusion hitbox or animation scheduling |
 | `origin_point` translation utility | Caller adds relative offsets before raster; Core offsets styled children | No separate named pure translation helper; ordinary finite coordinate addition remains caller responsibility |
@@ -977,9 +977,32 @@ timestamps saturate elapsed time to zero. Invalid policies/state/callback result
 preserve clock and output; nonfinite interpolation reports overflow. These are
 finite double scalar channels, rather than generic source `Interpolate` values.
 
-The frozen pointer `Spring` still has a distinct missing obligation: it advances
-elapsed time toward the **previous** target before adopting the next, preserving
-position and velocity; first-entry PlotHover disables travel. Existing CUI tab
-springs advance toward the newly supplied target and cannot be relabeled as this
-clock. Automatic projected pointer springs, renderer keyed clocks, PathCaches,
-paint/prepaint scheduling and generic tooltip overlay composition remain absent.
+### Scalar pointer spring glide
+
+`cui_plot_spring_step` covers the frozen `PlotHover.glide` scalar Pixels channel.
+Use separate zero-initialized `cui_plot_spring_clock` states for independently
+keyed x/y coordinates. `cui_plot_spring_defaults(response_seconds)` matches source
+damping 1, epsilon .001 and travel enabled; response zero snaps. Response is the
+undamped oscillation period, not a completion deadline. Damping below one can
+overshoot, above one approaches slowly, and zero is undamped. The analytic
+oscillator is adapted from CUI's existing tab spring C mathematics, with original
+clock ordering implementing the frozen source contract.
+
+The first value is adopted immediately. A later call advances elapsed time
+toward the **previous** target before adopting its new target, preserving current
+position and velocity. `request_frame` remains true until both displacement and
+speed are below epsilon, then position snaps exactly to target with zero velocity.
+A resting call leaves its timestamp unchanged. Backward timestamps saturate the
+elapsed step to zero; the host should normally provide monotonic seconds. Current
+policy parameters govern the elapsed step, as in the source. Reduced motion,
+`travel=false`, response zero, or `entering=true` pins both position and velocity
+to the target. Feed `cui_plot_hover_memory.entering` to the latter argument to
+avoid gliding from a previous hover location on the entering frame.
+
+Finite double channels and checked arithmetic are CUI's bounded contract, rather
+than source f32 renderer values. Invalid parameters/state preserve state/output;
+nonfinite propagation reports OVERFLOW without mutation. Very small responses,
+extreme magnitudes/damping or elapsed oscillation angles may exceed representable
+math. The host must schedule requested frames and project its theme policy.
+Renderer keyed clocks, automatic first-paint appearance timing, PathCaches and
+paint/prepaint tooltip overlay composition remain absent.

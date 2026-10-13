@@ -457,6 +457,12 @@ channel with `cui_plot_transition_step`, feed its value to
 Initialize the channel at zero before its first hover target of one, since the
 source transition adopts its first target immediately. Signed delays, cubic-out
 (default) or synchronous custom easing, reversal shortening and reduced-motion
-snapping are supported. This host-driven clock does not add automatic pointer
-spring glide or renderer keyed state. See [projected transition clocks](PLOT_MODEL.md#projected-transition-clocks)
+snapping are supported. This host-driven clock does not add renderer keyed state. See [projected transition clocks](PLOT_MODEL.md#projected-transition-clocks)
 for exact policy-change and ownership rules.
+
+Pointer glide uses `cui_plot_spring_step` with caller-owned scalar state, explicit
+seconds and a policy from `cui_plot_spring_defaults`. Pass hover memory's
+`entering` flag to snap on entry; later target changes preserve momentum and
+advance toward the previous target before retargeting. Schedule while
+`request_frame` is true. Use independent states for each coordinate. This is an
+explicit host seam, not automatic scoped renderer state or theme projection.

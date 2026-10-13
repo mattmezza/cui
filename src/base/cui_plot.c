@@ -2230,3 +2230,91 @@ cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *clock, doubl
     *out = value;
     return CUI_PLOT_OK;
 }
+
+cui_plot_spring_policy cui_plot_spring_defaults(double response) {
+    return (cui_plot_spring_policy){response, 1, .001, true};
+}
+/* Analytic damped oscillator, adapted from CUI tab spring math. This clock's
+ * ordering differs: advance the old target, then adopt the incoming target. */
+static bool plot_spring_advance(cui_plot_spring_clock *state, double elapsed,
+                                cui_plot_spring_policy policy) {
+    if (elapsed == 0)
+        return true;
+    double omega = 6.28318530717958647692 / policy.response;
+    double displacement = state->position - state->target, speed = state->velocity;
+    if (displacement == 0 && speed == 0)
+        return true;
+    double damping = policy.damping, next, next_speed;
+    if (!isfinite(omega) || !isfinite(displacement))
+        return false;
+    if (damping == 1) {
+        double sum = speed + omega * displacement;
+        double decay = exp(-omega * elapsed);
+        if (decay == 0) {
+            next = next_speed = 0;
+        } else {
+            next = (displacement + sum * elapsed) * decay;
+            next_speed = (speed - omega * sum * elapsed) * decay;
+        }
+    } else if (damping < 1) {
+        double frequency = omega * sqrt((1 - damping) * (1 + damping));
+        double decay = exp(-damping * omega * elapsed);
+        double angle = frequency * elapsed;
+        if (!isfinite(angle))
+            return false;
+        double sine = sin(angle), cosine = cos(angle);
+        next = decay * (displacement * cosine +
+                        (speed + damping * omega * displacement) / frequency * sine);
+        next_speed =
+            decay * (speed * cosine -
+                     (damping * omega * speed + omega * omega * displacement) / frequency * sine);
+    } else {
+        double factor = damping + sqrt(damping - 1) * sqrt(damping + 1);
+        double slow = -omega / factor, fast = -omega * factor;
+        double first = (speed - fast * displacement) / (slow - fast);
+        double second = displacement - first;
+        next = first * exp(slow * elapsed) + second * exp(fast * elapsed);
+        next_speed = slow * first * exp(slow * elapsed) + fast * second * exp(fast * elapsed);
+    }
+    state->position = state->target + next;
+    state->velocity = next_speed;
+    return isfinite(state->position) && isfinite(state->velocity);
+}
+cui_plot_result cui_plot_spring_step(cui_plot_spring_clock *clock, double target, double now,
+                                     cui_plot_spring_policy policy, bool reduced_motion,
+                                     bool entering, cui_plot_spring_value *out) {
+    if (!clock || !out || !isfinite(target) || !isfinite(now) || now < 0 ||
+        !isfinite(policy.response) || policy.response < 0 || !isfinite(policy.damping) ||
+        policy.damping < 0 || !isfinite(policy.epsilon) || policy.epsilon <= 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_spring_clock next = *clock;
+    if (!next.initialized)
+        next = (cui_plot_spring_clock){target, 0, target, now, true};
+    if (!isfinite(next.position) || !isfinite(next.velocity) || !isfinite(next.target) ||
+        !isfinite(next.updated_at) || next.updated_at < 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_spring_value value = {next.position, next.velocity, false};
+    /* Resting returns without updating even the stale timestamp, as source does. */
+    if (next.position != target || next.velocity != 0) {
+        if (reduced_motion || entering || !policy.travel || policy.response == 0) {
+            next = (cui_plot_spring_clock){target, 0, target, now, true};
+        } else {
+            double elapsed = now > next.updated_at ? now - next.updated_at : 0;
+            if (!plot_spring_advance(&next, elapsed, policy))
+                return CUI_PLOT_OVERFLOW;
+            if (fabs(next.position - target) < policy.epsilon &&
+                fabs(next.velocity) < policy.epsilon)
+                next = (cui_plot_spring_clock){target, 0, target, now, true};
+            else {
+                next.target = target;
+                next.updated_at = now;
+                value.request_frame = true;
+            }
+        }
+        value.value = next.position;
+        value.velocity = next.velocity;
+    }
+    *clock = next;
+    *out = value;
+    return CUI_PLOT_OK;
+}

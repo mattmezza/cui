@@ -8,14 +8,25 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
+def repository_key(path, root=ROOT):
+    return path.relative_to(root).as_posix()
+
+
 class ComponentUsageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text())['components']
-        cls.data = json.loads((ROOT / 'docs/component-usage.json').read_text())
+        cls.manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8'))['components']
+        cls.data = json.loads((ROOT / 'docs/component-usage.json').read_text(encoding='utf-8'))
         cls.entries = cls.data['components']
-        cls.headers = {str(p.relative_to(ROOT)): p.read_text() for p in (ROOT / 'include/cui').glob('*.h')}
+        cls.headers = {repository_key(p): p.read_text(encoding='utf-8') for p in (ROOT / 'include/cui').glob('*.h')}
         cls.all_headers = '\n'.join(cls.headers.values())
+
+    def test_repository_keys_are_portable(self):
+        for kind, root in [(pathlib.PureWindowsPath, 'C:/work/cui'),
+                           (pathlib.PurePosixPath, '/work/cui')]:
+            base = kind(root)
+            self.assertEqual(repository_key(base / 'include/cui/cui.h', base),
+                             'include/cui/cui.h')
 
     def test_exact_manifest_coverage_and_headers(self):
         self.assertEqual(len(self.entries), 78)
@@ -59,7 +70,7 @@ class ComponentUsageTests(unittest.TestCase):
         self.assertIn('not an application widget tree', self.data['lifecycle'])
 
     def test_guide_covers_metadata_and_lifetimes(self):
-        guide = (ROOT / 'docs/COMPONENT_USAGE.md').read_text()
+        guide = (ROOT / 'docs/COMPONENT_USAGE.md').read_text(encoding='utf-8')
         for entry in self.entries:
             self.assertIn('\n## ' + entry['name'] + '\n', guide)
             for field in ['state_ownership','interaction','usage']:

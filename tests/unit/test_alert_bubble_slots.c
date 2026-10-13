@@ -104,8 +104,17 @@ int main(void) {
                         if (list.commands[i].type == CUI_DRAW_TEXT &&
                             list.commands[i].text.length == 9 &&
                             !memcmp(list.commands[i].text.data, "Body slot", 9)) {
-                            assert(same(list.commands[i].color,
-                                        cui_bubble_foreground(&t, (cui_bubble_variant)variant)));
+                            cui_color expected =
+                                variant == CUI_BUBBLE_FILLED ? t.on_primary
+                                : variant == CUI_BUBBLE_DESTRUCTIVE || variant == CUI_BUBBLE_ERROR
+                                    ? t.danger
+                                : variant == CUI_BUBBLE_INFO    ? t.info
+                                : variant == CUI_BUBBLE_SUCCESS ? t.success
+                                : variant == CUI_BUBBLE_WARNING ? t.warning
+                                                                : t.text;
+                            assert(same(list.commands[i].color, expected));
+                            assert(same(cui_bubble_foreground(&t, (cui_bubble_variant)variant),
+                                        expected));
                             if (outgoing)
                                 assert(list.commands[i].bounds.x > 150);
                             else

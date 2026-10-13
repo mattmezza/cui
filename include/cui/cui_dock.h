@@ -95,6 +95,18 @@ typedef struct {
 } cui_dock_split_geometry;
 cui_dock_result cui_dock_split_layout(const cui_dock *, cui_dock_node split, cui_rect, float gap,
                                       cui_dock_split_geometry *);
+/* Filtered geometry omits all-hidden leaves/subtrees and their gaps/minima.
+ * Durable ratios/IDs are unchanged. Geometry metadata describes visible panels. */
+cui_dock_result cui_dock_layout_visible(const cui_dock *, cui_rect, float gap,
+                                        cui_dock_visibility_fn, void *, cui_dock_geometry *,
+                                        size_t capacity, size_t *count, bool *fit_minimum);
+typedef struct {
+    cui_dock_split_geometry geometry;
+    bool first_visible, second_visible;
+} cui_dock_visible_split_geometry;
+cui_dock_result cui_dock_split_layout_visible(const cui_dock *, cui_dock_node, cui_rect, float gap,
+                                              cui_dock_visibility_fn, void *,
+                                              cui_dock_visible_split_geometry *);
 /* Required serialized length excludes NUL. Insufficient output is untouched.
    Restore is bounded and transactional; successful restore invalidates IDs. */
 cui_dock_result cui_dock_serialize(const cui_dock *dock, char *output, size_t capacity,

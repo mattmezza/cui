@@ -501,7 +501,76 @@ static void test_slot_sizing(void) {
     near(geo[0].bounds.w, 150);
     cui_dock_destroy(d);
 }
+static bool visible_mask(void *user, const cui_dock *model, uint64_t key) {
+    (void)model;
+    return key < 64 && !(*(uint64_t *)user & (UINT64_C(1) << key));
+}
+static void test_hidden_geometry(void) {
+    cui_dock *d = make();
+    cui_dock_node a = cui_dock_root(d), b, c, extra;
+    assert(cui_dock_insert(d, a, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(d, a, CUI_DOCK_SPLIT_HORIZONTAL, .25, 1, false, &b) == CUI_DOCK_OK);
+    assert(cui_dock_split(d, b, CUI_DOCK_SPLIT_VERTICAL, .3, 2, false, &c) == CUI_DOCK_OK);
+    assert(cui_dock_split(d, a, CUI_DOCK_SPLIT_HORIZONTAL, .6, 3, false, &extra) == CUI_DOCK_OK);
+    assert(cui_dock_set_minimum(d, a, 1000, 1000) == CUI_DOCK_OK);
+    assert(cui_dock_set_minimum(d, extra, 1000, 1000) == CUI_DOCK_OK);
+    char before[65536], after[65536];
+    serialize(d, before, sizeof before);
+    cui_rect bounds = {10, 20, 400, 200};
+    cui_dock_geometry geo[4];
+    size_t count;
+    bool fit;
+    uint64_t hidden = 9;
+    assert(cui_dock_layout_visible(d, bounds, 4, visible_mask, &hidden, geo, 4, &count, &fit) ==
+           CUI_DOCK_OK);
+    assert(count == 2 && fit && geo[0].node == b && geo[1].node == c);
+    near(geo[0].bounds.x, 10);
+    near(geo[0].bounds.w, 400);
+    near(geo[0].bounds.h, 58.8f);
+    near(geo[1].bounds.y, 82.8f);
+    cui_dock_visible_split_geometry split;
+    assert(cui_dock_split_layout_visible(d, cui_dock_root(d), bounds, 4, visible_mask, &hidden,
+                                         &split) == CUI_DOCK_OK);
+    assert(!split.first_visible && split.second_visible && split.geometry.fit_minimum);
+    near(split.geometry.second.w, 400);
+    hidden = 11;
+    assert(cui_dock_layout_visible(d, bounds, 4, visible_mask, &hidden, geo, 4, &count, &fit) ==
+           CUI_DOCK_OK);
+    assert(count == 1 && fit && geo[0].node == c && geo[0].active_panel == 2 &&
+           geo[0].panel_count == 1);
+    near(geo[0].bounds.x, 10);
+    near(geo[0].bounds.y, 20);
+    near(geo[0].bounds.w, 400);
+    near(geo[0].bounds.h, 200);
+    hidden = 15;
+    geo[0].node = 777;
+    assert(cui_dock_layout_visible(d, bounds, 4, visible_mask, &hidden, geo, 4, &count, &fit) ==
+           CUI_DOCK_OK);
+    assert(count == 0 && fit && geo[0].node == 777);
+    hidden = 0;
+    assert(cui_dock_layout_visible(d, bounds, 4, visible_mask, &hidden, NULL, 0, &count, &fit) ==
+           CUI_DOCK_OK);
+    assert(count == 4 && !fit);
+    assert(cui_dock_layout_visible(d, bounds, 4, visible_mask, &hidden, geo, 3, &count, &fit) ==
+           CUI_DOCK_CAPACITY);
+    assert(geo[0].node == 777);
+    cui_dock_geometry legacy[4];
+    size_t legacy_count;
+    assert(cui_dock_layout(d, bounds, 4, legacy, 4, &legacy_count, NULL) == CUI_DOCK_OK);
+    assert(cui_dock_layout_visible(d, bounds, 4, NULL, NULL, geo, 4, &count, &fit) == CUI_DOCK_OK);
+    for (size_t i = 0; i < 4; i++) {
+        assert(geo[i].node == legacy[i].node);
+        near(geo[i].bounds.x, legacy[i].bounds.x);
+        near(geo[i].bounds.y, legacy[i].bounds.y);
+        near(geo[i].bounds.w, legacy[i].bounds.w);
+        near(geo[i].bounds.h, legacy[i].bounds.h);
+    }
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after));
+    cui_dock_destroy(d);
+}
 int main(void) {
+    test_hidden_geometry();
     test_slot_sizing();
     test_visibility_queries();
     cui_dock_group_constraints sealed = cui_dock_group_sealed();

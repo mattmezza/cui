@@ -1601,6 +1601,21 @@ static void test_workspace_visibility(void) {
     visibility_model = regions[1].model;
     edge_frame();
     edge_frame();
+    cui_dock_workspace_snapshot visibility_before, visibility_after;
+    assert(cui_dock_workspace_save(edges, &visibility_before));
+    cui_rect original_left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
+    hidden_bits = UINT64_C(1) << 2;
+    edge_frame();
+    assert(cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT)).w == 0);
+    assert(cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_CENTER)).w == 640);
+    assert(cui_dock_workspace_save(edges, &visibility_after));
+    for (size_t i = 0; i < 3; i++) {
+        assert(visibility_before.open[i] == visibility_after.open[i]);
+        assert(visibility_before.size[i] == visibility_after.size[i]);
+    }
+    hidden_bits = 0;
+    edge_frame();
+    assert(cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT)).w == original_left.w);
     cui_rect tab = cui_bounds(ui, cui_dock_tab_id(cui_dock_region_id(700, CUI_DOCK_CENTER), 0));
     cui_rect left = cui_bounds(ui, cui_dock_region_id(700, CUI_DOCK_LEFT));
     char source_before[4096], target_before[4096], after[4096];
@@ -1911,12 +1926,85 @@ static void test_lifecycle(void) {
     cui_dock_destroy(m);
     cui_dock_destroy(other);
 }
+static size_t hidden_frame(cui_dock *m, cui_dock_view *v, cui_dock_panel *descriptors,
+                           cui_dock_view_options opts, cui_id *first_handle) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    cui_dock_view_result value = cui_dock_view_render(ui, 9600, &theme, m, v, descriptors, 4, opts);
+    assert(value.error == CUI_DOCK_OK && !value.resized);
+    assert(cui_end_frame(ui).count > 0);
+    size_t count, handles = 0;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (items[i].role == CUI_ROLE_SEPARATOR) {
+            if (!handles && first_handle)
+                *first_handle = items[i].id;
+            handles++;
+        }
+    return handles;
+}
+static void test_hidden_styled_geometry(void) {
+    cui_dock *m = cui_dock_create((cui_dock_config){0});
+    cui_dock_node a = cui_dock_root(m), b, c, extra;
+    assert(cui_dock_insert(m, a, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(m, a, CUI_DOCK_SPLIT_HORIZONTAL, .25, 1, false, &b) == CUI_DOCK_OK);
+    assert(cui_dock_split(m, b, CUI_DOCK_SPLIT_VERTICAL, .3, 2, false, &c) == CUI_DOCK_OK);
+    assert(cui_dock_split(m, a, CUI_DOCK_SPLIT_HORIZONTAL, .6, 3, false, &extra) == CUI_DOCK_OK);
+    cui_dock_panel descriptors[4];
+    for (size_t i = 0; i < 4; i++)
+        descriptors[i] =
+            (cui_dock_panel){.key = i, .title = cui_string("Visible"), .render = content};
+    cui_dock_view *v = cui_dock_view_create(0, 0);
+    cui_dock_view_options opts = {.width = 640,
+                                  .height = 480,
+                                  .panel_visible = panel_visible,
+                                  .visibility_user = &hidden_bits};
+    visibility_model = m;
+    hidden_bits = 0;
+    cui_id handle = 0;
+    assert(hidden_frame(m, v, descriptors, opts, &handle) == 3);
+    cui_rect original = cui_bounds(ui, cui_dock_group_id(9600, c));
+    char before[4096], after[4096];
+    size_t n;
+    assert(cui_dock_serialize(m, before, sizeof before, &n) == CUI_DOCK_OK);
+    /* A splitter held when its branch disappears is cancelled, not committed. */
+    cui_rect divider = cui_bounds(ui, handle);
+    pointer(CUI_EVENT_POINTER_DOWN, divider.x + divider.w / 2, divider.y + divider.h / 2);
+    assert(hidden_frame(m, v, descriptors, opts, NULL) == 3);
+    hidden_bits = 9;
+    pointer(CUI_EVENT_POINTER_MOVE, divider.x + 40, divider.y + 40);
+    assert(hidden_frame(m, v, descriptors, opts, NULL) == 1);
+    cui_rect shown = cui_bounds(ui, cui_dock_group_id(9600, c));
+    assert(shown.x == 0 && shown.w == 640 && fabsf(shown.h - 336) < .01f);
+    assert(cui_bounds(ui, cui_dock_tab_id(9600, 0)).w == 0 &&
+           cui_bounds(ui, cui_dock_tab_id(9600, 3)).w == 0);
+    pointer(CUI_EVENT_POINTER_UP, divider.x + 40, divider.y + 40);
+    assert(hidden_frame(m, v, descriptors, opts, NULL) == 1);
+    hidden_bits = 11;
+    assert(hidden_frame(m, v, descriptors, opts, NULL) == 0);
+    shown = cui_bounds(ui, cui_dock_group_id(9600, c));
+    assert(shown.x == 0 && shown.y == 0 && shown.w == 640 && shown.h == 480);
+    hidden_bits = 15;
+    assert(hidden_frame(m, v, descriptors, opts, NULL) == 0);
+    assert(cui_bounds(ui, cui_dock_tab_id(9600, 2)).w == 0);
+    hidden_bits = 0;
+    assert(hidden_frame(m, v, descriptors, opts, NULL) == 3);
+    shown = cui_bounds(ui, cui_dock_group_id(9600, c));
+    assert(fabsf(shown.x - original.x) < .01f && fabsf(shown.y - original.y) < .01f &&
+           fabsf(shown.w - original.w) < .01f && fabsf(shown.h - original.h) < .01f);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    visibility_model = NULL;
+    hidden_bits = 0;
+    cui_dock_view_destroy(v);
+    cui_dock_destroy(m);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
     view = cui_dock_view_create(16, 16);
     test_factory_reconstruction();
     test_lifecycle();
+    test_hidden_styled_geometry();
     memset(rendered, 0, sizeof rendered);
     assert(ui && model && view);
     options = cui_dock_view_options_default();

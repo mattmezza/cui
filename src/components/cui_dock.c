@@ -926,14 +926,24 @@ static void dock_render_node(dock_scene *s, cui_dock_node node, float w, float h
     }
     bool horizontal = info.kind == CUI_DOCK_SPLIT_HORIZONTAL;
     float extent = horizontal ? w : h, cross = horizontal ? h : w;
-    cui_dock_split_geometry geometry;
-    cui_dock_result error =
-        cui_dock_split_layout(s->dock, node, (cui_rect){0, 0, w, h}, 0, &geometry);
+    cui_dock_visible_split_geometry filtered;
+    cui_dock_result error = cui_dock_split_layout_visible(s->dock, node, (cui_rect){0, 0, w, h}, 0,
+                                                          s->options.panel_visible,
+                                                          s->options.visibility_user, &filtered);
     if (error != CUI_DOCK_OK) {
         s->result.error = error;
         return;
     }
+    cui_dock_split_geometry geometry = filtered.geometry;
     s->result.fit_minimum &= geometry.fit_minimum;
+    if (!filtered.first_visible || !filtered.second_visible) {
+        cui_resizable_clear(&cache->resize);
+        if (filtered.first_visible)
+            dock_render_node(s, info.first, w, h);
+        if (filtered.second_visible)
+            dock_render_node(s, info.second, w, h);
+        return;
+    }
     float first = horizontal ? geometry.first.w : geometry.first.h;
     if (cache->resize.count == 2 && !cache->resize.dragging) {
         cache->slots[0].size = first;
@@ -1077,8 +1087,9 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
     dock_drag_events(&scene);
     size_t leaves = 0;
     bool fit = true;
-    error = cui_dock_layout(model, (cui_rect){0, 0, options.width, options.height}, 0, NULL, 0,
-                            &leaves, &fit);
+    error = cui_dock_layout_visible(model, (cui_rect){0, 0, options.width, options.height}, 0,
+                                    options.panel_visible, options.visibility_user, NULL, 0,
+                                    &leaves, &fit);
     if (error != CUI_DOCK_OK && error != CUI_DOCK_CAPACITY)
         return (cui_dock_view_result){.error = error};
     scene.result.fit_minimum = fit;
@@ -1674,21 +1685,41 @@ static void dock_workspace_render_child(cui_context *ui, void *user) {
     else
         dock_workspace_layer(child->scene, child->level + 1, width, height);
 }
-static cui_size dock_model_minimum(const cui_dock *model, cui_dock_node node) {
+static bool dock_node_visible(const cui_dock *model, cui_dock_node node,
+                              cui_dock_view_options options) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
+        return false;
+    if (info.kind == CUI_DOCK_TABS)
+        return cui_dock_visible_count(model, node, options.panel_visible,
+                                      options.visibility_user) != 0;
+    return dock_node_visible(model, info.first, options) ||
+           dock_node_visible(model, info.second, options);
+}
+static bool dock_workspace_visible(dock_workspace_scene *s, unsigned region) {
+    return dock_node_visible(s->regions[region].model, cui_dock_root(s->regions[region].model),
+                             s->options.view);
+}
+static cui_size dock_model_minimum(const cui_dock *model, cui_dock_node node,
+                                   cui_dock_view_options options) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(model, node, &info) || !dock_node_visible(model, node, options))
         return (cui_size){0};
     if (info.kind == CUI_DOCK_TABS)
         return (cui_size){(float)info.min_width, (float)info.min_height};
-    cui_size a = dock_model_minimum(model, info.first), b = dock_model_minimum(model, info.second);
-    return info.kind == CUI_DOCK_SPLIT_HORIZONTAL
-               ? (cui_size){a.width + b.width, fmaxf(a.height, b.height)}
-               : (cui_size){fmaxf(a.width, b.width), a.height + b.height};
+    cui_size a = dock_model_minimum(model, info.first, options),
+             b = dock_model_minimum(model, info.second, options);
+    cui_size min = info.kind == CUI_DOCK_SPLIT_HORIZONTAL
+                       ? (cui_size){a.width + b.width, fmaxf(a.height, b.height)}
+                       : (cui_size){fmaxf(a.width, b.width), a.height + b.height};
+    min.width = fmaxf(min.width, (float)info.min_width);
+    min.height = fmaxf(min.height, (float)info.min_height);
+    return min;
 }
 static float dock_region_minimum(dock_workspace_scene *s, unsigned region, bool horizontal) {
     float value = horizontal ? s->regions[region].minimum.width : s->regions[region].minimum.height;
-    cui_size minimum =
-        dock_model_minimum(s->regions[region].model, cui_dock_root(s->regions[region].model));
+    cui_size minimum = dock_model_minimum(s->regions[region].model,
+                                          cui_dock_root(s->regions[region].model), s->options.view);
     return fmaxf(value > 0     ? value
                  : region == 0 ? 64
                                : 48,
@@ -1698,6 +1729,13 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
                                  float height) {
     if (level == 3) {
         dock_workspace_region(s, CUI_DOCK_CENTER, width, height);
+        return;
+    }
+    if (!dock_workspace_visible(s, level + 1)) {
+        cui_resizable_clear(&s->state->resize[level]);
+        if (level == 2)
+            s->state->bottom_gesture = false;
+        dock_workspace_layer(s, level + 1, width, height);
         return;
     }
     bool collapse = level == 2 && s->options.collapsible_bottom &&
@@ -1720,7 +1758,7 @@ static void dock_workspace_layer(dock_workspace_scene *s, unsigned level, float 
     float remaining_min = dock_region_minimum(s, 0, horizontal);
     if (horizontal && s->state->snapshot.open[2])
         remaining_min = fmaxf(remaining_min, dock_region_minimum(s, 3, true));
-    if (level == 0 && s->state->snapshot.open[1])
+    if (level == 0 && s->state->snapshot.open[1] && dock_workspace_visible(s, 2))
         remaining_min += dock_region_minimum(s, 2, true);
     bool fit = edge_min + remaining_min <= extent;
     s->result.fit_minimum &= fit && cross >= dock_region_minimum(s, level + 1, !horizontal);

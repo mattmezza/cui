@@ -16,7 +16,7 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Stepper: make navigation and its current status visibly work. — 9741448 passes native75, sanitizers75, WASI67 and Chromium78; rendered-selection regression fails old code. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] Tooltip: center text in the panel. — first polish batch; native/browser geometry and interaction evidence below.
 - [x] Calendar and DatePicker: use SVG navigation icons; center popup content. — d55aeb7 passes native75, sanitizers75, WASI67 and Chromium78. Day cells are checked at three sizes; DatePicker trigger/opened icons are checked headlessly. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
-- [ ] ColorPicker: screen eyedropper through an explicit host capability.
+- [x] ColorPicker: browser screen eyedropper with explicit availability, cancellation and controlled RGBA completion. — 0bb3670 passes native75, sanitizers75, WASI67 and Chromium78. Native adapters do not capture the screen; documented applications supply their platform picker. Publication pending.
 - [x] Combobox and Select: options span the field width. — 76c36ba passes native75, sanitizers75, WASI67 and Chromium78; popup-width regression fails old code. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] Editor and Input: word navigation and vertical caret navigation. — Native/WASI/browser checks pass in the navigation batch; this fixes the gallery editor model, not complete code-editor parity.
 - [x] Input Group: constrain the field so addons stay on the same row. — 87721c1 passes native75, sanitizers75, WASI67 and Chromium78. Native checks all four sizes; browser checks 390px/1280px inline layout and block-mode opt-in. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
@@ -25,13 +25,13 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [x] Resizable: a composed workspace visibly resizes Explorer/editor panes and switches example files. — 1ceb567 passes Chromium78 with physical drag and visible geometry assertions; portable code is unchanged from validated 41de104. Published in 9c87b99; HTTPS78 and twenty-seven artifact files verified.
 - [x] Scrollable and Sidebar: natural wheel sensitivity and moving sidebar content. — 917f17d positions the sidebar content by its scroll offset and transports precise browser CSS pixels for scrollable/sidebar/virtual previews. Geometry and real-wheel browser regressions pass. Native77, sanitizers75, WASI67 and Chromium78 pass in the combined batch. Published in 917f17d; HTTPS78 and thirty artifact files verified.
 - [ ] Sheet: enter/exit animation with reduced-motion handling.
-- [ ] Theme: understandable, functional token demonstration.
+- [x] Theme: six labeled design-token swatches, inherited typography/controls and palette instructions. — dc12d14 passes native75, strict C11 web build, Chromium78 and quality checks. Documentation now describes system defaults, stored choices and host-owned native appearance. Publication pending.
 - [x] VirtualList: wheel/scrollbar/Home/End scroll real task rows from the 100,000-key model. — 85531a4 passes Chromium78 and submits at most nine rows; native model75 passes. Offscreen focus, asynchronous measurement and a public styled widget remain incomplete. Published in 9c87b99; HTTPS78 and twenty-seven artifact files verified.
 - [x] Chart: configurable 2px default strokes with smooth edges. — d564c70 passes native75, sanitizers75, WASI67 and Chromium78. Coverage regression fails the old raster; width/cache/clamping checks pass. Published in 9c87b99; HTTPS78 and twenty-seven artifact files verified.
 - [x] Command: content spans panel width. — 76c36ba checks full scroll/row width at two panel sizes, passes the same gates and fails old code. Published in f6c8cf8; HTTPS78 and twenty artifact files verified.
 - [x] DataTable: headers sort actual gallery rows and use themed SVG indicators. — 41de104 passes native75, sanitizers75, WASI67 and Chromium78; the graphic regression fails old code. Application-owned model sorting is documented. Published in 9c87b99; HTTPS78 and twenty-seven artifact files verified.
 - [x] Plot: visible projected sine wave with zoom/pan/reset and domain readout. — 8f1497a passes Chromium78 with changed/restored bitmap signatures. This composes the numerical model with Chart; a separate public Plot widget remains incomplete. Published in 9c87b99; HTTPS78 and twenty-seven artifact files verified.
-- [ ] TextView: Markdown fenced-code example.
+- [x] TextView: the existing fenced C code appears directly below the heading. — dc12d14 checks visible initial monospace bounds in Chromium78; native75 and quality checks pass. Publication pending.
 
 ## Design system
 

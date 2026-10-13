@@ -1,0 +1,8 @@
+Combined source checkpoint dc12d14
+Portable library is unchanged from 917f17d, validated native77/ASan75/WASI67.
+New host/model regression passes native75/ASan75/WASI67 in color-screen worker.
+Combined native77, strict WASM build, Chromium78 and lint/format/dist checks PASS.
+Includes real host EyeDropper integration, explained Theme tokens and visible Markdown code.
+Provider tests cover result/cancel/invalid/unavailable/disabled/stale completions.
+Browser tests stub host picking; OS pixel capture is not asserted headlessly.
+Full GPUI Kit parity and remaining feedback are unfinished.

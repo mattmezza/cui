@@ -8,4 +8,4 @@ Optional OFF build/CTest84/84 PASS.
 Installed pkg-config consumer links archive without a separate vendor archive and resolves Hebrew:PASS.
 Pinned hashes/licenses, format and docs5 PASS.
 Logs:/home/matteo/.cache/cui-validation/next16-bidi-{wrapped-test,wrapped-asan-test,off-test}.log
-Bidi rendering/shaping, cluster handling, caret/hit-testing/selection integration remain unfinished; this branch is not published and does not establish full international text parity.
+Subsequent integration adds explicit-line bidi/script HarfBuzz shaping and ordinary native mixed-direction/hard-line rendering with original UTF-8 cluster offsets. Caret/hit-testing/selection, automatic wrapping context, font fallback and full text integration remain unfinished; this branch is not published and does not establish full international text parity.

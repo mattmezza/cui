@@ -24,7 +24,7 @@ versions are deliberately rejected until the pins are reviewed.
 
 The runner builds an optimized portable static archive with C11,
 `-Wall -Wextra -Wpedantic -Werror`, and enabled assertions. It then compiles and
-executes 76 registered portable suites, including component/base behavior,
+executes 77 registered portable suites, including component/base behavior,
 implementation embedding, examples and single-/multi-TU distribution consumers. Each module gets an 8 MiB stack and a configurable
 instruction fuel budget (40 billion by default); exceeding the budget fails the suite. Runtime exits,
 traps, and compilation failures fail verification and are reported individually.

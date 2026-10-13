@@ -168,7 +168,7 @@ add_test(NAME virtual_model_distribution COMMAND dist_virtual_model)
 
 
 add_test(NAME component_usage_docs COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_component_usage.py)
-foreach(name bootstrap core base components render effects edit editor overlay virtual virtual_styled dock dock_styled plot plot_styled content disclosure choice numeric picker tree input table scroll surface form otp status message media description chrome resizable icon toolbar sidebar textarea settings carousel command root text_view chart speech questionnaire questionnaire_styled)
+foreach(name bootstrap core base components render effects edit editor overlay virtual virtual_styled dock dock_styled plot plot_styled content disclosure choice numeric picker tree input table scroll surface form otp status message media description chrome resizable icon toolbar sidebar textarea touch_textarea settings carousel command root text_view chart speech questionnaire questionnaire_styled)
  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_${name}.c)
   add_executable(test_${name} tests/unit/test_${name}.c)
   target_link_libraries(test_${name} PRIVATE cui cui_software)

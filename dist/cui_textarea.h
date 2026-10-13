@@ -677,9 +677,9 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             cui_consume_event(ui, i);
             continue;
         }
-        if (state->composition &&
-            (event.type == CUI_EVENT_CANCEL || (event.type >= CUI_EVENT_COMPOSITION_START &&
-                                                event.type <= CUI_EVENT_COMPOSITION_CANCEL))) {
+        if (state->composition && ((event.type == CUI_EVENT_CANCEL && state->composition->active) ||
+                                   (event.type >= CUI_EVENT_COMPOSITION_START &&
+                                    event.type <= CUI_EVENT_COMPOSITION_CANCEL))) {
             uint64_t revision = cui_edit_get_state(edit).revision;
             cui_edit_result r =
                 cui_edit_composition_event(edit, state->composition, event, !options.readonly);
@@ -722,6 +722,8 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                 fminf(state->maximum_y,
                       fmaxf(0, state->scroll_y -
                                    event.dy * (event.scroll_precise ? 1 : metrics.line_height)));
+            /* Explicit viewport movement wins over an earlier caret-reveal request. */
+            reveal = false;
             handled = state->scroll_x != old_x || state->scroll_y != old_y;
         } else if (primary && (event.type == CUI_EVENT_POINTER_DOWN ||
                                ((state->dragging || interaction.pressed) &&
@@ -904,6 +906,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
 /* src/components/cui_textarea.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
 static cui_id cui_textarea_child(cui_id id, size_t row, unsigned part) {
     return id ^ UINT64_C(0x7cf5d0e25db29861) ^
@@ -958,6 +961,10 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         return result;
     state->viewport.w = width;
     state->viewport.h = fmaxf(0, height - 2 * py);
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    if (state->composition && state->composition_owned)
+        state->composition->grow_view = true;
     result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;

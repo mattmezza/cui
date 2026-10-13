@@ -1631,6 +1631,10 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
     hit.viewport.x += cui_input_alignment(
         hit.viewport.w, cui_measure_text(ui, cui_edit_get_text(edit), metrics.font_size).width,
         options.text_align);
+    state->behavior.composition = cui_base_composition(ui, id, state->behavior.composition,
+                                                       &state->behavior.composition_owned);
+    if (state->behavior.composition && state->behavior.composition_owned)
+        state->behavior.composition->grow_view = true;
     bool multiline = cui_edit_get_state(edit).multiline;
     cui_input_result result = cui_base_input_ex(
         ui, id, name, edit, &state->behavior,

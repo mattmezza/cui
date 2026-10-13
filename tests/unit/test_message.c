@@ -21,6 +21,17 @@ static void models(void) {
     assert(cui_base_message(message, &plan) && plan.header_inset);
     message.width = NAN;
     assert(!cui_base_message(message, &plan));
+    message = cui_message_options_default();
+    message.max_bubble_width = 220;
+    message.avatar = (cui_message_slot){.present = true, .width = 40, .height = 40};
+    assert(cui_base_message(message, &plan) && plan.column_width == 220 &&
+           plan.footer_offset == 48);
+    message.width = 180;
+    assert(cui_base_message(message, &plan) && plan.column_width == 132);
+    message.max_bubble_width = NAN;
+    assert(!cui_base_message(message, &plan));
+    message.max_bubble_width = -1;
+    assert(!cui_base_message(message, &plan));
     cui_message_scroller_state *s =
         cui_message_scroller_create((cui_message_scroller_config){100, 20, 50});
     assert(s);
@@ -81,6 +92,69 @@ static void metadata_button(cui_context *ui, cui_id id, void *user, cui_message_
     cui_theme t = cui_theme_light();
     if (cui_button(ui, id, &t, cui_string("Reply"), false))
         *clicked = true;
+}
+static void compact_body(cui_context *ui, cui_id id, void *user, cui_message_style style) {
+    float *width = user;
+    *width = style.width;
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = style.width, .height = 30, .fixed_width = true, .fixed_height = true});
+    cui_interact(ui, id, CUI_ROLE_LABEL, cui_string("Compact body"), false, false, 0);
+    cui_end_box(ui);
+}
+static void compact_messages(void) {
+    cui_theme t = cui_theme_light();
+    for (unsigned mobile = 0; mobile < 2; mobile++)
+        for (unsigned end = 0; end < 2; end++) {
+            float row = mobile ? 240 : 600;
+            cui_context *ui = cui_create((cui_config){.width = row, .height = 300});
+            assert(ui);
+            float content = 0;
+            cui_message_body body = {
+                .typed_bubble = true,
+                .bubble = CUI_BUBBLE_SECONDARY,
+                .slot = {.present = true, .render = compact_body, .user = &content}};
+            cui_message_options o = cui_message_options_default();
+            o.width = row;
+            o.max_bubble_width = 220;
+            o.alignment = end ? CUI_MESSAGE_END : CUI_MESSAGE_START;
+            o.body = &body;
+            o.body_count = 1;
+            o.avatar = (cui_message_slot){
+                .present = true, .text = cui_string("AM"), .width = 40, .height = 40};
+            o.footer = (cui_message_slot){.present = true,
+                                          .text = cui_string("09:30 · Delivered"),
+                                          .inset = CUI_MESSAGE_INSET_OFF};
+            assert(cui_begin_frame(ui, row, 300, .016f));
+            assert(cui_message(ui, 500, &t, o));
+            cui_draw_list list = cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            float column = fminf(220, row - 48);
+            assert(fabsf(content - (column - 2 * t.padding)) < .01f);
+            size_t count;
+            const cui_semantic *sem = cui_semantics(ui, &count);
+            assert(count == 1);
+            assert(sem[0].bounds.w <= column && sem[0].bounds.x >= 0 &&
+                   sem[0].bounds.x + sem[0].bounds.w <= row);
+            if (end)
+                assert(sem[0].bounds.x > row - column - 60);
+            else
+                assert(sem[0].bounds.x >= 48);
+            bool metadata = false;
+            for (size_t i = 0; i < list.count; i++)
+                if (list.commands[i].type == CUI_DRAW_TEXT && list.commands[i].text.length == 18) {
+                    metadata = true;
+                    if (!end)
+                        assert(fabsf(list.commands[i].bounds.x - 48) < .01f);
+                    assert(list.commands[i].bounds.x + list.commands[i].bounds.w <= row + .01f);
+                }
+            assert(metadata);
+            o.max_bubble_width = NAN;
+            assert(cui_begin_frame(ui, row, 300, .016f));
+            assert(!cui_message(ui, 500, &t, o));
+            cui_end_frame(ui);
+            cui_destroy(ui);
+        }
 }
 static void composition(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
@@ -233,10 +307,15 @@ static void interactions(void) {
                 .type = CUI_EVENT_SCROLL, .x = 100, .y = 100, .dy = 3.5f, .scroll_precise = true}));
     result = scene(ui, s, o, &r);
     assert(result.view.scroll == before_precise - 3.5);
+    assert(cui_event_consumed(ui, 0));
     cui_focus(ui, 22);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
     result = scene(ui, s, o, &r);
     assert(result.view.scroll == 0 && result.view.scrolled_up);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 100, .y = 100,
+                                        .dy = 3.5f, .scroll_precise = true}));
+    result = scene(ui, s, o, &r);
+    assert(result.view.scroll == 0 && !cui_event_consumed(ui, 0));
     cui_focus(ui, cui_message_scroller_jump_id(22));
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     result = scene(ui, s, o, &r);
@@ -288,6 +367,7 @@ int main(void) {
     test_measure_preserves_top_padding();
     models();
 #ifndef CUI_MESSAGE_BASE_ONLY
+    compact_messages();
     composition();
 #endif
     interactions();

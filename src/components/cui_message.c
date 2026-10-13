@@ -105,9 +105,12 @@ bool cui_message(cui_context *ui, cui_id id, const cui_theme *t, cui_message_opt
         cui_interact(ui, id, o.role, o.name, false, false, 0);
         cui_set_tab_stop(ui, id, false);
     }
-    cui_begin_box(
-        ui, cui_message_component_child(id, 0),
-        (cui_box){.width = o.width, .row = true, .gap = o.row_gap, .align_y = CUI_ALIGN_END});
+    cui_begin_box(ui, cui_message_component_child(id, 0),
+                  (cui_box){.width = o.width,
+                            .row = true,
+                            .gap = o.row_gap,
+                            .align_y = CUI_ALIGN_END,
+                            .align_x = align});
     if (p.avatar && o.alignment == CUI_MESSAGE_START)
         cui_message_component_avatar(ui, cui_message_component_child(id, 1), t, o.avatar,
                                      o.alignment);

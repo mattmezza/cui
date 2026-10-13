@@ -4,7 +4,8 @@
 #include <string.h>
 bool cui_editor_state_init(cui_editor_state *s, cui_edit *edit, cui_textarea_line *lines,
                            size_t capacity) {
-    if (!s || !edit || !cui_edit_get_state(edit).multiline)
+    if (!s || !edit || !cui_edit_get_state(edit).multiline ||
+        cui_edit_get_content(edit).token_count)
         return false;
     cui_editor_state next = {.edit = edit};
     if (!cui_textarea_state_init(&next.view, lines, capacity))
@@ -120,10 +121,10 @@ static cui_edit_result cui_editor_completion_events(cui_context *ui, cui_id id,
 }
 cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cui_editor_state *s,
                                     cui_editor_options o, cui_textarea_metrics metrics) {
-    if (!ui || !id || !s || !s->edit || !s->view.lines || !s->view.capacity ||
-        s->view.capacity > 65536 || !isfinite(metrics.font_size) || metrics.font_size <= 0 ||
-        !isfinite(metrics.line_height) || metrics.line_height <= 0 ||
-        o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+    if (!ui || !id || !s || !s->edit || cui_edit_get_content(s->edit).token_count ||
+        !s->view.lines || !s->view.capacity || s->view.capacity > 65536 ||
+        !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
+        metrics.line_height <= 0 || o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
         o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||
         (o.language.length && !o.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};

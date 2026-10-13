@@ -561,7 +561,37 @@ static void completion_popup(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void inline_tokens_reject_code_mode(void) {
+    char buffer[64] = "Hi @Mary Jane!";
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
+    assert(edit);
+    cui_edit_token_span span = {
+        3, 13, {cui_string("mary"), cui_string("@Mary Jane"), cui_string("Mary")}};
+    cui_editor_state state;
+    cui_textarea_line lines[16];
+    assert(cui_editor_state_init(&state, edit, lines, 16));
+    assert(cui_edit_set_tokens(edit, &span, 1) == CUI_EDIT_OK);
+    cui_editor_state untouched = state;
+    assert(!cui_editor_state_init(&state, edit, lines, 16));
+    assert(!memcmp(&state, &untouched, sizeof state));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    cui_theme theme = cui_theme_light();
+    assert(cui_editor(ui, 10, &theme, cui_string("Code"), &state, cui_editor_default()).error ==
+           CUI_TEXTAREA_INVALID);
+    assert(cui_base_editor(ui, 10, cui_string("Code"), &state, cui_editor_default(),
+                           (cui_textarea_metrics){14, 20, 10, 8})
+               .error == CUI_TEXTAREA_INVALID);
+    cui_end_frame(ui);
+    size_t count;
+    cui_semantics(ui, &count);
+    assert(count == 0 && !strcmp(buffer, "Hi @Mary Jane!"));
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    inline_tokens_reject_code_mode();
     completion_model();
     completion_popup();
     narrow_editor_clipping();

@@ -608,7 +608,153 @@ static void test_unicode_word_events(void) {
     assert(cui_edit_delete_word(NULL) == CUI_EDIT_INVALID_ARGUMENT);
     cui_edit_destroy(edit);
 }
+static void test_inline_content(void) {
+    cui_edit_token_span spans[] = {
+        {3, 13, {cui_string("user42"), cui_string("@Mary Jane"), cui_string("Mary")}}};
+    cui_edit_content content = {cui_string("Hi @Mary Jane!"), spans, 1};
+    assert(cui_edit_content_valid(content));
+    size_t start = 777, end = 888;
+    assert(cui_edit_token_boundary(content, 5, false, &start) == CUI_EDIT_OK && start == 3);
+    assert(cui_edit_token_boundary(content, 5, true, &end) == CUI_EDIT_OK && end == 13);
+    assert(cui_edit_token_boundary(content, 3, true, &end) == CUI_EDIT_OK && end == 3);
+    assert(cui_edit_token_boundary(content, 13, false, &start) == CUI_EDIT_OK && start == 13);
+    assert(cui_edit_normalize_token_range(content, 5, 8, &start, &end) == CUI_EDIT_OK &&
+           start == 3 && end == 13);
+    assert(cui_edit_normalize_token_range(content, 5, 5, &start, &end) == CUI_EDIT_OK &&
+           start == 13 && end == 13);
+    start = 777;
+    end = 888;
+    assert(cui_edit_normalize_token_range(content, 8, 5, &start, &end) == CUI_EDIT_BOUNDARY);
+    assert(start == 777 && end == 888);
+    assert(cui_edit_token_boundary(content, 15, true, &start) == CUI_EDIT_BOUNDARY && start == 777);
+    cui_edit_token_span adjacent[] = {
+        {0, 2, {cui_string("same"), cui_string("@A"), cui_string("A")}},
+        {2, 4, {cui_string("same"), cui_string("@B"), cui_string("B")}}};
+    assert(cui_edit_content_valid((cui_edit_content){cui_string("@A@B"), adjacent, 2}));
+    adjacent[1].start = 1;
+    assert(!cui_edit_content_valid((cui_edit_content){cui_string("@A@B"), adjacent, 2}));
+    cui_edit_token_span bad = spans[0];
+    cui_edit_content invalid = {content.text, &bad, 1};
+    bad.start = bad.end;
+    assert(!cui_edit_content_valid(invalid));
+    bad = spans[0];
+    bad.end = SIZE_MAX;
+    assert(!cui_edit_content_valid(invalid));
+    bad = spans[0];
+    bad.token.text = cui_string("mismatch");
+    assert(!cui_edit_content_valid(invalid));
+    bad = spans[0];
+    bad.token.id = cui_string(" \xc2\xa0");
+    assert(!cui_edit_content_valid(invalid));
+    const char *labels[] = {"", "bad\n", "\xc2\x85", "\xe2\x80\xa8", "\xe2\x80\xa9", "\xc0\x80"};
+    for (size_t i = 0; i < sizeof labels / sizeof labels[0]; i++) {
+        bad = spans[0];
+        bad.token.label = cui_string(labels[i]);
+        assert(!cui_edit_content_valid(invalid));
+    }
+    bad = (cui_edit_token_span){1, 2, {cui_string("id"), cui_string("e"), cui_string("e")}};
+    assert(!cui_edit_content_valid((cui_edit_content){cui_string("AéZ"), &bad, 1}));
+    assert(!cui_edit_content_valid((cui_edit_content){content.text, NULL, 1}));
+    assert(!cui_edit_content_valid((cui_edit_content){content.text, spans, 65537}));
+    assert(cui_edit_content_valid((cui_edit_content){0}));
+    char buffer[128] = "old";
+    cui_edit *edit = make(buffer, sizeof buffer, true, 16);
+    assert(cui_edit_set_content(edit, content) == CUI_EDIT_OK && !strcmp(buffer, "Hi @Mary Jane!"));
+    cui_edit_content snapshot = cui_edit_get_content(edit);
+    assert(snapshot.tokens == spans && snapshot.token_count == 1 && snapshot.text.data == buffer);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_edit_select(edit, 5, 5) == CUI_EDIT_OK); /* exact scalar API survives */
+    assert(cui_edit_select_atomic(edit, 5, 5) == CUI_EDIT_OK &&
+           cui_edit_get_state(edit).cursor == 3);
+    assert(cui_edit_select_atomic(edit, 8, 5) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).anchor == 13 && cui_edit_get_state(edit).cursor == 3);
+    assert(cui_edit_select(edit, 3, 3) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 4); /* explicit scalar compatibility */
+    assert(cui_edit_move(edit, CUI_EDIT_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 3);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_RIGHT,
+                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK &&
+           cui_edit_get_state(edit).cursor == 13);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_LEFT,
+                                                  .modifiers = CUI_MOD_CTRL}) == CUI_EDIT_OK &&
+           cui_edit_get_state(edit).cursor == 3);
+    assert(cui_edit_apply_event(edit, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                  .key = CUI_KEY_RIGHT,
+                                                  .modifiers = CUI_MOD_SHIFT}) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 13 && cui_edit_get_state(edit).anchor == 3);
+    assert(cui_edit_get_state(edit).revision == revision);
+    assert(cui_edit_delete_word(edit) == CUI_EDIT_OK && !strcmp(buffer, "Hi !"));
+    assert(cui_edit_get_content(edit).token_count == 0);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "Hi @Mary Jane!"));
+    assert(cui_edit_get_state(edit).cursor == 13 && cui_edit_get_state(edit).anchor == 3);
+    assert(cui_edit_get_content(edit).token_count == 0); /* no token-history claim */
+    assert(cui_edit_set_tokens(edit, spans, 1) == CUI_EDIT_OK);
+    cui_edit_select(edit, 5, 5);
+    assert(cui_edit_insert(edit, cui_string("?")) == CUI_EDIT_OK &&
+           !strcmp(buffer, "Hi @Mary Jane?!"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && cui_edit_get_state(edit).cursor == 5);
+    assert(cui_edit_set_tokens(edit, spans, 1) == CUI_EDIT_OK);
+    assert(cui_edit_replace_range(edit, 5, 8, cui_string("X")) == CUI_EDIT_OK &&
+           !strcmp(buffer, "Hi X!"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && cui_edit_get_state(edit).cursor == 5);
+    assert(cui_edit_set_tokens(edit, spans, 1) == CUI_EDIT_OK);
+    assert(cui_edit_indent(edit, false, 2, false) == CUI_EDIT_INVALID_ARGUMENT);
+    bad = spans[0];
+    bad.end = SIZE_MAX;
+    assert(cui_edit_set_tokens(edit, &bad, 1) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_get_content(edit).tokens == spans);
+    assert(cui_edit_set_content(edit, (cui_edit_content){content.text, &bad, 1}) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    assert(!strcmp(buffer, "Hi @Mary Jane!") && cui_edit_get_content(edit).tokens == spans);
+    assert(cui_edit_set_tokens(edit, NULL, 0) == CUI_EDIT_OK);
+    assert(cui_edit_get_content(edit).token_count == 0);
+    cui_edit_destroy(edit);
+    char small[16] = "Hi @Mary Jane!";
+    edit = make(small, sizeof small, true, 16);
+    cui_edit_select(edit, 5, 5);
+    assert(cui_edit_set_tokens(edit, spans, 1) == CUI_EDIT_OK);
+    cui_edit_state before = cui_edit_get_state(edit);
+    assert(cui_edit_insert(edit, cui_string("long")) == CUI_EDIT_CAPACITY);
+    cui_edit_token_span large_span = {6, 16, spans[0].token};
+    assert(cui_edit_set_content(edit, (cui_edit_content){cui_string("XX Hi @Mary Jane!"),
+                                                         &large_span, 1}) == CUI_EDIT_CAPACITY);
+    cui_edit_state after = cui_edit_get_state(edit);
+    assert(before.cursor == after.cursor && before.anchor == after.anchor &&
+           before.revision == after.revision);
+    assert(!after.can_undo && !strcmp(small, "Hi @Mary Jane!") &&
+           cui_edit_get_content(edit).tokens == spans);
+    assert(cui_edit_insert(edit, (cui_str){"\xc0", 1}) == CUI_EDIT_INVALID_UTF8);
+    /* Simulated invalid live annotation storage rejects before any edit. */
+    spans[0].end = SIZE_MAX;
+    assert(cui_edit_delete_word(edit) == CUI_EDIT_INVALID_ARGUMENT);
+    assert(!strcmp(small, "Hi @Mary Jane!") && cui_edit_get_state(edit).cursor == 5);
+    assert(cui_edit_set_tokens(edit, NULL, 0) == CUI_EDIT_OK);
+    spans[0].end = 13;
+    cui_edit_destroy(edit);
+    strcpy(buffer, "@Mary Jane!");
+    edit = make(buffer, sizeof buffer, true, 16);
+    cui_edit_token_span alias = {
+        0, 10, {cui_string("id"), (cui_str){buffer, 10}, cui_string("Mary")}};
+    assert(cui_edit_set_content(edit, (cui_edit_content){(cui_str){buffer, 10}, &alias, 1}) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    assert(!strcmp(buffer, "@Mary Jane!") && cui_edit_get_state(edit).revision == 0);
+    cui_edit_destroy(edit);
+    /* A host may attach a sub-buffer; reject metadata beginning before it but
+     * overlapping mutable edit storage, not only pointers beginning inside. */
+    strcpy(buffer, "@Mary Jane!");
+    edit = make(buffer + 3, sizeof buffer - 3, true, 16);
+    alias =
+        (cui_edit_token_span){0, 10, {cui_string("id"), (cui_str){buffer, 10}, cui_string("Mary")}};
+    assert(cui_edit_set_content(edit, (cui_edit_content){cui_string(buffer), &alias, 1}) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    assert(!strcmp(buffer, "@Mary Jane!") && cui_edit_get_state(edit).revision == 0);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_inline_content();
     test_unicode_word_events();
     test_word_conformance();
     test_grapheme_conformance();

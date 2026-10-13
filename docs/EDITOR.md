@@ -233,8 +233,9 @@ Hosts can call appended `CUI_EDIT_UNICODE_WORD_PREVIOUS`/`NEXT` motions and
 behavior. `cui_word_next`/`previous`/`boundary` expose the Unicode 17.0.0 default
 boundaries with the same complete UTF-8 validation and byte-offset contract as
 the grapheme queries. They scan caller-supplied text without allocation; the edit
-model continues to borrow its NUL-terminated buffer. This does not add frozen
-host token-boundary overrides, multi-cursor editing, or dictionary segmentation.
+model continues to borrow its NUL-terminated buffer. This does not add code
+Editor inline-token integration, multi-cursor editing, or dictionary segmentation;
+ordinary atomic inline content is described below.
 
 Pinned `WordBreakProperty.txt`, `WordBreakTest.txt`, and `PropList.txt` supply the
 word properties, 1,944 official conformance cases, and Unicode White_Space.
@@ -269,5 +270,65 @@ Tests cover both selection orientations, fresh/preserved preferred x, exact
 line-start math, wrapped geometry, active-endpoint affinity, folded gap clamping,
 readonly/disabled views, page behavior, whole-grapheme targets, and unchanged
 document revision/undo history. This implements the retained single-selection
-behavior; frozen multi-cursor merging and host token-boundary overrides remain
-outside this adapter's scope.
+behavior; frozen multi-cursor merging remains outside this adapter's scope.
+Atomic inline content belongs to ordinary Input/Textarea, as described below.
+
+Atomic inline content for ordinary Textarea
+-------------------------------------------
+
+The frozen `inline_tokens.rs` exports `InlineToken`, `InputContent`, and token
+replacement APIs only for ordinary Input and Textarea. Its `check_token_mode`
+and `install_tokens` explicitly exclude code Editor mode. CUI therefore rejects
+annotated models in Editor initialization and base/styled Editor preflight;
+this feature belongs to `cui_edit` and the ordinary Textarea adapter.
+
+`cui_edit_content` borrows the document and a sorted caller-owned collection of
+`cui_edit_token_span`. Each span carries an ID, source text, and display-label
+metadata. IDs may repeat; they must contain a non-whitespace scalar. Source text
+and label are nonempty NUL-free UTF-8 without control characters or U+2028/U+2029.
+Ranges must be nonempty, nonoverlapping, on grapheme boundaries, and exactly
+match the token's source text. `cui_edit_content_valid` performs validation with
+one forward grapheme traversal. No host callback runs during validation or
+normalization, and no metadata allocation is hidden in these APIs.
+
+`cui_edit_set_content` replaces the text as one atomic edit/history step, then
+adopts the borrowed spans. Rejection preserves text, selection, history, and the
+old attachment. When replacing annotated content, token strings must not alias
+mutable edit storage; that alias is rejected before mutation. Use
+`cui_edit_set_tokens` to attach annotations to unchanged text while preserving
+selection/history. `cui_edit_get_content` returns a borrowed current snapshot:
+the document view lasts until the next mutation/destruction, while arrays and
+all token strings must remain immutable and alive until detachment. Call
+`cui_edit_set_tokens(edit, NULL, 0)` before releasing their storage.
+
+Pure `cui_edit_token_boundary` snaps strict interiors to the token start or end
+according to the requested bias. `cui_edit_normalize_token_range` expands
+nonempty ranges outward and moves collapsed insertion points to token end;
+output is untouched on rejection. Attached spans protect insertion, deletion,
+and range replacement using this normalization. Ctrl/Alt word deletion remains
+one undo step even when its initial Unicode target is inside a token. Keyboard
+motions skip token interiors, and Textarea hit testing/view selections use
+atomic boundaries. Raw source text remains visible; wrapping keeps each atom
+whole, with an oversized atom on one clipped overflowing row. Display labels
+are metadata for the host, not automatically painted chips.
+
+Explicit scalar `cui_edit_select`, PREVIOUS/NEXT and legacy WORD motions remain
+available. `cui_edit_select_atomic` expands selections outward and snaps a
+collapsed view cursor left. Attached atoms protect subsequent edits even when a
+host selected a scalar interior. Whole-document indent is unsupported while
+annotations are attached, so Textarea releases Tab ownership for those models.
+
+Any text revision, including undo/redo, detaches annotations. Hosts must refresh
+and reattach them; undo restores document text and the original byte selection,
+but does not restore token metadata. This scoped borrowed-content model does
+not implement frozen token replacement exports, owned content snapshots,
+incremental span/history remapping, chip/label rendering, masked/secret Input
+mode integration, grammar registries, or language services. Ordinary Input
+adapter wiring outside this module must enforce its own supported-mode rules.
+
+Headless tests cover source validation, repeated IDs, adjacency/overlap,
+grapheme/text mismatch, controls/Unicode whitespace, biased boundaries,
+normalization, scalar compatibility, atomic modifier deletion/undo, collapsed
+insertion, invalid/capacity/alias rejection before mutation, invalid borrowed
+range preflight, lifetime detachment, readonly/pointer/wrap geometry, Tab
+semantics, and explicit code Editor rejection.

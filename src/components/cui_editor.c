@@ -154,7 +154,8 @@ static cui_edit_result cui_editor_completion_popup(cui_context *ui, cui_id id,
 }
 cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                cui_editor_state *editor, cui_editor_options config) {
-    if (!editor || !editor->edit || (config.language.length && !config.language.data))
+    if (!editor || !editor->edit || cui_edit_get_content(editor->edit).token_count ||
+        (config.language.length && !config.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
     cui_edit *edit = editor->edit;
     cui_textarea_state *state = &editor->view;

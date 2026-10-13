@@ -824,7 +824,89 @@ static void test_vertical_selection_collapse(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_atomic_inline_tokens(void) {
+    styled_probe probe = {.width = 5};
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
+    char buffer[128] = "Hello @Mary Jane!";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_edit_token_span span = {
+        6, 16, {cui_string("mary"), cui_string("@Mary Jane"), cui_string("Mary")}};
+    assert(cui_edit_set_tokens(edit, &span, 1) == CUI_EDIT_OK);
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_options options = {.width = 240, .no_wrap = true};
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    assert(count == 1 && !semantics[0].details.handles_tab);
+    assert(cui_textarea_hit_test(ui, edit, &state, state.viewport.x + 45, state.viewport.y + 1) ==
+           6);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 6, 6);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 16);
+    key(ui, CUI_KEY_LEFT, CUI_MOD_CTRL | CUI_MOD_SHIFT);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 6 && cui_edit_get_state(edit).anchor == 16);
+    key(ui, CUI_KEY_BACKSPACE, CUI_MOD_CTRL);
+    assert(frame(ui, edit, &state, options).changed);
+    assert(!strcmp(buffer, "Hello !") && cui_edit_get_content(edit).token_count == 0);
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    frame(ui, edit, &state, options);
+    assert(!strcmp(buffer, "Hello @Mary Jane!") && cui_edit_get_content(edit).token_count == 0);
+    assert(cui_edit_set_tokens(edit, &span, 1) == CUI_EDIT_OK);
+    options.readonly = true;
+    cui_edit_select(edit, 6, 6);
+    key(ui, CUI_KEY_RIGHT, 0);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 16);
+    key(ui, CUI_KEY_BACKSPACE, CUI_MOD_CTRL);
+    assert(!frame(ui, edit, &state, options).changed);
+    assert(cui_edit_get_content(edit).token_count == 1 && !strcmp(buffer, "Hello @Mary Jane!"));
+    options.readonly = false;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = state.viewport.x + 45,
+                                           .y = state.viewport.y + 1,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 6 && cui_edit_get_state(edit).anchor == 6);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = state.viewport.x + 45,
+                                           .y = state.viewport.y + 1,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    frame(ui, edit, &state, options);
+    /* An inline atom remains one row even when its raw text is wider than the
+     * viewport; no visual wrap boundary may split an annotation. */
+    options.width = 40;
+    options.no_wrap = false;
+    frame(ui, edit, &state, options);
+    bool whole = false;
+    for (size_t i = 0; i < state.count; i++) {
+        assert(!(lines[i].start > 6 && lines[i].start < 16));
+        assert(!(lines[i].end > 6 && lines[i].end < 16));
+        whole |= lines[i].start == 6 && lines[i].end == 16;
+    }
+    assert(whole);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    size_t cursor = cui_edit_get_state(edit).cursor;
+    span.end = SIZE_MAX; /* simulated invalid borrowed range */
+    key(ui, CUI_KEY_DELETE, CUI_MOD_CTRL);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_INVALID);
+    assert(cui_edit_get_state(edit).revision == revision &&
+           cui_edit_get_state(edit).cursor == cursor);
+    assert(!strcmp(buffer, "Hello @Mary Jane!"));
+    semantics = cui_semantics(ui, &count);
+    assert(count == 0);
+    assert(cui_edit_set_tokens(edit, NULL, 0) == CUI_EDIT_OK);
+    span.end = 16;
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_atomic_inline_tokens();
     test_vertical_selection_collapse();
     test_unicode_word_keyboard();
     test_vertical_selection_document_edges();

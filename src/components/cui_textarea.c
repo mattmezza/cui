@@ -26,6 +26,8 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
     cui_textarea_result result = {.error = CUI_TEXTAREA_INVALID};
     cui_textarea_metrics metrics;
     if (!ui || !id || !theme || !edit || !state ||
+        (cui_edit_get_content(edit).token_count &&
+         !cui_edit_content_valid(cui_edit_get_content(edit))) ||
         !cui_textarea_measure(options, theme->font_size, &metrics) || !isfinite(options.width) ||
         !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
         options.rows > 65536 || options.min_rows > 65536 || options.max_rows > 65536 ||

@@ -25,7 +25,11 @@ static cui_size measure(void *user, cui_str text, float font, cui_text_style sty
     return (cui_size){text.length * font * .5f, font};
 }
 static bool paint(const cui_prepaint_info *info, const void *copied, cui_prepaint_writer *writer) {
+#if defined(_MSC_VER)
+    assert((uintptr_t)copied % _Alignof(payload) == 0);
+#else
     assert((uintptr_t)copied % _Alignof(max_align_t) == 0);
+#endif
     const payload *p = copied;
     assert(p->marker == 1234.5);
     *p->seen = *info;
@@ -97,6 +101,22 @@ static bool paint(const cui_prepaint_info *info, const void *copied, cui_prepain
         assert(info->capture == 20 && cui_event_target(p->ui, 0) == 20 &&
                !cui_event_consumed(p->ui, 0) && cui_pressed(p->ui, 20));
     return true;
+}
+typedef struct {
+    char tag;
+    long double real;
+    uint64_t integer;
+    unsigned *counter;
+} aligned_payload;
+static bool paint_aligned(const cui_prepaint_info *info, const void *copied,
+                          cui_prepaint_writer *writer) {
+    assert((uintptr_t)copied % _Alignof(aligned_payload) == 0);
+    const aligned_payload *p = copied;
+    assert(p->tag == 'A' && p->real == 1.25L && p->integer == UINT64_C(0x123456789abcdef0));
+    (*p->counter)++;
+    cui_draw_command command = {
+        .type = CUI_DRAW_RECT, .bounds = info->bounds, .color = {55, 0, 0, 255}};
+    return cui_prepaint_emit(writer, &command, false);
 }
 static cui_context *create(size_t commands, size_t bytes) {
     cui_context *ui = cui_create((cui_config){.max_elements = 64,
@@ -436,6 +456,26 @@ int main(void) {
     cui_end_box(ui);
     cui_end_frame(ui);
     assert(calls == before);
+    cui_destroy(ui);
+    /* "ab" consumes three string bytes; the following payload must be realigned. */
+    ui = create(128, 4096);
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_begin_box(ui, 1, (cui_box){.width = 300, .height = 200});
+    cui_text(ui, cui_string("ab"), 12, (cui_color){0, 0, 0, 255});
+    cui_begin_box(ui, 50, (cui_box){.width = 100, .height = 40});
+    unsigned aligned_calls = 0;
+    aligned_payload aligned = {'A', 1.25L, UINT64_C(0x123456789abcdef0), &aligned_calls};
+    assert(cui_set_prepaint(ui, (cui_prepaint_options){.callback = paint_aligned,
+                                                       .payload = &aligned,
+                                                       .payload_bytes = sizeof aligned,
+                                                       .command_budget = 3}));
+    aligned.real = 0;
+    aligned.integer = 0;
+    cui_end_box(ui);
+    cui_end_box(ui);
+    d = cui_end_frame(ui);
+    assert(aligned_calls == 1 && color_index(d, 55) != SIZE_MAX && cui_last_error(ui) == CUI_OK);
+    balanced(d);
     cui_destroy(ui);
     puts("prepaint: ok");
 }

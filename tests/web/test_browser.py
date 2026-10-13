@@ -2745,12 +2745,13 @@ def main():
             page.keyboard.press('Control+Home')
             page.keyboard.press('Control+Shift+ArrowRight')
             page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)===0&&cuiGallery.exports.gallery_input_selection(1)===9')
-            page.keyboard.press('Shift+ArrowDown')
-            page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)===0&&cuiGallery.exports.gallery_input_selection(1)===14')
-            page.keyboard.press('ArrowUp')
-            page.wait_for_function('cuiGallery.exports.gallery_input_selection(1)===0')
-            page.keyboard.press('ArrowDown')
-            page.wait_for_function('cuiGallery.exports.gallery_input_selection(0)===14&&cuiGallery.exports.gallery_input_selection(1)===14')
+            # Source single-line Input consumes vertical keys without moving selection.
+            vertical_selection = page.evaluate('Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_input_selection(i))')
+            for key in ['Shift+ArrowDown', 'ArrowUp', 'ArrowDown']:
+                before_vertical = page.evaluate('cuiGallery.frame')
+                page.keyboard.press(key)
+                page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before_vertical)
+                assert page.evaluate('Array.from({length:3},(_,i)=>cuiGallery.exports.gallery_input_selection(i))') == vertical_selection, key
             bounds = page.evaluate('Array.from({length:4},(_,i)=>cuiGallery.exports.gallery_semantic(0,i+1))')
             rectangle = canvas.bounding_box()
             y = rectangle['y'] + bounds[1] + bounds[3] - 16

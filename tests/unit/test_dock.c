@@ -579,6 +579,80 @@ static void test_hidden_geometry(void) {
     assert(!strcmp(before, after));
     cui_dock_destroy(d);
 }
+static void test_root_policy(void) {
+    assert(!cui_dock_create_with_root((cui_dock_config){0}, (cui_dock_root_kind)99));
+    cui_dock *d = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
+    cui_dock *any = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_ANY);
+    assert(d && any && cui_dock_root_policy(d) == CUI_DOCK_ROOT_SPLIT &&
+           cui_dock_root_policy(any) == CUI_DOCK_ROOT_ANY);
+    cui_dock_node root = cui_dock_root(d), leaf, other;
+    cui_dock_node_info info;
+    assert(cui_dock_node_get(d, root, &info) && info.nary && !info.child_count &&
+           info.kind == CUI_DOCK_SPLIT_HORIZONTAL);
+    cui_dock_geometry geometry[4];
+    size_t count = 999;
+    bool fit;
+    assert(cui_dock_layout(d, (cui_rect){0, 0, 300, 200}, 4, geometry, 4, &count, &fit) ==
+               CUI_DOCK_OK &&
+           !count && fit);
+    assert(cui_dock_set_sizes(d, root, NULL, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(d, root, 10, 0) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    assert(cui_dock_child_at(d, root, 0, &leaf, NULL));
+    assert(cui_dock_insert(d, root, 20, SIZE_MAX) == CUI_DOCK_OK);
+    assert(cui_dock_remove(d, 20) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    assert(cui_dock_split(d, leaf, CUI_DOCK_SPLIT_HORIZONTAL, .5, 30, false, &other) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_root(d) == root && cui_dock_node_get(d, root, &info) && info.child_count == 2);
+    cui_dock_node nested;
+    assert(cui_dock_split(d, other, CUI_DOCK_SPLIT_VERTICAL, .5, 40, false, &nested) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_remove(d, 40) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    assert(cui_dock_panel_find(d, 30, &nested, NULL) && nested == other);
+    assert(cui_dock_remove(d, 30) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    assert(cui_dock_node_get(d, root, &info) && info.child_count == 1);
+    char before[2048], after[2048];
+    serialize(d, before, sizeof before);
+    assert(cui_dock_restore(any, dock_test_string(before)) == CUI_DOCK_OK);
+    assert(cui_dock_node_get(any, cui_dock_root(any), &info) && info.kind == CUI_DOCK_TABS);
+    assert(cui_dock_transfer(d, 10, any, cui_dock_root(any), SIZE_MAX, CUI_DOCK_TABS, .5, false,
+                             NULL) == CUI_DOCK_DUPLICATE_PANEL);
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after));
+    assert(cui_dock_remove(any, 10) == CUI_DOCK_OK);
+    assert(cui_dock_transfer(d, 10, any, cui_dock_root(any), SIZE_MAX, CUI_DOCK_TABS, .5, false,
+                             NULL) == CUI_DOCK_OK);
+    assert(cui_dock_root(d) == root && cui_dock_node_get(d, root, &info) && !info.child_count);
+    assert(cui_dock_transfer(any, 10, d, root, 0, CUI_DOCK_TABS, .5, false, &leaf) == CUI_DOCK_OK);
+    assert(leaf != root && cui_dock_panel_find(d, 10, &other, NULL) && other == leaf);
+    assert(cui_dock_remove(d, 10) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    serialize(d, before, sizeof before);
+    assert(cui_dock_restore(d, dock_test_string(before)) == CUI_DOCK_OK);
+    assert(cui_dock_node_get(d, cui_dock_root(d), &info) && !info.child_count && info.nary);
+    /* Host policy wraps a legacy tab root without inventing pixel sizes. */
+    assert(cui_dock_restore(d, dock_test_string("CUIDOCK 1 T 0 0 0 1 77")) == CUI_DOCK_OK);
+    root = cui_dock_root(d);
+    cui_dock_slot_size slot;
+    assert(cui_dock_child_at(d, root, 0, &leaf, &slot) && !slot.has_size);
+    assert(cui_dock_root_policy(d) == CUI_DOCK_ROOT_SPLIT);
+    assert(cui_dock_remove(d, 77) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    /* A loaded binary split also retains its root after losing one leaf. */
+    assert(cui_dock_restore(d, dock_test_string("CUIDOCK 1 H .5 0 0 T 0 0 0 1 1 T 0 0 0 1 2")) ==
+           CUI_DOCK_OK);
+    root = cui_dock_root(d);
+    assert(cui_dock_remove(d, 1) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    assert(cui_dock_remove(d, 2) == CUI_DOCK_OK && cui_dock_root(d) == root);
+    cui_dock *small =
+        cui_dock_create_with_root((cui_dock_config){1, 1, 1, 2048}, CUI_DOCK_ROOT_SPLIT);
+    assert(small);
+    serialize(small, before, sizeof before);
+    assert(cui_dock_insert(small, cui_dock_root(small), 1, 0) == CUI_DOCK_CAPACITY);
+    assert(cui_dock_restore(small, dock_test_string("CUIDOCK 1 T 0 0 0 1 1")) == CUI_DOCK_CAPACITY);
+    serialize(small, after, sizeof after);
+    assert(!strcmp(before, after));
+    cui_dock_destroy(small);
+    cui_dock_destroy(any);
+    cui_dock_destroy(d);
+}
 static void test_nary_model(void) {
     cui_dock *d = cui_dock_create_nary((cui_dock_config){0});
     cui_dock_node a = cui_dock_root(d), b, c, bottom;
@@ -713,7 +787,7 @@ static void test_nary_normalization_capacity(void) {
     assert(cui_dock_child_at(d, root, 0, &a, &size) && size.has_size && size.size == 100);
     assert(cui_dock_child_at(d, root, 1, &b, &size) && !size.has_size);
     serialize(d, before, sizeof before);
-    const char *bad[] = {"CUIDOCK 2 X 0 0 1 0 T 0 0 0 1 0",
+    const char *bad[] = {"CUIDOCK 2 X 0 0 2 0 Y 0 0 1 0 T 0 0 0 1 0 0 T 0 0 0 1 1",
                          "CUIDOCK 2 X 0 0 2 2 T 0 0 0 1 0 0 T 0 0 0 1 1",
                          "CUIDOCK 2 X 0 0 2 1 -1 T 0 0 0 1 0 0 T 0 0 0 1 1",
                          "CUIDOCK 1 X 0 0 2 0 T 0 0 0 1 0 0 T 0 0 0 1 1",
@@ -732,6 +806,7 @@ static void test_nary_normalization_capacity(void) {
 int main(void) {
     test_nary_normalization_capacity();
     test_nary_model();
+    test_root_policy();
     test_hidden_geometry();
     test_slot_sizing();
     test_visibility_queries();

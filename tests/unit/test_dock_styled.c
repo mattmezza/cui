@@ -1202,6 +1202,44 @@ static size_t title_color_count(cui_color color, cui_draw_type type) {
     }
     return count;
 }
+static void test_pinned_root_scene(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
+    assert(model);
+    cui_dock_node root = cui_dock_root(model), leaf, right;
+    cui_dock_node_info info;
+    options.panel_style = CUI_DOCK_PANEL_AUTO;
+    frame();
+    assert(cui_bounds(ui, 800).w == 0 && cui_bounds(ui, cui_dock_tab_id(workspace, 0)).w == 0);
+    assert(cui_dock_insert(model, root, 0, 0) == CUI_DOCK_OK &&
+           cui_dock_child_at(model, root, 0, &leaf, NULL));
+    frame();
+    frame();
+    assert(cui_bounds(ui, 800).w > 0 && cui_bounds(ui, cui_dock_tab_id(workspace, 0)).h == 30);
+    assert(cui_dock_split(model, leaf, CUI_DOCK_SPLIT_HORIZONTAL, .5, 1, false, &right) ==
+           CUI_DOCK_OK);
+    frame();
+    frame();
+    assert(cui_bounds(ui, cui_dock_resize_id(workspace, model, root)).w > 0);
+    click(cui_dock_close_id(workspace, 1));
+    assert(result.closed && cui_dock_root(model) == root && cui_dock_node_get(model, root, &info) &&
+           info.child_count == 1);
+    frame();
+    frame();
+    assert(cui_bounds(ui, cui_dock_resize_id_at(workspace, model, root, 0)).w == 0);
+    assert(cui_bounds(ui, 800).w > 0);
+    cui_focus(ui, cui_dock_tab_id(workspace, 0));
+    click(cui_dock_close_id(workspace, 0));
+    assert(result.closed && cui_dock_root(model) == root && cui_dock_node_get(model, root, &info) &&
+           info.child_count == 0);
+    frame();
+    assert(cui_focused(ui) != cui_dock_tab_id(workspace, 0) && cui_bounds(ui, 800).w == 0);
+    assert(cui_dock_insert(model, root, 0, 0) == CUI_DOCK_OK);
+    frame();
+    frame();
+    assert(cui_bounds(ui, 800).w > 0 && cui_dock_root(model) == root);
+    options.panel_style = CUI_DOCK_PANEL_TAB_BAR;
+}
 static void test_title_palette(void) {
     cui_dock_destroy(model);
     model = cui_dock_create((cui_dock_config){0});
@@ -2343,6 +2381,7 @@ int main(void) {
     test_title_composition();
     test_title_modes_padding();
     test_title_palette();
+    test_pinned_root_scene();
     test_group_constraints();
     test_workspace_constraints();
     test_dynamic_visibility();

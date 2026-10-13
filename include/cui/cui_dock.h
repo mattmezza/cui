@@ -42,6 +42,10 @@ typedef struct {
 cui_dock *cui_dock_create(cui_dock_config config);
 /* Explicit optional-size/n-ary edit mode; legacy constructor remains binary. */
 cui_dock *cui_dock_create_nary(cui_dock_config config);
+typedef enum { CUI_DOCK_ROOT_ANY, CUI_DOCK_ROOT_SPLIT } cui_dock_root_kind;
+/* Canonical source-style constructor: initially an empty horizontal split. */
+cui_dock *cui_dock_create_with_root(cui_dock_config, cui_dock_root_kind);
+cui_dock_root_kind cui_dock_root_policy(const cui_dock *);
 void cui_dock_destroy(cui_dock *dock);
 cui_dock_node cui_dock_root(const cui_dock *dock);
 size_t cui_dock_memory_bytes(const cui_dock *dock);

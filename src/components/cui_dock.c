@@ -987,6 +987,8 @@ static bool dock_cache_children(dock_cache *cache, size_t count) {
 }
 static void dock_render_nary(dock_scene *s, cui_dock_node_info info, dock_cache *cache, float w,
                              float h) {
+    if (!info.child_count)
+        return;
     if (!dock_cache_children(cache, info.child_count)) {
         s->result.error = CUI_DOCK_CAPACITY;
         return;

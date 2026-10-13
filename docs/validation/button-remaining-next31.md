@@ -1,39 +1,46 @@
-# Remaining Button contracts after Next30
+# Remaining Button contracts after automatic label layout
 
-Audit target: frozen CUI `534a9db`. Reference: local GPUI component v0.7.1, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, verified with `git rev-parse HEAD`. This is a read-only delta from `button-completion-audit-next28.md/json` and `button-group-proposal-next29.md/json`, not a new family certification. Source paths below are relative to that pinned repository.
+Audit target: merged CUI `f9e4c1f`, with automatic label commit `7183636` integrated. Reference: local GPUI component v0.7.1, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, verified with `git rev-parse HEAD`. This is a read-only delta from `button-completion-audit-next28.md/json` and `button-group-proposal-next29.md/json`, not a new family certification. Source paths below are relative to that pinned repository.
 
-## Concrete first gap: automatic content containment
+## Closed bounded slice: automatic fixed/grow label layout
 
-`crates/component/src/button/button.rs:737-766` makes the content container fill available space, clips overflow, prohibits wrapping, and gives the visible label automatic ellipsis. CUI `src/components/cui_components.c:280-296` only gives the label a clipped fixed box when `label_width` is explicitly supplied, and `cui_button_label` requires optional state to ellipsize. Positive `.width` establishes an outer Button clip, but does not establish automatic available-label ellipsis; grow width does not enable that outer clip.
+The formerly failing fixed-80 and grow-parent-80 probes are historical evidence,
+not current defects. The merged implementation uses current-frame label bounds,
+owned prepaint header/string copies, a clipped content container and automatic
+no-wrap ellipsis. The full original semantic name is copied separately. Explicit
+`label_width` and optional caller state remain compatible; `allow_content_overflow`
+is a named legacy opt-out. FIT sizing is retained. Arbitrary child callbacks own
+their internal layout; a content clip is not proof that all arbitrary nested
+content inherits a no-wrap text policy.
 
-A strict C11 external probe against the frozen native library submitted an ordinary long label with `width=80`, no state and no explicit label width. It returned `CUI_OK`, Button bounds `(0,0,80,32)`, and TEXT bounds `(10,6.9,369.6,17.5)`: the TEXT command extends 299.6 pixels past the right edge, but the positive-width outer clip hard-crops it. It is a missing-ellipsis proof, not a positive-width visible-leak proof. A second run uses grow width `-1` in an 80-pixel parent: the Button grows to 104 pixels and the label wraps into six lines, with TEXT y positions extending through 87.2 and no clip commands, despite Button height 32. That run establishes missing grow-width containment/nowrap. The exact label is `A long label that needs automatic truncation`. Preserved reproducer and output: `/home/matteo/.cache/cui-validation/button-next31-label-probe.c` and `-fixed.log` / `-grow.log` (command types include CLIP_PUSH); the original `.log` records the initial fixed-width geometry. This is actual laid-out DrawCommand evidence, not a prediction from font metrics or a claim about physical devices.
+`test_button_label_layout.c` covers all 18 size choices and both densities, first
+frame grow, immediate width changes, artwork/caret/custom slots, full names,
+grapheme prefixes, copied temporary label bytes, invalid shapes and arena
+failure/recovery. `test_button_label_font.c` repeats it with actual native font
+measurement. The independent WASM fixture verifies visible ellipsis glyph pixels,
+clip containment and actual mouse/CDP touch activation. The optional 256-byte
+state buffer caps only its diagnostic visible prefix, not the full semantic name
+or state-free label. Full semantic bytes and the deferred label tail each use
+bounded frame storage, so available frame capacity, alignment and other submitted
+strings determine the actual maximum. Capacity errors produce a failed frame;
+accepted callbacks already processed are not rolled back. No new heap allocation,
+VLA or arbitrary full-label limit was introduced.
 
-Reproducer body:
-
-```c
-cui_context *ui = cui_create((cui_config){.max_elements=128, .max_commands=512});
-cui_theme t = cui_theme_light();
-cui_begin_frame(ui, 300, 200, 0);
-cui_begin_box(ui, 1, (cui_box){.width=300, .height=200});
-cui_button_ex(ui, 10, &t,
-    cui_string("A long label that needs automatic truncation"),
-    (cui_button_options){.width=80});
-cui_end_box(ui);
-cui_draw_list draw = cui_end_frame(ui);
-/* Compare TEXT bounds in draw with cui_bounds(ui, 10); inspect clip commands too.
- * Grow case: set parent.width=80 and Button options.width=-1. */
-cui_destroy(ui);
-```
+The label prepaint callback avoids state-buffer writes under inert ancestry and
+layout-only paint is omitted. This is narrower than whole Button lifecycle
+immutability: the independent passive-state probe below exposes a remaining
+metadata/tooltip issue. Core clip-only leakage was separately corrected by
+`eaa5e03`; passive Button lifecycle is not claimed complete from that paint fix.
 
 ## Exact remaining contracts
 
 | Contract and pinned source | Current CUI mapping and remaining limit |
 | --- | --- |
-| Automatic content clip/nowrap/ellipsis, Button `737-766` | Explicit `label_width` plus caller state is tested; automatic constrained-width ellipsis and grow-width containment are missing, with the concrete failures above. All source child content also shares the clipped content container. |
+| Automatic content clip/nowrap/ellipsis, Button `737-766` | Implemented and tested for fixed/grow labels in `f9e4c1f`; full names and explicit opt-outs retained. Arbitrary custom-child text layout remains caller-owned, with shared content clipping; do not certify arbitrary inherited CSS-like whitespace refinement. |
 | Public `Styled` refinement and Base semantic state styles, Base Button `135-181`, Components Button `580-584,611-613,722-723,792-804` | Public Core composition and Button custom colors/geometry/slots cover parts; there is no arbitrary Button root style refinement replayed after each selected/disabled state. Do not equate a palette override with the full style contract. |
 | Gradient-backed theme surfaces and Oklab transparent mixing, Button `899-988,1100-1273`, tests `1812-1868` | Button palettes hold RGBA colors, not source Background gradients. Alpha multiplication and supplied outline colors are not Oklab interpolation. This needs a separate paint/theme contract, not another variant enum. |
 | `ButtonCustomVariant.shadow(bool)`, Button `138-141,650-656,1093-1099` | Core now supports bounded value-owned drop shadows, but Button has no shadow option and theme has no equivalent global shadow enable flag. Only Custom requests shadow in the pinned Button: built-in variants do **not** require invented shadows. Loading opacity applies to the entire shadow/button; disabled suppresses shadow. GPUI `shadow_xs` is one black alpha .05 layer, offset `(0,1)`, `blur_radius=2`, from pinned dependency macro `gpui-pre-macros-0.3.8/src/styles.rs:416-424`; use the already audited blur conversion rather than guessing its sigma semantics. |
-| Focus painting, Button `625-631,879-880`, Components `styled.rs:235-333` | CUI paints a two-pixel border in theme focus color whenever focus-visible and not hidden. Source distinguishes outside three-pixel alpha-.5 ring, border tint without layout changes, and borderless Edge/Inside/Outside fallback lines when theme ring is off. Source filled fallback uses foreground alpha .6; outside/inside gap is .125 rem. Theme `hide_focus_ring` and Core current-frame outline/prepaint support exist, but the Button implementation does not use them for this exact policy. Also source borders are limited to Default or outline (`Button:700-703`), whereas CUI non-borderless variants generally use a one-pixel border. |
+| Focus painting, Button `625-631,879-880`, Components `styled.rs:235-333` | CUI paints a two-pixel border in theme focus color whenever focus-visible and not hidden. Source paints for its focused handle (not specifically keyboard focus-visible) and distinguishes outside three-pixel alpha-.5 ring, border tint without layout changes, and borderless Edge/Inside/Outside fallback lines when theme ring is off. Source filled fallback uses foreground alpha .6; outside/inside gap is .125 rem. Theme `hide_focus_ring` and Core current-frame outline/prepaint support exist, but the Button implementation does not use them for this exact policy. Also source borders are limited to Default or outline (`Button:700-703`), whereas CUI non-borderless variants generally use a one-pixel border. |
 | Ordered signed `tab_index`, Base `109-115`, styled `472-483` | Core public tab-stop API sets only 0/-1 and traversal follows semantic order. `skip_tab` is not signed indexed ordering. Full ordering would require an explicitly scoped Core change; it is not Button-only work. |
 | Public role override and explicit focusability, Base `88-128`, styled `326-329` | CUI derives Button/Link and permits Core semantic refinement; no Button role option or Base `focusable(false)` equivalent option. Late role refinement is not proof that keyboard/accessibility activation preserves the source behavior under every overridden role. Stable Core IDs replace GPUI focus handles without importing platform types. |
 | Native ClickEvent payload and event-local propagation, Base `99-105,248-252`, styled `447-453` | Standalone callbacks now run once per accepted event; Group requests expose event index and stable target. Standalone callback remains `void(user)` and does not receive pointer/key kind, modifiers or event index. Core frame events and consumption are available for composition, but are not a callback payload/propagation contract. No new bubbling claim follows from accepted target records. |
@@ -61,16 +68,107 @@ ButtonGroup: portable staged Core-only API, at most 256 snapshotted direct child
 
 Evidence includes `test_accepted_activation.c`, `test_button_group_base.c`, `test_button_group.c` (all 864 geometry cases retained, now bounded fixture allocations), `test_button_group_sdl.c`, actual WASM software-pixel probe and `test_button_collection_gallery.py` at 1280/390 pixels. These are not physical native touch, screen-reader acceptance or every platform's font shaping proofs.
 
-## Prioritized complete bounded production slice
+## New concrete CUI extension gap: passive Button state lifecycle
 
-Fix **automatic available-width content containment and label ellipsis** first. Proposed ownership after Input Stage3 finishes or Root extracts Button code: Button-only declarations/private paint/layout helpers in `include/cui/cui_components.h` and `src/components/cui_components.c`, new focused headless/WASM tests and guide; no Core/input/theme/global edits without separately demonstrated need. Root confirmed Stage3 currently owns that implementation file, so this audit performs no production edits.
+CUI inert/layout-only ancestry is an architectural extension; the pinned GPUI
+Button does not expose these scopes. `cui_button_ex` at current
+`src/components/cui_components.c:531-553` calls metadata and tooltip helpers even
+when Core rejects interaction registration under suppressed ancestry.
+`cui_button_metadata:475-507` and `cui_button_tooltip:510-529` derive their local
+inert condition only from `options.disabled || options.loading`.
 
-The reviewed contract should preserve an unconstrained FIT label, but clip the content viewport and automatically ellipsize a constrained label at the actual width left after padding, leading/trailing icons, caret and supplied slots. Positive fixed width, parent-driven grow width and relayout must use the same rule. Existing `label_width` remains an explicit maximum; explicit content/overflow opt-outs must be named and documented rather than inferred from state being NULL. Full original accessible name must remain unchanged. Custom content/children preserve their application composition contract and are clipped to the content viewport; do not pretend arbitrary slot callbacks are measurable without actually laying them out.
+A strict external probe initializes caller state with ID 10, initialized/hovered
+true, an open tooltip and wake deadline 42, then submits the same ordinary enabled
+Button under each ancestry. Exact observed output:
 
-Use current-frame laid-out bounds with the existing prepaint seam where intrinsic/grow width cannot be known during submission. No previous-frame bounds, host-supplied geometry, second layout pass or measurement callback mutation. Preserve Core infeasible-layout policy; fix the label/content minimum and clipping contract rather than globally changing layout constraints. Visible text retained for deferred paint must be copied into bounded frame-owned storage, not point at a temporary caller buffer. Propose exact payload/string capacity and error/fallback policy before implementation; test exhaustion, invalid registration/shape/resource failures and retain existing callback acceptance semantics. Do not silently truncate full accessible names or paint stale text after a failed registration. If the existing paint seam cannot provide current label/slot geometry or safe storage, report the exact narrow missing operation before requesting Core ownership.
+```text
+inert draws=11 semantics=0 hover_callbacks=1 hovered=0 tooltip_open=0 wake=0
+layout-only draws=0 semantics=0 hover_callbacks=1 hovered=0 tooltip_open=0 wake=0
+```
 
-Required failure-before/after tests: the width-80 case above; fixed and grow bounds after stationary-pointer resize; labels fitting exactly, zero available width, long single word, grapheme/UTF-8 boundary and longer-than-buffer input; every fourteen-size/four-legacy/two-density combination with leading/trailing icons/caret and actual custom slots; content/ellipsis pixel clipping and untouched full semantic name; loading/disabled/selected/focus and joined Group children; repeated activation/cancel/keyboard behavior unchanged; passive inert/layout-only and bounded resource failures. Real browser tests must use actual Canvas/WASM pixels and visible pointer/touch actions, not model setters as interaction evidence. Native font adapter fixtures should use actual measurement, not default scalar estimates. This closes one documented bounded behavior slice; gradients, focus paint, shadow and other table rows remain separate work.
+Probe: `/home/matteo/.cache/cui-validation/button-passive-state-probe.c` and `.log`.
+It compiled with `cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude` against the
+validated merged-equivalent Button library. The probe establishes one unwanted
+hover-exit callback and mutation of caller state, not a new activation leak:
+accepted activation queries already reject suppressed scopes. There is no claim
+of physical device or upstream source behavior from this synthetic Core scene.
+
+## Smallest next complete production slice
+
+Correct the **passive standalone Button lifecycle**, without adding a public API.
+Use existing `cui_frame_is_submitting` and `cui_frame_sequence` phase queries to
+separate ordinary interactive submission from ordinary suppressed paint/layout.
+Outside ordinary submission, do not start new Button interaction/state work.
+Within suppressed ancestry, preserve root/content dimensions, slots, artwork,
+selected/disabled/loading presentation and current label paint, but skip semantic
+metadata, action/hover callbacks, tooltip reducer submission, wake scheduling and
+all caller-state mutation. Keep the original caller-owned state pointer available
+to the deferred label paint: its existing `info.inert` guard forbids writes and
+retains the configured diagnostic-prefix cap. A temporary stack state pointer
+must never be retained by deferred paint. This requires no Core allocation,
+frame-state redesign or public phase extension.
+
+Explicit disabled/loading options during an ordinary frame remain ordinary
+interactive registration with disabled/busy blockers and existing cancellation;
+they must not be mistaken for suppressed ancestry. Styled Group already has a
+separate passive paint path and must retain its semantics/callback policy.
+Arbitrary content callbacks execute to compose passive visuals; action callbacks
+and hover notifications do not. That distinction is part of the CUI composition
+contract, not an assertion that all caller code is pure.
+
+Proposed ownership: Button-only `src/components/cui_components.c` helpers and
+entry point, new focused portable lifecycle test and independent browser fixture,
+plus `docs/BUTTON_BEHAVIOR.md`. No public declarations, Core, Base, theme, adapters,
+existing Input code or global registrations. Root handles registration/generated
+output. This audit authorizes no production edits.
+
+Meaningful tests must preload a byte-comparable complete caller state, use both
+same and changed Button IDs, both explicit and inherited inert/layout-only scopes,
+hover-entered and tooltip pending/open/suppressed states, and zero/nonzero dt.
+Require no callback and no state-byte/deadline mutation; inert retains actual
+clipped paint and bounds, layout-only retains bounds with no paint/semantics.
+Exercise ordinary next-frame reuse, pointer presence/cancel, keyboard activation,
+disabled/loading blockers, group children and state-free/custom-slot composition.
+A measurement or prepaint callback must not register new interactive state.
+Browser evidence should use genuine move/keyboard/touch, then host-controlled
+scope changes, to prove no extra hover/action callbacks and correct subsequent
+normal reuse; no direct reducer calls as input evidence. Capacity failures and
+caller lifetimes retain the existing current-label contract.
+
+## Next source-only candidate after the correctness slice
+
+The smallest independent source-style slice is `ButtonCustomVariant.shadow(bool)`
+(`button.rs:138-141,650-656,1093-1099`), not shadows on every variant. A reviewed
+proposal can append `bool custom_shadow` to Button options and a theme-level
+`bool button_shadows` policy, with zero retaining legacy no-shadow behavior and
+built-in themes explicitly enabling the source-compatible policy. Both gates
+must be true, variant must be Custom and disabled must be false; loading retains
+normal shadow with whole-control opacity. Use existing `cui_set_drop_shadows`
+immediately after opening the root, one value-owned audited `shadow_xs` layer,
+resolved corner radii/edge joins and ordinary ancestor clipping/opacity. Do not
+borrow a shadow array past registration or introduce resources. Root must review
+compatibility policy and audited GPUI blur conversion before implementation.
+
+That proposal owns Button-only declarations/helpers, the narrow theme policy,
+new headless/software/native/WASM pixel tests and guide. Tests require disabled
+suppression, loading/ancestor opacity, outline/selected/hover/pressed states,
+rounded/group joins, clip containment, every design size/density, policy off and
+capacity failure; screenshots alone do not prove blur equivalence. This closes
+one public property, leaving gradient/Oklab, arbitrary Styled refinement, exact
+focus painting, signed tab order, role/focusability, rich click payload,
+action-keybinding tooltips, typed icon preservation, caret tint, open presentation
+and numeric Size rules explicitly outstanding.
 
 ## Validation provenance
 
-No production changed, so no fresh full build was created for this documentation-only audit. The strict C11 external geometry probe compiled with `-Wall -Wextra -Wpedantic -Werror`. Independently rerun existing frozen native CTest: Button behavior, ButtonGroup, callback events, both activation blockers and blocker scroll scope passed 6/6; accepted activation and Base Group passed 2/2. Root's final `next30-shadow-capture-test.log` records 151/151 native and `next30-shadow-asan-test.log` 143/143 sanitizer. Root reports 121/121 WASI for frozen `534a9db`. Earlier intermediate combined/fixed logs contain unrelated or subsequently repaired failures; they are not substituted for final evidence. Browser/SDL evidence above refers to committed fixtures and prior recorded runs, not fresh physical-device testing in this audit.
+This reconciliation changes documentation only. Source pin was independently
+verified with `git rev-parse HEAD`. The passive-state probe compiled warning-clean
+and ran as above. The preceding automatic-label implementation ran warning-clean
+native CTest 144/145 (only stale generated distribution), portable and actual
+native font matrices, scoped ASan/UBSan and pinned Chrome1208 WASM mouse/touch and
+pixel assertions; logs are `button-label-{native-build,ctest,web,asan-build}.log`
+under `/home/matteo/.cache/cui-validation`. Root subsequently reports combined
+Next31 native 160/160 and portable 138/138. These counts are provenance, not an
+independent rerun on this documentation worktree or whole-family certification.
+Eight existing merged-equivalent native checks were independently rerun and passed (Components, Button behavior, accepted activation, callback events, Base/styled Group, prepaint parts and layout-only clips); log `button-reconcile-ctest.log`. No fresh full build is needed for this read-only amendment; no physical OS or
+screen-reader acceptance is claimed.

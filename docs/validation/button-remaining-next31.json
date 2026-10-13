@@ -1,5 +1,5 @@
 {
-  "audit_commit": "534a9db",
+  "audit_commit": "f9e4c1f",
   "reference_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
   "scope": [
     "Base Button",
@@ -293,8 +293,8 @@
   "remaining_contracts": [
     {
       "contract_and_source": "Automatic content clip/nowrap/ellipsis, Button `737-766`",
-      "current_mapping_and_limit": "Explicit `label_width` plus caller state is tested; automatic constrained-width ellipsis and grow-width containment are missing, with the concrete failures above. All source child content also shares the clipped content container.",
-      "status": "remaining_or_partial"
+      "current_mapping_and_limit": "Fixed/grow current-frame label clipping/nowrap/ellipsis implemented, full semantic name preserved; arbitrary custom nested whitespace remains caller-owned.",
+      "status": "implemented_bounded_slice"
     },
     {
       "contract_and_source": "Public `Styled` refinement and Base semantic state styles, Base Button `135-181`, Components Button `580-584,611-613,722-723,792-804`",
@@ -357,7 +357,76 @@
       "status": "remaining_or_partial"
     }
   ],
-  "concrete_probes": [
+  "priority_slice": {
+    "name": "passive standalone Button lifecycle",
+    "public_api_additions": [],
+    "existing_phase_seam": [
+      "cui_frame_is_submitting",
+      "cui_frame_sequence"
+    ],
+    "ownership_proposal": [
+      "src/components/cui_components.c Button-only",
+      "new focused portable/browser tests",
+      "docs/BUTTON_BEHAVIOR.md"
+    ],
+    "must_preserve": [
+      "passive layout/paint and slot composition",
+      "no caller state mutation or hover/action callback",
+      "original borrowed state lifetime for deferred label cap",
+      "ordinary disabled/loading blockers",
+      "next ordinary reuse",
+      "Core phase/presence/capture semantics"
+    ],
+    "no_production_authorized_by_this_audit": true
+  },
+  "implemented_group_work": "Retained; see BUTTON_GROUP.md and button-group-proposal-next29 audit, no reopened selection/order/join scope",
+  "excluded_requirements": [
+    "private tooltip_builder without public setter",
+    "private hover_group hooks as standalone public Button contract",
+    "invented built-in shadow requirement",
+    "invented Button hover/press spring",
+    "intrinsic menu implementation from open presentation trait",
+    "roving arrows or mandatory ButtonGroup selection"
+  ],
+  "intentional_differences": [
+    "legacy Primary zero variant",
+    "legacy pointer focus with opt-in prevention",
+    "legacy Link control height",
+    "role-default pointer cursor with configurable override",
+    "explicit Group ALL_ACTIVATIONS",
+    "disabled builder-order correction and non-sticky background identity",
+    "loading-only spinner extension"
+  ],
+  "validation": {
+    "strict_passive_probe": "C11 Wall Wextra Wpedantic Werror compiled/run",
+    "preceding_label_native_ctest": "144/145 only stale distribution",
+    "preceding_label_scoped_asan_ubsan": "portable and native-font fixtures passed",
+    "preceding_label_browser": "pinned1208 actual WASM pixels/mouse/CDP touch passed",
+    "root_reported_combined_native": "160/160",
+    "root_reported_combined_portable": "138/138",
+    "fresh_full_build": "not rerun for documentation-only amendment",
+    "physical_device_certified": false,
+    "independent_focused_ctest": "8/8 merged-equivalent native checks passed, button-reconcile-ctest.log"
+  },
+  "full_completion_certified": false,
+  "physical_device_certified": false,
+  "completed_slice": {
+    "name": "automatic fixed/grow label layout",
+    "worker_commit": "7183636",
+    "integrated_commit": "f9e4c1f",
+    "tests": [
+      "test_button_label_layout.c",
+      "test_button_label_font.c",
+      "test_button_label_layout.py"
+    ],
+    "limits": [
+      "bounded shared frame storage includes semantic and prepaint copies",
+      "optional state diagnostic prefix remains256 bytes",
+      "custom nested content layout remains caller-owned",
+      "shape/fallback remains adapter-owned"
+    ]
+  },
+  "concrete_probes_historical": [
     {
       "case": "fixed width80 no state/label_width",
       "button_bounds": [
@@ -391,52 +460,35 @@
       "artifact": "/home/matteo/.cache/cui-validation/button-next31-label-probe-grow.log"
     }
   ],
-  "priority_slice": {
-    "name": "automatic available-width containment and ellipsis",
-    "ownership_proposal": [
-      "include/cui/cui_components.h Button-only declarations",
-      "src/components/cui_components.c Button-only layout/paint helpers after Input Stage3 release",
-      "new scoped headless/browser tests and guide"
+  "passive_lifecycle_probe": {
+    "classification": "CUI architectural extension correctness gap, not pinned upstream inert contract",
+    "artifact": "/home/matteo/.cache/cui-validation/button-passive-state-probe.c",
+    "output": [
+      "inert draws=11 semantics=0 hover_callbacks=1 hovered=0 tooltip_open=0 wake=0",
+      "layout-only draws=0 semantics=0 hover_callbacks=1 hovered=0 tooltip_open=0 wake=0"
     ],
-    "must_preserve": [
-      "full original accessible name",
-      "accepted callbacks and cancellation",
-      "all18 sizes and2 density modes",
-      "fixed and grow current-frame bounds",
-      "leading/trailing icons/caret/custom slots",
-      "passive inert/layout-only composition",
-      "bounded frame-owned text and explicit capacity/resource errors"
+    "preloaded_state": {
+      "id": 10,
+      "initialized": true,
+      "hovered": true,
+      "tooltip_open": true,
+      "wake": 42
+    },
+    "finding": "metadata/tooltip helpers mutate caller state and emit hover-exit under ancestor suppression"
+  },
+  "next_source_slice": {
+    "name": "Custom-only shadow property",
+    "proposed_append_only_options": [
+      "cui_button_options.custom_shadow",
+      "cui_theme.button_shadows"
     ],
-    "no_production_authorized_by_this_audit": true
-  },
-  "implemented_group_work": "Retained; see BUTTON_GROUP.md and button-group-proposal-next29 audit, no reopened selection/order/join scope",
-  "excluded_requirements": [
-    "private tooltip_builder without public setter",
-    "private hover_group hooks as standalone public Button contract",
-    "invented built-in shadow requirement",
-    "invented Button hover/press spring",
-    "intrinsic menu implementation from open presentation trait",
-    "roving arrows or mandatory ButtonGroup selection"
-  ],
-  "intentional_differences": [
-    "legacy Primary zero variant",
-    "legacy pointer focus with opt-in prevention",
-    "legacy Link control height",
-    "role-default pointer cursor with configurable override",
-    "explicit Group ALL_ACTIVATIONS",
-    "disabled builder-order correction and non-sticky background identity",
-    "loading-only spinner extension"
-  ],
-  "validation": {
-    "independent_native_ctest_passed": 8,
-    "independent_ctest_failures": 0,
-    "strict_external_probe": "C11 Wall Wextra Wpedantic Werror compiled/run",
-    "root_final_native_log": "next30-shadow-capture-test.log 151/151",
-    "root_final_sanitizer_log": "next30-shadow-asan-test.log 143/143",
-    "root_reported_frozen_wasi": "121/121",
-    "fresh_full_build": "not run for documentation-only audit",
-    "browser_native_platform_evidence": "committed fixtures/prior runs, not freshly rerun physical devices"
-  },
-  "full_completion_certified": false,
-  "physical_device_certified": false
+    "zero_compatibility": "legacy no-shadow",
+    "implementation": "one audited shadow_xs layer via existing Core value-copy API; Custom&&theme gate&&!disabled; loading whole opacity",
+    "review_required": [
+      "theme defaults",
+      "audited GPUI blur conversion",
+      "scope approval"
+    ],
+    "does_not_close_other_style_gaps": true
+  }
 }

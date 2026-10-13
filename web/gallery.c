@@ -3529,25 +3529,40 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
 
         break;
     }
-    case 12:
-        cui_alert(ui, cui_id_from(ui, "alert"), &t,
-                  (cui_alert_options){.kind = CUI_ALERT_INFO,
-                                      .title = cui_string("Your changes are saved"),
-                                      .message = cui_string("You can keep working."),
-                                      .width = width - 48,
-                                      .visible = &alert_visible,
-                                      .dismissible = true});
+    case 12: {
+        static const char *const titles[] = {"Workspace update", "Your changes are saved",
+                                            "Storage is almost full", "Upload failed"};
+        static const char *const messages[] = {"A new version is available.", "You can keep working.",
+                                               "Archive unused projects to free space.",
+                                               "Check your connection and try again."};
+        for (unsigned kind = 0; kind < 4; kind++)
+            cui_alert(ui, cui_id_from(ui, titles[kind]), &t,
+                      (cui_alert_options){.kind = (cui_alert_kind)kind,
+                                          .title = cui_string(titles[kind]),
+                                          .message = cui_string(messages[kind]),
+                                          .width = width - 48,
+                                          .visible = kind == 1 ? &alert_visible : NULL,
+                                          .dismissible = kind == 1});
         if (cui_button(ui, cui_id_from(ui, "reset-alert"), &t, cui_string("Show alert"), disabled))
             alert_visible = true;
         break;
+    }
     case 13:
         cui_avatar(ui, cui_id_from(ui, "avatar"), &t, cui_string("Alex Morgan"), 56);
         break;
-    case 14:
-        cui_begin_bubble(ui, cui_id_from(ui, "bubble"), &t, CUI_BUBBLE_TINTED, width - 48);
-        cui_label(ui, &t, cui_string("A composed message surface."));
-        cui_end_bubble(ui);
+    case 14: {
+        static const char *const messages[] = {"Info: a new version is available.",
+                                               "Success: your changes are saved.",
+                                               "Warning: storage is almost full.",
+                                               "Error: upload failed. Please retry."};
+        for (unsigned kind = 0; kind < 4; kind++) {
+            cui_begin_bubble(ui, cui_id_from(ui, messages[kind]), &t,
+                              (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), width - 48);
+            cui_label(ui, &t, cui_string(messages[kind]));
+            cui_end_bubble(ui);
+        }
         break;
+    }
     case 15:
         cui_empty(ui, cui_id_from(ui, "empty"), &t, cui_string("No items yet"),
                   cui_string("Add your first item to get started."), width - 48);

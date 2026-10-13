@@ -1,0 +1,15 @@
+Python/Node integration checks, Linux X11, 2026-10-13.
+Python stdlib ctypes: actual CUI headless button events delivered [1, 2];
+callback exception identity preserved after returning through C; fresh rerun passed.
+Node JavaScript N-API: headless events, rejected callback, thrown callback,
+and independent rerun passed. TypeScript through Node type stripping passed.
+Native shared host and N-API addon compiled with C11 warning errors.
+Xvfb/SDL3 native checks: actual pointer click delivered Python count: 1,
+Node count: 1, and TypeScript count: 1; each final BMP was nonempty.
+Bare Xvfb required an xwininfo window-tree fallback when xdotool search missed
+the SDL3 window. xdotool still sends the real native pointer event.
+Initial no-window results and one concurrent Xvfb startup failure were preserved;
+the corrected driver and sequential TypeScript rerun passed.
+Root warning build and CTest: 97/97 passed before the size integration.
+This is a small C-host ABI example, not complete language bindings or physical
+desktop/cross-platform validation. Native event loops are synchronous.

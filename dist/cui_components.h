@@ -211,11 +211,13 @@ typedef struct {
     cui_str icon, name;
     cui_color color;
     bool custom_color;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_badge_options;
 cui_badge_options cui_badge_defaults(void);
 /* Compose arbitrary content with a zero-flow corner indicator. Count zero hides
  * only the indicator; count overflow reads maximum+. Dot/icon always show.
- * Numbers use source size offsets and fixed10px text, dots6px, icon10/16/24px.
+ * INHERIT uses source offsets and fixed10px text, dots6px, icon10/16/24px.
+ * Explicit design_size scales indicator text, padding and artwork.
  * Content/name/icon bytes are borrowed for the call. Invalid options submit no
  * UI and invoke no callback. Legacy cui_badge remains a standalone text pill. */
 bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
@@ -223,7 +225,7 @@ bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
 typedef struct {
     bool indeterminate, reduced_motion;
     double now_seconds; /* Monotonic host clock; source cycle1s, legacy cycle1.6s. */
-    float height;       /* Zero selects the size-based4/6/8/10px track. */
+    float height;       /* Zero selects legacy4/6/8/10px, or design control_height/4. */
     cui_str name;       /* Zero selects "Progress". */
     cui_control_size size;
     cui_color color;
@@ -232,6 +234,7 @@ typedef struct {
     bool custom_corners;
     cui_progress_motion *motion; /* Optional caller-owned determinate transition. */
     float duration; /* Zero selects source180ms; explicit instant via reduced_motion. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_progress_options;
 cui_progress_options cui_progress_defaults(void);
 /* Returns true while indeterminate motion needs another frame. The application
@@ -245,7 +248,7 @@ typedef struct {
 } cui_progress_circle_state;
 typedef struct {
     cui_progress_options progress;
-    float diameter, raster_scale; /* Zero diameter uses8/12/16/20px by control size. */
+    float diameter, raster_scale; /* Zero uses legacy8/12/16/20px or design control_height. */
 } cui_progress_circle_options;
 cui_progress_circle_options cui_progress_circle_defaults(void);
 /* Caller owns pixel storage; no resource allocation. Returns animation demand.
@@ -411,6 +414,37 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #include "cui_plot_view.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
 
 
 #include <math.h>
@@ -1225,10 +1259,14 @@ cui_badge_options cui_badge_defaults(void) {
 }
 bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_options o,
                   cui_button_content_fn content, void *user) {
-    if (!ui || !id || !t || o.variant < CUI_BADGE_COUNT || o.variant > CUI_BADGE_ICON ||
-        o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
+    if (!ui || !id || !t || !cui_design_valid(o.design_size) || o.variant < CUI_BADGE_COUNT ||
+        o.variant > CUI_BADGE_ICON || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
         (o.name.length && !o.name.data) || (o.icon.length && !o.icon.data))
         return false;
+    cui_design_metrics dm = {0};
+    if (o.design_size && !cui_design_resolve(o.design_size, t->font_size / 16, &dm))
+        return false;
+    float badge_font = o.design_size ? dm.font_size * .75f : 10;
     char number[3 * sizeof(size_t) + 3];
     if (o.count > o.maximum)
         snprintf(number, sizeof(number), "%zu+", o.maximum);
@@ -1240,6 +1278,8 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
         content(ui, user);
     if (visible) {
         float extent = o.size == CUI_CONTROL_LARGE ? 24 : o.size == CUI_CONTROL_MEDIUM ? 16 : 10;
+        if (o.design_size)
+            extent = dm.indicator_size;
         float x = o.variant != CUI_BADGE_COUNT ? 0
                                                : (o.size == CUI_CONTROL_LARGE    ? 1
                                                   : o.size == CUI_CONTROL_MEDIUM ? 3
@@ -1261,10 +1301,14 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
                         .align_x = CUI_ALIGN_CENTER,
                         .align_y = CUI_ALIGN_CENTER};
         if (o.variant == CUI_BADGE_COUNT) {
-            mark.height = 14;
-            mark.width = fmaxf(14, cui_measure_text(ui, cui_string(number), 10).width + 4);
+            mark.height = o.design_size ? dm.line_height * .75f + dm.padding_y : 14;
+            mark.width =
+                fmaxf(mark.height, cui_measure_text(ui, cui_string(number), badge_font).width +
+                                       (o.design_size ? dm.padding_x : 4));
         } else {
-            mark.width = mark.height = o.variant == CUI_BADGE_DOT ? 6 : extent;
+            mark.width = mark.height = o.variant == CUI_BADGE_DOT
+                                           ? (o.design_size ? dm.indicator_size * .375f : 6)
+                                           : extent;
             if (o.variant == CUI_BADGE_ICON) {
                 mark.border = t->background;
                 mark.border_width = 1;
@@ -1280,8 +1324,8 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
                                  (cui_semantic_details){.parent = id, .no_focus = true});
         cui_set_tab_stop(ui, indicator, false);
         if (o.variant == CUI_BADGE_COUNT)
-            cui_text_with_line_height(ui, cui_string(number), 10, (cui_color){255, 255, 255, 255},
-                                      10);
+            cui_text_with_line_height(ui, cui_string(number), badge_font,
+                                      (cui_color){255, 255, 255, 255}, badge_font);
         else if (o.variant == CUI_BADGE_ICON)
             cui_icon_named(ui, indicator ^ UINT64_C(0x2c38f42991a75e63), t, o.icon,
                            (cui_icon_options){.custom_size = extent - 2,
@@ -1299,8 +1343,11 @@ cui_progress_options cui_progress_defaults(void) {
 }
 bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width,
                      cui_progress_options o) {
-    if (!ui || !id || !t || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
-        (o.name.length && !o.name.data))
+    if (!ui || !id || !t || !cui_design_valid(o.design_size) || o.size < CUI_CONTROL_MEDIUM ||
+        o.size > CUI_CONTROL_XSMALL || (o.name.length && !o.name.data))
+        return false;
+    cui_design_metrics dm = {0};
+    if (o.design_size && !cui_design_resolve(o.design_size, t->font_size / 16, &dm))
         return false;
     bool reduced = o.reduced_motion || cui_reduced_motion(ui);
     cui_progress_geometry geometry =
@@ -1321,6 +1368,8 @@ bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fract
                    : o.size == CUI_CONTROL_SMALL      ? 6
                    : o.size == CUI_CONTROL_LARGE      ? 10
                                                       : 8;
+    if (o.design_size && !(isfinite(o.height) && o.height > 0))
+        height = dm.control_height * .25f;
     cui_color color = o.custom_color ? o.color : t->primary;
     cui_color track = color;
     track.a = (uint8_t)(track.a * .2f);
@@ -1874,8 +1923,12 @@ bool cui_progress_circle(cui_context *ui, cui_id id, const cui_theme *theme, flo
                          cui_progress_circle_state *state, cui_progress_circle_options options,
                          cui_button_content_fn content, void *user) {
     cui_progress_options p = options.progress;
-    if (!ui || !id || !theme || !state || p.size < CUI_CONTROL_MEDIUM ||
-        p.size > CUI_CONTROL_XSMALL || (p.name.length && !p.name.data))
+    if (!ui || !id || !theme || !cui_design_valid(p.design_size) || !state ||
+        p.size < CUI_CONTROL_MEDIUM || p.size > CUI_CONTROL_XSMALL ||
+        (p.name.length && !p.name.data))
+        return false;
+    cui_design_metrics dm = {0};
+    if (p.design_size && !cui_design_resolve(p.design_size, theme->font_size / 16, &dm))
         return false;
     bool reduced = p.reduced_motion || cui_reduced_motion(ui);
     cui_progress_geometry progress =
@@ -1896,6 +1949,8 @@ bool cui_progress_circle(cui_context *ui, cui_id id, const cui_theme *theme, flo
                                               : p.size == CUI_CONTROL_LARGE ? 20
                                                                             : 16)
                                            : options.diameter;
+    if (p.design_size && options.diameter == 0)
+        diameter = dm.control_height;
     cui_progress_circle_geometry geometry;
     cui_bitmap bitmap;
     if (!cui_progress_circle_measure(progress, diameter, &geometry) ||

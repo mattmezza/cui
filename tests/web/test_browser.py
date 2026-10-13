@@ -1318,6 +1318,10 @@ def main():
             rect = canvas.bounding_box()
             page.mouse.move(rect['x']+b[0]+18,rect['y']+b[1]+18)
             page.wait_for_function('document.querySelector(`#accessible button[aria-label="Close"]`)!==null')
+            action = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Review', 1))
+            close = page.evaluate('(i)=>[1,2,3,4].map(f=>cuiGallery.exports.gallery_semantic(i,f))', semantic_index('Close', 1))
+            assert (action[0]+action[2] <= close[0] or close[0]+close[2] <= action[0]
+                    or action[1]+action[3] <= close[1] or close[1]+close[3] <= action[1]), (action, close)
             click_semantic('Close', 1)
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_notification_stats(0)===0&&cuiGallery.exports.gallery_notification_stats(3)===n+1', arg=close_count)
             click_semantic('Add three alerts', 1)

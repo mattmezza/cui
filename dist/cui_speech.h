@@ -135,6 +135,7 @@ typedef struct {
     cui_speech_size size;
     bool disabled, show_when_unsupported;
     cui_str start_label, stop_label, unavailable_label; /* empty selects English defaults */
+    cui_design_size design_size;                        /* INHERIT preserves legacy metrics. */
 } cui_speech_button_options;
 bool cui_speech_button(cui_context *, cui_id, const cui_theme *, cui_speech_state *,
                        cui_speech_button_options, double now);
@@ -143,6 +144,7 @@ typedef struct {
     float width, height; /* zero selects 96 and the size-specific height */
     bool reduced_motion, custom_color;
     cui_color color;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_speech_waveform_options;
 /* Geometry in local coordinates; returns the required rectangle count. Invalid
  * geometry returns SIZE_MAX. Insufficient capacity leaves output untouched. */
@@ -555,6 +557,37 @@ size_t cui_speech_waveform_rects(const cui_speech_meter *meter, float width, flo
 /* src/components/cui_speech.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
+
 
 #include <math.h>
 static bool cui_speech_capturing(const cui_speech_state *s) {
@@ -562,8 +595,8 @@ static bool cui_speech_capturing(const cui_speech_state *s) {
 }
 bool cui_speech_button(cui_context *ui, cui_id id, const cui_theme *theme, cui_speech_state *s,
                        cui_speech_button_options o, double now) {
-    if (!ui || !id || !theme || !s || !s->initialized || !isfinite(now) ||
-        o.size < CUI_SPEECH_MEDIUM || o.size > CUI_SPEECH_XSMALL ||
+    if (!ui || !id || !theme || !cui_design_valid(o.design_size) || !s || !s->initialized ||
+        !isfinite(now) || o.size < CUI_SPEECH_MEDIUM || o.size > CUI_SPEECH_XSMALL ||
         (o.start_label.length && !o.start_label.data) ||
         (o.stop_label.length && !o.stop_label.data) ||
         (o.unavailable_label.length && !o.unavailable_label.data))
@@ -592,7 +625,8 @@ bool cui_speech_button(cui_context *ui, cui_id id, const cui_theme *theme, cui_s
                                            .loading = s->status == CUI_SPEECH_STOPPING,
                                            .selected = capturing,
                                            .icon = cui_string(capturing ? "square" : "mic"),
-                                           .icon_only = true});
+                                           .icon_only = true,
+                                           .design_size = o.design_size});
     if (pressed) {
         (void)cui_speech_toggle(s, now);
         cui_invalidate(ui);
@@ -601,12 +635,21 @@ bool cui_speech_button(cui_context *ui, cui_id id, const cui_theme *theme, cui_s
 }
 bool cui_speech_waveform(cui_context *ui, cui_id id, const cui_theme *theme,
                          const cui_speech_state *s, cui_speech_waveform_options o, double now) {
-    if (!ui || !id || !theme || !s || !s->initialized || !isfinite(now) || !isfinite(o.width) ||
-        !isfinite(o.height) || o.width < 0 || o.height < 0 || o.size < CUI_SPEECH_MEDIUM ||
-        o.size > CUI_SPEECH_XSMALL)
+    if (!ui || !id || !theme || !cui_design_valid(o.design_size) || !s || !s->initialized ||
+        !isfinite(now) || !isfinite(o.width) || !isfinite(o.height) || o.width < 0 ||
+        o.height < 0 || o.size < CUI_SPEECH_MEDIUM || o.size > CUI_SPEECH_XSMALL)
         return false;
     static const float heights[] = {20, 16, 24, 12};
     float width = o.width ? o.width : 96, height = o.height ? o.height : heights[o.size];
+    if (o.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(o.design_size, theme->font_size / 16, &d))
+            return false;
+        if (!o.width)
+            width = 6 * d.font_size;
+        if (!o.height)
+            height = d.control_height;
+    }
     bool capturing = cui_speech_capturing(s),
          animate = capturing && !o.reduced_motion && !cui_reduced_motion(ui);
     float lead = animate ? cui_speech_meter_lead(&s->meter, now) : 0;

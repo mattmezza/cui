@@ -1,0 +1,13 @@
+Published source: cdf5199cb1b7f01cc5baecb637c5b4f09d2af8a5
+Framework CI: 38400534087, all six jobs successful.
+Pages build and deploy: 38400534084, successful.
+Downloaded github-pages artifact: release-cdf5199-artifact/artifact.tar.
+Direct HTTPS SHA256 comparison: 303/303 artifact files matched.
+Actual public Chromium checks passed Select and Pagination vertical alignment,
+Command modal width, Shift-wheel Tabs, DataTable precise wheel distance and
+preserved page position when changing component routes.
+Actual public pane resizing: 24/24 cases passed, at 390/1280/1920 widths,
+both axes, both densities, and mouse/CDP touch input.
+Evidence logs: published-cdf5199-{files,visual,resizable}.log under
+/home/matteo/.cache/cui-validation.
+This proves publication and the listed checks, not complete 78-family parity.

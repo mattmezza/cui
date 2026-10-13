@@ -60,6 +60,7 @@ typedef struct {
     float radius;
     cui_color background, foreground, border;
     cui_tag_palette palette;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_tag_options;
 typedef struct {
     cui_color background, foreground, border;
@@ -609,6 +610,37 @@ bool cui_notification_system_click(cui_notification_state *s, cui_notification_i
 /* src/components/cui_status.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
+
 
 #include <math.h>
 static cui_color cui_status_alpha(cui_color c, float opacity) {
@@ -616,10 +648,10 @@ static cui_color cui_status_alpha(cui_color c, float opacity) {
     return c;
 }
 bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_tag_style *out) {
-    if (!t || !out || o.variant > CUI_TAG_PALETTE || o.variant < CUI_TAG_SECONDARY ||
-        o.size > CUI_STATUS_LARGE || o.size < CUI_STATUS_MEDIUM || !isfinite(o.radius) ||
-        o.radius < 0 || !isfinite(t->radius) || t->radius < 0 || !isfinite(t->font_size) ||
-        t->font_size <= 0)
+    if (!t || !out || !cui_design_valid(o.design_size) || o.variant > CUI_TAG_PALETTE ||
+        o.variant < CUI_TAG_SECONDARY || o.size > CUI_STATUS_LARGE || o.size < CUI_STATUS_MEDIUM ||
+        !isfinite(o.radius) || o.radius < 0 || !isfinite(t->radius) || t->radius < 0 ||
+        !isfinite(t->font_size) || t->font_size <= 0)
         return false;
     cui_color bg = t->secondary, fg = o.outline ? t->muted : t->secondary_foreground,
               border = t->border;
@@ -672,6 +704,14 @@ bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_ta
                                  : o.custom_radius ? o.radius
                                  : small           ? t->radius / 2
                                                    : t->radius};
+    if (o.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(o.design_size, t->font_size / 16, &d))
+            return false;
+        s.font_size = d.font_size;
+        s.padding_y = d.padding_y;
+        s.padding_x = fmaxf(d.padding_x, d.padding_y);
+    }
     if (!isfinite(s.font_size) || !isfinite(s.radius))
         return false;
     if (hovered) {

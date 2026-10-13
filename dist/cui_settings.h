@@ -35,6 +35,7 @@ typedef struct {
     cui_settings_size size;
     cui_settings_variant variant;
     bool vertical, disabled;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_settings_render_options;
 typedef void (*cui_setting_render_fn)(cui_context *, cui_id, const cui_theme *,
                                       cui_settings_render_options, void *);
@@ -126,6 +127,7 @@ typedef struct {
     cui_str search_placeholder, reset_label;
     size_t default_page, default_group;
     bool default_group_selected; /* Zero-init selects the page, not group zero. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_settings_options;
 typedef struct {
     bool selection_changed, reset, resized, scrolled;
@@ -439,6 +441,37 @@ cui_id cui_settings_part_id(cui_id root, size_t page, size_t group, size_t item,
 /* src/components/cui_settings.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PRIVATE_DESIGN_METRICS_H
+#define CUI_PRIVATE_DESIGN_METRICS_H
+
+#include <math.h>
+/* Private inline resolver: Base-only consumers must not link styled Theme code.
+ * Keep this table checked against cui_design_measure by the component tests. */
+static inline bool cui_design_valid(cui_design_size size) {
+    return size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL;
+}
+static inline bool cui_design_resolve(cui_design_size size, float density,
+                                      cui_design_metrics *out) {
+    if (!out || size <= CUI_DESIGN_INHERIT || !cui_design_valid(size) || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *out = (cui_design_metrics){font[size] * density,
+                                line[size] * density,
+                                height[size] * density,
+                                padding[size] * density,
+                                (height[size] - line[size]) * .5f * density,
+                                gap[size] * density,
+                                font[size] * density};
+    return true;
+}
+#endif
+
 
 #include <math.h>
 #include <string.h>
@@ -453,6 +486,7 @@ typedef struct {
     cui_settings_result *result;
     cui_str query;
     float content_width, height;
+    const cui_theme *control_theme;
 } settings_frame;
 typedef struct {
     settings_frame *frame;
@@ -636,12 +670,14 @@ static void sidebar(cui_context *ui, void *user) {
             ui, part(f, 0, 0, 0, 2),
             (cui_box){
                 .width = -1, .row = true, .gap = 4 * density(f), .align_y = CUI_ALIGN_CENTER});
-        cui_icon_named(ui, part(f, 0, 0, 0, 3), f->theme, cui_string("search"),
-                       (cui_icon_options){.size = CUI_ICON_SMALL});
-        cui_input_ex(
-            ui, part(f, 0, 0, 0, 4), f->theme, f->options.search_placeholder, f->state->search,
-            &f->state->search_input,
-            (cui_input_options){.width = -1, .placeholder = f->options.search_placeholder});
+        cui_icon_named(
+            ui, part(f, 0, 0, 0, 3), f->control_theme, cui_string("search"),
+            (cui_icon_options){.size = CUI_ICON_SMALL, .design_size = f->options.design_size});
+        cui_input_ex(ui, part(f, 0, 0, 0, 4), f->control_theme, f->options.search_placeholder,
+                     f->state->search, &f->state->search_input,
+                     (cui_input_options){.width = -1,
+                                         .design_size = f->options.design_size,
+                                         .placeholder = f->options.search_placeholder});
         cui_end_box(ui);
         /* Search is reduced before navigation/content, so same-frame text filters both. */
         f->query = cui_edit_get_text(f->state->search);
@@ -696,7 +732,7 @@ static void sidebar(cui_context *ui, void *user) {
 static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
                   cui_settings_render_options render) {
     if (item->render) {
-        item->render(f->ui, id, f->theme, render, item->user);
+        item->render(f->ui, id, f->control_theme, render, item->user);
         return false;
     }
     bool changed = false;
@@ -705,19 +741,21 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
     switch (item->kind) {
     case CUI_SETTING_SWITCH:
         if (item->boolean)
-            changed =
-                cui_switch_ex(f->ui, id, f->theme, (cui_str){0}, item->boolean, item->switch_state,
-                              (cui_switch_options){.size = size,
-                                                   .disabled = render.disabled,
-                                                   .accessibility_label = item->title,
-                                                   .now_seconds = cui_frame_time(f->ui),
-                                                   .reduced_motion = cui_reduced_motion(f->ui)});
+            changed = cui_switch_ex(
+                f->ui, id, f->control_theme, (cui_str){0}, item->boolean, item->switch_state,
+                (cui_switch_options){.size = size,
+                                     .design_size = render.design_size,
+                                     .disabled = render.disabled,
+                                     .accessibility_label = item->title,
+                                     .now_seconds = cui_frame_time(f->ui),
+                                     .reduced_motion = cui_reduced_motion(f->ui)});
         break;
     case CUI_SETTING_CHECKBOX:
         if (item->boolean) {
             cui_check_state value = *item->boolean ? CUI_CHECK_CHECKED : CUI_CHECK_UNCHECKED;
-            changed = cui_checkbox_ex(f->ui, id, f->theme, (cui_str){0}, &value,
+            changed = cui_checkbox_ex(f->ui, id, f->control_theme, (cui_str){0}, &value,
                                       (cui_checkbox_options){.size = size,
+                                                             .design_size = render.design_size,
                                                              .disabled = render.disabled,
                                                              .accessibility_label = item->title});
             if (changed)
@@ -726,11 +764,12 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
         break;
     case CUI_SETTING_INPUT:
         if (item->edit && item->input_state) {
-            cui_input_result result =
-                cui_input_ex(f->ui, id, f->theme, item->title, item->edit, item->input_state,
-                             (cui_input_options){.width = render.vertical ? -1 : 256 * density(f),
-                                                 .disabled = render.disabled,
-                                                 .size = input_size(render.size)});
+            cui_input_result result = cui_input_ex(
+                f->ui, id, f->control_theme, item->title, item->edit, item->input_state,
+                (cui_input_options){.width = render.vertical ? -1 : 256 * density(f),
+                                    .disabled = render.disabled,
+                                    .size = input_size(render.size),
+                                    .design_size = render.design_size});
             changed = result.changed;
             error = result.error;
         } else
@@ -744,8 +783,9 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
                 options.step = 1;
             options.width = render.vertical ? -1 : 128 * density(f);
             options.size = number_size(render.size);
+            options.design_size = render.design_size;
             double before = *item->number;
-            cui_number_result result = cui_number_input(f->ui, id, f->theme, item->title,
+            cui_number_result result = cui_number_input(f->ui, id, f->control_theme, item->title,
                                                         item->number_state, item->number, options);
             error = result.error;
             if (options.has_minimum && *item->number < options.minimum)
@@ -765,11 +805,12 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
                                       : render.size == CUI_SETTINGS_LARGE ? CUI_LIST_LARGE
                                                                           : CUI_LIST_MEDIUM;
             changed = cui_select(
-                f->ui, id, f->theme, item->title, (cui_str){0}, item->choices, item->choice_count,
-                item->choice, item->popup,
+                f->ui, id, f->control_theme, item->title, (cui_str){0}, item->choices,
+                item->choice_count, item->choice, item->popup,
                 (cui_choice_popup_options){.disabled = render.disabled,
                                            .width = render.vertical ? -1 : 256 * density(f),
                                            .size = list_size,
+                                           .design_size = render.design_size,
                                            .align_end = true,
                                            .viewport = {0, 0, 100000, 100000}});
         }
@@ -787,8 +828,12 @@ static void render_group(settings_frame *f, size_t p, size_t g, bool stacked) {
     const cui_setting_group *group = &f->pages[p].groups[g];
     cui_settings_variant variant = group->custom_variant ? group->variant : f->options.variant;
     float d = density(f), font = 14 * d;
-    cui_settings_render_options render = {
-        .page = p, .group = g, .size = f->options.size, .variant = variant, .vertical = stacked};
+    cui_settings_render_options render = {.page = p,
+                                          .group = g,
+                                          .size = f->options.size,
+                                          .design_size = f->options.design_size,
+                                          .variant = variant,
+                                          .vertical = stacked};
     cui_id id = part(f, p, g, 0, 20);
     cui_begin_box(f->ui, id, (cui_box){.width = -1});
     cui_begin_box(f->ui, part(f, p, g, 0, 44), (cui_box){.height = 16 * d});
@@ -899,8 +944,10 @@ static void content(cui_context *ui, void *user) {
     cui_begin_box(ui, part(f, p, 0, 0, 32),
                   (cui_box){.width = -1, .row = true, .gap = 4 * d, .align_y = CUI_ALIGN_CENTER});
     label(f, page->title, f->theme->font_size, f->theme->text);
-    cui_settings_render_options render = {
-        .page = p, .size = f->options.size, .variant = f->options.variant};
+    cui_settings_render_options render = {.page = p,
+                                          .size = f->options.size,
+                                          .design_size = f->options.design_size,
+                                          .variant = f->options.variant};
     if (page->title_suffix)
         page->title_suffix(ui, part(f, p, 0, 0, 33), f->theme, render, page->suffix_user);
     if (!page->no_reset && dirty) {
@@ -985,13 +1032,28 @@ static void content(cui_context *ui, void *user) {
 cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *theme,
                                  const cui_setting_page *pages, size_t count,
                                  cui_settings_state *state, cui_settings_options options) {
-    if (!ui || !id || !theme || !state || !isfinite(theme->font_size) || theme->font_size <= 0 ||
-        !isfinite(options.width) || !isfinite(options.height) || options.height < 0 ||
-        options.height > 1000000 || options.width > 1000000 || !isfinite(options.sidebar_width) ||
+    if (!ui || !id || !theme || !state || !cui_design_valid(options.design_size) ||
+        !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(options.width) ||
+        !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
+        options.width > 1000000 || !isfinite(options.sidebar_width) ||
         !isfinite(options.sidebar_minimum) || !isfinite(options.sidebar_maximum) ||
         options.size < CUI_SETTINGS_MEDIUM || options.size > CUI_SETTINGS_LARGE ||
         options.variant < CUI_SETTINGS_NORMAL || options.variant > CUI_SETTINGS_OUTLINE)
         return (cui_settings_result){.invalid = true};
+    const cui_theme *control_theme = theme;
+    cui_theme scaled;
+    if (options.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(options.design_size, theme->font_size / 16, &d))
+            return (cui_settings_result){.invalid = true};
+        scaled = *theme;
+        scaled.font_size = d.font_size;
+        scaled.control_height = d.control_height;
+        scaled.padding = d.padding_x;
+        scaled.gap = d.gap;
+        theme = &scaled;
+        options.size = CUI_SETTINGS_MEDIUM;
+    }
     cui_settings_result result = cui_settings_filter(pages, count, state, options);
     if (result.invalid)
         return result;
@@ -1016,7 +1078,8 @@ cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *th
                             &result,
                             state->search ? cui_edit_get_text(state->search) : options.query,
                             fmaxf(1, width - state->sidebar_width),
-                            height};
+                            height,
+                            control_theme};
     if (!frame.options.search_placeholder.length)
         frame.options.search_placeholder = cui_string("Search settings");
     if (!frame.options.reset_label.length)

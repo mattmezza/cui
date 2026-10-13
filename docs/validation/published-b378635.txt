@@ -1,0 +1,9 @@
+Published source:b378635c371c2fde2ad36c841c256f9e929976ba.
+Framework run38459879952:all6 jobs SUCCESS, including real Windows/macOS and Linux GCC/Clang; Pages run38459879994:SUCCESS and deployment complete.
+Public site:https://matteo.merola.co/cui/.
+All397 HTTPS artifact files match SHA256 of deployed artifact, including gallery WASM/JS/catalog/docs and static component/doc routes.
+Actual public Attachment:62/62 passes all14 sizes, both densities/orientations,390px text/action containment and actual CDP touch pan/tap to offscreen Open.
+MAIN warnings clean129/129 CTest passes. Full integrated frozen portable proof132/132 native,127/127 sanitizer,108/108 WASI plus78 stories/snippets is in gallery-next28.txt; configurations/counts are separate.
+Logs:/home/matteo/.cache/cui-validation/{ci,pages}-b378635.json;published-b378635-{files,attachment}.log;published-b378635-attachment.json;main-next28-{configure,build,test}.log.
+Artifact:/home/matteo/.cache/cui-validation/release-b378635-artifact/artifact.tar.
+This proves artifact delivery and scoped browser behavior, not complete family/source/native-device parity. All78 families remain; zero fully verified families.

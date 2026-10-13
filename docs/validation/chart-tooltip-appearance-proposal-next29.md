@@ -1,6 +1,6 @@
 # Tooltip appearance API proposal
 
-Baseline f8b7f43. Production edits await approval; Chart header/component and new scoped tests only.
+Historical proposal on baseline f8b7f43, subsequently implemented. The original ring-band/expanded-radius design below was superseded by correction626648e: pinned source paints a filled sigma-zero shadow under the surface with bounds expanded1px and ORIGINAL corner radii. Current behavior and terminal proof are in [the appearance guide](../CHART_TOOLTIP_APPEARANCE.md). Gaussian layers remain separate unfinished work.
 
 ```c
 typedef enum {

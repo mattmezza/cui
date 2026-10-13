@@ -110,6 +110,19 @@ cui_edit_result cui_edit_set_content(cui_edit *, cui_edit_content);
 /* Annotation-only attachment preserves text/selection/history. Any subsequent
  * document revision (including undo/redo) detaches spans; the host must refresh.
  * No metadata allocation, incremental remapping or token history is supplied. */
+/* Atomic borrowed-token insertion/replacement. Original endpoints must be grapheme
+ * boundaries; overlapping atoms expand the replacement. Output storage must be
+ * disjoint from attached spans, token strings, and model storage, and remains
+ * borrowed until detached. Count and output are untouched on failure. Exact
+ * token/range no-ops preserve selection/history but adopt the copied output.
+ * Undo restores text only and detaches tokens; metadata-only edits add no history. */
+cui_edit_result cui_edit_replace_range_with_token(cui_edit *, size_t start, size_t end,
+                                                  cui_edit_inline_token,
+                                                  cui_edit_token_span *output, size_t capacity,
+                                                  size_t *count);
+cui_edit_result cui_edit_replace_with_token(cui_edit *, cui_edit_inline_token,
+                                            cui_edit_token_span *output, size_t capacity,
+                                            size_t *count);
 cui_edit_result cui_edit_set_tokens(cui_edit *, const cui_edit_token_span *, size_t count);
 /* Token-safe view selection: nonempty ranges expand outward, collapsed cursors
  * snap left. The legacy exact scalar selection function below remains available. */

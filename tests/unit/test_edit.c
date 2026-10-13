@@ -753,7 +753,56 @@ static void test_inline_content(void) {
     assert(!strcmp(buffer, "@Mary Jane!") && cui_edit_get_state(edit).revision == 0);
     cui_edit_destroy(edit);
 }
+static void test_token_replacement(void) {
+    char buffer[64] = "A @one @two Z";
+    cui_edit *edit = make(buffer, sizeof buffer, true, 16);
+    cui_edit_token_span spans[2] = {
+        {2, 6, {cui_string("1"), cui_string("@one"), cui_string("One")}},
+        {7, 11, {cui_string("2"), cui_string("@two"), cui_string("Two")}}};
+    assert(cui_edit_set_tokens(edit, spans, 2) == CUI_EDIT_OK);
+    cui_edit_token_span output[4];
+    memset(output, 0x55, sizeof output);
+    cui_edit_token_span saved[4];
+    memcpy(saved, output, sizeof output);
+    size_t count = 99;
+    cui_edit_inline_token token = {cui_string("3"), cui_string("@x"), cui_string("X")};
+    assert(cui_edit_replace_range_with_token(edit, 3, 4, token, output, 1, &count) ==
+           CUI_EDIT_CAPACITY);
+    assert(count == 99 && !memcmp(saved, output, sizeof output) &&
+           !strcmp(buffer, "A @one @two Z"));
+    assert(cui_edit_replace_range_with_token(edit, 3, 4, token, spans, 2, &count) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    assert(cui_edit_replace_range_with_token(edit, 3, 4, token, output, 4, &count) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "A @x @two Z") && count == 2);
+    assert(output[0].start == 2 && output[0].end == 4 && output[1].start == 5 &&
+           output[1].end == 9);
+    assert(cui_edit_content_valid(cui_edit_get_content(edit)));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "A @one @two Z"));
+    assert(cui_edit_get_content(edit).token_count == 0);
+    assert(cui_edit_set_tokens(edit, spans, 2) == CUI_EDIT_OK);
+    cui_edit_select(edit, 0, 1);
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_edit_replace_range_with_token(edit, 2, 6, spans[0].token, output, 4, &count) ==
+           CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).anchor == 0 && cui_edit_get_state(edit).cursor == 1 &&
+           cui_edit_get_state(edit).revision == revision);
+    cui_edit_select(edit, 3, 4);
+    assert(cui_edit_replace_with_token(edit, token, spans, 2, &count) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "A @x @two Z"));
+    cui_edit_destroy(edit);
+    strcpy(buffer, "a");
+    edit = make(buffer, sizeof buffer, true, 16);
+    token.text = cui_string("\xcc\x81");
+    count = 99;
+    memcpy(output, saved, sizeof output);
+    assert(cui_edit_replace_range_with_token(edit, 1, 1, token, output, 4, &count) ==
+           CUI_EDIT_BOUNDARY);
+    assert(count == 99 && !memcmp(output, saved, sizeof output) && !strcmp(buffer, "a") &&
+           cui_edit_get_state(edit).revision == 0);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_token_replacement();
     test_inline_content();
     test_unicode_word_events();
     test_word_conformance();

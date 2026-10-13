@@ -332,3 +332,15 @@ normalization, scalar compatibility, atomic modifier deletion/undo, collapsed
 insertion, invalid/capacity/alias rejection before mutation, invalid borrowed
 range preflight, lifetime detachment, readonly/pointer/wrap geometry, Tab
 semantics, and explicit code Editor rejection.
+
+The ordinary edit model also provides `cui_edit_replace_with_token` and
+`cui_edit_replace_range_with_token`. These validate the original grapheme endpoints,
+expand existing atoms, remove intersected spans, and shift surviving spans. The
+host supplies a separate output span array; success attaches that borrowed array.
+All strings and output storage must remain alive and immutable until detachment.
+Rejected operations preserve text, selection, history, output spans, and count.
+Candidate insertion and surviving-span boundaries must remain grapheme boundaries.
+Exact token/range replacements preserve selection and document revision. Undo still
+restores document snapshots only and detaches annotations; token metadata has no
+history payload. This is ordinary Input/Textarea functionality, not CodeEditor token
+support. Masked/secret Input modes themselves are not currently implemented in CUI.

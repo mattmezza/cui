@@ -52,6 +52,17 @@ def main():
                     audit.page.wait_for_timeout(80)
                     assert formatted in audit.texts()
                     assert not audit.errors, audit.errors
+                # Disabling formatting must also clear its request workspace;
+                # the checked engine rejects orphaned formatting resources.
+                audit.configure('input-mode', 0)
+                field = audit.target('Display name', 6)
+                point = audit.point(field, .25, .5)
+                audit.page.mouse.click(point['x'], point['y'])
+                audit.page.wait_for_function('document.activeElement.id === "cui-ime-input"')
+                audit.page.keyboard.press('Control+a')
+                audit.session.send('Input.insertText', {'text': 'Ordinary42'})
+                audit.page.wait_for_timeout(80)
+                assert 'Ordinary42' in audit.texts()
                 audit.page.close()
             browser.close()
     finally:

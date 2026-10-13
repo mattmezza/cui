@@ -3540,7 +3540,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                                 .fraction_limited = true,
                                                                 .fraction_digits = 2}
                                             : (cui_edit_format){0},
-                .format_workspace = {input_format_workspace, sizeof input_format_workspace},
+                .format_workspace = input_mode == 7 || input_mode == 8
+                                        ? (cui_edit_workspace){input_format_workspace,
+                                                               sizeof input_format_workspace}
+                                        : (cui_edit_workspace){0},
                 .readonly = input_mode == 1,
                 .validate = input_mode == 3 ? gallery_name_acceptance : NULL,
                 .normalization =

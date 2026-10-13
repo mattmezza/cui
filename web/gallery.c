@@ -10,6 +10,9 @@ static unsigned page_touch_cancels;
 #include "cui/cui_chrome.h"
 #include "cui/cui_command.h"
 #include "cui/cui_components.h"
+#ifdef CUI_GALLERY_REGEX
+#include "cui/cui_regex.h"
+#endif
 #include "cui/cui_content.h"
 #include "cui/cui_description.h"
 #include "cui/cui_disclosure.h"
@@ -1601,6 +1604,34 @@ static cui_edit *edit;
 static cui_input_state input_state;
 static char input_format_workspace[1024];
 static int input_mode;
+#ifdef CUI_GALLERY_REGEX
+static cui_regex input_regex;
+static cui_regex_session input_regex_session;
+#endif
+static bool input_regex_ready;
+int gallery_regex_available(void) {
+    return input_regex_ready;
+}
+static void gallery_input_regex_init(void) {
+#ifdef CUI_GALLERY_REGEX
+    if (cui_regex_compile(cui_string("^[\\p{L} ]*$"),
+                          (cui_regex_options){.max_pattern_bytes = 64, .max_text_bytes = 1024},
+                          &input_regex) == CUI_REGEX_OK &&
+        cui_regex_session_create(&input_regex, 1024 * 1024, &input_regex_session) == CUI_REGEX_OK) {
+        input_regex_ready = true;
+        return;
+    }
+    (void)cui_regex_session_destroy(&input_regex_session);
+    (void)cui_regex_destroy(&input_regex);
+#endif
+}
+static cui_text_match gallery_input_regex_matcher(void) {
+#ifdef CUI_GALLERY_REGEX
+    if (input_regex_ready)
+        return cui_regex_matcher(&input_regex_session);
+#endif
+    return (cui_text_match){0};
+}
 static bool input_rejected;
 static bool gallery_name_acceptance(void *user, cui_str value) {
     (void)user;
@@ -2319,8 +2350,11 @@ int gallery_init(void) {
         return 0;
     if (!gallery_text_view_load())
         return 0;
-    return ui && edit && group_edit && form_name_edit && form_email_edit && dock && dock_view &&
-           query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
+    bool initialized = ui && edit && group_edit && form_name_edit && form_email_edit && dock &&
+                       dock_view && query && number_state.edit && rebuilt == CUI_VIRTUAL_OK;
+    if (initialized)
+        gallery_input_regex_init();
+    return initialized;
 }
 static int gallery_last_key_down, gallery_last_key_up;
 static unsigned gallery_last_pointer_down_clicks, gallery_last_pointer_up_clicks;
@@ -3522,6 +3556,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             ui, cui_id_from(ui, "input"), &t,
             cui_string(input_mode == 7   ? "Phone number"
                        : input_mode == 8 ? "Amount"
+                       : input_mode == 9 ? "Unicode name"
                        : input_mode >= 4 ? "Password"
                                          : "Display name"),
             edit, &input_state,
@@ -3546,8 +3581,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                         : (cui_edit_workspace){0},
                 .readonly = input_mode == 1,
                 .validate = input_mode == 3 ? gallery_name_acceptance : NULL,
-                .normalization =
-                    input_mode == 3 ? CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF : CUI_EDIT_NORMALIZE_NONE,
+                .matcher = input_mode == 9 ? gallery_input_regex_matcher() : (cui_text_match){0},
+                .normalization = input_mode == 3 || input_mode == 9
+                                     ? CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF
+                                     : CUI_EDIT_NORMALIZE_NONE,
                 .required = input_mode == 2,
                 .invalid = input_mode == 2,
                 .size = (cui_input_size)control_size,
@@ -3562,6 +3599,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                       cui_string(input_rejected
                                      ? "Number rejected; your name is unchanged."
                                      : "Names can contain Unicode text, but no digits."));
+        if (input_mode == 9)
+            cui_label(ui, &t,
+                      cui_string(input_rejected
+                                     ? "Regex rejected; your name is unchanged."
+                                     : "Unicode letters and spaces only · real regex provider."));
         if (input_mode == 7 || input_mode == 8)
             cui_label(ui, &t,
                       cui_string(input_mode == 7 ? "Select all and type 4155550123: (415) 555-0123."
@@ -5770,7 +5812,7 @@ int gallery_alert_attempts(void) {
     return alert_attempts;
 }
 void gallery_input_mode(int mode) {
-    if (mode < 0 || mode > 8)
+    if (mode < 0 || mode > 9 || (mode == 9 && !input_regex_ready))
         mode = 0;
     if (input_mode != mode)
         input_rejected = false;

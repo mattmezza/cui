@@ -1349,7 +1349,26 @@ bool cui_slider(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
     bool changed = cui_base_slider(ui, id, name, value, min, max, step, disabled);
     cui_text(ui, name, t->font_size, disabled ? t->muted : t->text);
     float ratio = value && isfinite(*value) && max > min ? (*value - min) / (max - min) : 0;
-    cui_progress(ui, id ^ UINT64_C(0x39c1a2170384edaa), t, ratio, 240);
+    cui_color track = t->primary;
+    track.a = (uint8_t)lroundf(track.a * .2f);
+    cui_begin_box(ui, id ^ UINT64_C(0x39c1a2170384edaa),
+                  (cui_box){.width = 240,
+                            .height = 8,
+                            .fixed_height = true,
+                            .clip = true,
+                            .background = track,
+                            .radius = t->radius == 0 ? 0 : 4});
+    float fill = fmaxf(0, fminf(1, ratio)) * 240;
+    if (fill > 0) {
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = fill,
+                                .height = 8,
+                                .fixed_height = true,
+                                .background = t->primary,
+                                .radius = t->radius == 0 ? 0 : 4});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
     cui_end_box(ui);
     return changed;
 }

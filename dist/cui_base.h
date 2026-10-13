@@ -314,6 +314,7 @@ bool cui_base_slider(cui_context *ui, cui_id id, cui_str name, float *value, flo
     float old = *value;
     float next = isfinite(old) ? cui_base_clamp(old, min, max) : min;
     cui_interaction s = cui_interact(ui, id, CUI_ROLE_SLIDER, name, disabled, false, next);
+    cui_set_semantic_details(ui, id, (cui_semantic_details){.minimum = min, .maximum = max});
     if (disabled)
         return false;
     cui_rect b = cui_bounds(ui, id);

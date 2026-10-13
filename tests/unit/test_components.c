@@ -953,6 +953,32 @@ static void test_badge_variants(void) {
     assert(calls == prior && list.count == 0);
     cui_destroy(ui);
 }
+static void test_slider_semantics(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    cui_theme theme = cui_theme_light();
+    float value = 20;
+    assert(cui_begin_frame(ui, 400, 200, 0));
+    assert(!cui_slider(ui, 901, &theme, cui_string("Level"), &value, 10, 50, 1, false));
+    cui_draw_list draw = cui_end_frame(ui);
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    assert(count == 1 && semantics[0].role == CUI_ROLE_SLIDER && semantics[0].value == 20);
+    assert(semantics[0].details.minimum == 10 && semantics[0].details.maximum == 50);
+    bool fill = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 60 &&
+            draw.commands[i].bounds.h == 8)
+            fill = true;
+    assert(fill);
+    cui_focus(ui, 901);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_END}));
+    assert(cui_begin_frame(ui, 400, 200, 0));
+    assert(cui_slider(ui, 901, &theme, cui_string("Level"), &value, 10, 50, 1, false));
+    cui_end_frame(ui);
+    semantics = cui_semantics(ui, &count);
+    assert(count == 1 && semantics[0].value == 50 && value == 50);
+    cui_destroy(ui);
+}
 static void circle_child(cui_context *ui, void *user) {
     unsigned *calls = user;
     ++*calls;
@@ -1226,6 +1252,7 @@ int main(void) {
     test_badge_variants();
     test_progress_source_style();
     test_progress_circle();
+    test_slider_semantics();
     test_progress_motion();
     test_button_hover_and_disabled_paint();
     test_button_paint_composition();

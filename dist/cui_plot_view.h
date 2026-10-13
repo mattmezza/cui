@@ -381,6 +381,104 @@ cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
 #include <stdio.h>
 #include <string.h>
 
+cui_plot_result cui_plot_viewport_reduce(cui_context *ui, uint64_t id, cui_plot_viewport *v,
+                                         cui_plot_viewport_options o) {
+    if (!ui || !id || !v || !v->initialized)
+        return CUI_PLOT_INVALID;
+    if (!o.enabled || o.disabled) {
+        v->dragging = false;
+        return CUI_PLOT_OK;
+    }
+    /* A transient nonmodal scope activates Core's original-hit query. The
+     * surface ID itself is sufficient; no extra retained semantic is created. */
+    if (!cui_begin_focus_scope(ui, id, false))
+        return CUI_PLOT_INVALID;
+    if (!cui_pointer_scope_allowed(ui, id))
+        v->dragging = false;
+    cui_rect bounds = cui_bounds(ui, id);
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    cui_plot_result result = CUI_PLOT_OK;
+    for (size_t i = 0; i < count; ++i) {
+        const cui_event *e = &events[i];
+        if (cui_event_consumed(ui, i))
+            continue;
+        bool target = cui_event_target(ui, i) == id;
+        double dx = 0, dy = 0, factor = 1;
+        bool transform = false, claimed = false;
+        if (e->type == CUI_EVENT_CANCEL && (target || v->dragging)) {
+            v->dragging = false;
+            claimed = true;
+        } else if (target && e->type == CUI_EVENT_POINTER_DOWN &&
+                   e->pointer_type == CUI_POINTER_MOUSE &&
+                   e->pointer_button == CUI_POINTER_PRIMARY && (e->modifiers & CUI_MOD_SHIFT) &&
+                   (o.pan_x || o.pan_y)) {
+            v->dragging = true;
+            v->pointer_x = e->x;
+            v->pointer_y = e->y;
+            claimed = true;
+        } else if (v->dragging && target && e->type == CUI_EVENT_POINTER_MOVE) {
+            dx = (double)e->x - v->pointer_x;
+            dy = (double)e->y - v->pointer_y;
+            v->pointer_x = e->x;
+            v->pointer_y = e->y;
+            transform = claimed = true;
+        } else if (v->dragging && e->type == CUI_EVENT_POINTER_UP) {
+            v->dragging = false;
+            (void)cui_cancel_event_activation(ui, i);
+            claimed = true;
+        } else if (target && e->type == CUI_EVENT_GESTURE) {
+            v->dragging = false;
+            if (e->scroll_phase != CUI_SCROLL_PHASE_ENDED &&
+                e->scroll_phase != CUI_SCROLL_PHASE_CANCELLED) {
+                dx = e->dx;
+                dy = e->dy;
+                factor = e->gesture_scale;
+                transform = true;
+            }
+            claimed = true;
+        } else if (e->type == CUI_EVENT_SCROLL && (e->modifiers & CUI_MOD_CTRL) &&
+                   (o.zoom_x || o.zoom_y) && cui_event_hit_within_scope(ui, i, id)) {
+            double delta = e->dy * (e->scroll_precise ? 1.0 : 32.0);
+            factor = exp(fmax(-20, fmin(20, delta * .002)));
+            transform = claimed = true;
+        }
+        if (transform) {
+            cui_plot_result next = cui_plot_viewport_transform(
+                v, o, dx, dy, factor, (cui_plot_point){e->x - bounds.x, e->y - bounds.y});
+            if (next != CUI_PLOT_OK)
+                result = next;
+            else
+                cui_invalidate(ui);
+        }
+        if (claimed)
+            (void)cui_consume_event(ui, i);
+    }
+    cui_end_focus_scope(ui);
+    return result;
+}
+bool cui_plot_viewport_bind(cui_context *ui, uint64_t id, const cui_plot_viewport *v,
+                            cui_plot_viewport_options o) {
+    if (!ui || !id || !v || !v->initialized)
+        return false;
+    size_t count;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (items[i].id == id) {
+            cui_semantic_details details = items[i].details;
+            bool enabled = o.enabled && !o.disabled && !items[i].disabled;
+            if (enabled)
+                details.pointer_activatable = true;
+            details.gesture_pan = enabled && (o.pan_x || o.pan_y);
+            details.gesture_zoom = enabled && (o.zoom_x || o.zoom_y);
+            cui_set_semantic_details(ui, id, details);
+            if (enabled)
+                return cui_set_cursor(ui, id, v->dragging ? CUI_CURSOR_GRABBING : CUI_CURSOR_GRAB);
+            return true;
+        }
+    return false;
+}
+
 cui_plot_axis_options cui_plot_axis_defaults(float width, float height) {
     return (cui_plot_axis_options){.width = width, .height = height, .x_line = true};
 }

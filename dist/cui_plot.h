@@ -294,6 +294,37 @@ cui_plot_result cui_plot_nice(cui_plot_scale *, size_t desired_count);
  * Factor >1 zooms in, keeping the data at anchor_pixel fixed. */
 cui_plot_result cui_plot_pan(cui_plot_scale *, double delta_pixels);
 cui_plot_result cui_plot_zoom(cui_plot_scale *, double factor, double anchor_pixel);
+/* Explicit caller-owned viewport. Limits are transformed domain units (log10
+ * for log scales); zero span limits are unconstrained. Both axes commit together. */
+typedef struct {
+    double minimum, maximum, min_span, max_span;
+    bool bounded;
+} cui_plot_viewport_limit;
+typedef struct {
+    bool enabled, disabled, pan_x, pan_y, zoom_x, zoom_y;
+    cui_plot_viewport_limit x_limit, y_limit;
+} cui_plot_viewport_options;
+typedef struct {
+    cui_plot_scale x, y, initial_x, initial_y;
+    double pointer_x, pointer_y;
+    bool initialized, dragging;
+} cui_plot_viewport;
+cui_plot_viewport_options cui_plot_viewport_defaults(void);
+cui_plot_result cui_plot_viewport_init(cui_plot_viewport *, cui_plot_scale x, cui_plot_scale y);
+cui_plot_result cui_plot_viewport_reset(cui_plot_viewport *);
+/* Pan precedes zoom at the new center; a pinch preserves data under the old
+ * center at the moved center. Positive factor >1 zooms in. */
+cui_plot_result cui_plot_viewport_transform(cui_plot_viewport *, cui_plot_viewport_options,
+                                            double dx, double dy, double factor,
+                                            cui_plot_point anchor);
+struct cui_context;
+/* Reduce before projecting, bind after submitting cui_plot_view. Shift-primary
+ * mouse drag, Ctrl-scroll (precise pixels, legacy steps*32), Core touch gestures.
+ * Hosts preserve modifiers and deliver CANCEL on capture loss. */
+cui_plot_result cui_plot_viewport_reduce(struct cui_context *, uint64_t id, cui_plot_viewport *,
+                                         cui_plot_viewport_options);
+bool cui_plot_viewport_bind(struct cui_context *, uint64_t id, const cui_plot_viewport *,
+                            cui_plot_viewport_options);
 cui_plot_result cui_plot_clip_line(cui_plot_line, cui_plot_rect viewport, cui_plot_line *out);
 cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_scale *y,
                                       cui_plot_point a, cui_plot_point b, cui_plot_rect viewport,
@@ -702,6 +733,84 @@ static cui_plot_result cui_plot_untransform(cui_plot_scale_kind kind, long doubl
         return cui_plot_number(result, out);
     }
     return cui_plot_number(value, out);
+}
+cui_plot_viewport_options cui_plot_viewport_defaults(void) {
+    return (cui_plot_viewport_options){
+        .enabled = true, .pan_x = true, .pan_y = true, .zoom_x = true, .zoom_y = true};
+}
+cui_plot_result cui_plot_viewport_init(cui_plot_viewport *v, cui_plot_scale x, cui_plot_scale y) {
+    if (!v || cui_plot_validate(&x) != CUI_PLOT_OK || cui_plot_validate(&y) != CUI_PLOT_OK)
+        return CUI_PLOT_INVALID;
+    *v = (cui_plot_viewport){.x = x, .y = y, .initial_x = x, .initial_y = y, .initialized = true};
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_viewport_reset(cui_plot_viewport *v) {
+    if (!v || !v->initialized)
+        return CUI_PLOT_INVALID;
+    cui_plot_scale x = v->initial_x, y = v->initial_y;
+    x.range_start = v->x.range_start;
+    x.range_end = v->x.range_end;
+    y.range_start = v->y.range_start;
+    y.range_end = v->y.range_end;
+    return cui_plot_viewport_init(v, x, y);
+}
+static cui_plot_result viewport_axis(cui_plot_scale *s, cui_plot_viewport_limit limit, double delta,
+                                     double factor, double anchor) {
+    if (!isfinite(limit.min_span) || !isfinite(limit.max_span) || limit.min_span < 0 ||
+        limit.max_span < 0 || (limit.max_span && limit.max_span < limit.min_span) ||
+        (limit.bounded &&
+         (!isfinite(limit.minimum) || !isfinite(limit.maximum) || limit.minimum >= limit.maximum ||
+          (long double)limit.min_span > (long double)limit.maximum - limit.minimum)))
+        return CUI_PLOT_INVALID;
+    long double lo = cui_plot_transform(s->kind, s->domain_min);
+    long double hi = cui_plot_transform(s->kind, s->domain_max), span = hi - lo;
+    long double range = (long double)s->range_end - s->range_start;
+    long double fraction = ((long double)anchor - s->range_start) / range;
+    long double center = lo - (long double)delta / range * span + fraction * span;
+    long double next_span = span / factor;
+    if (limit.min_span)
+        next_span = fmaxl(next_span, limit.min_span);
+    if (limit.max_span)
+        next_span = fminl(next_span, limit.max_span);
+    if (limit.bounded)
+        next_span = fminl(next_span, (long double)limit.maximum - limit.minimum);
+    lo = center - fraction * next_span;
+    hi = lo + next_span;
+    if (limit.bounded) {
+        if (lo < limit.minimum) {
+            hi += limit.minimum - lo;
+            lo = limit.minimum;
+        }
+        if (hi > limit.maximum) {
+            lo -= hi - limit.maximum;
+            hi = limit.maximum;
+        }
+    }
+    cui_plot_result result = cui_plot_untransform(s->kind, lo, &s->domain_min);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_untransform(s->kind, hi, &s->domain_max);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_validate(s);
+    return result;
+}
+cui_plot_result cui_plot_viewport_transform(cui_plot_viewport *v, cui_plot_viewport_options o,
+                                            double dx, double dy, double factor,
+                                            cui_plot_point anchor) {
+    if (!v || !v->initialized || !isfinite(dx) || !isfinite(dy) || !isfinite(factor) ||
+        factor <= 0 || !isfinite(anchor.x) || !isfinite(anchor.y) ||
+        cui_plot_validate(&v->x) != CUI_PLOT_OK || cui_plot_validate(&v->y) != CUI_PLOT_OK)
+        return CUI_PLOT_INVALID;
+    if (!o.enabled || o.disabled)
+        return CUI_PLOT_OK;
+    cui_plot_viewport next = *v;
+    cui_plot_result result =
+        viewport_axis(&next.x, o.x_limit, o.pan_x ? dx : 0, o.zoom_x ? factor : 1, anchor.x);
+    if (result == CUI_PLOT_OK)
+        result =
+            viewport_axis(&next.y, o.y_limit, o.pan_y ? dy : 0, o.zoom_y ? factor : 1, anchor.y);
+    if (result == CUI_PLOT_OK)
+        *v = next;
+    return result;
 }
 static long double cui_plot_fraction(long double value, long double a, long double b) {
     long double span = b - a;

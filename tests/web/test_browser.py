@@ -1288,10 +1288,11 @@ def main():
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_title_action(6)===n+1', arg=doubles)
             client_title_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('CUI workspace', 7))
             control_change('title-decoration', '3')
-            assert page.locator('#accessible [role=button]').count() == 0
+            assert page.locator('#accessible [role=button]').count() == 3
             native_title_x = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('CUI workspace', 7))
             assert native_title_x > client_title_x+60
             control_change('title-fullscreen', True)
+            assert page.locator('#accessible [role=button]').count() == 0
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,1)', semantic_index('CUI workspace', 7)) > native_title_x+10
             control_change('title-decoration', '0')
             assert page.locator('#accessible [role=button]').count() == 0

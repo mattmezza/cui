@@ -4102,7 +4102,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          (cui_semantic_details){.parent = table_id});
             }
             cui_id row_id = table_id + r + 1;
-            cui_table_begin_row(ui, row_id, &t, 40, r == 0);
+            cui_table_begin_row_ex(ui, row_id, &t,
+                                   (cui_table_row_options){.height = 40, .header = r == 0,
+                                      .custom_background = true,
+                                      .background = r == 0 ? t.accent : r % 2 ? t.surface : t.background});
             cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = section_id});
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;

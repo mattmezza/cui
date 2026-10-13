@@ -1,4 +1,4 @@
-# Go, Rust, JavaScript and TypeScript with CUI
+# Python, Go, Rust, Node JavaScript and TypeScript with CUI
 
 These runnable examples call the actual CUI library through a small C host. Each
 creates a styled **Increment** button, renders a counter, and calls your language
@@ -8,10 +8,65 @@ a deterministic headless interaction check instead.
 
 This is an integration starting point, not a complete binding of CUI's 78
 manifest entries. UI construction currently lives in `host.c`; application
-callbacks live in Go, Rust or Node. Extend that host ABI to expose the controls
+callbacks live in Python, Go, Rust or Node. Extend that host ABI to expose the controls
 and state your application needs. No Clay or SDL types cross this example ABI.
 
 ## Build and run
+
+### Python only: standard-library ctypes
+
+Use Python 3.9+, CMake 3.20+, Ninja and a C11 compiler. Python needs no pip
+packages, Node, Go or Rust. Native windows additionally need installed SDL3
+3.2+, FreeType, HarfBuzz and a TrueType/OpenType font. Build just the shared host:
+
+```sh
+cmake -S examples/foreign_languages -B examples/foreign_languages/build -G Ninja
+cmake --build examples/foreign_languages/build --target cui_example_host
+# Headless: two actual CUI button activations and Python callbacks.
+python3 examples/foreign_languages/python/main.py
+# Native: click Increment in the actual SDL3 window; close the window to return.
+python3 examples/foreign_languages/python/main.py /usr/share/fonts/noto/NotoSans-Regular.ttf
+```
+
+For another build directory, pass `--library /absolute/path/libcui_example_host.so`.
+Python imports the [small ctypes wrapper](../examples/foreign_languages/python/main.py):
+
+```python
+from main import run
+
+def changed(count):
+    print("Application callback:", count)
+
+run(changed, font="/path/to/your/font.ttf")
+```
+
+Place this Python code beside the wrapper or import it from your application's
+module path. The callback stays alive throughout the synchronous C call.
+Python exceptions are captured in the callback and re-raised after the host
+returns; they never unwind through C. The native loop blocks the calling Python
+thread until close, just like the small Node host below. A production application
+should expose a per-frame host API appropriate to its runtime.
+
+### Node JavaScript and TypeScript only
+
+Use the CMake/compiler and native dependencies above, plus Node 22.18+ and
+Node development headers (`node_api.h`). Go and Rust are unnecessary for these
+clients. No npm packages or node-gyp are required:
+
+```sh
+cmake -S examples/foreign_languages -B examples/foreign_languages/build -G Ninja
+cmake --build examples/foreign_languages/build --target cui_node
+node examples/foreign_languages/node/main.cjs
+node examples/foreign_languages/typescript/main.ts
+# Open the same native CUI window from either runtime:
+node examples/foreign_languages/node/main.cjs /usr/share/fonts/noto/NotoSans-Regular.ttf
+node examples/foreign_languages/typescript/main.ts /usr/share/fonts/noto/NotoSans-Regular.ttf
+```
+
+The TypeScript sample uses Node's built-in type stripping; it does not perform
+static type checking. Both clients use the same N-API addon and C host.
+
+### All five clients
 
 From the repository root, install/use CMake 3.20+, Ninja, a C11 compiler,
 Go 1.22+, Rust 1.85+ and Node 22.18+ (with Node development headers containing
@@ -29,7 +84,7 @@ examples/foreign_languages/check.sh
 The build compiles the C bridge and Node addon with `-Wall -Wextra -Wpedantic
 -Werror`, Go's C trampoline with warnings as errors, and Rust with `-D warnings`.
 It places all artifacts in `examples/foreign_languages/build/`, including the
-shared C host used by all four clients. The CMake subproject builds CUI directly
+shared C host used by all five clients. The CMake subproject builds CUI directly
 from this checkout with position independent code. Run on Linux with GCC/Clang;
 `build.sh` uses ELF rpath linker flags and needs adaptation for other platforms.
 
@@ -44,6 +99,7 @@ validation machine:
 
 ```sh
 FONT=/usr/share/fonts/noto/NotoSans-Regular.ttf
+python3 examples/foreign_languages/python/main.py "$FONT"
 examples/foreign_languages/build/go-demo "$FONT"
 examples/foreign_languages/build/rust-demo "$FONT"
 node examples/foreign_languages/node/main.cjs "$FONT"
@@ -143,12 +199,13 @@ integrating the sample into an application.
 
 Validated on Linux with Go 1.27.2, Rust 1.99.0, Node 25.8.0, SDL3 3.4.18,
 FreeType and HarfBuzz. The C host check verifies callback order, repeated independent runs and optional
-callbacks, in both native-enabled and core-only builds. All four headless clients
-verified counts 1 then 2.
-JavaScript also checked rejected arguments, a thrown callback and a subsequent
-successful run. The repository's default native build passed all 75 CTests.
+callbacks, in both native-enabled and core-only builds. Headless clients
+verify counts 1 then 2. Python additionally
+checks exact callback order, exception identity and a subsequent independent run.
+JavaScript also checks rejected arguments, a thrown callback and a subsequent
+successful run.
 
-Native Linux/X11 checks use Xvfb and xdotool to click the actual window button,
+Native Linux/X11 checks use Xvfb, xdotool and xwininfo to click the actual window button,
 verify that the foreign-language callback prints `count: 1`, and save a BMP of
 the final frame. They exercise a native window and SDL event dispatch, rather
 than merely generating headless commands:
@@ -157,6 +214,7 @@ than merely generating headless commands:
 FONT=/usr/share/fonts/noto/NotoSans-Regular.ttf
 EXAMPLES=examples/foreign_languages
 # Use TMPDIR pointing to a writable directory if your /tmp quota is constrained.
+timeout 15 xvfb-run -a "$EXAMPLES/native-check.sh" "$FONT" python python3 "$EXAMPLES/python/main.py"
 timeout 15 xvfb-run -a "$EXAMPLES/native-check.sh" "$FONT" go "$EXAMPLES/build/go-demo"
 timeout 15 xvfb-run -a "$EXAMPLES/native-check.sh" "$FONT" rust "$EXAMPLES/build/rust-demo"
 timeout 15 xvfb-run -a "$EXAMPLES/native-check.sh" "$FONT" node node "$EXAMPLES/node/main.cjs"

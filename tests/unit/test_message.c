@@ -227,6 +227,12 @@ static void interactions(void) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 100, .y = 100, .dy = 2}));
     cui_message_scroller_result result = scene(ui, s, o, &r);
     assert(result.view.scrolled_up && !result.view.following_tail);
+    double before_precise = result.view.scroll;
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 100, .y = 100, .dy = 3.5f, .scroll_precise = true}));
+    result = scene(ui, s, o, &r);
+    assert(result.view.scroll == before_precise - 3.5);
     cui_focus(ui, 22);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
     result = scene(ui, s, o, &r);

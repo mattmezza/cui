@@ -38,7 +38,8 @@ typedef enum {
     CUI_EVENT_KEY_UP,
     CUI_EVENT_TEXT,
     CUI_EVENT_SCROLL,
-    CUI_EVENT_CANCEL
+    CUI_EVENT_CANCEL,
+    CUI_EVENT_GESTURE /* Opt-in viewport pan/pinch; scale is relative to previous event. */
 } cui_event_type;
 typedef enum {
     CUI_KEY_NONE,
@@ -101,6 +102,7 @@ typedef enum {
 cui_key cui_key_from_character(char character);
 char cui_key_character(cui_key key);
 enum { CUI_MOD_SHIFT = 1, CUI_MOD_CTRL = 2, CUI_MOD_ALT = 4, CUI_MOD_META = 8 };
+typedef enum { CUI_POINTER_MOUSE, CUI_POINTER_TOUCH, CUI_POINTER_PEN } cui_pointer_type;
 typedef enum { CUI_POINTER_PRIMARY, CUI_POINTER_SECONDARY, CUI_POINTER_MIDDLE } cui_pointer_button;
 typedef enum {
     CUI_SCROLL_PHASE_NONE,
@@ -126,6 +128,10 @@ typedef struct {
     bool ime_composing, prefer_character_input;
     /* Host pointer click sequence count. Zero or one denotes an ordinary click. */
     unsigned click_count;
+    cui_pointer_type pointer_type; /* Zero preserves mouse callers. */
+    uint64_t pointer_id;           /* Contact identity, scoped to type/device. */
+    uint64_t pointer_device;       /* Zero for hosts without a device namespace. */
+    float gesture_scale;           /* Relative pinch multiplier; 1 for pan/end/cancel. */
 } cui_event;
 /* Caller-owned gesture filter. Clock is monotonic seconds; no allocation.
  * Precise gestures lock their initial dominant axis, release on strong turns,
@@ -194,7 +200,14 @@ typedef enum {
     CUI_CURSOR_RESIZE_HORIZONTAL,
     CUI_CURSOR_RESIZE_VERTICAL,
     CUI_CURSOR_MOVE,
-    CUI_CURSOR_NOT_ALLOWED
+    CUI_CURSOR_NOT_ALLOWED,
+    CUI_CURSOR_CROSSHAIR,
+    CUI_CURSOR_GRAB,
+    CUI_CURSOR_GRABBING,
+    CUI_CURSOR_ZOOM_IN,
+    CUI_CURSOR_ZOOM_OUT,
+    CUI_CURSOR_WAIT,
+    CUI_CURSOR_HELP
 } cui_cursor;
 typedef struct {
     bool expanded, selected, readonly, multiline, required, invalid, multiselectable, busy,
@@ -221,6 +234,9 @@ typedef struct {
     bool handles_tab; /* Focused editable control consumes Tab and Shift-Tab itself. */
     cui_cursor cursor;
     bool no_focus; /* Suppress role-default focus; pointer activation remains opt-in. */
+    bool gesture_pan, gesture_zoom; /* Explicit viewport opt-in; disabled by default. */
+    bool touch_drag_priority;   /* Custom drag control retains pointer moves over ancestor pan. */
+    bool touch_scroll_disabled; /* Scroll owners accept touch pan by default. */
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -492,6 +508,12 @@ bool cui_hovered(cui_context *ui, cui_id id);
 /* Cursor of the captured or topmost hovered enabled semantic from the completed
  * frame. Hosts apply this after end_frame; clipping and modal scopes apply. */
 cui_cursor cui_pointer_cursor(cui_context *ui);
+/* Apply after building a component; preserves its other semantic details. */
+bool cui_set_cursor(cui_context *, cui_id, cui_cursor);
+bool cui_set_gestures(cui_context *, cui_id, bool pan, bool zoom);
+bool cui_set_touch_drag_priority(cui_context *, cui_id, bool enabled);
+/* Non-mutating: activation remains available to its component/event consumer. */
+cui_interaction cui_interaction_state(const cui_context *, cui_id);
 /* Most recent processed pointer Move/Down/Up coordinates, initially0,0.
  * Queued events update them at begin_frame; idle frames retain them. This is
  * position only, not hover/occlusion/capture. Outputs must be distinct. Null or

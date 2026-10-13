@@ -329,7 +329,7 @@ function render(){
   }
  }
  while(clips-- >0)ctx.restore();
- canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed'][wasm.gallery_cursor()]||'default';
+ canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed','crosshair','grab','grabbing','zoom-in','zoom-out','wait','help'][wasm.gallery_cursor()]||'default';
  syncSemantics();
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));
@@ -586,7 +586,8 @@ for(const [event,type] of [['pointermove',0],['pointerdown',1],['pointerup',2]])
  const rect=canvas.getBoundingClientRect();
  if(type===1){canvas.focus();canvas.setPointerCapture(e.pointerId);suppressCompatibilityMouse=e.pointerType!=='mouse';}
  if(type!==0&&e.pointerType==='mouse')return; // MouseEvent.detail carries the click count; PointerEvent.detail is zero.
- wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),type===0?0:1);requestFrame();
+ if(e.pointerType==='touch'||e.pointerType==='pen')wasm.gallery_touch(type,e.clientX-rect.left,e.clientY-rect.top,e.pointerId,e.pointerType==='touch'?1:2);
+ else wasm.gallery_event(type,e.clientX-rect.left,e.clientY-rect.top,0,mods(e),0,pointerButton(e),type===0?0:1);requestFrame();
 });
 for(const [event,type] of [['mousedown',1],['mouseup',2]])canvas.addEventListener(event,e=>{
  if(!wasm||suppressCompatibilityMouse)return;
@@ -602,7 +603,8 @@ canvas.addEventListener('wheel',e=>{
 canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0,0,0);requestFrame();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('click',()=>{suppressCompatibilityMouse=false;});
-canvas.addEventListener('pointercancel',()=>{wasm?.gallery_event(7,0,0,0,0,0,0,0);requestFrame();});
+canvas.style.touchAction='none';
+canvas.addEventListener('pointercancel',e=>{wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
 canvas.addEventListener('blur',()=>{wasm?.gallery_event(7,0,0,0,0,0,0,0);wasm?.gallery_event(0,-100,-100,0,0,0,0,0);wasm?.gallery_focus(0xffffffff);requestFrame();});
 for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>{
  if(!wasm)return;const key=keyIdentity(e.key);

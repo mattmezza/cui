@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui.h"
+#include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -26,6 +27,7 @@
 #endif
 #define CUI_CORE_STACK_MAX 256
 #define CUI_CORE_EVENT_MAX 256
+#define CUI_CORE_DISPATCH_MAX (2 * CUI_CORE_EVENT_MAX)
 typedef struct {
     uint32_t clay_id;
     size_t parent;
@@ -94,11 +96,12 @@ struct cui_context {
     size_t semantic_count, previous_count;
     cui_id *ids, *activations;
     size_t id_count, activation_count;
-    cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_EVENT_MAX];
+    cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_DISPATCH_MAX];
     size_t queued_count, event_count;
-    bool event_consumed[CUI_CORE_EVENT_MAX];
-    cui_id event_targets[CUI_CORE_EVENT_MAX], event_activations[CUI_CORE_EVENT_MAX];
-    size_t event_activation_slots[CUI_CORE_EVENT_MAX];
+    bool event_consumed[CUI_CORE_DISPATCH_MAX];
+    cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
+    cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
+    size_t event_activation_slots[CUI_CORE_DISPATCH_MAX];
     uint64_t scopes[CUI_CORE_STACK_MAX];
     size_t scope_count;
     bool opened[CUI_CORE_STACK_MAX];
@@ -107,6 +110,12 @@ struct cui_context {
     size_t string_used;
     cui_id focus, capture, space_capture;
     float pointer_x, pointer_y, dt;
+    struct {
+        uint64_t id, device;
+        float x, y, start_x, start_y;
+        cui_id owner, viewport;
+        bool active, primary, dragging, blocked;
+    } contacts[16];
     double frame_time;
     bool reduced_motion;
     cui_core_resource *resources;
@@ -455,18 +464,41 @@ static cui_id cui_core_hit(cui_context *ui, float x, float y) {
 cui_cursor cui_pointer_cursor(cui_context *ui) {
     if (!ui)
         return CUI_CURSOR_DEFAULT;
-    cui_id id = ui->capture ? ui->capture : cui_core_hit(ui, ui->pointer_x, ui->pointer_y);
+    cui_id id = ui->capture;
+    if (!id) {
+        size_t hit = SIZE_MAX;
+        for (size_t i = 0; i < ui->previous_count; i++) {
+            const cui_semantic *s = &ui->previous[i];
+            if (!s->disabled && cui_core_previous_allowed(ui, i) &&
+                (cui_core_focusable(s) || s->details.pointer_activatable ||
+                 s->details.cursor != CUI_CURSOR_DEFAULT) &&
+                cui_core_inside(ui->previous_hits[i], ui->pointer_x, ui->pointer_y) &&
+                cui_core_above(ui, i, hit))
+                hit = i;
+        }
+        if (hit != SIZE_MAX)
+            id = ui->previous[hit].id;
+    }
     for (size_t i = 0; i < ui->previous_count; i++) {
         const cui_semantic *s = &ui->previous[i];
         if (s->id == id && !s->disabled && cui_core_previous_allowed(ui, i) &&
-            s->details.cursor >= CUI_CURSOR_DEFAULT && s->details.cursor <= CUI_CURSOR_NOT_ALLOWED)
+            s->details.cursor >= CUI_CURSOR_DEFAULT && s->details.cursor <= CUI_CURSOR_HELP)
             return s->details.cursor;
     }
     return CUI_CURSOR_DEFAULT;
 }
-static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from,
-                                  bool gesture_probe) {
+static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from, bool gesture_probe,
+                                  cui_id touch_owner_id) {
     cui_id hit = 0;
+    size_t touch_owner = SIZE_MAX;
+    if (event.pointer_type == CUI_POINTER_TOUCH) {
+        for (size_t n = 0; n < ui->previous_count; n++)
+            if (ui->previous[n].id == touch_owner_id && !ui->previous[n].disabled &&
+                cui_core_previous_allowed(ui, n))
+                touch_owner = n;
+        if (touch_owner == SIZE_MAX)
+            return 0;
+    }
     int16_t layer = INT16_MIN, blocking_layer = INT16_MIN;
     for (size_t i = 0; i < ui->previous_count; ++i) {
         const cui_semantic *node = &ui->previous[i];
@@ -481,6 +513,13 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from,
             while (parent != SIZE_MAX && parent != i)
                 parent = ui->previous_parents[parent];
             if (parent == SIZE_MAX)
+                continue;
+        }
+        if (touch_owner != SIZE_MAX && i != touch_owner) {
+            size_t ancestor = ui->previous_parents[touch_owner];
+            while (ancestor != SIZE_MAX && ancestor != i)
+                ancestor = ui->previous_parents[ancestor];
+            if (ancestor == SIZE_MAX)
                 continue;
         }
         cui_semantic_details d = node->details;
@@ -504,13 +543,198 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from,
                 can_y = false;
             }
         }
-        if (!node->disabled && d.scrollable && (can_x || can_y) &&
-            ui->previous_layers[i] >= layer) {
+        if (!node->disabled && d.scrollable &&
+            !(event.pointer_type == CUI_POINTER_TOUCH && d.touch_scroll_disabled) &&
+            (can_x || can_y) && ui->previous_layers[i] >= layer) {
             hit = node->id;
             layer = ui->previous_layers[i];
         }
     }
     return layer >= blocking_layer ? hit : 0;
+}
+/* Touch contacts are bounded and retained across immediate-mode frames. Pan
+ * reuses the same scroll event/reducer path as precise wheel input. */
+static cui_id cui_core_touch_owner(cui_context *ui, cui_event e, bool viewport) {
+    cui_id result = 0;
+    int16_t layer = INT16_MIN, blocking = INT16_MIN;
+    for (size_t i = 0; i < ui->previous_count; i++) {
+        cui_semantic *s = &ui->previous[i];
+        if (!cui_core_previous_allowed(ui, i) || !cui_core_inside(ui->previous_hits[i], e.x, e.y))
+            continue;
+        if ((cui_core_focusable(s) || s->details.pointer_activatable) &&
+            ui->previous_layers[i] > blocking)
+            blocking = ui->previous_layers[i];
+        bool eligible = viewport ? s->details.gesture_pan || s->details.gesture_zoom
+                                 : s->details.scrollable && !s->details.touch_scroll_disabled;
+        if (!s->disabled && eligible && ui->previous_layers[i] >= layer) {
+            result = s->id;
+            layer = ui->previous_layers[i];
+        }
+    }
+    return layer >= blocking ? result : 0;
+}
+static float cui_core_touch_float(double value) {
+    return (float)fmin((double)FLT_MAX, fmax(-(double)FLT_MAX, value));
+}
+static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id *scroll_owner) {
+    if (e->type == CUI_EVENT_CANCEL && e->pointer_type != CUI_POINTER_TOUCH) {
+        memset(ui->contacts, 0, sizeof ui->contacts);
+        return false;
+    }
+    if (e->pointer_type != CUI_POINTER_TOUCH ||
+        (e->type != CUI_EVENT_POINTER_DOWN && e->type != CUI_EVENT_POINTER_MOVE &&
+         e->type != CUI_EVENT_POINTER_UP && e->type != CUI_EVENT_CANCEL))
+        return false;
+    if (e->type != CUI_EVENT_CANCEL && (!isfinite(e->x) || !isfinite(e->y)))
+        return true;
+    size_t slot = 16, count = 0;
+    for (size_t n = 0; n < 16; n++) {
+        if (ui->contacts[n].active) {
+            count++;
+            if (ui->contacts[n].id == e->pointer_id && ui->contacts[n].device == e->pointer_device)
+                slot = n;
+        }
+    }
+    if (e->type == CUI_EVENT_POINTER_DOWN) {
+        if (slot != 16)
+            return true;
+        for (size_t n = 0; n < 16; n++)
+            if (!ui->contacts[n].active) {
+                slot = n;
+                break;
+            }
+        if (slot == 16)
+            return true;
+        for (size_t n = 0; n < 16; n++)
+            if (n != slot && !ui->contacts[n].active && ui->contacts[n].id == e->pointer_id &&
+                ui->contacts[n].device == e->pointer_device)
+                memset(&ui->contacts[n], 0, sizeof ui->contacts[n]);
+        ui->contacts[slot].id = e->pointer_id;
+        ui->contacts[slot].device = e->pointer_device;
+        ui->contacts[slot].x = ui->contacts[slot].start_x = e->x;
+        ui->contacts[slot].y = ui->contacts[slot].start_y = e->y;
+        ui->contacts[slot].owner = cui_core_touch_owner(ui, *e, false);
+        ui->contacts[slot].viewport = cui_core_touch_owner(ui, *e, true);
+        cui_id pointer_control = cui_core_hit(ui, e->x, e->y);
+        for (size_t n = 0; n < ui->previous_count; n++)
+            if (ui->previous[n].id == pointer_control &&
+                (ui->previous[n].details.touch_drag_priority ||
+                 ui->previous[n].role == CUI_ROLE_SLIDER ||
+                 ui->previous[n].role == CUI_ROLE_SCROLLBAR ||
+                 ui->previous[n].role == CUI_ROLE_SEPARATOR)) {
+                ui->contacts[slot].owner = ui->contacts[slot].viewport = 0;
+                break;
+            }
+        ui->contacts[slot].active = true;
+        ui->contacts[slot].primary = count == 0;
+        ui->contacts[slot].dragging = false;
+        ui->contacts[slot].blocked = false;
+        if (count) {
+            ui->capture = 0;
+            for (size_t n = 0; n < 16; n++)
+                if (ui->contacts[n].active)
+                    ui->contacts[n].blocked = true;
+            return true;
+        }
+        return false;
+    }
+    if (slot == 16)
+        return true;
+    bool cancelled = e->type == CUI_EVENT_CANCEL;
+    float contact_x = e->x, contact_y = e->y;
+    if (cancelled) {
+        contact_x = ui->contacts[slot].x;
+        contact_y = ui->contacts[slot].y;
+        e->x = contact_x;
+        e->y = contact_y;
+        ui->capture = 0;
+    }
+    float old_x = ui->contacts[slot].x, old_y = ui->contacts[slot].y;
+    double dx = (double)e->x - old_x, dy = (double)e->y - old_y;
+    double distance_x = (double)e->x - ui->contacts[slot].start_x;
+    double distance_y = (double)e->y - ui->contacts[slot].start_y;
+    bool ending = e->type == CUI_EVENT_POINTER_UP || e->type == CUI_EVENT_CANCEL;
+    cui_id viewport = ui->contacts[slot].viewport;
+    bool pan = false, zoom = false;
+    cui_event anchor = *e;
+    anchor.x = ui->contacts[slot].start_x;
+    anchor.y = ui->contacts[slot].start_y;
+    bool viewport_visible = viewport && cui_core_touch_owner(ui, anchor, true) == viewport;
+    for (size_t n = 0; n < ui->previous_count; n++)
+        if (viewport_visible && ui->previous[n].id == viewport && !ui->previous[n].disabled &&
+            cui_core_previous_allowed(ui, n)) {
+            pan = ui->previous[n].details.gesture_pan;
+            zoom = ui->previous[n].details.gesture_zoom;
+        }
+    if (!ui->contacts[slot].owner && !viewport &&
+        distance_x * distance_x + distance_y * distance_y >= 64)
+        ui->contacts[slot].dragging = true;
+    size_t partner = 16;
+    for (size_t n = 0; n < 16; n++)
+        if (n != slot && ui->contacts[n].active && ui->contacts[n].viewport == viewport) {
+            partner = n;
+            break;
+        }
+    bool pinch = zoom && viewport && count == 2 && partner != 16;
+    if (pinch || (pan && count == 1 && !ui->contacts[slot].blocked)) {
+        bool start = !ui->contacts[slot].dragging;
+        if (pinch || distance_x * distance_x + distance_y * distance_y >= 64 || !start) {
+            float scale = 1;
+            float center_x = e->x, center_y = e->y;
+            if (pinch) {
+                float px = ui->contacts[partner].x, py = ui->contacts[partner].y;
+                double previous = hypot((double)old_x - px, (double)old_y - py);
+                if (previous > 0.001f && !ending)
+                    scale = cui_core_touch_float(hypot((double)e->x - px, (double)e->y - py) /
+                                                 previous);
+                center_x = cui_core_touch_float(((double)e->x + px) * 0.5);
+                center_y = cui_core_touch_float(((double)e->y + py) * 0.5);
+                dx *= 0.5f;
+                dy *= 0.5f;
+                ui->contacts[partner].dragging = true;
+            }
+            ui->contacts[slot].dragging = true;
+            ui->capture = 0;
+            e->type = CUI_EVENT_GESTURE;
+            e->dx = pan && !ending ? cui_core_touch_float(dx) : 0;
+            e->dy = pan && !ending ? cui_core_touch_float(dy) : 0;
+            e->gesture_scale = scale;
+            e->x = center_x;
+            e->y = center_y;
+            e->scroll_phase =
+                ending  ? (cancelled ? CUI_SCROLL_PHASE_CANCELLED : CUI_SCROLL_PHASE_ENDED)
+                : start ? CUI_SCROLL_PHASE_STARTED
+                        : CUI_SCROLL_PHASE_MOVED;
+            *target = viewport;
+        }
+    } else if (count == 1 && !ui->contacts[slot].blocked) {
+        bool start = !ui->contacts[slot].dragging;
+        if (ui->contacts[slot].owner &&
+            (distance_x * distance_x + distance_y * distance_y >= 64 || !start)) {
+            ui->contacts[slot].dragging = true;
+            ui->capture = 0;
+            e->type = CUI_EVENT_SCROLL;
+            *scroll_owner = ui->contacts[slot].owner;
+            e->dx = ending ? 0 : cui_core_touch_float(start ? distance_x : dx);
+            e->dy = ending ? 0 : cui_core_touch_float(start ? distance_y : dy);
+            e->x = ui->contacts[slot].start_x;
+            e->y = ui->contacts[slot].start_y;
+            e->scroll_precise = true;
+            e->scroll_phase =
+                ending  ? (cancelled ? CUI_SCROLL_PHASE_CANCELLED : CUI_SCROLL_PHASE_ENDED)
+                : start ? CUI_SCROLL_PHASE_STARTED
+                        : CUI_SCROLL_PHASE_MOVED;
+        }
+    }
+    ui->contacts[slot].x = contact_x;
+    ui->contacts[slot].y = contact_y;
+    bool suppress = ui->contacts[slot].blocked || !ui->contacts[slot].primary;
+    if (e->type == CUI_EVENT_GESTURE)
+        suppress = false;
+    if (ending) {
+        ui->contacts[slot].active = false;
+    }
+    return suppress;
 }
 static void cui_core_activate(cui_context *ui, cui_id id) {
     if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
@@ -599,12 +823,59 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
     ui->activation_count = 0;
+    cui_id touch_cancellations[CUI_CORE_DISPATCH_MAX] = {0};
     for (size_t i = 0; i < ui->event_count; i++) {
         cui_event e = ui->events[i];
+        if (e.pointer_type == CUI_POINTER_TOUCH &&
+            (e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_MOVE ||
+             e.type == CUI_EVENT_POINTER_UP) &&
+            isfinite(e.x) && isfinite(e.y)) {
+            ui->pointer_x = e.x;
+            ui->pointer_y = e.y;
+        }
+        cui_id gesture_target = 0;
+        cui_id before_capture = ui->capture;
+        cui_id touch_owner = 0;
+        bool suppressed =
+            !touch_cancellations[i] && cui_core_touch(ui, &e, &gesture_target, &touch_owner);
+        ui->event_touch_owners[i] = touch_owner;
+        if (!touch_cancellations[i] && e.pointer_type == CUI_POINTER_TOUCH && before_capture &&
+            !ui->capture && e.type != CUI_EVENT_CANCEL) {
+            /* Notify the captured component's local pointer reducer before later
+             * queued contacts. This handoff must not reset Core's touch stream. */
+            if (ui->event_count < CUI_CORE_DISPATCH_MAX) {
+                size_t next = i + 1, remaining = ui->event_count - next;
+                memmove(ui->events + next + 1, ui->events + next, remaining * sizeof(*ui->events));
+                memmove(touch_cancellations + next + 1, touch_cancellations + next,
+                        remaining * sizeof(*touch_cancellations));
+                ui->events[next] = (cui_event){.type = CUI_EVENT_CANCEL,
+                                               .pointer_type = CUI_POINTER_TOUCH,
+                                               .pointer_id = e.pointer_id,
+                                               .pointer_device = e.pointer_device};
+                touch_cancellations[next] = before_capture;
+                ui->event_count++;
+            } else {
+                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            }
+        }
+        if (suppressed) {
+            ui->event_consumed[i] = true;
+            ui->event_targets[i] = 0;
+            ui->event_activations[i] = 0;
+            ui->event_activation_slots[i] = SIZE_MAX;
+            continue;
+        }
+        ui->events[i] = e;
         size_t before_activation = ui->activation_count;
         ui->event_activations[i] = 0;
         ui->event_activation_slots[i] = SIZE_MAX;
-        ui->event_targets[i] = ui->focus;
+        cui_id cancellation_target = touch_cancellations[i];
+        if (!cancellation_target && e.type == CUI_EVENT_CANCEL &&
+            e.pointer_type == CUI_POINTER_TOUCH)
+            cancellation_target = before_capture;
+        ui->event_targets[i] = cancellation_target           ? cancellation_target
+                               : e.type == CUI_EVENT_GESTURE ? gesture_target
+                                                             : ui->focus;
         if (e.type == CUI_EVENT_POINTER_MOVE || e.type == CUI_EVENT_POINTER_UP)
             ui->event_targets[i] = ui->capture;
         if (e.type == CUI_EVENT_POINTER_DOWN ||
@@ -614,7 +885,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 ui->event_targets[i] = ui->previous_focus_scopes[ui->previous_top_modal].id;
         }
         if (e.type == CUI_EVENT_SCROLL) {
-            cui_id owner = cui_core_scroll_hit(ui, e, SIZE_MAX, true);
+            cui_id owner = cui_core_scroll_hit(ui, e, SIZE_MAX, true, touch_owner);
             if (owner)
                 for (size_t n = 0; n < ui->previous_count; n++)
                     if (ui->previous[n].id == owner) {
@@ -623,7 +894,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                         break;
                     }
             ui->events[i] = e;
-            ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false);
+            ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false, touch_owner);
         }
         if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) &&
             (e.ime_composing || e.prefer_character_input)) {
@@ -669,10 +940,16 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 ui->focus_visible = false;
             }
         } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
-            if (ui->capture == cui_core_hit(ui, e.x, e.y))
+            bool touch_drag = false;
+            if (e.pointer_type == CUI_POINTER_TOUCH)
+                for (size_t n = 0; n < 16; n++)
+                    if (ui->contacts[n].id == e.pointer_id &&
+                        ui->contacts[n].device == e.pointer_device)
+                        touch_drag |= ui->contacts[n].dragging;
+            if (!touch_drag && ui->capture == cui_core_hit(ui, e.x, e.y))
                 cui_core_activate(ui, ui->capture);
             ui->capture = 0;
-        } else if (e.type == CUI_EVENT_CANCEL) {
+        } else if (e.type == CUI_EVENT_CANCEL && !touch_cancellations[i]) {
             ui->capture = 0;
             ui->space_capture = 0;
         } else if (e.type == CUI_EVENT_KEY_DOWN && !e.repeat) {
@@ -1727,7 +2004,8 @@ bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {
         return false;
     for (size_t i = 0; i < ui->previous_count; ++i)
         if (ui->previous[i].id == from && cui_core_previous_allowed(ui, i)) {
-            cui_id target = cui_core_scroll_hit(ui, ui->events[index], i, false);
+            cui_id target =
+                cui_core_scroll_hit(ui, ui->events[index], i, false, ui->event_touch_owners[index]);
             if (!target)
                 return false;
             ui->event_targets[index] = target;
@@ -1981,6 +2259,59 @@ bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
             return true;
         }
     return false;
+}
+bool cui_set_cursor(cui_context *ui, cui_id id, cui_cursor cursor) {
+    if (!cui_core_active(ui) || cursor < CUI_CURSOR_DEFAULT || cursor > CUI_CURSOR_HELP)
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            ui->semantics[i].details.cursor = cursor;
+            return true;
+        }
+    return false;
+}
+bool cui_set_touch_drag_priority(cui_context *ui, cui_id id, bool enabled) {
+    if (!cui_core_active(ui))
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            ui->semantics[i].details.touch_drag_priority = enabled;
+            return true;
+        }
+    return false;
+}
+bool cui_set_gestures(cui_context *ui, cui_id id, bool pan, bool zoom) {
+    if (!cui_core_active(ui))
+        return false;
+    for (size_t i = 0; i < ui->semantic_count; i++)
+        if (ui->semantics[i].id == id) {
+            ui->semantics[i].details.gesture_pan = pan;
+            ui->semantics[i].details.gesture_zoom = zoom;
+            return true;
+        }
+    return false;
+}
+cui_interaction cui_interaction_state(const cui_context *ui, cui_id id) {
+    cui_interaction result = {0};
+    if (!ui || !id)
+        return result;
+    const cui_semantic *items = ui->in_frame ? ui->semantics : ui->previous;
+    size_t count = ui->in_frame ? ui->semantic_count : ui->previous_count;
+    for (size_t n = 0; n < count; n++)
+        if (items[n].id == id && !items[n].disabled) {
+            result.hovered = cui_hovered((cui_context *)ui, id);
+            result.pressed = ui->capture == id || ui->space_capture == id;
+            result.focused = ui->focus == id;
+            result.focus_visible = result.focused && ui->focus_visible;
+            for (size_t i = 0; i < ui->event_count; i++)
+                if (ui->event_activations[i] == id)
+                    result.activated = true;
+            for (size_t i = 0; i < ui->activation_count; i++)
+                if (ui->activations[i] == id)
+                    result.activated = true;
+            break;
+        }
+    return result;
 }
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details) {
     if (!cui_core_active(ui))

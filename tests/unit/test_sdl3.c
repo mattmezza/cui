@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
     assert(!cui_sdl3_set_cursor(NULL, CUI_CURSOR_DEFAULT));
     assert(!cui_sdl3_set_cursor(s, (cui_cursor)999));
     if (strcmp(SDL_GetCurrentVideoDriver(), "dummy") != 0) {
-        for (int cursor = CUI_CURSOR_DEFAULT; cursor <= CUI_CURSOR_NOT_ALLOWED; cursor++) {
+        for (int cursor = CUI_CURSOR_DEFAULT; cursor <= CUI_CURSOR_HELP; cursor++) {
             assert(cui_sdl3_set_cursor(s, (cui_cursor)cursor));
             assert(SDL_GetCursor());
         }
@@ -152,6 +152,44 @@ int main(int argc, char **argv) {
     } else {
         assert(!cui_sdl3_set_cursor(s, CUI_CURSOR_RESIZE_HORIZONTAL));
     }
+    /* Native normalized contact coordinates become logical window pixels and
+     * touch-generated compatibility mouse events are excluded. */
+    SDL_Event finger = {.type = SDL_EVENT_FINGER_DOWN};
+    finger.tfinger.fingerID = 41;
+    finger.tfinger.touchID = 11;
+    finger.tfinger.x = .25f;
+    finger.tfinger.y = .5f;
+    assert(SDL_PushEvent(&finger));
+    finger.tfinger.touchID = 22;
+    assert(SDL_PushEvent(&finger)); /* Same finger ID on another native device. */
+    finger.type = SDL_EVENT_FINGER_MOTION;
+    finger.tfinger.fingerID = 42;
+    finger.tfinger.touchID = 11;
+    assert(SDL_PushEvent(&finger));
+    SDL_Event ghost = {.type = SDL_EVENT_MOUSE_BUTTON_DOWN};
+    ghost.button.which = SDL_TOUCH_MOUSEID;
+    ghost.button.button = SDL_BUTTON_LEFT;
+    assert(SDL_PushEvent(&ghost));
+    assert(cui_sdl3_poll(s, ui));
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    size_t native_count;
+    const cui_event *native = cui_frame_events(ui, &native_count);
+    unsigned finger_count = 0;
+    for (size_t n = 0; n < native_count; n++) {
+        assert(native[n].type != CUI_EVENT_POINTER_DOWN ||
+               native[n].pointer_type == CUI_POINTER_TOUCH);
+        if (native[n].pointer_type == CUI_POINTER_TOUCH) {
+            assert(native[n].pointer_id == (finger_count == 2 ? 42 : 41));
+            assert(native[n].pointer_device == (finger_count == 1 ? 22 : 11));
+            assert(native[n].x == 80 && native[n].y == 80);
+            finger_count++;
+        }
+    }
+    assert(finger_count == 3);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    assert(cui_begin_frame(ui, 320, 160, .016f));
+    cui_end_frame(ui);
     /* Every alphanumeric shortcut survives the native host translation. */
     const char *shortcut_chars = "abcdefghijklmnopqrstuvwxyz0123456789";
     for (size_t i = 0; shortcut_chars[i]; i++) {

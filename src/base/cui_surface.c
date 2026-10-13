@@ -266,7 +266,8 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
             cui_surface_resize_event(ui, s, o, e, i);
         if (e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&
             cui_event_target(ui, i) == cui_surface_part_id(s->overlay.id, 6)) {
-            s->body_scroll = fminf(s->body_maximum, fmaxf(0, s->body_scroll - e.dy * 48));
+            s->body_scroll = fminf(s->body_maximum,
+                                   fmaxf(0, s->body_scroll - e.dy * (e.scroll_precise ? 1 : 48)));
             cui_invalidate(ui);
         }
         cui_id activation = cui_event_activation(ui, i);

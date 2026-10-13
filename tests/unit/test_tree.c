@@ -299,6 +299,12 @@ static void virtualization(void) {
     scene(ui, &theme, model, &state, &selected,
           (cui_tree_options){.height = 240, .row_height = 32, .overscan = 2});
     assert(state.scroll == 160037);
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 10, .y = 100, .dy = -3.5f, .scroll_precise = true}));
+    scene(ui, &theme, model, &state, &selected,
+          (cui_tree_options){.height = 240, .row_height = 32, .overscan = 2});
+    assert(state.scroll == 160040.5f);
 #endif
     cui_destroy(ui);
     cui_tree_destroy(model);

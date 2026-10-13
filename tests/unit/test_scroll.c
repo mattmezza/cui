@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_scroll.h"
+#ifndef CUI_SCROLL_BASE_ONLY
+#include "cui/cui_base.h"
+#include "cui/cui_resizable.h"
+#endif
 #include <assert.h>
 #include <math.h>
 static cui_draw_list scene(cui_context *ui, const cui_theme *theme, cui_scroll_state *s,
@@ -422,11 +426,206 @@ static void persistent_owner(void) {
     assert(state.x == before + 40);
     cui_destroy(ui);
 }
+static void touch_pan_pixels(void) {
+#ifdef CUI_SCROLL_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_scroll_state state = {0};
+    cui_scroll_options options = {.width = 200,
+                                  .height = 120,
+                                  .content_width = 400,
+                                  .content_height = 400,
+                                  .horizontal = true,
+                                  .vertical = true};
+    scene(ui, &theme, &state, options);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 7,
+                                           .x = 60,
+                                           .y = 60}));
+    scene(ui, &theme, &state, options);
+    assert(cui_interaction_state(ui, 101).pressed);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 7,
+                                           .x = 55,
+                                           .y = 56}));
+    scene(ui, &theme, &state, options);
+    assert(state.x == 0 && state.y == 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 7,
+                                           .x = 40,
+                                           .y = 30}));
+    scene(ui, &theme, &state, options);
+    assert(state.x == 20 && state.y == 30);
+    assert(!cui_interaction_state(ui, 101).pressed);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 7,
+                                           .x = 40,
+                                           .y = 30}));
+    scene(ui, &theme, &state, options);
+    assert(state.x == 20 && state.y == 30);
+    for (unsigned row = 100; row < 110; row++)
+        assert(!cui_interaction_state(ui, row).activated);
+    cui_id bar = cui_scrollbar_id(1, true);
+    cui_rect bounds = cui_bounds(ui, bar);
+    cui_scroll_geometry geometry = cui_scroll_layout(options);
+    cui_rect thumb = cui_scrollbar_thumb(bounds, state.y, geometry.viewport.height,
+                                         options.content_height, true);
+    float x = thumb.x + thumb.w / 2, y = thumb.y + thumb.h / 2;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 8,
+                                           .x = x,
+                                           .y = y}));
+    scene(ui, &theme, &state, options);
+    assert(state.dragging_y);
+    float before_thumb = state.y;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 8,
+                                           .x = x,
+                                           .y = y + 15}));
+    scene(ui, &theme, &state, options);
+    assert(cui_frame_events(ui, NULL)[0].type == CUI_EVENT_POINTER_MOVE);
+    assert(state.y > before_thumb && state.x == 20);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 8,
+                                           .x = x,
+                                           .y = y + 15}));
+    scene(ui, &theme, &state, options);
+    assert(!state.dragging_y);
+    cui_destroy(ui);
+}
+static void full_touch_queue_handoff(void) {
+#ifdef CUI_SCROLL_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_scroll_state state = {0};
+    cui_scroll_options options = {.width = 200,
+                                  .height = 120,
+                                  .content_width = 400,
+                                  .content_height = 400,
+                                  .horizontal = true,
+                                  .vertical = true};
+    scene(ui, &theme, &state, options);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 17,
+                                           .x = 60,
+                                           .y = 60}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 17,
+                                           .x = 60,
+                                           .y = 30}));
+    for (unsigned n = 2; n < 256; n++)
+        assert(
+            cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = -100, .y = -100}));
+    scene(ui, &theme, &state, options);
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    assert(count == 257 && events[1].type == CUI_EVENT_SCROLL);
+    assert(events[2].type == CUI_EVENT_CANCEL && cui_event_target(ui, 2) == 101);
+    assert(state.y == 30 && !cui_interaction_state(ui, 101).pressed);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 17,
+                                           .x = 60,
+                                           .y = 30}));
+    scene(ui, &theme, &state, options);
+    assert(state.y == 30 && !cui_interaction_state(ui, 101).activated);
+    cui_destroy(ui);
+}
+#ifndef CUI_SCROLL_BASE_ONLY
+static void nested_drag_scene(cui_context *ui, cui_scroll_state *scroll,
+                              cui_resizable_state *resize, float *slider, int divider) {
+    cui_theme theme = cui_theme_light();
+    cui_scroll_options options = {.width = 200,
+                                  .height = 120,
+                                  .content_width = 400,
+                                  .content_height = 400,
+                                  .horizontal = true,
+                                  .vertical = true};
+    assert(cui_begin_frame(ui, 400, 300, .016f));
+    assert(cui_scrollable_begin(ui, 1, &theme, scroll, options));
+    cui_begin_box(ui, 2, (cui_box){.width = 180, .height = 30});
+    if (divider == 1)
+        cui_base_resize_handle(ui, 2, resize, 0, false, 1);
+    else
+        cui_base_slider(ui, 2, cui_string("Slider"), slider, 0, 100, 1, false);
+    if (divider == 2) {
+        assert(cui_set_semantic_role(ui, 2, CUI_ROLE_BUTTON));
+        assert(cui_set_touch_drag_priority(ui, 2, true));
+    }
+    cui_end_box(ui);
+    cui_scrollable_end(ui, 1, &theme, scroll, options);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void nested_touch_drag_controls(void) {
+    for (int divider = 0; divider < 3; divider++) {
+        cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+        cui_scroll_state scroll = {0};
+        cui_resizable_state resize;
+        cui_resizable_slot slots[2];
+        cui_resizable_panel panels[] = {cui_resizable_panel_default(10),
+                                        cui_resizable_panel_default(11)};
+        assert(cui_resizable_state_init(&resize, slots, 2));
+        assert(cui_resizable_sync(&resize, panels, 2, CUI_RESIZABLE_HORIZONTAL, 400) ==
+               CUI_RESIZABLE_OK);
+        float slider = 0;
+        nested_drag_scene(ui, &scroll, &resize, &slider, divider);
+        cui_rect bounds = cui_bounds(ui, 2);
+        float x = bounds.x + 60, y = bounds.y + 10;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                               .pointer_type = CUI_POINTER_TOUCH,
+                                               .pointer_id = 1,
+                                               .x = x,
+                                               .y = y}));
+        nested_drag_scene(ui, &scroll, &resize, &slider, divider);
+        float before = divider == 1 ? slots[0].size : slider;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                               .pointer_type = CUI_POINTER_TOUCH,
+                                               .pointer_id = 1,
+                                               .x = x + 40,
+                                               .y = y}));
+        nested_drag_scene(ui, &scroll, &resize, &slider, divider);
+        assert(cui_frame_events(ui, NULL)[0].type == CUI_EVENT_POINTER_MOVE);
+        assert((divider == 1 ? slots[0].size : slider) != before);
+        assert(scroll.x == 0 && scroll.y == 0);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                               .pointer_type = CUI_POINTER_TOUCH,
+                                               .pointer_id = 1,
+                                               .x = x + 40,
+                                               .y = y}));
+        nested_drag_scene(ui, &scroll, &resize, &slider, divider);
+        assert(!resize.dragging && scroll.x == 0 && scroll.y == 0);
+        cui_destroy(ui);
+    }
+}
+#endif
 int main(void) {
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
+#ifndef CUI_SCROLL_BASE_ONLY
+    nested_touch_drag_controls();
+#endif
+    full_touch_queue_handoff();
+    touch_pan_pixels();
     persistent_owner();
     gesture_filter();
     horizontal_mask_edges();

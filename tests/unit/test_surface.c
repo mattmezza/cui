@@ -700,6 +700,12 @@ static void base_scroll_body(void) {
         cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 150, .y = 100, .dy = -2}));
     base_scroll_scene(ui, &s);
     assert(s.body_scroll == 96 && cui_bounds(ui, 50).y == -96);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){
+            .type = CUI_EVENT_SCROLL, .x = 150, .y = 100, .dy = -3.5f, .scroll_precise = true}));
+    base_scroll_scene(ui, &s);
+    assert(s.body_scroll == 99.5f && cui_bounds(ui, 50).y == -99.5f);
     assert(
         cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 150, .y = 100, .dy = 100}));
     base_scroll_scene(ui, &s);

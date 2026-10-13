@@ -132,11 +132,40 @@ static void test_editing_navigation_scroll(void) {
                                            .dy = 2}));
     assert(frame(ui, edit, &state, options).scrolled);
     assert(state.scroll_y < state.maximum_y);
+    float before_precise = state.scroll_y;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = state.viewport.x + 1,
+                                           .y = state.viewport.y + 1,
+                                           .dy = -3.5f,
+                                           .scroll_precise = true}));
+    assert(frame(ui, edit, &state, options).scrolled);
+    assert(state.scroll_y == before_precise + 3.5f);
     cui_edit_select(edit, 0, 0);
     cui_edit_insert(edit, cui_string("controlled\n"));
     result = frame(ui, edit, &state, options);
     assert(!result.changed && state.count == 6 &&
            state.revision == cui_edit_get_state(edit).revision);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 77,
+                                           .x = state.viewport.x + 5,
+                                           .y = state.viewport.y + 20}));
+    frame(ui, edit, &state, options);
+    assert(state.dragging);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 77,
+                                           .x = state.viewport.x + 5,
+                                           .y = state.viewport.y + 5}));
+    frame(ui, edit, &state, options);
+    assert(!state.dragging); /* Pan handoff cancels retained selection dragging. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 77,
+                                           .x = state.viewport.x + 5,
+                                           .y = state.viewport.y + 5}));
+    frame(ui, edit, &state, options);
+    assert(!state.dragging);
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }

@@ -344,7 +344,7 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
             if (!isfinite(delta))
                 continue;
             float before = scroll->offset;
-            float after = before - delta * 32;
+            float after = before - delta * (event.scroll_precise ? 1 : 32);
             if (!isfinite(after))
                 after = delta < 0 ? scroll->maximum : 0;
             scroll->offset = fminf(scroll->maximum, fmaxf(0, after));
@@ -551,7 +551,8 @@ static bool cui_choice_scroll_event(cui_context *ui, const cui_choice_item *item
         length = count;
     if (*begin > count - length)
         *begin = count - length;
-    float amount = state->scroll_remainder - event.dy;
+    float amount = state->scroll_remainder -
+                   event.dy / (event.scroll_precise ? fmaxf(1, bounds.h / (float)length) : 1);
     if (!isfinite(amount))
         amount = event.dy > 0 ? -(float)count : (float)count;
     float whole = truncf(amount);
@@ -1185,7 +1186,8 @@ static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries
     }
     if (cursor->first_visible > maximum)
         cursor->first_visible = maximum;
-    float amount = cursor->scroll_remainder - event.dy;
+    float amount = cursor->scroll_remainder -
+                   event.dy / (event.scroll_precise ? fmaxf(1, state->row_height) : 1);
     if (!isfinite(amount))
         amount = event.dy > 0 ? -(float)count : (float)count;
     float whole = truncf(amount);

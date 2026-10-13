@@ -2664,12 +2664,276 @@ static void test_mesh_contract(void) {
     assert(exhausted.count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
     cui_destroy(ui);
 }
+static void touch(cui_context *ui, cui_event_type type, uint64_t id, float x, float y) {
+    assert(cui_queue_event(
+        ui,
+        (cui_event){
+            .type = type, .pointer_type = CUI_POINTER_TOUCH, .pointer_id = id, .x = x, .y = y}));
+}
+static void test_touch_lifecycle(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 42, 10, 10);
+    begin(ui);
+    assert(control(ui, 1, false).pressed);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_UP, 42, 10, 10);
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    assert(cui_interaction_state(ui, 1).activated);
+    assert(cui_interaction_state(ui, 1).activated);
+    cui_set_semantic_details(ui, 1,
+                             (cui_semantic_details){.expanded = true,
+                                                    .controls = 91,
+                                                    .scrollable = true,
+                                                    .scroll_y = 17,
+                                                    .scroll_max_y = 80});
+    assert(cui_set_gestures(ui, 1, true, false));
+    assert(cui_set_touch_drag_priority(ui, 1, true));
+    assert(cui_set_cursor(ui, 1, CUI_CURSOR_CROSSHAIR));
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    assert(semantic_count == 1 && semantics[0].role == CUI_ROLE_BUTTON);
+    assert(semantics[0].details.expanded && semantics[0].details.controls == 91);
+    assert(semantics[0].details.scrollable && semantics[0].details.scroll_y == 17);
+    assert(semantics[0].details.scroll_max_y == 80 && semantics[0].details.gesture_pan);
+    assert(!semantics[0].details.gesture_zoom && semantics[0].details.touch_drag_priority);
+    cui_end_frame(ui);
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_CROSSHAIR);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 42, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 99, 20, 10);
+    touch(ui, CUI_EVENT_POINTER_UP, 42, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_UP, 99, 20, 10);
+    begin(ui);
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 42, 10, 10);
+    touch(ui, CUI_EVENT_CANCEL, 42, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_UP, 42, 10, 10);
+    begin(ui);
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 42, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 42, 10, 22);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 42, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_UP, 42, 10, 10);
+    begin(ui);
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+static void test_touch_device_identity(void) {
+    cui_context *ui = make();
+    begin(ui);
+    control(ui, 1, false);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 41,
+                                           .pointer_device = 11,
+                                           .x = 10,
+                                           .y = 10}));
+    begin(ui);
+    assert(control(ui, 1, false).pressed);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 41,
+                                           .pointer_device = 22,
+                                           .x = 20,
+                                           .y = 10}));
+    begin(ui);
+    assert(!control(ui, 1, false).pressed);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 41,
+                                           .pointer_device = 22,
+                                           .x = 20,
+                                           .y = 10}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 41,
+                                           .pointer_device = 11,
+                                           .x = 10,
+                                           .y = 10}));
+    begin(ui);
+    assert(!control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 41, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_UP, 41, 10, 10);
+    begin(ui);
+    assert(control(ui, 1, false).activated);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+static void test_touch_modal(void) {
+    cui_context *ui = make();
+    begin(ui);
+    modal_frame(ui, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 1, 10, 10);
+    touch(ui, CUI_EVENT_POINTER_UP, 1, 10, 10);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 100);
+    modal_frame(ui, false);
+    assert(!cui_interaction_state(ui, 1).activated);
+    cui_end_frame(ui);
+    cui_rect modal_control = cui_bounds(ui, 2);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 2, modal_control.x + 5, modal_control.y + 5);
+    touch(ui, CUI_EVENT_POINTER_UP, 2, modal_control.x + 5, modal_control.y + 5);
+    begin(ui);
+    modal_frame(ui, false);
+    assert(cui_interaction_state(ui, 2).activated);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+static void test_touch_scroll_chain(void) {
+    cui_context *ui = make();
+    begin(ui);
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 1, 20, 40);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 20, 35);
+    begin(ui);
+    assert(cui_frame_events(ui, NULL)[1].type == CUI_EVENT_POINTER_MOVE);
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 20, 20);
+    begin(ui);
+    const cui_event *e = cui_frame_events(ui, NULL);
+    assert(e[0].type == CUI_EVENT_SCROLL && e[0].dy == -20 && e[0].scroll_precise);
+    float pointer_x, pointer_y;
+    assert(cui_pointer_position(ui, &pointer_x, &pointer_y));
+    assert(pointer_x == 20 && pointer_y == 20);
+    assert(cui_event_target(ui, 0) == 20);
+    scroll_regions(ui, 100, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 20, 10);
+    begin(ui);
+    assert(cui_event_target(ui, 0) == 10);
+    assert(cui_frame_events(ui, NULL)[0].dy == -10);
+    scroll_regions(ui, 100, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_UP, 1, 20, 10);
+    begin(ui);
+    assert(cui_frame_events(ui, NULL)[0].type == CUI_EVENT_SCROLL);
+    assert(cui_frame_events(ui, NULL)[0].scroll_phase == CUI_SCROLL_PHASE_ENDED);
+    scroll_regions(ui, 50, true);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 2, 20, 40);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 2, 20, 10);
+    begin(ui);
+    assert(cui_frame_events(ui, NULL)[1].type == CUI_EVENT_POINTER_MOVE);
+    assert(cui_event_target(ui, 1) == 30); /* Popup drag cannot scroll underneath. */
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+static void viewport(cui_context *ui, bool zoom, bool disabled) {
+    cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 160});
+    cui_interact(ui, 1, CUI_ROLE_REGION, cui_string("Viewport"), disabled, false, 0);
+    assert(cui_set_gestures(ui, 1, true, zoom));
+    assert(cui_set_cursor(ui, 1, CUI_CURSOR_GRAB));
+    cui_end_box(ui);
+}
+static void test_touch_viewport(void) {
+    cui_context *ui = make();
+    begin(ui);
+    viewport(ui, false, false);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 30, .y = 30}));
+    begin(ui);
+    viewport(ui, false, false);
+    assert(cui_interaction_state(ui, 1).hovered);
+    cui_end_frame(ui);
+    assert(cui_pointer_cursor(ui) == CUI_CURSOR_GRAB);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 1, 20, 20);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 2, 40, 20);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 2, 60, 20);
+    begin(ui);
+    assert(cui_event_consumed(ui, 2));
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 2, 100, 20);
+    begin(ui);
+    const cui_event *e = cui_frame_events(ui, NULL);
+    assert(e[0].type == CUI_EVENT_GESTURE && cui_event_target(ui, 0) == 1);
+    assert(e[0].gesture_scale == 2 && e[0].x == 60 && e[0].dx == 20);
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_CANCEL, 2, 0, 0);
+    begin(ui);
+    e = cui_frame_events(ui, NULL);
+    assert(e[0].type == CUI_EVENT_GESTURE && e[0].gesture_scale == 1);
+    assert(e[0].scroll_phase == CUI_SCROLL_PHASE_CANCELLED);
+    viewport(ui, true, true);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 1, 40, 20);
+    begin(ui);
+    assert(cui_event_consumed(ui, 0));
+    viewport(ui, true, true);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+static void test_touch_extreme_coordinates(void) {
+    cui_context *ui = make();
+    begin(ui);
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 1, 20, 20);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 2, 20.002f, 20);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 2, FLT_MAX, FLT_MAX);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 2, -FLT_MAX, -FLT_MAX);
+    begin(ui);
+    const cui_event *events = cui_frame_events(ui, NULL);
+    for (size_t n = 2; n < 4; n++) {
+        assert(events[n].type == CUI_EVENT_GESTURE);
+        assert(isfinite(events[n].dx) && isfinite(events[n].dy));
+        assert(isfinite(events[n].x) && isfinite(events[n].y));
+        assert(isfinite(events[n].gesture_scale));
+    }
+    assert(events[2].gesture_scale == FLT_MAX);
+    viewport(ui, true, false);
+    cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_CANCEL}));
+    begin(ui);
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 3, 20, 40);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 3, FLT_MAX, FLT_MAX);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 3, -FLT_MAX, -FLT_MAX);
+    begin(ui);
+    events = cui_frame_events(ui, NULL);
+    for (size_t n = 1; n < 3; n++) {
+        assert(events[n].type == CUI_EVENT_SCROLL);
+        assert(isfinite(events[n].dx) && isfinite(events[n].dy));
+    }
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_UP, 3, -FLT_MAX, -FLT_MAX);
+    begin(ui);
+    assert(cui_frame_events(ui, NULL)[0].scroll_phase == CUI_SCROLL_PHASE_ENDED);
+    scroll_regions(ui, 50, false);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
     test_mesh_contract();
     test_metrics_revision();
     test_pointer_click_metadata();
     test_unpainted_semantic_does_not_own_ancestor();
     test_semantic_parent_query();
+    test_touch_extreme_coordinates();
+    test_touch_device_identity();
+    test_touch_modal();
+    test_touch_lifecycle();
+    test_touch_scroll_chain();
+    test_touch_viewport();
     test_font_metrics();
     test_family_text_pipeline();
     test_styled_text_pipeline();

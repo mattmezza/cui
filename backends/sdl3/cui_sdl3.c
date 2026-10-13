@@ -32,7 +32,7 @@ struct cui_sdl3 {
     size_t glyph_bytes;
     uint64_t clock, hits, misses;
     char *clipboard;
-    SDL_Cursor *cursors[CUI_CURSOR_NOT_ALLOWED + 1];
+    SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
 };
 cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
@@ -64,7 +64,7 @@ void cui_sdl3_destroy(cui_sdl3 *s) {
     }
     for (size_t i = 0; i < BITMAP_SLOTS; i++)
         SDL_DestroyTexture(s->bitmaps[i].texture);
-    for (size_t i = 0; i <= CUI_CURSOR_NOT_ALLOWED; i++)
+    for (size_t i = 0; i <= CUI_CURSOR_HELP; i++)
         SDL_DestroyCursor(s->cursors[i]);
     SDL_free(s->clipboard);
     SDL_DestroyRenderer(s->renderer);
@@ -120,10 +120,12 @@ static cui_key key(SDL_Keycode k) {
 }
 bool cui_sdl3_set_cursor(cui_sdl3 *s, cui_cursor cursor) {
     static const SDL_SystemCursor kinds[] = {
-        SDL_SYSTEM_CURSOR_DEFAULT,    SDL_SYSTEM_CURSOR_POINTER,   SDL_SYSTEM_CURSOR_TEXT,
-        SDL_SYSTEM_CURSOR_EW_RESIZE,  SDL_SYSTEM_CURSOR_NS_RESIZE, SDL_SYSTEM_CURSOR_MOVE,
-        SDL_SYSTEM_CURSOR_NOT_ALLOWED};
-    if (!s || cursor < CUI_CURSOR_DEFAULT || cursor > CUI_CURSOR_NOT_ALLOWED)
+        SDL_SYSTEM_CURSOR_DEFAULT,     SDL_SYSTEM_CURSOR_POINTER,   SDL_SYSTEM_CURSOR_TEXT,
+        SDL_SYSTEM_CURSOR_EW_RESIZE,   SDL_SYSTEM_CURSOR_NS_RESIZE, SDL_SYSTEM_CURSOR_MOVE,
+        SDL_SYSTEM_CURSOR_NOT_ALLOWED, SDL_SYSTEM_CURSOR_CROSSHAIR, SDL_SYSTEM_CURSOR_MOVE,
+        SDL_SYSTEM_CURSOR_MOVE,        SDL_SYSTEM_CURSOR_CROSSHAIR, SDL_SYSTEM_CURSOR_CROSSHAIR,
+        SDL_SYSTEM_CURSOR_WAIT,        SDL_SYSTEM_CURSOR_DEFAULT};
+    if (!s || cursor < CUI_CURSOR_DEFAULT || cursor > CUI_CURSOR_HELP)
         return false;
     if (!s->cursors[cursor])
         s->cursors[cursor] = SDL_CreateSystemCursor(kinds[cursor]);
@@ -143,13 +145,38 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             s->quit = true;
             send = false;
             break;
+        case SDL_EVENT_FINGER_DOWN:
+        case SDL_EVENT_FINGER_MOTION:
+        case SDL_EVENT_FINGER_UP:
+        case SDL_EVENT_FINGER_CANCELED: {
+            int width, height;
+            SDL_GetWindowSize(s->window, &width, &height);
+            v.type = e.type == SDL_EVENT_FINGER_DOWN     ? CUI_EVENT_POINTER_DOWN
+                     : e.type == SDL_EVENT_FINGER_MOTION ? CUI_EVENT_POINTER_MOVE
+                     : e.type == SDL_EVENT_FINGER_UP     ? CUI_EVENT_POINTER_UP
+                                                         : CUI_EVENT_CANCEL;
+            v.pointer_type = CUI_POINTER_TOUCH;
+            v.pointer_id = (uint64_t)e.tfinger.fingerID;
+            v.pointer_device = (uint64_t)e.tfinger.touchID;
+            v.x = e.tfinger.x * width;
+            v.y = e.tfinger.y * height;
+            break;
+        }
         case SDL_EVENT_MOUSE_MOTION:
+            if (e.motion.which == SDL_TOUCH_MOUSEID) {
+                send = false;
+                break;
+            }
             v.type = CUI_EVENT_POINTER_MOVE;
             v.x = e.motion.x;
             v.y = e.motion.y;
             break;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         case SDL_EVENT_MOUSE_BUTTON_UP:
+            if (e.button.which == SDL_TOUCH_MOUSEID) {
+                send = false;
+                break;
+            }
             if (e.button.button != SDL_BUTTON_LEFT && e.button.button != SDL_BUTTON_RIGHT &&
                 e.button.button != SDL_BUTTON_MIDDLE) {
                 send = false;

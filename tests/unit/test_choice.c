@@ -1858,6 +1858,17 @@ static void test_tab_scrolling(void) {
         tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
         tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
         assert(scroll.maximum > 0 && scroll.offset == 0);
+        cui_rect touch_viewport = scroll.viewport;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = touch_viewport.x + 2,
+                                               .y = touch_viewport.y + 2,
+                                               .dx = vertical ? 0 : -3.5f,
+                                               .dy = vertical ? -3.5f : 0,
+                                               .scroll_precise = true}));
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
+        assert(scroll.offset == 3.5f);
+        scroll.offset = 0;
+        tab_scroll_scene(ui, &scroll, &value, vertical, false, 3);
         cui_rect prefix = cui_bounds(ui, 3000), suffix = cui_bounds(ui, 3001);
         cui_rect viewport = scroll.viewport, first = cui_bounds(ui, 10);
         assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,

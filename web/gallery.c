@@ -2096,6 +2096,25 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
                                         .pointer_button = (cui_pointer_button)button,
                                         .click_count = click_count});
 }
+void gallery_touch(int type, float x, float y, unsigned pointer_id, int pointer_type) {
+    if (type == CUI_EVENT_POINTER_DOWN) {
+        gallery_last_pointer_down_clicks = 1;
+        gallery_pointer_down_count++;
+    } else if (type == CUI_EVENT_POINTER_UP) {
+        gallery_last_pointer_up_clicks = 1;
+        gallery_pointer_up_count++;
+    }
+    if (ui)
+        cui_queue_event(ui, (cui_event){.type = (cui_event_type)type,
+                                        .x = x,
+                                        .y = y,
+                                        .pointer_id = pointer_id,
+                                        .pointer_type = (cui_pointer_type)pointer_type,
+                                        .click_count = type == CUI_EVENT_POINTER_DOWN ||
+                                                               type == CUI_EVENT_POINTER_UP
+                                                           ? 1
+                                                           : 0});
+}
 void gallery_scroll_pixels(float x, float y, float dx, float dy) {
     if (ui)
         cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
@@ -3636,6 +3655,18 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         float plot_width = fminf(640, fmaxf(80, width - 48));
         plot_scale.range_start = 28;
         plot_scale.range_end = plot_width - 12;
+        cui_id plot_id = cui_id_from(ui, "plot-wave");
+        cui_rect plot_bounds = cui_bounds(ui, plot_id);
+        size_t touch_count;
+        const cui_event *touch_events = cui_frame_events(ui, &touch_count);
+        for (size_t i = 0; i < touch_count && !disabled; i++)
+            if (touch_events[i].type == CUI_EVENT_GESTURE && cui_event_target(ui, i) == plot_id &&
+                !cui_event_consumed(ui, i)) {
+                cui_plot_pan(&plot_scale, touch_events[i].dx);
+                cui_plot_zoom(&plot_scale, touch_events[i].gesture_scale,
+                              touch_events[i].x - plot_bounds.x);
+                cui_consume_event(ui, i);
+            }
         float plot_anchor = (float)(plot_scale.range_start + plot_scale.range_end) / 2;
         cui_text(ui, cui_string("sin(x / 12), sampled through the CUI plot scale"), 14, t.text);
         cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
@@ -3755,7 +3786,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                       .axis = &axis,
                                       .name = cui_string("Projected sine wave"),
                                       .disabled = disabled != 0};
-        cui_plot_view(ui, cui_id_from(ui, "plot-wave"), &t, &view);
+        cui_plot_view(ui, plot_id, &t, &view);
+        cui_set_gestures(ui, plot_id, true, true);
+        cui_set_cursor(ui, plot_id, CUI_CURSOR_GRAB);
         double ticks[32];
         size_t count = 0;
         cui_plot_ticks(&plot_scale, 5, ticks, 32, &count);

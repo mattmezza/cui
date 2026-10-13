@@ -7,6 +7,28 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* Source Text/PlotLabel: caller-owned labels relative to this fixed surface.
+ * Size zero selects10px; explicit colors (including transparent) are preserved.
+ * Source font_weight is ignored by PlotLabel.paint, so this contract uses normal.
+ * Borrowed text remains valid through renderer completion. <=256 labels. */
+typedef struct {
+    cui_str text;
+    cui_plot_point origin;
+    float font_size;
+    cui_color color;
+    cui_align align;
+} cui_plot_label;
+cui_plot_result cui_plot_labels_layout(cui_context *, const cui_plot_label *, size_t count,
+                                       cui_rect *, size_t capacity, size_t *required);
+cui_plot_result cui_plot_labels(cui_context *, cui_id, cui_size extent, const cui_plot_label *,
+                                size_t count);
+/* Copy source-style measured UTF-8 truncation into caller storage, NUL terminated.
+ * <=4096 input bytes, strict UTF-8, zero size defaults10. max_width<=0 keeps text;
+ * when truncated, returns at least ellipsis even if that exceeds the budget.
+ * required includes NUL; errors preserve output, CAPACITY sets required.
+ * Input may alias output. No grapheme clustering/locale or automatic layout. */
+cui_plot_result cui_plot_truncate_text(cui_context *, cui_str, float font_size, float max_width,
+                                       char *output, size_t capacity, size_t *required);
 #define CUI_PLOT_AXIS_LIMIT 256u
 /* Borrowed labels; font size zero selects 10px. START/CENTER/END alignment is
  * applied about tick (source left/center/right). Alpha zero uses theme muted. */

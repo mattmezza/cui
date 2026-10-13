@@ -212,8 +212,7 @@ the bounded rasterizer intentionally fills only explicitly closed runs.
 The [complete frozen export audit](PLOT_MODEL.md#complete-frozen-plot-export-audit)
 lists exact supported routes and remaining differences. In particular this
 styled layer does not yet implement arbitrary gradient backgrounds or label-content callbacks,
-PlotLabel truncation/content collections, tessellation caches, hover/tooltip
-automatic event routing and exit motion clocks, implicit appear scope tracking, or the PlotElement
+tessellation caches, hover/tooltip automatic event routing and exit motion clocks, implicit appear scope tracking, or the PlotElement
 prepaint lifecycle. Chart-specific versions of some features do not automatically
 satisfy standalone Plot parity. Axis default positions and centered strokes are
 covered, while nondefault font scaling and theme fallback are deliberate CUI
@@ -337,3 +336,63 @@ radian override for spans at least π and its radius/span epsilon rules. Existin
 flatten calls retain seamless full turns. See the
 [Arc policy contract](PLOT_MODEL.md#explicit-frozen-arc-padding-policy); hover hit
 testing still ignores visual padding, matching the frozen source.
+
+## General labels and measured ellipsis
+
+`cui_plot_labels_layout` measures a caller-owned array of `cui_plot_label` using
+Core's configured text measurement. Origins are relative to the plot surface;
+START leaves x unchanged, CENTER subtracts half the measured width, END subtracts
+its full width. Font size zero selects the source's 10px default. Text is a
+single line, and y is its Core top origin. `cui_plot_labels` submits the collection
+in a fixed surface with the same geometry. Supply explicit colors: transparent
+labels stay transparent rather than falling back to theme muted. The frozen
+Text font_weight builder stores a field that its painter ignores; this API uses
+normal text rather than claiming weighted source rendering. Shaping/baseline
+metrics follow the configured CUI font backend, not identical GPUI ShapedLine.
+
+Arrays are bounded to 256 labels, text to 4096 bytes each, font size to 1024px,
+origins/extents/label dimensions to 16384px. Layout errors preserve the output
+rectangles; insufficient capacity reports the count. Drawing preflights the
+whole collection before submitting any boxes. Keep label text alive through
+renderer completion. There is no retained collection, tooltip content callback,
+automatic gutter allocation or semantic chart model.
+
+`cui_plot_truncate_text` copies into caller-owned NUL-terminated storage and
+reports required bytes including that terminator. It follows the source's
+binary search over Unicode scalar boundaries for the longest measured prefix
+plus `…`. A nonpositive width budget keeps the original text. When no prefix
+fits, it returns the ellipsis alone even if that also exceeds the budget. Input
+must be valid UTF-8 and at most 4096 bytes; size zero defaults to 10px. Measurement
+must return finite nonnegative dimensions no greater than 16777216px. This does
+not split UTF-8 byte sequences, but may split a combining or emoji grapheme,
+as does the source. No locale, wrapping or automatic truncation is implied.
+Invalid inputs preserve output and required; insufficient capacity preserves
+output and sets required. Input/output may alias. If storage is used as a label,
+keep it stable through renderer completion.
+
+```c
+#include <assert.h>
+#include "cui/cui_plot_view.h"
+static cui_size measure(void *user, cui_str text, float size) {
+    (void)user;
+    return (cui_size){(float)text.length * size / 2, size};
+}
+int main(void) {
+    /* Configure the application's real font callbacks for shaped text. */
+    cui_context *ui = cui_create((cui_config){.width=100, .height=60, .measure=measure});
+    assert(ui);
+    char text[32];
+    size_t required;
+    assert(cui_plot_truncate_text(ui,(cui_str){"Revenue",7},10,30,
+                                  text,sizeof text,&required)==CUI_PLOT_OK);
+    cui_plot_label label={.text={text,required-1}, .origin={50,10},
+                          .align=CUI_ALIGN_CENTER, .color={30,30,30,255}};
+    assert(cui_begin_frame(ui,100,60,.016f));
+    assert(cui_plot_labels(ui,123,(cui_size){100,60},&label,1)==CUI_PLOT_OK);
+    cui_draw_list draw=cui_end_frame(ui);
+    assert(draw.count>0);
+    /* Render draw before releasing text or destroying ui. */
+    cui_destroy(ui);
+    return 0;
+}
+```

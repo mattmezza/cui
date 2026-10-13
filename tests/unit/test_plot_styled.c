@@ -403,11 +403,104 @@ static void native_labels(void) {
             if (pixels[(y * w + x) * 4] > 100 && pixels[(y * w + x) * 4 + 3])
                 ++ink;
     assert(ink > 0);
+    cui_plot_label general = {
+        .text = {"Plot", 4}, .origin = {50, 20}, .color = green, .align = CUI_ALIGN_CENTER};
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_labels(ui, 81, (cui_size){100, 100}, &general, 1) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    ink = 0;
+    for (unsigned y = 15; y < 40; ++y)
+        for (unsigned x = 25; x < 75; ++x)
+            if (pixels[(y * w + x) * 4 + 1] > 100 && pixels[(y * w + x) * 4 + 3])
+                ++ink;
+    assert(ink > 0);
+    char truncated[32];
+    size_t required;
+    assert(cui_plot_truncate_text(ui, (cui_str){"Plot labels", 11}, 10, 20, truncated,
+                                  sizeof truncated, &required) == CUI_PLOT_OK);
+    assert(required > 3 && required < 12);
     cui_software_destroy(renderer);
     cui_destroy(ui);
     cui_font_close(font);
 }
 #endif
+static void general_labels(cui_context *ui) {
+    cui_plot_label labels[] = {
+        {.text = {"abc", 3}, .origin = {40, 12}, .align = CUI_ALIGN_START, .color = {1, 2, 3, 0}},
+        {.text = {"abc", 3},
+         .origin = {40, 24},
+         .align = CUI_ALIGN_CENTER,
+         .color = {255, 0, 0, 255}},
+        {.text = {"abc", 3}, .origin = {40, 36}, .align = CUI_ALIGN_END, .font_size = 20}};
+    cui_rect bounds[3], saved[3];
+    size_t required;
+    assert(cui_plot_labels_layout(ui, labels, 3, bounds, 3, &required) == CUI_PLOT_OK &&
+           required == 3);
+    assert(closef(bounds[0].x, 40) && closef(bounds[0].w, 15));
+    assert(closef(bounds[1].x, 32.5f) && closef(bounds[1].y, 24));
+    assert(closef(bounds[2].x, 10) && closef(bounds[2].h, 20));
+    memcpy(saved, bounds, sizeof bounds);
+    assert(cui_plot_labels_layout(ui, labels, 3, bounds, 2, &required) == CUI_PLOT_CAPACITY);
+    assert(memcmp(saved, bounds, sizeof bounds) == 0);
+    labels[2].font_size = NAN;
+    assert(cui_plot_labels_layout(ui, labels, 3, bounds, 3, &required) == CUI_PLOT_INVALID);
+    assert(memcmp(saved, bounds, sizeof bounds) == 0);
+    labels[2].font_size = 20;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_labels(ui, 900, (cui_size){100, 100}, labels, 3) == CUI_PLOT_OK);
+    cui_draw_list frame = cui_end_frame(ui);
+    size_t texts = 0;
+    for (size_t i = 0; i < frame.count; ++i)
+        if (frame.commands[i].type == CUI_DRAW_TEXT)
+            ++texts;
+    assert(texts == 3);
+    char output[64], old[64];
+    memset(output, 'x', sizeof output);
+    memcpy(old, output, sizeof output);
+    assert(cui_plot_truncate_text(ui, (cui_str){"abcdef", 6}, 10, 0, output, 64, &required) ==
+           CUI_PLOT_OK);
+    assert(strcmp(output, "abcdef") == 0 && required == 7);
+    assert(cui_plot_truncate_text(ui, (cui_str){"abcdef", 6}, 10, 25, output, 64, &required) ==
+           CUI_PLOT_OK);
+    assert(strcmp(output, "ab\xe2\x80\xa6") == 0);
+    assert(cui_plot_truncate_text(ui, (cui_str){"abcdef", 6}, 10, 1, output, 64, &required) ==
+           CUI_PLOT_OK);
+    assert(strcmp(output, "\xe2\x80\xa6") == 0 && required == 4);
+    const char utf8[] = "\xc3\xa9\xe4\xb8\xad"
+                        "abcdef";
+    assert(cui_plot_truncate_text(ui, (cui_str){utf8, sizeof utf8 - 1}, 10, 25, output, 64,
+                                  &required) == CUI_PLOT_OK);
+    assert(strcmp(output, "\xc3\xa9\xe2\x80\xa6") == 0);
+    strcpy(output, "abcdef");
+    assert(cui_plot_truncate_text(ui, (cui_str){output, 6}, 10, 25, output, 64, &required) ==
+           CUI_PLOT_OK);
+    assert(strcmp(output, "ab\xe2\x80\xa6") == 0);
+    memcpy(old, output, sizeof output);
+    assert(cui_plot_truncate_text(ui, (cui_str){"abcdef", 6}, 10, 25, output, 2, &required) ==
+           CUI_PLOT_CAPACITY);
+    assert(required == 6 && memcmp(old, output, sizeof output) == 0);
+    required = 99;
+    assert(cui_plot_truncate_text(ui, (cui_str){"\xc0\x80", 2}, 10, 25, output, 64, &required) ==
+           CUI_PLOT_INVALID);
+    assert(required == 99 && memcmp(old, output, sizeof output) == 0);
+    assert(cui_plot_truncate_text(ui, (cui_str){"", 0}, 0, 1, output, 64, &required) ==
+           CUI_PLOT_OK);
+    assert(output[0] == 0 && required == 1);
+    const char *invalid[] = {"\xed\xa0\x80", "\xf4\x90\x80\x80", "\xe2\x80", "\x80"};
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
+        required = 99;
+        assert(cui_plot_truncate_text(ui, (cui_str){invalid[i], strlen(invalid[i])}, 10, 25, output,
+                                      64, &required) == CUI_PLOT_INVALID);
+        assert(output[0] == 0 && required == 99);
+    }
+    char long_text[4096];
+    memset(long_text, 'x', sizeof long_text);
+    assert(cui_plot_truncate_text(ui, (cui_str){long_text, sizeof long_text}, 10, 25, output, 64,
+                                  &required) == CUI_PLOT_OK);
+    assert(strcmp(output, "xx\xe2\x80\xa6") == 0);
+}
 static void test_rounded_bar_raster(void) {
     cui_plot_path_command path[10];
     double radii[] = {4, 0, 0, 0};
@@ -430,6 +523,7 @@ int main(void) {
 #endif
     cui_context *ui = cui_create((cui_config){.width = 100, .height = 100, .measure = measure});
     assert(ui);
+    general_labels(ui);
     axes(ui);
     grid_pixels(ui);
     marker_pixels(ui);

@@ -2,9 +2,9 @@
 
 ## Current priorities — 13 October
 
-Published website feedback release `1f9ddda` passes CI, Pages, 196 HTTPS artifact comparisons and both full browser suites; see [publication proof](validation/published-1f9ddda.txt). All 78 families remain: two implemented, 76 tested subsets, zero verified. Published editor/Dock/Plot release `3386332` passes native90/90, sanitizer88/88, WASI75/75, all78 public browser stories, both public suites and270 HTTPS artifact comparisons; see [proof](validation/published-3386332.txt).
+Published touch/mesh/Chart release `65da7b2` passes all six CI jobs, Pages, 276 HTTPS artifact comparisons, both complete browser suites and actual CDP touch contacts; see [publication proof](validation/published-65da7b2.txt). Source validation passes native90/90, sanitizer90/90 and WASI75/75. All78 families remain: two implemented, 76 tested subsets, zero verified.
 
-Shared touch/contact routing, nested pixel scrolling, optional pan/pinch and extended cursor support are active isolated work. Native path meshes have separate Core/GPU worker evidence and await integration. [V1 readiness](V1_READINESS.md) records the remaining gates. Only root integrates; workers have explicit isolated ownership. No user dependency installation is required.
+Touch routing, nested scrolling, optional pan/pinch, drag priority, cancellation and named cursor/state hooks are published. Physical devices and full per-family coverage remain unfinished. Native/software analytic meshes and multi-contour/extended stroke geometry are integrated with documented limits. Next isolated bidi paragraph/wrapped-line analysis passes861948 Unicode cases and sanitizers; IME composition and shaped rendering are active. [V1 readiness](V1_READINESS.md) records remaining gates. Only root integrates; workers have explicit isolated ownership. No user dependency installation is required.
 
 ## Historical checkpoints
 

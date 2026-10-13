@@ -20,6 +20,9 @@ typedef struct {
     bool axis_lock;
     bool gesture_lock;    /* Persistent precise axis lock; disabled on WASM. */
     bool trap_horizontal; /* Opt-in horizontal mask edge ownership. */
+    /* Borrowed for this call/frame; NULL inherits the styled component's theme
+     * or keeps legacy behavior in a standalone Base call. Never retained. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_scroll_options;
 typedef struct {
     cui_size viewport;
@@ -40,6 +43,30 @@ void cui_scrollbar(cui_context *, cui_id, const cui_theme *, const cui_scroll_st
 cui_id cui_scrollbar_id(cui_id, bool vertical);
 cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float content,
                              bool vertical);
+cui_rect cui_scrollbar_thumb_ex(cui_rect track, float scroll, float viewport, float content,
+                                bool vertical, float minimum);
+/* Resolve shared skin before geometry and Base behavior. Legacy hide wins. */
+cui_scroll_options cui_scroll_resolve(const cui_theme *, cui_scroll_options);
+/* Shared bounded context-owned idle/fade state, driven by frame_time. Calling
+ * repeatedly during one frame does not advance time. No style/visible allocates
+ * no timer. Hidden/zero-opacity bars must not submit pointer semantics. */
+float cui_scrollbar_opacity(cui_context *, cui_id owner, cui_id scrollbar,
+                            const cui_scrollbar_style *, float value, bool dragging);
+/* Opt-in bars for a scrollable that had no bars by default. Call inside its
+ * viewport box after content, then apply changed offsets to that box. Local
+ * viewport coordinates are local to the current box; compensate a translated
+ * content box's position when necessary. Content extents are finite.
+ * Owns bounded drag state in the context, retains no caller pointers. */
+bool cui_scrollbar_overlay(cui_context *, cui_id owner, const cui_theme *, float *x, float *y,
+                           cui_rect viewport, cui_size content, cui_scroll_options);
+/* Split form for editors/virtual content: reduce before laying out the current
+ * offset, then paint after content inside the viewport. Base needs a resolved
+ * override style; INHERIT keeps the no-bar legacy. Paint takes final model
+ * offsets so deferred scrolling and discrete windows retain correct thumbs. */
+bool cui_base_scrollbar_overlay(cui_context *, cui_id owner, float *x, float *y, cui_rect viewport,
+                                cui_size content, cui_scroll_options);
+void cui_scrollbar_overlay_paint(cui_context *, cui_id owner, const cui_theme *, float x, float y,
+                                 cui_rect viewport, cui_size content, cui_scroll_options);
 /* Pair end only when begin succeeds. Children are clipped and translated. */
 bool cui_scrollable_begin(cui_context *, cui_id, const cui_theme *, cui_scroll_state *,
                           cui_scroll_options);
@@ -74,7 +101,66 @@ static float cui_scroll_positive(float value, float fallback) {
 static float cui_scroll_limit(float value, float maximum) {
     return isfinite(value) ? fminf(fmaxf(value, 0), maximum) : 0;
 }
+cui_scroll_options cui_scroll_resolve(const cui_theme *theme, cui_scroll_options o) {
+    if (!o.scrollbar_style && theme)
+        o.scrollbar_style = &theme->scrollbar;
+    if (o.scrollbar_style) {
+        if (isfinite(o.scrollbar_style->thickness) && o.scrollbar_style->thickness > 0)
+            o.bar_thickness = o.scrollbar_style->thickness;
+        if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+            o.hide_scrollbars = true;
+    }
+    return o;
+}
+typedef struct {
+    double last_activity;
+    float value;
+    bool initialized, hovered, held;
+} cui_scrollbar_timer;
+float cui_scrollbar_opacity(cui_context *ui, cui_id owner, cui_id bar,
+                            const cui_scrollbar_style *style, float value, bool dragging) {
+    if (!ui || !owner || !bar)
+        return 0;
+    if (!style || style->visibility != CUI_SCROLLBAR_AUTO_HIDE)
+        return style && style->visibility == CUI_SCROLLBAR_HIDDEN ? 0 : 1;
+    cui_scrollbar_timer *timer =
+        cui_resource_get(ui, bar, UINT64_C(0x7421c6e9a3540b87), sizeof(*timer), NULL, NULL);
+    if (!timer)
+        return 0;
+    double now = cui_frame_time(ui);
+    value = isfinite(value) ? value : 0;
+    bool hovered = cui_hovered(ui, owner);
+    bool held = dragging || cui_pressed(ui, bar) || cui_hovered(ui, bar) ||
+                cui_focused(ui) == owner || cui_focused(ui) == bar || cui_focus_within(ui, owner);
+    bool activity = !timer->initialized || timer->value != value || (hovered && !timer->hovered) ||
+                    (timer->held && !held);
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if ((hovered && events[i].type == CUI_EVENT_POINTER_MOVE) ||
+            ((events[i].type == CUI_EVENT_SCROLL || events[i].type == CUI_EVENT_KEY_DOWN) &&
+             (cui_event_target(ui, i) == owner || cui_event_target(ui, i) == bar)))
+            activity = true;
+    if (held || activity)
+        timer->last_activity = now;
+    timer->value = value;
+    timer->hovered = hovered;
+    timer->held = held;
+    timer->initialized = true;
+    if (held)
+        return 1;
+    double idle = fmin(60, cui_scroll_positive(style->idle_seconds, 1));
+    double fade = style->no_fade || style->reduced_motion || cui_reduced_motion(ui)
+                      ? 0
+                      : fmin(5, cui_scroll_positive(style->fade_seconds, .15f));
+    double elapsed = fmax(0, now - timer->last_activity);
+    if (elapsed >= idle + fade)
+        return 0;
+    cui_invalidate(ui);
+    return elapsed <= idle || fade == 0 ? 1 : (float)(1 - (elapsed - idle) / fade);
+}
 cui_scroll_geometry cui_scroll_layout(cui_scroll_options o) {
+    o = cui_scroll_resolve(NULL, o);
     float width = cui_scroll_positive(o.width, 320), height = cui_scroll_positive(o.height, 240);
     float bar = fminf(cui_scroll_positive(o.bar_thickness, 10), fminf(width, height) * .5f);
     cui_size viewport = {width - (o.vertical && !o.hide_scrollbars ? bar : 0),
@@ -93,13 +179,19 @@ cui_id cui_scrollbar_id(cui_id id, bool vertical) {
 }
 cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float content,
                              bool vertical) {
+    return cui_scrollbar_thumb_ex(track, scroll, viewport, content, vertical, 12);
+}
+cui_rect cui_scrollbar_thumb_ex(cui_rect track, float scroll, float viewport, float content,
+                                bool vertical, float minimum) {
     float length = vertical ? track.h : track.w;
     if (!isfinite(length) || length <= 0)
         return (cui_rect){0};
     viewport = cui_scroll_positive(viewport, length);
     content = cui_scroll_positive(content, viewport);
     float maximum = fmaxf(0, content - viewport);
-    float thumb = fminf(length, fmaxf(fminf(12, length), length * fminf(1, viewport / content)));
+    minimum = cui_scroll_positive(minimum, 12);
+    float thumb =
+        fminf(length, fmaxf(fminf(minimum, length), length * fminf(1, viewport / content)));
     float position =
         maximum > 0 ? cui_scroll_limit(scroll, maximum) / maximum * (length - thumb) : 0;
     if (vertical) {
@@ -115,6 +207,7 @@ bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
                         cui_scroll_geometry geometry, cui_scroll_options o, bool vertical) {
     if (!ui || !root || !s)
         return false;
+    o = cui_scroll_resolve(NULL, o);
     cui_id id = cui_scrollbar_id(root, vertical);
     float *value = vertical ? &s->y : &s->x;
     bool *dragging = vertical ? &s->dragging_y : &s->dragging_x;
@@ -123,6 +216,11 @@ bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
     float viewport = vertical ? geometry.viewport.height : geometry.viewport.width;
     bool disabled = o.disabled || maximum <= 0;
     float before = *value;
+    if (o.hide_scrollbars ||
+        cui_scrollbar_opacity(ui, root, id, o.scrollbar_style, *value, *dragging) <= 0) {
+        *dragging = false;
+        return false;
+    }
     cui_interact(ui, id, CUI_ROLE_SCROLLBAR,
                  vertical ? cui_string("Vertical scroll") : cui_string("Horizontal scroll"),
                  disabled, false, *value);
@@ -141,7 +239,8 @@ bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
             e.pointer_button != CUI_POINTER_PRIMARY)
             continue;
         cui_rect thumb =
-            cui_scrollbar_thumb(bounds, *value, viewport, viewport + maximum, vertical);
+            cui_scrollbar_thumb_ex(bounds, *value, viewport, viewport + maximum, vertical,
+                                   o.scrollbar_style ? o.scrollbar_style->min_thumb : 0);
         float pointer = vertical ? e.y : e.x;
         float start = vertical ? thumb.y : thumb.x;
         float thumb_length = vertical ? thumb.h : thumb.w;
@@ -210,6 +309,7 @@ bool cui_base_scrollable_finish(cui_context *ui, cui_id id, cui_scroll_state *s,
                                 cui_scroll_options o) {
     if (!ui || !id || !s)
         return false;
+    o = cui_scroll_resolve(NULL, o);
     cui_scroll_geometry g = cui_scroll_layout(o);
     float old_x = s->x, old_y = s->y;
     cui_scroll_reduce_wheel(ui, id, s, o, g);
@@ -232,6 +332,7 @@ bool cui_base_scrollable_finish(cui_context *ui, cui_id id, cui_scroll_state *s,
 bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_scroll_options o) {
     if (!ui || !id || !s)
         return false;
+    o = cui_scroll_resolve(NULL, o);
     cui_scroll_geometry g = cui_scroll_layout(o);
     float old_x = s->x, old_y = s->y;
     if (o.hide_scrollbars)
@@ -261,6 +362,62 @@ bool cui_base_scrollable(cui_context *ui, cui_id id, cui_scroll_state *s, cui_sc
     return s->x != old_x || s->y != old_y;
 }
 
+bool cui_base_scrollbar_overlay(cui_context *ui, cui_id id, float *x, float *y, cui_rect viewport,
+                                cui_size content, cui_scroll_options o) {
+    if (!ui || !id || !x || !y || x == y || !isfinite(*x) || !isfinite(*y) ||
+        !isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
+        !isfinite(viewport.h) || viewport.w <= 0 || viewport.h <= 0 || !isfinite(content.width) ||
+        !isfinite(content.height) || content.width < 0 || content.height < 0)
+        return false;
+    o = cui_scroll_resolve(NULL, o);
+    if (o.hide_scrollbars || !o.scrollbar_style ||
+        (o.scrollbar_style->visibility != CUI_SCROLLBAR_VISIBLE &&
+         o.scrollbar_style->visibility != CUI_SCROLLBAR_AUTO_HIDE)) {
+        cui_scroll_state *previous = cui_resource_find(ui, id, UINT64_C(0x30914be927c650a8));
+        if (previous)
+            previous->dragging_x = previous->dragging_y = false;
+        return false;
+    }
+    cui_scroll_state *state =
+        cui_resource_get(ui, id, UINT64_C(0x30914be927c650a8), sizeof(*state), NULL, NULL);
+    if (!state)
+        return false;
+    state->x = isfinite(*x) ? fmaxf(0, *x) : 0;
+    state->y = isfinite(*y) ? fmaxf(0, *y) : 0;
+    float bar =
+        fminf(cui_scroll_positive(o.bar_thickness, 10), fminf(viewport.w, viewport.h) * .5f);
+    cui_scroll_geometry g = {.viewport = {viewport.w, viewport.h},
+                             .maximum_x = o.horizontal ? fmaxf(0, content.width - viewport.w) : 0,
+                             .maximum_y = o.vertical ? fmaxf(0, content.height - viewport.h) : 0};
+    float old_x = state->x, old_y = state->y;
+    state->x = cui_scroll_limit(state->x, g.maximum_x);
+    state->y = cui_scroll_limit(state->y, g.maximum_y);
+    o.width = viewport.w + bar;
+    o.height = viewport.h + bar;
+    if (o.horizontal && g.maximum_x > 0)
+        cui_base_scrollbar(ui, id, state, g, o, false);
+    if (o.vertical && g.maximum_y > 0)
+        cui_base_scrollbar(ui, id, state, g, o, true);
+    *x = state->x;
+    *y = state->y;
+    size_t semantic_count;
+    const cui_semantic *semantics = cui_semantics(ui, &semantic_count);
+    for (size_t i = 0; i < semantic_count; i++)
+        if (semantics[i].id == id) {
+            cui_semantic_details details = semantics[i].details;
+            details.scroll_x = state->x;
+            details.scroll_y = state->y;
+            details.scroll_max_x = g.maximum_x;
+            details.scroll_max_y = g.maximum_y;
+            cui_set_semantic_details(ui, id, details);
+            break;
+        }
+    bool changed = old_x != state->x || old_y != state->y;
+    if (changed)
+        cui_invalidate(ui);
+    return changed;
+}
+
 /* src/components/cui_scroll.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -272,6 +429,7 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
                           cui_scroll_options o) {
     if (!ui || !id || !t || !s)
         return false;
+    o = cui_scroll_resolve(t, o);
     cui_scroll_geometry g = cui_scroll_layout(o);
     cui_base_scrollable(ui, id, s, o);
     cui_begin_box(ui, id,
@@ -299,22 +457,40 @@ void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scr
                    cui_scroll_geometry g, cui_scroll_options o, bool vertical) {
     if (!ui || !id || !t || !s)
         return;
+    o = cui_scroll_resolve(t, o);
+    if (o.hide_scrollbars)
+        return;
     float width = cui_scroll_component_positive(o.width, 320);
     float height = cui_scroll_component_positive(o.height, 240);
     float bar = vertical ? width - g.viewport.width : height - g.viewport.height;
     float length = vertical ? g.viewport.height : g.viewport.width;
     float value = vertical ? s->y : s->x;
     float maximum = vertical ? g.maximum_y : g.maximum_x;
-    cui_rect thumb =
-        cui_scrollbar_thumb((cui_rect){0, 0, vertical ? bar : length, vertical ? length : bar},
-                            value, length, length + maximum, vertical);
+    cui_rect thumb = cui_scrollbar_thumb_ex(
+        (cui_rect){0, 0, vertical ? bar : length, vertical ? length : bar}, value, length,
+        length + maximum, vertical, o.scrollbar_style ? o.scrollbar_style->min_thumb : 0);
     float start = vertical ? thumb.y : thumb.x;
     cui_id bar_id = cui_scrollbar_id(id, vertical);
+    const cui_scrollbar_style *style = o.scrollbar_style;
+    float opacity = cui_scrollbar_opacity(ui, id, bar_id, style, value,
+                                          vertical ? s->dragging_y : s->dragging_x);
+    cui_color track = style && style->custom_track_color ? style->track_color : t->border;
+    cui_color fill = style && style->custom_thumb_color ? style->thumb_color
+                     : o.disabled || maximum <= 0       ? t->border
+                     : cui_focused(ui) == bar_id        ? t->focus
+                                                        : t->muted;
+    if (style && style->no_track)
+        track.a = 0;
     cui_begin_box(ui, bar_id,
                   (cui_box){.width = vertical ? bar : length,
                             .height = vertical ? length : bar,
                             .row = !vertical,
-                            .background = t->border});
+                            .background = track,
+                            .radius = style && isfinite(style->track_radius)
+                                          ? fmaxf(0, style->track_radius)
+                                          : 0,
+                            .custom_opacity = true,
+                            .opacity = opacity});
     if (start > 0) {
         cui_begin_box(ui, 0,
                       (cui_box){.width = vertical ? bar : start, .height = vertical ? start : bar});
@@ -323,14 +499,16 @@ void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scr
     cui_begin_box(ui, 0,
                   (cui_box){.width = thumb.w,
                             .height = thumb.h,
-                            .background = o.disabled || maximum <= 0  ? t->border
-                                          : cui_focused(ui) == bar_id ? t->focus
-                                                                      : t->muted});
+                            .background = fill,
+                            .radius = style && isfinite(style->thumb_radius)
+                                          ? fmaxf(0, style->thumb_radius)
+                                          : 0});
     cui_end_box(ui);
     cui_end_box(ui);
 }
 void cui_scrollable_end(cui_context *ui, cui_id id, const cui_theme *t, const cui_scroll_state *s,
                         cui_scroll_options o) {
+    o = cui_scroll_resolve(t, o);
     cui_scroll_geometry g = cui_scroll_layout(o);
     cui_end_box(ui); /* content */
     cui_end_box(ui); /* viewport */
@@ -346,9 +524,59 @@ void cui_scrollable_end_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_s
                            cui_scroll_options o) {
     if (!ui || !id || !t || !s)
         return;
+    o = cui_scroll_resolve(t, o);
     cui_base_scrollable_finish(ui, id, s, o);
     cui_set_box_scroll_offset(ui, id ^ UINT64_C(0x75b21b4d3cba0f89), -s->x, -s->y);
     cui_scrollable_end(ui, id, t, s, o);
+}
+void cui_scrollbar_overlay_paint(cui_context *ui, cui_id id, const cui_theme *theme, float x,
+                                 float y, cui_rect viewport, cui_size content,
+                                 cui_scroll_options o) {
+    if (!ui || !id || !theme || !isfinite(x) || !isfinite(y) || !isfinite(viewport.x) ||
+        !isfinite(viewport.y) || !isfinite(viewport.w) || !isfinite(viewport.h) ||
+        viewport.w <= 0 || viewport.h <= 0 || !isfinite(content.width) ||
+        !isfinite(content.height) || content.width < 0 || content.height < 0)
+        return;
+    o = cui_scroll_resolve(theme, o);
+    if (o.hide_scrollbars || !o.scrollbar_style ||
+        (o.scrollbar_style->visibility != CUI_SCROLLBAR_VISIBLE &&
+         o.scrollbar_style->visibility != CUI_SCROLLBAR_AUTO_HIDE))
+        return;
+    cui_scroll_state *state =
+        cui_resource_get(ui, id, UINT64_C(0x30914be927c650a8), sizeof(*state), NULL, NULL);
+    if (!state)
+        return;
+    float bar = fminf(cui_scroll_component_positive(o.bar_thickness, 10),
+                      fminf(viewport.w, viewport.h) * .5f);
+    cui_scroll_geometry g = {.viewport = {viewport.w, viewport.h},
+                             .maximum_x = o.horizontal ? fmaxf(0, content.width - viewport.w) : 0,
+                             .maximum_y = o.vertical ? fmaxf(0, content.height - viewport.h) : 0};
+    state->x = fminf(fmaxf(0, x), g.maximum_x);
+    state->y = fminf(fmaxf(0, y), g.maximum_y);
+    o.width = viewport.w + bar;
+    o.height = viewport.h + bar;
+    if (o.vertical && g.maximum_y > 0) {
+        cui_begin_absolute_box(
+            ui, 0, (cui_box){0},
+            (cui_rect){viewport.x + viewport.w - bar, viewport.y, bar, viewport.h});
+        cui_scrollbar(ui, id, theme, state, g, o, true);
+        cui_end_box(ui);
+    }
+    if (o.horizontal && g.maximum_x > 0) {
+        cui_begin_absolute_box(
+            ui, 0, (cui_box){0},
+            (cui_rect){viewport.x, viewport.y + viewport.h - bar, viewport.w, bar});
+        cui_scrollbar(ui, id, theme, state, g, o, false);
+        cui_end_box(ui);
+    }
+}
+bool cui_scrollbar_overlay(cui_context *ui, cui_id id, const cui_theme *theme, float *x, float *y,
+                           cui_rect viewport, cui_size content, cui_scroll_options o) {
+    o = cui_scroll_resolve(theme, o);
+    bool changed = cui_base_scrollbar_overlay(ui, id, x, y, viewport, content, o);
+    if (x && y)
+        cui_scrollbar_overlay_paint(ui, id, theme, *x, *y, viewport, content, o);
+    return changed;
 }
 
 #endif

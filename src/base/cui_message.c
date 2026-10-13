@@ -20,9 +20,10 @@ bool cui_base_message(cui_message_options o, cui_message_plan *out) {
     if (!out || o.alignment < CUI_MESSAGE_START || o.alignment > CUI_MESSAGE_END ||
         !isfinite(o.width) || o.width <= 0 || !isfinite(o.stack_gap) || o.stack_gap < 0 ||
         !isfinite(o.row_gap) || o.row_gap < 0 || !isfinite(o.metadata_gap) || o.metadata_gap < 0 ||
-        (o.body_count && !o.body) || o.body_count > 256 ||
-        !cui_message_private_slot_valid(o.avatar) || !cui_message_private_slot_valid(o.header) ||
-        !cui_message_private_slot_valid(o.footer) || (!o.name.data && o.name.length))
+        !isfinite(o.max_bubble_width) || o.max_bubble_width < 0 || (o.body_count && !o.body) ||
+        o.body_count > 256 || !cui_message_private_slot_valid(o.avatar) ||
+        !cui_message_private_slot_valid(o.header) || !cui_message_private_slot_valid(o.footer) ||
+        (!o.name.data && o.name.length))
         return false;
     cui_message_plan p = {.avatar = cui_message_private_slot_present(o.avatar),
                           .header = cui_message_private_slot_present(o.header),
@@ -38,7 +39,9 @@ bool cui_base_message(cui_message_options o, cui_message_plan *out) {
     p.footer_inset = o.footer.inset == CUI_MESSAGE_INSET_ON ||
                      (o.footer.inset == CUI_MESSAGE_INSET_DEFAULT && !p.ghost);
     p.column_width = fmaxf(0, o.width - (p.avatar ? fmaxf(32, o.avatar.width) + o.row_gap : 0));
-    p.footer_offset = p.avatar ? 40 : 0;
+    if (o.max_bubble_width > 0)
+        p.column_width = fminf(p.column_width, o.max_bubble_width);
+    p.footer_offset = p.avatar ? fmaxf(32, o.avatar.width) + o.row_gap : 0;
     *out = p;
     return true;
 }
@@ -331,6 +334,14 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
     if (!ui || !id || !s || !cui_message_scroller_validate_options(o))
         return r;
     r.valid = true;
+    if (o.scrollbar_style) {
+        if (isfinite(o.scrollbar_style->thickness) && o.scrollbar_style->thickness > 0)
+            o.bar_thickness = o.scrollbar_style->thickness;
+        if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+            o.scrollbar = false;
+    }
+    if (!o.scrollbar)
+        s->scrollbar.dragging_y = false;
     for (size_t i = s->previous_begin; i < s->previous_end && i < s->count; i++) {
         double height = fmax(0, s->rows[i].bounds.h - s->rows[i].render_gap);
         if (s->rows[i].bounds.h > 0 && height != s->rows[i].raw_height) {
@@ -348,6 +359,7 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
                                  .content_height = (float)fmin(r.view.total, FLT_MAX),
                                  .bar_thickness = o.bar_thickness,
                                  .wheel_step = o.wheel_step,
+                                 .scrollbar_style = o.scrollbar_style,
                                  .vertical = o.scrollbar};
     cui_scroll_geometry geometry = {
         .viewport = {o.width - (o.scrollbar ? fminf(o.bar_thickness, o.width * .5f) : 0), o.height},
@@ -357,10 +369,13 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
     for (size_t i = 0; i < count; i++)
         if (cui_event_target(ui, i) == id) {
             cui_event e = events[i];
-            if (e.type == CUI_EVENT_SCROLL && fabsf(e.dy) >= fabsf(e.dx) && isfinite(e.dy))
+            if (e.type == CUI_EVENT_SCROLL && fabsf(e.dy) >= fabsf(e.dx) && isfinite(e.dy)) {
+                double before = s->scroll;
                 cui_message_scroller_scroll(s, s->scroll -
                                                    e.dy * (e.scroll_precise ? 1 : o.wheel_step));
-            else if (e.type == CUI_EVENT_KEY_DOWN && cui_focused(ui) == id) {
+                if (s->scroll != before)
+                    cui_consume_event(ui, i);
+            } else if (e.type == CUI_EVENT_KEY_DOWN && cui_focused(ui) == id) {
                 double target = s->scroll;
                 switch (e.key) {
                 case CUI_KEY_HOME:

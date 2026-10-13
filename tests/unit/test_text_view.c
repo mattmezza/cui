@@ -2457,6 +2457,46 @@ static void test_horizontal_table_interaction(void) {
     assert(f.state.scroll.y == 0 && f.blocks[0].table_scroll.x == 0);
     cui_destroy(ui);
 }
+static void test_table_scrollbar_skin(void) {
+    fixture f;
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("| abcdefghijklmnopqrstuvwxyz | another very wide "
+                                                 "column |\n| --- | --- |\n| x | y |")) ==
+           CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
+    cui_scrollbar_style style = {.visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 8};
+    cui_text_view_options options = cui_text_view_default();
+    options.width = 120;
+    options.table_mode = CUI_TEXT_VIEW_TABLE_NOWRAP;
+    options.scrollbar_style = &style;
+    for (unsigned i = 0; i < 3; i++)
+        frame(ui, &f, options);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    cui_rect track = {0};
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].role == CUI_ROLE_SCROLLBAR)
+            track = semantics[i].bounds;
+    assert(track.h == 8 && track.w > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = track.x + track.w - 2,
+                                           .y = track.y + track.h / 2}));
+    frame(ui, &f, options);
+    assert(f.blocks[0].table_scroll.x > 0);
+    size_t after_count;
+    const cui_semantic *after = cui_semantics(ui, &after_count);
+    for (size_t i = 0; i < after_count; i++)
+        if (after[i].role == CUI_ROLE_SCROLLBAR)
+            assert(after[i].bounds.x == track.x && after[i].bounds.w == track.w);
+    assert(
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = track.x, .y = track.y}));
+    style.visibility = CUI_SCROLLBAR_HIDDEN;
+    frame(ui, &f, options);
+    semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].role != CUI_ROLE_SCROLLBAR);
+    cui_destroy(ui);
+}
 static void test_passive_task_paint(void) {
     fixture f;
     setup(&f, CUI_TEXT_VIEW_MARKDOWN);
@@ -3251,6 +3291,7 @@ int main(void) {
     test_action_composition();
     test_table_edges_and_clip();
     test_horizontal_table_interaction();
+    test_table_scrollbar_skin();
     test_passive_task_paint();
     test_decoded_resource_callbacks();
     test_nested_list_paint();

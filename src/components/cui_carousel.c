@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_carousel.h"
+#include "cui/cui_scroll.h"
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -213,6 +214,27 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
         cui_invalidate(ui);
     cui_carousel_semantics(ui, id, s, o);
     cui_box root = o.custom_box ? o.box : (cui_box){.gap = 16};
+    cui_scroll_options bars = cui_scroll_resolve(
+        theme, (cui_scroll_options){.horizontal = s->axis == CUI_ORIENTATION_HORIZONTAL,
+                                    .vertical = s->axis == CUI_ORIENTATION_VERTICAL,
+                                    .disabled = o.disabled,
+                                    .scrollbar_style = o.scrollbar_style});
+    cui_scrollbar_style skin = *bars.scrollbar_style;
+    skin.reduced_motion |= o.reduced_motion;
+    bars.scrollbar_style = &skin;
+    cui_rect bar_viewport = {0, 0, s->frame_width, s->frame_height};
+    cui_size bar_content = {bar_viewport.w + (bars.horizontal ? s->maximum : 0),
+                            bar_viewport.h + (bars.vertical ? s->maximum : 0)};
+    float bar_x = bars.horizontal ? fmaxf(0, -s->offset) : 0;
+    float bar_y = bars.vertical ? fmaxf(0, -s->offset) : 0;
+    if (!s->runtime_looping &&
+        cui_base_scrollbar_overlay(ui, id, &bar_x, &bar_y, bar_viewport, bar_content, bars)) {
+        float offset = -(bars.horizontal ? bar_x : bar_y);
+        cui_carousel_select(s, cui_carousel_nearest(s, offset));
+        s->offset = offset;
+        s->velocity = 0;
+        cui_invalidate(ui);
+    }
     root.width = o.width;
     cui_begin_box(ui, id, root);
     cui_id frame = cui_carousel_part(id, 0);
@@ -249,6 +271,10 @@ bool cui_carousel(cui_context *ui, cui_id id, const cui_theme *theme, cui_carous
         cui_end_box(ui);
         cui_end_box(ui);
     }
+    if (!s->runtime_looping)
+        cui_scrollbar_overlay_paint(ui, id, theme, bars.horizontal ? fmaxf(0, -s->offset) : 0,
+                                    bars.vertical ? fmaxf(0, -s->offset) : 0, bar_viewport,
+                                    bar_content, bars);
     cui_end_box(ui);
     if (o.controls)
         o.controls(ui, theme, s, id, o.controls_user);

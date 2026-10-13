@@ -3,6 +3,8 @@
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
 static float cui_content_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
 }
@@ -90,6 +92,188 @@ void cui_avatar(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
                          false, false, 0);
     cui_text(ui, (cui_str){initials, n}, size * .38f, t->on_primary);
     cui_end_box(ui);
+}
+bool cui_avatar_image_init(cui_avatar_image *s, unsigned char *storage, size_t capacity,
+                           unsigned diameter) {
+    if (!s || !storage || !diameter || diameter > 512 || capacity < (size_t)diameter * diameter * 4)
+        return false;
+    *s = (cui_avatar_image){.storage = storage, .capacity = capacity, .diameter = diameter};
+    return true;
+}
+bool cui_avatar_image_prepare(cui_avatar_image *s, cui_bitmap source) {
+    if (!s || !s->storage || !s->diameter || s->diameter > 512 ||
+        s->capacity < (size_t)s->diameter * s->diameter * 4 || !cui_bitmap_valid(source) ||
+        source.width > 16384 || source.height > 16384)
+        return false;
+    size_t source_bytes = source.stride * source.height;
+    uintptr_t a = (uintptr_t)s->storage, b = (uintptr_t)source.pixels;
+    size_t bytes = (size_t)s->diameter * s->diameter * 4;
+    if ((a >= b && a - b < source_bytes) || (b >= a && b - a < bytes))
+        return false;
+    if (s->ready && s->source.pixels == source.pixels && s->source.width == source.width &&
+        s->source.height == source.height && s->source.stride == source.stride &&
+        s->source.revision == source.revision)
+        return true;
+    double extent = fmin(source.width, source.height), scale = extent / s->diameter;
+    double radius = s->diameter * .5;
+    for (unsigned y = 0; y < s->diameter; y++)
+        for (unsigned x = 0; x < s->diameter; x++) {
+            double sx = fmax(
+                0, fmin(source.width - 1, (x + .5) * scale + (source.width - extent) * .5 - .5));
+            double sy = fmax(
+                0, fmin(source.height - 1, (y + .5) * scale + (source.height - extent) * .5 - .5));
+            unsigned x0 = (unsigned)sx, y0 = (unsigned)sy;
+            unsigned x1 = x0 + 1 < source.width ? x0 + 1 : x0,
+                     y1 = y0 + 1 < source.height ? y0 + 1 : y0;
+            double fx = sx - x0, fy = sy - y0;
+            double coverage =
+                fmax(0, fmin(1, radius + .5 - hypot(x + .5 - radius, y + .5 - radius)));
+            unsigned char *out = s->storage + ((size_t)y * s->diameter + x) * 4;
+            for (unsigned c = 0; c < 4; c++) {
+                double top = source.pixels[(size_t)y0 * source.stride + x0 * 4 + c] * (1 - fx) +
+                             source.pixels[(size_t)y0 * source.stride + x1 * 4 + c] * fx;
+                double bottom = source.pixels[(size_t)y1 * source.stride + x0 * 4 + c] * (1 - fx) +
+                                source.pixels[(size_t)y1 * source.stride + x1 * 4 + c] * fx;
+                out[c] = (unsigned char)floor(
+                    (top * (1 - fy) + bottom * fy) * (c == 3 ? coverage : 1) + .5);
+            }
+        }
+    uint64_t revision = s->bitmap.revision + 1;
+    s->bitmap = (cui_bitmap){s->storage, s->diameter, s->diameter, s->diameter * 4,
+                             revision ? revision : 1};
+    s->source = source;
+    s->ready = true;
+    return true;
+}
+bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_avatar_options o) {
+    if (!ui || !id || !t)
+        return false;
+    float size = fminf(cui_content_positive(o.size, 48), 512);
+    float ring = isfinite(o.ring_width) ? fmaxf(0, fminf(o.ring_width, size * .25f)) : 0;
+    bool photo = o.image_state && cui_avatar_image_prepare(o.image_state, o.image);
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = size,
+                  .height = size,
+                  .fixed_width = true,
+                  .fixed_height = true,
+                  .radius = size * .5f,
+                  .padding = photo ? ring : 0,
+                  .align_x = CUI_ALIGN_CENTER,
+                  .align_y = CUI_ALIGN_CENTER,
+                  .background = photo ? (o.custom_ring ? o.ring : t->surface) : t->primary,
+                  .border = cui_focused(ui) == id ? t->primary : t->border,
+                  .border_width = photo ? 0 : 1});
+    cui_interaction interaction =
+        cui_interact(ui, id, o.interactive ? CUI_ROLE_BUTTON : CUI_ROLE_IMAGE,
+                     name.length ? name : cui_string("Anonymous"), o.disabled, false, 0);
+    if (interaction.focus_visible)
+        cui_set_outline(ui, 2, t->primary,
+                        (cui_corner_radii){size / 2, size / 2, size / 2, size / 2});
+    if (photo)
+        cui_paint_bitmap(ui, cui_content_child(id, 31),
+                         (cui_bitmap_paint){.bitmap = o.image_state->bitmap, .opacity = 1},
+                         (cui_box){.width = size - 2 * ring,
+                                   .height = size - 2 * ring,
+                                   .fixed_width = true,
+                                   .fixed_height = true});
+    else {
+        char initials[9];
+        size_t n = cui_avatar_initials(name, initials);
+        cui_text(ui, (cui_str){initials, n}, size * .38f, t->on_primary);
+    }
+    cui_end_box(ui);
+    size_t count;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (items[i].id == id) {
+            cui_semantic_details d = items[i].details;
+            d.pointer_activatable = o.interactive;
+            d.focusable = o.interactive;
+            d.no_focus = !o.interactive;
+            cui_set_semantic_details(ui, id, d);
+            cui_set_tab_stop(ui, id, o.interactive);
+            if (o.interactive)
+                cui_set_cursor(ui, id, o.disabled ? CUI_CURSOR_NOT_ALLOWED : CUI_CURSOR_POINTER);
+            break;
+        }
+    bool activated = false;
+    size_t n;
+    cui_frame_events(ui, &n);
+    for (size_t i = 0; i < n; i++)
+        if (o.interactive && !o.disabled && !cui_event_consumed(ui, i) &&
+            cui_event_activation(ui, i) == id) {
+            cui_consume_event(ui, i);
+            activated = true;
+        }
+    return activated;
+}
+size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *t,
+                        const cui_avatar_item *items, size_t count, cui_avatar_stack_options o) {
+    if (!ui || !id || !t || !count || count > 64 || !items)
+        return SIZE_MAX;
+    if (isfinite(o.width) && o.width > 0 && o.width < 1)
+        return SIZE_MAX;
+    float size = fminf(cui_content_positive(o.size, 48), 512);
+    float overlap = cui_content_positive(o.overlap, size * .25f);
+    overlap = fminf(overlap, size * .75f);
+    float step = size - overlap;
+    size_t visible = o.max_visible ? o.max_visible : 3;
+    if (visible > count)
+        visible = count;
+    if (isfinite(o.width) && o.width > 0) {
+        size = fminf(size, o.width);
+        overlap = fminf(overlap, size * .75f);
+        step = size - overlap;
+        size_t slots = 1 + (size_t)fminf(64, fmaxf(0, floorf((o.width - size) / step)));
+        if (visible + (visible < count ? 1 : 0) > slots)
+            visible = count <= slots ? count : slots - 1;
+    }
+    size_t slots = visible + (visible < count ? 1 : 0);
+    float width = size + step * (float)(slots - 1);
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = width, .height = size, .fixed_width = true, .fixed_height = true});
+    cui_content_semantic(ui, id, CUI_ROLE_GROUP, o.name.length ? o.name : cui_string("People"),
+                         false, false, 0);
+    size_t activated = SIZE_MAX;
+    for (size_t i = 0; i < visible; i++) {
+        cui_id child = id ^ (UINT64_C(0x7396dacf16000000) +
+                             (items[i].key ? items[i].key : i + 1) * UINT64_C(0x9e3779b97f4a7c15));
+        cui_begin_absolute_box(ui, cui_content_child(child, 32), (cui_box){0},
+                               (cui_rect){step * (float)i, 0, size, size});
+        if (cui_avatar_ex(ui, child, t, items[i].name,
+                          (cui_avatar_options){.size = size,
+                                               .ring_width = o.ring_width,
+                                               .image = items[i].image,
+                                               .image_state = items[i].image_state,
+                                               .custom_ring = true,
+                                               .ring = t->background,
+                                               .interactive = o.interactive,
+                                               .disabled = o.disabled}))
+            activated = i;
+        cui_end_box(ui);
+    }
+    if (visible < count) {
+        char label[48], text[16];
+        snprintf(label, sizeof label, "%zu more people", count - visible);
+        snprintf(text, sizeof text, "+%zu", count - visible);
+        cui_id child = cui_content_child(id, 99);
+        cui_begin_absolute_box(ui, child,
+                               (cui_box){.radius = size * .5f,
+                                         .background = t->secondary,
+                                         .border = t->background,
+                                         .border_width = o.ring_width,
+                                         .align_x = CUI_ALIGN_CENTER,
+                                         .align_y = CUI_ALIGN_CENTER},
+                               (cui_rect){step * (float)visible, 0, size, size});
+        cui_content_semantic(ui, child, CUI_ROLE_IMAGE, cui_string(label), false, false, 0);
+        cui_text(ui, cui_string(text), size * .28f, t->text);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    return activated;
 }
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble_variant v,
                       float width) {

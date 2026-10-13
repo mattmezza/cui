@@ -3358,7 +3358,48 @@ static void test_floating_ancestral_clips(void) {
     assert(!depth && nested && detached);
     cui_destroy(ui);
 }
+static unsigned resource_find_collected, resource_find_destroyed;
+static void resource_find_collect(void *payload) {
+    assert(*(int *)payload == 77);
+    resource_find_collected++;
+}
+static void resource_find_destroy(void *payload) {
+    assert(*(int *)payload == 77);
+    resource_find_destroyed++;
+}
+static void test_resource_find(void) {
+    cui_context *ui = cui_create((cui_config){.max_resources = 1});
+    assert(ui);
+    resource_find_collected = resource_find_destroyed = 0;
+    assert(!cui_resource_find(ui, 1, 1));
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_begin_frame(ui, 100, 100, .016f);
+    assert(!cui_resource_find(ui, 2, 1));
+    assert(cui_last_error(ui) == CUI_OK);
+    int *payload =
+        cui_resource_get(ui, 1, 1, sizeof(*payload), resource_find_collect, resource_find_destroy);
+    assert(payload && *payload == 0); /* Missing lookup consumed no resource slot. */
+    *payload = 77;
+    assert(cui_resource_find(ui, 1, 1) == payload);
+    assert(!cui_resource_find(ui, 1, 2));
+    cui_end_frame(ui);
+    assert(!cui_resource_find(ui, 1, 1));
+    cui_begin_frame(ui, 100, 100, .016f);
+    assert(resource_find_collected == 1 && !resource_find_destroyed);
+    assert(cui_resource_find(ui, 1, 1) == payload && *payload == 77);
+    cui_end_frame(ui);
+    cui_begin_frame(ui, 100, 100, .016f);
+    assert(resource_find_collected == 2 && !resource_find_destroyed);
+    cui_end_frame(ui); /* Omit for a complete frame. */
+    cui_begin_frame(ui, 100, 100, .016f);
+    assert(!cui_resource_find(ui, 1, 1));
+    assert(resource_find_destroyed == 1 && cui_last_error(ui) == CUI_OK);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    assert(resource_find_destroyed == 1);
+}
 int main(void) {
+    test_resource_find();
     test_accessibility_actions();
     test_accessibility_eligibility();
     test_accessibility_capture_preservation();

@@ -814,6 +814,41 @@ static void test_contact_lifecycle(void) {
     cui_carousel_tick(&s, 9.05, true);
     assert(!s.scrolling && !s.scroll_contact);
 }
+#ifndef CUI_CAROUSEL_BASE_ONLY
+static void test_scrollbar_skin(void) {
+    for (unsigned axis = 0; axis < 2; axis++) {
+        cui_context *ui = cui_create((cui_config){.width = 500, .height = 300});
+        cui_theme theme = cui_theme_dark();
+        theme.scrollbar = (cui_scrollbar_style){
+            .visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 12, .no_track = true};
+        cui_carousel_state state;
+        cui_carousel_geometry workspace[8];
+        setup(&state, workspace, 3);
+        cui_carousel_set_axis(&state, axis ? CUI_ORIENTATION_VERTICAL : CUI_ORIENTATION_HORIZONTAL);
+        cui_carousel_options options = cui_carousel_default();
+        options.width = 200;
+        options.height = 80;
+        options.reduced_motion = true;
+        for (unsigned i = 0; i < 3; i++)
+            frame(ui, &theme, &state, options);
+        cui_id bar = cui_scrollbar_id(2, axis != 0);
+        cui_rect bounds = cui_bounds(ui, bar);
+        assert((axis ? bounds.w : bounds.h) == 12);
+        pointer(ui, CUI_EVENT_POINTER_DOWN, bounds.x + (axis ? bounds.w / 2 : bounds.w - 2),
+                bounds.y + (axis ? bounds.h - 2 : bounds.h / 2));
+        frame(ui, &theme, &state, options);
+        assert(state.selected > 0 && changes == 1);
+        pointer(ui, CUI_EVENT_POINTER_UP, bounds.x, bounds.y);
+        theme.scrollbar.visibility = CUI_SCROLLBAR_HIDDEN;
+        frame(ui, &theme, &state, options);
+        size_t count;
+        const cui_semantic *semantics = cui_semantics(ui, &count);
+        for (size_t i = 0; i < count; i++)
+            assert(semantics[i].id != bar);
+        cui_destroy(ui);
+    }
+}
+#endif
 int main(void) {
     test_model();
     test_gestures();
@@ -821,6 +856,7 @@ int main(void) {
     test_duplicate_snaps();
     test_programmatic_cancel();
 #ifndef CUI_CAROUSEL_BASE_ONLY
+    test_scrollbar_skin();
     test_widget();
     test_controls();
     test_controls_during_motion();

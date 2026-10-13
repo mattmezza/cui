@@ -81,7 +81,7 @@ const snippets = {
  Checkbox:'cui_checkbox_ex(ui, id, &theme, label, &state,\n    (cui_checkbox_options){.size = CUI_CONTROL_SMALL,\n                           .required = true});',
  Switch:'cui_switch_ex(ui, id, &theme, label, &enabled,\n    &spring, (cui_switch_options){.now_seconds = now});',
  Toggle:'cui_toggle_group_ex(ui, group_id, &theme,\n    items, selected, 3, options);',
- Radio:'cui_radio_ex(ui, id, &theme, label, &selection, 1,\n    (cui_radio_options){.size = CUI_CONTROL_LARGE});',
+ Radio:'cui_radio_group_item choices[] = {\n    {cui_id_from(ui, "standard"), cui_string("Standard"), false},\n    {cui_id_from(ui, "priority"), cui_string("Priority"), false}};\ncui_radio_group(ui, id, &theme, choices, 2, &selected, &navigation,\n    (cui_radio_group_options){.name = cui_string("Delivery"),\n        .vertical = true, .design_size = CUI_DESIGN_BASE});',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
  Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.size = CUI_INPUT_SMALL,\n                                .width = 280});',
  Tag:'cui_tag(ui, id, &theme, cui_string("Workspace"), options);\n/* Rich children use cui_begin_tag / cui_end_tag. */',
@@ -112,7 +112,7 @@ const snippets = {
  'Focus Trap':'if (cui_begin_focus_scope(ui, scope_id, true)) {\n    /* Paint focusable children here. */\n    cui_end_focus_scope(ui);\n}',
  Clipboard:'/* Install clipboard_set/get on cui_platform first. */\nif (cui_button(ui, id, &theme, cui_string("Copy"), false))\n    platform.clipboard_set(platform.user, cui_string("Copied text"));',
  Shimmer:'cui_shimmer_text(ui, id, &theme, &shimmer,\n    cui_string("Loading content"), cui_shimmer_options_default());',
- Message:'cui_message(ui, id, &theme, (cui_message_options){\n    .width = 360, .body = bodies, .body_count = body_count});',
+ Message:'cui_message_body body = {\n    .slot = {.text = cui_string("Can you review the release notes?")},\n    .typed_bubble = true, .bubble = CUI_BUBBLE_SECONDARY};\ncui_message_options options = cui_message_options_default();\noptions.width = 360;\noptions.max_bubble_width = 280;\noptions.header.text = cui_string("Alex Morgan · 09:30");\noptions.body = &body;\noptions.body_count = 1;\noptions.footer.text = cui_string("Delivered · 09:30");\ncui_message(ui, id, &theme, options);\n/* Supply slot render callbacks for portraits and reaction controls. */',
  MessageScroller:'cui_message_scroller(ui, id, &theme, scroll_state,\n    draw_message_row, user, cui_message_scroller_options_default());',
 
  Editor:'/* Retain edit, state, query and workspace; call find bar every frame. */\ncui_editor_find_bar(ui, search_id, id, &theme, &state, &search, 640, false);\ncui_editor(ui, id, &theme, cui_string("C code"), &state, cui_editor_default());',
@@ -136,7 +136,7 @@ const snippets = {
  Accordion:'cui_accordion(ui, id, &theme, items, 3,\n    expanded, options, draw_panel, user);',
  Collapsible:'cui_collapsible(ui, id, &theme, label,\n    &open, false, draw_panel, user);',
  Tabs:'cui_tabs(ui, id, &theme, items, 3,\n    &selection, options, draw_panel, user);',
- Avatar:'cui_avatar(ui, id, &theme,\n    cui_string("Alex Morgan"), 56);',
+ Avatar:'/* Retain the cache, storage and borrowed RGBA8 photo pixels. */\nstatic unsigned char pixels[96 * 96 * 4];\nstatic cui_avatar_image circle;\nif (!circle.storage)\n    cui_avatar_image_init(&circle, pixels, sizeof pixels, 96);\nif (cui_avatar_ex(ui, id, &theme, cui_string("Alex Morgan"),\n    (cui_avatar_options){.size = 48, .ring_width = 2,\n        .image = photo, .image_state = &circle, .interactive = true})) {\n    /* Open this profile in your application. */\n}\n/* Missing pixels fall back to initials. See cui_avatar_stack for teams. */',
  Kbd:'cui_kbd(ui, id, &theme,\n    cui_string("Ctrl + K"));',
  Theme:'cui_theme theme = cui_theme_dark();\ncui_button(ui, id, &theme,\n    cui_string("Primary action"), false);',
  Image:'cui_image(ui, id, &state, source, loader, user, options);\n/* The host loader supplies borrowed RGBA8 frames. */',
@@ -249,16 +249,78 @@ function wasiImports(){
  };
 }
 function requestFrame(){if(framePending||!wasm)return;framePending=true;requestAnimationFrame(()=>{framePending=false;try{render();}catch(e){fatal(e);}});}
+function attachmentPreviewHeight(designScale){
+ const density=Number($('density').value)?0.875:1;
+ const fonts=[16,12,14,16,16,18,20,24,30,36,48,60,72,96,128];
+ const controls=[64,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
+ const padding=[12,4,8,10,10,12,16,20,24,28,32,40,48,56,64];
+ const gaps=[12,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
+ const font=fonts[designScale]*density,pad=padding[designScale]*density;
+ const cardWidth=Math.max(260,16.25*font),media=controls[designScale]*density;
+ const metadata=1.25*(font+font*0.875)+2;
+ const card=$('attachment-vertical').checked
+  ?cardWidth-2*pad+metadata+gaps[designScale]*density+2*pad
+  :Math.max(media,metadata);
+ return Math.max(420,Math.ceil(card+6+8+48));
+}
+function buttonPreviewHeight(width, controlHeight){
+ const rows=width<600?6:3;
+ const spacing=Number($('design-spacing').value);
+ const gap=spacing<0?16:spacing*4;
+ // Preview padding, primary control, counter label, variant rows, and their gaps.
+ return Math.max(260,48+(rows+1)*controlHeight+26+(rows+1)*gap+16);
+}
+function descriptionPreviewHeight(width, scale, density){
+ if(!scale)return 360;
+ const fonts=[0,12,14,16,16,18,20,24,30,36,48,60,72,96,128];
+ const heights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
+ const lines=[0,16,20,24,24,28,28,32,36,40,48,60,72,96,128];
+ const paddings=[0,4,8,10,10,12,16,20,24,28,32,40,48,56,64];
+ const font=fonts[scale]*density,px=paddings[scale]*density,py=(heights[scale]-lines[scale])*density/2;
+ const available=Math.max(1,width-48),requested=Number($('description-columns').value);
+ const columns=Math.max(1,Math.min(requested,Math.floor(available/(font*8+32))));
+ const vertical=Boolean($('description-vertical').checked)||font*6+120>available;
+ const cell=Math.max(1,available/columns-2*px-2);
+ const lineCount=(value,size,space)=>{
+  ctx.font=canvasFont(size,400,false,false,0);
+  let lines=1,run='';
+  for(const word of value.split(' ')){
+   const next=run?`${run} ${word}`:word;
+   if(run&&ctx.measureText(next).width>space){lines++;run=word}else run=next;
+  }
+  return lines;
+ };
+ const item=(label,value)=>{
+  const labelSpace=vertical?cell:Math.max(1,Math.min(120,cell/2)-2*px);
+  const valueSpace=vertical?cell:Math.max(1,cell-Math.min(120,cell/2)-2*px);
+  const labelHeight=lineCount(label,font*.875,labelSpace)*font*.875*1.618;
+  const valueHeight=lineCount(value,font,valueSpace)*font*1.618;
+  return (vertical?labelHeight+valueHeight:Math.max(labelHeight,valueHeight))+4*py+2;
+ };
+ const entries=[['Owner','Ada Lovelace'],['Team','Core UI'],['Status','In progress'],['Created','12 October 2026']];
+ const row=(a,b)=>columns===1?item(...entries[a])+item(...entries[b]):Math.max(item(...entries[a]),item(...entries[b]));
+ return Math.max(360,48+row(0,1)+8+row(2,3)+32);
+}
+function settingsPreviewHeight(scale,density){
+ if(!scale)return 640;
+ const fonts=[0,12,14,16,16,18,20,24,30,36,48,60,72,96,128];
+ const heights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
+ const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
+ const font=fonts[scale]*density;
+ // Search, two page entries, selected header, group heading, first setting and scroll room.
+ return Math.max(640,48+2*heights[scale]*density+12*font+8*gaps[scale]*density);
+}
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
  canvas.style.minWidth=selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.example?840:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+124):selected.name==='Alert'?540:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.example?840:selected.name==='Button'&&designScale>0?buttonPreviewHeight(width,designHeights[designScale]):selected.name==='Alert'?540:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
+ wasm.gallery_scrollbar_options(Number($('scrollbar-policy').value),Number($('scrollbar-width').value),Number($('scrollbar-radius').value),Number($('scrollbar-track').checked));
  wasm.gallery_table_pin(Number($('table-pin').value));
  wasm.gallery_table_mode(Number($('table-mode').value));
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
@@ -784,3 +846,5 @@ for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','te
 
 $('plot-mode').addEventListener('change',requestFrame);
 $('virtual-axis').addEventListener('change',requestFrame);
+
+for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track'])$(id).addEventListener('change',requestFrame);

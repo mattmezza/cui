@@ -197,6 +197,9 @@ typedef struct {
     cui_scroll_state *external_scroll;
     cui_media_render_fn children;
     void *user;
+    const cui_scrollbar_style *scrollbar_style;
+    const cui_theme
+        *scrollbar_theme; /* Optional borrowed palette; this API has no theme argument. */
 } cui_attachment_group_options;
 typedef struct {
     bool valid, changed;

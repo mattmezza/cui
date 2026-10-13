@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
+#include "cui/cui_software.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -281,7 +282,147 @@ static void semantic_colors(void) {
     }
     cui_destroy(ui);
 }
+static size_t avatar_stack_frame(cui_context *ui, cui_avatar_image *image, cui_bitmap source,
+                                 float width, bool disabled) {
+    cui_avatar_item people[8] = {0};
+    const char *names[] = {"Alex", "Jamie", "Robin", "Four", "Five", "Six", "Seven", "Eight"};
+    for (size_t i = 0; i < 8; i++)
+        people[i] = (cui_avatar_item){
+            .key = i + 1, .name = cui_string(names[i]), .image = source, .image_state = image};
+    cui_theme t = cui_theme_light();
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    size_t selected = cui_avatar_stack(ui, 1000, &t, people, 8,
+                                       (cui_avatar_stack_options){.size = 48,
+                                                                  .width = width,
+                                                                  .ring_width = 2,
+                                                                  .interactive = true,
+                                                                  .disabled = disabled});
+    cui_end_frame(ui);
+    return selected;
+}
+static void image_avatars(void) {
+    unsigned char source[8 * 4 * 4];
+    for (size_t y = 0; y < 4; y++)
+        for (size_t x = 0; x < 8; x++) {
+            size_t n = (y * 8 + x) * 4;
+            source[n] = x < 2 || x > 5 ? 255 : 0;
+            source[n + 1] = x >= 2 && x <= 5 ? 200 : 0;
+            source[n + 2] = 20;
+            source[n + 3] = 128;
+        }
+    unsigned char pixels[16 * 16 * 4];
+    cui_avatar_image image = {0}, saved;
+    assert(!cui_avatar_image_init(&image, pixels, sizeof pixels, 513));
+    assert(!cui_avatar_image_init(&image, pixels, 10, 16));
+    assert(cui_avatar_image_init(&image, pixels, sizeof pixels, 16));
+    cui_bitmap bitmap = {source, 8, 4, 8 * 4, 1};
+    assert(cui_avatar_image_prepare(&image, bitmap));
+    assert(image.bitmap.pixels == pixels && image.bitmap.width == 16 && pixels[3] == 0);
+    size_t center = (8 * 16 + 8) * 4;
+    assert(pixels[center] == 0 && pixels[center + 1] == 200 && pixels[center + 3] == 128);
+    uint64_t revision = image.bitmap.revision;
+    assert(cui_avatar_image_prepare(&image, bitmap) && image.bitmap.revision == revision);
+    saved = image;
+    assert(!cui_avatar_image_prepare(&image, (cui_bitmap){pixels, 16, 16, 64, 1}));
+    assert(memcmp(&image, &saved, sizeof image) == 0);
+    source[(2 * 8 + 4) * 4 + 1] = 50;
+    bitmap.revision++;
+    assert(cui_avatar_image_prepare(&image, bitmap) && image.bitmap.revision == revision + 1);
+    assert(pixels[center + 1] < 200);
+    for (size_t i = 0; i < sizeof source; i += 4) {
+        source[i] = 240;
+        source[i + 1] = 10;
+        source[i + 2] = 20;
+        source[i + 3] = 255;
+    }
+    bitmap.revision++;
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
+    assert(ui);
+    assert(avatar_stack_frame(ui, &image, bitmap, 200, false) == SIZE_MAX);
+    cui_rect bounds = cui_bounds(ui, 1000);
+    assert(bounds.w == 156 && bounds.h == 48);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    cui_id jamie = 0;
+    for (size_t i = 0; i < count; i++)
+        if (sem[i].name.length == 5 && !memcmp(sem[i].name.data, "Jamie", 5)) {
+            jamie = sem[i].id;
+            assert(sem[i].bounds.x == 36 && sem[i].bounds.w == 48 &&
+                   sem[i].role == CUI_ROLE_BUTTON);
+        }
+    assert(jamie);
+    cui_draw_list draw;
+    /* Use a separate render frame to inspect the genuine masked bitmap output. */
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    cui_theme t = cui_theme_light();
+    cui_avatar_ex(
+        ui, 3000, &t, cui_string("Photo"),
+        (cui_avatar_options){.size = 48, .ring_width = 2, .image = bitmap, .image_state = &image});
+    draw = cui_end_frame(ui);
+    size_t photos = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+            photos++;
+            assert(draw.commands[i].bitmap.bitmap.pixels[3] == 0);
+        }
+    assert(photos == 1);
+    cui_software *renderer = cui_software_create(100, 100, NULL);
+    assert(renderer);
+    assert(cui_software_render(renderer, &draw, (cui_color){255, 255, 255, 255}));
+    const unsigned char *rendered = cui_software_pixels(renderer, NULL, NULL);
+    assert(rendered[0] == 255 && rendered[1] == 255 && rendered[2] == 255);
+    assert(rendered[(24 * 100 + 24) * 4] > 230 && rendered[(24 * 100 + 24) * 4 + 1] < 20);
+    cui_software_destroy(renderer);
+    avatar_stack_frame(ui, &image, bitmap, 200, false);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 24}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 40, .y = 24}));
+    assert(avatar_stack_frame(ui, &image, bitmap, 200, false) == 1);
+    cui_focus(ui, jamie);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(avatar_stack_frame(ui, &image, bitmap, 200, false) == 1);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = 40,
+                                           .y = 24,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 1}));
+    avatar_stack_frame(ui, &image, bitmap, 200, false);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = 60,
+                                           .y = 24,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 1}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = 40,
+                                           .y = 24,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 1}));
+    assert(avatar_stack_frame(ui, &image, bitmap, 200, false) == SIZE_MAX);
+    avatar_stack_frame(ui, &image, bitmap, 200, true);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 24}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 40, .y = 24}));
+    assert(avatar_stack_frame(ui, &image, bitmap, 200, true) == SIZE_MAX);
+    avatar_stack_frame(ui, &image, bitmap, 90, false);
+    bounds = cui_bounds(ui, 1000);
+    assert(bounds.w == 84 && bounds.h == 48);
+    sem = cui_semantics(ui, &count);
+    bool overflow = false;
+    for (size_t i = 0; i < count; i++)
+        if (sem[i].name.length == 13 && !memcmp(sem[i].name.data, "7 more people", 13))
+            overflow = true;
+    assert(overflow);
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    cui_avatar_ex(ui, 4000, &t, cui_string("Sam Patel"), (cui_avatar_options){.size = 40});
+    draw = cui_end_frame(ui);
+    bool initials = false;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 2 &&
+            !memcmp(draw.commands[i].text.data, "SP", 2))
+            initials = true;
+    assert(initials);
+    cui_destroy(ui);
+}
 int main(void) {
+    image_avatars();
     semantic_colors();
     hover_panels();
     hover_intrinsic();

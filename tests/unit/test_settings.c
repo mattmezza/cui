@@ -483,7 +483,36 @@ static void test_design_sizes(void) {
     cui_destroy(ui);
 }
 
+static void test_narrow_layout(void) {
+    cui_context *ui = cui_create((cui_config){.width = 390, .height = 640});
+    bool enabled = false;
+    cui_setting_item item = {
+        .title = {"Receive updates", 15}, .kind = CUI_SETTING_CHECKBOX, .boolean = &enabled};
+    cui_setting_group group = {.title = {"Email alerts", 12}, .items = &item, .count = 1};
+    cui_setting_page page = {
+        .title = {"Preferences", 11}, .groups = &group, .count = 1, .default_open = true};
+    cui_settings_page_state workspace[1];
+    cui_settings_state state;
+    assert(ui && cui_settings_state_init(&state, workspace, 1, NULL));
+    cui_settings_options options = cui_settings_default();
+    options.width = 272;
+    options.height = 592;
+    cui_design_size sizes[] = {CUI_DESIGN_SM, CUI_DESIGN_BASE, CUI_DESIGN_XL};
+    for (size_t n = 0; n < sizeof(sizes) / sizeof(sizes[0]); n++) {
+        options.design_size = sizes[n];
+        assert(!frame(ui, &page, 1, &state, options).invalid);
+        assert(state.pages[0].viewport.w > 230);
+        cui_rect navigation = cui_bounds(ui, cui_settings_part_id(11, 0, 0, 0, 40));
+        cui_rect body = cui_bounds(ui, cui_settings_part_id(11, 0, 0, 0, 41));
+        assert(navigation.w == 272 && body.w == 272);
+        assert(body.y >= navigation.y + navigation.h - 1);
+        assert(state.sidebar_width == 250); /* Narrow layout preserves splitter state. */
+    }
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_narrow_layout();
     test_design_sizes();
     test_input_number_and_sizes();
     test_search_reset_resize_scroll();

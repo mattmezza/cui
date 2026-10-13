@@ -70,13 +70,18 @@ class Audit:
             y = rect['y'] + target['f'][2] + target['f'][4] * ry
             top = self.page.evaluate('document.querySelector("header").getBoundingClientRect().bottom+8')
             if y < top:
-                self.page.evaluate('(delta)=>scrollBy(0,delta)', y-top)
-            elif y > 870:
-                self.page.evaluate('(delta)=>scrollBy(0,delta)', y-870)
+                # Browser scroll offsets round to pixels; leave clearance instead of
+                # repeatedly requesting an ineffective fractional-pixel correction.
+                self.page.evaluate('(delta)=>scrollBy({top:delta,behavior:"instant"})', y-top-1)
+            elif y > self.page.viewport_size['height'] - 30:
+                self.page.evaluate('(delta)=>scrollBy({top:delta,behavior:"instant"})',
+                                   y - (self.page.viewport_size['height'] - 30) + 1)
             else:
                 assert self.page.evaluate('({x,y})=>document.elementFromPoint(x,y)===document.querySelector("canvas")', {'x': x, 'y': y}), f'Target is occluded by DOM: {target["name"]}'
                 return {'id': 1, 'x': x, 'y': y}
-        raise AssertionError(f'Touch target is outside browser viewport: {target["name"]}')
+        raise AssertionError(f'Touch target is outside browser viewport: {target["name"]}; '
+                             f'canvas={rect}, local={target["f"][1:5]}, point={(x,y)}, '
+                             f'scroll={self.page.evaluate("window.scrollY")}, header={top}')
 
     def dispatch(self, kind, points):
         if kind == 'touchCancel' and not self.active_touch:
@@ -243,7 +248,24 @@ def run_cases(a):
         a.scroll('Editor')
     a.case('Editor', 'vertical pan consumes pixels after keyboard-created overflow', editor_pan)
     for family in ['Scrollable', 'VirtualList', 'Sidebar', 'MessageScroller', 'DataTable']:
-        a.case(family, 'vertical pan consumes logical pixels', lambda f=family: a.scroll(f))
+        if family == 'MessageScroller':
+            def conversation_pan():
+                owner = a.target('Conversation', 38)
+                row = a.target(role=37, predicate=lambda s: owner['f'][2]+30 < s['f'][2] < owner['f'][2]+150)
+                point = a.point(owner, .1, .3)
+                a.dispatch('touchStart', [point])
+                # The first move measures newly visible virtual rows. Assert the
+                # next move against displayed geometry, independent of estimates.
+                a.dispatch('touchMove', [{**point, 'y': point['y']+60}])
+                row = a.target(row['name'], 37)
+                before = a.target('Conversation', 38)['f'][19]
+                a.dispatch('touchMove', [{**point, 'y': point['y']+90}])
+                a.dispatch('touchEnd', [])
+                assert abs(a.target(row['name'], 37)['f'][2]-row['f'][2]-30) < .2
+                assert a.target('Conversation', 38)['f'][19] < before
+            a.case(family, 'second virtual pan moves the measured visible row by exact pixels', conversation_pan)
+        else:
+            a.case(family, 'vertical pan consumes logical pixels', lambda f=family: a.scroll(f))
     def virtual():
         before = [s['name'] for s in a.snapshot() if s['f'][0] == 37]
         owner = a.scroll('VirtualList')

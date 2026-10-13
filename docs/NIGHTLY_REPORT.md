@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `2d291fe9741addc322a6e107e15d03bf97e0d650`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Published `main` source `0b667d07b258cbcb74cc8c279328027c1b69f71c`; all six framework CI jobs and Pages succeed, and all325 deployed files match the artifact. Active integration branch `integration/next21`, checkpoint `27063af`, passes warning native101/101. Avatar stacks, compact Message and optional accessibility packaging are integrated there; scrollbar appearance and RadioGroup remain isolated pending handoff. See [publication evidence](validation/published-0b667d0.txt) and the machine-readable checkpoint. No full family certification is claimed.
 
 ## Working architecture
 
@@ -22,7 +22,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Next19 gallery polish passes native96, sanitizer96, WASI80, browser78, actual Resizable24, touch42+16, page-touch19 and IME checks. Select/Pagination alignment, Shift-wheel Tabs, pixel DataTable wheel, Command width and retained page scroll have targeted browser regressions. Publication pending. Native starter release ddd0ae3 is deployed: six CI jobs and Pages pass,301 exact HTTPS artifact files and actual public guide screenshots/clipboard checked. Full family verification remains0/78; remaining user feedback and full ecosystem acceptance stay active. See [next19 checks](validation/gallery-polish-next19.txt) and [public starter verification](validation/published-ddd0ae3.txt).
+Published source `0b667d0` passes all six framework CI jobs and Pages, with all 325 HTTPS artifact files matching. Next21 source `13c851f` passes strict native 103/103 and sanitizer 103/103, Attachment browser 62/62, catalog touch 42/42, responsive content containment, Avatar/Message 9/9, RadioGroup 5/5 and shared scrollbar appearance checks. The combined browser suite passes all 78 stories and WASI passes 83/83; public deployment verification is pending. The feature ledger records 265 tested subsets, four implemented subsets and 52 not started features; no full family is verified.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 

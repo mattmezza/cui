@@ -274,5 +274,6 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #ifdef __cplusplus
 }
 #endif
+#include "cui_radio_group.h"
 #include "cui_settings.h"
 #endif

@@ -625,6 +625,10 @@ void cui_invalidate(cui_context *ui);
 typedef void (*cui_resource_fn)(void *payload);
 void *cui_resource_get(cui_context *, cui_id owner, cui_id namespace_id, size_t bytes,
                        cui_resource_fn collect, cui_resource_fn destroy);
+/* In-frame lookup only: no allocation and no error for missing/invalid input.
+ * Existing storage is marked used this frame. Context owns it; the pointer has
+ * the same renderer-completion/next-begin lifetime as resource_get. */
+void *cui_resource_find(cui_context *, cui_id owner, cui_id namespace_id);
 float cui_frame_delta(cui_context *);
 double cui_frame_time(cui_context *);
 /* Host candidate-window rectangle, logical pixels, last painted focused caret. */

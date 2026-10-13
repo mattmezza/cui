@@ -119,6 +119,7 @@ typedef struct {
     const cui_table_group_row *group_headers;
     void *render_userdata;
     cui_table_selection_mode selection_mode;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_table_options;
 cui_table_options cui_table_options_default(void);
 typedef struct {
@@ -463,9 +464,13 @@ bool cui_table_group_headers_valid(const cui_table_model *m, cui_table_options o
 }
 cui_scroll_geometry cui_table_scroll_layout(const cui_table_model *m, cui_table_options o) {
     float width = isfinite(o.width) && o.width > 0 ? o.width : 480, h = height(o);
-    if (!m || !o.scrollbars)
+    if (!m || !o.scrollbars ||
+        (o.scrollbar_style && o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN))
         return (cui_scroll_geometry){.viewport = {width, h}};
     float bar = isfinite(o.bar_thickness) && o.bar_thickness > 0 ? o.bar_thickness : 10;
+    if (o.scrollbar_style && isfinite(o.scrollbar_style->thickness) &&
+        o.scrollbar_style->thickness > 0)
+        bar = o.scrollbar_style->thickness;
     bar = fminf(bar, fminf(width, h) * .5f);
     float columns = cui_table_row_header_width(o);
     for (size_t c = 0; c < m->columns; c++)
@@ -477,13 +482,15 @@ cui_scroll_geometry cui_table_scroll_layout(const cui_table_model *m, cui_table_
         x = m->columns > cui_table_fixed_columns(m) && columns > width - (y ? bar : 0);
         y = rows > h - (x ? bar : 0);
     }
-    cui_scroll_geometry g = cui_scroll_layout((cui_scroll_options){.width = width,
-                                                                   .height = h,
-                                                                   .content_width = columns,
-                                                                   .content_height = rows,
-                                                                   .bar_thickness = bar,
-                                                                   .horizontal = x,
-                                                                   .vertical = y});
+    cui_scroll_geometry g =
+        cui_scroll_layout((cui_scroll_options){.width = width,
+                                               .height = h,
+                                               .content_width = columns,
+                                               .content_height = rows,
+                                               .bar_thickness = bar,
+                                               .scrollbar_style = o.scrollbar_style,
+                                               .horizontal = x,
+                                               .vertical = y});
     cui_table_view v =
         cui_table_column_viewport(m, 0, g.viewport.width - cui_table_row_header_width(o), 0);
     g.maximum_x = fmaxf(0, v.total + trailing_width(o) -
@@ -800,6 +807,10 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
         return out;
     }
     cui_table_options original = o;
+    if (o.scrollbar_style && o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+        original.scrollbars = o.scrollbars = false;
+    if (!o.scrollbars)
+        s->scrollbar.dragging_x = s->scrollbar.dragging_y = false;
     cui_scroll_geometry geometry = cui_table_scroll_layout(m, o);
     o = view_options(m, o);
     if (o.multiple_selection &&
@@ -1115,6 +1126,7 @@ cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *m
             .width = isfinite(original.width) && original.width > 0 ? original.width : 480,
             .height = height(original),
             .bar_thickness = original.bar_thickness,
+            .scrollbar_style = original.scrollbar_style,
             .wheel_step = row_height(o),
             .disabled = o.disabled || o.loading};
         if (geometry.maximum_x > 0)
@@ -1651,6 +1663,13 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
                                 cui_table_cell_fn render, void *data) {
     if (!ui || !t || !m || !s)
         return (cui_table_result){.error = CUI_TABLE_INVALID};
+    if (!o.scrollbar_style)
+        o.scrollbar_style = &t->scrollbar;
+    if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+        o.scrollbars = false;
+    else if (o.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
+             o.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE)
+        o.scrollbars = true;
     cui_table_result result = cui_table_reduce(ui, id, m, s, o);
     if (result.error != CUI_TABLE_OK && result.error != CUI_TABLE_CAPACITY)
         return result;
@@ -1812,6 +1831,7 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
             .width = isfinite(original.width) && original.width > 0 ? original.width : 480,
             .height = isfinite(original.height) && original.height > 0 ? original.height : 240,
             .bar_thickness = original.bar_thickness,
+            .scrollbar_style = original.scrollbar_style,
             .disabled = o.disabled || o.loading};
         if (geometry.maximum_y > 0)
             cui_scrollbar(ui, id, t, &s->scrollbar, geometry, bars, true);

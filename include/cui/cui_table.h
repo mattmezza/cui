@@ -118,6 +118,7 @@ typedef struct {
     const cui_table_group_row *group_headers;
     void *render_userdata;
     cui_table_selection_mode selection_mode;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_table_options;
 cui_table_options cui_table_options_default(void);
 typedef struct {

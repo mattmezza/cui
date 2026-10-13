@@ -2221,6 +2221,19 @@ void cui_invalidate(cui_context *ui) {
         ui->dirty = true;
 }
 
+void *cui_resource_find(cui_context *ui, cui_id owner, cui_id namespace_id) {
+    if (!ui || !ui->in_frame || !owner || !namespace_id)
+        return NULL;
+    for (size_t i = 0; i < ui->config.max_resources; i++) {
+        cui_core_resource *resource = &ui->resources[i];
+        if (resource->payload && resource->owner == owner &&
+            resource->namespace_id == namespace_id) {
+            resource->touched = true;
+            return resource->payload;
+        }
+    }
+    return NULL;
+}
 void *cui_resource_get(cui_context *ui, cui_id owner, cui_id namespace_id, size_t bytes,
                        cui_resource_fn collect, cui_resource_fn destroy) {
     if (!ui || !ui->in_frame || !owner || !namespace_id || !bytes) {

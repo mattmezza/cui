@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "../examples/composed_apps/app.h"
+#include "gallery_avatars.h"
 #include "touch_page_host.h"
 static cui_touch_page_host page_touch_host;
 static unsigned page_touch_cancels;
@@ -23,6 +24,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_questionnaire.h"
+#include "cui/cui_radio_group.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_root.h"
 #include "cui/cui_scroll.h"
@@ -150,6 +152,14 @@ double gallery_editor_stat(int field) {
 }
 static cui_context *ui;
 static cui_theme current_theme;
+static int scrollbar_policy, scrollbar_width = 10, scrollbar_radius;
+static bool scrollbar_track = true;
+void gallery_scrollbar_options(int policy, int width, int radius, int track) {
+    scrollbar_policy = policy >= 0 && policy <= 3 ? policy : 0;
+    scrollbar_width = width >= 4 && width <= 24 ? width : 10;
+    scrollbar_radius = radius >= 0 && radius <= 12 ? radius : 0;
+    scrollbar_track = track != 0;
+}
 static void gallery_progress_content(cui_context *, void *);
 static int gallery_preset_index = -1;
 static uint32_t typography_family;
@@ -186,6 +196,7 @@ static const cui_semantic *semantics;
 static size_t semantic_count;
 static bool checked, enabled = true, toggled;
 static int description_columns = 3, description_vertical, description_plain, description_size;
+static cui_scroll_state description_preview_scroll;
 static int status_right = 1, status_custom;
 static int resizable_vertical, resizable_disabled;
 static unsigned resizable_document;
@@ -196,6 +207,7 @@ static cui_carousel_geometry carousel_geometry[4];
 static unsigned carousel_changes;
 static int carousel_axis, carousel_looping;
 static cui_settings_state settings_state;
+static cui_scroll_state settings_preview_scroll;
 static cui_settings_page_state settings_pages_state[2];
 static char settings_search_buffer[96], settings_name_buffer[96] = "Ada";
 static char settings_number_buffer[64] = "15";
@@ -1016,7 +1028,7 @@ static void gallery_attachment_actions(cui_context *context, cui_id id, void *us
     (void)height;
     if (cui_button_ex(context, id, &current_theme, cui_string("Open"),
                       (cui_button_options){
-                          .size = CUI_CONTROL_XSMALL, .width = 64, .design_size = design_size}))
+                          .size = CUI_CONTROL_XSMALL, .width = width, .design_size = design_size}))
         attachment_actions++;
 }
 static void gallery_attachment_cards(cui_context *context, cui_id id, void *user, float width,
@@ -1039,7 +1051,12 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
             index ? CUI_ATTACHMENT_COMPLETE : (cui_attachment_status)attachment_status;
         options.model.size = (cui_media_size)gallery_xsmall_second_size();
         options.model.design_size = design_size;
-        options.model.width = 260;
+        cui_design_metrics attachment_design;
+        float attachment_font = current_theme.font_size;
+        if (design_size &&
+            cui_design_measure(design_size, current_theme.font_size / 16, &attachment_design))
+            attachment_font = attachment_design.font_size;
+        options.model.width = fmaxf(260, 16.25f * attachment_font);
         options.model.vertical = attachment_vertical != 0;
         options.model.identified = true;
         options.model.progress_known = true;
@@ -1051,7 +1068,9 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
             .kind = CUI_IMAGE_ASSET, .name = cui_string(name), .identity = 10 + index};
         options.image_loader = gallery_image_loader;
         options.actions = gallery_attachment_actions;
-        options.actions_width = 64;
+        options.actions_width =
+            fmaxf(64, cui_measure_text(context, cui_string("Open"), attachment_font).width +
+                          (design_size ? 2 * attachment_design.padding_x : 16));
         options.on_click = gallery_attachment_click;
         options.on_remove = gallery_attachment_remove;
         options.on_retry = gallery_attachment_retry;
@@ -1066,7 +1085,18 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
                        &attachment_states[index], options);
     }
 }
-static int radio, clicks;
+static int clicks;
+static cui_id radio_selected;
+static cui_radio_group_state radio_group_state;
+static unsigned radio_requests;
+static void gallery_radio_change(void *user, cui_id selected) {
+    (void)user;
+    radio_requests++;
+    radio_selected = selected;
+}
+unsigned gallery_radio_stat(unsigned field) {
+    return field == 0 ? radio_requests : 0;
+}
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
 static bool dropdown_outline, dropdown_selected;
@@ -1090,6 +1120,32 @@ static void disclosure_header(cui_context *context, const cui_disclosure_item *i
     cui_text(context, cui_string(" (custom)"), current_theme.font_size, current_theme.muted);
 }
 
+static unsigned char avatar_mask_pixels[3][96 * 96 * 4];
+static cui_avatar_image avatar_images[3];
+static bool avatar_images_ready;
+static int avatar_selected;
+static bool message_demo_disabled;
+static const char *avatar_names[3] = {"Alex Morgan", "Jamie Chen", "Robin Hayes"};
+static cui_bitmap gallery_avatar_source(unsigned index) {
+    const unsigned char *pixels[3] = {gallery_avatar_alex, gallery_avatar_jamie,
+                                      gallery_avatar_robin};
+    if (!avatar_images_ready) {
+        for (unsigned i = 0; i < 3; i++)
+            cui_avatar_image_init(&avatar_images[i], avatar_mask_pixels[i],
+                                  sizeof avatar_mask_pixels[i], 96);
+        avatar_images_ready = true;
+    }
+    return (cui_bitmap){pixels[index % 3], 96, 96, 96 * 4, 1};
+}
+static void gallery_message_avatar(cui_context *context, cui_id id, void *user,
+                                   cui_message_style style) {
+    unsigned index = (unsigned)(uintptr_t)user % 3;
+    cui_avatar_ex(context, id, &current_theme, cui_string(avatar_names[index]),
+                  (cui_avatar_options){.size = style.width,
+                                       .ring_width = 2,
+                                       .image = gallery_avatar_source(index),
+                                       .image_state = &avatar_images[index]});
+}
 static int message_alignment, message_variant = CUI_BUBBLE_SECONDARY, message_inset;
 static bool message_avatar = true, message_acknowledged, message_scrollbar = true;
 static unsigned message_actions, conversation_serial = 80, conversation_count = 80;
@@ -1098,40 +1154,64 @@ static char conversation_names[256][32], conversation_texts[256][64];
 static int conversation_mutation;
 static cui_message_scroller_state *conversation;
 static cui_message_scroller_result conversation_result;
-static void message_rich(cui_context *context, cui_id id, void *user, cui_message_style style) {
+static void message_header(cui_context *context, cui_id id, void *user, cui_message_style style) {
+    (void)id;
+    unsigned index = (unsigned)(uintptr_t)user % 3;
+    cui_text(context, cui_string(avatar_names[index]), style.font_size, style.color);
+    cui_text(context, cui_string(index ? "09:32" : "09:30"), style.font_size, style.color);
+}
+static void message_footer(cui_context *context, cui_id id, void *user, cui_message_style style) {
     (void)user;
-    cui_text(context, cui_string("Workspace is ready."), style.font_size, style.color);
-    cui_checkbox(context, id ^ 1, &current_theme, cui_string("Acknowledge message"),
-                 &message_acknowledged, false);
-    if (cui_button(context, id ^ 2, &current_theme, cui_string("Like message"), false))
+    cui_begin_box(context, id, (cui_box){.width = style.width, .gap = 4});
+    cui_text(context, cui_string("Delivered · 09:30"), style.font_size, style.color);
+    cui_begin_box(context, id ^ 8, (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});
+    cui_button_options button = {.size = CUI_CONTROL_SMALL, .variant = CUI_BUTTON_SECONDARY};
+    button.disabled = message_demo_disabled;
+    if (cui_button_ex(context, id ^ 2, &current_theme, cui_string("Like message"), button))
         message_actions++;
+    if (message_actions)
+        cui_text(context, cui_string("Liked"), style.font_size, style.color);
+    cui_end_box(context);
+    cui_checkbox(context, id ^ 1, &current_theme, cui_string("Acknowledge message"),
+                 &message_acknowledged, message_demo_disabled);
+    cui_end_box(context);
 }
 static void conversation_labels(void) {
     for (unsigned i = 0; i < conversation_count; i++) {
         snprintf(conversation_names[i], sizeof(conversation_names[i]), "Message %u",
                  conversation_ids[i]);
-        snprintf(conversation_texts[i], sizeof(conversation_texts[i]), "Workspace update %u",
-                 conversation_ids[i]);
+        static const char *messages[] = {
+            "Can you review the release notes?", "Looks good. Ready to ship.",
+            "Thanks! I'll post the update.", "The screenshots look great.",
+            "I'll check the mobile layout."};
+        snprintf(conversation_texts[i], sizeof conversation_texts[i], "%s",
+                 messages[conversation_ids[i] % 5]);
     }
 }
 static void conversation_row(cui_context *context, cui_id id, size_t index, void *user,
                              float width) {
     (void)user;
     conversation_rendered++;
-    cui_message_body bodies[2] = {
-        {.slot = {.present = true, .text = cui_string(conversation_texts[index])},
-         .typed_bubble = true,
-         .bubble = conversation_ids[index] % 2 ? CUI_BUBBLE_TINTED : CUI_BUBBLE_SECONDARY},
-        {.slot = {.present = true, .text = cui_string("Additional application-owned detail")}}};
+    unsigned person = conversation_ids[index] % 3;
+    cui_message_body body = {
+        .slot = {.present = true, .text = cui_string(conversation_texts[index])},
+        .typed_bubble = true,
+        .bubble = conversation_ids[index] % 2 ? CUI_BUBBLE_FILLED : CUI_BUBBLE_SECONDARY};
     cui_message_options options = cui_message_options_default();
     options.width = width;
+    options.max_bubble_width = fminf(280, width - 40);
     options.role = CUI_ROLE_LISTITEM;
     options.name = cui_string(conversation_names[index]);
     options.alignment = conversation_ids[index] % 2 ? CUI_MESSAGE_END : CUI_MESSAGE_START;
-    options.header = (cui_message_slot){.present = true, .text = cui_string("Alex Morgan")};
-    options.body = bodies;
-    options.body_count = conversation_ids[index] % 3 ? 1 : 2;
-    options.footer = (cui_message_slot){.present = true, .text = cui_string("Delivered")};
+    options.avatar = (cui_message_slot){.present = message_avatar,
+                                        .width = 32,
+                                        .height = 32,
+                                        .render = message_avatar ? gallery_message_avatar : NULL,
+                                        .user = (void *)(uintptr_t)person};
+    options.header = (cui_message_slot){.present = true, .text = cui_string(avatar_names[person])};
+    options.body = &body;
+    options.body_count = 1;
+    options.footer = (cui_message_slot){.present = true, .text = cui_string("09:32 · Read")};
     cui_message(context, id, &current_theme, options);
 }
 static cui_hover_state tooltip_state, card_state;
@@ -2316,6 +2396,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     next_wake = 0;
     /* The host has synchronously painted the preceding draw list by this call. */
     cui_icon_state_collect(&icon_state);
+    t.scrollbar = (cui_scrollbar_style){.visibility = (cui_scrollbar_visibility)scrollbar_policy,
+                                        .thickness = scrollbar_policy ? (float)scrollbar_width : 0,
+                                        .thumb_radius = (float)scrollbar_radius,
+                                        .track_radius = (float)scrollbar_radius,
+                                        .no_track = !scrollbar_track,
+                                        .idle_seconds = .8f,
+                                        .fade_seconds = .2f,
+                                        .reduced_motion = reduced_motion};
     current_theme = t;
     if (story == 80)
         composed_app_set_theme(gallery_app, &t);
@@ -2333,6 +2421,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         composed_app_scene(ui, gallery_app, width, height);
         break;
     case 64: {
+        cui_design_metrics metrics;
+        bool scaled = design_size != CUI_DESIGN_INHERIT &&
+                      cui_design_measure(design_size, t.font_size / 16, &metrics);
+        float font = scaled ? metrics.font_size : t.font_size;
+        float padding = scaled ? metrics.padding_x : 8;
+        float label_need = cui_measure_text(ui, cui_string("Created"), font * .875f).width;
+        float value_need = fmaxf(cui_measure_text(ui, cui_string("October"), font).width,
+                                 cui_measure_text(ui, cui_string("Lovelace"), font).width);
+        float inner_width = fmaxf(width, fmaxf(label_need, value_need) + 2 * padding + 48);
+        bool pan = inner_width > width + 1;
+        cui_id pan_id = cui_id_from(ui, "description-horizontal-preview");
+        cui_scroll_options pan_options = {.width = width - 48,
+                                          .height = height - 48,
+                                          .content_width = inner_width - 48,
+                                          .content_height = height - 48,
+                                          .horizontal = true,
+                                          .wheel_step = 32,
+                                          .bar_thickness = 8};
+        if (pan && !cui_scrollable_begin(ui, pan_id, &t, &description_preview_scroll, pan_options))
+            break;
         cui_description_item items[] = {
             {.id = cui_id_from(ui, "description-owner"),
              .label = cui_string("Owner"),
@@ -2352,10 +2460,27 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.vertical = description_vertical != 0;
         options.unbordered = description_plain != 0;
         options.size = (cui_description_size)description_size;
-        options.width = width - 48;
+        options.width = inner_width - 48;
         options.name = cui_string("Project details");
         options.design_size = design_size;
+        if (options.width > 0) {
+            static const float design_fonts[] = {16, 12, 14, 16, 16, 18, 20, 24,
+                                                 30, 36, 48, 60, 72, 96, 128};
+            float font = design_fonts[design_size >= CUI_DESIGN_XS && design_size <= CUI_DESIGN_9XL
+                                          ? design_size
+                                          : 0] *
+                         t.font_size / 16;
+            unsigned fitting = (unsigned)(options.width / (font * 8 + 32));
+            if (fitting < 1)
+                fitting = 1;
+            if (options.columns > fitting)
+                options.columns = fitting;
+            if (font * 6 + 120 > options.width)
+                options.vertical = true;
+        }
         cui_description_list(ui, cui_id_from(ui, "description-list"), &t, items, 5, options);
+        if (pan)
+            cui_scrollable_end(ui, pan_id, &t, &description_preview_scroll, pan_options);
         break;
     }
     case 65: {
@@ -2608,6 +2733,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 72: {
+        cui_design_metrics metrics;
+        float font = design_size != CUI_DESIGN_INHERIT &&
+                             cui_design_measure(design_size, t.font_size / 16, &metrics)
+                         ? metrics.font_size
+                         : t.font_size;
+        float required =
+            fmaxf(cui_measure_text(ui, cui_string("Preferences"), font).width,
+                  cui_measure_text(ui, cui_string("Receive updates"), font * .875f).width);
+        float inner_width = fmaxf(width, required + 48 + font * 4);
+        bool pan = inner_width > width + 1;
+        cui_id pan_id = cui_id_from(ui, "settings-horizontal-preview");
+        cui_scroll_options pan_options = {.width = width - 48,
+                                          .height = height - 48,
+                                          .content_width = inner_width - 48,
+                                          .content_height = height - 48,
+                                          .horizontal = true,
+                                          .wheel_step = 32,
+                                          .bar_thickness = 8};
+        if (pan && !cui_scrollable_begin(ui, pan_id, &t, &settings_preview_scroll, pan_options))
+            break;
         cui_choice_item modes[] = {
             {cui_id_from(ui, "settings-standard"), cui_string("Standard"), false},
             {cui_id_from(ui, "settings-focused"), cui_string("Focused"), false},
@@ -2668,14 +2813,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .groups = &privacy_group,
                                      .count = 1}};
         cui_settings_options options = cui_settings_default();
-        options.width = width - 48;
+        options.width = inner_width - 48;
         options.height = height - 48;
-        options.sidebar_width = 220;
+        options.sidebar_width = options.width < 400 ? 160 : 220;
         options.size = (cui_settings_size)settings_size;
         options.design_size = design_size;
         options.variant = (cui_settings_variant)settings_variant;
         settings_result = cui_settings(ui, cui_id_from(ui, "settings-preview"), &t, pages, 2,
                                        &settings_state, options);
+        if (pan)
+            cui_scrollable_end(ui, pan_id, &t, &settings_preview_scroll, pan_options);
         break;
     }
     case 73: {
@@ -3061,16 +3208,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 4: {
-        cui_radio_options options = {.size = (cui_control_size)control_size,
-                                     .design_size = design_size,
-                                     .disabled = disabled,
-                                     .required = choice_required != 0,
-                                     .invalid = choice_invalid != 0,
-                                     .skip_tab = choice_skip_tab != 0};
-        cui_radio_ex(ui, cui_id_from(ui, "radio-a"), &t, cui_string("Standard"), &radio, 0,
-                     options);
-        cui_radio_ex(ui, cui_id_from(ui, "radio-b"), &t, cui_string("Priority"), &radio, 1,
-                     options);
+        cui_radio_group_item items[] = {
+            {cui_id_from(ui, "radio-a"), cui_string("Standard"), false},
+            {cui_id_from(ui, "radio-b"), cui_string("Priority"), false},
+            {cui_id_from(ui, "radio-c"), cui_string("Express unavailable"), true}};
+        if (!radio_selected)
+            radio_selected = items[0].id;
+        cui_radio_group(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
+                        &radio_group_state,
+                        (cui_radio_group_options){.name = cui_string("Delivery options"),
+                                                  .vertical = true,
+                                                  .size = (cui_control_size)control_size,
+                                                  .design_size = design_size,
+                                                  .disabled = disabled,
+                                                  .required = choice_required != 0,
+                                                  .invalid = choice_invalid != 0,
+                                                  .skip_tab = choice_skip_tab != 0,
+                                                  .on_change = gallery_radio_change});
         break;
     }
     case 5:
@@ -3089,31 +3243,43 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .width = width > 360 ? 280 : width - 48});
         break;
     case 60: {
-        cui_message_body bodies[2] = {
-            {.slot = {.present = true, .render = message_rich},
-             .typed_bubble = true,
-             .bubble = (cui_bubble_variant)message_variant},
-            {.slot = {.present = true, .text = cui_string("A second message body")}}};
+        message_demo_disabled = disabled != 0;
+        cui_message_body body = {
+            .slot = {.present = true, .text = cui_string("Can you review the release notes?")},
+            .typed_bubble = true,
+            .bubble = (cui_bubble_variant)message_variant};
         cui_message_options options = cui_message_options_default();
         options.width = width - 48;
+        options.max_bubble_width = fminf(280, width - 88);
         options.alignment = (cui_message_alignment)message_alignment;
         options.role = CUI_ROLE_LISTITEM;
         options.name = cui_string("Workspace conversation");
         options.avatar =
             (cui_message_slot){.present = message_avatar,
-                               .text = message_avatar ? cui_string("AM") : cui_string(""),
                                .width = 32,
-                               .height = 32};
-        options.header = (cui_message_slot){.present = true,
-                                            .text = cui_string("Alex Morgan"),
-                                            .inset = (cui_message_inset)message_inset};
-        options.footer = (cui_message_slot){.present = true,
-                                            .text = cui_string("Delivered at 09:30"),
-                                            .inset = (cui_message_inset)message_inset};
-        options.body = bodies;
-        options.body_count = 2;
-        cui_begin_message_group(ui, cui_id_from(ui, "message-group"), width - 48, 24);
+                               .height = 32,
+                               .render = message_avatar ? gallery_message_avatar : NULL};
+        options.header = (cui_message_slot){
+            .present = true, .render = message_header, .inset = (cui_message_inset)message_inset};
+        options.footer = (cui_message_slot){
+            .present = true, .render = message_footer, .inset = (cui_message_inset)message_inset};
+        options.body = &body;
+        options.body_count = 1;
+        cui_begin_message_group(ui, cui_id_from(ui, "message-group"), width - 48, 16);
         cui_message(ui, cui_id_from(ui, "message"), &t, options);
+        cui_message_body reply = {
+            .slot = {.present = true, .text = cui_string("Looks good. I'll ship the update.")},
+            .typed_bubble = true,
+            .bubble = CUI_BUBBLE_FILLED};
+        options.alignment = message_alignment ? CUI_MESSAGE_START : CUI_MESSAGE_END;
+        options.name = cui_string("Reply from Jamie Chen");
+        options.avatar.user = (void *)(uintptr_t)1;
+        options.header.user = (void *)(uintptr_t)1;
+        options.body = &reply;
+        options.footer = (cui_message_slot){.present = true,
+                                            .text = cui_string("09:32 · Read"),
+                                            .inset = (cui_message_inset)message_inset};
+        cui_message(ui, cui_id_from(ui, "message-reply"), &t, options);
         cui_end_message_group(ui);
         if (renderer_fixture_enabled)
             gallery_paint_renderer_fixture(ui);
@@ -3165,8 +3331,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 63: {
         cui_attachment_group_options options = cui_attachment_group_options_default();
+        options.scrollbar_theme = &t;
         options.width = width - 48;
-        options.height = 220;
+        options.height = 0;
         options.gap = 12;
         options.edge_fade = true;
         options.now_seconds = host_seconds;
@@ -3550,9 +3717,44 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             alert_visible = true;
         break;
     }
-    case 13:
-        cui_avatar(ui, cui_id_from(ui, "avatar"), &t, cui_string("Alex Morgan"), 56);
+    case 13: {
+        cui_begin_box(ui, cui_id_from(ui, "avatar-examples"), (cui_box){.gap = 8});
+        cui_label(ui, &t, cui_string("Project team · choose a profile"));
+        cui_avatar_item people[8] = {0};
+        for (unsigned i = 0; i < 8; i++)
+            people[i] = (cui_avatar_item){
+                .key = i + 1,
+                .name = cui_string(i < 3 ? avatar_names[i] : "Additional teammate"),
+                .image = i < 3 ? gallery_avatar_source(i) : (cui_bitmap){0},
+                .image_state = i < 3 ? &avatar_images[i] : NULL};
+        size_t selected = cui_avatar_stack(
+            ui, cui_id_from(ui, "avatar-team"), &t, people, 8,
+            (cui_avatar_stack_options){.size = 48,
+                                       .width = width - 48,
+                                       .ring_width = 2,
+                                       .interactive = true,
+                                       .disabled = disabled != 0,
+                                       .name = cui_string("Project team avatars")});
+        if (selected != SIZE_MAX)
+            avatar_selected = (int)selected;
+        char selected_profile[64];
+        snprintf(selected_profile, sizeof selected_profile, "Selected profile: %s",
+                 avatar_names[avatar_selected % 3]);
+        cui_text(ui, cui_string(selected_profile), 14, t.text);
+        cui_label(ui, &t, cui_string("Small spaces keep the team count"));
+        cui_begin_box(ui, cui_id_from(ui, "avatar-compact-row"),
+                      (cui_box){.row = true, .gap = 20, .align_y = CUI_ALIGN_CENTER});
+        cui_avatar_stack(ui, cui_id_from(ui, "avatar-team-compact"), &t, people, 8,
+                         (cui_avatar_stack_options){.size = 40,
+                                                    .width = 96,
+                                                    .ring_width = 2,
+                                                    .name = cui_string("Compact team avatars")});
+        cui_avatar(ui, cui_id_from(ui, "avatar-fallback"), &t, cui_string("Sam Patel"), 40);
+        cui_end_box(ui);
+        cui_label(ui, &t, cui_string("No image? Initials remain available."));
+        cui_end_box(ui);
         break;
+    }
     case 14: {
         static const char *const messages[] = {
             "Info: a new version is available.", "Success: your changes are saved.",

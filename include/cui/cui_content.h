@@ -27,6 +27,46 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_opt
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
 size_t cui_avatar_initials(cui_str name, char output[9]);
 void cui_avatar(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float size);
+/* Caller-owned circular cover cache, no allocation. Storage must be disjoint
+ * from source pixels and stay live through rendering. diameter:1..512; capacity
+ * >=diameter*diameter*4. Revision/pointer/geometry changes rebuild the cache. */
+typedef struct {
+    unsigned char *storage;
+    size_t capacity;
+    unsigned diameter;
+    cui_bitmap source, bitmap;
+    bool ready;
+} cui_avatar_image;
+bool cui_avatar_image_init(cui_avatar_image *, unsigned char *storage, size_t capacity,
+                           unsigned diameter);
+bool cui_avatar_image_prepare(cui_avatar_image *, cui_bitmap source);
+typedef struct {
+    float size, ring_width;
+    cui_color ring;
+    bool custom_ring, interactive, disabled;
+    cui_bitmap image;
+    cui_avatar_image *image_state;
+} cui_avatar_options;
+/* Invalid/missing image/cache falls back to legacy initials. Returns activation
+ * only when interactive; image name remains the supplied accessible name. */
+bool cui_avatar_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_avatar_options);
+typedef struct {
+    uint64_t key; /* Stable unique application key; zero uses the index. */
+    cui_str name;
+    cui_bitmap image;
+    cui_avatar_image *image_state;
+} cui_avatar_item;
+typedef struct {
+    float size, overlap, width, ring_width;
+    size_t max_visible; /* Zero defaults to three photos, plus an overflow badge. */
+    bool interactive, disabled;
+    cui_str name;
+} cui_avatar_stack_options;
+/* <=64 items. width>0 reduces visible photos to fit; overlap zero uses size/4.
+ * Later photos paint/hit above earlier ones. Returns activated index or SIZE_MAX.
+ * The overflow badge reports the remaining count and is passive. */
+size_t cui_avatar_stack(cui_context *, cui_id, const cui_theme *, const cui_avatar_item *,
+                        size_t count, cui_avatar_stack_options);
 typedef enum {
     CUI_BUBBLE_FILLED,
     CUI_BUBBLE_SECONDARY,

@@ -57,6 +57,7 @@ typedef struct {
     /* Zero preserves immediate opening/closing. Uses cui_frame_time(ui). */
     float sheet_animation_seconds;
     bool reduced_motion;
+    const cui_scrollbar_style *scrollbar_style; /* Borrowed during begin; NULL uses theme. */
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
@@ -457,7 +458,35 @@ void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
 /* SPDX-License-Identifier: MIT */
 
 
+
 #include <math.h>
+#define CUI_SURFACE_SKIN_OWNER UINT64_C(0x1a45de91b7956712)
+#define CUI_SURFACE_SKIN_NAMESPACE UINT64_C(0xac3286f910fdcc31)
+typedef struct {
+    cui_surface_state *state;
+    cui_theme theme;
+    bool active, footer;
+} cui_surface_skin_entry;
+typedef struct {
+    size_t depth;
+    cui_surface_skin_entry entries[64];
+} cui_surface_skin_stack;
+static void cui_surface_skin_collect(void *payload) {
+    ((cui_surface_skin_stack *)payload)->depth = 0;
+}
+static cui_surface_skin_stack *cui_surface_skin_find(cui_context *ui) {
+    return cui_resource_find(ui, CUI_SURFACE_SKIN_OWNER, CUI_SURFACE_SKIN_NAMESPACE);
+}
+static void cui_surface_skin_paint(cui_context *ui, cui_surface_skin_entry *entry) {
+    if (!entry || !entry->active)
+        return;
+    cui_surface_state *s = entry->state;
+    cui_rect viewport = {0, 0, s->body_viewport.w, s->body_viewport.h};
+    cui_scroll_options options = {.vertical = true, .scrollbar_style = &entry->theme.scrollbar};
+    cui_scrollbar_overlay_paint(ui, cui_surface_part_id(s->overlay.id, 6), &entry->theme, 0,
+                                s->body_scroll, viewport,
+                                (cui_size){viewport.w, viewport.h + s->body_maximum}, options);
+}
 static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s,
                                    bool centered, float width) {
     cui_begin_box(
@@ -468,6 +497,18 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
                   .align_y = centered && s->body_maximum <= 0 ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
                   .offset_y = -s->body_scroll});
     cui_base_surface_submit_body(ui, s);
+    cui_surface_skin_stack *stack = cui_surface_skin_find(ui);
+    if (stack && stack->depth && stack->entries[stack->depth - 1].active) {
+        cui_surface_skin_entry *entry = &stack->entries[stack->depth - 1];
+        float x = 0;
+        cui_rect viewport = {0, 0, s->body_viewport.w, s->body_viewport.h};
+        if (cui_base_scrollbar_overlay(
+                ui, cui_surface_part_id(s->overlay.id, 6), &x, &s->body_scroll, viewport,
+                (cui_size){viewport.w, viewport.h + s->body_maximum},
+                (cui_scroll_options){.vertical = true, .scrollbar_style = &entry->theme.scrollbar}))
+            cui_set_box_scroll_offset(ui, cui_surface_part_id(s->overlay.id, 6), 0,
+                                      -s->body_scroll);
+    }
     if (centered && s->body_content.h <= 0)
         cui_invalidate(ui);
     /* Clipped viewports allow horizontal overflow in Clay. Bound the content
@@ -478,9 +519,24 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
 bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
                        cui_str description, cui_surface_options o) {
     cui_rect bounds = s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
-    if (!t || bounds.w <= 0 || bounds.h <= 0 ||
+    if (!t || bounds.w <= 0 || bounds.h <= 0)
+        return false;
+    const cui_scrollbar_style *skin = o.scrollbar_style ? o.scrollbar_style : &t->scrollbar;
+    bool active =
+        skin->visibility == CUI_SCROLLBAR_VISIBLE || skin->visibility == CUI_SCROLLBAR_AUTO_HIDE;
+    cui_surface_skin_stack *stack = cui_surface_skin_find(ui);
+    if (active && !stack)
+        stack = cui_resource_get(ui, CUI_SURFACE_SKIN_OWNER, CUI_SURFACE_SKIN_NAMESPACE,
+                                 sizeof(*stack), cui_surface_skin_collect, NULL);
+    if ((active && !stack) || (stack && stack->depth == 64) ||
         !cui_base_surface_begin(ui, s, title, description, o))
         return false;
+    if (stack) {
+        cui_surface_skin_entry *entry = &stack->entries[stack->depth++];
+        *entry = (cui_surface_skin_entry){.state = s, .theme = *t, .active = active};
+        entry->theme.scrollbar = *skin;
+        entry->theme.scrollbar.reduced_motion |= o.reduced_motion;
+    }
     bounds = cui_surface_current_geometry(s, o);
     int16_t layer = o.layer > 0 && o.layer < 32766 ? o.layer : 100;
     cui_rect handle = cui_surface_resize_bounds(s, o);
@@ -531,6 +587,12 @@ void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)
         return;
     cui_end_box(ui); /* body content */
+    cui_surface_skin_stack *stack = cui_surface_skin_find(ui);
+    if (stack && stack->depth) {
+        cui_surface_skin_entry *entry = &stack->entries[stack->depth - 1];
+        cui_surface_skin_paint(ui, entry);
+        entry->footer = true;
+    }
     cui_end_box(ui); /* body viewport */
     cui_begin_box(ui, 0, (cui_box){.width = -1});
     cui_begin_box(ui, 0,
@@ -538,6 +600,13 @@ void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
 }
 void cui_surface_end(cui_context *ui) {
     cui_end_box(ui);
+    cui_surface_skin_stack *stack = cui_surface_skin_find(ui);
+    if (stack && stack->depth) {
+        cui_surface_skin_entry *entry = &stack->entries[stack->depth - 1];
+        if (!entry->footer)
+            cui_surface_skin_paint(ui, entry);
+        stack->depth--;
+    }
     cui_end_box(ui);
     cui_end_box(ui);
     cui_base_surface_end(ui);

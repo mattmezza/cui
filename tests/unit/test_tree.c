@@ -2,6 +2,7 @@
 #include "cui/cui_tree.h"
 #ifndef CUI_TREE_BASE_ONLY
 #include "cui/cui_components.h"
+#include "cui/cui_scroll.h"
 #include "cui/cui_toolbar.h"
 #endif
 #include <assert.h>
@@ -363,8 +364,44 @@ static void tree_toolbar_artwork(void) {
     cui_tree_destroy(model);
 }
 #endif
+#ifndef CUI_TREE_BASE_ONLY
+static void tree_scrollbar_skin(void) {
+    cui_context *ui = cui_create((cui_config){.width = 700, .height = 500});
+    cui_tree_model *model = cui_tree_create(12);
+    cui_tree_node nodes[12];
+    bool expanded[12] = {0};
+    for (size_t i = 0; i < 12; i++)
+        nodes[i] = (cui_tree_node){i + 1, {"Row", 3}, 0, false};
+    assert(cui_tree_rebuild(model, nodes, expanded, 12) == CUI_TREE_OK);
+    cui_tree_state state = {0};
+    cui_id selected = 1;
+    cui_theme theme = cui_theme_light();
+    theme.scrollbar = (cui_scrollbar_style){.visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 14};
+    cui_tree_options options = {.width = 240, .height = 120, .row_height = 32};
+    for (unsigned i = 0; i < 3; i++)
+        scene(ui, &theme, model, &state, &selected, options);
+    cui_rect track = cui_bounds(ui, cui_scrollbar_id(10, true));
+    assert(track.w == 14 && track.h > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = track.x + track.w / 2,
+                                           .y = track.y + track.h - 2}));
+    scene(ui, &theme, model, &state, &selected, options);
+    assert(state.scroll > 0 && selected == 1);
+    theme.scrollbar.visibility = CUI_SCROLLBAR_HIDDEN;
+    assert(
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = track.x, .y = track.y}));
+    scene(ui, &theme, model, &state, &selected, options);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].role != CUI_ROLE_SCROLLBAR);
+    cui_tree_destroy(model);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
 #ifndef CUI_TREE_BASE_ONLY
+    tree_scrollbar_skin();
     tree_toolbar_artwork();
 #endif
     models();

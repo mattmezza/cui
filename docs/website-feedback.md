@@ -90,7 +90,7 @@ The following remain open until release and direct website verification:
 - [ ] Toolbar Find example searches real visible content and reports matches.
 - [ ] Component switching preserves page and catalog scroll positions.
 - [ ] Command dialog search/results fill available content width.
-- [ ] Long DataTable scrolling matches panel pixel-based wheel behavior.
+- [x] Long DataTable scrolling matches panel pixel-based wheel behavior. — Published0b667d0 actual public pixel-wheel regression passes; publication hashes325/325.
 - [ ] Plot opt-in Shift-drag pan, Ctrl-wheel zoom, touch pan and pinch-to-zoom.
 - [ ] Table alternating row colors and independently customizable header background.
 - [ ] Avatar stack example with profile images and overflow count.
@@ -101,10 +101,14 @@ Focused local checks are evidence for individual fixes, not full parity.
 
 - [x] Native starter source and website guide: dependencies, C11 compiler, CMake, Make, pkg-config static linker flags, actual native window, sidebar pages and bottom account menu. Published ddd0ae3; direct public screenshots and copied linker recipe verified.
 - [ ] Resizable at wide desktop widths: both demo panes reach hard maxima, preventing drag; isolated fix verified before integration.
-- [ ] Center Pagination compact counter (`x / y`) alongside button labels; previous button-label check did not cover counter. A new headless regression fails before the root fix and passes afterward.
-- [ ] Apply xs/sm/base/md/lg/xl/2xl and larger design sizes to all remaining legacy four-size controls; dropdown, badge and other legacy selector families need coverage.
-- [ ] DatePicker localized month/weekday labels, formatting and a clickable header year grid for quick selection of historical dates such as1980.
+- [x] Center Pagination compact counter (`x / y`) alongside button labels; previous button-label check did not cover counter. A new headless regression fails before the root fix and passes afterward. Actual public geometry passes in0b667d0.
+- [x] Apply xs/sm/base/md/lg/xl/2xl and larger design sizes to remaining legacy four-size controls. — Actual public14-size checks pass12 legacy families, including dropdown and badge, at both densities; complete78-family sizing audit remains broader ongoing work.
+- [x] DatePicker localized month/weekday labels, formatting and a clickable header year grid for quick selection of historical dates such as1980. — Public0b667d0 passes28/28 mouse/contact locale/year cases across seven locales; native min/max/custom-locale tests pass.
 
 These points remain tracked until integrated and deployed verification, alongside the complete component manifest.
 
 Additional open feedback: Alert/Bubble semantic styles; intrinsic HoverCard; reusable Message conversation; Notification action/close separation; shared optional scrollbar appearance/auto-hide across families; Python native example and clearly documented Node JavaScript/TypeScript startup.
+
+Python and Node JavaScript/TypeScript startup examples are now published and verified, including both actual Copy-button recipes; native pointer callbacks are documented in validation/python-node-native.txt. This is a small example host ABI, not complete cross-language component bindings.
+
+- [ ] Attachment design sizes: horizontal base-height cards clip subtitle/action content; card and auto group heights must fit contents across all14 sizes and both densities. Screenshot reproduced 13 October; intrinsic card/group sizing integrated in `13c851f`. Rebuilt browser checks pass 62/62 including mobile subtitle pixels and real touch access to offscreen Open. Native and sanitizer suites pass 103/103. Public deployment verification pending.

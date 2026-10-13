@@ -1,0 +1,25 @@
+Compiled source: 13c851f0ce33bff5c8c521e1c436314dff9edfff
+Portable source SHA256: e983aafb4da0f0ca983a14e8b84a3995e5adb77ac5367daa1b17fa0ed523c2ff
+Strict warnings native CTest: 103/103 pass, including optional Linux accessibility.
+ASAN/UBSAN CTest: 103/103 pass, ASAN_OPTIONS=detect_leaks=0.
+Actual local Chromium 1228 WASM catalog: 78/78 stories and interaction assertions pass.
+Displayed usage snippets: 78/78 compile.
+Attachment: 62/62, including all14 design sizes, both densities/orientations,
+390px Base/SM subtitle pixels and actual touch pan/tap of an offscreen Open action.
+Responsive gallery: Button, Settings and Description List pass all14 sizes,
+390/1280 widths and both densities; extreme mobile fonts preserve typography
+with CUI horizontal scrolling and no page-width overflow.
+Catalog touch: 42/42; additional touch: 16/16; page-navigation touch: 19/19.
+Avatar/Message: 9/9; RadioGroup: 5/5; shared scrollbar appearance/idle checks pass.
+Site guides, typography, backgrounds, reduced motion and composed app pass.
+Formatter, manifest, licenses and generated-distribution checks pass.
+WASI runtime: 83/83 pass; final content fingerprint unchanged.
+New public deployment verification pending.
+Logs: /home/matteo/.cache/cui-validation/next21-{native-containment-test,
+asan-containment-test,browser-containment,attachment-release,responsive-release,
+touch-fixed,touch-more-final,touch-page-final,avatar-final,radio-final,
+scrollbar-final,site-final,wasi}.log.
+WASI starts from e663032 plus generated header changes, then 13c851f commits
+those exact files. Its content fingerprint must remain identical through completion.
+Older failed viewport-helper and distribution/Radio-label runs remain preserved.
+This verifies the listed subsets only. No full family is certified.

@@ -275,6 +275,7 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #ifdef __cplusplus
 }
 #endif
+#include "cui_radio_group.h"
 #include "cui_settings.h"
 #endif
 
@@ -412,6 +413,10 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #define CUI_PLOT_VIEW_IMPLEMENTATION
 #endif
 #include "cui_plot_view.h"
+#ifndef CUI_RADIO_GROUP_IMPLEMENTATION
+#define CUI_RADIO_GROUP_IMPLEMENTATION
+#endif
+#include "cui_radio_group.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

@@ -234,15 +234,19 @@ bool cui_description_list(cui_context *ui, cui_id id, const cui_theme *theme,
         } else {
             for (size_t col = 0; col < row.count; ++col) {
                 const cui_description_item *item = &items[row.first + col];
-                cui_begin_box(
-                    ui, item->id,
-                    (cui_box){.width = cui_description_fraction(&row, item->span, options.columns),
-                              .width_percent = true,
-                              .row = !options.vertical,
-                              .height = options.vertical ? 0 : -1});
+                float fraction = cui_description_fraction(&row, item->span, options.columns);
+                float default_label_width = 120;
+                if (options.width > 0 && !options.vertical && !options.custom_label_width)
+                    default_label_width =
+                        fminf(default_label_width, fmaxf(0, (options.width - 2) * fraction * .5f));
+                cui_begin_box(ui, item->id,
+                              (cui_box){.width = fraction,
+                                        .width_percent = true,
+                                        .row = !options.vertical,
+                                        .height = options.vertical ? 0 : -1});
                 cui_box label = {.width = options.vertical             ? -1
                                           : options.custom_label_width ? options.label_width
-                                                                       : 120,
+                                                                       : default_label_width,
                                  .fixed_width = !options.vertical,
                                  .width_percent = !options.vertical && options.custom_label_width &&
                                                   options.label_width_percent,

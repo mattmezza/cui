@@ -198,6 +198,9 @@ typedef struct {
     cui_scroll_state *external_scroll;
     cui_media_render_fn children;
     void *user;
+    const cui_scrollbar_style *scrollbar_style;
+    const cui_theme
+        *scrollbar_theme; /* Optional borrowed palette; this API has no theme argument. */
 } cui_attachment_group_options;
 typedef struct {
     bool valid, changed;
@@ -481,6 +484,8 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
     p.dashed = m.status == CUI_ATTACHMENT_PENDING;
     if (!m.vertical) {
         p.height = p.metrics.height;
+        if (m.design_size && m.content)
+            p.height = fmaxf(p.height, 1.25f * (p.metrics.text + p.metrics.description) + 2);
         p.width = m.content ? p.metrics.chip_width
                             : (m.media ? p.metrics.media + p.metrics.padding_start
                                        : p.metrics.padding_end) +
@@ -551,6 +556,7 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
     return true;
 }
 #endif
+
 
 
 #include <math.h>
@@ -711,15 +717,18 @@ static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
         if (child.custom_color)
             color = child.color;
         bool retry = !title && p.retry_description && !retry_used;
-        float suffix_width = retry ? 48 : p.append_percentage && !title ? 48 : 0;
-        cui_begin_box(
-            ui, child_id,
-            (cui_box){.width = width, .height = font * 1.25f, .row = true, .clip = true, .gap = 4});
-        float text_width = fmaxf(0, width - suffix_width);
-        cui_begin_box(
-            ui, cui_media_id(child_id, 1),
-            (cui_box){
-                .width = text_width, .fixed_width = true, .height = font * 1.25f, .clip = true});
+        float suffix_width = 0;
+        if (retry)
+            suffix_width = fmaxf(48, cui_measure_text(ui, o.retry_label, font).width);
+        else if (p.append_percentage && !title) {
+            char percentage[16];
+            snprintf(percentage, sizeof percentage, "· %u%%", (unsigned)floorf(p.progress + .5f));
+            suffix_width = fmaxf(48, cui_measure_text(ui, cui_string(percentage), font).width);
+        }
+        cui_begin_box(ui, child_id, (cui_box){.width = width, .row = true, .clip = true, .gap = 4});
+        float text_width = fmaxf(0, width - suffix_width - (suffix_width > 0 ? 4 : 0));
+        cui_begin_box(ui, cui_media_id(child_id, 1),
+                      (cui_box){.width = text_width, .fixed_width = true, .clip = true});
         if (title && cui_attachment_in_progress(status)) {
             cui_marker_child text = {.kind = CUI_MARKER_TEXT, .text = child.text};
             cui_marker_options marker =
@@ -848,6 +857,14 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
         p.width += o.actions_width + (o.model.media ? p.metrics.gap : 0);
         r.plan.width = p.width;
     }
+    if (!o.model.vertical && o.model.content && !o.model.width && o.model.design_size) {
+        /* The design chip width must reserve metadata in addition to media/actions. */
+        p.width = fmaxf(p.width, p.metrics.padding_start + p.metrics.padding_end +
+                                     (o.model.media ? p.media_width + p.metrics.gap : 0) +
+                                     (o.actions ? o.actions_width + p.metrics.gap : 0) +
+                                     8 * p.metrics.text);
+        r.plan.width = p.width;
+    }
     float radius = o.model.size == CUI_MEDIA_XSMALL ? t->radius : t->radius * 1.5f;
     bool click = o.model.identified && o.on_click;
     cui_interaction root = cui_interact(ui, id, CUI_ROLE_GROUP, o.name, false, false, 0);
@@ -863,7 +880,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
     cui_begin_box(
         ui, id,
         (cui_box){.width = p.width,
-                  .height = o.model.vertical && !p.flush ? 0 : p.height,
+                  .height = p.flush ? p.height : 0,
                   .row = !o.model.vertical,
                   .gap = o.model.vertical ? p.metrics.gap : 0,
                   .align_x = o.model.vertical ? CUI_ALIGN_CENTER : CUI_ALIGN_START,
@@ -875,6 +892,11 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                   .align_y = CUI_ALIGN_CENTER});
     cui_track_bounds(ui, id, &state->card);
     if (!o.model.vertical) {
+        /* Preserve the nominal chip minimum, but fit real metadata/action height. */
+        cui_begin_box(
+            ui, cui_media_id(id, 15),
+            (cui_box){.width = 0, .fixed_width = true, .height = p.height, .fixed_height = true});
+        cui_end_box(ui);
         cui_begin_box(ui, cui_media_id(id, 2),
                       (cui_box){.width = p.metrics.padding_start, .fixed_width = true});
         cui_end_box(ui);
@@ -970,7 +992,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
             cui_rect b = state->card;
             cui_begin_portal(
                 ui, action_id, (cui_box){.row = true, .gap = 4},
-                (cui_rect){b.x + b.w - o.actions_width - 12, b.y + 12, o.actions_width, 24}, 3);
+                (cui_rect){b.x + b.w - o.actions_width - 12, b.y + 12, o.actions_width, 0}, 3);
             o.actions(ui, cui_media_id(id, 6), o.actions_user, o.actions_width, 24);
             cui_end_box(ui);
         } else {
@@ -1056,6 +1078,16 @@ cui_attachment_group_result cui_attachment_group(cui_context *ui, cui_id id,
                                                     .scroll_axis_lock = true,
                                                     .scroll_x = scroll->x,
                                                     .scroll_max_x = r.maximum});
+    cui_theme scrollbar_theme = o.scrollbar_theme ? *o.scrollbar_theme : cui_theme_light();
+    cui_scroll_options bars = cui_scroll_resolve(
+        &scrollbar_theme,
+        (cui_scroll_options){.horizontal = true, .scrollbar_style = o.scrollbar_style});
+    cui_scrollbar_style skin = *bars.scrollbar_style;
+    skin.reduced_motion |= o.reduced_motion;
+    bars.scrollbar_style = &skin;
+    r.changed |= cui_base_scrollbar_overlay(ui, id, &scroll->x, &scroll->y,
+                                            (cui_rect){0, 0, o.width, height},
+                                            (cui_size){s->content.w, height}, bars);
     cui_begin_box(
         ui, id,
         (cui_box){.width = o.width, .height = o.height, .clip = true, .offset_x = -scroll->x});
@@ -1068,6 +1100,9 @@ cui_attachment_group_result cui_attachment_group(cui_context *ui, cui_id id,
     cui_end_box(ui);
     cui_begin_box(ui, cui_media_id(id, 4), (cui_box){.height = 4, .fixed_height = true});
     cui_end_box(ui);
+    cui_scrollbar_overlay_paint(ui, id, &scrollbar_theme, scroll->x, 0,
+                                (cui_rect){0, 0, o.width, height}, (cui_size){s->content.w, height},
+                                bars);
     cui_end_box(ui);
     float leading = o.edge_fade && r.maximum > 1 && scroll->x > 1 ? 1 : 0;
     float trailing = o.edge_fade && r.maximum > 1 && scroll->x < r.maximum - 1 ? 1 : 0;

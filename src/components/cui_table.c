@@ -295,6 +295,13 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
                                 cui_table_cell_fn render, void *data) {
     if (!ui || !t || !m || !s)
         return (cui_table_result){.error = CUI_TABLE_INVALID};
+    if (!o.scrollbar_style)
+        o.scrollbar_style = &t->scrollbar;
+    if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+        o.scrollbars = false;
+    else if (o.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
+             o.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE)
+        o.scrollbars = true;
     cui_table_result result = cui_table_reduce(ui, id, m, s, o);
     if (result.error != CUI_TABLE_OK && result.error != CUI_TABLE_CAPACITY)
         return result;
@@ -456,6 +463,7 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
             .width = isfinite(original.width) && original.width > 0 ? original.width : 480,
             .height = isfinite(original.height) && original.height > 0 ? original.height : 240,
             .bar_thickness = original.bar_thickness,
+            .scrollbar_style = original.scrollbar_style,
             .disabled = o.disabled || o.loading};
         if (geometry.maximum_y > 0)
             cui_scrollbar(ui, id, t, &s->scrollbar, geometry, bars, true);

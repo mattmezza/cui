@@ -40,6 +40,9 @@ typedef struct {
     cui_message_slot avatar, header, footer;
     const cui_message_body *body;
     size_t body_count;
+    /* Optional compact column cap; zero preserves the legacy available width.
+     * Row alignment keeps outgoing content at the end of the full message row. */
+    float max_bubble_width;
 } cui_message_options;
 typedef struct {
     bool avatar, header, footer, ghost, header_inset, footer_inset;
@@ -97,6 +100,7 @@ typedef struct {
     /* Adjust a configured button's appearance without replacing its action. */
     cui_message_slot jump_content;
     float jump_width, jump_height;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_message_scroller_options;
 typedef struct {
     cui_message_scroller_view view;

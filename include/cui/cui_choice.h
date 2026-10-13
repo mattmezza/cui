@@ -104,6 +104,7 @@ typedef struct {
     float last_empty_space_width;       /* logical px; zero defaults to12 unless flag set */
     bool custom_last_empty_space_width; /* permits an explicit zero-width tail */
     cui_design_size design_size;        /* INHERIT preserves legacy metrics. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -168,6 +169,7 @@ typedef struct {
     float density; /* zero derives theme.font_size/16; ordinary List has no size variant */
     float height;  /* positive fixed row override; zero uses source natural text plus padding */
     cui_design_size design_size; /* INHERIT preserves legacy metrics. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -191,6 +193,7 @@ typedef struct {
     float row_height;            /* positive fixed row override; zero uses source natural height */
     float max_height;            /* positive popup cap; default source 20rem = 320*density */
     cui_design_size design_size; /* Trigger, query and popup rows share this scale. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */
@@ -300,6 +303,7 @@ typedef struct {
     cui_menu_size size; /* source Small20; other sizes26 logical px */
     float density;      /* zero derives theme.font_size/16 */
     float max_height;   /* positive override; default min(viewport.height/2,450*density) */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_menu_tree_options;
 struct cui_tab_overflow {
     cui_menu_tree_state menu;

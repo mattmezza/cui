@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_textarea.h"
 #include "cui/cui_base.h"
+#include "cui/cui_scroll.h"
 #include <math.h>
 static cui_id cui_textarea_child(cui_id id, size_t row, unsigned part) {
     return id ^ UINT64_C(0x7cf5d0e25db29861) ^
@@ -72,6 +73,16 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
                                           options.text_style);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
+    cui_scroll_options bars =
+        cui_scroll_resolve(theme, (cui_scroll_options){.horizontal = options.no_wrap,
+                                                       .vertical = true,
+                                                       .disabled = options.disabled,
+                                                       .wheel_step = metrics.line_height,
+                                                       .scrollbar_style = options.scrollbar_style});
+    cui_rect bar_viewport = {0, 0, width, state->viewport.h};
+    cui_size bar_content = {width + state->maximum_x, state->viewport.h + state->maximum_y};
+    result.scrolled |= cui_base_scrollbar_overlay(ui, id, &state->scroll_x, &state->scroll_y,
+                                                  bar_viewport, bar_content, bars);
     bool focused = cui_focused(ui) == id && !options.disabled;
     if ((focused && !state->focused) || result.changed || result.selection_changed)
         state->blink_started = cui_frame_time(ui);
@@ -199,6 +210,8 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         cui_end_box(ui);
     }
     cui_end_box(ui);
+    cui_scrollbar_overlay_paint(ui, id, theme, state->scroll_x, state->scroll_y, bar_viewport,
+                                bar_content, bars);
     cui_end_box(ui);
     cui_begin_box(ui, cui_textarea_child(id, 0, 6), (cui_box){.width = px, .fixed_width = true});
     cui_end_box(ui);

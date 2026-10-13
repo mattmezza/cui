@@ -9,6 +9,8 @@ cui_virtual_widget_result cui_virtual_list_draw(cui_context *ui, cui_id id, cons
                                                 cui_virtual_render_item_fn render, void *user) {
     cui_virtual_widget_result out = {.error = CUI_VIRTUAL_INVALID};
     cui_scroll_options scroll;
+    if (t)
+        o.scroll = cui_scroll_resolve(t, o.scroll);
     if (!t || !render || !cui_virtual_widget_scroll_options(v, o, &scroll))
         return out;
     if (!ui || !id || !s)
@@ -31,6 +33,8 @@ cui_virtual_widget_result cui_virtual_list_draw(cui_context *ui, cui_id id, cons
         if (!cui_virtual_widget_scroll_options(v, o, &scroll))
             return out;
     }
+    o.scroll = cui_scroll_resolve(t, o.scroll);
+    scroll = cui_scroll_resolve(t, scroll);
     out = cui_base_virtual_list(ui, id, v, s, o);
     if (out.error != CUI_VIRTUAL_OK)
         return out;

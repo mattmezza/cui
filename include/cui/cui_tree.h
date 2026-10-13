@@ -52,6 +52,7 @@ typedef struct {
     bool disabled, manual_selection;
     float width, height, row_height, dt;
     size_t overscan;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_tree_options;
 typedef struct {
     bool selection_changed, expansion_changed;

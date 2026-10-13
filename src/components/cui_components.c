@@ -162,8 +162,8 @@ static bool cui_button_shape_valid(cui_button_options);
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state) {
     cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
-        !cui_button_shape_valid(o))
+    if (!ui || !t || !cui_frame_is_submitting(ui) ||
+        !cui_components_design(t, o.design_size, &design) || !cui_button_shape_valid(o))
         return;
     bool disabled = o.disabled;
     cui_box b = cui_components_control(t, disabled, false);
@@ -366,7 +366,14 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         .size = CUI_ICON_CUSTOM, .custom_size = icon, .custom_color = true, .color = foreground};
     if (o.leading_content)
         o.leading_content(ui, o.leading_user);
-    else if (o.loading) {
+    else if (o.loading && !cui_frame_paint_enabled(ui)) {
+        /* Layout-only composition retains the icon slot without allocating or
+         * scheduling invisible loading artwork. */
+        cui_begin_box(
+            ui, id ^ UINT64_C(0x7185e28e9fb974db),
+            (cui_box){.width = icon, .height = icon, .fixed_width = true, .fixed_height = true});
+        cui_end_box(ui);
+    } else if (o.loading) {
         if (o.loading_icon.length) {
             if (!cui_reduced_motion(ui)) {
                 double phase = fmod(cui_frame_time(ui), .8) / .8;
@@ -414,7 +421,14 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
                 name.data, name.length);
             cui_end_box(ui);
         } else {
-            cui_str visible = cui_button_label(ui, o.state, name, font, o.label_width);
+            cui_button_state passive_label;
+            cui_button_state *label_state = o.state;
+            if (label_state && !cui_frame_sequence(ui)) {
+                /* This legacy branch copies text synchronously into the frame arena. */
+                passive_label = *label_state;
+                label_state = &passive_label;
+            }
+            cui_str visible = cui_button_label(ui, label_state, name, font, o.label_width);
             cui_begin_box(
                 ui, 0,
                 (cui_box){.width = cui_button_dimension(o.label_width) ? o.label_width : 0,
@@ -539,6 +553,15 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
         !cui_button_shape_valid(o))
         return false;
+    if (!cui_frame_is_submitting(ui))
+        return false;
+    if (!cui_frame_sequence(ui)) {
+        /* Suppressed ancestry composes visuals without touching caller lifecycle state.
+         * The borrowed state survives through deferred label paint, whose inert guard
+         * preserves the diagnostic prefix cap without writing it. */
+        cui_button_paint_state(ui, id, t, name, o, (cui_interaction){0});
+        return false;
+    }
     bool inert = o.disabled || o.loading;
     cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
     cui_interaction interaction = cui_interact(

@@ -133,3 +133,38 @@ supported combining-mark case. `test_button_label_layout.py` compiles actual WAS
 checks Canvas pixels, current-frame widths and ellipsis commands, and dispatches
 real Chromium mouse and CDP touch contacts. These tests close this label-layout
 slice; they do not certify the entire Button family or physical device behavior.
+
+Standalone Button composition under inherited inert or layout-only ancestry now
+uses a passive path selected by Core's ordinary-submission phase queries. Inert
+scopes retain content layout, artwork, clipping and presentation; layout-only
+scopes retain layout without paint. Neither path registers Button metadata,
+reduces tooltip state, invokes action/hover notifications, schedules a tooltip wake, or
+changes any bytes of the caller-owned Button state. Content callbacks still run
+to compose the visual children; they remain application code.
+
+The original state pointer remains borrowed through deferred label paint, so its
+existing 256-byte diagnostic-prefix cap stays consistent without a temporary
+stack-state lifetime. The synchronous legacy overflow/explicit-ellipsis branch
+uses a temporary paint copy whose visible bytes Core copies immediately; no
+temporary state pointer reaches deferred paint. Passive ID reuse preserves state; a later ordinary frame
+performs normal ID reconciliation. Explicit disabled/loading options in an
+ordinary frame retain their existing blockers, hover/tooltip cleanup and loading
+presentation. Calls outside ordinary submission, including font measurement and
+prepaint callbacks, perform no standalone Button work. This is a CUI passive
+composition correctness rule, not an upstream GPUI inert-scope parity claim.
+
+The focused passive lifecycle fixture compares complete preloaded caller-state
+bytes across fixed/grow labels, same/changed IDs, direct/inherited ancestry,
+tooltip open/pending/suppressed states and zero/nonzero frame deltas. It retains
+strict no-draw assertions for layout-only composition and checks ordinary touch
+reuse, cancellation, disabled/loading behavior and guarded phases. The native
+font fixture and independent Chromium WASM fixture extend that evidence to real
+font measurement and actual hover-opened tooltips, Canvas paint and mouse/CDP
+touch/keyboard reuse; they do not claim physical touchscreen coverage.
+
+Visible inert loading artwork keeps its animation redraw requests. Layout-only
+loading composes the same-sized icon slot without calling the artwork painter or
+requesting invisible animation redraw. The existing Core paint-enabled query
+distinguishes these policies; caller state/deadlines remain unchanged in both.
+The fixture separately checks Core redraw state after each begin-frame reset and
+verifies normal loading resumes, rather than inferring wake behavior from pixels.

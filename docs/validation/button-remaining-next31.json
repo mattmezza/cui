@@ -1,0 +1,442 @@
+{
+  "audit_commit": "534a9db",
+  "reference_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "scope": [
+    "Base Button",
+    "Components Button",
+    "ButtonGroup",
+    "ButtonIcon"
+  ],
+  "inventory_provenance": "button-completion-audit-next28.json (same pinned source); this audit updates remaining contracts rather than recertifying every method",
+  "source_public_method_inventory": {
+    "crates/base/src/button.rs": [
+      {
+        "method": "new",
+        "line": 38
+      },
+      {
+        "method": "disabled",
+        "line": 59
+      },
+      {
+        "method": "selected",
+        "line": 70
+      },
+      {
+        "method": "styles",
+        "line": 76
+      },
+      {
+        "method": "accessibility_label",
+        "line": 82
+      },
+      {
+        "method": "role",
+        "line": 88
+      },
+      {
+        "method": "track_focus",
+        "line": 94
+      },
+      {
+        "method": "on_click",
+        "line": 100
+      },
+      {
+        "method": "tab_index",
+        "line": 109
+      },
+      {
+        "method": "tab_stop",
+        "line": 115
+      },
+      {
+        "method": "focusable",
+        "line": 127
+      },
+      {
+        "method": "selected",
+        "line": 173
+      },
+      {
+        "method": "disabled",
+        "line": 180
+      }
+    ],
+    "crates/component/src/button/button.rs": [
+      {
+        "method": "new",
+        "line": 103
+      },
+      {
+        "method": "color",
+        "line": 114
+      },
+      {
+        "method": "foreground",
+        "line": 120
+      },
+      {
+        "method": "hover",
+        "line": 126
+      },
+      {
+        "method": "active",
+        "line": 132
+      },
+      {
+        "method": "shadow",
+        "line": 138
+      },
+      {
+        "method": "is_link",
+        "line": 163
+      },
+      {
+        "method": "is_text",
+        "line": 168
+      },
+      {
+        "method": "is_ghost",
+        "line": 173
+      },
+      {
+        "method": "new",
+        "line": 241
+      },
+      {
+        "method": "role",
+        "line": 326
+      },
+      {
+        "method": "outline",
+        "line": 332
+      },
+      {
+        "method": "rounded",
+        "line": 338
+      },
+      {
+        "method": "label",
+        "line": 371
+      },
+      {
+        "method": "accessibility_id",
+        "line": 377
+      },
+      {
+        "method": "accessibility_label",
+        "line": 391
+      },
+      {
+        "method": "icon",
+        "line": 397
+      },
+      {
+        "method": "tooltip",
+        "line": 403
+      },
+      {
+        "method": "tooltip_placement",
+        "line": 412
+      },
+      {
+        "method": "tooltip_with_action",
+        "line": 418
+      },
+      {
+        "method": "loading",
+        "line": 435
+      },
+      {
+        "method": "compact",
+        "line": 441
+      },
+      {
+        "method": "on_click",
+        "line": 447
+      },
+      {
+        "method": "on_hover",
+        "line": 456
+      },
+      {
+        "method": "loading_icon",
+        "line": 464
+      },
+      {
+        "method": "tab_index",
+        "line": 472
+      },
+      {
+        "method": "tab_stop",
+        "line": 480
+      },
+      {
+        "method": "dropdown_caret",
+        "line": 486
+      },
+      {
+        "method": "toggled",
+        "line": 497
+      }
+    ],
+    "crates/component/src/button/button_group.rs": [
+      {
+        "method": "new",
+        "line": 44
+      },
+      {
+        "method": "child",
+        "line": 61
+      },
+      {
+        "method": "children",
+        "line": 67
+      },
+      {
+        "method": "multiple",
+        "line": 73
+      },
+      {
+        "method": "layout",
+        "line": 79
+      },
+      {
+        "method": "compact",
+        "line": 87
+      },
+      {
+        "method": "outline",
+        "line": 95
+      },
+      {
+        "method": "on_click",
+        "line": 123
+      }
+    ],
+    "crates/component/src/button/button_icon.rs": [
+      {
+        "method": "new",
+        "line": 25
+      }
+    ],
+    "crates/component/src/icon.rs": [
+      {
+        "method": "view",
+        "line": 42
+      },
+      {
+        "method": "new",
+        "line": 105
+      },
+      {
+        "method": "path",
+        "line": 117
+      },
+      {
+        "method": "data",
+        "line": 136
+      },
+      {
+        "method": "view",
+        "line": 153
+      },
+      {
+        "method": "transform",
+        "line": 158
+      },
+      {
+        "method": "empty",
+        "line": 163
+      },
+      {
+        "method": "rotate",
+        "line": 170
+      }
+    ]
+  },
+  "trait_contracts": {
+    "Base": [
+      "Selectable",
+      "Styled",
+      "ParentElement",
+      "InteractiveElement",
+      "StatefulInteractiveElement",
+      "RenderOnce"
+    ],
+    "Button": [
+      "ButtonVariants",
+      "Disableable",
+      "FocusableExt",
+      "Selectable selected/open",
+      "Sizable",
+      "Styled",
+      "ParentElement",
+      "InteractiveElement",
+      "RenderOnce"
+    ],
+    "ButtonGroup": [
+      "Disableable",
+      "Sizable",
+      "Styled",
+      "ButtonVariants",
+      "RenderOnce"
+    ],
+    "Icon": [
+      "Styled text_color",
+      "Sizable",
+      "From/IntoElement",
+      "Render/RenderOnce"
+    ]
+  },
+  "remaining_contracts": [
+    {
+      "contract_and_source": "Automatic content clip/nowrap/ellipsis, Button `737-766`",
+      "current_mapping_and_limit": "Explicit `label_width` plus caller state is tested; automatic constrained-width ellipsis and grow-width containment are missing, with the concrete failures above. All source child content also shares the clipped content container.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Public `Styled` refinement and Base semantic state styles, Base Button `135-181`, Components Button `580-584,611-613,722-723,792-804`",
+      "current_mapping_and_limit": "Public Core composition and Button custom colors/geometry/slots cover parts; there is no arbitrary Button root style refinement replayed after each selected/disabled state. Do not equate a palette override with the full style contract.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Gradient-backed theme surfaces and Oklab transparent mixing, Button `899-988,1100-1273`, tests `1812-1868`",
+      "current_mapping_and_limit": "Button palettes hold RGBA colors, not source Background gradients. Alpha multiplication and supplied outline colors are not Oklab interpolation. This needs a separate paint/theme contract, not another variant enum.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "`ButtonCustomVariant.shadow(bool)`, Button `138-141,650-656,1093-1099`",
+      "current_mapping_and_limit": "Core now supports bounded value-owned drop shadows, but Button has no shadow option and theme has no equivalent global shadow enable flag. Only Custom requests shadow in the pinned Button: built-in variants do **not** require invented shadows. Loading opacity applies to the entire shadow/button; disabled suppresses shadow. GPUI `shadow_xs` is one black alpha .05 layer, offset `(0,1)`, `blur_radius=2`, from pinned dependency macro `gpui-pre-macros-0.3.8/src/styles.rs:416-424`; use the already audited blur conversion rather than guessing its sigma semantics.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Focus painting, Button `625-631,879-880`, Components `styled.rs:235-333`",
+      "current_mapping_and_limit": "CUI paints a two-pixel border in theme focus color whenever focus-visible and not hidden. Source distinguishes outside three-pixel alpha-.5 ring, border tint without layout changes, and borderless Edge/Inside/Outside fallback lines when theme ring is off. Source filled fallback uses foreground alpha .6; outside/inside gap is .125 rem. Theme `hide_focus_ring` and Core current-frame outline/prepaint support exist, but the Button implementation does not use them for this exact policy. Also source borders are limited to Default or outline (`Button:700-703`), whereas CUI non-borderless variants generally use a one-pixel border.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Ordered signed `tab_index`, Base `109-115`, styled `472-483`",
+      "current_mapping_and_limit": "Core public tab-stop API sets only 0/-1 and traversal follows semantic order. `skip_tab` is not signed indexed ordering. Full ordering would require an explicitly scoped Core change; it is not Button-only work.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Public role override and explicit focusability, Base `88-128`, styled `326-329`",
+      "current_mapping_and_limit": "CUI derives Button/Link and permits Core semantic refinement; no Button role option or Base `focusable(false)` equivalent option. Late role refinement is not proof that keyboard/accessibility activation preserves the source behavior under every overridden role. Stable Core IDs replace GPUI focus handles without importing platform types.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Native ClickEvent payload and event-local propagation, Base `99-105,248-252`, styled `447-453`",
+      "current_mapping_and_limit": "Standalone callbacks now run once per accepted event; Group requests expose event index and stable target. Standalone callback remains `void(user)` and does not receive pointer/key kind, modifiers or event index. Core frame events and consumption are available for composition, but are not a callback payload/propagation contract. No new bubbling claim follows from accepted target records.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "`Selectable::open`, styled `500-507,553-559`",
+      "current_mapping_and_limit": "Caller can OR selected with popup-open presentation; there is no independent `open` field. Pinned open is presentation separate from selected/toggled, not an intrinsic menu implementation or automatic expanded metadata requirement. Treat this as a missing direct API convenience/state distinction, not as an absent menu subsystem.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "`tooltip_with_action` and action-context keybinding, styled `418-431,863-873`",
+      "current_mapping_and_limit": "String tooltip, placement, delay/cancel/focus and borrowed state are implemented and tested. Button does not resolve application actions/context into keybinding presentation. A portable application resolver/content contract is needed, not GPUI Action types.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "ButtonIcon typed Icon/Spinner/Progress slot, `button/button_icon.rs:55-110,117-130`",
+      "current_mapping_and_limit": "Named/data-backed icons, default animated spinner and named loading-glyph rotation are present; `leading_content` can explicitly compose Spinner/Progress. No typed ButtonIcon adapter preserves a supplied Spinner/Progress through loading automatically. Source creates a spinner only when an icon exists; CUI's loading-only button spinner is an intentional extension. Reduced-motion rotation has headless evidence; full typed-slot preservation is not certified.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Caret presentation, styled `780-783`",
+      "current_mapping_and_limit": "CUI supplies a real named chevron and distribution spacer, but uses current foreground unchanged. Source caret uses normal foreground opacity .75, even when label state changes. Exact caret tint and compound-held hover are not covered merely by SVG command count.",
+      "status": "remaining_or_partial"
+    },
+    {
+      "contract_and_source": "Arbitrary numeric `Size::Size`, styled `616-619,663-670`",
+      "current_mapping_and_limit": "Explicit height/font/icon/width overrides and four legacy plus fourteen design sizes are tested. They do not automatically apply the source single-pixel-size rule (icon .75 times size, normal horizontal padding .2 times size). This is an API mapping limit, not a missing fourteen-size implementation.",
+      "status": "remaining_or_partial"
+    }
+  ],
+  "concrete_probes": [
+    {
+      "case": "fixed width80 no state/label_width",
+      "button_bounds": [
+        0,
+        0,
+        80,
+        32
+      ],
+      "text_bounds": [
+        10,
+        6.9,
+        369.6,
+        17.5
+      ],
+      "outer_clip": true,
+      "finding": "hard cropping without automatic ellipsis; not visible positive-width leakage",
+      "artifact": "/home/matteo/.cache/cui-validation/button-next31-label-probe-fixed.log"
+    },
+    {
+      "case": "grow width-1 parent width80",
+      "button_bounds": [
+        0,
+        0,
+        104,
+        32
+      ],
+      "text_lines": 6,
+      "last_text_y": 87.2,
+      "clip_commands": 0,
+      "finding": "wrapped label exceeds Button height and no content clip",
+      "artifact": "/home/matteo/.cache/cui-validation/button-next31-label-probe-grow.log"
+    }
+  ],
+  "priority_slice": {
+    "name": "automatic available-width containment and ellipsis",
+    "ownership_proposal": [
+      "include/cui/cui_components.h Button-only declarations",
+      "src/components/cui_components.c Button-only layout/paint helpers after Input Stage3 release",
+      "new scoped headless/browser tests and guide"
+    ],
+    "must_preserve": [
+      "full original accessible name",
+      "accepted callbacks and cancellation",
+      "all18 sizes and2 density modes",
+      "fixed and grow current-frame bounds",
+      "leading/trailing icons/caret/custom slots",
+      "passive inert/layout-only composition",
+      "bounded frame-owned text and explicit capacity/resource errors"
+    ],
+    "no_production_authorized_by_this_audit": true
+  },
+  "implemented_group_work": "Retained; see BUTTON_GROUP.md and button-group-proposal-next29 audit, no reopened selection/order/join scope",
+  "excluded_requirements": [
+    "private tooltip_builder without public setter",
+    "private hover_group hooks as standalone public Button contract",
+    "invented built-in shadow requirement",
+    "invented Button hover/press spring",
+    "intrinsic menu implementation from open presentation trait",
+    "roving arrows or mandatory ButtonGroup selection"
+  ],
+  "intentional_differences": [
+    "legacy Primary zero variant",
+    "legacy pointer focus with opt-in prevention",
+    "legacy Link control height",
+    "role-default pointer cursor with configurable override",
+    "explicit Group ALL_ACTIVATIONS",
+    "disabled builder-order correction and non-sticky background identity",
+    "loading-only spinner extension"
+  ],
+  "validation": {
+    "independent_native_ctest_passed": 8,
+    "independent_ctest_failures": 0,
+    "strict_external_probe": "C11 Wall Wextra Wpedantic Werror compiled/run",
+    "root_final_native_log": "next30-shadow-capture-test.log 151/151",
+    "root_final_sanitizer_log": "next30-shadow-asan-test.log 143/143",
+    "root_reported_frozen_wasi": "121/121",
+    "fresh_full_build": "not run for documentation-only audit",
+    "browser_native_platform_evidence": "committed fixtures/prior runs, not freshly rerun physical devices"
+  },
+  "full_completion_certified": false,
+  "physical_device_certified": false
+}

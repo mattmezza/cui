@@ -228,6 +228,7 @@ typedef struct {
     const cui_dock *model;
     cui_dock_node tab;
     const cui_dock_panel_state *state;
+    const cui_dock_schema_node *source; /* Full borrowed leaf for typed reconstruction; else NULL. */
 } cui_dock_panel_build_context;
 typedef struct cui_dock_panel_factory {
     cui_str name;
@@ -235,11 +236,18 @@ typedef struct cui_dock_panel_factory {
     cui_dock_result (*build)(void *, const cui_dock_panel_build_context *, cui_dock_panel *);
     void (*destroy)(void *, cui_dock_panel *);
     cui_dock_result (*dump)(void *, const cui_dock_panel *, cui_str *payload);
+    cui_dock_result (*dump_schema)(void *, const cui_dock_panel *, cui_dock_schema_node *);
 } cui_dock_panel_factory;
+typedef struct {
+    uint64_t key;
+    cui_dock_schema_node source; /* Borrowed full PanelState leaf, including children. */
+} cui_dock_panel_typed_state;
 typedef struct {
     cui_dock_panel_state state;
     cui_dock_panel panel;
     const cui_dock_panel_factory *factory; /* NULL: unknown-name placeholder. */
+    cui_dock_schema_node source;
+    bool has_source;
 } cui_dock_panel_instance;
 /* Exact key coverage required. On failure output/model are unchanged and staged
  * successful builds are destroyed. Output must not contain live instances. */
@@ -247,8 +255,17 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *, const cui_dock_pan
                                             size_t state_count, const cui_dock_panel_factory *,
                                             size_t factory_count, cui_dock_panel_instance *,
                                             size_t capacity);
+/* Typed leaves are borrowed through release; builders see their complete source. */
+cui_dock_result cui_dock_panels_reconstruct_typed(const cui_dock *,
+                                                  const cui_dock_panel_typed_state *,
+                                                  size_t state_count,
+                                                  const cui_dock_panel_factory *,
+                                                  size_t factory_count,
+                                                  cui_dock_panel_instance *, size_t capacity);
 /* Dump borrows the factory payload; failure leaves output unchanged. */
 cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *, cui_dock_panel_state *);
+/* Preserves the complete unknown leaf, or delegates to factory dump_schema. */
+cui_dock_result cui_dock_panel_dump_schema(const cui_dock_panel_instance *, cui_dock_schema_node *);
 /* Calls factory destroy once, then clears instances. No lifecycle notification. */
 void cui_dock_panels_release(cui_dock_panel_instance *, size_t count);
 /* Lifecycle captures the complete host workspace, including closed regions. */

@@ -1951,9 +1951,11 @@ static void test_workspace_visibility(void) {
 static unsigned factory_builds, factory_destroys;
 static uint64_t factory_fail_key = UINT64_MAX;
 static bool factory_dump_fail, factory_wrong_key;
+static const cui_dock_schema_node *factory_source_expected;
 static cui_dock_result factory_build(void *user, const cui_dock_panel_build_context *context,
                                      cui_dock_panel *panel) {
     assert(user == &factory_builds && context->model && context->tab);
+    assert(context->source == factory_source_expected);
     ++factory_builds;
     if (context->state->key == factory_fail_key)
         return CUI_DOCK_CAPACITY;
@@ -1977,6 +1979,77 @@ static cui_dock_result factory_dump(void *user, const cui_dock_panel *panel, cui
     *payload = cui_string("updated payload");
     return CUI_DOCK_OK;
 }
+static cui_dock_result factory_dump_typed(void *user, const cui_dock_panel *panel,
+                                          cui_dock_schema_node *source) {
+    assert(user == &factory_builds && panel->render == content);
+    if (factory_dump_fail)
+        return CUI_DOCK_INVALID;
+    source->payload = cui_string("typed update");
+    return CUI_DOCK_OK;
+}
+static bool factory_export_typed(void *user, uint64_t key, cui_dock_schema_node *out) {
+    const cui_dock_panel_instance *instances = user;
+    return cui_dock_panel_dump_schema(&instances[key], out) == CUI_DOCK_OK;
+}
+static void test_factory_typed(void) {
+    cui_dock *m = cui_dock_create((cui_dock_config){0});
+    assert(m && cui_dock_insert(m, cui_dock_root(m), 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(m, cui_dock_root(m), 1, 1) == CUI_DOCK_OK);
+    const char bytes[] = {'x', 0, 'y'};
+    cui_dock_schema_node child = {.kind = CUI_DOCK_SCHEMA_PANEL,
+                                  .panel_name = {"Nested", 6},
+                                  .payload = {bytes, 3}};
+    cui_dock_panel_typed_state typed[2] = {
+        {.key = 0,
+         .source = {.kind = CUI_DOCK_SCHEMA_PANEL,
+                    .panel_name = {"Known", 5},
+                    .payload = {bytes, 3},
+                    .children = &child,
+                    .child_count = 1}},
+        {.key = 1,
+         .source = {.kind = CUI_DOCK_SCHEMA_PANEL,
+                    .panel_name = {"Unknown", 7},
+                    .payload = {bytes, 3},
+                    .children = &child,
+                    .child_count = 1}}};
+    cui_dock_panel_factory factory = {.name = cui_string("Known"),
+                                      .user = &factory_builds,
+                                      .build = factory_build,
+                                      .destroy = factory_destroy,
+                                      .dump_schema = factory_dump_typed};
+    cui_dock_panel_instance instances[2] = {0};
+    instances[0].panel.key = 777;
+    factory_builds = factory_destroys = 0;
+    factory_source_expected = &typed[0].source;
+    typed[1].source.kind = CUI_DOCK_SCHEMA_STACK;
+    assert(cui_dock_panels_reconstruct_typed(m, typed, 2, &factory, 1, instances, 2) ==
+           CUI_DOCK_INVALID);
+    assert(!factory_builds && instances[0].panel.key == 777);
+    typed[1].source.kind = CUI_DOCK_SCHEMA_PANEL;
+    assert(cui_dock_panels_reconstruct_typed(m, typed, 2, &factory, 1, instances, 2) == CUI_DOCK_OK);
+    assert(factory_builds == 1 && instances[0].has_source && instances[1].has_source);
+    cui_dock_schema_node dump = {0};
+    factory_dump_fail = true;
+    assert(cui_dock_panel_dump_schema(&instances[0], &dump) == CUI_DOCK_INVALID &&
+           dump.kind == CUI_DOCK_SCHEMA_STACK);
+    factory_dump_fail = false;
+    assert(cui_dock_panel_dump_schema(&instances[0], &dump) == CUI_DOCK_OK &&
+           dump.payload.length == 12 && !memcmp(dump.payload.data, "typed update", 12) &&
+           dump.children == &child);
+    assert(cui_dock_panel_dump_schema(&instances[1], &dump) == CUI_DOCK_OK &&
+           dump.payload.length == 3 && !memcmp(dump.payload.data, bytes, 3) &&
+           dump.children == &child);
+    cui_dock_schema_node exported[8];
+    double sizes[4];
+    size_t nc, sc;
+    assert(cui_dock_schema_export(m, factory_export_typed, instances, exported, 8, sizes, 4, &nc,
+                                  &sc) == CUI_DOCK_OK);
+    assert(nc == 3 && exported[1].children == &child && exported[2].children == &child);
+    cui_dock_panels_release(instances, 2);
+    assert(factory_destroys == 1);
+    factory_source_expected = NULL;
+    cui_dock_destroy(m);
+}
 static void test_factory_reconstruction(void) {
     cui_dock *m = cui_dock_create((cui_dock_config){0});
     cui_dock_node tab = cui_dock_root(m);
@@ -1985,8 +2058,11 @@ static void test_factory_reconstruction(void) {
     const char bytes[] = {'x', 0, 'y'};
     cui_dock_panel_state states[2] = {{0, cui_string("Known"), {bytes, 3}},
                                       {1, cui_string("Unknown"), {bytes, 3}}};
-    cui_dock_panel_factory factory = {cui_string("Known"), &factory_builds, factory_build,
-                                      factory_destroy, factory_dump};
+    cui_dock_panel_factory factory = {.name = cui_string("Known"),
+                                      .user = &factory_builds,
+                                      .build = factory_build,
+                                      .destroy = factory_destroy,
+                                      .dump = factory_dump};
     cui_dock_panel_instance output[2] = {0};
     output[0].panel.key = 777;
     char before[4096], after[4096];
@@ -2430,6 +2506,7 @@ int main(void) {
     model = cui_dock_create((cui_dock_config){0});
     view = cui_dock_view_create(16, 16);
     test_factory_reconstruction();
+    test_factory_typed();
     test_lifecycle();
     test_hidden_styled_geometry();
     test_nary_styled();

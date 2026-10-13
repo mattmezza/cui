@@ -507,6 +507,41 @@ bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corn
  * first-frame grow/alignment and lifetime rules as solid underlays. */
 bool cui_set_bitmap_underlay(cui_context *, cui_underlay_layout, cui_bitmap_paint,
                              cui_corner_radii);
+/* Current-frame paint after the single layout pass. Register on an open box
+ * with a nonzero ID. No layout/input/focus mutation is permitted in callbacks. */
+typedef struct cui_prepaint_writer cui_prepaint_writer;
+typedef struct {
+    cui_id owner;
+    cui_rect bounds, clip, visible_bounds;
+    float pointer_x, pointer_y;
+    bool pointer_valid, pointer_inside, pointer_visible, modal_allowed, inert;
+    cui_id pointer_hit, capture;
+    float opacity;
+    double frame_time;
+    float frame_delta;
+} cui_prepaint_info;
+typedef bool (*cui_prepaint_fn)(const cui_prepaint_info *, const void *, cui_prepaint_writer *);
+typedef struct {
+    cui_prepaint_fn callback;
+    const void *payload;
+    size_t payload_bytes;   /* Copied/aligned frame storage; contained pointers remain borrowed. */
+    size_t command_budget;  /* Positive; includes two clip commands per nonempty stream. */
+    bool hover_hitbox;      /* Passive point-occlusion participation, never activation/focus. */
+    int16_t deferred_layer; /* Zero inherits owner; other layers must not precede owner. */
+} cui_prepaint_options;
+bool cui_set_prepaint(cui_context *, cui_prepaint_options);
+/* Explicit passive barrier, including inert painted overlays; false clears it.
+ * Layout-only nodes never participate. Does not alter input dispatch. */
+bool cui_set_hover_hitbox(cui_context *, bool enabled);
+/* Global-coordinate paint. Local stream clips to visible_bounds; deferred stream
+ * clips to viewport, uses the requested layer and is denied outside modal scope.
+ * No caller clip commands. TEXT data is copied; bitmap/mesh storage is borrowed
+ * through renderer completion. A false callback/invalid emit rolls back its output;
+ * capacity failure empties the final draw list. Writer is callback-local only. */
+bool cui_prepaint_emit(cui_prepaint_writer *, const cui_draw_command *, bool deferred);
+cui_size cui_prepaint_measure(cui_prepaint_writer *, cui_str, float, cui_text_style);
+void cui_prepaint_request_frame(cui_prepaint_writer *);
+
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Zero-flow child at parent-relative bounds, inheriting clipping and layer.
  * A width/height of -1 fills the corresponding parent extent; zero is fixed.

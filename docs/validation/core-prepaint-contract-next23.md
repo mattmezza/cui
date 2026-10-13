@@ -2,8 +2,9 @@
 
 Audit source: CUI `3f4e108`; reference GPUI component v0.7.1
 `87d10ae5e1299d1be18670a37570c5402f952e34` in
-`/tmp/cui-gpui-reference`. This is a design proposal, not an implemented API or
-Chart/Plot feature promotion. No production files were changed.
+`/tmp/cui-gpui-reference`. The audit below records the original design. The Core implementation now adds
+the paint-only contract described here; Chart/Plot integration and source-family
+feature promotion remain separate work.
 
 ## Observed phases and the actual gap
 
@@ -270,3 +271,76 @@ fixture passed both the command above and ASAN/UBSAN with leak detection.
 Optional native adapters were excluded from this portable audit build; no
 native GPU or SDL coverage is inferred. Logs are under
 `/home/matteo/.cache/cui-validation/tmp-storage/core-prepaint`.
+
+## Implemented Core contract
+
+Register `cui_set_prepaint` while the owning identified box is open. One
+registration per box is allowed; duplicate registration reports
+`CUI_ERROR_DUPLICATE_ID` and preserves the first. The callback and a positive
+command budget are required. Payload bytes are copied into the existing bounded
+frame arena with `max_align_t` alignment. Pointers inside the payload remain
+borrowed and must survive `cui_end_frame`; no caller-owned pointee rollback is
+promised. Registrations and command storage are bounded by configured element
+and command capacities, with no per-frame heap allocation.
+
+After the single `Clay_EndLayout`, Core freezes current bounds, ancestor clips,
+visible intersections, opacity, modal eligibility, and the live global pointer.
+All callbacks see this same snapshot. `pointer_inside` is geometric;
+`pointer_visible` additionally requires modal eligibility, a non-inert owner,
+and the owner winning current-frame hit ordering. `capture` and public input
+queries retain the previous completed-frame routing contract. An offscreen
+owner still receives its callback with empty visible bounds so stationary hover
+state can be cleared; layout-only subtrees do not participate.
+
+`hover_hitbox` and `cui_set_hover_hitbox` add explicit passive hit participation
+without focus or activation. Such a barrier follows current clip, layer, paint
+root, and submission order. An explicitly participating inert painted overlay
+can occlude an underlying owner. Clearing the passive flag does not remove
+ordinary semantic control participation. Modal denial applies even outside the
+modal's painted rectangle; ordinary passive overlays only block their visible
+rectangle. The snapshot is read-only and does not replace input dispatch.
+
+The writer emits fixed portable RECT, BORDER, TEXT, IMAGE, and MESH commands in
+global coordinates. Local output appears at the owner's custom paint seam after
+its existing underlay, before its children, clipped to current visible bounds.
+Existing custom-data painters remain intact. Text and contextual text spans are
+copied into frame storage; bitmap pixels and mesh vertices remain borrowed under
+the normal draw-list lifetime contract. Owner opacity is applied once.
+Caller clip commands and invalid/nonfinite geometry are rejected.
+
+Deferred output is clipped to the viewport and ordered among top-level paint
+layers. Zero inherits the owner layer; nonzero values must be nonnegative and
+at least the owner layer. Negative values (including `INT16_MIN`) and values
+preceding the owner are rejected atomically during registration. Positive values
+through `INT16_MAX` are supported. At equal layers, owner paint order decides
+ordering; the deferred stream follows that layer's ordinary paint. An owner
+outside the active modal scope cannot emit deferred output, so increasing its
+layer cannot cross a modal boundary. A modal-eligible owner may request a later
+layer; later modal portal paint still follows normal layer ordering. No negative
+portal support is introduced.
+
+Each nonempty local or deferred stream uses two implicit clip commands, included
+in the declared command budget. Returning false, invalid commands, or prohibited
+mutation discards that callback's output and frame-arena additions while retaining
+ordinary owner paint. Capacity failure empties the entire returned draw list and
+reports `CUI_ERROR_CAPACITY`; it does not expose a partial command stream. Clear
+the sticky error explicitly outside a callback before subsequent error checks.
+
+Callbacks may use `cui_prepaint_measure` and `cui_prepaint_request_frame`.
+Measurement hooks run inside the same phase guard. Layout, event queuing,
+focus/semantics/resources mutation, nested frame execution, creation/destruction,
+and public invalidation are rejected during a callback, including mutation of
+another context on the same thread. This records `CUI_ERROR_LIFECYCLE` and rolls
+back the owner output. The writer itself is valid only during its callback;
+retaining or using its pointer later is invalid. Read-only input queries remain
+available. A repaint request is explicit; Core does not animate automatically.
+
+`tests/unit/test_prepaint.c` exercises current clipped bounds and opacity,
+stationary-pointer relayout, copied payload/text lifetime, passive portal and
+modal occlusion, offscreen callbacks, local/deferred ordering and balanced clips,
+maximum and negative layers, duplicate/arena/command capacity, invalid paint,
+callback and measurement reentrancy, previous-frame capture preservation, and
+explicit repaint requests. This is Core evidence, not physical-device evidence
+or a claim that Chart/Plot consumers already use the new seam. Arbitrary
+layout-submitted tooltip content still requires a separate integration design;
+the new deferred stream deliberately supports fixed paint only.

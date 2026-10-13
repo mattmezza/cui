@@ -1,0 +1,9 @@
+Theme token preview and initial visible Markdown fence
+Parent: 917f17d; portable library source unchanged.
+Native CTest: 75/75 PASS; strict C11 WASM build PASS.
+Complete Chromium gallery: 78 stories and 78 compiled excerpts PASS.
+Browser checks six token labels, font metrics, theme pixels and an initially visible
+monospace C fence within the first 320px of the TextView viewport.
+Lint/format/distribution checks PASS after formatting; native suite rerun PASS.
+Parent portable source passes native77, sanitizers75 and WASI67.
+This improves demonstrations and docs; it does not certify full Theme/TextView parity.

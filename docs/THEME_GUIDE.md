@@ -2,7 +2,9 @@
 
 A `cui_theme` C struct carries surface/background, text/muted, primary/on-primary, border/focus/destructive colors and typography/spacing/radius/control height. `cui_theme_light`, `dark`, `high_contrast`, and `terminal` return runtime values. Pass the theme to every styled call; copying and adjusting a token is an explicit per-component override.
 
-The gallery offers light/dark and high contrast switches. The terminal system proves different presentation over the same base behavior. High contrast uses distinct foreground/border/focus values and larger type. System preference detection, a theme-file loader, comprehensive typography/shadow/motion/semantic token families and global density provider are pending. Reduced-motion support will require an actual animation scheduler; no animation is currently claimed.
+The website follows your system light/dark preference by default. Its header palette button selects Follow System, a built-in theme, or one of the pinned named GPUI palette adaptations; an explicit choice persists across visits. The Theme preview shows six actual semantic color tokens alongside typography and controls. It is a design-system demonstration, rather than a separate input widget. Native applications choose a `cui_theme` and pass it into styled component calls; system appearance is supplied by the host. High contrast and the terminal theme demonstrate alternative presentation over the same base behavior.
+
+Motion uses host frame time and component state; Switch, Shimmer, disclosure, loading indicators and indeterminate Progress expose reduced-motion handling. A comprehensive typography/shadow/motion token system, native theme-file loader and automatic global density provider remain pending. The gallery density selector adjusts its example theme.
 
 Intent tokens `warning`, `success`, `info`, and `danger` can be used as filled
 surfaces or as text/borders on the theme surface. `on_warning`, `on_success`,
@@ -30,3 +32,15 @@ state and the host supplies time/redraw scheduling.
 The independent `secondary` background and `secondary_foreground` tokens style semantic secondary content such as Tag. Button palettes remain separately overridable.
 
 Tabs have independent `tab_foreground`, `tab_active_foreground`, `tab_active`, `tab_bar`, `tab_bar_segmented`, and `secondary_hover` colors. These do not follow later edits to Button palettes automatically. `spring_move` configures positional motion separately from `spring_control`, defaulting to response0.28seconds, damping0.85, epsilon0.1 and enabled travel.
+
+## Override a token
+
+```c
+cui_theme theme = cui_theme_light();
+theme.radius = 8;
+theme.font_size = 16;
+theme.gap = 12;
+cui_button(ui, id, &theme, cui_string("Save changes"), false);
+```
+
+Retain the chosen theme in application state. Change it in response to your host's appearance notification or theme menu callback and invalidate the context. Component values and models remain intact when the theme changes. `cui_theme_preset_get` loads a named palette by index without exposing platform types; see the Theme Presets guide for the pinned collection.

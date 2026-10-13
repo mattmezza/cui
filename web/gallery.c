@@ -1380,12 +1380,13 @@ int gallery_text_view_stats(int field) {
 }
 static bool gallery_text_view_load(void) {
     static const char *documents[] = {
-        "# Project notes\n\nA **bold** idea with *emphasis* and `inline code`. "
+        "# Project notes\n\n```c\n"
+        "cui_text_view(ui, id, theme, &state, options);\n```\n\n"
+        "A **bold** idea with *emphasis* and `inline code`. "
         "Read the [CUI guide](https://example.com/cui).\n\n"
         "- First task\n- Second task\n\n"
         "> A portable interface starts with clear content.\n\n"
-        "| Stage | Owner |\n| --- | --- |\n| Design | Ada |\n| Test | Lin |\n\n"
-        "```c\ncui_text_view(ui, id, theme, &state, options);\n```",
+        "| Stage | Owner |\n| --- | --- |\n| Design | Ada |\n| Test | Lin |\n",
         "<h1>Project notes</h1><p>A <strong>bold</strong> idea with <em>emphasis</em> "
         "and <code>inline code</code>. Read the <a href=\"https://example.com/cui\">CUI "
         "guide</a>.</p>"
@@ -2779,8 +2780,42 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_separator(ui, cui_id_from(ui, "separator"), &t, width - 48);
         cui_label(ui, &t, cui_string("After the separator"));
         break;
-    case 11:
-        cui_label(ui, &t, cui_string("Semantic tokens and runtime themes"));
+    case 11: {
+        cui_label(ui, &t, cui_string("Themes are reusable design tokens"));
+        cui_label(ui, &t,
+                  cui_string("Use the palette button in the website header to switch themes."));
+        const char *names[] = {"Background", "Surface", "Text", "Primary", "Border", "Focus"};
+        cui_color colors[] = {t.background, t.surface, t.text, t.primary, t.border, t.focus};
+        for (unsigned row = 0; row < 3; row++) {
+            cui_push_id(ui, names[row * 2]);
+            cui_begin_box(ui, cui_id_from(ui, "token-row"),
+                          (cui_box){.row = true, .width = width - 48, .gap = 12});
+            for (unsigned column = 0; column < 2; column++) {
+                unsigned token = row * 2 + column;
+                cui_push_id(ui, names[token]);
+                cui_begin_box(ui, cui_id_from(ui, "token"),
+                              (cui_box){.row = true,
+                                        .width = (width - 60) / 2,
+                                        .height = 28,
+                                        .gap = 8,
+                                        .align_y = CUI_ALIGN_CENTER});
+                cui_begin_box(ui, cui_id_from(ui, token ? "token-swatch" : "background-swatch"),
+                              (cui_box){.width = 24,
+                                        .height = 24,
+                                        .radius = t.radius,
+                                        .background = colors[token],
+                                        .border = t.border,
+                                        .border_width = 1});
+                cui_end_box(ui);
+                cui_label(ui, &t, cui_string(names[token]));
+                cui_end_box(ui);
+                cui_pop_id(ui);
+            }
+            cui_end_box(ui);
+            cui_pop_id(ui);
+        }
+        cui_label(ui, &t,
+                  cui_string("The same controls inherit the colors, font size and corner radius."));
         cui_text_ex(ui, cui_string("Semibold heading"), 24, t.text, 30,
                     (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD});
         cui_text_ex(ui, cui_string("Italic emphasis"), 14, t.muted, 20,
@@ -2816,6 +2851,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_end_box(ui);
         }
         break;
+    }
     case 12:
         cui_alert(ui, cui_id_from(ui, "alert"), &t,
                   (cui_alert_options){.kind = CUI_ALERT_INFO,

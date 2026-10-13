@@ -269,6 +269,10 @@ def main():
             page.evaluate('''()=>{window.styledTextFonts={};window.styledTextPaint={};const original=CanvasRenderingContext2D.prototype.fillText;window.restoreFillText=()=>{CanvasRenderingContext2D.prototype.fillText=original};CanvasRenderingContext2D.prototype.fillText=function(value,...args){if(['Semibold heading','Italic emphasis','Monospace code'].includes(value)){window.styledTextFonts[value]=this.font;window.styledTextPaint[value]={y:args[1],baseline:this.textBaseline};}return original.call(this,value,...args)}}''')
             page.evaluate('location.hash="Theme"')
             page.wait_for_function('cuiGallery.renderedComponent==="Theme"')
+            page.wait_for_function("Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).some(i=>cuiGallery.exports.gallery_command(i,0)===2 && new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))==='Themes are reusable design tokens')")
+            for token in ['Background','Surface','Text','Primary','Border','Focus']:
+                assert page.evaluate("label=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))===label)}", token)
+
             page.wait_for_function('Object.keys(window.styledTextFonts).length===3')
             fonts = page.evaluate('window.styledTextFonts')
             assert '600' in fonts['Semibold heading'], fonts
@@ -564,6 +568,11 @@ def main():
             control_change('disabled', False)
             page.evaluate('location.hash="TextView"')
             page.wait_for_function('cuiGallery.renderedComponent==="TextView"')
+            # Fenced code must be visible in the initial viewport, not just parsed below it.
+            page.wait_for_function("()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>e.gallery_command(i,0)===2&&e.gallery_command(i,24)===1&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))).includes('cui_text_view'))}")
+            code_bounds = page.evaluate("()=>{const e=cuiGallery.exports;const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))).includes('cui_text_view'));return [e.gallery_command(i,2),e.gallery_command(i,4)]}")
+            assert code_bounds[0] >= 0 and sum(code_bounds) < 320, code_bounds
+
             assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(5)') == 0
             assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(0)') > 100
             assert page.evaluate('cuiGallery.exports.gallery_text_view_stats(1)') >= 7

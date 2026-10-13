@@ -1116,7 +1116,23 @@ static void test_multicursor_typing_history(void) {
     assert(cui_edit_redo(edit) == CUI_EDIT_OK && !strcmp(buffer, "axyb\ncxyd"));
     cui_edit_destroy(edit);
 }
+static void test_typing_history_batch_limit(void) {
+    char buffer[1200] = "";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = sizeof buffer * 4,
+                                                      .max_history_steps = 3});
+    assert(edit);
+    for (size_t i = 0; i < 1001; ++i)
+        assert(cui_edit_type(edit, cui_string("x")) == CUI_EDIT_OK);
+    assert(strlen(buffer) == 1001);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && strlen(buffer) == 1000);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !buffer[0]);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    test_typing_history_batch_limit();
     test_multicursor_typing_history();
     test_typing_history_coalescing();
     test_change_span_metadata();

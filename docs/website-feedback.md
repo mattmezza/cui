@@ -35,20 +35,20 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 
 ## Design system
 
-- [ ] Shared size scale: xs, sm, base, md, lg, xl, 2xl, 3xl, 4xl and larger where useful.
-- [ ] Rounded-corner tokens and interactive examples.
-- [ ] Typography: fonts, styles, weights and sizes.
-- [ ] Animation examples and configurable motion.
-- [ ] Backgrounds: colors, gradients, opacity and blur, with truthful renderer capabilities.
-- [ ] Spacing tokens with explicit unit-to-pixel dimensions.
-- [ ] Professional composed examples with copyable working code: app shell, sidebar/hamburger, account menu, hero and pricing CTAs.
+- [x] [Shared size scale](DESIGN_SYSTEM.md): xs through9xl, preserving inherited metrics. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Rounded-corner tokens and interactive examples](DESIGN_SYSTEM.md). — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Typography](TYPOGRAPHY.md): registered fonts, styles, weights and sizes. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Animation examples and configurable/reduced motion](MOTION.md). — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Backgrounds](BACKGROUNDS.md): colors, gradients, opacity and bitmap blur, with documented renderer capabilities. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Spacing tokens](DESIGN_SYSTEM.md) with explicit unit-to-pixel dimensions. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Composed native app example](COMPOSED_APPS.md): sidebar/hamburger, account menu, hero, pricing CTAs and editable settings. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
 
 ## Documentation and publishing
 
-- [ ] Every component explains its immediate/retained state and ownership.
-- [ ] Callback, event and host integration examples.
+- [x] [All78 component usage guides](COMPONENT_USAGE.md) explain frame composition, retained state and ownership. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
+- [x] [Callback/event/host examples](IMMEDIATE_AND_STATE.md), with per-component usage and synchronous lifetime rules. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
 - [x] Reproducible Go, Rust, JavaScript and TypeScript examples with actual support limits. Integrated `fc56f33`; four headless clients and four SDL3/Xvfb native windows pass actual pointer-click callbacks. The small example host ABI is not a full component binding. See [LANGUAGE_BINDINGS.md](LANGUAGE_BINDINGS.md).
-- [ ] Improved browsable documentation and intuitive getting-started path.
+- [x] [Browsably published docs and getting-started path](START_HERE.md), including reproducible build, state/callback and host instructions. — Published9220c22: [full live-site evidence](validation/published-9220c22.txt), with actual C/WASM pixels and interaction checks. See the linked guide for capabilities and limits.
 - [x] Copyable agent prompt and generated llms.txt / llms-full.txt, with llm.txt and llm-full.txt aliases. — Published f6c8cf8; actual HTTPS copy/export checks and artifact byte comparisons pass. Broader documentation and bindings remain open.
 - [x] Original product media with recorded provenance. — 31847cc adds real CUI WASM workspace captures for light/dark, a 1200×630 original social card and a pinned regeneration script. The larger composed-app gallery remains open. Published in 1dc98a9; HTTPS78 and all 147 page artifacts verified.
 - [x] Static Open Graph coverage for home, all 78 components and every published docs entry. — 31847cc validates 147 distinct canonical pages, required tags, share-image dimensions, sitemap and JS-disabled fallback content. Direct project-Pages visits/reloads and Chromium78 pass. External sharing-service caches are not asserted. Published in 1dc98a9; HTTPS78 and all 147 page artifacts verified.

@@ -1,0 +1,17 @@
+Validated source:726a730dce69c838345bec31355707aa14c8fd89
+Portable SHA256:5ea622ca90366fb090fc257be2fb965180ef8d3bab1fb842db52c39f0e0b6bd6
+WASI75/75 runtime suites; fingerprint unchanged throughout and after source commit.
+Original frozenHEAD8292ccf+trackednext13 generated/format changes equals726a730.
+Warnings native90/90, ASAN/UBSAN88/88; coremetrics accessorASAN1/1.
+Real Chromium full78 stories/78 compiledexcerpts includes rectangular two-row
+selection,replacement/Undo,and three-cursor bracket-indent/Undo. FullChrome
+extensions/design/app/mobile pass. Followingtypedfactory/Coregeneration changes
+have no gallerybehavior changes and are coveredbyfullnative/sanitizer/WASI.
+Docs3/usage5/sharing3 +manifest/licenses/pins/format/generateddistribution pass.
+200,000-line documentcorrectness only; cache/performance workerqueuednext14.
+StyledPlot appearance/hover composition and sRGB gradient softwarepaint tested.
+Source-shapedtypedDockArea persistence atomicfourmodels/workspace/factories tested.
+NativeGPU mesh rendering and automaticCoreprepaint remainmissing.
+Next13 logs /home/matteo/.cache/cui-validation/next13-{native-test2,asan-test,wasi,browser,extensions}.log
+Full-familyparity incomplete:2 implemented/76 tested/0 verified.
+Publication ofthisrevision pending.

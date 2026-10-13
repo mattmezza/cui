@@ -4,6 +4,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 static bool close(double a, double b) {
     return fabs(a - b) <= 1e-11 * fmax(1, fmax(fabs(a), fabs(b)));
 }
@@ -15,7 +16,206 @@ static double random_unit(void) {
     seed = seed * UINT64_C(6364136223846793005) + 1;
     return (double)(seed >> 11) / 9007199254740992.0;
 }
+static void band_scales(void) {
+    const uint64_t keys[] = {1, 2, 3, 1, 2, 3};
+    uint64_t storage[8] = {99, 99, 99, 99, 99, 99, 99, 99};
+    cui_plot_band_scale scale = {0};
+    size_t required = 999, index = 999;
+    cui_plot_band_options options = {.range_start = 0, .range_end = 90};
+    assert(cui_plot_band_init(&scale, NULL, 0, keys, 6, options, &required) == CUI_PLOT_CAPACITY);
+    assert(required == 3 && scale.count == 0);
+    assert(cui_plot_band_init(&scale, storage, 2, keys, 6, options, &required) ==
+           CUI_PLOT_CAPACITY);
+    assert(storage[0] == 99 && scale.count == 0 && required == 3);
+    assert(cui_plot_band_init(&scale, storage, 8, keys, 6, options, &required) == CUI_PLOT_OK);
+    assert(required == 3 && scale.count == 3 && storage[0] == 1 && storage[1] == 2 &&
+           storage[2] == 3);
+    cui_plot_band_geometry geometry;
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OK);
+    assert(geometry.start == 0 && geometry.step == 30 && geometry.band_width == 30);
+    double pixel = 1234;
+    assert(cui_plot_band_map(&scale, 2, &pixel) == CUI_PLOT_OK && pixel == 30);
+    assert(cui_plot_band_map(&scale, 9, &pixel) == CUI_PLOT_EMPTY && pixel == 30);
+    assert(cui_plot_band_at(&scale, 3, &pixel) == CUI_PLOT_EMPTY && pixel == 30);
+    assert(cui_plot_band_nearest(&scale, 15, &index) == CUI_PLOT_OK && index == 1);
+    assert(cui_plot_band_nearest(&scale, -100, &index) == CUI_PLOT_OK && index == 0);
+    assert(cui_plot_band_nearest(&scale, 100, &index) == CUI_PLOT_OK && index == 2);
+    scale.options.padding_inner = .4;
+    scale.options.padding_outer = .2;
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OK);
+    assert(close(geometry.start, 6) && close(geometry.step, 31.2) &&
+           close(geometry.band_width, 18));
+    assert(cui_plot_band_map(&scale, 3, &pixel) == CUI_PLOT_OK && close(pixel, 68.4));
+    scale.options.has_max_band_width = true;
+    scale.options.max_band_width = 10;
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OK && geometry.band_width == 10);
+    assert(cui_plot_band_map(&scale, 3, &pixel) == CUI_PLOT_OK && close(pixel, 68.4));
+    scale.options.range_start = 90;
+    scale.options.range_end = 0;
+    assert(cui_plot_band_map(&scale, 1, &pixel) == CUI_PLOT_OK && close(pixel, 6));
+    scale.options = (cui_plot_band_options){.range_start = 0,
+                                            .range_end = 100,
+                                            .padding_inner = .4,
+                                            .padding_outer = .2,
+                                            .band_count = 4};
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OK && geometry.band_count == 4);
+    assert(close(geometry.step, 25.5) && close(geometry.band_width, 15));
+    assert(cui_plot_band_map(&scale, 2, &pixel) == CUI_PLOT_OK && close(pixel, 30.5));
+    assert(cui_plot_band_nearest(&scale, 81.5, &index) == CUI_PLOT_OK && index == 3);
+    scale.count = 1;
+    assert(cui_plot_band_map(&scale, 1, &pixel) == CUI_PLOT_OK && close(pixel, 5));
+    scale.options.band_count = 0;
+    assert(cui_plot_band_map(&scale, 1, &pixel) == CUI_PLOT_OK && close(pixel, 20));
+    scale.options.has_max_band_width = true;
+    scale.options.max_band_width = 30;
+    assert(cui_plot_band_map(&scale, 1, &pixel) == CUI_PLOT_OK && pixel == 35);
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OK && geometry.step == 100);
+    scale.options.range_start = scale.options.range_end = 12;
+    assert(cui_plot_band_map(&scale, 1, &pixel) == CUI_PLOT_OK && pixel == 12);
+    scale.count = 3;
+    assert(cui_plot_band_nearest(&scale, 12, &index) == CUI_PLOT_OK && index == 0);
+    assert(cui_plot_band_nearest(&scale, 13, &index) == CUI_PLOT_OK && index == 2);
+    assert(cui_plot_band_init(&scale, NULL, 0, NULL, 0, options, &required) == CUI_PLOT_OK);
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OK && geometry.band_width == 0);
+    assert(cui_plot_band_nearest(&scale, 50, &index) == CUI_PLOT_OK && index == 0);
+    scale.options.band_count = 4;
+    assert(cui_plot_band_nearest(&scale, 60, &index) == CUI_PLOT_OK && index == 3);
+    uint64_t aliased[] = {3, 1, 3, 2, 1};
+    assert(cui_plot_band_init(&scale, aliased + 1, 4, aliased, 5, options, &required) ==
+           CUI_PLOT_OK);
+    assert(scale.count == 3 && aliased[1] == 3 && aliased[2] == 1 && aliased[3] == 2);
+    cui_plot_band_scale saved = scale;
+    uint64_t saved_keys[5];
+    memcpy(saved_keys, aliased, sizeof aliased);
+    cui_plot_band_options bad[] = {{.range_end = NAN},
+                                   {.range_start = INFINITY},
+                                   {.padding_inner = -1},
+                                   {.padding_inner = 2},
+                                   {.padding_outer = -1},
+                                   {.padding_outer = 2},
+                                   {.max_band_width = -1, .has_max_band_width = true},
+                                   {.max_band_width = INFINITY, .has_max_band_width = true},
+                                   {.band_count = CUI_PLOT_CATEGORY_LIMIT + 1}};
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; ++i) {
+        required = 987;
+        assert(cui_plot_band_init(&scale, aliased, 5, keys, 6, bad[i], &required) != CUI_PLOT_OK);
+        assert(required == 987 && !memcmp(&scale, &saved, sizeof scale) &&
+               !memcmp(aliased, saved_keys, sizeof aliased));
+    }
+    pixel = 321;
+    index = 432;
+    geometry = (cui_plot_band_geometry){.start = 543};
+    assert(cui_plot_band_map(NULL, 1, &pixel) == CUI_PLOT_INVALID && pixel == 321);
+    assert(cui_plot_band_layout(&scale, NULL) == CUI_PLOT_INVALID);
+    assert(cui_plot_band_nearest(&scale, NAN, &index) == CUI_PLOT_INVALID && index == 432);
+    scale.options = (cui_plot_band_options){.range_start = -DBL_MAX, .range_end = DBL_MAX};
+    scale.count = 1;
+    assert(cui_plot_band_layout(&scale, &geometry) == CUI_PLOT_OVERFLOW && geometry.start == 543);
+}
+static void point_scales(void) {
+    const uint64_t keys[] = {5, 7, 5, 9};
+    cui_plot_point_scale scale;
+    assert(cui_plot_point_init(&scale, keys, 4, 40, 100) == CUI_PLOT_OK);
+    double pixel = 987;
+    size_t index = 876;
+    assert(cui_plot_point_map(&scale, 5, &pixel) == CUI_PLOT_OK && pixel == 40);
+    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && pixel == 80);
+    assert(cui_plot_point_at(&scale, 3, &pixel) == CUI_PLOT_OK && pixel == 100);
+    assert(cui_plot_point_nearest(&scale, 50, &index) == CUI_PLOT_OK && index == 1);
+    assert(cui_plot_point_nearest(&scale, 30, &index) == CUI_PLOT_OK && index == 0);
+    assert(cui_plot_point_nearest(&scale, 110, &index) == CUI_PLOT_OK && index == 3);
+    assert(cui_plot_point_init(&scale, keys, 4, 100, 40) == CUI_PLOT_OK);
+    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && pixel == 60);
+    assert(cui_plot_point_nearest(&scale, 90, &index) == CUI_PLOT_OK && index == 1);
+    assert(cui_plot_point_nearest(&scale, 120, &index) == CUI_PLOT_OK && index == 0);
+    assert(cui_plot_point_nearest(&scale, 10, &index) == CUI_PLOT_OK && index == 3);
+    assert(cui_plot_point_init(&scale, keys, 1, 100, 40) == CUI_PLOT_OK);
+    assert(cui_plot_point_at(&scale, 0, &pixel) == CUI_PLOT_OK && pixel == 70);
+    assert(cui_plot_point_nearest(&scale, DBL_MAX, &index) == CUI_PLOT_OK && index == 0);
+    assert(cui_plot_point_init(&scale, NULL, 0, 40, 100) == CUI_PLOT_OK);
+    assert(cui_plot_point_nearest(&scale, 50, &index) == CUI_PLOT_OK && index == 0);
+    pixel = 123;
+    assert(cui_plot_point_map(&scale, 5, &pixel) == CUI_PLOT_EMPTY && pixel == 123);
+    assert(cui_plot_point_at(&scale, 0, &pixel) == CUI_PLOT_EMPTY && pixel == 123);
+    assert(cui_plot_point_init(&scale, keys, 4, 20, 20) == CUI_PLOT_OK);
+    assert(cui_plot_point_at(&scale, 3, &pixel) == CUI_PLOT_OK && pixel == 20);
+    assert(cui_plot_point_nearest(&scale, 30, &index) == CUI_PLOT_OK && index == 0);
+    cui_plot_point_scale saved = scale;
+    assert(cui_plot_point_init(&scale, NULL, 1, 0, 1) == CUI_PLOT_INVALID);
+    assert(cui_plot_point_init(&scale, keys, CUI_PLOT_CATEGORY_LIMIT + 1, 0, 1) ==
+           CUI_PLOT_CAPACITY);
+    assert(cui_plot_point_init(&scale, keys, 4, NAN, 1) == CUI_PLOT_INVALID);
+    assert(!memcmp(&scale, &saved, sizeof scale));
+    assert(cui_plot_point_map(NULL, 1, &pixel) == CUI_PLOT_INVALID);
+    assert(cui_plot_point_at(&scale, 0, NULL) == CUI_PLOT_INVALID);
+    index = 987;
+    assert(cui_plot_point_nearest(&scale, INFINITY, &index) == CUI_PLOT_INVALID && index == 987);
+    assert(cui_plot_point_init(&scale, keys, 3, -DBL_MAX, DBL_MAX) == CUI_PLOT_OK);
+    assert(cui_plot_point_at(&scale, 1, &pixel) == CUI_PLOT_OK && pixel == 0);
+    assert(cui_plot_point_at(&scale, 2, &pixel) == CUI_PLOT_OK && pixel == DBL_MAX);
+    for (unsigned i = 0; i < 500; ++i) {
+        double start = random_unit() * 1000 - 500, end = random_unit() * 1000 - 500;
+        if (fabs(start - end) < 1e-9)
+            continue;
+        assert(cui_plot_point_init(&scale, keys, 4, start, end) == CUI_PLOT_OK);
+        for (size_t j = 0; j < 4; ++j) {
+            assert(cui_plot_point_at(&scale, j, &pixel) == CUI_PLOT_OK);
+            assert(close(pixel, start + (end - start) * (double)j / 3));
+            assert(cui_plot_point_nearest(&scale, pixel, &index) == CUI_PLOT_OK && index == j);
+        }
+    }
+}
+static void ordinal_scales(void) {
+    const uint64_t keys[] = {1, 2, 1, 3, 4, 5};
+    const unsigned range[] = {10, 20, 30};
+    unsigned unknown = 0, output = 987;
+    cui_plot_ordinal_scale scale;
+    assert(cui_plot_ordinal_init(&scale, keys, 6, range, 3, sizeof *range, NULL) == CUI_PLOT_OK);
+    const unsigned expected[] = {10, 20, 10, 10, 20, 30};
+    for (size_t i = 0; i < 6; ++i) {
+        assert(cui_plot_ordinal_map(&scale, keys[i], &output, sizeof output) == CUI_PLOT_OK);
+        assert(output == expected[i]);
+    }
+    output = 987;
+    assert(cui_plot_ordinal_map(&scale, 99, &output, sizeof output) == CUI_PLOT_EMPTY &&
+           output == 987);
+    assert(cui_plot_ordinal_map(&scale, 1, &output, 1) == CUI_PLOT_CAPACITY && output == 987);
+    assert(cui_plot_ordinal_map(&scale, 1, NULL, 0) == CUI_PLOT_CAPACITY);
+    assert(cui_plot_ordinal_map(&scale, 1, NULL, sizeof output) == CUI_PLOT_INVALID);
+    assert(cui_plot_ordinal_init(&scale, keys, 6, range, 3, sizeof *range, &unknown) ==
+           CUI_PLOT_OK);
+    assert(cui_plot_ordinal_map(&scale, 99, &output, sizeof output) == CUI_PLOT_OK && output == 0);
+    assert(cui_plot_ordinal_init(&scale, keys, 6, NULL, 0, sizeof *range, &unknown) == CUI_PLOT_OK);
+    output = 987;
+    assert(cui_plot_ordinal_map(&scale, 1, &output, sizeof output) == CUI_PLOT_EMPTY &&
+           output == 987);
+    assert(cui_plot_ordinal_map(&scale, 99, &output, sizeof output) == CUI_PLOT_OK && output == 0);
+    assert(cui_plot_ordinal_init(&scale, NULL, 0, range, 3, sizeof *range, &unknown) ==
+           CUI_PLOT_OK);
+    assert(cui_plot_ordinal_map(&scale, 1, &output, sizeof output) == CUI_PLOT_OK && output == 0);
+    typedef struct {
+        unsigned char r, g, b, a;
+    } rgba;
+    const rgba colors[] = {{1, 2, 3, 255}, {4, 5, 6, 128}};
+    rgba color = {0};
+    assert(cui_plot_ordinal_init(&scale, keys, 6, colors, 2, sizeof *colors, NULL) == CUI_PLOT_OK);
+    assert(cui_plot_ordinal_map(&scale, 3, &color, sizeof color) == CUI_PLOT_OK);
+    assert(!memcmp(&color, &colors[1], sizeof color));
+    cui_plot_ordinal_scale saved = scale;
+    assert(cui_plot_ordinal_init(&scale, keys, 6, colors, 2, 0, NULL) == CUI_PLOT_INVALID);
+    assert(cui_plot_ordinal_init(&scale, keys, 6, NULL, 2, sizeof color, NULL) == CUI_PLOT_INVALID);
+    assert(cui_plot_ordinal_init(&scale, NULL, 6, colors, 2, sizeof color, NULL) ==
+           CUI_PLOT_INVALID);
+    assert(cui_plot_ordinal_init(&scale, keys, 6, colors, SIZE_MAX, sizeof color, NULL) ==
+           CUI_PLOT_CAPACITY);
+    assert(cui_plot_ordinal_init(&scale, keys, 6, colors, 2, SIZE_MAX, NULL) == CUI_PLOT_CAPACITY);
+    assert(!memcmp(&scale, &saved, sizeof scale));
+    assert(cui_plot_ordinal_map(NULL, 1, &color, sizeof color) == CUI_PLOT_INVALID);
+}
 int main(void) {
+    band_scales();
+    point_scales();
+    ordinal_scales();
     cui_plot_scale linear = {CUI_PLOT_LINEAR, 0, 100, 0, 500, false};
     double pixel, value;
     assert(cui_plot_map(&linear, 25, &pixel) == CUI_PLOT_OK && pixel == 125);

@@ -3,6 +3,7 @@
 #define CUI_PLOT_H
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,6 +30,70 @@ typedef struct {
 typedef struct {
     cui_plot_point start, end;
 } cui_plot_line;
+/* Allocation-free categorical scale models, using application-defined keys.
+ * Point/Ordinal borrow arrays; Band copies a first-occurrence deduplicated
+ * domain into caller storage. All buffers must outlive their models. */
+#define CUI_PLOT_CATEGORY_LIMIT 4096u
+#define CUI_PLOT_ORDINAL_BYTE_LIMIT 1048576u
+typedef struct {
+    double range_start, range_end, padding_inner, padding_outer, max_band_width;
+    size_t band_count;
+    bool has_max_band_width;
+} cui_plot_band_options;
+typedef struct {
+    uint64_t *domain;
+    size_t count, capacity;
+    cui_plot_band_options options;
+} cui_plot_band_scale;
+typedef struct {
+    double start, step, band_width;
+    size_t band_count;
+} cui_plot_band_geometry;
+/* On CAPACITY, required reports distinct key count; scale/storage are untouched.
+ * NULL storage with zero capacity queries required storage. Initialization is
+ * transactional, including when input keys alias destination storage. */
+cui_plot_result cui_plot_band_init(cui_plot_band_scale *, uint64_t *storage, size_t capacity,
+                                   const uint64_t *domain, size_t count, cui_plot_band_options,
+                                   size_t *required);
+/* Band order always starts at the lower endpoint, including reversed ranges.
+ * Inner padding is 0..1; outer padding is nonnegative and at most half the
+ * effective band count. Width cap affects widths, not ticks/steps. */
+cui_plot_result cui_plot_band_layout(const cui_plot_band_scale *, cui_plot_band_geometry *);
+cui_plot_result cui_plot_band_map(const cui_plot_band_scale *, uint64_t key, double *pixel);
+cui_plot_result cui_plot_band_at(const cui_plot_band_scale *, size_t index, double *pixel);
+/* May identify reserved empty bands beyond domain.count. Empty/zero-step scales
+ * return defined clamped indices; see PLOT_MODEL.md. */
+cui_plot_result cui_plot_band_nearest(const cui_plot_band_scale *, double pixel, size_t *index);
+typedef struct {
+    const uint64_t *domain;
+    size_t count;
+    double range_start, range_end;
+} cui_plot_point_scale;
+/* Point preserves duplicate keys and range direction. Key lookup finds the
+ * first occurrence; at() maps each entry, including later duplicates. */
+cui_plot_result cui_plot_point_init(cui_plot_point_scale *, const uint64_t *domain, size_t count,
+                                    double range_start, double range_end);
+cui_plot_result cui_plot_point_map(const cui_plot_point_scale *, uint64_t key, double *pixel);
+cui_plot_result cui_plot_point_at(const cui_plot_point_scale *, size_t index, double *pixel);
+cui_plot_result cui_plot_point_nearest(const cui_plot_point_scale *, double pixel, size_t *index);
+typedef struct {
+    const uint64_t *domain;
+    size_t count;
+    const void *range, *unknown;
+    size_t range_count, element_size;
+    bool has_unknown;
+} cui_plot_ordinal_scale;
+/* Generic range elements are copied with memmove, preserving their C type's
+ * bytes. Range and optional unknown value are borrowed. No implicit domain
+ * insertion. Known keys use their first index modulo range_count; a known key
+ * with empty range stays EMPTY even when unknown is configured. */
+cui_plot_result cui_plot_ordinal_init(cui_plot_ordinal_scale *, const uint64_t *domain,
+                                      size_t count, const void *range, size_t range_count,
+                                      size_t element_size, const void *unknown);
+/* EMPTY/INVALID/OVERFLOW/CAPACITY leave output unchanged. NULL output/zero
+ * capacity queries required element capacity for a resolvable key. */
+cui_plot_result cui_plot_ordinal_map(const cui_plot_ordinal_scale *, uint64_t key, void *output,
+                                     size_t output_capacity);
 /* Domain must ascend; pixel ranges may reverse. All endpoints finite. */
 cui_plot_result cui_plot_validate(const cui_plot_scale *);
 cui_plot_result cui_plot_map(const cui_plot_scale *, double value, double *pixel);

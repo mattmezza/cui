@@ -301,3 +301,225 @@ cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_sca
     *out = r;
     return CUI_PLOT_OK;
 }
+
+static cui_plot_result cui_plot_categories(const uint64_t *keys, size_t count) {
+    if (count > CUI_PLOT_CATEGORY_LIMIT)
+        return CUI_PLOT_CAPACITY;
+    return count && !keys ? CUI_PLOT_INVALID : CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_band_geometry_for(size_t count, cui_plot_band_options o,
+                                                  cui_plot_band_geometry *out) {
+    if (!isfinite(o.range_start) || !isfinite(o.range_end) || !isfinite(o.padding_inner) ||
+        o.padding_inner < 0 || o.padding_inner > 1 || !isfinite(o.padding_outer) ||
+        o.padding_outer < 0 ||
+        (o.has_max_band_width && (!isfinite(o.max_band_width) || o.max_band_width < 0)))
+        return CUI_PLOT_INVALID;
+    size_t bands = count > o.band_count ? count : o.band_count;
+    if (bands > CUI_PLOT_CATEGORY_LIMIT)
+        return CUI_PLOT_CAPACITY;
+    if (bands && o.padding_outer > (double)bands / 2)
+        return CUI_PLOT_INVALID;
+    long double low = fmin(o.range_start, o.range_end);
+    long double high = fmax(o.range_start, o.range_end);
+    long double span = high - low;
+    long double average = bands ? span / bands : 0;
+    long double width = average * (1 - o.padding_inner);
+    if (o.has_max_band_width)
+        width = fminl(width, o.max_band_width);
+    long double step = bands <= 1 ? span
+                                  : average * (1 - 2 * (long double)o.padding_outer / bands) *
+                                        (1 + (long double)o.padding_inner / (bands - 1));
+    long double start =
+        bands == 1 ? cui_plot_lerp(low, high, .5L) - width / 2 : low + average * o.padding_outer;
+    cui_plot_band_geometry result = {.band_count = bands};
+    cui_plot_result status = cui_plot_number(start, &result.start);
+    if (status == CUI_PLOT_OK)
+        status = cui_plot_number(step, &result.step);
+    if (status == CUI_PLOT_OK)
+        status = cui_plot_number(width, &result.band_width);
+    if (status == CUI_PLOT_OK)
+        *out = result;
+    return status;
+}
+cui_plot_result cui_plot_band_layout(const cui_plot_band_scale *s, cui_plot_band_geometry *out) {
+    if (!s || !out || s->count > s->capacity)
+        return CUI_PLOT_INVALID;
+    cui_plot_result status = cui_plot_categories(s->domain, s->count);
+    return status == CUI_PLOT_OK ? cui_plot_band_geometry_for(s->count, s->options, out) : status;
+}
+cui_plot_result cui_plot_band_init(cui_plot_band_scale *s, uint64_t *storage, size_t capacity,
+                                   const uint64_t *domain, size_t count,
+                                   cui_plot_band_options options, size_t *required) {
+    if (!s || !required || (capacity && !storage))
+        return CUI_PLOT_INVALID;
+    cui_plot_result status = cui_plot_categories(domain, count);
+    if (status != CUI_PLOT_OK)
+        return status;
+    uint64_t distinct[CUI_PLOT_CATEGORY_LIMIT];
+    size_t unique = 0;
+    for (size_t i = 0; i < count; ++i) {
+        size_t at = 0;
+        while (at < unique && distinct[at] != domain[i])
+            ++at;
+        if (at == unique)
+            distinct[unique++] = domain[i];
+    }
+    cui_plot_band_geometry geometry;
+    status = cui_plot_band_geometry_for(unique, options, &geometry);
+    if (status != CUI_PLOT_OK)
+        return status;
+    *required = unique;
+    if (capacity < unique)
+        return CUI_PLOT_CAPACITY;
+    if (unique)
+        memmove(storage, distinct, unique * sizeof *storage);
+    *s = (cui_plot_band_scale){storage, unique, capacity, options};
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_band_at(const cui_plot_band_scale *s, size_t index, double *pixel) {
+    if (!pixel)
+        return CUI_PLOT_INVALID;
+    cui_plot_band_geometry geometry;
+    cui_plot_result status = cui_plot_band_layout(s, &geometry);
+    if (status != CUI_PLOT_OK)
+        return status;
+    if (index >= s->count)
+        return CUI_PLOT_EMPTY;
+    return cui_plot_number((long double)geometry.start + index * (long double)geometry.step, pixel);
+}
+cui_plot_result cui_plot_band_map(const cui_plot_band_scale *s, uint64_t key, double *pixel) {
+    if (!pixel)
+        return CUI_PLOT_INVALID;
+    cui_plot_band_geometry geometry;
+    cui_plot_result status = cui_plot_band_layout(s, &geometry);
+    if (status != CUI_PLOT_OK)
+        return status;
+    for (size_t i = 0; i < s->count; ++i)
+        if (s->domain[i] == key)
+            return cui_plot_band_at(s, i, pixel);
+    return CUI_PLOT_EMPTY;
+}
+static size_t cui_plot_nearest_category(long double index, size_t count) {
+    if (!count || index <= 0)
+        return 0;
+    if (!isfinite(index) || index >= (long double)(count - 1))
+        return count - 1;
+    return (size_t)floorl(index + .5L);
+}
+cui_plot_result cui_plot_band_nearest(const cui_plot_band_scale *s, double pixel, size_t *index) {
+    if (!index || !isfinite(pixel))
+        return CUI_PLOT_INVALID;
+    cui_plot_band_geometry geometry;
+    cui_plot_result status = cui_plot_band_layout(s, &geometry);
+    if (status != CUI_PLOT_OK)
+        return status;
+    size_t result = 0;
+    if (geometry.band_count > 1) {
+        if (geometry.step == 0)
+            result = pixel > geometry.start ? geometry.band_count - 1 : 0;
+        else {
+            long double normalized = ((long double)pixel - geometry.start) / geometry.step;
+            result = cui_plot_nearest_category(normalized, geometry.band_count);
+        }
+    }
+    *index = result;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_point_valid(const cui_plot_point_scale *s) {
+    if (!s || !isfinite(s->range_start) || !isfinite(s->range_end))
+        return CUI_PLOT_INVALID;
+    return cui_plot_categories(s->domain, s->count);
+}
+cui_plot_result cui_plot_point_init(cui_plot_point_scale *s, const uint64_t *domain, size_t count,
+                                    double start, double end) {
+    if (!s)
+        return CUI_PLOT_INVALID;
+    cui_plot_point_scale candidate = {domain, count, start, end};
+    cui_plot_result status = cui_plot_point_valid(&candidate);
+    if (status == CUI_PLOT_OK)
+        *s = candidate;
+    return status;
+}
+cui_plot_result cui_plot_point_at(const cui_plot_point_scale *s, size_t index, double *pixel) {
+    if (!pixel)
+        return CUI_PLOT_INVALID;
+    cui_plot_result status = cui_plot_point_valid(s);
+    if (status != CUI_PLOT_OK)
+        return status;
+    if (index >= s->count)
+        return CUI_PLOT_EMPTY;
+    long double fraction = s->count == 1 ? .5L : (long double)index / (s->count - 1);
+    return cui_plot_number(cui_plot_lerp(s->range_start, s->range_end, fraction), pixel);
+}
+cui_plot_result cui_plot_point_map(const cui_plot_point_scale *s, uint64_t key, double *pixel) {
+    if (!pixel)
+        return CUI_PLOT_INVALID;
+    cui_plot_result status = cui_plot_point_valid(s);
+    if (status != CUI_PLOT_OK)
+        return status;
+    for (size_t i = 0; i < s->count; ++i)
+        if (s->domain[i] == key)
+            return cui_plot_point_at(s, i, pixel);
+    return CUI_PLOT_EMPTY;
+}
+cui_plot_result cui_plot_point_nearest(const cui_plot_point_scale *s, double pixel, size_t *index) {
+    if (!index || !isfinite(pixel))
+        return CUI_PLOT_INVALID;
+    cui_plot_result status = cui_plot_point_valid(s);
+    if (status != CUI_PLOT_OK)
+        return status;
+    size_t result = 0;
+    if (s->count > 1 && s->range_start != s->range_end) {
+        long double fraction = cui_plot_fraction(pixel, s->range_start, s->range_end);
+        result = cui_plot_nearest_category(fraction * (s->count - 1), s->count);
+    }
+    *index = result;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_ordinal_valid(const cui_plot_ordinal_scale *s) {
+    if (!s || !s->element_size || (s->range_count && !s->range) || (s->has_unknown && !s->unknown))
+        return CUI_PLOT_INVALID;
+    cui_plot_result status = cui_plot_categories(s->domain, s->count);
+    if (status != CUI_PLOT_OK)
+        return status;
+    if (s->range_count > CUI_PLOT_CATEGORY_LIMIT || s->element_size > CUI_PLOT_ORDINAL_BYTE_LIMIT ||
+        s->range_count > CUI_PLOT_ORDINAL_BYTE_LIMIT / s->element_size)
+        return CUI_PLOT_CAPACITY;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_ordinal_init(cui_plot_ordinal_scale *s, const uint64_t *domain,
+                                      size_t count, const void *range, size_t range_count,
+                                      size_t element_size, const void *unknown) {
+    if (!s)
+        return CUI_PLOT_INVALID;
+    cui_plot_ordinal_scale candidate = {domain,      count,        range,          unknown,
+                                        range_count, element_size, unknown != NULL};
+    cui_plot_result status = cui_plot_ordinal_valid(&candidate);
+    if (status == CUI_PLOT_OK)
+        *s = candidate;
+    return status;
+}
+cui_plot_result cui_plot_ordinal_map(const cui_plot_ordinal_scale *s, uint64_t key, void *output,
+                                     size_t capacity) {
+    cui_plot_result status = cui_plot_ordinal_valid(s);
+    if (status != CUI_PLOT_OK)
+        return status;
+    size_t at = 0;
+    while (at < s->count && s->domain[at] != key)
+        ++at;
+    const void *value = NULL;
+    if (at < s->count) {
+        if (!s->range_count)
+            return CUI_PLOT_EMPTY;
+        value = (const unsigned char *)s->range + (at % s->range_count) * s->element_size;
+    } else if (s->has_unknown)
+        value = s->unknown;
+    else
+        return CUI_PLOT_EMPTY;
+    if (capacity < s->element_size)
+        return CUI_PLOT_CAPACITY;
+    if (!output)
+        return CUI_PLOT_INVALID;
+    memmove(output, value, s->element_size);
+    return CUI_PLOT_OK;
+}

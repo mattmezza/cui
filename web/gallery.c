@@ -2506,7 +2506,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         for (unsigned i = 0; i < 3; i++) {
             bool matched = toolbar_contains(toolbar_document[i], query);
             cui_begin_box(ui, 0,
-                          (cui_box){.width = -1,
+                          (cui_box){.width = width - 48,
+                                    .fixed_width = true,
                                     .padding = 6,
                                     .background = matched ? t.secondary : t.surface});
             char line[160];

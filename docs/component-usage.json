@@ -1588,11 +1588,16 @@
       "interaction": "Hit testing identifies data; tooltip/format/paint callbacks customize output and are not application action callbacks.",
       "usage": "Submit data/options each frame; route application actions from explicit hit testing or child controls.",
       "docs": [
-        "docs/CHART.md"
+        "docs/CHART.md",
+        "docs/CHART_TYPED_TOOLTIP.md",
+        "docs/CHART_SOURCE_POINT_AXIS.md",
+        "docs/CHART_RADAR_TOOLTIP_TITLE.md",
+        "docs/PLOT_CHART_CURRENT_FRAME.md"
       ],
       "callback_symbols": [
         "cui_chart_tooltip_fn",
-        "cui_chart_format_fn"
+        "cui_chart_format_fn",
+        "cui_chart_tooltip_build_fn"
       ],
       "scope": "styled frame component",
       "name": "Chart",

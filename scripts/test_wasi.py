@@ -89,7 +89,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion")
+SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -165,7 +165,9 @@ def main() -> int:
     parser.add_argument("--zig", default="zig", help="path to Zig 0.16.0")
     # Theme/variant matrices repeatedly construct full contexts; keep a finite
     # suite budget large enough for those allocation-heavy behavioral tests.
-    parser.add_argument("--fuel", type=int, default=40_000_000_000, help="per-suite instruction budget")
+    # Core current-frame snapshot storage increased per-context initialization;
+    # the Choice matrix exhausts 40B fuel in calloc with every assertion enabled.
+    parser.add_argument("--fuel", type=int, default=80_000_000_000, help="per-suite instruction budget")
     args = parser.parse_args()
     root = args.root.resolve()
     build = (args.build_dir or root / "build/wasi").resolve()
@@ -220,7 +222,8 @@ def main() -> int:
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
         targets += [("radio_group_base_only", ["tests/unit/test_radio_group_base.c", "src/core/cui.c", "src/base/cui_radio_group.c"], False, [])]
-        targets += [("native_starter", ["examples/native_starter/app.c", "examples/native_starter/test_app.c", "examples/system_theme/main.c", "tests/integration/test_system_theme_app.c"], True, [])]
+        targets += [("native_starter", ["examples/native_starter/app.c", "examples/native_starter/test_app.c"], True, [])]
+        targets += [("system_theme_app", ["tests/integration/test_system_theme_app.c"], True, [])]
         targets += [("bidi", ["tests/unit/test_bidi.c", "src/text/cui_bidi.c"], False,
                      bidi_include + [str(bidi_object)])]
         targets += [("speech_base_only", ["tests/unit/test_speech.c", "src/base/cui_speech.c"], False, ["-DCUI_SPEECH_BASE_ONLY=1"])]

@@ -22,6 +22,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory', type=Path, default=Path('build/web'))
     p.add_argument('--chromium')
+    p.add_argument('--controlled-clock', action='store_true',
+                   help='Advance the real browser host clock in 10ms render steps')
     args = p.parse_args()
     class Handler(SimpleHTTPRequestHandler):
         def log_message(self, *args):
@@ -31,6 +33,16 @@ def main():
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
+            if args.controlled_clock:
+                original_new_page = browser.new_page
+                def controlled_page(**kwargs):
+                    page = original_new_page(**kwargs)
+                    page.add_init_script('''(()=>{let clock=0;
+                        const raf=window.requestAnimationFrame.bind(window);
+                        Object.defineProperty(performance,'now',{value:()=>clock});
+                        window.requestAnimationFrame=fn=>raf(()=>{clock+=10;fn(clock)});})();''')
+                    return page
+                browser.new_page = controlled_page
             a = Audit(browser, f'http://127.0.0.1:{server.server_port}')
             a.page.emulate_media(reduced_motion='no-preference')
             a.route('Chart')

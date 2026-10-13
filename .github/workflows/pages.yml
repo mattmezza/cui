@@ -76,7 +76,9 @@ jobs:
       - name: Verify Table sizing and selection-only DataTable actions
         run: uv run tests/web/test_table_selection_contracts.py
       - name: Verify Chart appearance and stationary hover gating
-        run: uv run tests/web/test_chart_appearance_hover.py
+        run: |
+          uv run tests/web/test_chart_appearance_hover.py
+          uv run tests/web/test_chart_appearance_hover.py --controlled-clock
       - name: Verify current-frame prepaint clipping and pointer occlusion
         run: uv run tests/web/test_core_prepaint.py
       - name: Verify independent Plot and Chart motion policies

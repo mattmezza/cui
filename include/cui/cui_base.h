@@ -80,9 +80,9 @@ size_t cui_base_input_visual_hit_test(void *geometry, cui_str, float x, float y)
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;
-    cui_edit_composition *composition; /* Optional caller-owned session and view buffers. */
-    bool composition_owned;            /* Internal default resource flag; initialize false. */
-    uintptr_t bound_edit_identity; /* Internal numeric identity; no retained model pointer. */
+    cui_edit_composition *composition;   /* Optional caller-owned session and view buffers. */
+    bool composition_owned;              /* Internal default resource flag; initialize false. */
+    uintptr_t bound_edit_identity;       /* Internal numeric identity; no retained model pointer. */
     bool focus_initialized, was_focused; /* Zero-init; focus/rebind splits typing history. */
 } cui_input_behavior_state;
 /* Lazy bounded default session (4095 preedit / 65535 rendered bytes). */

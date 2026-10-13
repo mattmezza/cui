@@ -115,3 +115,5 @@ keyboard activation is an explicit accessibility improvement. No invented
 roving arrow-key tree policy replaces the source's composition. Sidebar widths
 and row sizes follow source; it does not claim four selectable sizes where the
 frozen API has no Sizable interface.
+
+The browser gallery forwards pixel wheel deltas as precise CUI scroll events for Scrollable, Sidebar and VirtualList. Fractional deltas retain their distance rather than being multiplied by the widget's discrete wheel step. Native hosts can opt into the same contract with `cui_event.scroll_precise = true`; discrete wheel events continue to use the configured step. Sidebar's absolute content position follows its scroll model, while the scrollbar stays anchored in the viewport.

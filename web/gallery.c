@@ -1707,6 +1707,15 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
                                         .pointer_button = (cui_pointer_button)button,
                                         .click_count = click_count});
 }
+void gallery_scroll_pixels(float x, float y, float dx, float dy) {
+    if (ui)
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                        .x = x,
+                                        .y = y,
+                                        .dx = dx,
+                                        .dy = dy,
+                                        .scroll_precise = true});
+}
 void gallery_scroll(float x, float y, float dx, float dy) {
     if (ui)
         cui_queue_event(ui,

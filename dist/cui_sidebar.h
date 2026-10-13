@@ -762,8 +762,8 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
     cui_base_scrollable(ui, body, &s->scroll, scroll);
     cui_begin_box(ui, body, (cui_box){.width = -1, .height = -1, .clip = true, .row = true});
     cui_track_bounds(ui, body, &s->viewport);
-    cui_begin_absolute_box(ui, cui_sidebar_part_id(id, 2), (cui_box){.offset_y = -s->scroll.y},
-                           (cui_rect){.w = -1, .h = total});
+    cui_begin_absolute_box(ui, cui_sidebar_part_id(id, 2), (cui_box){0},
+                           (cui_rect){.y = -s->scroll.y, .w = -1, .h = total});
     float pad = s->icon_collapsed ? 8 : 12, top = count               ? s->icon_collapsed ? 20 : 12
                                                   : s->icon_collapsed ? 8
                                                                       : 0;

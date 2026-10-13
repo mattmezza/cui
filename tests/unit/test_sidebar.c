@@ -236,12 +236,23 @@ static void test_layout(void) {
         closef(s.bounds.w, 255);
         assert(s.viewport.h < 260 && s.viewport.h > 220);
         assert(h.calls == 2 && f.calls == 2 && c.calls == 2);
+        float content_y = cui_bounds(ui, e.id).y;
         assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
                                                .x = s.viewport.x + 30,
                                                .y = s.viewport.y + 30,
                                                .dy = -2}));
         render_frame(ui, &themes[t], &s, &e, 1, o);
         assert(s.scroll.y > 0);
+        closef(cui_bounds(ui, e.id).y, content_y - s.scroll.y);
+        float scroll_before = s.scroll.y;
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = s.viewport.x + 30,
+                                               .y = s.viewport.y + 30,
+                                               .dy = -17.5f,
+                                               .scroll_precise = true}));
+        render_frame(ui, &themes[t], &s, &e, 1, o);
+        closef(s.scroll.y, scroll_before + 17.5f);
+        closef(cui_bounds(ui, e.id).y, content_y - s.scroll.y);
         o.collapsed = true;
         o.reduced_motion = true;
         render_frame(ui, &themes[t], &s, &e, 1, o);

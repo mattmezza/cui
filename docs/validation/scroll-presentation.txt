@@ -1,0 +1,10 @@
+Sidebar painting and browser wheel precision
+Source: fix/scroll-presentation, parent 9c87b99.
+Native CTest: 75/75; ASan/UBSan CTest: 75/75.
+WASI runtime: 67/67; complete Chromium gallery: 78 stories/excerpts PASS.
+Strict web build and lint/format/distribution checks PASS.
+Native regression verifies sidebar entry Y moves by model scroll across all themes,
+including precise 17.5-pixel input. Linked old component fails the new geometry check.
+Browser regression compares sidebar/scrollable displacement with actual DOM wheel
+CSS pixels (DevTools physical input varies with display scale), and checks entry movement.
+This validates model/painting/host transport; it does not claim complete Sidebar parity.

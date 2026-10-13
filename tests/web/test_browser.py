@@ -479,6 +479,23 @@ def main():
             click_semantic('Reset layout', 1)
             wait_semantic('Workspace panel 1', 41)
             assert semantic_index('Panel 3', 1) is None
+            page.evaluate('location.hash="Plot"')
+            page.wait_for_function('cuiGallery.renderedComponent==="Plot"')
+            wait_semantic('Projected sine wave', 20)
+            def plot_signature():
+                return page.evaluate('''()=>{const e=cuiGallery.exports;const i=Array.from({length:e.gallery_count()},(_,i)=>i)
+                    .find(i=>e.gallery_command(i,0)===5&&e.gallery_bitmap_pixels(i));
+                    const data=new Uint8Array(e.memory.buffer,e.gallery_bitmap_pixels(i),e.gallery_bitmap(i,2)*e.gallery_bitmap(i,1));
+                    let hash=2166136261;for(let p=0;p<data.length;p+=16)hash=Math.imul(hash^data[p],16777619);return hash>>>0;}''')
+            initial_plot = plot_signature()
+            click_semantic('Zoom in', 1)
+            zoomed_plot = plot_signature()
+            assert zoomed_plot != initial_plot
+            click_semantic('Pan left', 1)
+            assert plot_signature() != zoomed_plot
+            click_semantic('Reset', 1)
+            assert plot_signature() == initial_plot
+            page.screenshot(path='/tmp/cui-web-plot.png')
             page.evaluate('location.hash="Command"')
             page.wait_for_function('cuiGallery.renderedComponent==="Command"')
             assert semantic_index('Command palette', 6) is not None

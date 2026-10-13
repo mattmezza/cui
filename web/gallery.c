@@ -974,6 +974,8 @@ static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
 static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
+static unsigned char plot_pixels[640 * 160 * 4];
+static cui_chart_state plot_state = {.pixels = plot_pixels, .byte_capacity = sizeof(plot_pixels)};
 static cui_overlay trap;
 static int clipboard_request;
 static char clipboard_status[128] = "Clipboard access requires a secure browser context.";
@@ -3077,17 +3079,54 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 28: {
-        cui_label(ui, &t, cui_string("Base model: plot scale and tick calculation"));
-        if (cui_button(ui, cui_id_from(ui, "plot-zoom"), &t, cui_string("Zoom in at center"),
-                       disabled))
-            cui_plot_zoom(&plot_scale, 1.5, 150);
+        float plot_width = fmaxf(1, width - 48);
+        plot_scale.range_start = 0;
+        plot_scale.range_end = plot_width;
+        cui_text(ui, cui_string("sin(x / 12), sampled through the CUI plot scale"), 14, t.text);
+        cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "plot-zoom"), &t, cui_string("Zoom in"), disabled))
+            cui_plot_zoom(&plot_scale, 1.5, plot_width / 2);
+        if (cui_button(ui, cui_id_from(ui, "plot-zoom-out"), &t, cui_string("Zoom out"), disabled))
+            cui_plot_zoom(&plot_scale, 1 / 1.5, plot_width / 2);
+        if (cui_button(ui, cui_id_from(ui, "plot-reset"), &t, cui_string("Reset"), disabled))
+            plot_scale = (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 0, plot_width, false};
+        cui_end_box(ui);
+        cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
+        if (cui_button(ui, cui_id_from(ui, "plot-left"), &t, cui_string("Pan left"), disabled))
+            cui_plot_pan(&plot_scale, plot_width * .15);
+        if (cui_button(ui, cui_id_from(ui, "plot-right"), &t, cui_string("Pan right"), disabled))
+            cui_plot_pan(&plot_scale, -plot_width * .15);
+        cui_end_box(ui);
+        cui_chart_datum data[65] = {0};
+        for (size_t i = 0; i < 65; ++i) {
+            double value;
+            cui_plot_inverse(&plot_scale, plot_width * i / 64, &value);
+            data[i].value = sin(value / 12);
+        }
+        cui_chart_options options = {.kind = CUI_CHART_LINE,
+                                     .data = data,
+                                     .count = 65,
+                                     .width = (unsigned)fminf(640, plot_width),
+                                     .height = 160,
+                                     .logical_width = plot_width,
+                                     .logical_height = 160,
+                                     .has_domain = true,
+                                     .domain_min = -1.2,
+                                     .domain_max = 1.2,
+                                     .hide_axes = true,
+                                     .hide_x_axis = true,
+                                     .hide_legend = true,
+                                     .noninteractive = true};
+        options = cui_chart_theme(options, &t);
+        cui_chart(ui, cui_id_from(ui, "plot-wave"), &plot_state, &options,
+                  cui_string("Projected sine wave"));
         double ticks[32];
         size_t count = 0;
         cui_plot_ticks(&plot_scale, 5, ticks, 32, &count);
         char text[128];
-        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; ticks: %zu", plot_scale.domain_min,
+        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; %zu scale ticks", plot_scale.domain_min,
                  plot_scale.domain_max, count);
-        cui_label(ui, &t, cui_string(text));
+        cui_text(ui, cui_string(text), 14, t.muted);
         break;
     }
     case 29: {

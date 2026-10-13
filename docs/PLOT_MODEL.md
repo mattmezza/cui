@@ -72,3 +72,9 @@ chart description, animated transitions, or rendering adapters are supplied.
 `test_plot` checks 1500 deterministic forward/inverse and zoom-anchor cases,
 linear/log ticks, reversed ranges, transactional failures, subnormal domains,
 finite extreme domains/ranges, clipping, projected lines, and bar baselines.
+
+## Browser demonstration
+
+The Plot gallery displays `sin(x / 12)` rather than only reporting scale metadata. Each frame samples 65 values using `cui_plot_inverse` and paints them with the existing Chart renderer. Zoom in/out change the domain around the viewport center; Pan left/right shift it; Reset restores 0–100. The domain readout and nice-tick count update with the retained scale.
+
+This demonstrates composing the numerical Plot API with a renderer. It does not introduce a separate public Plot widget or mouse gesture API. The scale is application-owned retained state; sampling and drawing are immediate. See `web/gallery.c` for the composed example.

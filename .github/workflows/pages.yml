@@ -82,6 +82,8 @@ jobs:
           uv run tests/web/test_chart_appearance_hover.py --controlled-clock
       - name: Verify pointer presence capture and actual gallery leave behavior
         run: uv run tests/web/test_pointer_presence.py --directory build/web
+      - name: Verify source point-axis geometry with actual WASM pixels
+        run: uv run tests/web/test_chart_source_point_axis.py
       - name: Verify current-frame Chart and Plot geometry and tooltip pixels
         run: uv run tests/web/test_plot_chart_prepaint.py
       - name: Verify current-frame prepaint clipping and pointer occlusion

@@ -3025,27 +3025,31 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         static const cui_chart_link links[] = {{0, 2, 16, {0}}, {0, 3, 12, {0}}, {1, 3, 18, {0}},
                                                {2, 4, 16, {0}}, {3, 5, 30, {0}}, {4, 5, 16, {0}}};
         float logical_width = fminf(width - 48, 720);
-        cui_chart_options options = {.kind = (cui_chart_kind)chart_kind,
-                                     .interaction_mode = CUI_PLOT_INTERACTION_CURRENT_FRAME,
-                                     .data = data,
-                                     .count = sizeof(data) / sizeof(data[0]),
-                                     .links = links,
-                                     .link_count = sizeof(links) / sizeof(links[0]),
-                                     .width = (unsigned)(logical_width * 2),
-                                     .height = 560,
-                                     .logical_width = logical_width,
-                                     .logical_height = 280,
-                                     .data_revision = chart_revision,
-                                     .appear_key = chart_revision,
-                                     .disable_appear = !chart_animate,
-                                     .reduced_motion = reduced_motion,
-                                     .curve = (cui_chart_curve)chart_curve,
-                                     .show_dots = chart_dots != 0,
-                                     .show_bar_values = chart_labels != 0,
-                                     .pie_show_labels = chart_labels != 0,
-                                     .sankey_show_labels = chart_labels != 0,
-                                     .sankey_show_values = chart_labels != 0,
-                                     .inner_radius = chart_labels ? 42 : 0};
+        cui_chart_options options = {
+            .kind = (cui_chart_kind)chart_kind,
+            .interaction_mode = CUI_PLOT_INTERACTION_CURRENT_FRAME,
+            .layout_mode = (chart_kind == CUI_CHART_LINE || chart_kind == CUI_CHART_AREA)
+                               ? CUI_CHART_LAYOUT_SOURCE_POINT
+                               : CUI_CHART_LAYOUT_LEGACY,
+            .data = data,
+            .count = sizeof(data) / sizeof(data[0]),
+            .links = links,
+            .link_count = sizeof(links) / sizeof(links[0]),
+            .width = (unsigned)(logical_width * 2),
+            .height = 560,
+            .logical_width = logical_width,
+            .logical_height = 280,
+            .data_revision = chart_revision,
+            .appear_key = chart_revision,
+            .disable_appear = !chart_animate,
+            .reduced_motion = reduced_motion,
+            .curve = (cui_chart_curve)chart_curve,
+            .show_dots = chart_dots != 0,
+            .show_bar_values = chart_labels != 0,
+            .pie_show_labels = chart_labels != 0,
+            .sankey_show_labels = chart_labels != 0,
+            .sankey_show_values = chart_labels != 0,
+            .inner_radius = chart_labels ? 42 : 0};
         options = cui_chart_theme(options, &t);
         chart_result = cui_chart_render_animated(ui, &chart_state, &options);
         if (chart_result == CUI_PLOT_OK)

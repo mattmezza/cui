@@ -71,6 +71,8 @@ jobs:
         run: uv run tests/web/test_alert_bubble_slots.py
       - name: Verify caller-clocked loading motion and reduced-motion quiescence
         run: uv run tests/web/test_status_motion.py
+      - name: Verify Button callbacks slots focus and painted states
+        run: uv run tests/web/test_button_behavior.py
       - name: Upload static gallery
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

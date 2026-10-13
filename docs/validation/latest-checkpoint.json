@@ -1,9 +1,9 @@
 {
   "source": "13c851f0ce33bff5c8c521e1c436314dff9edfff",
   "compiled_source": "13c851f0ce33bff5c8c521e1c436314dff9edfff",
-  "published_source": "0b667d07b258cbcb74cc8c279328027c1b69f71c",
+  "published_source": "fbbc40b4be6c86be1fce1ddd827279b9c80183cf",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Next21 integrates intrinsic attachment sizing, responsive content, controlled radio groups, avatar stacks, compact conversations, configurable shared scrollbars and optional Linux accessibility packaging. Native103, sanitizer103, WASI83, browser78, Attachment62, touch42+16+19 and responsive checks pass. Published source remains0b667d0 pending new deployment. Full family verification remains0/78.",
+  "summary": "Next21 integrates intrinsic attachment sizing, responsive content, controlled radio groups, avatar stacks, compact conversations, configurable shared scrollbars and optional Linux accessibility packaging. Native103, sanitizer103, WASI83, browser78, Attachment62, touch42+16+19 and responsive checks pass. Published source fbbc40b passes all six framework CI jobs and Pages; all339 artifact files match HTTPS and actual published Attachment checks pass62/62. Full family verification remains0/78.",
   "checks": [
     {
       "name": "native",
@@ -72,5 +72,12 @@
     }
   ],
   "portable_test_source": "e663032a22cb3ee3c394698c08075c5f78930326 plus exact generated headers committed13c851f",
-  "portable_source_sha256": "e983aafb4da0f0ca983a14e8b84a3995e5adb77ac5367daa1b17fa0ed523c2ff"
+  "portable_source_sha256": "e983aafb4da0f0ca983a14e8b84a3995e5adb77ac5367daa1b17fa0ed523c2ff",
+  "publication": {
+    "pages_run": 38423548663,
+    "framework_run": 38423548633,
+    "artifact_https_files_matched": 339,
+    "published_attachment_passed": 62,
+    "published_attachment_total": 62
+  }
 }

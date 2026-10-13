@@ -3199,8 +3199,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             }
             cui_end_box(ui);
         }
-        cui_button_options extra = {
-            .size = (cui_control_size)control_size, .design_size = design_size, .disabled = disabled};
+        cui_button_options extra = {.size = (cui_control_size)control_size,
+                                    .design_size = design_size,
+                                    .disabled = disabled};
         extra.icon = cui_string("download");
         extra.trailing_icon = cui_string("arrow-right");
         extra.dropdown_caret = true;
@@ -3210,7 +3211,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         extra.dropdown_caret = false;
         extra.children = gallery_button_badge;
         extra.children_user = &t;
-        cui_button_ex(ui, cui_id_from(ui, "button-children"), &t, cui_string("Custom content"), extra);
+        cui_button_ex(ui, cui_id_from(ui, "button-children"), &t, cui_string("Custom content"),
+                      extra);
         extra.children = NULL;
         extra.width = fminf(width - 48, 340);
         extra.label_width = fmaxf(1, extra.width - 48);

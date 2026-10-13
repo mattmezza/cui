@@ -1,23 +1,27 @@
 # Native text integration audit
 
 At integration/next18 `b291765`, native font shaping and explicit line geometry
-work, but ordinary wrapping and editor geometry do not preserve that result.
+worked, but ordinary wrapping and editor geometry did not preserve that result.
 `tests/integration/test_native_text_geometry.c` reproduces four observable
 mismatches using supported Hebrew glyphs and an explicitly registered fallback
-face. This is a production read-only audit; its executable returns 1 while the
-confirmed integration gaps remain. It returns 77 when optional native bidi or
-actual supported font fixtures are unavailable.
+face. The follow-up implements the unwrapped Input host geometry seam described in
+[INPUT_VISUAL_GEOMETRY.md](INPUT_VISUAL_GEOMETRY.md). The default executable now
+verifies fixed Input behavior and returns 0; `--audit` preserves the remaining
+Textarea and automatic wrapped-paragraph observations and returns 1. It returns
+77 when optional native bidi or actual supported font fixtures are unavailable.
 
 ## Runtime evidence
 
 With Noto Sans as the primary and Noto Sans Hebrew as an explicit fallback:
 
-| Operation on `אבג` at size 14 | Existing editor result | Native shaped result |
+| Operation on `אבג` at size 14 | Original editor result | Native shaped result |
 | --- | --- | --- |
 | Caret at original UTF-8 byte 0 | x=0 | x=22.094, the visual right edge |
 | Hit at visual left edge | Input byte 0, Textarea byte 0 | byte 6, the logical end |
 | Select first Hebrew character, bytes 0..2 | Highlight x=0 | Highlight x=13.250, over the actual rightmost character |
 
+The current Input path matches all of these results when its geometry hook is
+configured. Textarea still produces the prefix-based results in `--audit`.
 These are shaped cluster edges, so no interior ligature/GDEF caret policy is
 needed to reproduce the mismatch. The Textarea IME input rectangle follows its
 incorrect prefix caret position as well. The test compares the actual painted
@@ -63,9 +67,10 @@ fixture; the comparisons derive expected values at runtime.
   U+2028 line context inside its own whole-string input (`src/text/cui_text.c`,
   `text_lines_create`/`text_paragraph_append`). It cannot reconstruct context
   already removed by Core or Textarea automatic wrapping.
-- Input hit testing (`src/base/cui_base.c:399`) binary-searches logical prefix
-  widths and immediately returns byte 0 at the left edge. Input paint and IME
-  rectangles also use prefix measurements (`src/components/cui_components.c`,
+- The original Input hit testing (`src/base/cui_base.c:399`) binary-searched logical prefix
+  widths and immediately returned byte 0 at the left edge. Its legacy fallback
+  still does; configured unwrapped Input now consumes host geometry. Original
+  Input paint and IME rectangles also used prefix measurements (`src/components/cui_components.c`,
   `cui_input_paint`). Textarea's public row-x/row-offset and pointer hit functions
   use the same monotone-prefix assumption (`src/base/cui_textarea.c:408`).
 - Textarea measures and paints each selected wrapped byte slice separately and
@@ -82,23 +87,22 @@ grapheme or claim visual keyboard navigation already exists.
 
 ## Narrow next implementation ownership
 
-Two independent changes are justified by these reproductions; neither should
-be described as completed by this audit.
+The reproductions justified two independent changes. The first is now
+implemented for unwrapped Input, with the explicit cluster-interior fallback
+limits documented in INPUT_VISUAL_GEOMETRY.md. The second remains pending.
 
-1. First integrate **unwrapped Input visual geometry** through a portable host
+1. Implemented: **unwrapped Input visual geometry** through a portable host
    callback seam rather than making Core depend on native text/font types.
-   Initial ownership should cover the geometry callback public/config seam in
+   The implementation covers the geometry callback public/config seam in
    `include/cui/cui.h` and `src/core/cui.c`, its native implementation in
    `include/cui/cui_text.h`/`src/text/cui_text.c`, Input geometry plumbing in
    `include/cui/cui_base.h`/`src/base/cui_base.c` and Input painting in
    `src/components/cui_components.c`, with focused headless/native integration
-   tests. Derive caret, pointer hit, selection rectangles, horizontal reveal
-   and IME rect from one retained layout, preserving original bytes, style and
-   actual fallback faces. Keep the existing measurement-only host usable.
-   Define the behavior for editor offsets inside a shaped cluster explicitly;
-   current native geometry rejects them, so silently substituting nearest
-   glyph positions would overstate support. Textarea can be a separate follow-up
-   once that callback seam and single-line policy are tested.
+   tests. Caret, pointer hit, selection rectangles, horizontal reveal and IME
+   rect now use a retained session while measurement-only hosts keep their
+   existing path. Exact shaped-interior offsets deliberately use the documented
+   legacy fallback without changing logical selection. Textarea remains a
+   separate follow-up.
 2. Separately preserve **original paragraph plus chosen line range** through
    wrapping and renderer submission. Initial ownership requires Core text
    command metadata/layout, native text, and the SDL/GPU/Sokol/software text
@@ -128,18 +132,23 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror -Iinclude \
   build/libcui_text.a build/libcui_bidi.a build/libcui.a \
   $(pkg-config --libs freetype2 harfbuzz) -lm -o /tmp/cui-native-text-audit
 /tmp/cui-native-text-audit
+/tmp/cui-native-text-audit --audit # preserves remaining known gaps
 ctest --test-dir build --output-on-failure
 ```
 
 Use `CUI_TEST_FONT` and `CUI_TEST_HEBREW_FONT` to select explicit supported
 fixtures; known Noto and DejaVu paths are tried when unset. The executable is
 not registered by this worker because CMake belongs to the integrator. Its
-current return 1 preserves four gap observations rather than declaring native
-editor/wrapping integration complete.
+default verifies fixed Input behavior; `--audit` still preserves four remaining
+Textarea/wrapping observations rather than declaring full native integration.
 
 Validation at this snapshot: portable warnings-as-errors native build and the
-new manual audit compile pass; existing CTest passes 91/91. The enabled audit
-returns 1 with all four observations using the actual Noto fallback fixture.
+new manual integration compile pass; existing CTest passes 92/93. The sole
+failure is the expected distribution regeneration check for changed Core/Base/
+Components headers, which is integrator-owned. The enabled default
+passes using actual Noto fallback fixtures; `--audit` retains the four remaining
+Textarea/wrapping observations.
 ASan/UBSan report no runtime errors. The BIDI-off audit compiles/links and
-returns 77 with an explicit unavailable message. No production, CMake or
-distribution files changed.
+returns 77 with an explicit unavailable message. The follow-up changes only its
+assigned Input/geometry production files; no CMake or distribution output is
+changed.

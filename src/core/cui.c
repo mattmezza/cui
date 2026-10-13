@@ -122,6 +122,9 @@ struct cui_context {
     double frame_time;
     cui_id text_input_owner, composition_owner;
     cui_rect text_input_bounds;
+    cui_id text_geometry_ime_owner;
+    cui_rect text_geometry_ime_bounds;
+    float text_geometry_ime_height;
     bool reduced_motion;
     cui_core_resource *resources;
     size_t resource_bytes;
@@ -169,6 +172,38 @@ cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text
         result.height < 0)
         return (cui_size){0};
     return result;
+}
+bool cui_has_text_geometry(const cui_context *ui) {
+    return ui && ui->config.text_geometry;
+}
+void cui_release_text_geometry(cui_text_geometry *geometry) {
+    if (geometry && geometry->ops && geometry->ops->release)
+        geometry->ops->release(geometry->session);
+    if (geometry)
+        *geometry = (cui_text_geometry){0};
+}
+cui_text_layout_status cui_get_text_geometry(cui_context *ui, cui_str text, float size,
+                                             cui_text_style style, cui_text_geometry *out) {
+    if (!ui || !out || (!text.data && text.length) || !isfinite(size) || size <= 0 ||
+        !cui_core_text_style_valid(style))
+        return CUI_TEXT_LAYOUT_INVALID;
+    if (!ui->config.text_geometry)
+        return CUI_TEXT_LAYOUT_UNAVAILABLE;
+    cui_text_geometry result = {0};
+    cui_text_layout_status status =
+        ui->config.text_geometry(ui->config.measure_user, text, fminf(size, 65535), style, &result);
+    if (status != CUI_TEXT_LAYOUT_OK) {
+        cui_release_text_geometry(&result);
+        return status;
+    }
+    if (!result.ops || !result.ops->carets || !result.ops->hit_test || !result.ops->selection ||
+        !result.ops->release || !isfinite(result.width) || !isfinite(result.height) ||
+        result.width < 0 || result.height < 0 || result.byte_length != text.length) {
+        cui_release_text_geometry(&result);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
+    *out = result;
+    return CUI_TEXT_LAYOUT_OK;
 }
 bool cui_measure_font_metrics(cui_context *ui, float size, cui_text_style style,
                               cui_font_metrics *out) {
@@ -2727,10 +2762,28 @@ void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
         return;
     ui->text_input_owner = owner;
     ui->text_input_bounds = bounds;
+    ui->text_geometry_ime_owner = 0;
+}
+bool cui_set_text_input_geometry_rect(cui_context *ui, cui_id owner, cui_id caret, float height) {
+    if (!ui || !ui->in_frame || !owner || !caret || !isfinite(height) || height < 0 ||
+        !cui_track_bounds(ui, caret, &ui->text_geometry_ime_bounds))
+        return false;
+    ui->text_input_owner = owner;
+    ui->text_geometry_ime_owner = owner;
+    ui->text_geometry_ime_height = height;
+    return true;
 }
 bool cui_text_input_rect(const cui_context *ui, cui_rect *out) {
     if (!ui || !out || !ui->focus || ui->focus != ui->text_input_owner)
         return false;
-    *out = ui->text_input_bounds;
+    if (ui->text_geometry_ime_owner == ui->focus && !ui->in_frame) {
+        cui_rect bounds = ui->text_geometry_ime_bounds;
+        cui_rect result = {bounds.x, bounds.y - (ui->text_geometry_ime_height - bounds.h) * .5f, 1,
+                           ui->text_geometry_ime_height};
+        if (!isfinite(result.x) || !isfinite(result.y) || !isfinite(result.h))
+            return false;
+        *out = result;
+    } else
+        *out = ui->text_input_bounds;
     return true;
 }

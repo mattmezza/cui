@@ -1006,3 +1006,47 @@ cui_text_layout_status cui_text_layout_selection(const cui_text_layout *layout, 
     return CUI_TEXT_LAYOUT_UNAVAILABLE;
 }
 #endif
+
+static cui_text_layout_status text_geometry_carets(const void *session, size_t byte,
+                                                   cui_text_caret *out, size_t capacity,
+                                                   size_t *count) {
+    return cui_text_layout_carets(session, byte, out, capacity, count);
+}
+static cui_text_layout_status text_geometry_hit(const void *session, float x, float y,
+                                                cui_text_affinity affinity, cui_text_caret *out) {
+    return cui_text_layout_hit_test(session, x, y, affinity, out);
+}
+static cui_text_layout_status text_geometry_selection(const void *session, size_t start, size_t end,
+                                                      cui_text_selection_rect *out, size_t capacity,
+                                                      size_t *count) {
+    return cui_text_layout_selection(session, start, end, out, capacity, count);
+}
+static void text_geometry_release(void *session) {
+    cui_text_layout_destroy(session);
+}
+cui_text_layout_status cui_font_text_geometry(void *font, cui_str text, float size,
+                                              cui_text_style style, cui_text_geometry *out) {
+    static const cui_text_geometry_ops ops = {text_geometry_carets, text_geometry_hit,
+                                              text_geometry_selection, text_geometry_release};
+    if (!out)
+        return CUI_TEXT_LAYOUT_INVALID;
+#ifdef CUI_TEXT_BIDI
+    if (!text.data && text.length)
+        return CUI_TEXT_LAYOUT_INVALID;
+    size_t offset = 0;
+    while (offset < text.length) {
+        uint32_t cp;
+        if (!text_next(text, &offset, &cp) || paragraph_separator(cp) || cp == 0x2028)
+            return CUI_TEXT_LAYOUT_INVALID;
+    }
+#endif
+    cui_text_layout *layout = NULL;
+    cui_text_layout_view view;
+    cui_text_layout_status status = cui_font_layout_line(font, text, size, style, CUI_BIDI_AUTO_LTR,
+                                                         0, SIZE_MAX, NULL, &layout);
+    if (status != CUI_TEXT_LAYOUT_OK)
+        return status;
+    (void)cui_text_layout_get(layout, &view);
+    *out = (cui_text_geometry){layout, &ops, view.width, view.height, text.length};
+    return CUI_TEXT_LAYOUT_OK;
+}

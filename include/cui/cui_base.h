@@ -66,8 +66,17 @@ typedef struct {
     cui_rect viewport;
     float font_size, scroll_x;
 } cui_input_hit_geometry;
-/* Reusable measured scalar hit test. Invalid input returns SIZE_MAX. */
+/* Optional visual host geometry, otherwise measured scalar hit test. */
 size_t cui_base_input_hit_test(void *geometry, cui_str, float x, float y);
+/* Explicit measurement-only legacy path; never calls optional geometry factory. */
+size_t cui_base_input_measured_hit_test(void *geometry, cui_str, float x, float y);
+/* Borrowed immutable visual session plus existing viewport/scroll mapping. */
+typedef struct {
+    cui_input_hit_geometry measured;
+    const cui_text_geometry *visual;
+    cui_text_affinity *affinity; /* Optional output, preserved on failed hit. */
+} cui_input_visual_hit_geometry;
+size_t cui_base_input_visual_hit_test(void *geometry, cui_str, float x, float y);
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;

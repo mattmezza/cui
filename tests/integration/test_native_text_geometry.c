@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_base.h"
+#include "cui/cui_components.h"
 #include "cui/cui_text.h"
 #include "cui/cui_textarea.h"
 #include <ft2build.h>
@@ -153,7 +154,7 @@ static void caret_audit(cui_context *ui, cui_font *font) {
     printf("RTL left edge: Input byte %zu, Textarea byte %zu, shaped byte %zu\n", input_byte,
            textarea_byte, caret.byte_offset);
     comparison(input_byte == caret.byte_offset && textarea_byte == caret.byte_offset,
-               "Input/Textarea visual left hit maps to logical start instead of RTL end");
+               "Textarea visual left hit maps to logical start instead of RTL end");
     assert(cui_edit_select_atomic(edit, 0, 2) == CUI_EDIT_OK);
     theme.selection = (cui_color){17, 33, 49, 255};
     assert(cui_begin_frame(ui, 600, 400, .016f));
@@ -212,7 +213,126 @@ static void wrap_audit(cui_context *ui, cui_font *font) {
     cui_text_layout_destroy(contextual);
     cui_text_layout_destroy(standalone);
 }
-int main(void) {
+static void input_case(cui_context *ui, cui_font *font, const char *sample) {
+    char buffer[128];
+    assert(strlen(sample) < sizeof buffer);
+    strcpy(buffer, sample);
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    assert(edit);
+    assert(cui_edit_select_atomic(edit, 0, 0) == CUI_EDIT_OK);
+    cui_input_state state = {0};
+    cui_theme theme = cui_theme_light();
+    theme.selection = (cui_color){17, 33, 49, 255};
+    cui_input_options options = {.width = 280};
+    for (unsigned frame = 0; frame < 2; ++frame) {
+        if (frame)
+            cui_focus(ui, 60);
+        assert(cui_begin_frame(ui, 600, 400, .016f));
+        assert(cui_input_ex(ui, 60, &theme, cui_string("RTL input"), edit, &state, options).error ==
+               CUI_EDIT_OK);
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    cui_input_metrics input_metrics;
+    assert(cui_input_measure(options, theme.font_size, &input_metrics));
+    cui_text_layout *line = layout(font, cui_string(buffer), input_metrics.font_size, 0, SIZE_MAX);
+    cui_text_caret edge;
+    size_t count;
+    assert(cui_text_layout_carets(line, 0, &edge, 1, &count) == CUI_TEXT_LAYOUT_OK);
+    cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(60)), ime;
+    assert(cui_text_input_rect(ui, &ime));
+    assert(fabsf(ime.x - viewport.x + state.scroll_x - edge.x) < .01f);
+    cui_input_hit_geometry measured = {.ui = ui,
+                                       .viewport = viewport,
+                                       .font_size = input_metrics.font_size,
+                                       .scroll_x = state.scroll_x};
+    assert(cui_text_layout_hit_test(line, 0, 0, CUI_TEXT_DOWNSTREAM, &edge) == CUI_TEXT_LAYOUT_OK);
+    size_t expected_hit = edge.byte_offset;
+    assert(cui_base_input_hit_test(&measured, cui_string(buffer), viewport.x, viewport.y) ==
+           expected_hit);
+    cui_event event = {.type = CUI_EVENT_POINTER_DOWN, .x = viewport.x + .01f, .y = viewport.y + 2};
+    assert(cui_queue_event(ui, event));
+    event.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, event));
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    assert(cui_input_ex(ui, 60, &theme, cui_string("RTL input"), edit, &state, options).error ==
+           CUI_EDIT_OK);
+    cui_end_frame(ui);
+    assert(cui_edit_get_state(edit).cursor == expected_hit);
+    if (!strcmp(sample, "abc אבג")) {
+        cui_text_caret edges[2];
+        size_t edge_count;
+        assert(cui_text_layout_carets(line, 4, edges, 2, &edge_count) == CUI_TEXT_LAYOUT_OK &&
+               edge_count == 2);
+        assert(edges[0].x != edges[1].x);
+        for (size_t e = 0; e < edge_count; ++e) {
+            cui_text_caret chosen;
+            assert(cui_text_layout_hit_test(line, edges[e].x, 0, CUI_TEXT_DOWNSTREAM, &chosen) ==
+                   CUI_TEXT_LAYOUT_OK);
+            assert(chosen.byte_offset == 4);
+            viewport = cui_bounds(ui, cui_input_viewport_id(60));
+            event = (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                .x = viewport.x + edges[e].x - state.scroll_x,
+                                .y = viewport.y + 2};
+            assert(cui_queue_event(ui, event));
+            event.type = CUI_EVENT_POINTER_UP;
+            assert(cui_queue_event(ui, event));
+            for (unsigned idle = 0; idle < 2; ++idle) {
+                assert(cui_begin_frame(ui, 600, 400, .016f));
+                assert(cui_input_ex(ui, 60, &theme, cui_string("RTL input"), edit, &state, options)
+                           .error == CUI_EDIT_OK);
+                cui_end_frame(ui);
+                viewport = cui_bounds(ui, cui_input_viewport_id(60));
+                assert(cui_text_input_rect(ui, &ime));
+                assert(cui_edit_get_state(edit).cursor == 4);
+                assert(fabsf(ime.x - viewport.x + state.scroll_x - chosen.x) < .01f);
+            }
+        }
+    }
+    cui_text_layout_view view;
+    assert(cui_text_layout_get(line, &view));
+    size_t selection_end = 0;
+    for (size_t i = 0; i < view.cluster_count; ++i)
+        if (!view.clusters[i].byte_start)
+            selection_end = view.clusters[i].byte_end;
+    if (!strcmp(sample, "abc אבג 123"))
+        selection_end = 10;
+    assert(selection_end && cui_edit_select_atomic(edit, 0, selection_end) == CUI_EDIT_OK);
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    assert(cui_input_ex(ui, 60, &theme, cui_string("RTL input"), edit, &state, options).error ==
+           CUI_EDIT_OK);
+    cui_draw_list draw = cui_end_frame(ui);
+    cui_text_selection_rect selected[32];
+    assert(cui_text_layout_selection(line, 0, selection_end, selected, 32, &count) ==
+               CUI_TEXT_LAYOUT_OK &&
+           count);
+    viewport = cui_bounds(ui, cui_input_viewport_id(60));
+    size_t painted_count = 0;
+    for (size_t i = 0; i < draw.count; ++i)
+        if (draw.commands[i].type == CUI_DRAW_RECT &&
+            !memcmp(&draw.commands[i].color, &theme.selection, sizeof theme.selection)) {
+            assert(painted_count < count);
+            assert(fabsf(draw.commands[i].bounds.x - viewport.x + state.scroll_x -
+                         selected[painted_count].bounds.x) < .01f);
+            assert(fabsf(draw.commands[i].bounds.w - selected[painted_count].bounds.w) < .01f);
+            ++painted_count;
+        }
+    assert(painted_count == count);
+    raster actual = {0};
+    assert(cui_font_draw(font, cui_string(buffer), input_metrics.font_size, 0, 0, glyph, &actual));
+    assert(actual.pixels);
+    printf("Input geometry and actual raster passed: %s\n", sample);
+    cui_text_layout_destroy(line);
+    cui_edit_destroy(edit);
+}
+
+int main(int argc, char **argv) {
+    bool audit = argc == 2 && !strcmp(argv[1], "--audit");
+    if (argc > 1 && !audit) {
+        fprintf(stderr, "usage: %s [--audit]\n", argv[0]);
+        return 2;
+    }
     const char *const primary_paths[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
                                          "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                                          "/usr/share/fonts/TTF/DejaVuSans.ttf"};
@@ -227,7 +347,13 @@ int main(void) {
     }
     cui_font *font = cui_font_open(primary), *fallback = cui_font_open(hebrew);
     assert(font && fallback);
-    assert(cui_font_set_fallbacks(font, &fallback, 1));
+    const char *const arabic_paths[] = {"/usr/share/fonts/noto/NotoSansArabic-Regular.ttf",
+                                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                        "/usr/share/fonts/TTF/DejaVuSans.ttf"};
+    const char *arabic_path = font_path("CUI_TEST_ARABIC_FONT", arabic_paths, 3);
+    cui_font *arabic = arabic_path ? cui_font_open(arabic_path) : NULL;
+    cui_font *chain[] = {fallback, arabic};
+    assert(cui_font_set_fallbacks(font, chain, arabic ? 2 : 1));
     cui_text_layout *probe = NULL;
     cui_text_layout_status status =
         cui_font_layout_line(font, cui_string("אבג 123 !"), 24, (cui_text_style){0},
@@ -236,6 +362,7 @@ int main(void) {
         puts("SKIP: native bidi disabled or selected faces lack actual sample glyphs");
         cui_font_close(font);
         cui_font_close(fallback);
+        cui_font_close(arabic);
         return 77;
     }
     assert(status == CUI_TEXT_LAYOUT_OK);
@@ -247,13 +374,32 @@ int main(void) {
                                               .measure = cui_font_measure,
                                               .measure_styled = cui_font_measure_styled,
                                               .font_metrics = metrics,
-                                              .measure_user = font});
+                                              .measure_user = font,
+                                              .text_geometry = cui_font_text_geometry});
     assert(ui);
-    caret_audit(ui, font);
-    wrap_audit(ui, font);
+    input_case(ui, font, "אבג");
+    input_case(ui, font, "שָׁלוֹם");
+    input_case(ui, font, "abc אבג 123");
+    input_case(ui, font, "abc אבג");
+    if (arabic) {
+        cui_text_layout *arabic_probe = NULL;
+        if (cui_font_layout_line(font, cui_string("السَّلَامُ"), 14, (cui_text_style){0},
+                                 CUI_BIDI_AUTO_LTR, 0, SIZE_MAX, NULL,
+                                 &arabic_probe) == CUI_TEXT_LAYOUT_OK) {
+            cui_text_layout_destroy(arabic_probe);
+            input_case(ui, font, "السَّلَامُ");
+        } else
+            puts("Arabic Input geometry untested: selected fixtures lack actual glyphs");
+    } else
+        puts("Arabic Input geometry untested: set CUI_TEST_ARABIC_FONT");
+    if (audit) {
+        caret_audit(ui, font);
+        wrap_audit(ui, font);
+    }
     cui_destroy(ui);
     cui_font_close(font);
     cui_font_close(fallback);
+    cui_font_close(arabic);
     fprintf(stderr, "native text integration audit: %u observed gap(s)\n", gaps);
     return gaps ? 1 : 0;
 }

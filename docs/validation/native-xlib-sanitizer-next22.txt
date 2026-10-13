@@ -1,0 +1,7 @@
+Linux host SDL3.4.18 /libX11.1.8.13, 13October2026.
+Raw next22 sanitizer CTest112:111 pass; only GPUtest reports54144-54148bytes/913 allocations.
+SDL-only reproducer SDL_Init(SDL_INIT_VIDEO);SDL_Quit() reports same913 allocations with no CUI code, window or GPUdevice.
+LD_DEBUG allocation addresses identify libX11.so.6 locale/XIM globals (_XrmInternalStringToQuark, Xlocale converters and XIM init). Dynamic modulefini occurs before LeakSanitizer.
+Keeping Xlib loaded for process lifetime via LD_PRELOAD=/usr/lib/libasan.so.8:/usr/lib/libX11.so.6 makes SDL-only and actual current test_gpu pass with default leak checking. Root repeats actualGPUreadback, nestedclip/alpha validation successfully; no suppression or ASAN_OPTIONS disabling leaks used.
+This is host module lifetime evidence, not evidence that Xlib caches were freed. CUI cleanup already calls renderer destroy, SDL_DestroyGPUDevice, SDL_DestroyWindow, SDL_Quit. No CUI production/test cleanup change is justified by this failure.
+All111 other sanitizer tests pass on exact next22 source. Report raw whole-suite failure separately; native warning-enabled112/112 passes. No physical mobile/native-accessibility or hardware-vendor coverage implied.

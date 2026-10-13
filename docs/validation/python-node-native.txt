@@ -13,3 +13,5 @@ the corrected driver and sequential TypeScript rerun passed.
 Root warning build and CTest: 97/97 passed before the size integration.
 This is a small C-host ABI example, not complete language bindings or physical
 desktop/cross-platform validation. Native event loops are synchronous.
+
+Next22 source 3f4e108 includes the contextual text callback in the native host. The shared host and N-API addon rebuild with strict C11 warnings. All headless Python, Go, Rust, Node and TypeScript examples pass. Actual Xvfb pointer clicks deliver count 1 and nonempty BMP captures for Python, Node JavaScript and TypeScript. This remains a small C-host ABI demonstration rather than full language bindings for the 78 component families.

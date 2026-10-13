@@ -241,6 +241,13 @@ static void cui_input_history_focus(cui_context *ui, cui_id id, cui_edit *edit,
     state->focus_initialized = true;
     state->was_focused = focused;
 }
+static cui_edit_result cui_input_checked(cui_edit *edit, cui_edit_request request,
+                                         cui_base_input_options options, bool *rejected) {
+    cui_edit_checked_result result = cui_edit_apply_checked(
+        edit, request, (cui_edit_acceptance){options.validate, options.validate_user});
+    *rejected |= result.rejected;
+    return result.error;
+}
 cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edit *edit,
                                              cui_input_behavior_state *state,
                                              cui_base_input_options options, size_t i) {
@@ -281,8 +288,17 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
     if (state->composition &&
         (event.type == CUI_EVENT_CANCEL || (event.type >= CUI_EVENT_COMPOSITION_START &&
                                             event.type <= CUI_EVENT_COMPOSITION_CANCEL))) {
-        result.error =
-            cui_edit_composition_event(edit, state->composition, event, !options.readonly);
+        result.error = cui_input_checked(edit,
+                                         (cui_edit_request){.kind = CUI_EDIT_REQUEST_COMPOSITION,
+                                                            .composition = state->composition,
+                                                            .event = event,
+                                                            .editable = !options.readonly},
+                                         options, &result.rejected);
+        /* Host COMMIT ends the native/browser session even if acceptance
+         * rejected the document edit. Engine rollback is a separate operation. */
+        if (result.rejected && event.type == CUI_EVENT_COMPOSITION_COMMIT)
+            (void)cui_edit_composition_event(
+                edit, state->composition, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
         result.changed = before.revision != cui_edit_get_state(edit).revision;
         cui_consume_event(ui, i);
         return result;
@@ -347,17 +363,25 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
                 (paste ? !host->clipboard_get : !host->clipboard_set))
                 error = CUI_EDIT_CLIPBOARD_UNAVAILABLE;
             else if (paste)
-                error = cui_edit_insert(edit, host->clipboard_get(host->user));
+                error =
+                    cui_input_checked(edit,
+                                      (cui_edit_request){.kind = CUI_EDIT_REQUEST_INSERT,
+                                                         .text = host->clipboard_get(host->user)},
+                                      options, &result.rejected);
             else {
                 cui_str text = cui_edit_get_text(edit);
                 if (!host->clipboard_set(host->user, (cui_str){text.data + start, end - start}))
                     error = CUI_EDIT_CLIPBOARD_UNAVAILABLE;
                 else if (event.key == CUI_KEY_X && !options.readonly)
-                    error = cui_edit_delete(edit);
+                    error = cui_input_checked(
+                        edit, (cui_edit_request){.kind = CUI_EDIT_REQUEST_DELETE_SELECTION},
+                        options, &result.rejected);
             }
         }
     } else if (!options.readonly || cui_input_readonly_event(event))
-        error = cui_edit_apply_event(edit, event);
+        error = cui_input_checked(
+            edit, (cui_edit_request){.kind = CUI_EDIT_REQUEST_EVENT, .event = event}, options,
+            &result.rejected);
     if (primary && event.type == CUI_EVENT_POINTER_UP)
         state->dragging = false;
     if (!before.multiline && event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ENTER &&
@@ -394,6 +418,7 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
     for (size_t i = 0; i < count; ++i) {
         cui_input_result event = cui_base_input_reduce_event(ui, id, edit, state, options, i);
         result.submitted |= event.submitted;
+        result.rejected |= event.rejected;
         if (result.error == CUI_EDIT_OK && event.error != CUI_EDIT_OK)
             result.error = event.error;
     }

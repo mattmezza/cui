@@ -39,28 +39,15 @@ required/invalid semantics, same-frame error presentation and IME commit/Undo pl
 focus-loss cancellation. IME preedit remains outside committed document/history;
 commit is one Undo step. Existing size/geometry/IME APIs remain intact.
 
-## Explicit validation gap
+## Whole-value validation
 
-Source `InputBaseState::validate` accepts a predicate for the proposed complete
-text. `is_valid_input` treats empty input as valid; replacement rejects only when
-the candidate is invalid and the previous text is valid, allowing edits to repair
-pre-existing invalid defaults. History replay bypasses that validation.
-CUI currently has **no equivalent whole-value edit acceptance callback**.
-`cui_input_options.invalid` is an explicit semantic/paint flag, not a predicate;
-`required` likewise does not reject an empty edit. Edit errors such as capacity,
-invalid UTF-8 or forbidden line breaks produce same-frame invalid semantics and
-paint without mutating text/history. A flag cannot substitute for source validation.
-
-A future safe validator needs an engine-owned replacement preview seam that knows
-all model storage extents and can enforce scratch alias rules before writes.
-Proposed policy is a synchronous `(void *user, cui_str candidate) -> bool` callback
-with bounded caller scratch, candidate+NUL sizing, atomic capacity rejection and
-observable rejection distinct from engine errors. Empty candidate bypasses the
-predicate; invalid candidate invokes the old-value predicate, rejecting only a
-previously valid value. Preedit and Undo/Redo bypass it; IME commit, typing, paste,
-cut and erasure require consistent preflight. The opaque current model cannot
-expose enough storage information to safely bolt this onto a partial widget-only
-facade. No callback API is introduced in this batch.
+The previously missing source predicate is now implemented by the checked engine
+seam and composed Input options; see [Input acceptance](INPUT_ACCEPTANCE.md) for
+exact callback, healing, IME, borrowing and rollback contracts. Explicit `invalid`
+and `required` flags remain distinct from edit acceptance. Source preedit updates
+also run the predicate; CUI preserves provisional rendering without committed
+mutation while providing that validation. This does not implement regex/mask
+constraints or source content-type roles.
 
 Other source-specific gaps are deliberately preserved: source single-line
 normalization strips CR/LF while CUI's edit model rejects them with

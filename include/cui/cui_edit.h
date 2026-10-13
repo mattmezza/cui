@@ -40,6 +40,40 @@ typedef struct {
     bool grow_view, view_valid;
     size_t view_length;
 } cui_edit_composition;
+/* Source single-line acceptance: empty values are valid; reject a candidate
+ * only when its predicate fails and the previous visible value passes. */
+typedef bool (*cui_edit_accept_fn)(void *user, cui_str candidate);
+typedef struct {
+    cui_edit_accept_fn validate;
+    void *user;
+} cui_edit_acceptance;
+typedef enum {
+    CUI_EDIT_REQUEST_EVENT,
+    CUI_EDIT_REQUEST_INSERT,
+    CUI_EDIT_REQUEST_DELETE_SELECTION,
+    CUI_EDIT_REQUEST_COMPOSITION
+} cui_edit_request_kind;
+typedef struct {
+    cui_edit_request_kind kind;
+    cui_event event;
+    cui_str text;
+    cui_edit_composition *composition;
+    bool editable;
+} cui_edit_request;
+typedef struct {
+    cui_edit_result error;
+    bool rejected;
+} cui_edit_checked_result;
+/* No new preview allocation: uses bounded engine/session workspaces. Predicate
+ * borrows text synchronously; never retain/write it. Same-model mutators are
+ * guarded during callbacks (including void destruction); outer call fails on
+ * attempted reentry. Pure model getters remain available. External side effects
+ * and direct caller-buffer writes are outside this protection. Multiline models
+ * bypass the predicate, matching the source single-line contract. Undo/Redo and
+ * composition START/CANCEL bypass it; UPDATE/COMMIT validate provisional text.
+ * Rejection preserves logical state and prior view's defined bytes; internal
+ * scratch and unused buffer tails are unspecified. */
+cui_edit_checked_result cui_edit_apply_checked(cui_edit *, cui_edit_request, cui_edit_acceptance);
 /* Disabled/read-only/unfocused callers pass editable=false to cancel. Update
  * never changes document/history. Commit is exactly one undo transaction. */
 cui_edit_result cui_edit_composition_event(cui_edit *, cui_edit_composition *, cui_event,

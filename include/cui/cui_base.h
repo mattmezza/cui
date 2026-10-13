@@ -60,6 +60,7 @@ bool cui_progress_animate(cui_progress_motion *, float fraction, double now_seco
 typedef struct {
     bool changed, submitted;
     cui_edit_result error;
+    bool rejected; /* Acceptance rejection; distinct from errors/explicit invalid. */
 } cui_input_result;
 typedef struct {
     cui_context *ui;
@@ -95,6 +96,8 @@ typedef struct {
     void *hit_test_user;
     bool delegate_up_down;  /* Composite popup owns vertical navigation. */
     bool delegate_home_end; /* Composite popup owns these keys; editor leaves them untouched. */
+    cui_edit_accept_fn validate; /* Optional source single-line whole-value predicate. */
+    void *validate_user;         /* Borrowed synchronously; no retained candidate text. */
 } cui_base_input_options;
 /* Reduce one frame event in queue order after registering the textbox with
  * cui_interact. Does not submit/paint semantics or replay other events. The

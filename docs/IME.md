@@ -30,11 +30,27 @@ Attach its pointer to `cui_input_state.behavior.composition` or
 `composition_owned` false for caller-owned storage.
 
 Built-in controls lazily allocate a retained default resource when composition
-first arrives, bounded to 4095 preedit bytes and 65535 rendered document bytes.
-The resource is included in `resource_bytes`. Applications needing larger text
-must attach appropriately sized caller buffers. Preedit or rendered capacity
-failure returns `CUI_EDIT_CAPACITY` through the control result and preserves the
-previous composition and document. No adapter truncates text to 63 bytes.
+first arrives, bounded to 4095 preedit bytes. Styled Input, Textarea, Editor and
+Questionnaire enable `grow_view`: their edit model privately owns rendered storage
+sized from the actual document plus preedit and grows geometrically when needed.
+There is no 65535-byte document limit for these built-in consumers. Growth is
+bounded by the model's configured document capacity plus bounded preedit capacity;
+overflow or allocation failure returns `CUI_EDIT_CAPACITY` before changing the
+previous visible preedit or document. Snapshots are built only on successful
+composition updates; idle view reads reuse the existing snapshot.
+
+The default UI resource remains included in `resource_bytes`; dynamic rendered
+storage is owned by the edit model and freed by `cui_edit_destroy`, independently
+of UI resource collection. Its borrowed view is valid until the next composition
+update/growth or model destruction. The session's original `view_buffer` remains
+caller/UI-resource owned and never points at freed model storage. A retained
+session rebound to a replacement model discards its old active composition.
+Keep session and preedit buffers alive during use, and do not use borrowed views
+after model destruction. Caller-owned sessions retain their explicit fixed
+rendered-buffer bound unless they opt into `grow_view`; this flag also allows an
+initially null rendered buffer. Applications needing larger preedit must attach
+appropriately sized caller buffers. Fixed rendered capacity failure likewise
+preserves composition and document. No adapter truncates text to 63 bytes.
 A reusable headless consumer can call `cui_edit_composition_view` and
 `cui_edit_composition_selection` to paint the temporary document and caret.
 
@@ -76,7 +92,8 @@ with surrounding-text reconversion, platform replacement ranges or candidate UI.
 
 Headless unit tests cover Unicode/emoji ranges, queue deep-copy lifetime, bounded
 failure, large caller buffers, cancellation, external drift, single undo and
-multiple-selection rejection. `tests/web/test_ime.py` uses Chromium CDP native
+multiple-selection rejection. Large-document tests cover more than 200000 bytes,
+owned allocation growth, idle reuse, scrolling, commit/Undo and model rebinding. `tests/web/test_ime.py` uses Chromium CDP native
 `Input.imeSetComposition` and `Input.insertText` for all four text consumers;
 it also checks read-only and blur/disabled cancellation. SDL injected preedit
 checks scalar-to-byte conversion with an emoji and an accented scalar. Linux and

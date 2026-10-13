@@ -1105,7 +1105,55 @@ static void test_ime_virtual_rows(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_ime_large_default_document(void) {
+    const size_t length = 200005, capacity = 220000;
+    char *document = malloc(capacity);
+    cui_textarea_line *rows = calloc(45000, sizeof(*rows));
+    assert(document && rows);
+    for (size_t i = 0; i < length; i++)
+        document[i] = (i % 5 == 4) ? '\n' : 'a';
+    document[length] = 0;
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = document,
+                                                       .capacity = capacity,
+                                                       .multiline = true,
+                                                       .history_bytes = capacity * 4,
+                                                       .max_history_steps = 3});
+    assert(edit);
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, rows, 45000));
+    cui_textarea_options options = {.width = 180, .height = 120, .no_wrap = true};
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    cui_focus(ui, 10);
+    assert(cui_edit_select(edit, length, length) == CUI_EDIT_OK);
+    cui_event update = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                        .text_data = "\xf0\x9f\x98\x80",
+                        .text_length = 4,
+                        .composition_anchor = 4,
+                        .composition_cursor = 4};
+    assert(cui_queue_event(ui, update));
+    cui_textarea_result result = frame(ui, edit, &state, options);
+    assert(result.error == CUI_TEXTAREA_OK && result.edit_error == CUI_EDIT_OK && !result.changed);
+    assert(state.composition_owned && state.composition->grow_view && state.composition->active);
+    assert(cui_edit_composition_view(edit, state.composition).length > 200000 &&
+           state.cursor == length + 4);
+    assert(strlen(document) == length && state.scroll_y > 0 && state.caret_line == state.count - 1);
+    const char *snapshot = cui_edit_composition_view(edit, state.composition).data;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK &&
+           cui_edit_composition_view(edit, state.composition).data == snapshot);
+    update.type = CUI_EVENT_COMPOSITION_COMMIT;
+    assert(cui_queue_event(ui, update));
+    assert(frame(ui, edit, &state, options).changed && strlen(document) == length + 4);
+    key(ui, CUI_KEY_Z, CUI_MOD_CTRL);
+    assert(frame(ui, edit, &state, options).changed && strlen(document) == length);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+    free(rows);
+    free(document);
+}
 int main(void) {
+    test_ime_large_default_document();
     test_ime_virtual_rows();
     test_incremental_wrap_reflow();
     test_large_document_viewport();

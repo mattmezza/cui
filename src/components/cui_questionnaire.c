@@ -671,6 +671,8 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
                              .scroll_x = view->scroll_x};
     input.behavior.composition =
         cui_base_composition(ui, id, input.behavior.composition, &input.behavior.composition_owned);
+    if (input.behavior.composition && input.behavior.composition_owned)
+        input.behavior.composition->grow_view = true;
     if (input.behavior.composition && (disabled || cui_focused(ui) != id))
         (void)cui_edit_composition_event(d->input, input.behavior.composition,
                                          (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);

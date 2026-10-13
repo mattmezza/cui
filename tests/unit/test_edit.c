@@ -1,6 +1,7 @@
 #include "cui/cui_edit.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 static cui_edit *make(char *buffer, size_t capacity, bool multiline, size_t steps) {
     cui_edit *e = cui_edit_create((cui_edit_config){buffer, capacity, multiline, 8192, steps});
@@ -1372,12 +1373,90 @@ static void test_ime_session(void) {
     assert(!c.active && !strcmp(multiline, "abcdef"));
     cui_edit_destroy(e);
 }
+static void test_ime_owned_view_growth(void) {
+    size_t capacity = 400001;
+    char *document = malloc(capacity), *insert = malloc(100001);
+    assert(document && insert);
+    memset(document, 'a', 200000);
+    document[200000] = 0;
+    memset(insert, 'b', 100000);
+    insert[100000] = 0;
+    cui_edit *e = cui_edit_create((cui_edit_config){.buffer = document,
+                                                    .capacity = capacity,
+                                                    .history_bytes = capacity * 5,
+                                                    .max_history_steps = 4});
+    assert(e);
+    assert(cui_edit_select(e, 100000, 100000) == CUI_EDIT_OK);
+    char preedit[4096];
+    cui_edit_composition c = {.buffer = preedit, .capacity = sizeof(preedit), .grow_view = true};
+    cui_event update = {.type = CUI_EVENT_COMPOSITION_UPDATE,
+                        .text_data = "\xf0\x9f\x98\x80",
+                        .text_length = 4,
+                        .composition_anchor = 4,
+                        .composition_cursor = 4};
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    cui_str snapshot = cui_edit_composition_view(e, &c);
+    assert(snapshot.length == 200004 && c.view_buffer == NULL);
+    assert(!memcmp(snapshot.data + 100000, update.text_data, 4) && strlen(document) == 200000);
+    char *first = (char *)snapshot.data;
+    /* An idle view read must neither allocate nor rebuild/copy a document. */
+    first[0] = 'z';
+    assert(cui_edit_composition_view(e, &c).data == first && first[0] == 'z');
+    first[0] = 'a';
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL},
+                                      true) == CUI_EDIT_OK);
+    assert(cui_edit_composition_view(e, &c).data == document);
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    assert(cui_edit_composition_view(e, &c).data == first); /* Reuse after cancellation. */
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL},
+                                      true) == CUI_EDIT_OK);
+    assert(cui_edit_insert(e, (cui_str){insert, 100000}) == CUI_EDIT_OK);
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    assert(cui_edit_composition_view(e, &c).data != first);
+    snapshot = cui_edit_composition_view(e, &c);
+    assert(snapshot.length == 300004 && strlen(document) == 300000);
+    update.type = CUI_EVENT_COMPOSITION_COMMIT;
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    assert(strlen(document) == 300004 && !c.active);
+    assert(cui_edit_undo(e) == CUI_EDIT_OK && strlen(document) == 300000);
+    assert(cui_edit_undo(e) == CUI_EDIT_OK && strlen(document) == 200000);
+    update.type = CUI_EVENT_COMPOSITION_UPDATE;
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    cui_str previous = cui_edit_composition_view(e, &c);
+    char oversized[4096];
+    memset(oversized, 'q', sizeof(oversized));
+    assert(cui_edit_composition_event(e, &c,
+                                      (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                                                  .text_data = oversized,
+                                                  .text_length = sizeof(oversized)},
+                                      true) == CUI_EDIT_CAPACITY);
+    assert(c.active && c.length == 4 && cui_edit_composition_view(e, &c).data == previous.data &&
+           cui_edit_composition_view(e, &c).length == previous.length);
+    cui_edit_destroy(e);
+    assert(c.view_buffer == NULL); /* Owned rendering never installs a dangling session pointer. */
+    char rebound[64] = "replacement";
+    e = make(rebound, sizeof(rebound), false, 4);
+    assert(cui_edit_composition_view(e, &c).data == rebound);
+    assert(cui_edit_composition_selection(e, &c).cursor == cui_edit_get_state(e).cursor);
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_GESTURE}, true) ==
+           CUI_EDIT_OK);
+    assert(!c.active && !strcmp(rebound, "replacement"));
+    assert(cui_edit_composition_event(e, &c, update, true) == CUI_EDIT_OK);
+    assert(cui_edit_composition_view(e, &c).length == 15);
+    assert(cui_edit_composition_event(e, &c, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL},
+                                      true) == CUI_EDIT_OK);
+    assert(!c.active && !strcmp(rebound, "replacement"));
+    cui_edit_destroy(e);
+    free(insert);
+    free(document);
+}
 int main(void) {
     test_multi_typing_change_limit();
     test_directional_delete_history();
     test_multi_delete_history();
     test_column_anchor_history();
     test_typing_history_batch_limit();
+    test_ime_owned_view_growth();
     test_ime_session();
     test_multicursor_typing_history();
     test_typing_history_coalescing();

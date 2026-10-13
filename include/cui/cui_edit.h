@@ -22,9 +22,10 @@ typedef struct {
     bool multiline;
     size_t history_bytes, max_history_steps;
 } cui_edit_config;
-/* Caller-owned reusable IME session, one primary selection only. Both preedit
- * and view buffers are required, disjoint, and remain alive for the session;
- * capacities include the trailing NUL. Zero-initialize the remaining fields. */
+/* Caller-owned reusable IME session, one primary selection only. Preedit and
+ * fixed-mode view buffers must be disjoint and remain alive during use; grow_view
+ * permits a null view buffer. Capacities include the trailing NUL. Zero-initialize
+ * the remaining fields. */
 typedef struct {
     char *buffer;
     size_t capacity, length, start, end, anchor, cursor;
@@ -33,6 +34,11 @@ typedef struct {
     char *view_buffer;
     size_t view_capacity;
     bool active;
+    /* Opt-in model-owned rendered storage; preedit remains caller bounded.
+     * Built-in default sessions enable this. Owned view lives until model destroy
+     * or its next update; original caller view_buffer remains caller-owned. */
+    bool grow_view, view_valid;
+    size_t view_length;
 } cui_edit_composition;
 /* Disabled/read-only/unfocused callers pass editable=false to cancel. Update
  * never changes document/history. Commit is exactly one undo transaction. */

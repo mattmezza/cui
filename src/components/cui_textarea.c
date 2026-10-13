@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_textarea.h"
+#include "cui/cui_base.h"
 #include <math.h>
 static cui_id cui_textarea_child(cui_id id, size_t row, unsigned part) {
     return id ^ UINT64_C(0x7cf5d0e25db29861) ^
@@ -54,6 +55,10 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         return result;
     state->viewport.w = width;
     state->viewport.h = fmaxf(0, height - 2 * py);
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    if (state->composition && state->composition_owned)
+        state->composition->grow_view = true;
     result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;

@@ -206,6 +206,10 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
         return result;
     state->viewport.w = width;
     state->viewport.h = fmaxf(0, height - 2 * py);
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    if (state->composition && state->composition_owned)
+        state->composition->grow_view = true;
     result = cui_base_editor(ui, id, name, editor, config, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;

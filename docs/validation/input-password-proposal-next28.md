@@ -79,7 +79,7 @@ typedef enum {
     CUI_INPUT_CONTENT_PASSWORD,
     CUI_INPUT_CONTENT_NEW_PASSWORD
 } cui_input_content_type;
-typedef struct { char *buffer; size_t capacity; } cui_input_mask_storage;
+typedef struct { char *buffers[3]; size_t capacities[3]; } cui_input_mask_storage;
 /* Append to Base/styled Input options: */
 bool masked;
 cui_input_content_type content_type;
@@ -159,10 +159,10 @@ typedef enum { CUI_TEXT_INPUT_TEXT = 0,
 } cui_text_input_type;
 typedef struct {
     cui_text_input_type type;
-    cui_input_content_type purpose; /* move shared enum into Core-level header */
+    cui_text_input_purpose purpose; /* enum defined in Core; no reverse dependency */
 } cui_text_input_config;
-void cui_set_text_input_config(cui_context *, cui_id owner, cui_text_input_config);
-bool cui_get_text_input_config(const cui_context *, cui_text_input_config *);
+bool cui_set_text_input_config(cui_context *, cui_id owner, cui_text_input_config);
+/* Final exact state/query and purpose declarations are specified below. */
 ```
 
 Only the currently validated focused editable owner contributes config; reset
@@ -220,3 +220,237 @@ SDL type properties; web secure bridge plus a focused password fixture and CDP
 suite; new unit/native-font tests and guide. Global CMake/dist registration remains
 integrator-owned. Splitting host/semantic work from dots without keeping the
 feature explicitly unavailable would be an incomplete password implementation.
+
+## Revision 1: authoritative staging and focused-config contracts
+
+This revision supersedes the earlier single-buffer storage/query sketches. It is
+still proposal-only; Core production ownership is held by `touch_cursors_sol61`.
+No production work is authorized until the integrator approves ownership after
+that handoff.
+
+### Hard presentation preparation, separate from acceptance
+
+A post-reduction `malloc`/factory failure cannot preserve an already changed
+model. Do not put mask capacity inside `validate`: old-invalid healing would then
+allow an oversized candidate, and callback order/count would differ. Instead add
+a synchronous **hard preflight** to checked engine requests, used before the
+candidate acceptance predicate and before document/history/selection mutation.
+The frontend stages only bullets and their geometry; the engine never takes
+ownership of frontend sessions or foreign memory.
+
+Proposed exact engine declarations:
+
+```c
+typedef struct { void *data; size_t bytes; } cui_edit_workspace;
+typedef cui_edit_result (*cui_edit_prepare_fn)(void *user,
+    cui_str candidate, bool provisional);
+typedef struct {
+    cui_edit_prepare_fn prepare;
+    void *user;
+    cui_edit_workspace caller_workspaces[3];
+    size_t caller_workspace_count; /* 0..3; fixed buffers declare all */
+} cui_edit_presentation;
+/* Append to cui_edit_request: */
+cui_edit_presentation presentation;
+/* Append to cui_edit_checked_result: */
+bool presentation_prepared;
+bool presentation_applied;
+```
+
+`prepare` borrows the complete normalized real candidate synchronously. It is a
+hard resource/representation check, not a value-acceptance predicate. Engine
+same-model guards are active during it, including void destroy and cache getters;
+attempted mutation makes the checked request fail before commit. Exact declared
+caller workspace extents are validated before callbacks against engine/model/
+history/selection/columns, current session/preedit/view buffers, the original
+payload and each other. Known descriptor/user-state aliases must also be rejected
+before writes. Direct writes to undeclared buffers/external callbacks still lie
+outside the enforceable C borrowing contract; this seam must not promise global
+UI reentry protection. No allocator or text factory is called by portable Core.
+
+There is no engine-owned finish callback. `presentation_prepared` means successful
+preflight produced frontend staging; `presentation_applied` means that candidate
+became the visible logical value. On rejection/error the caller discards staging.
+This avoids a fallible or model-mutating publication callback inside the engine.
+A checked caller must consume/discard staging before the next request. Built-in
+Input uses a private frontend publication function after each returned checked
+result; publication performs pointer/session swaps and releases only, never
+allocation, user validation or fallible shaping. Base Input event reduction needs
+a narrow completion hook to its styled owner (exact public declaration below),
+because several edits in one frame must publish/discard in event order, not once
+at the frame end.
+
+```c
+typedef void (*cui_input_presentation_complete_fn)(void *user,
+    bool prepared, bool applied);
+/* Append to Base Input options (styled options expose storage, not hooks): */
+cui_edit_presentation presentation;
+cui_input_presentation_complete_fn presentation_complete;
+void *presentation_user;
+```
+
+The completion hook runs *after* the checked engine call and is notification/
+frontend ownership plumbing, outside that call's model transaction. User-written
+hooks must not mutate/reenter the model or fail; the built-in hook is private,
+reviewable, no-fail CUI code. Do not extend the engine's rollback promise over
+arbitrary completion side effects. The Base helper must invoke it once for every
+checked result with prepared staging, including rejection; raw host CANCEL still
+clears session through the existing lifecycle path and invalidates frontend
+provisional staging. Callback pointers/user data are borrowed for that request,
+not persisted by the engine. No custom predicate is invoked while publishing.
+
+Preparation points are explicit:
+
+1. Replacement/type/paste/delete: validate original UTF8/range, normalize/count,
+   check document capacity and declared workspace aliases, construct candidate,
+   run preflight exactly once, then run candidate/old predicates with current
+   source ordering. Commit through existing history/coalescing only after both
+   gates pass. Empty candidates still require a representable empty mask even
+   though acceptance bypasses its predicate.
+2. IME UPDATE/COMMIT: original preedit cap and UTF8 endpoints first, normalized
+   composed candidate next. Stage display bytes/geometry before candidate
+   acceptance; commit has no additional preflight or predicate replay. Rejected
+   UPDATE discards staged mask and preserves prior preedit/view/cache. Rejected
+   host COMMIT then cancels the session; frontend publication must select the
+   already prepared committed-view cache rather than allocate at that boundary.
+3. Undo/Redo: preflight the recorded target full value **before** history restore
+   or selection/coalescing mutation. Resource failure leaves replay state/model
+   untouched. Replay bypasses acceptance/normalization, not the hard display
+   resource gate. Caller-fixed display budget may prevent Undo of a larger value;
+   return CAPACITY explicitly, never reveal it or silently drop history.
+4. START/CANCEL/focus-loss/read-only transition: reserve/retain a committed-view
+   mask cache before beginning composition, so ending it can select that cache
+   with no allocation. Provisional updates use a separate staging slot; entering
+   composition must not discard the committed-view resource. Initial submission,
+   explicit reveal→masked transition and model rebinding prepare the current
+   composed and committed representations before reducing events.
+
+This requires **three owned cache slots** while composing: committed base,
+currently visible preedit, and candidate staging. For fixed caller bytes the exact
+storage contract therefore must include three disjoint equal-budget display
+buffers, not the earlier two-buffer sketch:
+
+```c
+typedef struct {
+    char *buffers[3];
+    size_t capacities[3];
+} cui_input_mask_storage;
+```
+
+The public engine declared workspace array/count is likewise three (0..3)
+for this final contract. All three caller capacities include NUL; effective hard
+budget is their minimum, so every candidate fits any role after a swap. Caller
+struct fields remain unchanged; private frontend state tracks slot roles. Only
+slots not referenced by live immutable geometry/draw sessions may be overwritten.
+Release old staged factory/session references before reuse. On successful UPDATE,
+swap candidate/visible while retaining committed; on COMMIT swap candidate into
+committed and clear provisional. On CANCEL return to retained committed slot.
+No allocation or shape operation occurs after model commit or during cancellation.
+If capacity was changed by the caller during a retained session, reject it as an
+invalid rebinding rather than use stale pointers. Buffers live until explicit
+unbind/UI resource destruction, and remain caller-owned throughout.
+
+Factory sessions may allocate independently even with fixed display bytes. Their
+failure is caught during staging. Owned default slots lazily grow before commit,
+with checked scalar×3 arithmetic and transactional replacement: retain all prior
+slots/session pointers until the new stage is complete. Allocation failure returns
+CAPACITY; host factory failure needs an appended `CUI_EDIT_PRESENTATION` result
+rather than conflating unsupported/invalid shaping with a valid predicate rejection.
+A missing native factory uses the existing *bullet-only* measured geometry path;
+an installed factory returning failure is a hard staging error, not plaintext or
+partially changed-model fallback. A valid measured fallback must itself be finite
+and bounded. Presentation failure returns `rejected=false`: it is not validation.
+No per-edit hidden engine allocation; frontend allocations are explicit owned
+cache growth/session creation and tested separately.
+
+On plain→masked toggle, release every plaintext geometry session before freeing
+its copied text, clear affinities tied to plaintext widths, then prepare the current
+mask. Failure renders no secret text, leaves the model unchanged and exposes a
+presentation error; the old plaintext cache must not be painted or reused as a
+fallback. Blank fail-closed initial/toggle presentation is allowed when no prior
+safe mask exists. A previous safe masked display may remain on resource rejection,
+but its caret/hit interaction cannot be associated with a changed value. Toggle
+and cache failure tests must inspect factory destruction order and every draw call.
+
+### Exact Core config lifecycle, no reverse dependency
+
+Purpose is defined in Core, not the component header:
+
+```c
+typedef enum {
+    CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED = 0,
+    CUI_TEXT_INPUT_PURPOSE_PASSWORD,
+    CUI_TEXT_INPUT_PURPOSE_NEW_PASSWORD
+} cui_text_input_purpose;
+typedef struct {
+    cui_text_input_type type;
+    cui_text_input_purpose purpose;
+} cui_text_input_config;
+typedef struct {
+    cui_id owner;
+    cui_text_input_config config;
+    uint64_t generation;
+} cui_text_input_state;
+bool cui_set_text_input_config(cui_context *, cui_id owner,
+    cui_text_input_config);
+bool cui_get_text_input_config(const cui_context *, cui_text_input_state *out);
+/* Base/styled option uses the Core type directly: */
+cui_text_input_purpose content_type;
+```
+
+Setter is frame-only and validates ID/enums before recording provisional metadata;
+false leaves previous staged metadata unchanged. It cannot borrow a model/string/
+platform pointer. Multiple setters for different controls are permitted, but only
+the finalized validated focused owner is chosen at end_frame. Owner must be a
+live single-line editable textbox in the active focus scope, not disabled, readonly,
+no-focus, removed or modal-obscured. Readonly controls still focus/allow selection,
+but never produce active host text config. The getter is valid after end_frame;
+during a frame, null output, absent owner, changed current focus or invalid owner
+returns false with output unchanged. It rechecks current focus against finalized
+semantic metadata; no old frame's secure config may be applied to a different ID.
+Each begin_frame clears pending candidates, and an omitted widget clears active
+config at end_frame. Zero means ordinary TEXT/UNSPECIFIED, not password; a valid
+ordinary editable textbox can explicitly publish that zero config.
+
+Generation increments when finalized owner/config becomes different or disappears,
+including remove/re-add of the same ID. It is an opaque host session stamp, not a
+model pointer. At UINT64_MAX, an attempted configuration transition fails closed
+(no active host config) until context recreation; do not allow generation reuse to
+validate old async input. Getter false tells adapters to end/clear native/browser
+text sessions and reset previously applied purpose/type. SDL should stop text
+input for absent/readonly/disabled owner; a new ordinary owner explicitly restarts
+ordinary settings. Browser clears transient input, cancels composition, releases
+bridge focus and removes secure purpose metadata. App explicit reveal affects
+canvas masking independently of purpose; secret semantic exposure stays disabled
+when Password/NewPassword purpose remains set.
+
+### Forced failures and integration ownership
+
+Meaningful precommit tests must inject allocator failure at each owned mask slot
+growth and factory create failure after allocation, with old fixed mask fitting but
+new scalar count exceeding budget. Compare complete logical model/history/redo/
+selection/coalescing/session ownership plus previous safe display bytes/terminator
+and cached session identity. Assert user predicate is not called on hard failure;
+invalid-old healing must not override capacity and predicates keep normal order
+once preflight succeeds. Include typed/paste/delete/IME/Undo/Redo, empty value,
+multiple edits per frame and cancellation after a larger provisional value. Assert
+prepare once, complete once, no publication allocation, no predicate replay and
+exact release counts. Include fixed-buffer aliases into model/history/current
+view, descriptor overlap, forced fresh binding/toggle failure and stale factory
+pointers after destruction. Sanitizers and caller allocator/factory spies must
+prove no leak/double free and no overwritten live borrowed mask bytes.
+
+Core tests need config before/after frame, late focus change, omitted target,
+readonly/disabled transitions, modal obscuration, ordinary zero config, bad enum,
+null output, same-ID removal/reappearance and generation saturation. Native/real
+CDP tests must validate secure type/reset state and composition ownership; physical
+OS password/candidate behavior remains unclaimed. No tests have been run for this
+proposal-only revision.
+
+Revised ownership request: edit.h/edit.c hard preflight/restore seams/helpers;
+Input-only Base/Components APIs/reducers/cache/paint; Core header/source config and
+secret metadata **only after touch worker handoff**; AccessKit protected mapping;
+SDL config application; web secure fixture/bridge and CDP tests; new focused unit/
+native-font failure tests/docs. CMake/generated distribution stay integrator-owned.
+The Core-purpose definitions must land before frontend/adapter declarations use
+them. Implementation approval remains pending.

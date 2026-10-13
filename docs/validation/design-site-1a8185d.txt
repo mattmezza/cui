@@ -1,0 +1,37 @@
+Combined library and website validation
+
+Portable source commit: 1a8185dc6091c6b1061df5ed79da63fb5609ea79
+Portable source SHA256: 5fbb078aab40da3fb66072cb4b19a782e86f88f19bf1b700a3396bd1f85ae25b
+WASI ran with no tracked modifications, Zig 0.16.0, wasmtime 49.0.0,
+assertions enabled and 30,000,000,000 instructions per suite: 69/69 pass.
+The earlier combined6 attempt failed its effects include path, accidental
+multi-TU test input, and a production-sized repeated two-item fixture's fuel
+budget. These were corrected; only the complete stable rerun is counted.
+
+Warnings-as-errors native build and CTest: 82/82 pass.
+ASan/UBSan native build and CTest: 80/80 pass (optional GPU targets absent).
+Native font-family integration checks real face metrics, glyph pixels,
+family/style fallback, sparse uint32 IDs, registration ownership and wrappers.
+
+Chromium: all 78 WASM stories and 78 displayed C excerpts pass.
+Additional browser checks: all78 per-family interaction guides; real gradient,
+blur and opacity pixels; browser family IDs including UINT32_MAX fallback;
+font styles and sizes; configurable text fade and reduced motion; composed app
+pricing/account/settings/edit/save/theme state and 390px layout. Pass in full
+Chromium and the CI Chromium headless shell.
+Visual regressions: Marker, Pagination/Stepper, Rating and real Image pass.
+Component usage metadata: 4/4 tests. Docs: 3/3. Sharing: 3/3.
+Manifest, licenses, pinned palettes, formatting and amalgamation checks pass.
+
+All 78 manifest families remain. Full GPUI family parity remains unverified.
+Browser fonts map to installed host families; fonts are not downloaded.
+Backdrop capture remains a host responsibility. Go/Rust/Node/TypeScript
+examples use the documented narrow native bridge rather than complete bindings.
+The composed app is session-local and has no authentication/payment server.
+
+Evidence logs (integrator cache):
+combined8-native.log, combined8-asan.log, combined8-wasi.log,
+combined6-browser.log, combined7-visual.log, combined9-extensions.log,
+combined7-usage.log, combined8-docs.log, combined8-sharing.log,
+combined9-quality.log. Typography/TextView complete doc programs were also
+strictly compiled and executed by the worker; see its 3f57627 commit report.

@@ -2134,3 +2134,174 @@ cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *instance,
     *out = state;
     return CUI_DOCK_OK;
 }
+
+bool cui_dock_lifecycle_init(cui_dock_lifecycle *state, cui_dock_lifecycle_snapshot *current,
+                             cui_dock_lifecycle_snapshot *pending, size_t capacity) {
+    if (!state || !current || !pending || current == pending || !capacity ||
+        capacity > CUI_DOCK_PANEL_LIMIT)
+        return false;
+    *state = (cui_dock_lifecycle){.current = current, .pending = pending, .capacity = capacity};
+    return true;
+}
+static size_t dock_lifecycle_count(const cui_dock *model, cui_dock_node node) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(model, node, &info))
+        return 0;
+    return info.kind == CUI_DOCK_TABS
+               ? info.panel_count
+               : dock_lifecycle_count(model, info.first) + dock_lifecycle_count(model, info.second);
+}
+static bool dock_lifecycle_unique(const cui_dock_lifecycle_region *regions, size_t region,
+                                  cui_dock_node node) {
+    const cui_dock *model = regions[region].model;
+    cui_dock_node_info info;
+    cui_dock_node_get(model, node, &info);
+    if (info.kind != CUI_DOCK_TABS)
+        return dock_lifecycle_unique(regions, region, info.first) &&
+               dock_lifecycle_unique(regions, region, info.second);
+    for (size_t i = 0; i < info.panel_count; i++) {
+        uint64_t key;
+        cui_dock_panel_at(model, node, i, &key);
+        for (size_t j = 0; j < region; j++)
+            if (cui_dock_panel_find(regions[j].model, key, NULL, NULL))
+                return false;
+    }
+    return true;
+}
+static void dock_lifecycle_fill(cui_dock_lifecycle *state, const cui_dock_lifecycle_region *region,
+                                cui_dock_node node, cui_dock_node zoom_group,
+                                const cui_dock_panel *panels, size_t panel_count, size_t *index) {
+    cui_dock_node_info info;
+    cui_dock_node_get(region->model, node, &info);
+    if (info.kind != CUI_DOCK_TABS) {
+        dock_lifecycle_fill(state, region, info.first, zoom_group, panels, panel_count, index);
+        dock_lifecycle_fill(state, region, info.second, zoom_group, panels, panel_count, index);
+        return;
+    }
+    bool collapsed = region->collapsed ||
+                     (region->group_collapsed &&
+                      region->group_collapsed(region->constraints_user, region->model, node));
+    uint64_t displayed = 0;
+    bool has_displayed = cui_dock_displayed_panel(region->model, node, region->panel_visible,
+                                                  region->visibility_user, &displayed);
+    for (size_t i = 0; i < info.panel_count; i++) {
+        uint64_t key;
+        cui_dock_panel_at(region->model, node, i, &key);
+        cui_dock_panel panel = {.key = key};
+        for (size_t j = 0; j < panel_count; j++)
+            if (panels[j].key == key) {
+                panel = panels[j];
+                break;
+            }
+        state->pending[(*index)++] = (cui_dock_lifecycle_snapshot){
+            .panel = panel,
+            .model = region->model,
+            .tab = node,
+            .active = !collapsed && info.has_active && info.active_panel == key,
+            .displayed = has_displayed && displayed == key,
+            .group_zoomed = zoom_group == node};
+    }
+}
+cui_dock_result cui_dock_lifecycle_capture(cui_dock_lifecycle *state,
+                                           const cui_dock_lifecycle_region *regions, size_t nr,
+                                           const cui_dock_panel *panels, size_t np) {
+    if (!state || !state->current || !state->pending || state->dispatching || (nr && !regions) ||
+        (np && !panels) || nr > CUI_DOCK_NODE_LIMIT || np > CUI_DOCK_PANEL_LIMIT)
+        return CUI_DOCK_INVALID;
+    for (size_t i = 0; i < np; i++)
+        for (size_t j = 0; j < i; j++)
+            if (panels[i].key == panels[j].key)
+                return CUI_DOCK_DUPLICATE_PANEL;
+    size_t total = 0;
+    for (size_t i = 0; i < nr; i++) {
+        if (!regions[i].model)
+            return CUI_DOCK_INVALID;
+        for (size_t j = 0; j < i; j++)
+            if (regions[i].model == regions[j].model)
+                return CUI_DOCK_INVALID;
+        size_t count = dock_lifecycle_count(regions[i].model, cui_dock_root(regions[i].model));
+        if (count > state->capacity - total)
+            return CUI_DOCK_CAPACITY;
+        total += count;
+        if (!dock_lifecycle_unique(regions, i, cui_dock_root(regions[i].model)))
+            return CUI_DOCK_DUPLICATE_PANEL;
+    }
+    size_t index = 0;
+    for (size_t i = 0; i < nr; i++) {
+        uint64_t zoom_key;
+        cui_dock_node zoom_group = 0;
+        if (regions[i].view && cui_dock_view_zoomed(regions[i].view, &zoom_key))
+            cui_dock_panel_find(regions[i].model, zoom_key, &zoom_group, NULL);
+        dock_lifecycle_fill(state, &regions[i], cui_dock_root(regions[i].model), zoom_group, panels,
+                            np, &index);
+    }
+    state->pending_count = index;
+    state->has_pending = true;
+    return CUI_DOCK_OK;
+}
+static const cui_dock_lifecycle_snapshot *
+dock_lifecycle_find(const cui_dock_lifecycle_snapshot *items, size_t count, uint64_t key) {
+    for (size_t i = 0; i < count; i++)
+        if (items[i].panel.key == key)
+            return &items[i];
+    return NULL;
+}
+bool cui_dock_lifecycle_dispatch(cui_dock_lifecycle *state) {
+    if (!state || !state->current || !state->pending || state->dispatching)
+        return false;
+    if (!state->has_pending)
+        return true;
+    cui_dock_lifecycle_snapshot *old = state->current;
+    size_t old_count = state->current_count;
+    state->current = state->pending;
+    state->current_count = state->pending_count;
+    state->pending = old;
+    state->pending_count = 0;
+    state->has_pending = false;
+    state->dispatching = true;
+    for (size_t i = 0; i < state->current_count; i++) {
+        const cui_dock_lifecycle_snapshot *now = &state->current[i];
+        const cui_dock_lifecycle_snapshot *was =
+            dock_lifecycle_find(old, old_count, now->panel.key);
+        if (was && was->panel.lifecycle_identity != now->panel.lifecycle_identity)
+            was = NULL;
+        if ((!was || was->model != now->model || was->tab != now->tab) && now->panel.on_added)
+            now->panel.on_added(now->panel.user, now->panel.key, now->model, now->tab);
+    }
+    for (size_t i = 0; i < old_count; i++) {
+        const cui_dock_lifecycle_snapshot *now =
+            dock_lifecycle_find(state->current, state->current_count, old[i].panel.key);
+        if ((!now || now->panel.lifecycle_identity != old[i].panel.lifecycle_identity) &&
+            old[i].panel.on_removed)
+            old[i].panel.on_removed(old[i].panel.user, old[i].panel.key);
+    }
+    /* All deactivations precede activations; removals never receive false. */
+    for (unsigned phase = 0; phase < 2; phase++)
+        for (size_t i = 0; i < state->current_count; i++) {
+            const cui_dock_lifecycle_snapshot *now = &state->current[i];
+            if (now->active != (phase != 0))
+                continue;
+            const cui_dock_lifecycle_snapshot *was =
+                dock_lifecycle_find(old, old_count, now->panel.key);
+            if (was && was->panel.lifecycle_identity != now->panel.lifecycle_identity)
+                was = NULL;
+            if ((!was ? now->active : was->active != now->active) && now->panel.set_active)
+                now->panel.set_active(now->panel.user, now->panel.key, now->active);
+        }
+    /* Group zoom edges notify only the current visible displayed member. */
+    for (size_t i = 0; i < state->current_count; i++) {
+        const cui_dock_lifecycle_snapshot *now = &state->current[i];
+        if (!now->displayed || !now->panel.set_zoomed)
+            continue;
+        bool old_zoom = false;
+        for (size_t j = 0; j < old_count; j++)
+            if (old[j].model == now->model && old[j].tab == now->tab) {
+                old_zoom = old[j].group_zoomed;
+                break;
+            }
+        if (old_zoom != now->group_zoomed)
+            now->panel.set_zoomed(now->panel.user, now->panel.key, now->group_zoomed);
+    }
+    state->dispatching = false;
+    return true;
+}

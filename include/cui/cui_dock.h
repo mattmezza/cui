@@ -140,6 +140,12 @@ typedef struct {
     float title_width, title_suffix_width;
     bool hide_title_bar; /* Auto single-panel mode; multiple/collapsed tabs remain reachable. */
     bool omit_inner_padding;
+    void (*on_added)(void *, uint64_t panel, const cui_dock *, cui_dock_node tab);
+    void (*on_removed)(void *, uint64_t panel);
+    void (*set_active)(void *, uint64_t panel, bool);
+    void (*set_zoomed)(void *, uint64_t panel, bool);
+    const void *lifecycle_identity; /* Optional token distinguishes replacement at the same key. */
+
 } cui_dock_panel;
 /* Caller-owned reconstruction seam; strings/payloads are borrowed opaque bytes. */
 typedef struct {
@@ -173,6 +179,38 @@ cui_dock_result cui_dock_panels_reconstruct(const cui_dock *, const cui_dock_pan
 cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *, cui_dock_panel_state *);
 /* Calls factory destroy once, then clears instances. No lifecycle notification. */
 void cui_dock_panels_release(cui_dock_panel_instance *, size_t count);
+/* Lifecycle captures the complete host workspace, including closed regions. */
+typedef struct {
+    const cui_dock *model;
+    const cui_dock_view *view; /* Optional, supplies group zoom state. */
+    cui_dock_visibility_fn panel_visible;
+    void *visibility_user;
+    bool collapsed;
+    bool (*group_collapsed)(void *, const cui_dock *, cui_dock_node);
+    void *constraints_user;
+} cui_dock_lifecycle_region;
+typedef struct {
+    cui_dock_panel panel;
+    const cui_dock *model;
+    cui_dock_node tab;
+    bool active, displayed, group_zoomed;
+} cui_dock_lifecycle_snapshot;
+typedef struct {
+    cui_dock_lifecycle_snapshot *current, *pending;
+    size_t capacity, current_count, pending_count;
+    bool has_pending, dispatching;
+} cui_dock_lifecycle;
+/* Storage must be distinct, disjoint arrays retained for tracker's lifetime. */
+bool cui_dock_lifecycle_init(cui_dock_lifecycle *, cui_dock_lifecycle_snapshot *current,
+                             cui_dock_lifecycle_snapshot *pending, size_t capacity);
+/* Capture after committed edits; repeated captures coalesce before dispatch.
+ * Failure leaves both committed and pending notifications unchanged. */
+cui_dock_result cui_dock_lifecycle_capture(cui_dock_lifecycle *, const cui_dock_lifecycle_region *,
+                                           size_t region_count, const cui_dock_panel *,
+                                           size_t panel_count);
+/* Call on the next host tick. Postcommit callbacks; recursive use is rejected.
+ * Returns false for invalid/reentrant calls, true even when nothing is pending. */
+bool cui_dock_lifecycle_dispatch(cui_dock_lifecycle *);
 typedef enum {
     CUI_DOCK_SELECTED,
     CUI_DOCK_CLOSED,

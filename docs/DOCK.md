@@ -160,7 +160,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | `Dock`, `DockSizing`, `DockPlacement` | Retained left/right/bottom open flags and preferred sizes, bounds/minima clamping and pointer/keyboard resizing. Frozen component deliberately does not re-export base `Dock`. Opt-in bottom collapse includes its strip/live-size snapping. Per-edge collapsibility is retained and guards closing and bottom drag snapping. |
 | `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
 | `AnyDrag`, `DragPanel`, `DropIndicator`, `DropPlaceholderBounds`, `DropTarget`, `DragPanelPreview` | Portable queued tab gestures, cross-group/region transfer, content-edge splits, accepted/rejected target indications and previews. No GPUI entity drag payload or opaque host drag union is needed for CUI events. |
-| Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; dynamic visibility predicate; no automatic added/removed/active lifecycle hook or panel-specific dump callback. |
+| Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; dynamic visibility predicate; caller-owned next-tick lifecycle reconciliation and factory payload dump callbacks; no automatic view-owned lifetime management. |
 | `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. Named caller-owned factories reconstruct live descriptors and preserve unknown payloads; no automatic JSON schema/parser or Rust state-schema import. |
 | `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
 | Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Per-title chrome colors remain a gap. |
@@ -329,3 +329,39 @@ The caller owns instance storage, descriptors, registry, payload bytes and all f
 The v1 layout remains unchanged. Restore the layout first, reconstruct its records into new storage, then publish the model and descriptors together; preserve the old model/instances until both steps succeed. Hosts can wrap the layout, panel records and application schema version in their own JSON or other format. This seam does not parse JSON, import the frozen Rust `PanelState` tree schema, manage application schema migration, or deliver lifecycle notifications.
 
 Headless tests reconstruct and render a real control, dump updated known payloads, retain byte-exact unknown payloads, reject invalid coverage/duplicate registry names before callbacks, roll back a later failed builder and wrong-key builder, preserve serialized layout, and verify destruction occurs once.
+
+
+### Deferred lifecycle reconciliation
+
+The frozen `panel.rs`, `active.rs` and `tab_group.rs` distinguish group arrivals from genuine removals. Initial reconciliation announces only the active panel; inactive panels never receive an initial `false`. Active changes use frame-end net state, with deactivation before activation. A hidden stored-active panel still receives `true`, independently of visible rendering fallback. Moves preserve prior notified active state and re-add to the destination group without removal. Removal itself is the deactivation signal.
+
+CUI exposes those rules through caller-owned `cui_dock_lifecycle` bookkeeping. Append `on_added`, `on_removed`, `set_active` and `set_zoomed` callbacks to descriptors, using the existing panel `user`. Keep two distinct, disjoint `cui_dock_lifecycle_snapshot` arrays alive for the tracker's lifetime. Initialize once; capture the complete workspace after committing edits/end-frame, and dispatch on the next host tick. Include closed regions: closing an edge is not removing its panels. Missing descriptors are still tracked by key but have no callbacks.
+
+```c
+cui_dock_lifecycle lifecycle;
+cui_dock_lifecycle_snapshot current[64], pending[64];
+if (!cui_dock_lifecycle_init(&lifecycle, current, pending, 64)) {
+    /* Invalid storage/capacity. */
+}
+/* At the beginning of the next host tick: */
+(void)cui_dock_lifecycle_dispatch(&lifecycle);
+/* After all region edits and rendering have committed: */
+cui_dock_lifecycle_region regions[] = {
+    {.model = center_model, .view = center_view},
+    {.model = inspector_model, .view = inspector_view}
+};
+cui_dock_result result = cui_dock_lifecycle_capture(
+    &lifecycle, regions, 2, descriptors, descriptor_count);
+```
+
+Pass each region's visibility predicate to determine its visible zoom recipient; active notifications use the stored active key. Set `collapsed` or a pure `group_collapsed` callback to mirror collapsed group constraints: collapse deactivates the stored active panel, and reopening activates it again. Ordinary closed edges should remain uncollapsed unless the host intentionally presents the collapsed bottom strip. The lifecycle capture itself does not change layout, focus, policies or visibility.
+
+Repeated successful captures replace pending state until dispatch, so within-frame selection churn produces only net active edges. Capacity, duplicate descriptors, repeated model regions or duplicate keys across models reject before changing pending notifications. All regions must be captured together to recognize cross-region moves. A failed or vetoed edit whose model stays unchanged yields no lifecycle edge.
+
+Dispatch commits bookkeeping before invoking callbacks. It delivers group arrivals first, genuine removals next, then all active deactivations before activations. Moving the same instance to a different model/tab calls `on_added` with the new location; it never calls `on_removed`. An optional `lifecycle_identity` token distinguishes a newly constructed instance at an existing stable key: changing the token emits new-added, old-removed and initial activation for the replacement. With null tokens the stable key is the instance identity. Restore-invalidated tab IDs produce a fresh group arrival while retained instance active state remains seeded.
+
+Group zoom-state edges notify only the currently visible displayed panel, including restore even when that panel never received zoom-in. Selecting another tab in an already zoomed group does not retroactively notify it. Capture reports net group zoom state; it does not reconstruct every intermediate zoom toggle within one tick. The frozen source dispatches zoom operation events asynchronously, so hosts requiring that event stream should retain their operation results separately.
+
+Callbacks run outside rendering and can edit a model for the next capture. Recursive capture/dispatch on the same tracker is rejected. Do not reinitialize, directly modify or free tracker storage during dispatch. Callback/user/token resources from both old and new snapshots must remain valid until dispatch completes; callback edits cannot invalidate another scheduled callback's resources. Group/model pointers passed to callbacks are borrowed location identities; retain models through dispatch before destruction. Do not release old reconstructed instances until their removal callbacks finish. For shutdown, capture zero regions and dispatch removals before releasing factories/models; abandoning the tracker emits no implicit callbacks.
+
+This explicit host seam batches group-add notifications with next-tick dispatch rather than invoking them synchronously from a Rust entity update. It provides portable net-state bookkeeping, not ownership of panel instances. Tests cover deferred initial activation, coalesced selection churn, ordering, hidden stored-active behavior, collapse/reopen, visible-only zoom delivery without retroactive notifications, cross-region moves, genuine removal without `false`, rejected-capture rollback, postcommit callback edits, reentry rejection and instance replacement.

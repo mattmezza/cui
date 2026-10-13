@@ -1742,11 +1742,181 @@ static void test_factory_reconstruction(void) {
     assert(factory_destroys == 3);
     cui_dock_destroy(m);
 }
+typedef struct {
+    char type;
+    uint64_t key;
+} lifecycle_event;
+static lifecycle_event lifecycle_log[64];
+static size_t lifecycle_count;
+static cui_dock_lifecycle *lifecycle_tracking;
+static bool lifecycle_reenter, lifecycle_mutate;
+static cui_dock *lifecycle_model;
+static void lifecycle_record(char type, uint64_t key) {
+    assert(lifecycle_count < 64);
+    lifecycle_log[lifecycle_count++] = (lifecycle_event){type, key};
+}
+static void lifecycle_added(void *user, uint64_t key, const cui_dock *m, cui_dock_node tab) {
+    assert(user == &lifecycle_count && m && tab);
+    lifecycle_record('A', key);
+    if (lifecycle_reenter) {
+        assert(!cui_dock_lifecycle_dispatch(lifecycle_tracking));
+        assert(cui_dock_lifecycle_capture(lifecycle_tracking, NULL, 0, NULL, 0) ==
+               CUI_DOCK_INVALID);
+    }
+}
+static void lifecycle_removed(void *user, uint64_t key) {
+    assert(user == &lifecycle_count);
+    lifecycle_record('R', key);
+}
+static void lifecycle_active(void *user, uint64_t key, bool active) {
+    assert(user == &lifecycle_count);
+    lifecycle_record(active ? 'T' : 'F', key);
+    if (lifecycle_mutate && active) {
+        lifecycle_mutate = false;
+        assert(cui_dock_activate(lifecycle_model, 1) == CUI_DOCK_OK);
+    }
+}
+static void lifecycle_zoom(void *user, uint64_t key, bool zoomed) {
+    assert(user == &lifecycle_count);
+    lifecycle_record(zoomed ? 'Z' : 'z', key);
+}
+static void lifecycle_expect(size_t i, char type, uint64_t key) {
+    assert(i < lifecycle_count && lifecycle_log[i].type == type && lifecycle_log[i].key == key);
+}
+static void test_lifecycle(void) {
+    cui_dock *m = cui_dock_create((cui_dock_config){0});
+    cui_dock *other = cui_dock_create((cui_dock_config){0});
+    cui_dock_node tab = cui_dock_root(m), destination = cui_dock_root(other);
+    assert(cui_dock_insert(m, tab, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(m, tab, 1, 1) == CUI_DOCK_OK);
+    cui_dock_panel descriptors[2] = {0};
+    for (size_t i = 0; i < 2; i++)
+        descriptors[i] = (cui_dock_panel){.key = i,
+                                          .user = &lifecycle_count,
+                                          .on_added = lifecycle_added,
+                                          .on_removed = lifecycle_removed,
+                                          .set_active = lifecycle_active,
+                                          .set_zoomed = lifecycle_zoom};
+    cui_dock_lifecycle_snapshot current[3], pending[3];
+    cui_dock_lifecycle tracker;
+    assert(!cui_dock_lifecycle_init(&tracker, current, current, 2));
+    assert(cui_dock_lifecycle_init(&tracker, current, pending, 3));
+    lifecycle_tracking = &tracker;
+    lifecycle_count = 0;
+    lifecycle_reenter = true;
+    cui_dock_view *v = cui_dock_view_create(0, 0);
+    cui_dock_lifecycle_region regions[2] = {{.model = m, .view = v}, {.model = other}};
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(lifecycle_count == 0);
+    assert(cui_dock_lifecycle_dispatch(&tracker));
+    assert(lifecycle_count == 3);
+    lifecycle_expect(0, 'A', 0);
+    lifecycle_expect(1, 'A', 1);
+    lifecycle_expect(2, 'T', 0);
+    lifecycle_reenter = false;
+    lifecycle_count = 0;
+    assert(cui_dock_activate(m, 1) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_activate(m, 0) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 0);
+    assert(cui_dock_activate(m, 1) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 2);
+    lifecycle_expect(0, 'F', 0);
+    lifecycle_expect(1, 'T', 1);
+    lifecycle_count = 0;
+    /* Hidden stored-active still receives true; rendering fallback does not. */
+    visibility_model = m;
+    hidden_bits = 2;
+    regions[0].panel_visible = panel_visible;
+    regions[0].visibility_user = &hidden_bits;
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 0);
+    assert(cui_dock_view_set_zoom(v, m, 1, true));
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 1);
+    lifecycle_expect(0, 'Z', 0);
+    lifecycle_count = 0;
+    hidden_bits = 0;
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 0);
+    assert(cui_dock_view_set_zoom(v, m, 1, false));
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 1);
+    lifecycle_expect(0, 'z', 1);
+    lifecycle_count = 0;
+    regions[0].collapsed = true;
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 1);
+    lifecycle_expect(0, 'F', 1);
+    lifecycle_count = 0;
+    regions[0].collapsed = false;
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 1);
+    lifecycle_expect(0, 'T', 1);
+    lifecycle_count = 0;
+    /* Cross-region move keeps active state and never emits removal. */
+    assert(cui_dock_transfer(m, 1, other, destination, 0, CUI_DOCK_TABS, .5, false, NULL) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 2);
+    lifecycle_expect(0, 'A', 1);
+    lifecycle_expect(1, 'T', 0);
+    lifecycle_count = 0;
+    assert(cui_dock_remove(other, 1) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 1);
+    lifecycle_expect(0, 'R', 1);
+    lifecycle_count = 0;
+    /* Invalid capture preserves already queued notifications. */
+    assert(cui_dock_insert(m, tab, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_insert(other, destination, 1, 0) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) ==
+           CUI_DOCK_DUPLICATE_PANEL);
+    assert(cui_dock_insert(m, tab, 2, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_CAPACITY);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 1);
+    lifecycle_expect(0, 'A', 1);
+    lifecycle_count = 0;
+    assert(cui_dock_remove(m, 2) == CUI_DOCK_OK && cui_dock_remove(other, 1) == CUI_DOCK_OK);
+    /* Postcommit callback edits are observed only by the next capture. */
+    assert(cui_dock_activate(m, 1) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_activate(m, 0) == CUI_DOCK_OK);
+    lifecycle_model = m;
+    lifecycle_mutate = true;
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 2);
+    lifecycle_expect(0, 'F', 0);
+    lifecycle_expect(1, 'T', 1);
+    lifecycle_count = 0;
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 0);
+    int identity;
+    descriptors[1].lifecycle_identity = &identity;
+    assert(cui_dock_lifecycle_capture(&tracker, regions, 2, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 3);
+    lifecycle_expect(0, 'A', 1);
+    lifecycle_expect(1, 'R', 1);
+    lifecycle_expect(2, 'T', 1);
+    lifecycle_count = 0;
+    assert(cui_dock_lifecycle_capture(&tracker, NULL, 0, descriptors, 2) == CUI_DOCK_OK);
+    assert(cui_dock_lifecycle_dispatch(&tracker) && lifecycle_count == 2);
+    lifecycle_expect(0, 'R', 0);
+    lifecycle_expect(1, 'R', 1);
+    visibility_model = NULL;
+    hidden_bits = 0;
+    cui_dock_view_destroy(v);
+    cui_dock_destroy(m);
+    cui_dock_destroy(other);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
     view = cui_dock_view_create(16, 16);
     test_factory_reconstruction();
+    test_lifecycle();
     memset(rendered, 0, sizeof rendered);
     assert(ui && model && view);
     options = cui_dock_view_options_default();

@@ -138,6 +138,54 @@ void cui_spinner(cui_context *ui, cui_id id, const cui_theme *theme, float size,
                  bool reduced_motion);
 void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *theme, float width, float height,
                   float radius, float phase, bool secondary, bool reduced_motion);
+/* Opt-in, caller-clocked loading motion. State is caller-owned, contains no
+ * allocation, and must not be shared by independent animations. Zero duration
+ * selects the source period (.8 seconds Spinner, 2 seconds Skeleton). */
+typedef struct {
+    bool ready;
+    double started, last_time;
+} cui_loading_motion;
+typedef float (*cui_loading_ease_fn)(float phase, void *user);
+typedef struct {
+    float phase, opacity;
+    bool active;
+    double next_wake_seconds; /* Absolute caller-clock deadline; zero when static. */
+} cui_loading_motion_result;
+/* Pure, atomic sampling; period in (0,60], now in [0,1e12]. Skeleton uses
+ * a triangular bounce of the easing curve. Invalid callback output rejects. */
+bool cui_loading_motion_sample(cui_loading_motion *, double now_seconds, float period,
+                               bool reduced_motion, bool skeleton, cui_loading_ease_fn,
+                               void *ease_user, cui_loading_motion_result *);
+/* Callback paints one icon; radians are center-relative rotation. No callback
+ * userdata is retained. A failing callback must leave its own paint unchanged. */
+typedef bool (*cui_spinner_paint_fn)(cui_context *, cui_id, const cui_theme *, float size,
+                                     cui_color, float radians, void *user);
+typedef struct {
+    float size, duration;
+    double now_seconds;
+    bool reduced_motion, custom_color;
+    cui_color color;
+    cui_loading_ease_fn ease;
+    void *ease_user;
+    cui_spinner_paint_fn paint;
+    void *paint_user;
+} cui_spinner_options;
+typedef struct {
+    float width, height, radius, duration;
+    double now_seconds;
+    bool secondary, reduced_motion;
+    cui_loading_ease_fn ease;
+    void *ease_user;
+} cui_skeleton_options;
+cui_spinner_options cui_spinner_options_default(void);
+cui_skeleton_options cui_skeleton_options_default(void);
+/* Paint-only, source-compatible semantics: neither adds a focus stop or busy
+ * status. On success caller schedules result.next_wake_seconds; these APIs do
+ * not invalidate perpetually. Legacy phase APIs above retain their behavior. */
+bool cui_spinner_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
+                    cui_spinner_options, cui_loading_motion_result *);
+bool cui_skeleton_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
+                     cui_skeleton_options, cui_loading_motion_result *);
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *theme, float length, bool vertical);
 /* Shared delayed lifecycle for hover cards/tooltips, independent of styling. */
 typedef struct {
@@ -902,6 +950,59 @@ void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *t, float width, f
     cui_end_box(ui);
     if (!reduced)
         cui_invalidate(ui);
+}
+bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
+                    cui_spinner_options o, cui_loading_motion_result *out) {
+    if (!ui || !id || !theme || !state || !out || !isfinite(o.size) || o.size <= 0 ||
+        o.size > 4096 || !isfinite(o.duration) || o.duration < 0 || o.duration > 60)
+        return false;
+    cui_loading_motion next = *state;
+    cui_loading_motion_result result;
+    if (!cui_loading_motion_sample(&next, o.now_seconds, o.duration ? o.duration : .8f,
+                                   o.reduced_motion || cui_reduced_motion(ui), false, o.ease,
+                                   o.ease_user, &result))
+        return false;
+    cui_color color = o.custom_color ? o.color : theme->text;
+    float radians = result.phase * 6.2831853071795864769f;
+    bool painted =
+        o.paint ? o.paint(ui, id, theme, o.size, color, radians, o.paint_user)
+                : cui_icon_named(ui, id, theme, cui_string("loader"),
+                                 (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                                    .custom_size = o.size,
+                                                    .custom_color = true,
+                                                    .color = color,
+                                                    .custom_transform = true,
+                                                    .transform = cui_icon_rotation(radians)}) ==
+                      CUI_ICON_OK;
+    if (!painted)
+        return false;
+    *state = next;
+    *out = result;
+    return true;
+}
+bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
+                     cui_skeleton_options o, cui_loading_motion_result *out) {
+    if (!ui || !id || !theme || !state || !out || !isfinite(o.width) || o.width <= 0 ||
+        o.width > 4096 || !isfinite(o.height) || o.height <= 0 || o.height > 4096 ||
+        !isfinite(o.radius) || o.radius < 0 || o.radius > 4096 || !isfinite(o.duration) ||
+        o.duration < 0 || o.duration > 60)
+        return false;
+    cui_loading_motion next = *state;
+    cui_loading_motion_result result;
+    if (!cui_loading_motion_sample(&next, o.now_seconds, o.duration ? o.duration : 2,
+                                   o.reduced_motion || cui_reduced_motion(ui), true, o.ease,
+                                   o.ease_user, &result))
+        return false;
+    /* The reference has no loading boolean, status role, or busy relationship. */
+    cui_color color = theme->secondary;
+    color.a = (uint8_t)(color.a * result.opacity * (o.secondary ? .5f : 1));
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = o.width, .height = o.height, .radius = o.radius, .background = color});
+    cui_end_box(ui);
+    *state = next;
+    *out = result;
+    return true;
 }
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *t, float length, bool vertical) {
     if (!ui || !t)

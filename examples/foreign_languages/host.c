@@ -39,6 +39,7 @@ int cui_example_run(const char *font_path, unsigned frames, cui_example_changed 
             return 2;
         config.measure = cui_font_measure;
         config.text_geometry = cui_font_text_geometry;
+        config.text_geometry_line = cui_font_text_geometry_line;
         config.measure_user = font;
         backend = cui_sdl3_create("CUI language example", 480, 240, font);
         if (!backend) {

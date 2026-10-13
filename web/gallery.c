@@ -3862,10 +3862,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.now_seconds = cui_frame_time(ui);
         options.reduced_motion = reduced_motion;
         cui_loading_motion_result motion;
-        if (cui_skeleton_ex(ui, cui_id_from(ui, "skeleton"), &t, &skeleton_motion,
-                            options, &motion))
+        if (cui_skeleton_ex(ui, cui_id_from(ui, "skeleton"), &t, &skeleton_motion, options,
+                            &motion))
             next_wake = motion.next_wake_seconds > 0
-                ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui)) : 0;
+                            ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui))
+                            : 0;
         break;
     }
     case 19: {
@@ -3874,10 +3875,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.now_seconds = cui_frame_time(ui);
         options.reduced_motion = reduced_motion;
         cui_loading_motion_result motion;
-        if (cui_spinner_ex(ui, cui_id_from(ui, "spinner"), &t, &spinner_motion,
-                           options, &motion))
+        if (cui_spinner_ex(ui, cui_id_from(ui, "spinner"), &t, &spinner_motion, options, &motion))
             next_wake = motion.next_wake_seconds > 0
-                ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui)) : 0;
+                            ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui))
+                            : 0;
         break;
     }
     case 20: {

@@ -301,6 +301,7 @@ int main(int argc, char **argv) {
                                               .measure_styled = cui_font_measure_styled,
                                               .font_metrics = cui_font_get_metrics,
                                               .text_geometry = cui_font_text_geometry,
+                                              .text_geometry_line = cui_font_text_geometry_line,
                                               .measure_user = font});
     if (!ui) {
         cui_font_close(font);

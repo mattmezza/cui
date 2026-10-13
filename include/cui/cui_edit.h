@@ -96,8 +96,8 @@ cui_edit_result cui_edit_select_disjoint(cui_edit *, const cui_edit_selection *,
  * Inline-token content is excluded while selection storage is attached. */
 cui_edit_result cui_edit_replace_selections(cui_edit *, cui_str text);
 /* Interactive text input. Adjacent batches with unchanged cursor collection
- * coalesce into one bounded Undo entry (at most 1000 batches). Other edits
- * remain atomic. Navigation/selection breaks the typing group. */
+ * coalesce into one bounded Undo entry (at most 1000 cursor changes). Newlines,
+ * other edits, navigation and selection break the typing group. */
 cui_edit_result cui_edit_type_selections(cui_edit *, cui_str text);
 typedef enum {
     CUI_EDIT_PREVIOUS,
@@ -141,6 +141,10 @@ cui_edit_result cui_edit_selection_motion(const cui_edit *, cui_edit_selection, 
 /* Expand collapsed cursors over one grapheme/Unicode word, merge overlaps, and
  * delete atomically. Undo restores original cursors rather than expanded ranges. */
 cui_edit_result cui_edit_erase_selections(cui_edit *, bool backwards, bool by_word);
+/* Interactive grapheme erasure; adjacent batches of the same direction and
+ * cursor shape share a bounded Undo step. Word and selected-range deletion
+ * remain atomic. */
+cui_edit_result cui_edit_erase_selections_interactive(cui_edit *, bool backwards, bool by_word);
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
 cui_edit *cui_edit_create(cui_edit_config config);

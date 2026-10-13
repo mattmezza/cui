@@ -1201,6 +1201,38 @@ static void multicursor_column_history(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void multicursor_delete_history(void) {
+    char buffer[128] = "abc\nxyz";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                      .capacity = sizeof buffer,
+                                                      .multiline = true,
+                                                      .history_bytes = 1024,
+                                                      .max_history_steps = 7});
+    cui_edit_selection live[4];
+    cui_edit_selection_snapshot history[8];
+    assert(edit && cui_edit_attach_selections(edit, live, 4, history, 8) == CUI_EDIT_OK);
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_cursor_anchor anchors[4];
+    assert(cui_editor_state_init(&editor, edit, lines, 32) &&
+           cui_editor_multicursor_init(&editor, anchors, 4));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_focus(ui, 10);
+    cui_editor_options options = cui_editor_default();
+    options.textarea.width = 240;
+    options.textarea.height = 100;
+    cui_edit_selection cursors[] = {{1, 3, 3}, {2, 7, 7}};
+    assert(cui_edit_select_many(edit, cursors, 2) == CUI_EDIT_OK);
+    cui_draw_list commands;
+    draw(ui, &editor, options, &commands);
+    assert(multi_key(ui, &editor, options, CUI_KEY_BACKSPACE, 0).changed);
+    assert(multi_key(ui, &editor, options, CUI_KEY_BACKSPACE, 0).changed);
+    assert(!strcmp(buffer, "a\nx"));
+    assert(multi_key(ui, &editor, options, CUI_KEY_Z, CUI_MOD_CTRL).changed);
+    assert(!strcmp(buffer, "abc\nxyz") && live[0].cursor == 3 && live[1].cursor == 7);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 static void multicursor_clipboard_and_indent(void) {
     char buffer[128] = "1\n2\n3", scratch[128];
     cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
@@ -1558,6 +1590,7 @@ int main(void) {
     multicursor_clipboard_and_indent();
     multicursor_visual_rows();
     multicursor_column_history();
+    multicursor_delete_history();
     multiple_cursor_adapter();
     search_activation_and_paint();
     replacement_panel();

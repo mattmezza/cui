@@ -532,10 +532,11 @@ plus 400,000 document bytes. These are single-run CPU measurements; host font
 providers, document content, and load change the results. No 60 Hz guarantee
 follows from this headless workload.
 
-Consecutive interactive text batches with unchanged cursor collection coalesce
-into one Undo step, up to 1000 batches. Navigation, selection changes, folds,
-clipboard actions and atomic edits break the group; paste and completion remain
-individual Undo steps. This slice does not implement multiple IME composition
+Consecutive interactive text or same-direction grapheme deletion batches with
+unchanged cursor collection coalesce by intent into one Undo step, up to 1000
+cursor changes. Newlines, navigation, selection changes, folds, clipboard
+actions, word deletion, and atomic edits break the group; paste and completion
+remain individual Undo steps. This slice does not implement multiple IME composition
 ranges. Optional caller-owned `cui_edit_column_anchor` storage and one
 `cui_edit_column_snapshot` per document-history slot retain each cursor's
 preferred pixel x, logical grapheme column, and soft-wrap affinity across

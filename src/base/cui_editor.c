@@ -512,7 +512,10 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
         if (!vertical && !pointer && !rectangle && !key && !clipboard && !indent &&
             event.type != CUI_EVENT_TEXT)
             continue;
-        if (event.type != CUI_EVENT_TEXT)
+        if (event.type != CUI_EVENT_TEXT &&
+            !(event.type == CUI_EVENT_KEY_DOWN &&
+              (event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE) &&
+              !command && !alt))
             cui_edit_break_coalescing(editor->edit);
         if (event.key == CUI_KEY_ESCAPE && count == 1)
             continue;
@@ -699,8 +702,8 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
             }
         } else if (event.key == CUI_KEY_BACKSPACE || event.key == CUI_KEY_DELETE) {
             if (!options.readonly)
-                error = cui_edit_erase_selections(editor->edit, event.key == CUI_KEY_BACKSPACE,
-                                                  command || alt);
+                error = cui_edit_erase_selections_interactive(
+                    editor->edit, event.key == CUI_KEY_BACKSPACE, command || alt);
         } else if (event.key == CUI_KEY_ESCAPE) {
             error = cui_edit_select(editor->edit, live[0].anchor, live[0].cursor);
         } else if (vertical &&

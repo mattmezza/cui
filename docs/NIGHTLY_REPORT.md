@@ -1,6 +1,6 @@
 # Nightly report — live development checkpoint
 
-Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `30deb99704e28e7fa82721fc5199de53822fdd53`. See swarm-status.md for branch promotion and push/CI observations.
+Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `2d291fe9741addc322a6e107e15d03bf97e0d650`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
@@ -22,7 +22,7 @@ Every non-verified family remains incomplete; tested means only its documented s
 
 ## Validation evidence
 
-Published30deb99 passes all six CI jobs and Pages. Actual HTTPS:286/286 artifact files, all78 browser stories/compiled excerpts, extensions, native Chromium composition across four consumers, and actual touch42/42 plus16/16. Integrated source passes native93/93, ASan/UBSan93/93 and WASI77/77. Full family verification remains0/78; website page-pan fallback, additional IME consumers, font fallback and full international/native accessibility/platform scope remain active. See published-30deb99.txt and ime-bidi-touch-next16.txt for exact evidence and limits.
+Integrated next17 compiled source 2d291fe9741addc322a6e107e15d03bf97e0d650 passes native95/95, ASan/UBSan95/95, WASI79/79, all78 browser stories and compiled excerpts, extensions, native Chromium composition across seven consumers, touch42/42 plus16/16 and page navigation19/19. Explicit native font fallback, Numeric/OTP composition, ListMulti callback ownership and page-swipe fallback are integrated. Published source remains30deb99 until CI/deployment verification. Full family verification remains0/78; physical devices, native accessibility, bidi editing/wrapping and full platform/ecosystem acceptance remain unfinished. See [next17 proof](validation/fallback-ime-touch-next17.txt) and [previous publication](validation/published-30deb99.txt).
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 

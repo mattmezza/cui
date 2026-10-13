@@ -1,24 +1,24 @@
 {
-  "source": "30deb99704e28e7fa82721fc5199de53822fdd53",
-  "compiled_source": "57f8066bf5e4bcc39b2e2867be4eda673c996607",
+  "source": "2d291fe9741addc322a6e107e15d03bf97e0d650",
+  "compiled_source": "2d291fe9741addc322a6e107e15d03bf97e0d650",
   "published_source": "30deb99704e28e7fa82721fc5199de53822fdd53",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published30deb99 passes all six CI jobs and Pages. Actual HTTPS:286/286 artifact files, all78 browser stories/compiled excerpts, extensions, native Chromium composition across four consumers, and actual touch42/42 plus16/16. Integrated source passes native93/93, ASan/UBSan93/93 and WASI77/77. Full family verification remains0/78; website page-pan fallback, additional IME consumers, font fallback and full international/native accessibility/platform scope remain active. See published-30deb99.txt and ime-bidi-touch-next16.txt for exact evidence and limits.",
+  "summary": "Integrated next17 compiled source 2d291fe9741addc322a6e107e15d03bf97e0d650 passes native95/95, ASan/UBSan95/95, WASI79/79, all78 browser stories and compiled excerpts, extensions, native Chromium composition across seven consumers, touch42/42 plus16/16 and page navigation19/19. Explicit native font fallback, Numeric/OTP composition, ListMulti callback ownership and page-swipe fallback are integrated. Published source remains30deb99 until CI/deployment verification. Full family verification remains0/78; physical devices, native accessibility, bidi editing/wrapping and full platform/ecosystem acceptance remain unfinished.",
   "checks": [
     {
       "name": "native",
-      "passed": 93,
-      "total": 93
+      "passed": 95,
+      "total": 95
     },
     {
       "name": "sanitizers",
-      "passed": 93,
-      "total": 93
+      "passed": 95,
+      "total": 95
     },
     {
       "name": "WASI",
-      "passed": 77,
-      "total": 77
+      "passed": 79,
+      "total": 79
     },
     {
       "name": "browser_stories",
@@ -34,6 +34,11 @@
       "name": "touch_followup_cases",
       "passed": 16,
       "total": 16
+    },
+    {
+      "name": "touch_page_cases",
+      "passed": 19,
+      "total": 19
     }
   ]
 }

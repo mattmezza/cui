@@ -508,6 +508,41 @@ bool cui_set_underlay_ex(cui_context *, cui_underlay_layout, cui_color, cui_corn
  * first-frame grow/alignment and lifetime rules as solid underlays. */
 bool cui_set_bitmap_underlay(cui_context *, cui_underlay_layout, cui_bitmap_paint,
                              cui_corner_radii);
+/* Current-frame paint after the single layout pass. Register on an open box
+ * with a nonzero ID. No layout/input/focus mutation is permitted in callbacks. */
+typedef struct cui_prepaint_writer cui_prepaint_writer;
+typedef struct {
+    cui_id owner;
+    cui_rect bounds, clip, visible_bounds;
+    float pointer_x, pointer_y;
+    bool pointer_valid, pointer_inside, pointer_visible, modal_allowed, inert;
+    cui_id pointer_hit, capture;
+    float opacity;
+    double frame_time;
+    float frame_delta;
+} cui_prepaint_info;
+typedef bool (*cui_prepaint_fn)(const cui_prepaint_info *, const void *, cui_prepaint_writer *);
+typedef struct {
+    cui_prepaint_fn callback;
+    const void *payload;
+    size_t payload_bytes;   /* Copied/aligned frame storage; contained pointers remain borrowed. */
+    size_t command_budget;  /* Positive; includes two clip commands per nonempty stream. */
+    bool hover_hitbox;      /* Passive point-occlusion participation, never activation/focus. */
+    int16_t deferred_layer; /* Zero inherits owner; other layers must not precede owner. */
+} cui_prepaint_options;
+bool cui_set_prepaint(cui_context *, cui_prepaint_options);
+/* Explicit passive barrier, including inert painted overlays; false clears it.
+ * Layout-only nodes never participate. Does not alter input dispatch. */
+bool cui_set_hover_hitbox(cui_context *, bool enabled);
+/* Global-coordinate paint. Local stream clips to visible_bounds; deferred stream
+ * clips to viewport, uses the requested layer and is denied outside modal scope.
+ * No caller clip commands. TEXT data is copied; bitmap/mesh storage is borrowed
+ * through renderer completion. A false callback/invalid emit rolls back its output;
+ * capacity failure empties the final draw list. Writer is callback-local only. */
+bool cui_prepaint_emit(cui_prepaint_writer *, const cui_draw_command *, bool deferred);
+cui_size cui_prepaint_measure(cui_prepaint_writer *, cui_str, float, cui_text_style);
+void cui_prepaint_request_frame(cui_prepaint_writer *);
+
 void cui_begin_box(cui_context *ui, cui_id id, cui_box box);
 /* Zero-flow child at parent-relative bounds, inheriting clipping and layer.
  * A width/height of -1 fills the corresponding parent extent; zero is fixed.
@@ -5770,7 +5805,10 @@ freely, subject to the following restrictions:
 #define CUI_CORE_DISPATCH_MAX (2 * CUI_CORE_EVENT_MAX)
 typedef struct {
     uint32_t clay_id;
-    size_t parent;
+    cui_id id;
+    size_t parent, focus_scope;
+    bool hover_hitbox;
+    size_t prepaint;
     bool clip, layout_only, inert;
     int16_t layer;
     float opacity;
@@ -5792,6 +5830,20 @@ typedef struct {
     size_t parent;
     bool modal, active;
 } cui_core_focus_scope;
+typedef struct {
+    size_t node, offset, count, budget;
+    cui_prepaint_options options;
+    cui_prepaint_info info;
+    bool done, deferred_done;
+} cui_core_prepaint;
+typedef struct {
+    cui_rect bounds, clip, visible;
+    bool found, modal_allowed;
+} cui_core_geometry;
+struct cui_prepaint_writer {
+    cui_context *ui;
+    size_t registration;
+};
 typedef struct {
     cui_id id;
     cui_rect *retained;
@@ -5831,6 +5883,13 @@ struct cui_context {
     uint64_t text_metrics_revision;
     cui_draw_command *commands;
     size_t count;
+    cui_core_prepaint *prepaints;
+    cui_core_geometry *geometry;
+    cui_draw_command *prepaint_commands;
+    bool *prepaint_deferred;
+    size_t prepaint_count, prepaint_reserved;
+    bool prepainting, prepaint_failed, prepaint_capacity;
+    cui_prepaint_writer *prepaint_writer;
     cui_core_box_node *nodes;
     cui_core_bounds_track *bounds_tracks;
     size_t bounds_track_count;
@@ -5861,6 +5920,7 @@ struct cui_context {
     size_t string_used;
     cui_id focus, capture, space_capture;
     float pointer_x, pointer_y, dt;
+    bool pointer_position_known;
     struct {
         uint64_t id, device;
         float x, y, start_x, start_y;
@@ -5879,6 +5939,13 @@ struct cui_context {
     cui_error error;
     bool in_frame, focus_visible, dirty;
 };
+#if defined(__cplusplus)
+static thread_local cui_context *cui_core_paint_context;
+#elif defined(_MSC_VER)
+static __declspec(thread) cui_context *cui_core_paint_context;
+#else
+static _Thread_local cui_context *cui_core_paint_context;
+#endif
 static bool cui_core_layout_only(const cui_context *ui) {
     return ui && ui->in_frame && ui->depth && !ui->overflow_depth && ui->opened[ui->depth - 1] &&
            ui->nodes[ui->node_stack[ui->depth - 1]].layout_only;
@@ -5888,16 +5955,32 @@ static bool cui_core_inert(const cui_context *ui) {
            ui->nodes[ui->node_stack[ui->depth - 1]].inert;
 }
 static void cui_core_fail(cui_context *ui, cui_error e) {
+    if (ui && ui->prepainting) {
+        ui->prepaint_failed = true;
+        if (e == CUI_ERROR_CAPACITY)
+            ui->prepaint_capacity = true;
+    }
     if (ui && ui->error == CUI_OK)
         ui->error = e;
 }
 static void cui_core_select_context(cui_context *ui) {
     Clay_SetCurrentContext(ui->clay);
 }
+static bool cui_core_mutation(cui_context *ui) {
+    if (cui_core_paint_context) {
+        cui_core_fail(cui_core_paint_context, CUI_ERROR_LIFECYCLE);
+        return false;
+    }
+    if (ui && ui->prepainting) {
+        cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        return false;
+    }
+    return true;
+}
 static bool cui_core_active(cui_context *ui) {
     if (!ui)
         return false;
-    if (!ui->in_frame) {
+    if (!cui_core_mutation(ui) || !ui->in_frame) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
         return false;
     }
@@ -6054,6 +6137,8 @@ cui_size cui_measure_text(cui_context *ui, cui_str text, float size) {
     return cui_measure_text_ex(ui, text, size, (cui_text_style){0});
 }
 void cui_text_metrics_changed(cui_context *ui) {
+    if (!cui_core_mutation(ui))
+        return;
     if (!ui || ui->in_frame)
         return;
     cui_core_select_context(ui);
@@ -6134,6 +6219,10 @@ cui_color cui_color_mix_oklab(cui_color first, cui_color second, float amount) {
 }
 
 cui_context *cui_create(cui_config config) {
+    if (cui_core_paint_context) {
+        cui_core_fail(cui_core_paint_context, CUI_ERROR_LIFECYCLE);
+        return NULL;
+    }
     cui_context *ui = calloc(1, sizeof(*ui));
     if (!ui)
         return NULL;
@@ -6156,6 +6245,8 @@ cui_context *cui_create(cui_config config) {
         config.max_elements > SIZE_MAX / sizeof(cui_semantic) ||
         config.max_elements > SIZE_MAX / sizeof(cui_id) ||
         config.max_elements > SIZE_MAX / sizeof(cui_core_box_node) ||
+        config.max_elements > SIZE_MAX / sizeof(cui_core_prepaint) ||
+        config.max_elements > SIZE_MAX / sizeof(cui_core_geometry) ||
         config.max_elements > SIZE_MAX / sizeof(size_t) ||
         config.max_elements > SIZE_MAX / sizeof(cui_rect) ||
         config.max_elements > SIZE_MAX / sizeof(cui_core_bounds_track) ||
@@ -6174,6 +6265,10 @@ cui_context *cui_create(cui_config config) {
     ui->text_styles = calloc(ui->text_style_capacity, sizeof(*ui->text_styles));
     ui->resources = calloc(config.max_resources, sizeof(*ui->resources));
     ui->commands = calloc(config.max_commands, sizeof(*ui->commands));
+    ui->prepaints = calloc(config.max_elements, sizeof(*ui->prepaints));
+    ui->geometry = calloc(config.max_elements, sizeof(*ui->geometry));
+    ui->prepaint_commands = calloc(config.max_commands, sizeof(*ui->prepaint_commands));
+    ui->prepaint_deferred = calloc(config.max_commands, sizeof(*ui->prepaint_deferred));
     ui->semantics = calloc(config.max_elements, sizeof(*ui->semantics));
     ui->previous = calloc(config.max_elements, sizeof(*ui->previous));
     ui->ids = calloc(config.max_elements, sizeof(*ui->ids));
@@ -6200,7 +6295,8 @@ cui_context *cui_create(cui_config config) {
     Clay_SetMaxElementCount((int32_t)(config.max_elements * 2 + 32));
     size_t n = Clay_MinMemorySize();
     ui->arena = malloc(n);
-    if (!ui->text_sources || !ui->resources || !ui->text_styles || !ui->commands ||
+    if (!ui->prepaints || !ui->geometry || !ui->prepaint_commands || !ui->prepaint_deferred ||
+        !ui->text_sources || !ui->resources || !ui->text_styles || !ui->commands ||
         !ui->semantics || !ui->previous || !ui->ids || !ui->activations || !ui->semantic_scopes ||
         !ui->previous_semantic_scopes || !ui->scroll_gestures || !ui->previous_scroll_gestures ||
         !ui->strings || !ui->nodes || !ui->semantic_nodes || !ui->previous_parents ||
@@ -6229,6 +6325,8 @@ cui_context *cui_create(cui_config config) {
     return ui;
 }
 void cui_destroy(cui_context *ui) {
+    if (!cui_core_mutation(ui))
+        return;
     if (!ui)
         return;
     if (Clay_GetCurrentContext() == ui->clay)
@@ -6258,6 +6356,10 @@ void cui_destroy(cui_context *ui) {
     free(ui->previous_hits);
     free(ui->previous_layers);
     free(ui->previous_order);
+    free(ui->prepaints);
+    free(ui->geometry);
+    free(ui->prepaint_commands);
+    free(ui->prepaint_deferred);
     free(ui->commands);
     free(ui->semantics);
     free(ui->previous);
@@ -6680,11 +6782,15 @@ bool cui_accessibility_action_supported(const cui_context *ui, cui_id id,
     return ui && !ui->in_frame && cui_core_accessibility_supported(ui, id, action);
 }
 bool cui_queue_accessibility_action(cui_context *ui, cui_id id, cui_accessibility_action action) {
+    if (!cui_core_mutation(ui))
+        return false;
     return cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
                                            .accessibility_target = id,
                                            .accessibility_action = action});
 }
 bool cui_queue_event(cui_context *ui, cui_event e) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui)
         return false;
     if (ui->in_frame) {
@@ -6727,6 +6833,8 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
     return true;
 }
 bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui)
         return false;
     if (ui->in_frame) {
@@ -6791,6 +6899,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             isfinite(e.x) && isfinite(e.y)) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
+            ui->pointer_position_known = true;
         }
         cui_id gesture_target = 0;
         cui_id before_capture = ui->capture;
@@ -6915,6 +7024,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             e.type == CUI_EVENT_POINTER_UP) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
+            ui->pointer_position_known = true;
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
@@ -7010,6 +7120,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->node_count = 0;
     ui->paint_root_count = 0;
     ui->bounds_track_count = 0;
+    ui->prepaint_count = ui->prepaint_reserved = 0;
+    ui->prepaint_capacity = false;
     ui->overflow_depth = 0;
     ui->focus_depth = ui->focus_scope_count = 0;
     ui->top_modal = SIZE_MAX;
@@ -7121,14 +7233,18 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         parent = SIZE_MAX;
     else if (parent != SIZE_MAX)
         layer = ui->nodes[parent].layer;
-    ui->nodes[ui->node_count] = (cui_core_box_node){.clay_id = internal_id,
-                                                    .parent = parent,
-                                                    .clip = b.clip,
-                                                    .layout_only = layout_only,
-                                                    .inert = inert,
-                                                    .layer = layer,
-                                                    .opacity = opacity,
-                                                    .paint_root = paint_root};
+    ui->nodes[ui->node_count] = (cui_core_box_node){
+        .clay_id = internal_id,
+        .id = id,
+        .parent = parent,
+        .focus_scope = ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX,
+        .prepaint = SIZE_MAX,
+        .clip = b.clip,
+        .layout_only = layout_only,
+        .inert = inert,
+        .layer = layer,
+        .opacity = opacity,
+        .paint_root = paint_root};
     ui->node_stack[ui->depth - 1] = ui->node_count++;
     Clay__OpenElementWithId((Clay_ElementId){.id = internal_id});
     uint16_t bw = cui_core_scalar(b.border_width);
@@ -7174,6 +7290,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
 }
 bool cui_set_box_scroll_offset(cui_context *ui, cui_id id, float x, float y) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || !id || !isfinite(x) || !isfinite(y) || cui_core_inert(ui))
         return false;
     for (size_t i = 0; i < ui->node_count; ++i)
@@ -7205,6 +7323,8 @@ static bool cui_core_bitmap_paint_valid(cui_bitmap_paint *paint) {
            s->y + s->h <= paint->bitmap.height;
 }
 bool cui_paint_bitmap(cui_context *ui, cui_id id, cui_bitmap_paint paint, cui_box box) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || !cui_core_bitmap_paint_valid(&paint))
         return false;
     cui_rect *s = &paint.source;
@@ -7253,6 +7373,8 @@ bool cui_mesh_valid(cui_mesh_paint paint) {
     return cui_core_mesh_bounds(paint, NULL);
 }
 bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box box) {
+    if (!cui_core_mutation(ui))
+        return false;
     cui_rect bounds;
     if (!ui || !ui->in_frame || !cui_core_mesh_bounds(paint, &bounds))
         return false;
@@ -7272,6 +7394,8 @@ bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box bo
     return ok;
 }
 bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
         !isfinite(width) || width < 0 || !isfinite(radii.top_left) || !isfinite(radii.top_right) ||
         !isfinite(radii.bottom_left) || !isfinite(radii.bottom_right) || radii.top_left < 0 ||
@@ -7286,6 +7410,8 @@ bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_r
 }
 bool cui_set_underlay_ex(cui_context *ui, cui_underlay_layout layout, cui_color color,
                          cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
     cui_rect bounds = layout.bounds;
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
         !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) || !isfinite(bounds.h) ||
@@ -7311,6 +7437,8 @@ bool cui_set_underlay(cui_context *ui, cui_rect bounds, cui_color color, cui_cor
 }
 bool cui_set_bitmap_underlay(cui_context *ui, cui_underlay_layout layout, cui_bitmap_paint paint,
                              cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!cui_core_bitmap_paint_valid(&paint) ||
         !cui_set_underlay_ex(ui, layout, (cui_color){0}, radii))
         return false;
@@ -7735,6 +7863,398 @@ static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderComman
     }
     return bounds;
 }
+static void *cui_core_frame_copy(cui_context *ui, const void *data, size_t bytes) {
+#if defined(__cplusplus)
+    size_t alignment = alignof(max_align_t);
+#else
+    size_t alignment = _Alignof(max_align_t);
+#endif
+    size_t padding = (alignment - ui->string_used % alignment) % alignment;
+    size_t available = ui->config.frame_bytes - ui->string_used;
+    if (padding > available || bytes > available - padding) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return NULL;
+    }
+    void *copy = ui->strings + ui->string_used + padding;
+    if (bytes)
+        memcpy(copy, data, bytes);
+    ui->string_used += padding + bytes;
+    return copy;
+}
+bool cui_set_hover_hitbox(cui_context *ui, bool enabled) {
+    if (!cui_core_active(ui) || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1])
+        return false;
+    cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    if (!node->id)
+        return false;
+    node->hover_hitbox = enabled;
+    return true;
+}
+bool cui_set_prepaint(cui_context *ui, cui_prepaint_options options) {
+    if (!cui_core_active(ui) || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1])
+        return false;
+    size_t n = ui->node_stack[ui->depth - 1];
+    cui_core_box_node *node = &ui->nodes[n];
+    if (!node->id || !options.callback || !options.command_budget ||
+        (options.payload_bytes && !options.payload))
+        return false;
+    if (node->prepaint != SIZE_MAX) {
+        cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
+        return false;
+    }
+    if (options.deferred_layer == 0)
+        options.deferred_layer = node->layer;
+    if (options.deferred_layer < node->layer)
+        return false;
+    if (ui->prepaint_count == ui->config.max_elements ||
+        options.command_budget > ui->config.max_commands - ui->prepaint_reserved) {
+        ui->prepaint_capacity = true;
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    const void *payload = NULL;
+    if (options.payload_bytes) {
+        payload = cui_core_frame_copy(ui, options.payload, options.payload_bytes);
+        if (!payload) {
+            ui->prepaint_capacity = true;
+            return false;
+        }
+    }
+    options.payload = payload;
+    node->prepaint = ui->prepaint_count;
+    if (options.hover_hitbox)
+        node->hover_hitbox = true;
+    ui->prepaints[ui->prepaint_count++] = (cui_core_prepaint){.node = n,
+                                                              .offset = ui->prepaint_reserved,
+                                                              .budget = options.command_budget,
+                                                              .options = options};
+    ui->prepaint_reserved += options.command_budget;
+    Clay__GetOpenLayoutElement()->config.custom.customData = node;
+    return true;
+}
+static bool cui_core_writer(cui_prepaint_writer *writer) {
+    return writer && writer->ui && writer->ui->prepainting &&
+           writer->ui->prepaint_writer == writer &&
+           writer->registration < writer->ui->prepaint_count;
+}
+static bool cui_core_prepaint_rect(cui_rect r) {
+    return isfinite(r.x) && isfinite(r.y) && isfinite(r.w) && isfinite(r.h) && r.w >= 0 &&
+           r.h >= 0 && isfinite(r.x + r.w) && isfinite(r.y + r.h);
+}
+static bool cui_core_prepaint_command(cui_draw_command *c) {
+    if (!cui_core_prepaint_rect(c->bounds) || c->type < CUI_DRAW_RECT || c->type > CUI_DRAW_MESH ||
+        c->type == CUI_DRAW_CLIP_PUSH || c->type == CUI_DRAW_CLIP_POP)
+        return false;
+    if (!isfinite(c->radius) || c->radius < 0 || !isfinite(c->stroke) || c->stroke < 0)
+        return false;
+    if (c->custom_corners) {
+        const float radii[] = {c->corner_radii.top_left, c->corner_radii.top_right,
+                               c->corner_radii.bottom_left, c->corner_radii.bottom_right};
+        for (size_t i = 0; i < 4; i++)
+            if (!isfinite(radii[i]) || radii[i] < 0)
+                return false;
+    }
+    if (c->custom_border_edges) {
+        const float edges[] = {c->border_edges.left, c->border_edges.right, c->border_edges.top,
+                               c->border_edges.bottom};
+        for (size_t i = 0; i < 4; i++)
+            if (!isfinite(edges[i]) || edges[i] < 0)
+                return false;
+    }
+    if (c->type == CUI_DRAW_IMAGE)
+        return cui_core_bitmap_paint_valid(&c->bitmap);
+    if (c->type == CUI_DRAW_MESH)
+        return cui_core_mesh_bounds(c->mesh, &c->bounds);
+    if (c->type != CUI_DRAW_TEXT)
+        return true;
+    if (!isfinite(c->font_size) || c->font_size <= 0 || c->font_size > 65535 ||
+        !cui_core_text_style_valid(c->text_style))
+        return false;
+    if (c->text_source.paragraph.length) {
+        if (!cui_text_line_source_valid(c->text_source) ||
+            c->text_color_count > CUI_TEXT_COLOR_SPAN_MAX ||
+            (c->text_color_count && !c->text_colors))
+            return false;
+        size_t previous = c->text_source.byte_start;
+        for (size_t i = 0; i < c->text_color_count; i++) {
+            cui_text_line_source range = {c->text_source.paragraph, c->text_colors[i].byte_start,
+                                          c->text_colors[i].byte_end};
+            if (range.byte_start < previous || range.byte_end > c->text_source.byte_end ||
+                !cui_text_line_source_valid(range))
+                return false;
+            previous = range.byte_end;
+        }
+    } else if ((c->text.length && !c->text.data) || c->text.length > INT32_MAX ||
+               c->text_color_count)
+        return false;
+    return true;
+}
+bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *command,
+                       bool deferred) {
+    if (!cui_core_writer(writer))
+        return false;
+    cui_context *ui = writer->ui;
+    cui_core_prepaint *p = &ui->prepaints[writer->registration];
+    if (ui->prepaint_failed)
+        return false;
+    cui_draw_command c = command ? *command : (cui_draw_command){.type = (cui_draw_type)-1};
+    if (!command || !cui_core_prepaint_command(&c) || (deferred && !p->info.modal_allowed)) {
+        cui_core_fail(ui, CUI_ERROR_LAYOUT);
+        return false;
+    }
+    bool local = false, late = false;
+    for (size_t i = 0; i < p->count; i++)
+        if (ui->prepaint_deferred[p->offset + i])
+            late = true;
+        else
+            local = true;
+    size_t needed = p->count + 1 + 2 * ((local || !deferred) + (late || deferred));
+    if (needed > p->budget) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    if (c.type == CUI_DRAW_TEXT) {
+        if (c.text_source.paragraph.length) {
+            c.text_source.paragraph = cui_core_copy_string(ui, c.text_source.paragraph);
+            if (ui->prepaint_failed)
+                return false;
+            c.text = (cui_str){c.text_source.paragraph.data + c.text_source.byte_start,
+                               c.text_source.byte_end - c.text_source.byte_start};
+            if (c.text_color_count) {
+                c.text_colors = cui_core_frame_copy(ui, c.text_colors,
+                                                    c.text_color_count * sizeof(*c.text_colors));
+                if (!c.text_colors)
+                    return false;
+            }
+        } else {
+            c.text = cui_core_copy_string(ui, c.text);
+            if (ui->prepaint_failed)
+                return false;
+        }
+    }
+    ui->prepaint_commands[p->offset + p->count] = c;
+    ui->prepaint_deferred[p->offset + p->count] = deferred;
+    p->count++;
+    return true;
+}
+cui_size cui_prepaint_measure(cui_prepaint_writer *writer, cui_str text, float size,
+                              cui_text_style style) {
+    if (!cui_core_writer(writer))
+        return (cui_size){0};
+    return cui_measure_text_ex(writer->ui, text, size, style);
+}
+void cui_prepaint_request_frame(cui_prepaint_writer *writer) {
+    if (cui_core_writer(writer))
+        writer->ui->dirty = true;
+}
+static cui_rect cui_core_prepaint_intersection(cui_rect a, cui_rect b) {
+    float x = fmaxf(a.x, b.x), y = fmaxf(a.y, b.y);
+    return (cui_rect){x, y, fmaxf(0, fminf(a.x + a.w, b.x + b.w) - x),
+                      fmaxf(0, fminf(a.y + a.h, b.y + b.h) - y)};
+}
+static bool cui_core_prepaint_scope(cui_context *ui, size_t scope) {
+    for (size_t n = scope; n != SIZE_MAX; n = ui->focus_scopes[n].parent)
+        if (!ui->focus_scopes[n].active)
+            return false;
+    return cui_core_scope_contains(ui->focus_scopes, scope, ui->top_modal);
+}
+static bool cui_core_prepaint_above(cui_context *ui, size_t candidate, size_t previous) {
+    if (previous == SIZE_MAX)
+        return true;
+    cui_core_box_node *a = &ui->nodes[candidate], *b = &ui->nodes[previous];
+    uint64_t ao = ((uint64_t)a->paint_root << 32) | (candidate + 1),
+             bo = ((uint64_t)b->paint_root << 32) | (previous + 1);
+    return a->layer > b->layer || (a->layer == b->layer && ao >= bo);
+}
+static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray commands) {
+    if (!ui->prepaint_count)
+        return;
+    cui_rect viewport = {0, 0, ui->config.width, ui->config.height};
+    for (size_t i = 0; i < ui->node_count; i++) {
+        Clay_ElementData d = Clay_GetElementData((Clay_ElementId){.id = ui->nodes[i].clay_id});
+        cui_rect bounds = {d.boundingBox.x, d.boundingBox.y, d.boundingBox.width,
+                           d.boundingBox.height};
+        bool valid = cui_core_prepaint_rect(bounds);
+        if (!valid) {
+            bounds = (cui_rect){0};
+            cui_core_fail(ui, CUI_ERROR_LAYOUT);
+        }
+        ui->geometry[i] = (cui_core_geometry){
+            .bounds = bounds,
+            .clip = viewport,
+            .found = d.found && valid,
+            .modal_allowed = cui_core_prepaint_scope(ui, ui->nodes[i].focus_scope)};
+    }
+    size_t hit = SIZE_MAX;
+    cui_id hit_id = 0;
+    for (size_t i = 0; i < ui->node_count; i++) {
+        cui_core_geometry *g = &ui->geometry[i];
+        size_t parent = ui->nodes[i].parent;
+        if (parent != SIZE_MAX)
+            g->clip = ui->geometry[parent].clip;
+        if (ui->nodes[i].clip)
+            g->clip = cui_core_prepaint_intersection(g->clip, g->bounds);
+        g->visible = cui_core_prepaint_intersection(g->bounds, g->clip);
+        if (g->found && g->modal_allowed && !ui->nodes[i].layout_only &&
+            ui->nodes[i].hover_hitbox && ui->pointer_position_known &&
+            cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
+            cui_core_prepaint_above(ui, i, hit)) {
+            hit = i;
+            hit_id = ui->nodes[i].id;
+        }
+    }
+    for (size_t i = 0; i < ui->semantic_count; i++) {
+        cui_semantic *s = &ui->semantics[i];
+        if (s->disabled ||
+            (!cui_core_focusable(s) && !s->details.pointer_activatable && !s->details.scrollable) ||
+            !cui_core_prepaint_scope(ui, ui->semantic_scopes[i]))
+            continue;
+        Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(cui_core_folded(s->id));
+        if (item == &Clay_LayoutElementHashMapItem_DEFAULT || !item->layoutElement)
+            continue;
+        void *data = item->layoutElement->config.userData;
+        if (!data || data == ui)
+            continue; /* Layout-only nodes deliberately carry the context marker. */
+        size_t n = (size_t)((cui_core_box_node *)data - ui->nodes);
+        if (n >= ui->node_count || ui->nodes[n].id != s->id)
+            continue;
+        cui_core_geometry *g = &ui->geometry[n];
+        if (g->found && !ui->nodes[n].inert && !ui->nodes[n].layout_only && g->modal_allowed &&
+            cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
+            cui_core_prepaint_above(ui, n, hit)) {
+            hit = n;
+            hit_id = s->id;
+        }
+    }
+    for (size_t i = 0; i < ui->prepaint_count; i++) {
+        cui_core_prepaint *p = &ui->prepaints[i];
+        cui_core_box_node *n = &ui->nodes[p->node];
+        cui_core_geometry *g = &ui->geometry[p->node];
+        p->info = (cui_prepaint_info){
+            .owner = n->id,
+            .bounds = g->bounds,
+            .clip = g->clip,
+            .visible_bounds = g->visible,
+            .pointer_x = ui->pointer_x,
+            .pointer_y = ui->pointer_y,
+            .pointer_valid =
+                ui->pointer_position_known && isfinite(ui->pointer_x) && isfinite(ui->pointer_y),
+            .pointer_inside = ui->pointer_position_known && g->found &&
+                              cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y),
+            .modal_allowed = g->modal_allowed,
+            .inert = n->inert || !g->found,
+            .pointer_hit = hit_id,
+            .capture = ui->capture,
+            .opacity = n->opacity,
+            .frame_time = ui->frame_time,
+            .frame_delta = ui->dt};
+        p->info.pointer_visible =
+            p->info.pointer_inside && p->info.modal_allowed && !p->info.inert && hit == p->node;
+    }
+    (void)commands;
+    for (size_t iteration = 0; iteration < ui->prepaint_count; iteration++) {
+        size_t selected = SIZE_MAX;
+        for (size_t i = 0; i < ui->prepaint_count; i++)
+            if (!ui->prepaints[i].done &&
+                (selected == SIZE_MAX ||
+                 cui_core_prepaint_above(ui, ui->prepaints[selected].node, ui->prepaints[i].node)))
+                selected = i;
+        if (selected == SIZE_MAX)
+            break;
+        cui_core_prepaint *p = &ui->prepaints[selected];
+        p->done = true;
+        if (ui->nodes[p->node].layout_only)
+            continue;
+        size_t bytes = ui->string_used;
+        cui_prepaint_writer writer = {ui, selected};
+        ui->prepaint_writer = &writer;
+        ui->prepainting = true;
+        ui->prepaint_failed = false;
+        cui_core_paint_context = ui;
+        bool ok = p->options.callback(&p->info, p->options.payload, &writer);
+        if (!ok)
+            cui_core_fail(ui, CUI_ERROR_LAYOUT);
+        cui_core_paint_context = NULL;
+        ui->prepainting = false;
+        ui->prepaint_writer = NULL;
+        cui_core_select_context(ui);
+        if (ui->prepaint_failed) {
+            p->count = 0;
+            ui->string_used = bytes;
+        }
+        if (ui->prepaint_capacity)
+            break;
+    }
+}
+static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool deferred) {
+    size_t count = 0;
+    for (size_t i = 0; i < p->count; i++)
+        count += ui->prepaint_deferred[p->offset + i] == deferred;
+    if (!count)
+        return true;
+    if (count + 2 > ui->config.max_commands - ui->count) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        ui->count = 0;
+        ui->prepaint_capacity = true;
+        return false;
+    }
+    ui->commands[ui->count++] = (cui_draw_command){
+        .type = CUI_DRAW_CLIP_PUSH,
+        .bounds = deferred ? (cui_rect){0, 0, ui->config.width, ui->config.height}
+                           : p->info.visible_bounds};
+    for (size_t i = 0; i < p->count; i++)
+        if (ui->prepaint_deferred[p->offset + i] == deferred) {
+            cui_draw_command c = ui->prepaint_commands[p->offset + i];
+            if (c.type == CUI_DRAW_IMAGE)
+                c.bitmap.opacity *= p->info.opacity;
+            else if (c.type == CUI_DRAW_MESH) {
+                c.mesh.color.r *= p->info.opacity;
+                c.mesh.color.g *= p->info.opacity;
+                c.mesh.color.b *= p->info.opacity;
+                c.mesh.color.a *= p->info.opacity;
+            } else
+                c.color.a = (uint8_t)(c.color.a * p->info.opacity);
+            ui->commands[ui->count++] = c;
+        }
+    ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
+    return true;
+}
+static bool cui_core_prepaint_defer(cui_context *ui, int32_t next_layer) {
+    for (;;) {
+        size_t selected = SIZE_MAX;
+        for (size_t i = 0; i < ui->prepaint_count; i++) {
+            cui_core_prepaint *p = &ui->prepaints[i];
+            if (p->deferred_done || p->options.deferred_layer >= next_layer)
+                continue;
+            if (selected == SIZE_MAX ||
+                p->options.deferred_layer < ui->prepaints[selected].options.deferred_layer ||
+                (p->options.deferred_layer == ui->prepaints[selected].options.deferred_layer &&
+                 cui_core_prepaint_above(ui, ui->prepaints[selected].node, p->node)))
+                selected = i;
+        }
+        if (selected == SIZE_MAX)
+            return true;
+        cui_core_prepaint *p = &ui->prepaints[selected];
+        p->deferred_done = true;
+        if (!cui_core_prepaint_output(ui, p, true))
+            return false;
+    }
+}
+
+/* Clay's floating-root scissor wrappers omit zIndex. Resolve their root layer
+ * from the first painted command before inserting a deferred stream. */
+static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray a, int32_t start) {
+    for (int32_t i = start; i < a.length; i++) {
+        Clay_RenderCommand *c = &a.internalArray[i];
+        if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START ||
+            c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END)
+            continue;
+        if (c->userData && c->userData != ui)
+            return ((cui_core_box_node *)c->userData)->layer;
+        return c->zIndex;
+    }
+    return INT32_MAX;
+}
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
@@ -7744,10 +8264,22 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     while (ui->depth)
         cui_end_box(ui);
     Clay_RenderCommandArray a = Clay_EndLayout(ui->dt);
+    if (!ui->prepaint_capacity)
+        cui_core_prepaint_prepare(ui, a);
     ui->count = 0;
     uint32_t underlay_background_id = 0;
+    size_t conversion_clip_depth = 0;
+    if (ui->prepaint_capacity)
+        goto cui_core_commands_done;
     for (int32_t i = 0; i < a.length; i++) {
         Clay_RenderCommand *c = &a.internalArray[i];
+        if (!conversion_clip_depth && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END &&
+            !cui_core_prepaint_defer(ui, cui_core_prepaint_layer(ui, a, i)))
+            goto cui_core_commands_done;
+        if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START)
+            conversion_clip_depth++;
+        else if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END && conversion_clip_depth)
+            conversion_clip_depth--;
         if (c->userData == ui && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
             c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END)
             continue;
@@ -7847,36 +8379,39 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 ui->commands[ui->count++] =
                     (cui_draw_command){.type = CUI_DRAW_MESH, .bounds = mesh_bounds, .mesh = mesh};
             }
-            if (!node->has_underlay)
-                continue;
-            ui->commands[ui->count++] =
-                (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds};
-            cui_underlay_layout layout = node->underlay_layout;
-            cui_rect underlay = node->underlay_bounds;
-            if (layout.grow_width)
-                underlay.w = fmaxf(0, d.bounds.w + underlay.w);
-            if (layout.grow_height)
-                underlay.h = fmaxf(0, d.bounds.h + underlay.h);
-            float align_x = layout.horizontal == CUI_ALIGN_END      ? 1
-                            : layout.horizontal == CUI_ALIGN_CENTER ? .5f
-                                                                    : 0;
-            float align_y = layout.vertical == CUI_ALIGN_END      ? 1
-                            : layout.vertical == CUI_ALIGN_CENTER ? .5f
-                                                                  : 0;
-            underlay.x += d.bounds.x + (d.bounds.w - underlay.w) * align_x;
-            underlay.y += d.bounds.y + (d.bounds.h - underlay.h) * align_y;
-            cui_color underlay_color = node->underlay_color;
-            underlay_color.a = (uint8_t)(underlay_color.a * opacity);
-            cui_bitmap_paint bitmap = node->bitmap;
-            bitmap.opacity *= opacity;
-            ui->commands[ui->count++] =
-                (cui_draw_command){.type = node->bitmap_underlay ? CUI_DRAW_IMAGE : CUI_DRAW_RECT,
-                                   .bitmap = bitmap,
-                                   .bounds = underlay,
-                                   .color = underlay_color,
-                                   .corner_radii = node->underlay_radii,
-                                   .custom_corners = true};
-            ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
+            if (node->has_underlay) {
+                ui->commands[ui->count++] =
+                    (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds};
+                cui_underlay_layout layout = node->underlay_layout;
+                cui_rect underlay = node->underlay_bounds;
+                if (layout.grow_width)
+                    underlay.w = fmaxf(0, d.bounds.w + underlay.w);
+                if (layout.grow_height)
+                    underlay.h = fmaxf(0, d.bounds.h + underlay.h);
+                float align_x = layout.horizontal == CUI_ALIGN_END      ? 1
+                                : layout.horizontal == CUI_ALIGN_CENTER ? .5f
+                                                                        : 0;
+                float align_y = layout.vertical == CUI_ALIGN_END      ? 1
+                                : layout.vertical == CUI_ALIGN_CENTER ? .5f
+                                                                      : 0;
+                underlay.x += d.bounds.x + (d.bounds.w - underlay.w) * align_x;
+                underlay.y += d.bounds.y + (d.bounds.h - underlay.h) * align_y;
+                cui_color underlay_color = node->underlay_color;
+                underlay_color.a = (uint8_t)(underlay_color.a * opacity);
+                cui_bitmap_paint bitmap = node->bitmap;
+                bitmap.opacity *= opacity;
+                ui->commands[ui->count++] = (cui_draw_command){
+                    .type = node->bitmap_underlay ? CUI_DRAW_IMAGE : CUI_DRAW_RECT,
+                    .bitmap = bitmap,
+                    .bounds = underlay,
+                    .color = underlay_color,
+                    .corner_radii = node->underlay_radii,
+                    .custom_corners = true};
+                ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
+            }
+            if (node->prepaint != SIZE_MAX &&
+                !cui_core_prepaint_output(ui, &ui->prepaints[node->prepaint], false))
+                goto cui_core_commands_done;
             continue;
         }
         case CLAY_RENDER_COMMAND_TYPE_TEXT:
@@ -7980,6 +8515,8 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.color.a = (uint8_t)(d.color.a * opacity);
         ui->commands[ui->count++] = d;
     }
+    if (!cui_core_prepaint_defer(ui, INT32_MAX))
+        goto cui_core_commands_done;
 cui_core_commands_done:
     for (size_t i = 0; i < ui->bounds_track_count; i++) {
         cui_core_bounds_track track = ui->bounds_tracks[i];
@@ -8174,6 +8711,8 @@ cui_id cui_focused(cui_context *ui) {
     return ui && !cui_core_inert(ui) ? ui->focus : 0;
 }
 void cui_focus(cui_context *ui, cui_id id) {
+    if (!cui_core_mutation(ui))
+        return;
     if (ui && !cui_core_inert(ui)) {
         if (id) {
             const cui_semantic *items = ui->in_frame ? ui->semantics : ui->previous;
@@ -8207,6 +8746,8 @@ cui_error cui_last_error(cui_context *ui) {
     return ui ? ui->error : CUI_ERROR_LIFECYCLE;
 }
 void cui_clear_error(cui_context *ui) {
+    if (!cui_core_mutation(ui))
+        return;
     if (ui)
         ui->error = CUI_OK;
 }
@@ -8214,6 +8755,8 @@ bool cui_needs_redraw(cui_context *ui) {
     return ui && ui->dirty;
 }
 void cui_invalidate(cui_context *ui) {
+    if (!cui_core_mutation(ui))
+        return;
     if (ui)
         ui->dirty = true;
 }
@@ -8233,6 +8776,8 @@ void *cui_resource_find(cui_context *ui, cui_id owner, cui_id namespace_id) {
 }
 void *cui_resource_get(cui_context *ui, cui_id owner, cui_id namespace_id, size_t bytes,
                        cui_resource_fn collect, cui_resource_fn destroy) {
+    if (!cui_core_mutation(ui))
+        return NULL;
     if (!ui || !ui->in_frame || !owner || !namespace_id || !bytes) {
         if (ui)
             cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
@@ -8277,6 +8822,8 @@ bool cui_reduced_motion(cui_context *ui) {
     return ui && ui->reduced_motion;
 }
 void cui_set_reduced_motion(cui_context *ui, bool reduced) {
+    if (!cui_core_mutation(ui))
+        return;
     if (ui && ui->reduced_motion != reduced) {
         ui->reduced_motion = reduced;
         cui_invalidate(ui);
@@ -8284,6 +8831,8 @@ void cui_set_reduced_motion(cui_context *ui, bool reduced) {
 }
 
 void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value) {
+    if (!cui_core_mutation(ui))
+        return;
     if (!cui_core_active(ui))
         return;
     for (size_t i = 0; i < ui->semantic_count; i++)
@@ -8298,6 +8847,8 @@ cui_id cui_event_target(cui_context *ui, size_t index) {
 }
 
 bool cui_defer_scroll_event(cui_context *ui, size_t index, cui_id from) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || cui_core_inert(ui) || !from || index >= ui->event_count ||
         ui->event_consumed[index] || ui->events[index].type != CUI_EVENT_SCROLL ||
         ui->event_targets[index] != from)
@@ -8322,6 +8873,8 @@ bool cui_event_consumed(cui_context *ui, size_t index) {
     return ui && index < ui->event_count && ui->event_consumed[index];
 }
 bool cui_consume_event(cui_context *ui, size_t index) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || cui_core_inert(ui) || index >= ui->event_count)
         return false;
     ui->event_consumed[index] = true;
@@ -8332,6 +8885,8 @@ bool cui_consume_event(cui_context *ui, size_t index) {
     return true;
 }
 bool cui_cancel_event_activation(cui_context *ui, size_t index) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || cui_core_inert(ui) || index >= ui->event_count)
         return false;
     size_t slot = ui->event_activation_slots[index];
@@ -8475,6 +9030,8 @@ bool cui_focus_within(cui_context *ui, cui_id scope) {
     return false;
 }
 bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || !scope || !ui->focus || cui_core_inert(ui))
         return false;
     size_t owner = SIZE_MAX, start = SIZE_MAX;
@@ -8540,6 +9097,8 @@ bool cui_hover_within(cui_context *ui, cui_id scope) {
     return false;
 }
 bool cui_focus_restore(cui_context *ui, cui_id trigger) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui)
         return false;
     for (size_t i = 0; i < ui->previous_count; i++)
@@ -8554,6 +9113,8 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 }
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
         role > CUI_ROLE_RADIOGROUP)
         return false;
@@ -8565,6 +9126,8 @@ bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     return false;
 }
 bool cui_set_cursor(cui_context *ui, cui_id id, cui_cursor cursor) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!cui_core_active(ui) || cursor < CUI_CURSOR_DEFAULT || cursor > CUI_CURSOR_HELP)
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
@@ -8575,6 +9138,8 @@ bool cui_set_cursor(cui_context *ui, cui_id id, cui_cursor cursor) {
     return false;
 }
 bool cui_set_touch_drag_priority(cui_context *ui, cui_id id, bool enabled) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!cui_core_active(ui))
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
@@ -8585,6 +9150,8 @@ bool cui_set_touch_drag_priority(cui_context *ui, cui_id id, bool enabled) {
     return false;
 }
 bool cui_set_gestures(cui_context *ui, cui_id id, bool pan, bool zoom) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!cui_core_active(ui))
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
@@ -8618,6 +9185,8 @@ cui_interaction cui_interaction_state(const cui_context *ui, cui_id id) {
     return result;
 }
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details) {
+    if (!cui_core_mutation(ui))
+        return;
     if (!cui_core_active(ui))
         return;
     for (size_t i = 0; i < ui->semantic_count; i++)
@@ -8628,6 +9197,8 @@ void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details d
         }
 }
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
+    if (!cui_core_mutation(ui))
+        return;
     if (!cui_core_active(ui))
         return;
     for (size_t i = 0; i < ui->semantic_count; i++)
@@ -8660,6 +9231,8 @@ bool cui_hovered(cui_context *ui, cui_id id) {
 }
 
 bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!cui_core_active(ui) || cui_core_inert(ui))
         return false;
     size_t dismissed = SIZE_MAX;
@@ -8767,6 +9340,8 @@ bool cui_pointer_position(const cui_context *ui, float *x, float *y) {
 }
 
 void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
+    if (!cui_core_mutation(ui))
+        return;
     if (!ui || !owner || !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) ||
         !isfinite(bounds.h) || bounds.w < 0 || bounds.h < 0)
         return;
@@ -8775,6 +9350,8 @@ void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
     ui->text_geometry_ime_owner = 0;
 }
 bool cui_set_text_input_geometry_rect(cui_context *ui, cui_id owner, cui_id caret, float height) {
+    if (!cui_core_mutation(ui))
+        return false;
     if (!ui || !ui->in_frame || !owner || !caret || !isfinite(height) || height < 0 ||
         !cui_track_bounds(ui, caret, &ui->text_geometry_ime_bounds))
         return false;

@@ -155,9 +155,11 @@ static void clipboard_and_readonly(void) {
     const cui_semantic *semantics = cui_semantics(ui, &count);
     assert(count == 1 && semantics[0].details.readonly && semantics[0].details.required &&
            semantics[0].details.invalid);
+    size_t readonly_cursor = cui_edit_get_state(edit).cursor;
     key(ui, CUI_KEY_UP, 0);
     result = base_frame(ui, edit, &state, options);
-    assert(!result.changed && cui_edit_get_state(edit).cursor == 0);
+    /* Source single-line Input has no vertical rows, including read-only. */
+    assert(!result.changed && cui_edit_get_state(edit).cursor == readonly_cursor);
     key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
     result = base_frame(ui, edit, &state, options);
     assert(!result.changed && cui_edit_get_state(edit).cursor == 5 &&

@@ -16,6 +16,11 @@ typedef struct {
 /* Optional SDL3 adapter; all operations must run on the main thread. */
 cui_sdl3 *cui_sdl3_create(const char *title, int width, int height, cui_font *font);
 void cui_sdl3_destroy(cui_sdl3 *backend);
+/* Main-thread copied system-theme snapshot. Initial query revision is 1; poll
+ * observes SDL notifications and invalidates Core. Revision saturates at UINT64_MAX.
+ * SYSTEM_THEME means query/notification API support, not a known OS answer.
+ * No reduced-motion/high-contrast detection. Null arguments leave output intact. */
+bool cui_sdl3_appearance(cui_sdl3 *backend, cui_platform_appearance *out);
 bool cui_sdl3_poll(cui_sdl3 *backend, cui_context *ui);
 /* Apply after end_frame for immediate feedback. poll also applies the previous
  * frame hint. Returns false if the host driver does not support system cursors. */

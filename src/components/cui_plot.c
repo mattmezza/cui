@@ -666,12 +666,22 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
                                        const cui_plot_view_options *view,
                                        cui_plot_element_state *next,
                                        const cui_plot_element_options *o) {
-    if (!o || !next || !point_valid(o->pointer) ||
+    if (!o || !next || (o->custom_motion && !cui_plot_motion_valid(&o->motion)) ||
+        !point_valid(o->pointer) ||
         !point_valid((cui_plot_point){o->bounds.x_min, o->bounds.y_min}) ||
         !point_valid((cui_plot_point){o->bounds.x_max, o->bounds.y_max}) ||
         o->bounds.x_max - o->bounds.x_min != view->bitmap.width ||
         o->bounds.y_max - o->bounds.y_min != view->bitmap.height || o->tooltip_layer < 0)
         return CUI_PLOT_INVALID;
+    cui_plot_element_options resolved_options;
+    if (o->custom_motion) {
+        resolved_options = *o;
+        resolved_options.enter = cui_plot_motion_transition_adapter(&resolved_options.motion.enter);
+        resolved_options.exit = cui_plot_motion_transition_adapter(&resolved_options.motion.exit);
+        resolved_options.appear =
+            cui_plot_motion_transition_adapter(&resolved_options.motion.appear);
+        o = &resolved_options;
+    }
     if (next->owner != id)
         *next = (cui_plot_element_state){.owner = id};
     cui_plot_result result = element_appearance(ui, id, next, o);
@@ -679,6 +689,12 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
         return result;
     if (o->on_appear)
         o->on_appear(id, &next->appearance, o->user);
+    if (o->custom_motion) {
+        /* The adapter points into this call's local options. Persist only values;
+         * later stagger sampling takes an explicit copied policy instead. */
+        next->appearance.easing = NULL;
+        next->appearance.user = NULL;
+    }
     next->request_frame = next->appearance.request_frame;
     if (!view->interactive || view->disabled) {
         next->cursor = (cui_plot_cursor_memory){0};
@@ -714,15 +730,18 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
     if (result != CUI_PLOT_OK)
         return result;
     next->request_frame |= motion.request_frame;
-    result = cui_plot_hover_track(&next->hover, has_live ? &live : NULL,
-                                  has_live ? &relative : NULL, motion.value);
+    result =
+        cui_plot_hover_track(&next->hover, has_live ? &live : NULL, has_live ? &relative : NULL,
+                             o->custom_motion ? fmax(0, fmin(1, motion.value)) : motion.value);
     return result;
 }
 static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_theme *theme,
                                       const cui_plot_view_options *o, cui_plot_element_state *state,
                                       const cui_plot_element_options *element) {
-    if (!ui || !id || !theme || !o || (!o->name.data && o->name.length) ||
-        !cui_bitmap_valid(o->bitmap) || o->bitmap.width > 16384 || o->bitmap.height > 16384)
+    if (!ui || !id || !theme || !o ||
+        (element && element->custom_motion && !cui_plot_motion_valid(&element->motion)) ||
+        (!o->name.data && o->name.length) || !cui_bitmap_valid(o->bitmap) ||
+        o->bitmap.width > 16384 || o->bitmap.height > 16384)
         return CUI_PLOT_INVALID;
     cui_plot_axis_label_geometry geometry[512];
     size_t labels = 0;

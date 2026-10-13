@@ -10,6 +10,19 @@ typedef struct {
     cui_str (*clipboard_get)(void *user);
     void (*text_input)(void *user, bool enabled, cui_rect bounds);
 } cui_platform;
+/* Host appearance observation, independent of optional Theme policies.
+ * UNKNOWN is a valid result when the video driver cannot discover appearance. */
+typedef enum {
+    CUI_SYSTEM_APPEARANCE_UNKNOWN,
+    CUI_SYSTEM_APPEARANCE_LIGHT,
+    CUI_SYSTEM_APPEARANCE_DARK
+} cui_system_appearance;
+enum { CUI_APPEARANCE_SYSTEM_THEME = 1 };
+typedef struct {
+    cui_system_appearance appearance;
+    unsigned capabilities;
+    uint64_t revision;
+} cui_platform_appearance;
 /* Portable window services; adapters expose only actions they can honor. */
 typedef enum {
     CUI_WINDOW_MOVE,

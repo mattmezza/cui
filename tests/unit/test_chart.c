@@ -502,6 +502,7 @@ static void test_appearance_hover_gate(void) {
     draw = cui_end_frame(ui);
     assert(state.rendered_reveal_progress == 1 && state.hovered == SIZE_MAX &&
            !hover_gate_popup(draw));
+    assert(state.appear_hover_pending && cui_needs_redraw(ui));
     /* A stationary pointer becomes eligible when appearance completes. */
     assert(cui_begin_frame(ui, 256, 256, .002f));
     assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));

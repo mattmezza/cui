@@ -2,8 +2,9 @@
 
 Audit source: CUI `3f4e108`; reference GPUI component v0.7.1
 `87d10ae5e1299d1be18670a37570c5402f952e34` in
-`/tmp/cui-gpui-reference`. This is a design proposal, not an implemented API or
-Chart/Plot feature promotion. No production files were changed.
+`/tmp/cui-gpui-reference`. The audit below records the original design. The Core implementation now adds
+the paint-only contract described here; Chart/Plot integration and source-family
+feature promotion remain separate work.
 
 ## Observed phases and the actual gap
 
@@ -270,3 +271,158 @@ fixture passed both the command above and ASAN/UBSAN with leak detection.
 Optional native adapters were excluded from this portable audit build; no
 native GPU or SDL coverage is inferred. Logs are under
 `/home/matteo/.cache/cui-validation/tmp-storage/core-prepaint`.
+
+## Implemented Core contract
+
+Register `cui_set_prepaint` while the owning identified box is open. One
+registration per box is allowed; duplicate registration reports
+`CUI_ERROR_DUPLICATE_ID` and preserves the first. The callback and a positive
+command budget are required. Payload bytes are copied into the existing bounded
+frame arena with `max_align_t` alignment. Pointers inside the payload remain
+borrowed and must survive `cui_end_frame`; no caller-owned pointee rollback is
+promised. Registrations and command storage are bounded by configured element
+and command capacities, with no per-frame heap allocation.
+
+After the single `Clay_EndLayout`, Core freezes current bounds, ancestor clips,
+visible intersections, opacity, modal eligibility, and the live global pointer.
+All callbacks see this same snapshot. `pointer_inside` is geometric;
+`pointer_visible` additionally requires modal eligibility, a non-inert owner,
+and the owner winning current-frame hit ordering. `capture` and public input
+queries retain the previous completed-frame routing contract. An offscreen
+owner still receives its callback with empty visible bounds so stationary hover
+state can be cleared; layout-only subtrees do not participate.
+
+`hover_hitbox` and `cui_set_hover_hitbox` add explicit passive hit participation
+without focus or activation. Such a barrier follows current clip, layer, paint
+root, and submission order. An explicitly participating inert painted overlay
+can occlude an underlying owner. Clearing the passive flag does not remove
+ordinary semantic control participation. Modal denial applies even outside the
+modal's painted rectangle; ordinary passive overlays only block their visible
+rectangle. The snapshot is read-only and does not replace input dispatch.
+
+The writer emits fixed portable RECT, BORDER, TEXT, IMAGE, and MESH commands in
+global coordinates. Local output appears at the owner's custom paint seam after
+its existing underlay, before its children, clipped to current visible bounds.
+Existing custom-data painters remain intact. Text and contextual text spans are
+copied into frame storage; bitmap pixels and mesh vertices remain borrowed under
+the normal draw-list lifetime contract. Owner opacity is applied once.
+Caller clip commands and invalid/nonfinite geometry are rejected.
+
+Deferred output is clipped to the viewport and ordered among top-level paint
+layers. Zero inherits the owner layer; nonzero values must be nonnegative and
+at least the owner layer. Negative values (including `INT16_MIN`) and values
+preceding the owner are rejected atomically during registration. Positive values
+through `INT16_MAX` are supported. At equal layers, owner paint order decides
+ordering; the deferred stream follows that layer's ordinary paint. An owner
+outside the active modal scope cannot emit deferred output, so increasing its
+layer cannot cross a modal boundary. A modal-eligible owner may request a later
+layer; later modal portal paint still follows normal layer ordering. No negative
+portal support is introduced.
+
+Each nonempty local or deferred stream uses two implicit clip commands, included
+in the declared command budget. Returning false, invalid commands, or prohibited
+mutation discards that callback's output and frame-arena additions while retaining
+ordinary owner paint. Capacity failure empties the entire returned draw list and
+reports `CUI_ERROR_CAPACITY`; it does not expose a partial command stream. Clear
+the sticky error explicitly outside a callback before subsequent error checks.
+
+Callbacks may use `cui_prepaint_measure` and `cui_prepaint_request_frame`.
+Measurement hooks run inside the same phase guard. Layout, event queuing,
+focus/semantics/resources mutation, nested frame execution, creation/destruction,
+and public invalidation are rejected during a callback, including mutation of
+another context on the same thread. This records `CUI_ERROR_LIFECYCLE` and rolls
+back the owner output. The writer itself is valid only during its callback;
+retaining or using its pointer later is invalid. Read-only input queries remain
+available. A repaint request is explicit; Core does not animate automatically.
+
+`tests/unit/test_prepaint.c` exercises current clipped bounds and opacity,
+stationary-pointer relayout, copied payload/text lifetime, passive portal and
+modal occlusion, offscreen callbacks, local/deferred ordering and balanced clips,
+maximum and negative layers, duplicate/arena/command capacity, invalid paint,
+callback and measurement reentrancy, previous-frame capture preservation, and
+explicit repaint requests. This is Core evidence, not physical-device evidence
+or a claim that Chart/Plot consumers already use the new seam. Arbitrary
+layout-submitted tooltip content still requires a separate integration design;
+the new deferred stream deliberately supports fixed paint only.
+
+## Follow-up portability, presence, and scaling review
+
+The phase guard uses C++ `thread_local`, MSVC C `__declspec(thread)`, or standard
+C11 `_Thread_local`. Strict C11 Core tests and C++11 public-header/TLS declaration
+probes pass on the available Linux compiler. Windows/MSVC execution was not
+available. The complete standalone implementation remains C11 source: a C++20
+implementation compile still rejects pre-existing implicit `void *` conversions,
+C aggregate enum initializers, and out-of-order designated initializers. Compile
+implementation as C and link from C++ through the public header; this review does
+not certify a complete C++ implementation build. Temporary standalone generation
+used `scripts/amalgamate.py`'s `generate` function without editing distribution.
+
+Pointer position initially is unknown. Only accepted pointer down/move/up events
+make it known; `pointer_valid`, `pointer_inside`, and `pointer_visible` are false
+and `pointer_hit` is zero before that first event. The last known coordinates
+persist on idle frames and after CANCEL. CANCEL withdraws capture/activation;
+it does not mean the pointer physically left the window. The existing event
+surface has no explicit host pointer-leave/presence event, so this API cannot
+infer physical pointer presence after host leave or focus loss. Legacy input
+routing remains unchanged.
+
+Malformed options (missing callback, zero budget, null nonempty payload, invalid
+layer, or an unidentified/missing open owner) return false without installing a
+registration or consuming its budget. They do not set a new sticky error; this
+matches the existing option-setter convention. Calls outside layout or from a
+callback report lifecycle errors; duplicates and capacity have the explicit
+errors described above.
+
+Preparation now skips entirely when no prepaint callback is registered. With
+callbacks it resolves current semantic nodes through Clay's existing hash map,
+not an N-by-S scan. Ancestor clips propagate once from already submitted parents.
+Snapshot work is O(N + S), plus bounded focus-scope ancestry checks (depth at most
+256). Callback selection remains O(P squared); deferred insertion costs O(C*P +
+P squared), with raw scissor look-ahead potentially O(C squared) for an artificial
+sequence of clip-only commands. N, S, P and C are configured/submitted nodes,
+semantics, callbacks and render commands, respectively. At default N=4096,
+P=4096 means about 16.8 million callback selection comparisons; ordinary single
+Chart/Plot use has P near one. The supported million-element ceiling is a
+capacity bound, not a performance guarantee. Large callback-heavy virtualized
+scenes need a sorted index and cached layer look-ahead before scaling claims.
+Virtualized offscreen rows should not register callbacks for every model item.
+
+New retained storage is N*(sizeof registration + sizeof geometry) plus
+C*(sizeof draw command + sizeof bool), allocated once at context creation. On
+this 64-bit build these sizes are 192, 52, 264, and 1 bytes: default capacities add
+3,170,304 bytes, before allocator rounding. Payloads/text consume the existing
+frame arena. There is no hidden per-frame heap allocation or unbounded binding
+cache, but the extra fixed reservation is material for small embedded hosts.
+
+## Actual WASM browser proof
+
+`tests/web/core_prepaint_probe.c` is a Core-only scene with a clipped scroll
+owner, absolute paint child, passive portal, and modal scope.
+`tests/web/test_core_prepaint.py` compiles that scene and Core using pinned
+Zig 0.16.0 with C11 and `-Wall -Wextra -Wpedantic -Werror`, then drives the
+result in Playwright 1.58.0 and Chromium 1208. Its small Canvas2D host renders
+actual portable rectangle/clip draw commands returned by Core; it does not
+substitute previous bounds or fabricate hover/tooltip geometry.
+
+The strict assertions cover unknown first pointer; actual pointer movement;
+local paint containment and deferred paint beyond that clip; passive and modal
+occlusion; viewport resize with no further pointer event; and genuine browser
+wheel input routed to the Core scroll owner, consumed by its fixture reducer,
+with exact current-frame owner displacement under the stationary pointer.
+Checkbox controls toggle overlays using keyboard Space so the real pointer
+stays stationary. Pixel reads check local colors, suppressed/visible deferred
+paint, overlay paint, and exposed scroll background. Callback/frame counters
+and input signals accompany pixels, and clip balance and browser errors are
+checked. The scroll capacity and reduction belong to this isolated host fixture,
+not an assertion that every production scroll component uses prepaint.
+
+Run from the repository with:
+
+```sh
+uv run --script tests/web/test_core_prepaint.py --output build/core-prepaint-probe
+```
+
+The default is installed Chromium 1208; `--chromium` may select its matching
+headless shell. The output includes the exact compiled WASM, HTML host, and a
+scroll-state PNG. This is Chromium/WASM Core seam evidence, not full Chart/Plot
+integration, physical touchscreen, or native Windows validation.

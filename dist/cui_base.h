@@ -81,8 +81,10 @@ size_t cui_base_input_visual_hit_test(void *geometry, cui_str, float x, float y)
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;
-    cui_edit_composition *composition; /* Optional caller-owned session and view buffers. */
-    bool composition_owned;            /* Internal default resource flag; initialize false. */
+    cui_edit_composition *composition;   /* Optional caller-owned session and view buffers. */
+    bool composition_owned;              /* Internal default resource flag; initialize false. */
+    uintptr_t bound_edit_identity;       /* Internal numeric identity; no retained model pointer. */
+    bool focus_initialized, was_focused; /* Zero-init; focus/rebind splits typing history. */
 } cui_input_behavior_state;
 /* Lazy bounded default session (4095 preedit / 65535 rendered bytes). */
 cui_edit_composition *cui_base_composition(cui_context *, cui_id, cui_edit_composition *,
@@ -376,6 +378,16 @@ static bool cui_input_readonly_event(cui_event event) {
            event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END ||
            (event.key == CUI_KEY_A && (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)));
 }
+static void cui_input_history_focus(cui_context *ui, cui_id id, cui_edit *edit,
+                                    cui_input_behavior_state *state, bool disabled) {
+    bool focused = !disabled && cui_focused(ui) == id;
+    if (!state->focus_initialized || state->bound_edit_identity != (uintptr_t)edit ||
+        state->was_focused != focused)
+        cui_edit_break_coalescing(edit);
+    state->bound_edit_identity = (uintptr_t)edit;
+    state->focus_initialized = true;
+    state->was_focused = focused;
+}
 cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edit *edit,
                                              cui_input_behavior_state *state,
                                              cui_base_input_options options, size_t i) {
@@ -386,6 +398,7 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         result.error = CUI_EDIT_INVALID_ARGUMENT;
         return result;
     }
+    cui_input_history_focus(ui, id, edit, state, options.disabled);
     cui_edit_state before = cui_edit_get_state(edit);
     state->composition =
         cui_base_composition(ui, id, state->composition, &state->composition_owned);
@@ -433,6 +446,13 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
     if (options.delegate_up_down && event.type == CUI_EVENT_KEY_DOWN &&
         (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN))
         return result;
+    /* The pinned single-line Input has no vertical text rows. Composite
+     * delegation above keeps Up/Down available to popup/list owners. */
+    if (!before.multiline && event.type == CUI_EVENT_KEY_DOWN &&
+        (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN)) {
+        cui_consume_event(ui, i);
+        return result;
+    }
     if (options.delegate_home_end && event.type == CUI_EVENT_KEY_DOWN &&
         (event.key == CUI_KEY_HOME || event.key == CUI_KEY_END))
         return result;
@@ -505,6 +525,7 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
     cui_edit_state before = cui_edit_get_state(edit);
     (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, options.disabled, false,
                        (float)before.length);
+    cui_input_history_focus(ui, id, edit, state, options.disabled);
     state->composition =
         cui_base_composition(ui, id, state->composition, &state->composition_owned);
     if (state->composition && state->composition->active)
@@ -536,7 +557,11 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
 }
 cui_input_result cui_base_input(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
                                 bool disabled) {
-    cui_input_behavior_state state = {0};
+    /* This legacy wrapper has no retained lifecycle state. Preserve its edit
+     * engine coalescing; stateful ex/styled callers track focus transitions. */
+    cui_input_behavior_state state = {.bound_edit_identity = (uintptr_t)edit,
+                                      .focus_initialized = true,
+                                      .was_focused = ui && !disabled && cui_focused(ui) == id};
     return cui_base_input_ex(ui, id, name, edit, &state,
                              (cui_base_input_options){.disabled = disabled});
 }

@@ -4,9 +4,9 @@
 
 Published source `3b28a2c` passes all six framework CI jobs and Pages; all355 HTTPS artifact files match. Actual published Attachment checks pass62/62 across all14 design sizes, both densities and orientations, mobile subtitle pixels and real touch access to offscreen actions.
 
-Next23 compiled checkpoint137e1c5 passes strict native117/117 and sanitizer115/115. Native includes GPU/Sokol; the sanitizer configuration excludes those two integration tests. Portable Theme registry/semantic imports/motion and explicit preference projection, standalone registry header and Chart appearance hover gating are integrated. Actual WASM preference and Chart browser proofs pass; Attachment remains62/62. WASI94/94 and broad browser78/78 pass; all78 displayed excerpts compile. The initial93/94 standalone-header runner include-path failure is retained alongside the corrected full94/94 rerun. Publication is pending.
+Next24 compiled checkpoint6e0c4bf passes strict native122/122, sanitizer120/120 and WASI98/98. Native includes GPU/Sokol; sanitizer excludes them. Broad browser78/78 and all78 usage snippets compile. Attachment62/62, design sizes, Theme preference events, Core prepaint pixels and owner Plot/Chart motion pass. Chart real-time and controlled-clock hover checks pass after repairing early float completion. Mainb640ad6 all six CI jobs pass; Pages failed the now-reproduced Chart scheduling defect. Publication of Next24 is pending. See validation/gallery-next24.txt for failures, repairs and boundaries.
 
-The feature ledger records274 tested subsets, four implemented subsets and46 not started features; full family verification remains0/78. Core current-frame prepaint, native SDL system appearance observation and owner Plot/Chart theme motion continue in explicitly owned isolated worktrees. Only root integrates. No dependency installation is required from the user.
+The feature ledger records278 tested subsets, four implemented subsets and45 not started features (327 total); full family verification remains0/78. Current-frame Plot/Chart consumers, explicit pointer presence/host leave handling and safe whole-value Input edit acceptance continue in explicitly owned isolated worktrees. Only root integrates. No dependency installation is required from the user.
 
 ## Historical checkpoints
 

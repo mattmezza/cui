@@ -4,7 +4,7 @@ Native warning build + CTest122/122 PASS; actual GPU/Sokol/font/native Accessibi
 ASAN+UBSAN CTest120/120 PASS; GPU/Sokol integrations unregistered in this configuration.
 WASI98/98 PASS, Zig0.16/Wasmtime49, assertions enabled, bounded80B per-suite fuel, no native adapters or browser host.
 Initial frozen0375d9a runner93/96: Choice40B fuel exhausted in calloc; prepaint fixture32-byte arena was larger than payload on wasm32; native_starter accidentally included SDL example sources. All raw failures retained. Choice80B bounded rerun PASS; exact-size arena fill then second registration overflow preserves strict capacity/no callbacks assertions; native starter sources separated and new system_theme_app target added. Corrected full98/98 rerun PASS.
-Broad actual browser78 stories PASS and all78 displayed C snippets compile.
+Before the final Input change, broad actual browser78 stories PASS. At frozen6e0c4bf all78 displayed C snippets compile, but broad behavior times out at an obsolete single-line Shift+Down selection assertion; this latest broad run did not pass. Correcting that exact source-contract assertion and rerunning remains required.
 Attachment62/62 PASS: all14 sizes/densities/orientations, mobile subtitle pixels, actual touch pan/tap offscreen Open.
 Design12 stories×14 sizes, circular pixels, densities and both Tabs overflow axes PASS.
 Actual Theme WASM import + matchMedia appearance/reduced/contrast semantic pixels PASS.
@@ -15,3 +15,5 @@ Native Follow System application actual Xvfb3-frame launch and nonempty900x540 B
 Mainb640ad6 framework38438973833 all6SUCCESS; Pages38438973805 failed Chart tooltip timeout. Next24 not yet pushed/published at this checkpoint. Public3b28a2c remains355/355 HTTPS artifacts+Attachment62/62 validated.
 Raw logs/artifacts: /home/matteo/.cache/cui-validation/next24-frozen-{native,asan}-test.log, next24-frozen-wasi.log, next24-frozen-browser.log, next24-frozen-attachment.{log,json,png}, next24-frozen-design.log, next24-frozen-theme.log, next24-core-prepaint.log, next24-owner-motion.log, next24-frozen-chart-{real,controlled2}.log; initial next24-wasi.log, chart-controlled-clock-before.log and pages-b640ad6-failed.log retained.
 Remaining gaps: automatic Chart/Plot consumers, arbitrary custom tooltip layout, pointer presence after host leave, whole-value Input validation, physical/native platform acceptance and full-family scope. No feature or family marked fully verified.
+
+Frameworkf0217a0 run38442384364:5/6PASS, Windowscompile fails MSVC-C missingmax_align_t; Pages38442384466 fails obsolete single-line vertical selection test. Initial broad-pass claim was incorrect for finalInput source; corrected here and in live reports.

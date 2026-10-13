@@ -190,6 +190,7 @@ static unsigned char progress_circle_pixels[1056 * 1056 * 4];
 static cui_progress_circle_state progress_circle_state = {progress_circle_pixels,
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
+static cui_loading_motion spinner_motion, skeleton_motion;
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
 static const cui_semantic *semantics;
@@ -3853,16 +3854,32 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 17:
         cui_kbd(ui, cui_id_from(ui, "kbd"), &t, cui_string("Ctrl + K"));
         break;
-    case 18:
-        cui_skeleton(ui, cui_id_from(ui, "skeleton"), &t, width - 48, 36, 6,
-                     cui_loading_phase(host_seconds, 1.4f), false, reduced_motion);
-        redraw = !reduced_motion;
+    case 18: {
+        cui_skeleton_options options = cui_skeleton_options_default();
+        options.width = width - 48;
+        options.height = 36;
+        options.radius = 6;
+        options.now_seconds = cui_frame_time(ui);
+        options.reduced_motion = reduced_motion;
+        cui_loading_motion_result motion;
+        if (cui_skeleton_ex(ui, cui_id_from(ui, "skeleton"), &t, &skeleton_motion,
+                            options, &motion))
+            next_wake = motion.next_wake_seconds > 0
+                ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui)) : 0;
         break;
-    case 19:
-        cui_spinner(ui, cui_id_from(ui, "spinner"), &t, 32, cui_loading_phase(host_seconds, 1.0f),
-                    reduced_motion);
-        redraw = !reduced_motion;
+    }
+    case 19: {
+        cui_spinner_options options = cui_spinner_options_default();
+        options.size = 32;
+        options.now_seconds = cui_frame_time(ui);
+        options.reduced_motion = reduced_motion;
+        cui_loading_motion_result motion;
+        if (cui_spinner_ex(ui, cui_id_from(ui, "spinner"), &t, &spinner_motion,
+                           options, &motion))
+            next_wake = motion.next_wake_seconds > 0
+                ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui)) : 0;
         break;
+    }
     case 20: {
         cui_disclosure_item items[3] = {
             {cui_id_from(ui, "a1"), cui_string("Getting started"), false},

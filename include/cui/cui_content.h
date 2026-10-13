@@ -137,6 +137,54 @@ void cui_spinner(cui_context *ui, cui_id id, const cui_theme *theme, float size,
                  bool reduced_motion);
 void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *theme, float width, float height,
                   float radius, float phase, bool secondary, bool reduced_motion);
+/* Opt-in, caller-clocked loading motion. State is caller-owned, contains no
+ * allocation, and must not be shared by independent animations. Zero duration
+ * selects the source period (.8 seconds Spinner, 2 seconds Skeleton). */
+typedef struct {
+    bool ready;
+    double started, last_time;
+} cui_loading_motion;
+typedef float (*cui_loading_ease_fn)(float phase, void *user);
+typedef struct {
+    float phase, opacity;
+    bool active;
+    double next_wake_seconds; /* Absolute caller-clock deadline; zero when static. */
+} cui_loading_motion_result;
+/* Pure, atomic sampling; period in (0,60], now in [0,1e12]. Skeleton uses
+ * a triangular bounce of the easing curve. Invalid callback output rejects. */
+bool cui_loading_motion_sample(cui_loading_motion *, double now_seconds, float period,
+                               bool reduced_motion, bool skeleton, cui_loading_ease_fn,
+                               void *ease_user, cui_loading_motion_result *);
+/* Callback paints one icon; radians are center-relative rotation. No callback
+ * userdata is retained. A failing callback must leave its own paint unchanged. */
+typedef bool (*cui_spinner_paint_fn)(cui_context *, cui_id, const cui_theme *, float size,
+                                     cui_color, float radians, void *user);
+typedef struct {
+    float size, duration;
+    double now_seconds;
+    bool reduced_motion, custom_color;
+    cui_color color;
+    cui_loading_ease_fn ease;
+    void *ease_user;
+    cui_spinner_paint_fn paint;
+    void *paint_user;
+} cui_spinner_options;
+typedef struct {
+    float width, height, radius, duration;
+    double now_seconds;
+    bool secondary, reduced_motion;
+    cui_loading_ease_fn ease;
+    void *ease_user;
+} cui_skeleton_options;
+cui_spinner_options cui_spinner_options_default(void);
+cui_skeleton_options cui_skeleton_options_default(void);
+/* Paint-only, source-compatible semantics: neither adds a focus stop or busy
+ * status. On success caller schedules result.next_wake_seconds; these APIs do
+ * not invalidate perpetually. Legacy phase APIs above retain their behavior. */
+bool cui_spinner_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
+                    cui_spinner_options, cui_loading_motion_result *);
+bool cui_skeleton_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
+                     cui_skeleton_options, cui_loading_motion_result *);
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *theme, float length, bool vertical);
 /* Shared delayed lifecycle for hover cards/tooltips, independent of styling. */
 typedef struct {

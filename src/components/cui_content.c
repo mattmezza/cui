@@ -570,6 +570,59 @@ void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *t, float width, f
     if (!reduced)
         cui_invalidate(ui);
 }
+bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
+                    cui_spinner_options o, cui_loading_motion_result *out) {
+    if (!ui || !id || !theme || !state || !out || !isfinite(o.size) || o.size <= 0 ||
+        o.size > 4096 || !isfinite(o.duration) || o.duration < 0 || o.duration > 60)
+        return false;
+    cui_loading_motion next = *state;
+    cui_loading_motion_result result;
+    if (!cui_loading_motion_sample(&next, o.now_seconds, o.duration ? o.duration : .8f,
+                                   o.reduced_motion || cui_reduced_motion(ui), false, o.ease,
+                                   o.ease_user, &result))
+        return false;
+    cui_color color = o.custom_color ? o.color : theme->text;
+    float radians = result.phase * 6.2831853071795864769f;
+    bool painted =
+        o.paint ? o.paint(ui, id, theme, o.size, color, radians, o.paint_user)
+                : cui_icon_named(ui, id, theme, cui_string("loader"),
+                                 (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                                    .custom_size = o.size,
+                                                    .custom_color = true,
+                                                    .color = color,
+                                                    .custom_transform = true,
+                                                    .transform = cui_icon_rotation(radians)}) ==
+                      CUI_ICON_OK;
+    if (!painted)
+        return false;
+    *state = next;
+    *out = result;
+    return true;
+}
+bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
+                     cui_skeleton_options o, cui_loading_motion_result *out) {
+    if (!ui || !id || !theme || !state || !out || !isfinite(o.width) || o.width <= 0 ||
+        o.width > 4096 || !isfinite(o.height) || o.height <= 0 || o.height > 4096 ||
+        !isfinite(o.radius) || o.radius < 0 || o.radius > 4096 || !isfinite(o.duration) ||
+        o.duration < 0 || o.duration > 60)
+        return false;
+    cui_loading_motion next = *state;
+    cui_loading_motion_result result;
+    if (!cui_loading_motion_sample(&next, o.now_seconds, o.duration ? o.duration : 2,
+                                   o.reduced_motion || cui_reduced_motion(ui), true, o.ease,
+                                   o.ease_user, &result))
+        return false;
+    /* The reference has no loading boolean, status role, or busy relationship. */
+    cui_color color = theme->secondary;
+    color.a = (uint8_t)(color.a * result.opacity * (o.secondary ? .5f : 1));
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = o.width, .height = o.height, .radius = o.radius, .background = color});
+    cui_end_box(ui);
+    *state = next;
+    *out = result;
+    return true;
+}
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *t, float length, bool vertical) {
     if (!ui || !t)
         return;

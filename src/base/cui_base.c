@@ -243,6 +243,7 @@ static void cui_input_history_focus(cui_context *ui, cui_id id, cui_edit *edit,
 }
 static cui_edit_result cui_input_checked(cui_edit *edit, cui_edit_request request,
                                          cui_base_input_options options, bool *rejected) {
+    request.normalization = options.normalization;
     cui_edit_checked_result result = cui_edit_apply_checked(
         edit, request, (cui_edit_acceptance){options.validate, options.validate_user});
     *rejected |= result.rejected;

@@ -174,6 +174,77 @@ size_t cui_editor_match_count(const cui_editor_state *s, cui_str query) {
     return count;
 }
 
+static bool cui_editor_replace_valid(cui_editor_state *s, cui_str query, cui_str replacement) {
+    return s && s->edit && !cui_edit_get_content(s->edit).token_count && query.length &&
+           cui_edit_valid_utf8(query) && cui_edit_valid_utf8(replacement);
+}
+cui_edit_result cui_editor_replace_current(cui_editor_state *s, cui_str query,
+                                           cui_str replacement) {
+    if (!cui_editor_replace_valid(s, query, replacement))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_state state = cui_edit_get_state(s->edit);
+    size_t start = state.cursor < state.anchor ? state.cursor : state.anchor;
+    size_t end = state.cursor > state.anchor ? state.cursor : state.anchor;
+    cui_str text = cui_edit_get_text(s->edit);
+    if (end - start != query.length || memcmp(text.data + start, query.data, query.length))
+        return CUI_EDIT_BOUNDARY;
+    cui_edit_result result = cui_edit_replace_range(s->edit, start, end, replacement);
+    if (result == CUI_EDIT_OK)
+        cui_editor_cancel_completion(s);
+    return result;
+}
+static bool cui_editor_storage_overlap(const void *a, size_t an, const void *b, size_t bn) {
+    if (!an || !bn)
+        return false;
+    uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+    return x >= y ? x - y < bn : y - x < an;
+}
+cui_edit_result cui_editor_replace_all(cui_editor_state *s, cui_str query, cui_str replacement,
+                                       char *scratch, size_t capacity, size_t *count) {
+    if (!cui_editor_replace_valid(s, query, replacement) || !scratch || !count)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str text = cui_edit_get_text(s->edit);
+    if (cui_editor_storage_overlap(scratch, capacity, text.data, text.length + 1) ||
+        cui_editor_storage_overlap(scratch, capacity, query.data, query.length) ||
+        cui_editor_storage_overlap(scratch, capacity, replacement.data, replacement.length) ||
+        cui_editor_storage_overlap(scratch, capacity, count, sizeof(*count)) ||
+        cui_editor_storage_overlap(count, sizeof(*count), text.data, text.length + 1))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    size_t matches = cui_editor_match_count(s, query);
+    if (!matches) {
+        *count = 0;
+        return CUI_EDIT_OK;
+    }
+    size_t length = text.length - matches * query.length;
+    if (replacement.length && matches > (SIZE_MAX - length) / replacement.length)
+        return CUI_EDIT_CAPACITY;
+    length += matches * replacement.length;
+    if (length >= capacity)
+        return CUI_EDIT_CAPACITY;
+    size_t at = 0, out = 0;
+    while (at < text.length) {
+        if (query.length <= text.length - at && cui_editor_boundary(text, at) &&
+            cui_editor_boundary(text, at + query.length) &&
+            !memcmp(text.data + at, query.data, query.length)) {
+            if (replacement.length)
+                memcpy(scratch + out, replacement.data, replacement.length);
+            out += replacement.length;
+            at += query.length;
+        } else
+            scratch[out++] = text.data[at++];
+    }
+    scratch[out] = 0;
+    cui_edit_result result =
+        cui_edit_replace_range(s->edit, 0, text.length, (cui_str){scratch, length});
+    if (result != CUI_EDIT_OK)
+        return result;
+    cui_edit_select(s->edit, 0, 0);
+    s->view.scroll_x = s->view.scroll_y = 0;
+    cui_editor_cancel_completion(s);
+    *count = matches;
+    return CUI_EDIT_OK;
+}
+
 bool cui_editor_set_folds(cui_editor_state *state, cui_editor_fold *folds, size_t count) {
     return state && cui_textarea_set_folds(&state->view, state->edit, folds, count);
 }

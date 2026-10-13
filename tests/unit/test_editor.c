@@ -590,7 +590,51 @@ static void inline_tokens_reject_code_mode(void) {
     cui_destroy(ui);
     cui_edit_destroy(edit);
 }
+static void replace_workflow(void) {
+    char buffer[64] = "one oneone \xc3\xa9";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 2048,
+                                                       .max_history_steps = 16});
+    cui_textarea_line lines[16];
+    cui_editor_state state;
+    assert(edit && cui_editor_state_init(&state, edit, lines, 16));
+    char scratch[128];
+    size_t count = 99;
+    cui_edit_select(edit, 0, 3);
+    assert(cui_editor_replace_current(&state, cui_string("two"), cui_string("x")) ==
+           CUI_EDIT_BOUNDARY);
+    assert(cui_edit_get_state(edit).cursor == 3 && !strcmp(buffer, "one oneone \xc3\xa9"));
+    assert(cui_editor_replace_current(&state, cui_string("one"), cui_string("two")) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "two oneone \xc3\xa9"));
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "one oneone \xc3\xa9"));
+    uint64_t revision = cui_edit_get_state(edit).revision;
+    assert(cui_editor_replace_all(&state, cui_string("one"), cui_string("abc"), scratch, 3,
+                                  &count) == CUI_EDIT_CAPACITY);
+    assert(count == 99 && cui_edit_get_state(edit).revision == revision);
+    assert(cui_editor_replace_all(&state, cui_string("one"), cui_string("x"), buffer, sizeof buffer,
+                                  &count) == CUI_EDIT_INVALID_ARGUMENT);
+    state.view.scroll_x = 20;
+    state.view.scroll_y = 30;
+    assert(cui_editor_replace_all(&state, cui_string("one"), cui_string("x"), scratch,
+                                  sizeof scratch, &count) == CUI_EDIT_OK);
+    assert(count == 3 && !strcmp(buffer, "x xx \xc3\xa9") && !state.view.scroll_x &&
+           !state.view.scroll_y);
+    assert(cui_edit_get_state(edit).cursor == 0 && cui_edit_get_state(edit).anchor == 0);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "one oneone \xc3\xa9"));
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK && !strcmp(buffer, "x xx \xc3\xa9"));
+    revision = cui_edit_get_state(edit).revision;
+    assert(cui_editor_replace_all(&state, cui_string("none"), cui_string(""), scratch,
+                                  sizeof scratch, &count) == CUI_EDIT_OK);
+    assert(count == 0 && cui_edit_get_state(edit).revision == revision);
+    assert(cui_editor_replace_all(&state, cui_string("x"), cui_string(""), scratch, sizeof scratch,
+                                  &count) == CUI_EDIT_OK);
+    assert(count == 3 && !strcmp(buffer, "  \xc3\xa9"));
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    replace_workflow();
     inline_tokens_reject_code_mode();
     completion_model();
     completion_popup();

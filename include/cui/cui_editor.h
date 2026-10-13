@@ -57,6 +57,17 @@ cui_editor_options cui_editor_default(void);
  * Missing/invalid queries preserve selection. Reverse search starts before the
  * selection; forward search starts after it. No query pointer is retained. */
 cui_edit_result cui_editor_find(cui_editor_state *, cui_str query, bool reverse, bool wrap);
+/* Replace the exact selected literal match. No match returns BOUNDARY unchanged.
+ * Successful replacement is one undo step and collapses the selection to its end.
+ * Programmatic APIs do not enforce view readonly/disabled options. */
+cui_edit_result cui_editor_replace_current(cui_editor_state *, cui_str query, cui_str replacement);
+/* Replace all nonoverlapping case-sensitive literal matches in one undo step.
+ * Scratch is caller-owned byte storage, disjoint from model storage/query/
+ * replacement/count; its contents are unspecified on failure. Count is written
+ * only on success. No matches succeeds with zero and preserves state. Success
+ * with matches resets selection and scroll to document start. */
+cui_edit_result cui_editor_replace_all(cui_editor_state *, cui_str query, cui_str replacement,
+                                       char *scratch, size_t capacity, size_t *count);
 typedef struct {
     cui_edit *query; /* Borrowed single-line model. */
     cui_input_behavior_state input;

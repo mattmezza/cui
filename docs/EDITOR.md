@@ -344,3 +344,13 @@ Exact token/range replacements preserve selection and document revision. Undo st
 restores document snapshots only and detaches annotations; token metadata has no
 history payload. This is ordinary Input/Textarea functionality, not CodeEditor token
 support. Masked/secret Input modes themselves are not currently implemented in CUI.
+
+Literal replacement is available through `cui_editor_replace_current` (the
+selection must exactly match the query) and `cui_editor_replace_all`. Replace-all
+uses a caller-provided byte scratch buffer, scans nonoverlapping matches, and
+commits one document replacement for one-step Undo. Its count is untouched on
+failure; scratch contents are unspecified. Successful replace-all resets selection
+and scroll to the start. These programmatic operations ignore view readonly and
+disabled options; host UI must enforce its editing policy. They remain case-sensitive;
+the frozen source's ASCII-insensitive retained matcher, automatic next-current-match
+tracking, and built-in replacement panel are not implemented by these APIs.

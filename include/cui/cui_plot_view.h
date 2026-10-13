@@ -126,10 +126,16 @@ cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, un
                                        size_t stride, size_t capacity_bytes,
                                        const cui_plot_cached_shape *, size_t count,
                                        cui_color clear);
-/* Source Background subset for software paths: encoded-sRGB solid/two-stop
- * gradients. No Oklab, slash/checkerboard patterns or native renderer triangles.
+/* Portable source Background draw routes: solid, linear, slash/checkerboard.
+ * Native renderer triangles and exact GPU/Hsla conversion remain separate.
  * Angle0 points up,90 right; caller angle is never changed for bar orientation. */
-typedef enum { CUI_PLOT_BACKGROUND_SOLID, CUI_PLOT_BACKGROUND_LINEAR } cui_plot_background_kind;
+typedef enum {
+    CUI_PLOT_BACKGROUND_SOLID,
+    CUI_PLOT_BACKGROUND_LINEAR,
+    CUI_PLOT_BACKGROUND_SLASH,
+    CUI_PLOT_BACKGROUND_CHECKERBOARD
+} cui_plot_background_kind;
+typedef enum { CUI_PLOT_COLOR_SRGB, CUI_PLOT_COLOR_OKLAB } cui_plot_color_space;
 typedef struct {
     cui_color color;
     double position;
@@ -139,14 +145,27 @@ typedef struct {
     cui_color solid;
     double angle;
     cui_plot_color_stop from, to;
+    cui_plot_color_space color_space;
+    bool source_projection; /* source short-axis scaling/dominant-axis gradient */
+    double pattern_width, pattern_interval, pattern_size;
 } cui_plot_background;
 cui_plot_background cui_plot_solid_background(cui_color);
 cui_plot_background cui_plot_linear_background(double angle, cui_plot_color_stop from,
                                                cui_plot_color_stop to);
+/* Source gradient projection, preserving old diagonal constructor behavior. */
+cui_plot_background cui_plot_linear_background_source(double angle, cui_plot_color_stop from,
+                                                      cui_plot_color_stop to, cui_plot_color_space);
+/* Source f32 1/255 slash packing, checked before sampling. Width/interval finite
+ * nonnegative, packed u32 fits and interval*255<65535; decoded period must be>0.
+ * Checker size finite1/255..16384. Patterns anchor at frame origin, parameters in
+ * raster pixel units (no implicit device scale/offset). Slash has source1px AA. */
+cui_plot_background cui_plot_pattern_slash(cui_color, double width, double interval);
+cui_plot_background cui_plot_checkerboard(cui_color, double size);
 /* Explicit positive finite relative frame/position within +/-16384. Stops0..1
  * may be reversed; equal stops make a right-continuous hard edge. Projection
- * clamps beyond stops. Channels interpolate straight encoded-sRGB RGBA8; this
- * is not a claim of byte-identical GPUI shader/color-space output. */
+ * clamps beyond stops. sRGB interpolates straight encoded RGBA8; Oklab decodes
+ * sRGB, mixes standard Lab/alpha and gamut-clamps encoded output. Source pattern
+ * phase/coverage rules are retained, not byte-identical GPU/Hsla output. */
 cui_plot_result cui_plot_background_sample(const cui_plot_background *, cui_plot_rect frame,
                                            cui_plot_point position, cui_color *out);
 typedef struct {

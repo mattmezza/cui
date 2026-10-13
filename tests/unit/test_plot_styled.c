@@ -1182,7 +1182,112 @@ static void software_backgrounds(void) {
            CUI_PLOT_CAPACITY);
     assert(memcmp(direct, pixels, sizeof pixels) == 0);
 }
+static void source_backgrounds(void) {
+    cui_plot_rect frame = {0, 0, 8, 8};
+    cui_color c, saved;
+    cui_plot_background bg = cui_plot_linear_background_source(
+        90, (cui_plot_color_stop){red, 0}, (cui_plot_color_stop){blue, 1}, CUI_PLOT_COLOR_OKLAB);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){4, 4}, &c) == CUI_PLOT_OK);
+    /* Published Oklab red/blue midpoint, encoded back to sRGB. */
+    assert(c.r == 140 && c.g == 83 && c.b == 162 && c.a == 255);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){0, 4}, &c) == CUI_PLOT_OK);
+    assert(memcmp(&c, &red, sizeof c) == 0);
+    bg.from.color = (cui_color){0, 0, 0, 0};
+    bg.to.color = (cui_color){255, 255, 255, 255};
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){4, 4}, &c) == CUI_PLOT_OK);
+    assert(c.r == 99 && c.g == 99 && c.b == 99 && c.a == 128);
+    bg.color_space = CUI_PLOT_COLOR_SRGB;
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){4, 4}, &c) == CUI_PLOT_OK);
+    assert(c.r == 128 && c.a == 128);
+    bg = cui_plot_linear_background_source(45, (cui_plot_color_stop){red, 0},
+                                           (cui_plot_color_stop){blue, 1}, CUI_PLOT_COLOR_SRGB);
+    assert(cui_plot_background_sample(&bg, (cui_plot_rect){0, 0, 16, 8}, (cui_plot_point){12, 4},
+                                      &c) == CUI_PLOT_OK);
+    assert(c.r == 70 && c.b == 185); /* short-axis rescale, not diagonal extent */
+    bg = cui_plot_checkerboard((cui_color){20, 40, 60, 128}, 2);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){.5, .5}, &c) == CUI_PLOT_OK &&
+           c.a == 0);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){2.5, .5}, &c) == CUI_PLOT_OK &&
+           c.a == 128 && c.r == 20);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){2.5, 2.5}, &c) == CUI_PLOT_OK &&
+           c.a == 0);
+    assert(cui_plot_background_sample(&bg, (cui_plot_rect){10, 20, 26, 36},
+                                      (cui_plot_point){12.5, 20.5}, &c) == CUI_PLOT_OK &&
+           c.a == 128);
+    /* Shader signed remainder: negative odd checks are transparent. */
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){-1, .5}, &c) == CUI_PLOT_OK &&
+           c.a == 0);
+    bg = cui_plot_pattern_slash((cui_color){20, 40, 60, 128}, 2, 2);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){0, 0}, &c) == CUI_PLOT_OK &&
+           c.a == 128);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){1, 0}, &c) == CUI_PLOT_OK &&
+           c.a >= 63 && c.a <= 65);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){2, 0}, &c) == CUI_PLOT_OK &&
+           c.a == 0);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){4, 0}, &c) == CUI_PLOT_OK &&
+           c.a == 128);
+    assert(cui_plot_background_sample(&bg, (cui_plot_rect){10, 20, 26, 36},
+                                      (cui_plot_point){11, 20}, &saved) == CUI_PLOT_OK);
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){1, 0}, &c) == CUI_PLOT_OK);
+    assert(memcmp(&c, &saved, sizeof c) == 0);
+    bg.pattern_width = 2.003; /* same source 1/255 quantized width */
+    assert(cui_plot_background_sample(&bg, frame, (cui_plot_point){1, 0}, &saved) == CUI_PLOT_OK);
+    assert(memcmp(&c, &saved, sizeof c) == 0);
+    const cui_plot_background invalid[] = {
+        cui_plot_pattern_slash(red, 0, 0),   cui_plot_pattern_slash(red, -1, 2),
+        cui_plot_pattern_slash(red, 2, 257), cui_plot_pattern_slash(red, NAN, 2),
+        cui_plot_pattern_slash(red, 258, 2), cui_plot_checkerboard(red, 0),
+        cui_plot_checkerboard(red, 16385),   cui_plot_checkerboard(red, NAN)};
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; ++i) {
+        assert(cui_plot_background_sample(&invalid[i], frame, (cui_plot_point){1, 0}, &saved) ==
+               CUI_PLOT_INVALID);
+        assert(memcmp(&c, &saved, sizeof c) == 0);
+    }
+    cui_plot_path_command commands[] = {{.kind = CUI_PLOT_PATH_MOVE, .point = {0, 0}},
+                                        {.kind = CUI_PLOT_PATH_LINE, .point = {8, 0}},
+                                        {.kind = CUI_PLOT_PATH_LINE, .point = {8, 8}},
+                                        {.kind = CUI_PLOT_PATH_LINE, .point = {0, 8}},
+                                        {.kind = CUI_PLOT_PATH_CLOSE}};
+    cui_plot_path_segment storage[8];
+    cui_plot_path_cache cache;
+    cui_plot_cached_path path;
+    cache_builder builder = {commands, 5, 0, CUI_PLOT_OK};
+    assert(cui_plot_path_cache_init(&cache, storage, 8) == CUI_PLOT_OK);
+    assert(cui_plot_path_cache_get(&cache, 1, (cui_plot_point){0}, build_cache, &builder, &path) ==
+           CUI_PLOT_OK);
+    unsigned char pixels[8 * 8 * 4], before[sizeof pixels];
+    cui_plot_background_shape shape = {.path = path,
+                                       .background_frame = frame,
+                                       .fill =
+                                           cui_plot_checkerboard((cui_color){255, 0, 0, 128}, 2),
+                                       .stroke = cui_plot_solid_background((cui_color){0})};
+    assert(cui_plot_raster_backgrounds(pixels, 8, 8, 32, sizeof pixels, &shape, 1,
+                                       (cui_color){0}) == CUI_PLOT_OK);
+    assert(pixels[3] == 0 && pixels[2 * 4] == 255 && pixels[2 * 4 + 3] == 128);
+    shape.fill = cui_plot_pattern_slash((cui_color){255, 0, 0, 0}, 2, 2);
+    assert(cui_plot_raster_backgrounds(pixels, 8, 8, 32, sizeof pixels, &shape, 1, blue) ==
+           CUI_PLOT_OK);
+    for (size_t i = 0; i < sizeof pixels; i += 4)
+        assert(pixels[i] == 0 && pixels[i + 2] == 255 && pixels[i + 3] == 255);
+    shape.fill = cui_plot_linear_background_source(
+        90, (cui_plot_color_stop){red, 0}, (cui_plot_color_stop){blue, 1}, CUI_PLOT_COLOR_OKLAB);
+    assert(cui_plot_raster_backgrounds(pixels, 8, 8, 32, sizeof pixels, &shape, 1,
+                                       (cui_color){0}) == CUI_PLOT_OK);
+    assert(pixels[4 * 4 + 1] > 70); /* Oklab fill has a visible green component */
+    shape.fill = cui_plot_solid_background((cui_color){0});
+    shape.stroke_width = 2;
+    shape.stroke = cui_plot_checkerboard(red, 2);
+    assert(cui_plot_raster_backgrounds(pixels, 8, 8, 32, sizeof pixels, &shape, 1,
+                                       (cui_color){0}) == CUI_PLOT_OK);
+    assert(pixels[3] == 0 && pixels[2 * 4] == 255 && pixels[2 * 4 + 3] == 255);
+    memcpy(before, pixels, sizeof pixels);
+    shape.stroke = invalid[0];
+    assert(cui_plot_raster_backgrounds(pixels, 8, 8, 32, sizeof pixels, &shape, 1, blue) ==
+           CUI_PLOT_INVALID);
+    assert(memcmp(before, pixels, sizeof pixels) == 0 && builder.builds == 1);
+}
 int main(void) {
+    source_backgrounds();
     software_backgrounds();
     styled_appearance();
     plot_elements();

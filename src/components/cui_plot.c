@@ -231,10 +231,41 @@ static bool background_frame_valid(cui_plot_rect frame) {
            point_valid((cui_plot_point){frame.x_max, frame.y_max}) && frame.x_min < frame.x_max &&
            frame.y_min < frame.y_max;
 }
+static bool slash_parameters(const cui_plot_background *bg, double *width, double *period) {
+    if (!isfinite(bg->pattern_width) || !isfinite(bg->pattern_interval) || bg->pattern_width < 0 ||
+        bg->pattern_interval < 0 || bg->pattern_width > 257 || bg->pattern_interval >= 257)
+        return false;
+    float w = (float)bg->pattern_width * 255.f;
+    float gap = (float)bg->pattern_interval * 255.f;
+    if (gap >= 65535.f)
+        return false;
+    uint64_t packed = (uint64_t)w * 65535 + (uint64_t)gap;
+    if (packed > UINT32_MAX)
+        return false;
+    float encoded = (float)packed;
+    float decoded_width = encoded / 65535.f / 255.f;
+    float decoded_gap = fmodf(encoded, 65535.f) / 255.f;
+    float height = decoded_width + decoded_gap;
+    float p = height * sinf(3.1415926f / 4);
+    if (!(p > 0) || !isfinite(p))
+        return false;
+    *width = p * (decoded_width / height) / 2;
+    *period = p;
+    return true;
+}
 static bool background_valid(const cui_plot_background *background) {
     if (!background || background->kind < CUI_PLOT_BACKGROUND_SOLID ||
-        background->kind > CUI_PLOT_BACKGROUND_LINEAR)
+        background->kind > CUI_PLOT_BACKGROUND_CHECKERBOARD ||
+        background->color_space < CUI_PLOT_COLOR_SRGB ||
+        background->color_space > CUI_PLOT_COLOR_OKLAB)
         return false;
+    if (background->kind == CUI_PLOT_BACKGROUND_SLASH) {
+        double width, period;
+        return slash_parameters(background, &width, &period);
+    }
+    if (background->kind == CUI_PLOT_BACKGROUND_CHECKERBOARD)
+        return isfinite(background->pattern_size) && background->pattern_size >= 1. / 255 &&
+               background->pattern_size <= 16384;
     return background->kind == CUI_PLOT_BACKGROUND_SOLID ||
            (isfinite(background->angle) && isfinite(background->from.position) &&
             isfinite(background->to.position) && background->from.position >= 0 &&
@@ -249,18 +280,93 @@ cui_plot_background cui_plot_linear_background(double angle, cui_plot_color_stop
     return (cui_plot_background){
         .kind = CUI_PLOT_BACKGROUND_LINEAR, .angle = angle, .from = from, .to = to};
 }
+cui_plot_background cui_plot_linear_background_source(double angle, cui_plot_color_stop from,
+                                                      cui_plot_color_stop to,
+                                                      cui_plot_color_space space) {
+    cui_plot_background bg = cui_plot_linear_background(angle, from, to);
+    bg.color_space = space;
+    bg.source_projection = true;
+    return bg;
+}
+cui_plot_background cui_plot_pattern_slash(cui_color color, double width, double interval) {
+    return (cui_plot_background){.kind = CUI_PLOT_BACKGROUND_SLASH,
+                                 .solid = color,
+                                 .pattern_width = width,
+                                 .pattern_interval = interval};
+}
+cui_plot_background cui_plot_checkerboard(cui_color color, double size) {
+    return (cui_plot_background){.kind = CUI_PLOT_BACKGROUND_CHECKERBOARD,
+                                 .solid = color,
+                                 .pattern_size = (double)(float)size};
+}
+/* Standard Oklab transforms (same published matrices used by the pinned shader).
+ * CUI colors are encoded sRGB bytes, so decode before entering linear RGB. */
+static double plot_srgb_decode(double value) {
+    return value <= .04045 ? value / 12.92 : pow((value + .055) / 1.055, 2.4);
+}
+static unsigned char plot_srgb_encode(double value) {
+    value = fmax(0, fmin(1, value));
+    double encoded = value <= .0031308 ? value * 12.92 : 1.055 * pow(value, 1. / 2.4) - .055;
+    return (unsigned char)lround(fmax(0, fmin(1, encoded)) * 255);
+}
+static void plot_color_lab(cui_color color, double out[3]) {
+    double r = plot_srgb_decode(color.r / 255.), g = plot_srgb_decode(color.g / 255.);
+    double b = plot_srgb_decode(color.b / 255.);
+    double l = cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b);
+    double m = cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b);
+    double s = cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
+    out[0] = .2104542553 * l + .7936177850 * m - .0040720468 * s;
+    out[1] = 1.9779984951 * l - 2.4285922050 * m + .4505937099 * s;
+    out[2] = .0259040371 * l + .7827717662 * m - .8086757660 * s;
+}
+static cui_color plot_lab_color(const double a[3], const double b[3], double t,
+                                unsigned char alpha) {
+    double L = a[0] * (1 - t) + b[0] * t, A = a[1] * (1 - t) + b[1] * t;
+    double B = a[2] * (1 - t) + b[2] * t;
+    double l = L + .3963377774 * A + .2158037573 * B;
+    double m = L - .1055613458 * A - .0638541728 * B;
+    double s = L - .0894841775 * A - 1.2914855480 * B;
+    l *= l * l;
+    m *= m * m;
+    s *= s * s;
+    return (cui_color){plot_srgb_encode(4.0767416621 * l - 3.3077115913 * m + .2309699292 * s),
+                       plot_srgb_encode(-1.2684380046 * l + 2.6097574011 * m - .3413193965 * s),
+                       plot_srgb_encode(-.0041960863 * l - .7034186147 * m + 1.7076147010 * s),
+                       alpha};
+}
 typedef struct {
     const cui_plot_background *background;
-    double center_x, center_y, x, y;
+    double center_x, center_y, x, y, pattern_width, pattern_period;
+    double lab_from[3], lab_to[3];
 } plot_background_sampler;
 static plot_background_sampler background_sampler(const cui_plot_background *background,
                                                   cui_plot_rect frame) {
     plot_background_sampler sample = {.background = background};
-    if (!background || background->kind == CUI_PLOT_BACKGROUND_SOLID)
+    sample.center_x = frame.x_min;
+    sample.center_y = frame.y_min;
+    if (!background || background->kind == CUI_PLOT_BACKGROUND_SOLID ||
+        background->kind == CUI_PLOT_BACKGROUND_CHECKERBOARD)
         return sample;
+    if (background->kind == CUI_PLOT_BACKGROUND_SLASH) {
+        (void)slash_parameters(background, &sample.pattern_width, &sample.pattern_period);
+        return sample;
+    }
+    if (background->color_space == CUI_PLOT_COLOR_OKLAB) {
+        plot_color_lab(background->from.color, sample.lab_from);
+        plot_color_lab(background->to.color, sample.lab_to);
+    }
     double angle = fmod(background->angle, 360) * (3.14159265358979323846 / 180);
     double dx = sin(angle), dy = -cos(angle);
-    double length = fabs((frame.x_max - frame.x_min) * dx) + fabs((frame.y_max - frame.y_min) * dy);
+    double width = frame.x_max - frame.x_min, height = frame.y_max - frame.y_min;
+    double length;
+    if (background->source_projection) {
+        if (width > height)
+            dy *= height / width;
+        else
+            dx *= width / height;
+        length = hypot(dx, dy) * (fabs(dx) > fabs(dy) ? width : height);
+    } else
+        length = fabs(width * dx) + fabs(height * dy);
     sample.x = dx / length;
     sample.y = dy / length;
     sample.center_x = frame.x_min / 2 + frame.x_max / 2;
@@ -271,6 +377,23 @@ static cui_color background_color(plot_background_sampler sample, cui_plot_point
     const cui_plot_background *background = sample.background;
     if (background->kind == CUI_PLOT_BACKGROUND_SOLID)
         return background->solid;
+    if (background->kind == CUI_PLOT_BACKGROUND_SLASH ||
+        background->kind == CUI_PLOT_BACKGROUND_CHECKERBOARD) {
+        double x = point.x - sample.center_x, y = point.y - sample.center_y, coverage;
+        if (background->kind == CUI_PLOT_BACKGROUND_CHECKERBOARD)
+            coverage = fmax(0, fmin(1, fmod(floor(x / background->pattern_size) +
+                                                floor(y / background->pattern_size),
+                                            2)));
+        else {
+            double rotated = cosf(3.1415926f / 4) * x + sinf(3.1415926f / 4) * y;
+            double phase = fmod(rotated, sample.pattern_period);
+            double distance = fmin(phase, sample.pattern_period - phase) - sample.pattern_width;
+            coverage = fmax(0, fmin(1, .5 - distance));
+        }
+        cui_color color = background->solid;
+        color.a = (unsigned char)lround(color.a * coverage);
+        return color;
+    }
     double position =
         .5 + (point.x - sample.center_x) * sample.x + (point.y - sample.center_y) * sample.y;
     double interval = background->to.position - background->from.position;
@@ -278,6 +401,14 @@ static cui_color background_color(plot_background_sampler sample, cui_plot_point
                              : (position - background->from.position) / interval;
     t = fmax(0, fmin(1, t));
     cui_color a = background->from.color, b = background->to.color;
+    if (background->color_space == CUI_PLOT_COLOR_OKLAB) {
+        if (t == 0)
+            return a;
+        if (t == 1)
+            return b;
+        return plot_lab_color(sample.lab_from, sample.lab_to, t,
+                              (unsigned char)lround(a.a * (1 - t) + b.a * t));
+    }
     return (cui_color){(unsigned char)lround(a.r * (1 - t) + b.r * t),
                        (unsigned char)lround(a.g * (1 - t) + b.g * t),
                        (unsigned char)lround(a.b * (1 - t) + b.b * t),

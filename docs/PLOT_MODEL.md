@@ -1132,32 +1132,63 @@ patterns, and sRGB/Oklab interpolation. Plot's Bar explicitly uses a supplied
 background verbatim and never rotates its angle for orientation. Source story
 area gradients also use reversed stops (opaque at1, transparent at0).
 
-CUI's software subset uses `cui_plot_background` with solid or two-stop linear
-encoded-sRGB color stops. `cui_plot_background_sample` accepts an explicit
-positive relative frame and point. Angle0 points top,90 right, increasing
-clockwise; finite angles normalize modulo360. Gradient projection runs across
-the frame's full projected diagonal, clamps outside stop locations, and retains
-caller stop order. Equal stops produce an explicit right-continuous hard edge.
-Channels interpolate straight encoded-sRGB RGBA8 and are then source-over
-composited by the existing rasterizer. This checked CPU contract is not claimed
-byte-identical to GPU shader/Hsla conversion, premultiplication or Oklab output.
+CUI's portable `cui_plot_background` supports all four source background kinds
+on cached software paths. `cui_plot_linear_background_source` selects the pinned
+shader's short-axis rescaling and dominant-axis projection; angle0 points top,
+90 right, increasing clockwise. The earlier `cui_plot_linear_background` retains
+its full projected diagonal for compatibility. Both preserve stop order, clamp
+outside stops and define equal stops as a right-continuous hard edge (source
+shader division at equal stops is undefined). Finite stop positions remain0..1.
+
+`CUI_PLOT_COLOR_SRGB` interpolates encoded RGBA8 channels. `CUI_PLOT_COLOR_OKLAB`
+decodes sRGB bytes to linear RGB, uses the standard Oklab matrices/cube roots,
+mixes Lab and alpha independently, then encodes and clamps RGB to the byte gamut.
+Endpoints preserve their exact input bytes, including transparent RGB. This is
+straight alpha, not premultiplied interpolation: transparent endpoint RGB still
+contributes. Black/white halfway is99 in Oklab versus128 in encoded sRGB.
+GPUI accepts Hsla and prepares shader colors in a different representation;
+this checked RGBA8 CPU route does not promise byte-identical GPU color output.
+
+`cui_plot_pattern_slash(color,width,interval)` retains the pinned source's unusual
+packing: each parameter is converted to f32, multiplied by255 and truncated,
+then packed as `width_scaled*65535+interval_scaled` and rounded to f32. Shader
+width decoding divides that float by65535 then255, without flooring; interval
+uses its remainder modulo65535. The diagonal period is their decoded sum times
+sin(pi/4). Signed remainder and the source one-pixel alpha coverage ramp are
+preserved. Width/interval must be finite nonnegative, width<=257, interval<257,
+the packed integer must fit uint32, and the decoded period must be positive.
+Zero period and overflowing packing are rejected rather than inheriting
+undefined arithmetic. Widths within the same1/255 truncation bin have identical
+coverage; f32 packed precision can affect the decoded spacing.
+
+`cui_plot_checkerboard(color,size)` converts size to f32; finite size1/255..16384
+is accepted. An odd `floor(x/size)+floor(y/size)` cell is colored, an even cell
+transparent. The shader's signed remainder behavior is retained: negative odd
+cells also become transparent. Both patterns anchor at the explicit frame
+minimum corner. Parameters use raster pixel units; expanding the frame does not
+stretch a pattern. Source Background has no independent scale/offset field.
+The host chooses pixel-unit sizes and the frame origin explicitly, including
+any device-scale conversion. Pattern alpha multiplies the supplied color alpha.
 
 `cui_plot_raster_backgrounds` consumes cached relative segments, explicit
-`background_frame`, fill/stroke backgrounds and stroke width. It prepares
-gradient coefficients once per shape, evaluates colors only on covered pixels,
-and shares the solid rasterizer's sampling/fill/stroke/alpha code. Origin moves
-frame and geometry together without rebuilding. Explicit gradients are never
-rotated based on bar alignment. A fill can fade to alpha0; stroke backgrounds
-are independent. Geometry/color/frame buffers are borrowed and must be stable
-and disjoint from pixel output during the call.
+`background_frame`, independent fill/stroke backgrounds and stroke width.
+Gradient projection and Lab endpoints are prepared once per shape; covered
+pixels perform bounded color evaluation. Origin moves frame and geometry
+together without rebuilding. Backgrounds are never rotated for bar alignment.
+Buffers are borrowed, stable and disjoint from pixel output during the call.
 
-The existing bounds remain: up to64 shapes,4096 segments per shape,1024² pixels,
-64-million pixel*segment work, positions/frame corners within +/-16384,
-stroke width0..1024; stop positions must be finite0..1. Invalid/capacity failures
-preserve all pixels. Old solid APIs preserve their behavior and defaults. Core
-quad-based Bar/Dot/Axis/Grid drivers still accept their existing solid colors;
-use pure paths plus this software route for gradient fills/strokes. No Oklab,
-pattern or arbitrary GPU Background parity is claimed.
+The existing limits remain64 shapes,4096 segments per shape,1024² pixels,
+64-million pixel*segment work, positions/frame corners within +/-16384 and
+stroke width0..1024. Invalid/capacity failures preserve all pixels. Pattern and
+Lab evaluation add constant work per covered pixel, with no allocation or
+unbounded tessellation. Old solid APIs retain their defaults. Quad-based
+Bar/Dot/Axis/Grid drivers still accept solid colors; use pure paths and this
+software route for gradient/pattern fills and strokes.
+
+The shader audit uses the exact `gpui-pre-wgpu =0.3.8` crate from the frozen lock
+(checksum439c5421cafe1a7cf68d0c0ae5cc82b26fad6b0e6345ac98d20acaf1f2463914),
+`src/shaders.wgsl` gradient preparation and `background_color`. Double geometry,
+RGBA8 output and segment rasterization remain deliberate portable differences.
 
 Native source painting requires a path/mesh command with bounds and tessellated
 vertices, fill/stroke background and clipping/coverage attributes. Source

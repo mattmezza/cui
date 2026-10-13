@@ -562,18 +562,36 @@ for capacity failures and exact lifetime rules.
 
 ## Software fill and stroke backgrounds
 
-Frozen shapes accept GPUI Background values verbatim. The portable software
-subset provides `cui_plot_solid_background`, `cui_plot_linear_background`,
-`cui_plot_background_sample` and `cui_plot_raster_backgrounds`. The raster route
-uses existing cached segments with an explicit relative background frame and
-independent fill/stroke colors or two-stop gradients. Angle0 points up,90 right;
-caller angles/stops are preserved and never automatically rotated for a bar.
-Reversed stop positions and transparent endpoints support source-style area
-fades. Origin translation reuses tessellation and carries the gradient frame
-with the geometry. Gradient coefficients are prepared once per shape.
+Frozen shapes accept GPUI Background values verbatim. The portable cached-path
+route supports solids, two-stop sRGB/Oklab gradients, slash and checkerboard
+patterns through `cui_plot_raster_backgrounds`. Fill and stroke backgrounds are
+independent, with an explicit relative frame anchored to geometry. Cache origin
+translation moves geometry and paint together without rebuilding segments.
 
-This route interpolates straight encoded-sRGB RGBA8, uses the existing bounded
-software fill/stroke sampling and preserves pixels on validation/capacity errors.
-It does not add Oklab, patterns, native GPU path meshes or gradient Core quads.
-Existing solid widget drivers remain separate. See the [Background audit](PLOT_MODEL.md#background-draw-routes-and-native-renderer-gap)
-for exact bounds, color differences and the remaining renderer prerequisite.
+```c
+cui_plot_background gradient = cui_plot_linear_background_source(
+    90, (cui_plot_color_stop){{255, 0, 0, 255}, 0},
+    (cui_plot_color_stop){{0, 0, 255, 0}, 1}, CUI_PLOT_COLOR_OKLAB);
+cui_plot_background stripes = cui_plot_pattern_slash((cui_color){0, 0, 0, 128}, 2, 2);
+cui_plot_background checks = cui_plot_checkerboard((cui_color){0, 0, 0, 128}, 4);
+/* Assign gradient/stripes/checks to a background shape's fill or stroke;
+ * its cached path and positive background_frame remain required. */
+```
+
+Angle0 points up,90 right; source projection scales the shorter axis before
+projecting onto the dominant extent. The older `cui_plot_linear_background`
+keeps its earlier diagonal projection. Caller angles/stops are preserved,
+including reversed stops, and never rotated automatically for a bar. Oklab
+mixes decoded linear RGB in Lab with independent alpha; transparent endpoint RGB
+still contributes. Output is encoded, gamut-clamped RGBA8.
+
+Pattern sizes are raster pixel units anchored at the frame minimum corner,
+with no implicit device scaling. Checkerboard odd cells are colored; slash uses
+source f32 packing and a one-pixel alpha ramp. Invalid zero periods, overflowing
+packing and invalid sizes fail before changing pixels. Patterns and gradients
+reuse existing bounded raster work and do not add allocation.
+
+The segment renderer does not reproduce GPU Hsla conversion, native path meshes
+or gradient Core quads. Existing solid widget drivers remain separate. See the
+[Background audit](PLOT_MODEL.md#background-draw-routes-and-native-renderer-gap)
+for exact pattern bounds, numeric rules and the remaining Core prerequisite.

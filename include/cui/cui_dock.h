@@ -140,6 +140,33 @@ cui_dock_result cui_dock_children_layout(const cui_dock *, cui_dock_node split, 
 cui_dock_result cui_dock_serialize(const cui_dock *dock, char *output, size_t capacity,
                                    size_t *length);
 cui_dock_result cui_dock_restore(cui_dock *dock, cui_str serialized);
+/* Frozen PanelState/PanelInfo shape; names, payload and input children are borrowed.
+ * JSON parsing is host-owned. Payload represents the Panel variant's opaque value. */
+typedef enum {
+    CUI_DOCK_SCHEMA_STACK,
+    CUI_DOCK_SCHEMA_TABS,
+    CUI_DOCK_SCHEMA_PANEL
+} cui_dock_schema_kind;
+typedef struct cui_dock_schema_node {
+    cui_str panel_name, payload;
+    cui_dock_schema_kind kind;
+    const struct cui_dock_schema_node *children;
+    size_t child_count;
+    const double *sizes;
+    size_t size_count, axis, active_index;
+} cui_dock_schema_node;
+/* Pure key mapping: do not create live panels or mutate the model in this callback. */
+typedef bool (*cui_dock_schema_key_fn)(void *, const cui_dock_schema_node *, uint64_t *key);
+cui_dock_result cui_dock_schema_import(cui_dock *, const cui_dock_schema_node *,
+                                       cui_dock_schema_key_fn, void *);
+/* Source supplies complete leaf states; returned borrowed data must outlive output. */
+typedef bool (*cui_dock_schema_dump_fn)(void *, uint64_t key, cui_dock_schema_node *);
+/* Output root is nodes[0]. Query with nodes=NULL. Capacity/callback failure leaves
+ * buffers untouched; counts report required capacities only after valid traversal. */
+cui_dock_result cui_dock_schema_export(const cui_dock *, cui_dock_schema_dump_fn, void *,
+                                       cui_dock_schema_node *nodes, size_t node_capacity,
+                                       double *sizes, size_t size_capacity, size_t *node_count,
+                                       size_t *size_count);
 /* Styled adapter; the domain model above remains independently linkable. */
 typedef struct cui_dock_view cui_dock_view;
 struct cui_menu_entry;

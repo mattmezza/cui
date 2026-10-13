@@ -161,8 +161,8 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
 | `AnyDrag`, `DragPanel`, `DropIndicator`, `DropPlaceholderBounds`, `DropTarget`, `DragPanelPreview` | Portable queued tab gestures, cross-group/region transfer, content-edge splits, accepted/rejected target indications and previews. No GPUI entity drag payload or opaque host drag union is needed for CUI events. |
 | Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; dynamic visibility predicate; caller-owned next-tick lifecycle reconciliation and factory payload dump callbacks; no automatic view-owned lifetime management. |
-| `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. Named caller-owned factories reconstruct live descriptors and preserve unknown payloads; no automatic JSON schema/parser or Rust state-schema import. |
-| `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
+| `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. Named caller-owned factories reconstruct live descriptors and preserve unknown payloads; typed frozen `PanelState` conversion is available; JSON text parsing remains host-owned. |
+| `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text, validated edge snapshot and typed `PanelState`/`PanelInfo` import/export. No complete serde `DockAreaState` JSON reader/writer; callback data and focus are transient. |
 | Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Optional per-panel simple-title background/foreground match the frozen `TitleStyle` scope. |
 | Component `ToggleZoom`, `ClosePanel` | Real controls and close shortcut with focus/policy gates; user zoom is withheld when controls are None, and restore stays reachable. No Rust action dispatch registration. |
 
@@ -328,7 +328,7 @@ The export-family table above is complemented by these operation mappings. CUI e
 | Frozen method family | CUI operation / limit |
 | --- | --- |
 | `PaneTree` node/panel lookup, root, insert/remove/move/split, active selection, sizes and normalization | `root`, `node_get`, `child_at`, panel queries, `insert`, `remove`, `move`, `move_split`, `split`, `activate`, `set_sizes`; canonical same-axis normalization is automatic after edits. `create_with_root` selects source-style root preservation. |
-| `PanelBuilder` horizontal/vertical splits, child optional sizes, tabs and active index | Compose canonical model operations and `set_sizes`; no fluent builder or direct serde tree import. |
+| `PanelBuilder` horizontal/vertical splits, child optional sizes, tabs and active index | Compose canonical model operations and `set_sizes`; typed schema conversion is available; no fluent builder or JSON parser. |
 | `DockArea` center/edge installation, open/toggle/collapsible, add/remove/select/move, zoom, dump/load | Workspace descriptors and edge setters/snapshot plus model/view operations; hosts supply independent models and caller-owned factory payload records. |
 | `TabGroup` sealed/in-split constraints, active/displayed panel, close/zoom and renderer | Group constraint constructors/callback, visibility-aware queries, real view controls, menu/policy callbacks and scene callbacks. |
 | `Panel` visible, closable, zoomable, title/style/suffix, toolbar, menu, focus and lifecycle | Borrowed descriptors and presentation callbacks, visibility predicate, factory/dump helpers and caller-owned lifecycle reconciliation. Optional simple-title palettes match the source; custom title scenes choose their own explicit ink. |
@@ -371,7 +371,7 @@ Reconstruction stages descriptors before publishing output. On a failed builder 
 
 The caller owns instance storage, descriptors, registry, payload bytes and all factory-created user data. Keep borrowed registry/strings alive until `cui_dock_panels_release`; that function destroys each successful known instance once and clears the array. Do not overwrite live instances with reconstruction. Release descriptors only after the UI no longer references them. Dump payloads remain valid according to the factory's documented lifetime and should be copied into host persistence before it expires.
 
-The v1 layout remains unchanged. Restore the layout first, reconstruct its records into new storage, then publish the model and descriptors together; preserve the old model/instances until both steps succeed. Hosts can wrap the layout, panel records and application schema version in their own JSON or other format. This seam does not parse JSON, import the frozen Rust `PanelState` tree schema, manage application schema migration, or deliver lifecycle notifications.
+The v1 layout remains unchanged. Restore the layout first, reconstruct its records into new storage, then publish the model and descriptors together; preserve the old model/instances until both steps succeed. Hosts can wrap the layout, panel records and application schema version in their own JSON or other format. This factory seam does not parse JSON, manage application schema migration or deliver lifecycle notifications. The typed schema converter below handles frozen tree structure.
 
 Headless tests reconstruct and render a real control, dump updated known payloads, retain byte-exact unknown payloads, reject invalid coverage/duplicate registry names before callbacks, roll back a later failed builder and wrong-key builder, preserve serialized layout, and verify destruction occurs once.
 
@@ -456,3 +456,53 @@ Check allocations/results. Root insertion into an empty canonical split creates 
 The policy belongs to the caller's tree configuration, as in the frozen source, and is not encoded as a new persistence field. V2 permits zero/one-child canonical roots but continues rejecting such nonroot nodes. Restore retains the destination's policy: Split wraps a nonempty tab root with an unknown-size horizontal child, converts an empty tab root to an empty split, and retains an existing split root. Any promotes a loaded canonical singleton root. A pinned root selects v2 editing/serialization even when restoring legacy v1 data; legacy binary ratios remain intact until subsequent edits. No pixel sizes are inferred. Capacity/depth failures while inserting or wrapping reject atomically and preserve the model. Successful restore continues invalidating node IDs, so refresh the saved root ID afterward.
 
 Structural tests cover empty and singleton construction/layout, nested opposite-axis collapse, stable pinned roots after remove/transfer, duplicate-transfer rollback, v1 wrapping and binary-root removal, v2 empty round trips and capacity/depth rejection. Styled tests close both actual groups, verify divider disappearance and focus repair, then reopen content beneath the retained root.
+
+### Typed frozen persistence schema
+
+`cui_dock_schema_node` mirrors the exported `PanelState` / `PanelInfo` data contract from frozen `state.rs`:
+
+| Frozen serialized field | Portable typed field |
+| --- | --- |
+| `panel_name` | borrowed `panel_name` |
+| `children` | borrowed contiguous `children` and `child_count` |
+| `info: {"stack":{"sizes":[...],"axis":...}}` | `SCHEMA_STACK`, `sizes`/`size_count`, `axis` |
+| `info: {"tabs":{"active_index":...}}` | `SCHEMA_TABS`, `active_index` |
+| `info: {"panel":<application JSON value>}` | `SCHEMA_PANEL`, opaque borrowed `payload` |
+
+This is a typed import/export seam, not a JSON text parser. The host decodes/encodes these fields with its own JSON library, keeps payload bytes and strings alive, and handles the outer `DockAreaState` envelope. That envelope has optional `version`, required `center`, and omitted optional `left_dock`/`right_dock`/`bottom_dock`; each `DockState` has `panel`, `placement` (`center`, `left`, `right`, `bottom`), `size` and `open`. Apply typed conversion separately to each host-owned model, and retain edge state with the existing workspace snapshot. The CUI API does not atomically publish a four-region serde envelope.
+
+`cui_dock_schema_import` stages the complete model and commits only on success. A pure key callback maps each source leaf to a stable application key. The source schema contains no panel IDs: use host identity data or precompute unique traversal keys, rather than assuming names are unique. Do not construct live panels or mutate models in the callback; rejected imports may have called it for some leaves. Duplicate keys, invalid descriptors, nonfinite/out-of-bound sizes, callback failure and node/panel/depth limits preserve the old model and IDs. Import selects canonical v2 editing, while ordinary v1/v2 restore stays available.
+
+The converter follows frozen `state_convert.rs`: it wraps bare leaves in tabs, recursively flattens nested tabs, ignores the old `TabPanel` carrying a Panel variant defect, clamps an excessive active index, drops empty child containers, promotes nonroot singleton splits and normalizes same-axis stacks. Axis zero is horizontal and every other value is vertical. Short size vectors and nonpositive entries become unknown; excess entries do not create children. Values must be finite and bounded to CUI's 1e9 dimension limit. The caller's RootKind policy applies after construction. Source descriptor traversal is bounded by the configured node plus panel capacities and a maximum depth of 64, with model construction also respecting its configured depth; oversized input can reject before normalization would shrink it.
+
+`cui_dock_schema_export` takes a pure dump callback equivalent to frozen `PanelSource::dump`, returning complete borrowed leaf states. This supports unknown plugins retaining their original names, payloads and child states. Hosts can use the existing factory `dump` result as the opaque payload and retain original unknown descriptor children. Output container names are `StackPanel` and `TabPanel`; active selection is unconditional even for an empty tab group. Known canonical slot sizes are emitted directly and unknown slots emit zero, matching the frozen writer's sentinel. Real known zero sizes also emit zero and import as unknown, an ambiguity of that source schema. Legacy binary ratios have no absolute pixel value, so their exported sizes are zero; retain v1 serialization or resolve measured canonical sizes when ratio-preserving persistence is required.
+
+The existing panel factory records can supply ordinary leaf dumps without giving the model ownership of instances:
+
+```c
+typedef struct {
+    const cui_dock_panel_instance *instances;
+    size_t count;
+} schema_host;
+static bool dump_leaf(void *user, uint64_t key, cui_dock_schema_node *out) {
+    const schema_host *host = user;
+    for (size_t i = 0; i < host->count; ++i) {
+        if (host->instances[i].state.key != key)
+            continue;
+        cui_dock_panel_state state;
+        if (cui_dock_panel_dump(&host->instances[i], &state) != CUI_DOCK_OK)
+            return false;
+        *out = (cui_dock_schema_node){.panel_name = state.name,
+                                     .payload = state.payload,
+                                     .kind = CUI_DOCK_SCHEMA_PANEL};
+        return true;
+    }
+    return false;
+}
+```
+
+A host retaining an unknown full leaf descriptor can instead return that descriptor unchanged, including its borrowed children. The JSON adapter interprets the opaque payload as the Panel variant's value; the base converter does not validate application JSON.
+
+Query required capacities with null `nodes`; provide node and double buffers to export. The root is `nodes[0]`, and container child/size pointers point inside those buffers. Callback-supplied leaf strings, payload and descendants remain borrowed. Failed callback/validation leaves counts and buffers untouched; insufficient capacity reports required counts and leaves both buffers untouched. Do not alias buffers with live descriptor data that callbacks read, and keep all borrowed leaf data alive while using the exported tree.
+
+Tests transcribe all 16 center story payloads and exact two-tab `[704,263]` vertical geometry from the shipped `fixtures/layout.json`, check typed round trips, query/short-buffer rejection, callback rejection, duplicate IDs, malformed descriptors, capacity failure, nested tabs, unknown children, size sentinels and nonzero-axis compatibility. Styled tests import a selected panel, exercise its real tab/content callbacks, export changed active selection and reimport it. This covers tree conversion; full source JSON parsing and application version migration remain host obligations.

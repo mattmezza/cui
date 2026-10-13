@@ -579,6 +579,202 @@ static void test_hidden_geometry(void) {
     assert(!strcmp(before, after));
     cui_dock_destroy(d);
 }
+typedef struct {
+    const cui_dock_schema_node *leaves[32];
+    size_t count;
+    bool reject, duplicate;
+} schema_source;
+static bool schema_key(void *user, const cui_dock_schema_node *state, uint64_t *key) {
+    schema_source *source = user;
+    if (source->reject)
+        return false;
+    for (size_t i = 0; i < source->count; i++)
+        if (source->leaves[i] == state) {
+            *key = source->duplicate ? 1 : i + 1;
+            return true;
+        }
+    return false;
+}
+static bool schema_dump(void *user, uint64_t key, cui_dock_schema_node *out) {
+    schema_source *source = user;
+    if (source->reject || !key || key > source->count)
+        return false;
+    *out = *source->leaves[key - 1];
+    return true;
+}
+static void test_schema_conversion(void) {
+    /* Exact center fields/payloads from frozen dock/fixtures/layout.json. */
+    const char *payloads[] = {
+        "{\"story_klass\":\"ButtonStory\"}",    "{\"story_klass\":\"InputStory\"}",
+        "{\"story_klass\":\"TextStory\"}",      "{\"story_klass\":\"SelectStory\"}",
+        "{\"story_klass\":\"DialogStory\"}",    "{\"story_klass\":\"SwitchStory\"}",
+        "{\"story_klass\":\"ProgressStory\"}",  "{\"story_klass\":\"DataTableStory\"}",
+        "{\"story_klass\":\"ImageStory\"}",     "{\"story_klass\":\"IconStory\"}",
+        "{\"story_klass\":\"TooltipStory\"}",   "{\"story_klass\":\"ProgressStory\"}",
+        "{\"story_klass\":\"CalendarStory\"}",  "{\"story_klass\":\"ResizableStory\"}",
+        "{\"story_klass\":\"ScrollbarStory\"}", "{\"story_klass\":\"PopupStory\"}"};
+    cui_dock_schema_node leaves[16];
+    schema_source source = {0};
+    for (size_t i = 0; i < 16; i++) {
+        leaves[i] = (cui_dock_schema_node){.panel_name = {"StoryContainer", 14},
+                                           .payload = dock_test_string(payloads[i]),
+                                           .kind = CUI_DOCK_SCHEMA_PANEL};
+        source.leaves[source.count++] = &leaves[i];
+    }
+    cui_dock_schema_node tabs[2] = {
+        {.panel_name = {"TabPanel", 8},
+         .kind = CUI_DOCK_SCHEMA_TABS,
+         .children = leaves,
+         .child_count = 15},
+        {.panel_name = {"TabPanel", 8},
+         .kind = CUI_DOCK_SCHEMA_TABS,
+         .children = &leaves[15],
+         .child_count = 1},
+    };
+    double input_sizes[] = {704, 263};
+    cui_dock_schema_node state = {.panel_name = {"StackPanel", 10},
+                                  .kind = CUI_DOCK_SCHEMA_STACK,
+                                  .children = tabs,
+                                  .child_count = 2,
+                                  .sizes = input_sizes,
+                                  .size_count = 2,
+                                  .axis = 1};
+    cui_dock *d = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
+    assert(d && cui_dock_schema_import(d, &state, schema_key, &source) == CUI_DOCK_OK);
+    cui_dock_node root = cui_dock_root(d), a, b;
+    cui_dock_node_info info;
+    cui_dock_slot_size size;
+    assert(cui_dock_node_get(d, root, &info) && info.kind == CUI_DOCK_SPLIT_VERTICAL &&
+           info.child_count == 2);
+    assert(cui_dock_child_at(d, root, 0, &a, &size) && size.has_size && size.size == 704);
+    assert(cui_dock_node_get(d, a, &info) && info.panel_count == 15 && info.active_panel == 1);
+    assert(cui_dock_child_at(d, root, 1, &b, &size) && size.has_size && size.size == 263);
+    assert(cui_dock_node_get(d, b, &info) && info.panel_count == 1 && info.active_panel == 16);
+    cui_dock_schema_node output[32], untouched[32];
+    double sizes[32], old_sizes[32];
+    memset(output, 0x5a, sizeof output);
+    memcpy(untouched, output, sizeof output);
+    memset(sizes, 0x3a, sizeof sizes);
+    memcpy(old_sizes, sizes, sizeof sizes);
+    size_t nc = 0, sc = 0;
+    assert(cui_dock_schema_export(d, schema_dump, &source, NULL, 0, NULL, 0, &nc, &sc) ==
+               CUI_DOCK_OK &&
+           nc == 19 && sc == 2);
+    assert(cui_dock_schema_export(d, schema_dump, &source, output, 1, sizes, 32, &nc, &sc) ==
+           CUI_DOCK_CAPACITY);
+    assert(!memcmp(output, untouched, sizeof output) && !memcmp(sizes, old_sizes, sizeof sizes));
+    source.reject = true;
+    nc = sc = 999;
+    assert(cui_dock_schema_export(d, schema_dump, &source, output, 32, sizes, 32, &nc, &sc) ==
+               CUI_DOCK_INVALID &&
+           nc == 999 && sc == 999);
+    assert(!memcmp(output, untouched, sizeof output));
+    source.reject = false;
+    assert(cui_dock_schema_export(d, schema_dump, &source, output, 32, sizes, 32, &nc, &sc) ==
+           CUI_DOCK_OK);
+    assert(output[0].children == &output[1] && output[0].sizes == sizes && sizes[0] == 704 &&
+           sizes[1] == 263);
+    assert(output[1].child_count == 15 && output[2].child_count == 1 &&
+           output[1].children == &output[3]);
+    assert(output[3].payload.data == leaves[0].payload.data &&
+           output[18].payload.length == leaves[15].payload.length);
+    char before[8192], after[8192];
+    serialize(d, before, sizeof before);
+    cui_dock *restored = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
+    schema_source exported = {0};
+    for (size_t i = 0; i < 16; i++)
+        exported.leaves[exported.count++] = &output[3 + i];
+    assert(cui_dock_schema_import(restored, output, schema_key, &exported) == CUI_DOCK_OK);
+    serialize(restored, after, sizeof after);
+    assert(!strcmp(before, after));
+    source.duplicate = true;
+    assert(cui_dock_schema_import(d, &state, schema_key, &source) == CUI_DOCK_DUPLICATE_PANEL);
+    source.duplicate = false;
+    source.reject = true;
+    assert(cui_dock_schema_import(d, &state, schema_key, &source) == CUI_DOCK_INVALID);
+    source.reject = false;
+    input_sizes[0] = NAN;
+    assert(cui_dock_schema_import(d, &state, schema_key, &source) == CUI_DOCK_INVALID);
+    input_sizes[0] = 704;
+    state.children = NULL;
+    assert(cui_dock_schema_import(d, &state, schema_key, &source) == CUI_DOCK_INVALID);
+    state.children = tabs;
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after));
+    cui_dock *small = cui_dock_create((cui_dock_config){2, 1, 2, 4096});
+    serialize(small, before, sizeof before);
+    assert(cui_dock_schema_import(small, &state, schema_key, &source) == CUI_DOCK_CAPACITY);
+    serialize(small, after, sizeof after);
+    assert(!strcmp(before, after));
+    /* Nested tabs flatten, old empty TabPanel records disappear, active clamps. */
+    cui_dock_schema_node nested[] = {
+        {.panel_name = {"TabPanel", 8},
+         .kind = CUI_DOCK_SCHEMA_TABS,
+         .children = leaves,
+         .child_count = 2},
+        {.panel_name = {"TabPanel", 8}, .kind = CUI_DOCK_SCHEMA_PANEL, .payload = {"null", 4}},
+    };
+    cui_dock_schema_node nested_root = {
+        .kind = CUI_DOCK_SCHEMA_TABS, .children = nested, .child_count = 2, .active_index = 999};
+    assert(cui_dock_schema_import(restored, &nested_root, schema_key, &source) == CUI_DOCK_OK);
+    assert(cui_dock_child_at(restored, cui_dock_root(restored), 0, &a, NULL));
+    assert(cui_dock_node_get(restored, a, &info) && info.panel_count == 2 &&
+           info.active_panel == 2);
+    /* Unknown leaves retain their complete borrowed child state through dump. */
+    leaves[0].children = &leaves[15];
+    leaves[0].child_count = 1;
+    leaves[0].panel_name = (cui_str){"UnknownPlugin", 13};
+    assert(cui_dock_schema_import(restored, &leaves[0], schema_key, &source) == CUI_DOCK_OK);
+    assert(cui_dock_schema_export(restored, schema_dump, &source, output, 32, sizes, 32, &nc,
+                                  &sc) == CUI_DOCK_OK);
+    assert(output[2].children == &leaves[15] && output[2].panel_name.length == 13 &&
+           output[2].payload.data == leaves[0].payload.data);
+    /* Short/zero/negative sizes are unknown; any nonzero axis is vertical. */
+    input_sizes[0] = -1;
+    state.size_count = 1;
+    state.axis = 27;
+    assert(cui_dock_schema_import(restored, &state, schema_key, &source) == CUI_DOCK_OK);
+    assert(cui_dock_child_at(restored, cui_dock_root(restored), 0, &a, &size) && !size.has_size);
+    assert(cui_dock_child_at(restored, cui_dock_root(restored), 1, &b, &size) && !size.has_size);
+    /* Normalize same-axis stacks using source distribute_slot and drop empties. */
+    cui_dock_schema_node inner_leaves[] = {leaves[0], leaves[1]};
+    inner_leaves[0].child_count = 0;
+    inner_leaves[0].children = NULL;
+    double inner_sizes[] = {100, 200}, outer_sizes[] = {600, 0, 0};
+    cui_dock_schema_node outer_children[] = {
+        {.kind = CUI_DOCK_SCHEMA_STACK,
+         .children = inner_leaves,
+         .child_count = 2,
+         .sizes = inner_sizes,
+         .size_count = 2},
+        leaves[15],
+        {.kind = CUI_DOCK_SCHEMA_TABS},
+    };
+    cui_dock_schema_node outer = {.kind = CUI_DOCK_SCHEMA_STACK,
+                                  .children = outer_children,
+                                  .child_count = 3,
+                                  .sizes = outer_sizes,
+                                  .size_count = 3};
+    schema_source normalization = {
+        .leaves = {&inner_leaves[0], &inner_leaves[1], &outer_children[1]}, .count = 3};
+    assert(cui_dock_schema_import(restored, &outer, schema_key, &normalization) == CUI_DOCK_OK);
+    root = cui_dock_root(restored);
+    assert(cui_dock_node_get(restored, root, &info) && info.child_count == 3);
+    assert(cui_dock_child_at(restored, root, 0, &a, &size) && size.has_size && size.size == 200);
+    assert(cui_dock_child_at(restored, root, 1, &a, &size) && size.has_size && size.size == 400);
+    assert(cui_dock_child_at(restored, root, 2, &a, &size) && !size.has_size);
+    serialize(restored, before, sizeof before);
+    cui_dock_schema_node cyclic = {.kind = CUI_DOCK_SCHEMA_STACK, .child_count = 1};
+    cyclic.children = &cyclic;
+    assert(cui_dock_schema_import(restored, &cyclic, schema_key, &source) == CUI_DOCK_CAPACITY);
+    outer.child_count = SIZE_MAX;
+    assert(cui_dock_schema_import(restored, &outer, schema_key, &source) == CUI_DOCK_CAPACITY);
+    serialize(restored, after, sizeof after);
+    assert(!strcmp(before, after));
+    cui_dock_destroy(small);
+    cui_dock_destroy(restored);
+    cui_dock_destroy(d);
+}
 static void test_root_policy(void) {
     assert(!cui_dock_create_with_root((cui_dock_config){0}, (cui_dock_root_kind)99));
     cui_dock *d = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
@@ -807,6 +1003,7 @@ int main(void) {
     test_nary_normalization_capacity();
     test_nary_model();
     test_root_policy();
+    test_schema_conversion();
     test_hidden_geometry();
     test_slot_sizing();
     test_visibility_queries();

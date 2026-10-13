@@ -1202,6 +1202,47 @@ static size_t title_color_count(cui_color color, cui_draw_type type) {
     }
     return count;
 }
+static bool scene_schema_key(void *user, const cui_dock_schema_node *state, uint64_t *key) {
+    (void)user;
+    if (state->payload.length != 1 || state->payload.data[0] < '0' || state->payload.data[0] > '1')
+        return false;
+    *key = (uint64_t)(state->payload.data[0] - '0');
+    return true;
+}
+static bool scene_schema_dump(void *user, uint64_t key, cui_dock_schema_node *out) {
+    if (key > 1)
+        return false;
+    *out = ((cui_dock_schema_node *)user)[key];
+    return true;
+}
+static void test_schema_scene(void) {
+    cui_dock_schema_node leaves[] = {
+        {.kind = CUI_DOCK_SCHEMA_PANEL, .panel_name = {"Editor", 6}, .payload = {"0", 1}},
+        {.kind = CUI_DOCK_SCHEMA_PANEL, .panel_name = {"Preview", 7}, .payload = {"1", 1}},
+    };
+    cui_dock_schema_node tree = {
+        .kind = CUI_DOCK_SCHEMA_TABS, .children = leaves, .child_count = 2, .active_index = 1};
+    cui_dock_destroy(model);
+    model = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
+    assert(model && cui_dock_schema_import(model, &tree, scene_schema_key, NULL) == CUI_DOCK_OK);
+    unsigned before0 = rendered[0], before1 = rendered[1];
+    frame();
+    frame();
+    assert(rendered[0] == before0 && rendered[1] > before1 &&
+           cui_bounds(ui, cui_dock_tab_id(workspace, 0)).w > 0 && cui_bounds(ui, 801).w > 0);
+    click(cui_dock_tab_id(workspace, 0));
+    assert(result.selected && rendered[0] > before0 && cui_bounds(ui, 800).w > 0);
+    cui_dock_schema_node exported[8];
+    double sizes[4];
+    size_t nc, sc;
+    assert(cui_dock_schema_export(model, scene_schema_dump, leaves, exported, 8, sizes, 4, &nc,
+                                  &sc) == CUI_DOCK_OK);
+    assert(exported[1].kind == CUI_DOCK_SCHEMA_TABS && exported[1].active_index == 0);
+    assert(cui_dock_schema_import(model, exported, scene_schema_key, NULL) == CUI_DOCK_OK);
+    frame();
+    frame();
+    assert(cui_bounds(ui, 800).w > 0 && cui_bounds(ui, 801).w == 0);
+}
 static void test_pinned_root_scene(void) {
     cui_dock_destroy(model);
     model = cui_dock_create_with_root((cui_dock_config){0}, CUI_DOCK_ROOT_SPLIT);
@@ -2382,6 +2423,7 @@ int main(void) {
     test_title_modes_padding();
     test_title_palette();
     test_pinned_root_scene();
+    test_schema_scene();
     test_group_constraints();
     test_workspace_constraints();
     test_dynamic_visibility();

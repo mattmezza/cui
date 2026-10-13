@@ -1663,3 +1663,259 @@ bool cui_dock_displayed_panel(const cui_dock *model, cui_dock_node node,
     }
     return false;
 }
+
+/* Typed frozen state conversion: schema text and live panel ownership stay outside base. */
+typedef struct {
+    cui_dock *model;
+    cui_dock_schema_key_fn key;
+    void *user;
+    size_t visited;
+    cui_dock_result error;
+} cui_dock_private_schema_reader;
+static bool cui_dock_private_schema_valid(const cui_dock_schema_node *state) {
+    return state && state->kind >= CUI_DOCK_SCHEMA_STACK && state->kind <= CUI_DOCK_SCHEMA_PANEL &&
+           (!state->panel_name.length || state->panel_name.data) &&
+           (!state->payload.length || state->payload.data) &&
+           (!state->child_count || state->children) && (!state->size_count || state->sizes);
+}
+static bool cui_dock_private_schema_visit(cui_dock_private_schema_reader *reader,
+                                          const cui_dock_schema_node *state, size_t depth) {
+    if (!cui_dock_private_schema_valid(state)) {
+        reader->error = CUI_DOCK_INVALID;
+        return false;
+    }
+    size_t bound = reader->model->config.node_capacity + reader->model->config.panel_capacity;
+    if (depth > CUI_DOCK_PRIVATE_MAX_DEPTH || state->child_count > bound ||
+        state->size_count > bound ||
+        ++reader->visited >
+            reader->model->config.node_capacity + reader->model->config.panel_capacity) {
+        reader->error = CUI_DOCK_CAPACITY;
+        return false;
+    }
+    return true;
+}
+static bool cui_dock_private_schema_empty_tab(const cui_dock_schema_node *state) {
+    return state->kind == CUI_DOCK_SCHEMA_PANEL && state->panel_name.length == 8 &&
+           !memcmp(state->panel_name.data, "TabPanel", 8);
+}
+static bool cui_dock_private_schema_panels(cui_dock_private_schema_reader *reader,
+                                           const cui_dock_schema_node *state, size_t tab,
+                                           size_t depth, bool visited) {
+    if (!visited && !cui_dock_private_schema_visit(reader, state, depth))
+        return false;
+    if (state->kind == CUI_DOCK_SCHEMA_TABS) {
+        for (size_t i = 0; i < state->child_count; i++)
+            if (!cui_dock_private_schema_panels(reader, &state->children[i], tab, depth + 1, false))
+                return false;
+        return true;
+    }
+    if (cui_dock_private_schema_empty_tab(state))
+        return true;
+    uint64_t key;
+    if (!reader->key || !reader->key(reader->user, state, &key)) {
+        reader->error = CUI_DOCK_INVALID;
+        return false;
+    }
+    reader->error = cui_dock_insert(reader->model, cui_dock_private_id(&reader->model->state, tab),
+                                    key, SIZE_MAX);
+    return reader->error == CUI_DOCK_OK;
+}
+static size_t cui_dock_private_schema_build(cui_dock_private_schema_reader *reader,
+                                            const cui_dock_schema_node *state, size_t parent,
+                                            size_t depth) {
+    cui_dock *model = reader->model;
+    if (!cui_dock_private_schema_visit(reader, state, depth))
+        return SIZE_MAX;
+    size_t node = cui_dock_private_free_node(model, &model->state);
+    if (node == SIZE_MAX || model->generation == UINT32_MAX || depth > model->config.max_depth) {
+        reader->error = CUI_DOCK_CAPACITY;
+        return SIZE_MAX;
+    }
+    cui_dock_private_init_node(&model->state, node, ++model->generation, parent);
+    if (state->kind != CUI_DOCK_SCHEMA_STACK) {
+        if (!cui_dock_private_schema_panels(reader, state, node, depth, true))
+            return SIZE_MAX;
+        size_t active = model->state.nodes[node].count
+                            ? (state->active_index < model->state.nodes[node].count
+                                   ? state->active_index
+                                   : model->state.nodes[node].count - 1)
+                            : 0;
+        size_t panel = model->state.nodes[node].first;
+        while (active--)
+            panel = model->state.panels[panel].next;
+        model->state.nodes[node].active = panel;
+        return node;
+    }
+    model->state.nodes[node].canonical = true;
+    model->state.nodes[node].kind =
+        state->axis == 0 ? CUI_DOCK_SPLIT_HORIZONTAL : CUI_DOCK_SPLIT_VERTICAL;
+    for (size_t i = 0; i < state->size_count; i++)
+        if (!isfinite(state->sizes[i]) || fabs(state->sizes[i]) > CUI_DOCK_PRIVATE_MAX_DIMENSION) {
+            reader->error = CUI_DOCK_INVALID;
+            return SIZE_MAX;
+        }
+    for (size_t i = 0; i < state->child_count; i++) {
+        size_t child = cui_dock_private_schema_build(reader, &state->children[i], node, depth + 1);
+        if (child == SIZE_MAX)
+            return SIZE_MAX;
+        model->state.nodes[child].has_size = i < state->size_count && state->sizes[i] > 0;
+        model->state.nodes[child].size = model->state.nodes[child].has_size ? state->sizes[i] : 0;
+        cui_dock_private_insert_child(&model->state, node, child, SIZE_MAX);
+    }
+    return node;
+}
+static void cui_dock_private_schema_normalize(cui_dock_private_state *state, size_t node) {
+    cui_dock_private_node *container = &state->nodes[node];
+    if (container->kind == CUI_DOCK_TABS)
+        return;
+    size_t child = container->a;
+    while (child != SIZE_MAX) {
+        size_t next = state->nodes[child].sibling_next;
+        cui_dock_private_schema_normalize(state, child);
+        cui_dock_private_node *inner = &state->nodes[child];
+        bool empty = inner->kind == CUI_DOCK_TABS ? !inner->count : !inner->child_count;
+        if (empty) {
+            cui_dock_private_remove_child(state, node, child);
+            inner->used = false;
+        } else if (inner->canonical && inner->child_count == 1) {
+            size_t only = inner->a;
+            cui_dock_private_replace_child(state, node, child, only);
+            inner->used = false;
+        }
+        child = next;
+    }
+    cui_dock_private_normalize(state, node);
+}
+cui_dock_result cui_dock_schema_import(cui_dock *model, const cui_dock_schema_node *input,
+                                       cui_dock_schema_key_fn key, void *user) {
+    if (!model || !input)
+        return CUI_DOCK_INVALID;
+    cui_dock trial = cui_dock_private_stage(model);
+    memset(trial.state.nodes, 0, model->config.node_capacity * sizeof(*trial.state.nodes));
+    memset(trial.state.panels, 0, model->config.panel_capacity * sizeof(*trial.state.panels));
+    trial.nary_edits = true;
+    cui_dock_private_schema_reader reader = {&trial, key, user, 0, CUI_DOCK_OK};
+    size_t root = cui_dock_private_schema_build(&reader, input, SIZE_MAX, 1);
+    if (root == SIZE_MAX)
+        return reader.error;
+    trial.state.root = root;
+    if (trial.state.root_split && trial.state.nodes[root].kind == CUI_DOCK_TABS) {
+        size_t wrapper = cui_dock_private_free_node(&trial, &trial.state);
+        if (wrapper == SIZE_MAX || trial.generation == UINT32_MAX || trial.config.max_depth < 2)
+            return CUI_DOCK_CAPACITY;
+        cui_dock_private_init_node(&trial.state, wrapper, ++trial.generation, SIZE_MAX);
+        trial.state.nodes[wrapper].kind = CUI_DOCK_SPLIT_HORIZONTAL;
+        trial.state.nodes[wrapper].canonical = true;
+        cui_dock_private_insert_child(&trial.state, wrapper, root, SIZE_MAX);
+        trial.state.root = wrapper;
+    }
+    cui_dock_private_schema_normalize(&trial.state, trial.state.root);
+    root = trial.state.root;
+    if (!trial.state.root_split && trial.state.nodes[root].canonical &&
+        trial.state.nodes[root].child_count == 1) {
+        size_t only = trial.state.nodes[root].a;
+        cui_dock_private_replace_child(&trial.state, SIZE_MAX, root, only);
+        trial.state.nodes[root].used = false;
+    }
+    cui_dock_private_commit(model, &trial);
+    model->nary_edits = true;
+    return CUI_DOCK_OK;
+}
+typedef struct {
+    const cui_dock *model;
+    cui_dock_schema_dump_fn dump;
+    void *user;
+    cui_dock_schema_node *nodes;
+    bool *owned;
+    double *sizes;
+    size_t node_count, size_count;
+    cui_dock_result error;
+} cui_dock_private_schema_writer;
+static void cui_dock_private_schema_write(cui_dock_private_schema_writer *writer, cui_dock_node id,
+                                          size_t slot) {
+    cui_dock_node_info info;
+    cui_dock_node_get(writer->model, id, &info);
+    cui_dock_schema_node *out = &writer->nodes[slot];
+    writer->owned[slot] = true;
+    bool tabs = info.kind == CUI_DOCK_TABS;
+    size_t count = tabs ? info.panel_count : info.child_count;
+    *out = (cui_dock_schema_node){.panel_name = {(tabs ? "TabPanel" : "StackPanel"), tabs ? 8 : 10},
+                                  .kind = tabs ? CUI_DOCK_SCHEMA_TABS : CUI_DOCK_SCHEMA_STACK,
+                                  .child_count = count,
+                                  .axis = info.kind == CUI_DOCK_SPLIT_VERTICAL ? 1 : 0};
+    size_t children = writer->node_count;
+    writer->node_count += count;
+    out->children = count ? &writer->nodes[children] : NULL;
+    if (!tabs) {
+        out->sizes = count ? &writer->sizes[writer->size_count] : NULL;
+        out->size_count = count;
+        writer->size_count += count;
+    }
+    for (size_t i = 0; i < count; i++) {
+        if (tabs) {
+            uint64_t key;
+            cui_dock_panel_at(writer->model, id, i, &key);
+            if (info.has_active && key == info.active_panel)
+                out->active_index = i;
+            if (!writer->dump || !writer->dump(writer->user, key, &writer->nodes[children + i]) ||
+                !cui_dock_private_schema_valid(&writer->nodes[children + i])) {
+                writer->error = CUI_DOCK_INVALID;
+                return;
+            }
+        } else {
+            cui_dock_node child;
+            cui_dock_slot_size size;
+            cui_dock_child_at(writer->model, id, i, &child, &size);
+            writer->sizes[(size_t)(out->sizes - writer->sizes) + i] = size.has_size ? size.size : 0;
+            cui_dock_private_schema_write(writer, child, children + i);
+            if (writer->error != CUI_DOCK_OK)
+                return;
+        }
+    }
+}
+cui_dock_result cui_dock_schema_export(const cui_dock *model, cui_dock_schema_dump_fn dump,
+                                       void *user, cui_dock_schema_node *nodes, size_t capacity,
+                                       double *sizes, size_t size_capacity, size_t *node_count,
+                                       size_t *size_count) {
+    if (!model || !node_count || !size_count)
+        return CUI_DOCK_INVALID;
+    size_t bound = model->config.node_capacity + model->config.panel_capacity;
+    cui_dock_private_schema_writer writer = {
+        .model = model,
+        .dump = dump,
+        .user = user,
+        .nodes = calloc(bound, sizeof(*writer.nodes)),
+        .owned = calloc(bound, sizeof(*writer.owned)),
+        .sizes = calloc(model->config.node_capacity, sizeof(*writer.sizes)),
+        .node_count = 1,
+        .error = CUI_DOCK_OK};
+    if (!writer.nodes || !writer.owned || !writer.sizes)
+        writer.error = CUI_DOCK_CAPACITY;
+    else
+        cui_dock_private_schema_write(&writer, cui_dock_root(model), 0);
+    if (writer.error == CUI_DOCK_OK) {
+        *node_count = writer.node_count;
+        *size_count = writer.size_count;
+        if (nodes && (capacity < writer.node_count || size_capacity < writer.size_count ||
+                      (writer.size_count && !sizes)))
+            writer.error = CUI_DOCK_CAPACITY;
+        else if (nodes) {
+            for (size_t i = 0; i < writer.node_count; i++) {
+                cui_dock_schema_node value = writer.nodes[i];
+                if (writer.owned[i]) {
+                    if (value.children)
+                        value.children = &nodes[value.children - writer.nodes];
+                    if (value.sizes)
+                        value.sizes = &sizes[value.sizes - writer.sizes];
+                }
+                nodes[i] = value;
+            }
+            if (writer.size_count)
+                memcpy(sizes, writer.sizes, writer.size_count * sizeof(*sizes));
+        }
+    }
+    free(writer.nodes);
+    free(writer.owned);
+    free(writer.sizes);
+    return writer.error;
+}

@@ -75,7 +75,7 @@ function paintBitmap(i,x,y,w,h,radii){
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(bitmap,sx,sy,sw,sh,x,y,w,h);ctx.restore();
 }
 const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79};
-const modelStories = new Set(['Editor','VirtualList','Dock','Plot','Focus Trap']);
+const modelStories = new Set(['Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
  Checkbox:'cui_checkbox_ex(ui, id, &theme, label, &state,\n    (cui_checkbox_options){.size = CUI_CONTROL_SMALL,\n                           .required = true});',
@@ -115,10 +115,10 @@ const snippets = {
  Message:'cui_message(ui, id, &theme, (cui_message_options){\n    .width = 360, .body = bodies, .body_count = body_count});',
  MessageScroller:'cui_message_scroller(ui, id, &theme, scroll_state,\n    draw_message_row, user, cui_message_scroller_options_default());',
 
- Editor:'cui_edit_undo(edit);\ncui_edit_redo(edit);',
- VirtualList:'cui_virtual_view view = cui_virtual_viewport(\n    list, scroll, viewport_height, 1);',
- Dock:'cui_dock_split(dock, tab,\n    CUI_DOCK_SPLIT_HORIZONTAL, 0.5,\n    new_panel_key, false, &new_tab);',
- Plot:'cui_plot_zoom(&scale, 1.5, anchor_pixel);\ncui_plot_ticks(&scale, 5, ticks, 32, &count);',
+ Editor:'/* Retain edit, state, query and workspace; call find bar every frame. */\ncui_editor_find_bar(ui, search_id, id, &theme, &state, &search, 640, false);\ncui_editor(ui, id, &theme, cui_string("C code"), &state, cui_editor_default());',
+ VirtualList:'/* Retain list and state; paint_row composes each visible item. */\ncui_virtual_list_draw(ui, id, &theme, list, &state,\n    (cui_virtual_widget_options){.scroll = {\n        .width = 640, .height = 320}, .overscan = 1},\n    paint_row, user);',
+ Dock:'/* Retain dock and view; panels hold your content callbacks. */\ncui_dock_view_render(ui, id, &theme, dock, view, panels, count,\n    (cui_dock_view_options){.width = 640, .height = 400,\n        .tab_height = 32, .allow_reorder = true});',
+ Plot:'/* Build pixels with cui_plot_raster; retain pixels and axis labels. */\ncui_plot_view(ui, id, &theme,\n    &(cui_plot_view_options){.bitmap = bitmap, .axis = &axis,\n        .name = cui_string("Trend")});',
  Calendar:'cui_calendar(ui, id, &theme, &state,\n    &selection, options);',
  DatePicker:'cui_date_picker(ui, id, &theme, label,\n    &state, &selection, options);',
  ColorPicker:'cui_color_picker(ui, id, &theme,\n    &state, &color, options);',
@@ -255,7 +255,7 @@ function render(){
  const designScale=Number($('design-size').value),designHeights=[0,20,24,32,32,40,48,56,64,80];
  const gaps=[0,4,4,6,6,8,8,12,12,16];
  canvas.style.minWidth=selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth,height=selected.example?720:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+100):selected.name==='Plot'?440:selected.name==='Dock'?400:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth,height=selected.example?720:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+100):selected.name==='Editor'?440:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -284,6 +284,8 @@ function render(){
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
  wasm.gallery_typography_options(Number($('text-family').value),Number($('text-size').value),Number($('text-weight').value),Number($('text-italic').checked));
  wasm.gallery_effects_options(Number($('effect-angle').value),Number($('effect-opacity').value),Number($('effect-blur').value));
+ wasm.gallery_plot_mode(Number($('plot-mode').value));
+ wasm.gallery_virtual_mode(Number($('virtual-axis').value));
  wasm.gallery_design_options(Number($('design-size').value),Number($('design-radius').value),Number($('design-spacing').value));
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
@@ -520,6 +522,8 @@ function selectComponent(){
  $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea','Input','NumberInput'].includes(selected.name);
  $('control-size').value='0';
  $('control-size').disabled=false;
+ $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
+ $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control'])$(id).hidden=selected.name!=='Theme';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
  $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput'].includes(selected.name);$('design-size').value='0';
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
@@ -622,7 +626,7 @@ reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if(themeChoice==='system')syncTheme();});
 $('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});window.addEventListener('popstate',()=>{if(catalog&&documents)route();});
 window.addEventListener('keydown',event=>{
- const editing=event.target instanceof HTMLElement&&(event.target.matches('input,textarea,select')||event.target.isContentEditable);
+ const editing=event.target instanceof HTMLElement&&(event.target.matches('input,textarea,select')||event.target.isContentEditable||event.target.closest('[role="textbox"]'))||(event.target===canvas&&wasm&&prefersCharacterInput(event));
  if(event.key==='/'&&!editing&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();document.body.classList.add('menu-open');$('catalog').hidden=false;$('docs-nav').hidden=true;$('search').focus();$('search').select();}
  if(event.key==='Enter'&&document.activeElement===$('search')){const first=$('catalog').querySelector('a');if(first){event.preventDefault();location.hash=first.getAttribute('href');$('search').value='';navigation();$('search').blur();}}
  if(event.key==='Escape'&&document.activeElement===$('search')){$('search').value='';navigation();$('search').blur();}
@@ -679,3 +683,6 @@ try{
 }catch(error){fatal(error);}
 
 for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic'])$(id).addEventListener('change',requestFrame);
+
+$('plot-mode').addEventListener('change',requestFrame);
+$('virtual-axis').addEventListener('change',requestFrame);

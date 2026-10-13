@@ -10,11 +10,13 @@
 #include "cui_content.h"
 #include "cui_description.h"
 #include "cui_disclosure.h"
+#include "cui_editor.h"
 #include "cui_form.h"
 #include "cui_icon.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
+#include "cui_plot_view.h"
 #include "cui_questionnaire.h"
 #include "cui_resizable.h"
 #include "cui_root.h"
@@ -27,6 +29,7 @@
 #include "cui_theme.h"
 #include "cui_toolbar.h"
 #include "cui_tree.h"
+#include "cui_virtual_scroll.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

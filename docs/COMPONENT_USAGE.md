@@ -583,15 +583,15 @@ API: `cui_date_picker_init`, `cui_date_picker`. [Public header](../include/cui/c
 
 ## Editor
 
-**Composition:** application model + frame composition. **Scope:** base model only; compose with Input or Textarea.
+**Composition:** application model + frame composition. **Scope:** styled frame adapter + retained base model.
 
-**State:** Application owns the text buffer; cui_edit owns edit/history metadata until destroyed.
+**State:** Application retains cui_edit, its text buffer, cui_editor_state and the visual-row workspace; the state borrows the edit model.
 
-**Interaction:** Explicit edit/move/selection operations return cui_edit_result; no standalone styled Editor widget callback.
+**Interaction:** cui_editor returns edit, selection and scroll results; cui_editor_find selects literal UTF-8 matches; cui_editor_highlight_fn supplies language-aware token colors.
 
-**Usage:** Create the model once and compose it using Input or Textarea; only the attached model may mutate its buffer.
+**Usage:** Initialize a multiline edit and editor workspace once, submit cui_editor each frame, and handle results or invoke find between interaction frames.
 
-API: `cui_edit_create`, `cui_edit_destroy`, `cui_edit_get_text`. [Public header](../include/cui/cui_edit.h); [guide](EDITING.md).
+API: `cui_editor_state_init`, `cui_editor`, `cui_editor_find`. [Public header](../include/cui/cui_editor.h); [guide](EDITOR.md), [guide](EDITING.md).
 
 ## Form
 
@@ -763,15 +763,15 @@ API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_ta
 
 ## Dock
 
-**Composition:** application model + frame composition. **Scope:** base model only; application composes docking UI.
+**Composition:** application model + frame composition. **Scope:** styled frame adapter + retained base model.
 
-**State:** Application retains allocated cui_dock and panel data; destroys the model explicitly.
+**State:** Application retains cui_dock, cui_dock_view and the panel registry; keep callback data alive through renderer completion.
 
-**Interaction:** Explicit insert/move/activate/ratio operations return cui_dock_result; no styled dock action callback.
+**Interaction:** Panel render callbacks compose active content; on_event reports select, close, reorder, move, split and resize; allow_operation may veto structural actions.
 
-**Usage:** Compute tab-node rectangles with cui_dock_layout and compose application tab/panel controls in those rectangles.
+**Usage:** Create the model and view once, register stable panel keys, submit cui_dock_view_render each frame and serialize the model between frames.
 
-API: `cui_dock_create`, `cui_dock_layout`, `cui_dock_destroy`. [Public header](../include/cui/cui_dock.h); [guide](DOCK_MODEL.md).
+API: `cui_dock_view_create`, `cui_dock_view_render`, `cui_dock_view_destroy`. [Public header](../include/cui/cui_dock.h); [guide](DOCK.md), [guide](DOCK_MODEL.md).
 
 ## List
 
@@ -955,15 +955,15 @@ API: `cui_tree_create`, `cui_tree_rebuild`, `cui_tree`, `cui_tree_destroy`. [Pub
 
 ## VirtualList
 
-**Composition:** application model + frame composition. **Scope:** base range model only; application composes rows.
+**Composition:** application model + frame composition. **Scope:** styled frame adapter + retained base model.
 
-**State:** Caller retains allocated cui_virtual_list plus keys/heights and scroll value.
+**State:** Application retains cui_virtual_list and cui_virtual_widget_state; keyed extents live in the model and row controls remain application-owned.
 
-**Interaction:** Explicit height/rebuild operations return status; application routes row selection and scrolling.
+**Interaction:** cui_virtual_render_item_fn composes only the visible window; cui_virtual_measure_item_fn supplies optional intrinsic measurement; scrollbars and owner keys update state.
 
-**Usage:** Compute the visible range/padding, then compose only those rows each frame; destroy the index after use.
+**Usage:** Rebuild keyed item extents between frames, then call cui_virtual_list_draw with a viewport and row callback; keep model keys stable while callbacks run.
 
-API: `cui_virtual_create`, `cui_virtual_viewport`, `cui_virtual_destroy`. [Public header](../include/cui/cui_virtual.h); [guide](VIRTUALIZATION.md).
+API: `cui_virtual_list_draw`, `cui_base_virtual_list`. [Public header](../include/cui/cui_virtual_scroll.h); [guide](VIRTUAL_LIST.md), [guide](VIRTUALIZATION.md).
 
 ## Chart
 
@@ -1003,15 +1003,15 @@ API: `cui_table_create`, `cui_data_table`, `cui_table_destroy`. [Public header](
 
 ## Plot
 
-**Composition:** application model + frame composition. **Scope:** base numeric model only; no standalone styled plot.
+**Composition:** application model + frame composition. **Scope:** styled frame adapter + standalone numeric model; bounded software rasterizer.
 
-**State:** Caller retains scales and point data; functions do not retain a widget tree.
+**State:** Caller retains scales, samples, path commands, RGBA pixels, tick labels and callback state; no retained widget tree.
 
-**Interaction:** Pure numeric operations return cui_plot_result; application routes pan/zoom events.
+**Interaction:** cui_plot_activate_fn receives validated pointer positions; pure numeric operations return cui_plot_result and the application routes pan/zoom.
 
-**Usage:** Map values into frame coordinates and compose drawing or use Chart; Plot itself submits no widget.
+**Usage:** Build paths and render into caller-owned pixels, then submit a themed bitmap and axes each frame; keep labels and pixels alive through renderer completion.
 
-API: `cui_plot_map`, `cui_plot_pan`, `cui_plot_zoom`. [Public header](../include/cui/cui_plot.h); [guide](PLOT_MODEL.md).
+API: `cui_plot_view`, `cui_plot_axis`, `cui_plot_raster`, `cui_plot_path`, `cui_plot_map`. [Public header](../include/cui/cui_plot_view.h); [guide](PLOT.md); [numeric model](PLOT_MODEL.md).
 
 ## Table
 

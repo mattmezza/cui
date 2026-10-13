@@ -63,8 +63,8 @@ class ComponentUsageTests(unittest.TestCase):
         for entry in self.entries:
             self.assertIn(entry['composition'], ['immediate frame submission', 'application model + frame composition'])
         index = {x['name']: x for x in self.entries}
-        for name in ['Dock', 'Plot', 'VirtualList', 'Editor']:
-            self.assertIn('base', index[name]['scope'])
+        for name in ['Dock', 'VirtualList', 'Editor', 'Plot']:
+            self.assertTrue(index[name]['scope'].startswith('styled frame adapter'))
             self.assertEqual(index[name]['composition'], 'application model + frame composition')
         self.assertIn('host adapter', index['Clipboard']['scope'])
         self.assertIn('not an application widget tree', self.data['lifecycle'])

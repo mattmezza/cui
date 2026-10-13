@@ -813,23 +813,28 @@
     },
     {
       "api_symbols": [
-        "cui_edit_create",
-        "cui_edit_destroy",
-        "cui_edit_get_text"
+        "cui_editor_state_init",
+        "cui_editor",
+        "cui_editor_find"
       ],
       "state_types": [
-        "cui_edit"
+        "cui_editor_state",
+        "cui_edit",
+        "cui_textarea_line"
       ],
-      "state_ownership": "Application owns the text buffer; cui_edit owns edit/history metadata until destroyed.",
-      "interaction": "Explicit edit/move/selection operations return cui_edit_result; no standalone styled Editor widget callback.",
-      "usage": "Create the model once and compose it using Input or Textarea; only the attached model may mutate its buffer.",
+      "state_ownership": "Application retains cui_edit, its text buffer, cui_editor_state and the visual-row workspace; the state borrows the edit model.",
+      "interaction": "cui_editor returns edit, selection and scroll results; cui_editor_find selects literal UTF-8 matches; cui_editor_highlight_fn supplies language-aware token colors.",
+      "usage": "Initialize a multiline edit and editor workspace once, submit cui_editor each frame, and handle results or invoke find between interaction frames.",
       "docs": [
+        "docs/EDITOR.md",
         "docs/EDITING.md"
       ],
-      "callback_symbols": [],
-      "scope": "base model only; compose with Input or Textarea",
+      "callback_symbols": [
+        "cui_editor_highlight_fn"
+      ],
+      "scope": "styled frame adapter + retained base model",
       "name": "Editor",
-      "public_header": "include/cui/cui_edit.h",
+      "public_header": "include/cui/cui_editor.h",
       "composition": "application model + frame composition"
     },
     {
@@ -1136,21 +1141,28 @@
     },
     {
       "api_symbols": [
-        "cui_dock_create",
-        "cui_dock_layout",
-        "cui_dock_destroy"
+        "cui_dock_view_create",
+        "cui_dock_view_render",
+        "cui_dock_view_destroy"
       ],
       "state_types": [
-        "cui_dock"
+        "cui_dock",
+        "cui_dock_view",
+        "cui_dock_panel"
       ],
-      "state_ownership": "Application retains allocated cui_dock and panel data; destroys the model explicitly.",
-      "interaction": "Explicit insert/move/activate/ratio operations return cui_dock_result; no styled dock action callback.",
-      "usage": "Compute tab-node rectangles with cui_dock_layout and compose application tab/panel controls in those rectangles.",
+      "state_ownership": "Application retains cui_dock, cui_dock_view and the panel registry; keep callback data alive through renderer completion.",
+      "interaction": "Panel render callbacks compose active content; on_event reports select, close, reorder, move, split and resize; allow_operation may veto structural actions.",
+      "usage": "Create the model and view once, register stable panel keys, submit cui_dock_view_render each frame and serialize the model between frames.",
       "docs": [
+        "docs/DOCK.md",
         "docs/DOCK_MODEL.md"
       ],
-      "callback_symbols": [],
-      "scope": "base model only; application composes docking UI",
+      "callback_symbols": [
+        "render",
+        "on_event",
+        "allow_operation"
+      ],
+      "scope": "styled frame adapter + retained base model",
       "name": "Dock",
       "public_header": "include/cui/cui_dock.h",
       "composition": "application model + frame composition"
@@ -1506,23 +1518,27 @@
     },
     {
       "api_symbols": [
-        "cui_virtual_create",
-        "cui_virtual_viewport",
-        "cui_virtual_destroy"
+        "cui_virtual_list_draw",
+        "cui_base_virtual_list"
       ],
       "state_types": [
-        "cui_virtual_list"
+        "cui_virtual_list",
+        "cui_virtual_widget_state"
       ],
-      "state_ownership": "Caller retains allocated cui_virtual_list plus keys/heights and scroll value.",
-      "interaction": "Explicit height/rebuild operations return status; application routes row selection and scrolling.",
-      "usage": "Compute the visible range/padding, then compose only those rows each frame; destroy the index after use.",
+      "state_ownership": "Application retains cui_virtual_list and cui_virtual_widget_state; keyed extents live in the model and row controls remain application-owned.",
+      "interaction": "cui_virtual_render_item_fn composes only the visible window; cui_virtual_measure_item_fn supplies optional intrinsic measurement; scrollbars and owner keys update state.",
+      "usage": "Rebuild keyed item extents between frames, then call cui_virtual_list_draw with a viewport and row callback; keep model keys stable while callbacks run.",
       "docs": [
+        "docs/VIRTUAL_LIST.md",
         "docs/VIRTUALIZATION.md"
       ],
-      "callback_symbols": [],
-      "scope": "base range model only; application composes rows",
+      "callback_symbols": [
+        "cui_virtual_render_item_fn",
+        "cui_virtual_measure_item_fn"
+      ],
+      "scope": "styled frame adapter + retained base model",
       "name": "VirtualList",
-      "public_header": "include/cui/cui_virtual.h",
+      "public_header": "include/cui/cui_virtual_scroll.h",
       "composition": "application model + frame composition"
     },
     {
@@ -1603,23 +1619,27 @@
     },
     {
       "api_symbols": [
-        "cui_plot_map",
-        "cui_plot_pan",
-        "cui_plot_zoom"
+        "cui_plot_view",
+        "cui_plot_axis",
+        "cui_plot_raster"
       ],
       "state_types": [
-        "cui_plot_scale"
+        "cui_plot_scale",
+        "cui_plot_view_options"
       ],
-      "state_ownership": "Caller retains scales and point data; functions do not retain a widget tree.",
-      "interaction": "Pure numeric operations return cui_plot_result; application routes pan/zoom events.",
-      "usage": "Map values into frame coordinates and compose drawing or use Chart; Plot itself submits no widget.",
+      "state_ownership": "Caller retains scales, samples, path commands, RGBA pixels, tick labels and callback state; no retained widget tree.",
+      "interaction": "cui_plot_activate_fn receives validated pointer positions; pure numeric operations return cui_plot_result and the application routes pan/zoom.",
+      "usage": "Build paths and render into caller-owned pixels, then submit a themed bitmap and axes each frame; keep labels and pixels alive through renderer completion.",
       "docs": [
+        "docs/PLOT.md",
         "docs/PLOT_MODEL.md"
       ],
-      "callback_symbols": [],
-      "scope": "base numeric model only; no standalone styled plot",
+      "callback_symbols": [
+        "cui_plot_activate_fn"
+      ],
+      "scope": "styled frame adapter + standalone numeric model; bounded software rasterizer",
       "name": "Plot",
-      "public_header": "include/cui/cui_plot.h",
+      "public_header": "include/cui/cui_plot_view.h",
       "composition": "application model + frame composition"
     },
     {

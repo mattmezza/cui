@@ -1,0 +1,65 @@
+Integration base: d95f727c040d999cebff3318fea76b960867e61b
+Root wiring/gallery changes were present during validation and are included in
+this proof's portable source fingerprint:
+ced33a366a76842a47d399198f44a362b61bd1710306c6c423e6a4215f38d35d
+The WASI runner confirmed the fingerprint remained unchanged through all75 suites.
+
+Warning-enabled native build: PASS; CTest88/88.
+ASan/UBSan build: PASS; CTest86/86 (optional GPU adapter/tests absent).
+Portable WASI Preview1:75/75, pinned Zig0.16.0 and wasmtime49.0.0,
+assertions enabled,30-billion instruction budget per suite.
+Generated single/multi TU and independently linkable Dock/Virtual models: PASS.
+Manifest/license/preset/format/distribution checks: PASS; all78 entries retained.
+Component usage metadata:5/5; docs3/3; sharing3/3.
+All78 displayed usage excerpts compile and are covered by docs.
+
+Full real-browser suite: PASS in Chromium1228 and CI's headless-shell1228.
+All78 live C/WASM stories, direct routes/reloads/no-JavaScript fallbacks,
+keyboard/pointer interaction, themes/search/copy,390px DOM and clipped-paint
+layout checks pass. Newly exercised behavior:
+- Editor: actual multiline code/token coloring, SVG fold controls, collapse/
+  expand, Ctrl-F literal search/count/navigation/no-match, Escape, slash entry,
+  edit/undo/redo and bounded unwrapped mobile viewport.
+- VirtualList: bounded100K visible window, wheel/scrollbar/End/Home, and
+  selectable horizontal100-item example through the public styled adapter.
+- Dock: actual tab/close/select/resize adapter, split/reset, toolbar callbacks,
+  maximize/restore, independent toggleable edges, real pointer transfer into
+  the closed Inspector edge, automatic opening and model/reset restoration.
+- Plot: independent path/bitmap/themed-axis composition, line/area/step/radial
+  output, pan/zoom/reset with deterministic pixel changes.
+- Slash catalog search works when the canvas is focused outside an editor,
+  and slash text entry remains inside an editor.
+
+Design/app extension suite: PASS in Chromium and headless-shell. All78 guides,
+actual gradient/blur/opacity bytes, font families/scales/styles, configurable/
+reduced motion, composed-app account/CTA/edit/save/theme/mobile callbacks.
+Visual regression suite: PASS for Marker line layout, Pagination/Stepper
+centering, graphical Rating and actual Image pixels.
+
+Reproduction:
+cmake -S . -B build -G Ninja
+cmake --build build
+ctest --test-dir build --output-on-failure
+uv run scripts/test_wasi.py --build-dir <fresh-dir>
+python scripts/build_web.py
+uv run tests/web/test_browser.py --chromium <chromium-or-headless-shell>
+uv run tests/web/test_site_extensions.py --chromium <chromium-or-headless-shell>
+uv run tests/web/test_visual_regressions.py --chromium <chromium>
+python tests/web/test_snippets.py
+python tests/test_component_usage.py
+python tests/test_docs.py
+python tests/test_sharing.py
+make lint format-check dist-check
+
+Local logs: adapters-final-native-{build,test}.log,
+adapters-final-asan-{build,test}.log, adapters-final-wasi.log,
+adapters-browser7.log, adapters-browser-shell.log,
+adapters-extensions{1,-shell}.log, adapters-visuals-final.log,
+adapters-final-quality2.log, adapters-final-usage2.log,
+adapters-docs3.log and adapters-sharing3.log.
+
+Scope: these are meaningful integration proofs for partial portable APIs and
+live stories, not full GPUI Kit parity. Plot's complete frozen export audit,
+Editor language/completion/grapheme limitations and remaining Dock/menu/
+window gaps remain explicit. No native-window interaction or native platform
+accessibility verification is claimed for these new adapters by these tests.

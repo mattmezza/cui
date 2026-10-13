@@ -1,0 +1,32 @@
+Published source: 596742dea927d1a8924c10f0e7eced9c7fdf6738
+Pages run: https://github.com/mattmezza/cui/actions/runs/38338126688 (success)
+Library CI: https://github.com/mattmezza/cui/actions/runs/38338126641 (success)
+
+Windows/macOS/Linux portable jobs and Linux GCC/Clang native jobs passed.
+The predecessor e1b0645 library CI failed only in the Windows component-usage
+checker because a repository-relative Windows path was compared to manifest
+POSIX paths. 596742d normalizes keys with as_posix and adds a Windows-path
+regression. Its source/gallery behavior is unchanged from e1b0645.
+
+Actual HTTPS deployment verification:
+184/184 checked files byte-match the 596742d github-pages artifact:
+155 shareable page HTML files plus runtime/catalog/docs/theme/indexing files,
+original media, guide Markdown, and native-app screenshots.
+
+The e1b0645 asset-equivalent HTTPS deployment also passed the complete browser
+suite across 78 families/direct routes/reloads/no-JavaScript fallbacks and the
+extension suite for all 78 usage guides, gradient/blur/opacity output, registered
+font families (including UINT32_MAX), typography/control scales, configurable
+and reduced motion, composed-app callbacks, themes, and mobile layout.
+
+Reproduction commands:
+gh run download 38338126688 -n github-pages
+Compare each routes.json path and listed runtime/guide/media bytes from
+artifact.tar against https://matteo.merola.co/cui/ using Cache-Control: no-cache.
+Run tests/web/test_browser.py and tests/web/test_site_extensions.py with their
+local HTTP setup adapted to the HTTPS deployment URL.
+
+Local proof logs: published-596742d-hashes.log,
+published-e1b0645-browser.log, published-e1b0645-extensions.log.
+This proves the deployed release, not complete GPUI feature parity. All 78
+manifest entries remain; feature-level limitations remain in gpui-parity.json.

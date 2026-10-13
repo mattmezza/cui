@@ -21,11 +21,11 @@ SOURCES = (
     "src/effects/cui_effects.c",
     "src/base/cui_base.c",
     "src/base/cui_models.c",
-    "src/base/cui_edit.c",
+    "src/base/cui_edit.c", "src/base/cui_editor.c", "src/components/cui_editor.c",
     "src/base/cui_overlay.c",
-    "src/base/cui_virtual.c",
-    "src/base/cui_dock.c",
-    "src/base/cui_plot.c",
+    "src/base/cui_virtual.c", "src/base/cui_virtual_scroll.c", "src/components/cui_virtual.c",
+    "src/base/cui_dock.c", "src/components/cui_dock.c",
+    "src/base/cui_plot.c", "src/components/cui_plot.c",
     "src/theme/cui_theme.c",
     "src/components/cui_components.c",
     "src/base/cui_table.c",
@@ -88,7 +88,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "overlay", "virtual", "dock", "plot", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled")
+SUITES = ("bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -96,7 +96,7 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += [f"tests/unit/test_{name}.c" for name in SUITES]
     paths += ["tests/unit/test_core_embed.c", "tests/distribution/single.c",
               "tests/distribution/implementation.c", "tests/distribution/consumer.c",
-              "tests/distribution/effects.c"]
+              "tests/distribution/effects.c", "tests/distribution/dock_model.c", "tests/distribution/virtual_model.c"]
     paths += [f"examples/{name}/main.c" for name in ("unstyled", "styled_settings")]
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
@@ -230,6 +230,8 @@ def main() -> int:
         targets += [(f"example_{name}", [f"examples/{name}/main.c"], True, [])
                     for name in ("unstyled", "styled_settings")]
         distribution_flags = ["-I", str(root / "dist"), "-DCUI_DISTRIBUTION_CONTROLS=1"]
+        targets += [("virtual_model_distribution", ["tests/distribution/virtual_model.c"], False, distribution_flags + virtual_clock)]
+        targets += [("dock_model_distribution", ["tests/distribution/dock_model.c"], False, distribution_flags)]
         targets += [("effects_distribution", ["tests/distribution/effects.c"], False, distribution_flags)]
         targets += [("distribution_single", ["tests/distribution/single.c"], False, distribution_flags),
                     ("distribution_multi", ["tests/distribution/implementation.c", "tests/distribution/consumer.c"], False, distribution_flags)]

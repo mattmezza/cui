@@ -3007,10 +3007,11 @@
       "reference_url": "https://gpui-kit.com/component/editor/",
       "category": "forms",
       "base_behavior": [],
-      "public_header": "include/cui/cui_edit.h",
+      "public_header": "include/cui/cui_editor.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_edit.c"
+        "tests/unit/test_edit.c",
+        "tests/unit/test_editor.c"
       ],
       "status": "implemented",
       "platforms": {
@@ -3019,7 +3020,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Reusable bounded UTF-8 scalar editing model exists. No source editor, gutter, highlighting, diagnostics, grapheme editing or200K-line validation."
+        "Styled multiline caret/selection/scroll, line numbers, complete text-style measurement, host token colors, UTF-8 literal find panel and caller-owned folding are headless tested.",
+        "Language parsers, completion/LSP, regex/replace search, multicursor, grapheme and bidi navigation remain incomplete; folds require host refresh after edits."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3048,6 +3050,14 @@
           "name": "200K-line benchmark",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "styled editor: text metrics, token callbacks, literal find panel and caller-owned folding",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_editor.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3070,7 +3080,8 @@
       },
       "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
       "evidence": [
-        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met.",
+        "Styled adapter has partial headless coverage; full family definition of done and browser integration remain pending."
       ]
     },
     {
@@ -4225,7 +4236,8 @@
       "public_header": "include/cui/cui_dock.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_dock.c"
+        "tests/unit/test_dock.c",
+        "tests/unit/test_dock_styled.c"
       ],
       "status": "tested",
       "platforms": {
@@ -4233,7 +4245,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Retained split/tab tree, stable keys, constrained geometry and transactional versioned persistence tested. Styled Dock, drag/drop, resize gestures, floating windows and keyboard/focus integration pending."
+        "Styled tabs, close/select, toolbar/zoom, nested resize, policy-veto, independent resizable edge regions, atomic cross-region transfers and closed-edge drop opening are headless tested; the gallery exercises actual closed-edge transfer.",
+        "Closed-edge resize-to-open, panel menus and native floating-window integration remain pending; not complete GPUI Dock parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4261,8 +4274,28 @@
         },
         {
           "name": "focus and keyboard behavior",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock_styled.c",
+            "docs/DOCK.md"
+          ]
+        },
+        {
+          "name": "styled toolbar/zoom, policy-veto and independent resizable edge regions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "tests/unit/test_dock_styled.c"
+          ]
+        },
+        {
+          "name": "atomic cross-region tab transfer, closed-edge drop opening and rejection/cancellation rollback",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "tests/unit/test_dock_styled.c",
+            "tests/web/test_browser.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4277,7 +4310,10 @@
           "Runnable example"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e"
+      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "evidence": [
+        "Styled adapter has partial headless coverage; full family definition of done and browser integration remain pending."
+      ]
     },
     {
       "name": "List",
@@ -5458,11 +5494,12 @@
         "cui_virtual_capture_anchor",
         "cui_virtual_restore_anchor"
       ],
-      "public_header": "include/cui/cui_virtual.h",
+      "public_header": "include/cui/cui_virtual_scroll.h",
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_virtual.c",
-        "tests/unit/test_base.c"
+        "tests/unit/test_base.c",
+        "tests/unit/test_virtual_styled.c"
       ],
       "status": "tested",
       "platforms": {
@@ -5471,7 +5508,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Retained keyed variable-height Fenwick model tested including anchor restoration. No styled scroll/focus/navigation widget yet."
+        "Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. Intrinsic measurement is an explicit host callback; row selection/controls remain application-owned and scroll positions use float coordinates."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5507,6 +5544,15 @@
             "tests/unit/test_virtual.c",
             "docs/VIRTUALIZATION.md"
           ]
+        },
+        {
+          "name": "styled bounded visible-window composition with horizontal/vertical scroll and Auto/Infer host measurement",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_virtual.c",
+            "tests/unit/test_base.c",
+            "tests/unit/test_virtual_styled.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -5537,7 +5583,8 @@
       },
       "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
       "evidence": [
-        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+        "Partial coverage only; see limitations and named tests. Full family definition of done not met.",
+        "Styled adapter has partial headless coverage; full family definition of done and browser integration remain pending."
       ]
     },
     {
@@ -5821,10 +5868,11 @@
         "cui_plot_project_line",
         "cui_plot_project_bar"
       ],
-      "public_header": "include/cui/cui_plot.h",
+      "public_header": "include/cui/cui_plot_view.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_plot.c"
+        "tests/unit/test_plot.c",
+        "tests/unit/test_plot_styled.c"
       ],
       "status": "tested",
       "platforms": {
@@ -5832,7 +5880,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Allocation-free linear/log scales, inverse mapping, ticks, pan/anchored zoom and clipped line/bar geometry tested. Band/ordinal/category/time scales, retained series, axes/labels/legend, missing-data segmentation, stacks, hover/selection, styled output and chart accessibility pending."
+        "Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.",
+        "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5856,6 +5905,14 @@
           "name": "headless geometry and themed output",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "pure category scales and paths, themed axes, bounded software output and grid/bar geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot.c",
+            "tests/unit/test_plot_styled.c"
+          ]
         }
       ],
       "upstream_doc": {

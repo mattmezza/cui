@@ -11,11 +11,13 @@
 #include "cui_content.h"
 #include "cui_description.h"
 #include "cui_disclosure.h"
+#include "cui_editor.h"
 #include "cui_form.h"
 #include "cui_icon.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
+#include "cui_plot_view.h"
 #include "cui_questionnaire.h"
 #include "cui_resizable.h"
 #include "cui_root.h"
@@ -28,6 +30,7 @@
 #include "cui_theme.h"
 #include "cui_toolbar.h"
 #include "cui_tree.h"
+#include "cui_virtual_scroll.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -340,6 +343,18 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 #define CUI_QUESTIONNAIRE_IMPLEMENTATION
 #endif
 #include "cui_questionnaire.h"
+#ifndef CUI_EDITOR_IMPLEMENTATION
+#define CUI_EDITOR_IMPLEMENTATION
+#endif
+#include "cui_editor.h"
+#ifndef CUI_VIRTUAL_SCROLL_IMPLEMENTATION
+#define CUI_VIRTUAL_SCROLL_IMPLEMENTATION
+#endif
+#include "cui_virtual_scroll.h"
+#ifndef CUI_PLOT_VIEW_IMPLEMENTATION
+#define CUI_PLOT_VIEW_IMPLEMENTATION
+#endif
+#include "cui_plot_view.h"
 /* src/components/cui_components.c */
 /* SPDX-License-Identifier: MIT */
 

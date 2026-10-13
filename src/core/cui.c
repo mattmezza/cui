@@ -2652,6 +2652,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     ui->count = 0;
     uint32_t underlay_background_id = 0;
     size_t conversion_clip_depth = 0;
+    size_t layout_clip_depth = 0;
     if (ui->prepaint_capacity)
         goto cui_core_commands_done;
     for (int32_t i = 0; i < a.length; i++) {
@@ -2663,8 +2664,19 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             conversion_clip_depth++;
         else if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END && conversion_clip_depth)
             conversion_clip_depth--;
-        if (c->userData == ui && c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
-            c->commandType != CLAY_RENDER_COMMAND_TYPE_SCISSOR_END)
+        // Clay's closing scissor has no userData. Match suppressed starts by
+        // nesting depth so layout-only descendants emit neither half of a clip.
+        // Inert painted nodes retain ordinary clipping and their paint.
+        if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
+            (layout_clip_depth || c->userData == ui)) {
+            layout_clip_depth++;
+            continue;
+        }
+        if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_END && layout_clip_depth) {
+            layout_clip_depth--;
+            continue;
+        }
+        if (layout_clip_depth || c->userData == ui)
             continue;
         float opacity = c->userData && c->userData != ui
                             ? ((const cui_core_box_node *)c->userData)->opacity

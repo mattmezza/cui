@@ -3437,9 +3437,13 @@
           ]
         },
         {
-          "name": "validation/disabled/error/semantic states",
-          "status": "not_started",
-          "evidence": []
+          "name": "bounded whole-value edit acceptance and disabled/error/semantic states",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input_acceptance.c",
+            "tests/unit/test_input.c",
+            "docs/INPUT_ACCEPTANCE.md"
+          ]
         },
         {
           "name": "ordered host clipboard and undo/redo shortcuts",
@@ -5943,6 +5947,15 @@
             "tests/web/test_plot_chart_owner_motion.py",
             "docs/PLOT_CHART_OWNER_MOTION.md"
           ]
+        },
+        {
+          "name": "opt-in current-frame clipped hover geometry and deferred paint-only tooltip",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot_chart_prepaint.c",
+            "tests/web/test_plot_chart_prepaint.py",
+            "docs/PLOT_CHART_CURRENT_FRAME.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -6258,6 +6271,15 @@
             "tests/unit/test_plot_chart_owner_motion.c",
             "tests/web/test_plot_chart_owner_motion.py",
             "docs/PLOT_CHART_OWNER_MOTION.md"
+          ]
+        },
+        {
+          "name": "opt-in current-frame clipped hover geometry and deferred paint-only tooltip",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot_chart_prepaint.c",
+            "tests/web/test_plot_chart_prepaint.py",
+            "docs/PLOT_CHART_CURRENT_FRAME.md"
           ]
         }
       ],

@@ -61,7 +61,15 @@ def main():
             a.page.wait_for_function('cuiGallery.exports.gallery_chart_stats(2)===1')
             a.page.wait_for_function(POPUP)
             a.page.mouse.move(point['x'] + chart['f'][3] + 80, point['y'])
-            a.page.wait_for_timeout(180)
+            if args.controlled_clock:
+                # Controlled time advances 10ms per rendered RAF, independently
+                # of wall time and concurrent compiler/browser load.
+                exit_started = a.page.evaluate('performance.now()')
+                a.page.wait_for_function('!(' + POPUP + ')()')
+                exit_elapsed = a.page.evaluate('performance.now()') - exit_started
+                assert exit_elapsed <= 300, ('Tooltip exit exceeded frame-clock budget', exit_elapsed)
+            else:
+                a.page.wait_for_timeout(180)
             assert not a.page.evaluate(POPUP), 'Tooltip exit failed to settle'
             # Fresh appearance plus reduced motion completes immediately.
             a.configure('chart-animate', False)

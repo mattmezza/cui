@@ -1,0 +1,9 @@
+Integration base af933d8, with urgent published-message test fix fa26032.
+Published remainsfbbc40b; next22 source is not yet deployed.
+Native warning-enabled complete112/112: Table4579dd4 + regenerated distribution/test registration.
+Actual combined Chromium1208 Button11/11; Table all14sizes×both densities plus source sort cycle, action opt-out and mobile9XL touchpan PASS.
+Actual Checkbox34/34 and semantic Alert/Bubble proof passed at preceding combined source.
+Spinner/Skeleton finite wake, actual moving pixels and reduced-motion idle quiescence + Progress semantics browser PASS.
+WASI90/90 at67afbff; SHA256897d6cd86368cd88c7948f8228fde26de1a453468b02b53a7af30a4aeab80318. LaterButton53b1 andTable15158 need fresh portable verification.
+Sanitizers110/111 at67afbff: oneGPU LeakSanitizer failure also reproduced targeted. Diagnostic Xlib dynamic locale/input-method global allocation, before CUI renderer creation; do not suppress or claim whole suite passes. Investigation continues.
+Manifest78 preserved;271 tested feature subsets,4 implemented,46 not_started;0 fullyverified families.

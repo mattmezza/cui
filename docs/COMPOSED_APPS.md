@@ -118,10 +118,38 @@ recursively submit a frame or destroy the app/context from a callback. Destroy
 the app with `composed_app_destroy` after the renderer has consumed its last
 draw list. The host owns CUI context, font and backend destruction separately.
 
-To restyle the demo, edit its theme setup in `composed_app_scene`, the `sidebar`
-composition and the page render functions. To connect it to production data,
-replace the sample metrics and implement authentication, billing and persistence
-in your application layer. The sample callback is the integration boundary.
+To follow a host application's selected theme, copy its theme into the scene
+before submitting the frame:
+
+```c
+cui_theme selected = cui_theme_dark();
+composed_app_set_theme(app, &selected);
+/* selected may now go out of scope: color/metric values were copied. */
+composed_app_scene(ui, app, width, height);
+```
+
+Call the setter between frames on the UI thread. Calling it every frame is
+supported; it preserves the selected plan, editor/preferences, session and
+keyboard focus. `composed_app_set_theme(app, NULL)` restores Northstar's default
+native palette. Pointer-valued icon hooks and their user storage remain owned by
+the host and must retain the lifetimes required by CUI; copying the theme does
+not copy data behind those pointers.
+
+Cards and the header use `theme.surface`, the document uses `theme.background`,
+and scene ink, borders and controls follow the supplied theme. The hero and
+feedback panels derive subtle tints from its palette. The navy navigation rail
+intentionally keeps its own readable light ink across themes. Light, dark,
+high-contrast and terminal themes run through the complete interaction test;
+representative header/hero/card ink contrast, keyboard focus paint, copied-theme
+storage and live theme switching are also checked. These are targeted checks,
+not a claim of a comprehensive accessibility audit.
+
+![Northstar with a dark host theme](../examples/composed_apps/screenshots/overview-dark.png)
+
+To restyle the demo further, edit the `sidebar` composition and page render
+functions. To connect it to production data, replace the sample metrics and
+implement authentication, billing and persistence in your application layer.
+The sample callback is the integration boundary.
 
 ## Native captures and interaction validation
 
@@ -159,6 +187,82 @@ Artifacts appear in `build/native-interactions.log` and
 `build/native-interactions.bmp`.
 
 ![Native settings after editing and saving](../examples/composed_apps/screenshots/settings-saved-desktop.png)
+
+### Reproduce native host-theme validation
+
+The optional native audit driver lives in `test_app.c` behind
+`APP_THEME_NATIVE`; ordinary CTest stays portable. Build it explicitly after the
+native example build above:
+
+```sh
+EXAMPLES=examples/composed_apps
+cc -std=c11 -Wall -Wextra -Wpedantic -Werror -DAPP_THEME_NATIVE \
+  -Iinclude -I"$EXAMPLES" "$EXAMPLES/app.c" "$EXAMPLES/test_app.c" \
+  "$EXAMPLES/build/cui-build/libcui_sdl3.a" \
+  "$EXAMPLES/build/cui-build/libcui_text.a" "$EXAMPLES/build/cui-build/libcui.a" \
+  $(pkg-config --cflags --libs sdl3 freetype2 harfbuzz) -lm \
+  -o "$EXAMPLES/build/test_theme_native"
+```
+
+The driver accepts `--native FONT light|dark|contrast|terminal OUTPUT_DIRECTORY`.
+It runs a bounded 1200-frame window that closes after the verified workflow
+settles, captures each visited page and its final
+frame, prints measured control centers for automation, and returns success only
+if the native interactions produced Team selection, sign-in/out and one saved
+Grace Hopper profile with notifications off and sync on. The following helper
+uses the measured centers rather than fixed per-theme coordinates:
+
+```sh
+cat > "$EXAMPLES/build/theme-check.sh" <<'SH'
+#!/bin/sh
+set -eu
+font=$1
+theme=$2
+example_dir=$(pwd)/examples/composed_apps
+"$example_dir/build/test_theme_native" --native "$font" "$theme" "$example_dir/build" \
+  >"$example_dir/build/$theme-theme.log" 2>&1 &
+client=$!
+sleep 0.8
+window=$(xdotool search --name '^Northstar / theme audit$')
+xdotool windowfocus "$window"
+click() {
+  line=$(rg "^bound id=$1 " "$example_dir/build/$theme-theme.log" | tail -1)
+  x=$(printf '%s\n' "$line" | awk '{sub("x=","",$3); print $3}')
+  y=$(printf '%s\n' "$line" | awk '{sub("y=","",$4); print $4}')
+  xdotool mousemove --window "$window" "$x" "$y" click 1
+  sleep 0.6
+}
+click 120 # Overview CTA opens pricing.
+click 131 # Choose Team.
+click 101
+xdotool key --window "$window" End Return # Sign in.
+sleep 0.6
+click 112 # Settings navigation.
+click 140
+xdotool key --window "$window" ctrl+a
+xdotool type --window "$window" --clearmodifiers --delay 5 'Grace Hopper'
+sleep 0.6
+click 141
+click 142
+click 143
+click 101
+xdotool key --window "$window" End Return # Sign out.
+wait "$client"
+rg '^native event=' "$example_dir/build/$theme-theme.log"
+SH
+for theme in light dark contrast terminal; do
+  timeout 30 xvfb-run -a -s '-screen 0 1600x1200x24' \
+    sh "$EXAMPLES/build/theme-check.sh" "$FONT" "$theme" || break
+done
+```
+
+Run from the repository root and set `TMPDIR` if needed as described above.
+The helper assumes the validated font and Linux tools. It waits briefly for
+window creation and bounded frame progress; slower machines may need longer
+waits/timeouts. Each theme writes `<theme>-overview.bmp`, `<theme>-pricing.bmp`,
+`<theme>-settings.bmp`, `<theme>-settings-saved.bmp` and `<theme>-theme.log` in the
+build directory. Actual native workflows passed for all four themes; committed
+light/dark PNGs show the captured SDL frames.
 
 ## Scope and limits
 

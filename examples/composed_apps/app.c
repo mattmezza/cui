@@ -6,6 +6,8 @@
 #include <string.h>
 struct composed_app {
     app_page page;
+    cui_theme theme;
+    bool custom_theme;
     int plan;
     bool logged_in, desktop_sidebar, mobile_sidebar, narrow;
     bool notifications, sync, invalid_name;
@@ -18,7 +20,6 @@ struct composed_app {
     app_callback callback;
     void *user;
 };
-static const cui_color ink = {25, 38, 58, 255}, muted = {101, 114, 133, 255};
 static const cui_color navy = {20, 35, 55, 255}, white = {255, 255, 255, 255};
 static const char *const pages[] = {"Overview", "Plans & billing", "Workspace settings"};
 static const char *const plans[] = {"Starter", "Team", "Studio"};
@@ -48,6 +49,30 @@ void composed_app_destroy(composed_app *app) {
         return;
     cui_edit_destroy(app->name);
     free(app);
+}
+void composed_app_set_theme(composed_app *app, const cui_theme *theme) {
+    if (!app)
+        return;
+    app->custom_theme = theme != NULL;
+    if (theme)
+        app->theme = *theme;
+}
+static cui_theme default_theme(void) {
+    cui_theme t = cui_theme_light();
+    t.text = (cui_color){25, 38, 58, 255};
+    t.muted = (cui_color){101, 114, 133, 255};
+    t.background = (cui_color){245, 247, 250, 255};
+    t.border = (cui_color){225, 231, 238, 255};
+    t.primary = (cui_color){38, 82, 132, 255};
+    t.buttons[CUI_THEME_BUTTON_PRIMARY].normal = t.primary;
+    t.buttons[CUI_THEME_BUTTON_PRIMARY].hover = (cui_color){31, 69, 113, 255};
+    t.buttons[CUI_THEME_BUTTON_PRIMARY].active = (cui_color){23, 56, 95, 255};
+    return t;
+}
+static cui_color tint(cui_color surface, cui_color accent, unsigned percent) {
+    return (cui_color){(uint8_t)((surface.r * (100 - percent) + accent.r * percent) / 100),
+                       (uint8_t)((surface.g * (100 - percent) + accent.g * percent) / 100),
+                       (uint8_t)((surface.b * (100 - percent) + accent.b * percent) / 100), 255};
 }
 app_snapshot composed_app_snapshot(const composed_app *a) {
     if (!a)
@@ -157,8 +182,8 @@ static void topbar(cui_context *ui, composed_app *a, const cui_theme *t, float w
                             .padding = a->narrow ? 12 : 24,
                             .gap = 16,
                             .align_y = CUI_ALIGN_CENTER,
-                            .background = white,
-                            .border = {226, 231, 237, 255},
+                            .background = t->surface,
+                            .border = t->border,
                             .custom_border_edges = true,
                             .border_edges = {.bottom = 1}});
     if (cui_button_ex(ui, APP_MENU, t, cui_string("Toggle navigation"),
@@ -170,7 +195,7 @@ static void topbar(cui_context *ui, composed_app *a, const cui_theme *t, float w
         else
             a->desktop_sidebar = !a->desktop_sidebar;
     }
-    text(ui, a->narrow ? "Northstar" : pages[a->page], 16, ink, true);
+    text(ui, a->narrow ? "Northstar" : pages[a->page], 16, t->text, true);
     spacer(ui);
     cui_choice_item items[] = {
         {.id = APP_PROFILE, .label = cui_string("Workspace settings")},
@@ -207,18 +232,19 @@ static void topbar(cui_context *ui, composed_app *a, const cui_theme *t, float w
     }
     cui_end_box(ui);
 }
-static void metric(cui_context *ui, const char *label, const char *value, const char *detail) {
+static void metric(cui_context *ui, const cui_theme *t, const char *label, const char *value,
+                   const char *detail) {
     cui_begin_box(ui, 0,
                   (cui_box){.width = -1,
                             .padding = 20,
                             .gap = 8,
                             .radius = 12,
-                            .background = white,
-                            .border = {225, 231, 238, 255},
+                            .background = t->surface,
+                            .border = t->border,
                             .border_width = 1});
-    text(ui, label, 12, muted, false);
-    text(ui, value, 30, ink, true);
-    text(ui, detail, 11, (cui_color){34, 127, 98, 255}, false);
+    text(ui, label, 12, t->muted, false);
+    text(ui, value, 30, t->text, true);
+    text(ui, detail, 11, t->muted, false);
     cui_end_box(ui);
 }
 static void render_overview(cui_context *ui, composed_app *a, const cui_theme *t, float width) {
@@ -228,30 +254,32 @@ static void render_overview(cui_context *ui, composed_app *a, const cui_theme *t
                             .padding = stack ? 24 : 32,
                             .gap = 16,
                             .radius = 16,
-                            .background = {227, 237, 249, 255}});
-    text(ui, "BUILD SOMETHING GREAT, TOGETHER", 11, (cui_color){56, 89, 128, 255}, true);
-    text(ui, "A calmer place to do your best work.", stack ? 30 : 42, ink, true);
-    text(ui, "Keep your projects, people and next steps in one thoughtful workspace.", 15, muted,
+                            .background = a->custom_theme
+                                              ? tint(t->surface, t->primary, t->dark ? 12 : 8)
+                                              : (cui_color){227, 237, 249, 255}});
+    text(ui, "BUILD SOMETHING GREAT, TOGETHER", 11, t->text, true);
+    text(ui, "A calmer place to do your best work.", stack ? 30 : 42, t->text, true);
+    text(ui, "Keep your projects, people and next steps in one thoughtful workspace.", 15, t->muted,
          false);
     if (button(ui, APP_HERO_CTA, t, "Find your team's plan", CUI_BUTTON_PRIMARY, 0))
         pricing(a);
     cui_end_box(ui);
     cui_begin_box(ui, 31, (cui_box){.width = -1, .row = !stack, .gap = 16});
-    metric(ui, "Active projects", "12", "Sample workspace activity");
-    metric(ui, "Teammates", "8", "A small team, a shared direction");
-    metric(ui, "Weekly progress", "84%", "Illustrative demo metrics");
+    metric(ui, t, "Active projects", "12", "Sample workspace activity");
+    metric(ui, t, "Teammates", "8", "A small team, a shared direction");
+    metric(ui, t, "Weekly progress", "84%", "Illustrative demo metrics");
     cui_end_box(ui);
     cui_begin_box(ui, 32,
                   (cui_box){.width = -1,
                             .padding = 24,
                             .gap = 14,
                             .radius = 12,
-                            .background = white,
-                            .border = {225, 231, 238, 255},
+                            .background = t->surface,
+                            .border = t->border,
                             .border_width = 1});
-    text(ui, "Your next chapter", 20, ink, true);
-    text(ui, "Make this workspace yours", 14, ink, true);
-    text(ui, "Choose a display name and decide which updates reach you.", 13, muted, false);
+    text(ui, "Your next chapter", 20, t->text, true);
+    text(ui, "Make this workspace yours", 14, t->text, true);
+    text(ui, "Choose a display name and decide which updates reach you.", 13, t->muted, false);
     if (button(ui, 121, t, "Personalize workspace", CUI_BUTTON_OUTLINE, 0))
         settings(a);
     cui_end_box(ui);
@@ -271,18 +299,18 @@ static void plan_card(cui_context *ui, composed_app *a, const cui_theme *t, int 
                             .padding = 24,
                             .gap = 14,
                             .radius = 14,
-                            .background = white,
+                            .background = t->surface,
                             .border = plan == 1 ? t->primary : t->border,
                             .border_width = plan == 1 ? 2 : 1});
-    text(ui, plan == 1 ? "TEAM FAVORITE" : "FLEXIBLE BY DESIGN", 10, plan == 1 ? t->primary : muted,
-         true);
-    text(ui, plans[plan], 24, ink, true);
-    text(ui, details[plan], 12, muted, false);
-    text(ui, prices[plan], 38, ink, true);
-    text(ui, plan ? "per teammate / month" : "free for personal use", 12, muted, false);
+    text(ui, plan == 1 ? "TEAM FAVORITE" : "FLEXIBLE BY DESIGN", 10,
+         plan == 1 ? t->primary : t->muted, true);
+    text(ui, plans[plan], 24, t->text, true);
+    text(ui, details[plan], 12, t->muted, false);
+    text(ui, prices[plan], 38, t->text, true);
+    text(ui, plan ? "per teammate / month" : "free for personal use", 12, t->muted, false);
     cui_separator(ui, 0, t, -1);
     for (int i = 0; i < 3; ++i)
-        text(ui, features[plan][i], 13, ink, false);
+        text(ui, features[plan][i], 13, t->text, false);
     if (button(ui, (cui_id)(APP_PLAN_STARTER + plan), t,
                selected ? "Selected plan" : "Choose this plan",
                plan == 1 ? CUI_BUTTON_PRIMARY : CUI_BUTTON_OUTLINE, -1) &&
@@ -295,15 +323,15 @@ static void plan_card(cui_context *ui, composed_app *a, const cui_theme *t, int 
     cui_end_box(ui);
 }
 static void render_pricing(cui_context *ui, composed_app *a, const cui_theme *t, float width) {
-    text(ui, "Space for your next big idea.", width < 650 ? 30 : 36, ink, true);
-    text(ui, "Simple plans for teams of every size. Pick a fit and keep creating.", 14, muted,
+    text(ui, "Space for your next big idea.", width < 650 ? 30 : 36, t->text, true);
+    text(ui, "Simple plans for teams of every size. Pick a fit and keep creating.", 14, t->muted,
          false);
     cui_begin_box(ui, 39, (cui_box){.width = -1, .row = width >= 720, .gap = 16});
     for (int i = 0; i < 3; ++i)
         plan_card(ui, a, t, i);
     cui_end_box(ui);
     text(ui, "Demo pricing only. Selections remain in memory and reset when you close the app.", 12,
-         muted, false);
+         t->muted, false);
 }
 static void name_control(cui_context *ui, const cui_theme *t, void *user, float width) {
     composed_app *a = user;
@@ -314,17 +342,17 @@ static void name_control(cui_context *ui, const cui_theme *t, void *user, float 
         a->invalid_name = false;
 }
 static void render_settings(cui_context *ui, composed_app *a, const cui_theme *t, float width) {
-    text(ui, "A workspace that feels like you.", width < 650 ? 28 : 36, ink, true);
-    text(ui, "Tune the small details. Keep the important things close.", 14, muted, false);
+    text(ui, "A workspace that feels like you.", width < 650 ? 28 : 36, t->text, true);
+    text(ui, "Tune the small details. Keep the important things close.", 14, t->muted, false);
     cui_begin_box(ui, 50,
                   (cui_box){.width = -1,
                             .padding = 24,
                             .gap = 20,
                             .radius = 14,
-                            .background = white,
+                            .background = t->surface,
                             .border = t->border,
                             .border_width = 1});
-    text(ui, "Profile & preferences", 20, ink, true);
+    text(ui, "Profile & preferences", 20, t->text, true);
     cui_form_field field = {
         .id = 51,
         .control = APP_NAME,
@@ -341,9 +369,9 @@ static void render_settings(cui_context *ui, composed_app *a, const cui_theme *t
     cui_separator(ui, 53, t, -1);
     cui_checkbox(ui, APP_NOTIFICATIONS, t, cui_string("Email notifications"), &a->notifications,
                  false);
-    text(ui, "Preference only: this demo never sends email.", 12, muted, false);
+    text(ui, "Preference only: this demo never sends email.", 12, t->muted, false);
     cui_switch(ui, APP_SYNC, t, cui_string("Sync across devices"), &a->sync, false);
-    text(ui, "Preference only: no remote sync service is connected.", 12, muted, false);
+    text(ui, "Preference only: no remote sync service is connected.", 12, t->muted, false);
     if (button(ui, APP_SAVE, t, "Save preferences", CUI_BUTTON_PRIMARY, 0)) {
         cui_str name = cui_edit_get_text(a->name);
         bool nonspace = false;
@@ -367,16 +395,10 @@ void composed_app_scene(cui_context *ui, composed_app *a, float width, float hei
     if (!ui || !a)
         return;
     a->narrow = width < 760;
-    cui_theme t = cui_theme_light();
-    t.primary = (cui_color){38, 82, 132, 255};
-    t.buttons[CUI_THEME_BUTTON_PRIMARY].normal = t.primary;
-    t.buttons[CUI_THEME_BUTTON_PRIMARY].hover = (cui_color){31, 69, 113, 255};
-    t.buttons[CUI_THEME_BUTTON_PRIMARY].active = (cui_color){23, 56, 95, 255};
+    cui_theme t = a->custom_theme ? a->theme : default_theme();
     bool show = a->narrow ? a->mobile_sidebar : a->desktop_sidebar;
     cui_begin_box(
-        ui, 1,
-        (cui_box){
-            .width = -1, .height = -1, .row = !a->narrow, .background = {245, 247, 250, 255}});
+        ui, 1, (cui_box){.width = -1, .height = -1, .row = !a->narrow, .background = t.background});
     if (show && !a->narrow)
         sidebar(ui, a, &t, 224);
     cui_begin_box(ui, 2, (cui_box){.width = -1, .height = -1});
@@ -400,7 +422,9 @@ void composed_app_scene(cui_context *ui, composed_app *a, float width, float hei
                                  .bar_thickness = 8,
                                  .wheel_step = 48,
                                  .hide_scrollbars = content_height <= viewport_height};
-    if (cui_scrollable_begin(ui, APP_CONTENT, &t, &a->scroll, scroll)) {
+    cui_theme content_theme = t;
+    content_theme.surface = t.background;
+    if (cui_scrollable_begin(ui, APP_CONTENT, &content_theme, &a->scroll, scroll)) {
         cui_begin_box(ui, 3, (cui_box){.width = -1, .padding = a->narrow ? 16 : 32, .gap = 20});
         if (a->page == APP_OVERVIEW)
             render_overview(ui, a, &t, inner_width);
@@ -409,15 +433,18 @@ void composed_app_scene(cui_context *ui, composed_app *a, float width, float hei
         else
             render_settings(ui, a, &t, inner_width);
         if (a->notice[0]) {
-            cui_begin_box(
-                ui, 60,
-                (cui_box){
-                    .width = -1, .padding = 16, .radius = 10, .background = {227, 239, 231, 255}});
-            text(ui, a->notice, 13, ink, false);
+            cui_begin_box(ui, 60,
+                          (cui_box){.width = -1,
+                                    .padding = 16,
+                                    .radius = 10,
+                                    .background = a->invalid_name
+                                                      ? tint(t.surface, t.danger, 10)
+                                                      : tint(t.surface, t.success, 10)});
+            text(ui, a->notice, 13, t.text, false);
             cui_end_box(ui);
         }
         cui_end_box(ui);
-        cui_scrollable_end_ex(ui, APP_CONTENT, &t, &a->scroll, scroll);
+        cui_scrollable_end_ex(ui, APP_CONTENT, &content_theme, &a->scroll, scroll);
     }
     cui_end_box(ui);
     cui_end_box(ui);

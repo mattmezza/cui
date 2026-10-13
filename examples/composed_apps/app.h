@@ -2,6 +2,7 @@
 #ifndef CUI_COMPOSED_APP_H
 #define CUI_COMPOSED_APP_H
 #include "cui/cui.h"
+#include "cui/cui_theme.h"
 typedef struct composed_app composed_app;
 typedef enum { APP_OVERVIEW, APP_PRICING, APP_SETTINGS } app_page;
 typedef enum { APP_NAVIGATED, APP_SESSION_CHANGED, APP_PLAN_CHANGED, APP_SETTINGS_SAVED } app_event;
@@ -35,6 +36,10 @@ enum {
 };
 composed_app *composed_app_create(app_callback callback, void *user);
 void composed_app_destroy(composed_app *app);
+/* Copy theme values; NULL restores the original native palette. Pointer-valued
+ * theme hooks/user storage remain host-owned and must outlive scene submission.
+ * Set between frames on the UI thread; theme changes preserve application state. */
+void composed_app_set_theme(composed_app *app, const cui_theme *theme);
 app_snapshot composed_app_snapshot(const composed_app *app);
 /* Submit inside an active frame; caller owns begin/end and renderer. Retain app
  * until renderer completion: draw-command text borrows application storage. */

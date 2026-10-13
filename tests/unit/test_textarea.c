@@ -412,7 +412,83 @@ static void test_repeated_down_visible_rows(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+typedef struct {
+    float width;
+    unsigned calls;
+    cui_text_style style;
+} styled_probe;
+static cui_size styled_measure(void *user, cui_str text, float size, cui_text_style style) {
+    styled_probe *p = user;
+    p->style = style;
+    ++p->calls;
+    float width = p->width * (style.family == 7 ? 2 : 1);
+    return (cui_size){width * text.length, size};
+}
+static void test_complete_text_style(void) {
+    styled_probe p = {.width = 5};
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &p});
+    char buffer[128] = "abcdefgh";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_options o = {.width = 62, .rows = 2};
+    assert(frame(ui, edit, &state, o).error == CUI_TEXTAREA_OK && state.count == 1);
+    o.text_style = (cui_text_style){
+        .family = 7, .weight = CUI_TEXT_WEIGHT_BOLD, .italic = true, .monospace = true};
+    assert(frame(ui, edit, &state, o).error == CUI_TEXTAREA_OK && state.count == 2);
+    assert(state.lines[0].end == 4 && state.lines[0].width == 40);
+    assert(state.text_style.family == 7 && p.style.italic && p.style.monospace &&
+           p.style.weight == CUI_TEXT_WEIGHT_BOLD);
+    assert(cui_textarea_hit_test(ui, edit, &state, state.viewport.x + 14, state.viewport.y + 1) ==
+           1);
+    bool found = false;
+    for (size_t i = 0; i < drawing.count; ++i)
+        if (drawing.commands[i].type == CUI_DRAW_TEXT) {
+            assert(drawing.commands[i].text_style.family == 7 &&
+                   drawing.commands[i].text_style.weight == CUI_TEXT_WEIGHT_BOLD &&
+                   drawing.commands[i].text_style.italic &&
+                   drawing.commands[i].text_style.monospace);
+            found = true;
+        }
+    assert(found);
+    o.no_wrap = true;
+    cui_edit_select(edit, 0, 0);
+    frame(ui, edit, &state, o);
+    cui_edit_select(edit, 8, 8);
+    cui_focus(ui, 10);
+    frame(ui, edit, &state, o);
+    assert(state.maximum_x == 41 && state.scroll_x == 41);
+    p.width = 3;
+    cui_text_metrics_changed(ui);
+    frame(ui, edit, &state, o);
+    assert(state.lines[0].width == 48 && state.maximum_x == 9 && state.scroll_x == 9);
+    o.text_style.family = 0;
+    frame(ui, edit, &state, o);
+    assert(state.lines[0].width == 24 && state.scroll_x == 0);
+    cui_textarea_options scaled = {.width = 400, .height = 200, .text_style = o.text_style};
+    for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+        scaled.design_size = (cui_design_size)size;
+        cui_design_metrics metrics;
+        assert(cui_design_measure(scaled.design_size, 1, &metrics));
+        assert(frame(ui, edit, &state, scaled).error == CUI_TEXTAREA_OK);
+        assert(state.font_size == metrics.font_size && state.line_height == metrics.line_height);
+        assert(state.viewport.w == 400 - 2 * (metrics.padding_x + 1));
+        for (size_t i = 0; i < drawing.count; ++i)
+            if (drawing.commands[i].type == CUI_DRAW_TEXT)
+                assert(drawing.commands[i].font_size == metrics.font_size &&
+                       drawing.commands[i].text_style.monospace);
+    }
+    o.text_style.weight = (cui_text_weight)99;
+    cui_edit_state saved = cui_edit_get_state(edit);
+    assert(frame(ui, edit, &state, o).error == CUI_TEXTAREA_INVALID);
+    assert(cui_edit_get_state(edit).revision == saved.revision);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_complete_text_style();
     test_repeated_down_visible_rows();
     test_composition_navigation();
     test_tab_indent_and_focus();

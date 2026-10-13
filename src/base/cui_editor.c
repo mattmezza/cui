@@ -14,6 +14,7 @@ bool cui_editor_state_init(cui_editor_state *s, cui_edit *edit, cui_textarea_lin
 cui_editor_options cui_editor_default(void) {
     cui_editor_options o = {.textarea = cui_textarea_default(), .line_numbers = true};
     o.textarea.no_wrap = true;
+    o.textarea.text_style.monospace = true;
     o.textarea.rows = 12;
     return o;
 }

@@ -32,6 +32,7 @@ typedef struct {
     bool dragging, preferred_valid, upstream_affinity, initialized, focused;
     double blink_started;
     cui_textarea_error error;
+    cui_text_style text_style; /* Style of measured visual rows. */
 } cui_textarea_state;
 typedef struct {
     cui_textarea_size size;
@@ -48,6 +49,7 @@ typedef struct {
     cui_str placeholder;
     const cui_platform *clipboard;
     cui_design_size design_size; /* Styled control only; base uses supplied metrics. */
+    cui_text_style text_style;   /* Zero preserves the legacy default font. */
 } cui_textarea_options;
 typedef struct {
     float font_size, line_height, padding_x, padding_y;
@@ -66,6 +68,10 @@ cui_id cui_textarea_viewport_id(cui_id);
 /* Build measured visual rows; viewport is the editable inner bounds. */
 cui_textarea_error cui_textarea_layout(cui_context *, cui_edit *, cui_textarea_state *,
                                        cui_textarea_metrics, float viewport_width, bool wrap);
+/* Style-aware row layout; legacy layout above uses the default zero style. */
+cui_textarea_error cui_textarea_layout_ex(cui_context *, cui_edit *, cui_textarea_state *,
+                                          cui_textarea_metrics, float viewport_width, bool wrap,
+                                          cui_text_style);
 size_t cui_textarea_hit_test(cui_context *, cui_edit *, cui_textarea_state *, float x, float y);
 /* Base uses the state's last viewport and supplied metrics, preserving caller layout. */
 cui_textarea_result cui_base_textarea(cui_context *, cui_id, cui_str name, cui_edit *,

@@ -15,9 +15,10 @@ static size_t cui_textarea_visible_rows(cui_textarea_options options, size_t cou
     return count < minimum ? minimum : count > maximum ? maximum : count;
 }
 static float cui_textarea_prefix(cui_context *ui, cui_str text, cui_textarea_line line,
-                                 size_t offset, float font) {
+                                 size_t offset, float font, cui_text_style style) {
     size_t end = offset < line.start ? line.start : offset > line.end ? line.end : offset;
-    return cui_measure_text(ui, (cui_str){text.data + line.start, end - line.start}, font).width;
+    return cui_measure_text_ex(ui, (cui_str){text.data + line.start, end - line.start}, font, style)
+        .width;
 }
 cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                  cui_edit *edit, cui_textarea_state *state,
@@ -60,7 +61,8 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
     if (!isfinite(height) || height > 1000000)
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
     state->viewport.h = fmaxf(0, height - 2 * py);
-    result.error = cui_textarea_layout(ui, edit, state, metrics, width, !options.no_wrap);
+    result.error = cui_textarea_layout_ex(ui, edit, state, metrics, width, !options.no_wrap,
+                                          options.text_style);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
     bool focused = cui_focused(ui) == id && !options.disabled;
@@ -131,22 +133,27 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
                                 .height = metrics.line_height,
                                 .fixed_height = true});
         if (first < line.next && last > line.start) {
-            float left = cui_textarea_prefix(ui, text, line, first, metrics.font_size);
-            float right = cui_textarea_prefix(ui, text, line, last, metrics.font_size);
+            float left =
+                cui_textarea_prefix(ui, text, line, first, metrics.font_size, options.text_style);
+            float right =
+                cui_textarea_prefix(ui, text, line, last, metrics.font_size, options.text_style);
             if (line.hard_break && last > line.end)
-                right += cui_measure_text(ui, cui_string(" "), metrics.font_size).width;
+                right +=
+                    cui_measure_text_ex(ui, cui_string(" "), metrics.font_size, options.text_style)
+                        .width;
             if (right > left)
                 cui_set_underlay(ui, (cui_rect){left, 0, right - left, metrics.line_height},
                                  theme->selection, (cui_corner_radii){0});
         }
         if (!text.length && options.placeholder.length)
-            cui_text_with_line_height(ui, options.placeholder, metrics.font_size, theme->muted,
-                                      metrics.line_height);
+            cui_text_line(ui, options.placeholder, metrics.font_size, theme->muted,
+                          metrics.line_height, options.text_style);
         else if (line.end > line.start)
-            cui_text_with_line_height(ui, (cui_str){text.data + line.start, line.end - line.start},
-                                      metrics.font_size, foreground, metrics.line_height);
+            cui_text_line(ui, (cui_str){text.data + line.start, line.end - line.start},
+                          metrics.font_size, foreground, metrics.line_height, options.text_style);
         if (caret && row == state->caret_line) {
-            float x = cui_textarea_prefix(ui, text, line, selection.cursor, metrics.font_size);
+            float x = cui_textarea_prefix(ui, text, line, selection.cursor, metrics.font_size,
+                                          options.text_style);
             cui_begin_absolute_box(ui, cui_textarea_child(id, row, 11),
                                    (cui_box){.background = theme->caret},
                                    (cui_rect){x, 0, 1, metrics.line_height});

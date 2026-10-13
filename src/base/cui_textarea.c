@@ -18,18 +18,18 @@ static size_t cui_textarea_previous(cui_str text, size_t at) {
     } while (at && ((unsigned char)text.data[at] & 0xc0) == 0x80);
     return at;
 }
-static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, size_t end,
-                                float font) {
-    return cui_measure_text(ui, (cui_str){text.data + start, end - start}, font).width;
+static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, size_t end, float font,
+                                cui_text_style style) {
+    return cui_measure_text_ex(ui, (cui_str){text.data + start, end - start}, font, style).width;
 }
 /* Exponential bracketing avoids measuring the entire remaining document for
  * every narrow wrapped row. Prefix widths use the host's text measurement. */
 static size_t cui_textarea_fit(cui_context *ui, cui_str text, size_t start, size_t end, float font,
-                               float width) {
+                               float width, cui_text_style style) {
     size_t low = start, high = end - start > 64 ? start + 64 : end;
     while (high < end && ((unsigned char)text.data[high] & 0xc0) == 0x80)
         high++;
-    while (cui_textarea_width(ui, text, start, high, font) <= width) {
+    while (cui_textarea_width(ui, text, start, high, font, style) <= width) {
         low = high;
         if (high == end)
             return end;
@@ -42,7 +42,7 @@ static size_t cui_textarea_fit(cui_context *ui, cui_str text, size_t start, size
         size_t middle = low + (high - low + 1) / 2;
         while (middle < high && ((unsigned char)text.data[middle] & 0xc0) == 0x80)
             middle++;
-        if (cui_textarea_width(ui, text, start, middle, font) <= width)
+        if (cui_textarea_width(ui, text, start, middle, font, style) <= width)
             low = middle;
         else
             high = cui_textarea_previous(text, middle);
@@ -63,7 +63,9 @@ cui_id cui_textarea_viewport_id(cui_id id) {
 }
 bool cui_textarea_measure(cui_textarea_options options, float root, cui_textarea_metrics *out) {
     if (!out || options.size < CUI_TEXTAREA_MEDIUM || options.size > CUI_TEXTAREA_CUSTOM ||
-        options.tab_size > 4096 || !isfinite(root) || root <= 0 || root > 4096)
+        options.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+        options.text_style.weight > CUI_TEXT_WEIGHT_BOLD || options.tab_size > 4096 ||
+        !isfinite(root) || root <= 0 || root > 4096)
         return false;
     float density = root / 16;
     float font = options.size == CUI_TEXTAREA_XSMALL  ? 12
@@ -99,17 +101,20 @@ static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t c
     }
     return state->count ? state->count - 1 : 0;
 }
-cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_textarea_state *state,
-                                       cui_textarea_metrics metrics, float width, bool wrap) {
+cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
+                                          cui_textarea_state *state, cui_textarea_metrics metrics,
+                                          float width, bool wrap, cui_text_style style) {
     if (!ui || !edit || !state || !state->lines || !state->capacity || state->capacity > 65536 ||
         !cui_edit_get_state(edit).multiline || !isfinite(width) || width <= 0 ||
         !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
-        metrics.line_height <= 0) {
+        metrics.line_height <= 0 || style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+        style.weight > CUI_TEXT_WEIGHT_BOLD) {
         if (state)
             state->error = CUI_TEXTAREA_INVALID;
         return CUI_TEXTAREA_INVALID;
     }
     cui_str text = cui_edit_get_text(edit);
+    state->text_style = style;
     state->count = 0;
     state->font_size = metrics.font_size;
     state->line_height = metrics.line_height;
@@ -135,7 +140,7 @@ cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_text
         }
         size_t finish = end;
         if (wrap && start < end) {
-            finish = cui_textarea_fit(ui, text, start, end, metrics.font_size, width);
+            finish = cui_textarea_fit(ui, text, start, end, metrics.font_size, width, style);
             if (finish == start)
                 finish = cui_textarea_next(text, start);
             if (finish < end) {
@@ -148,7 +153,7 @@ cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_text
                 hard = false;
             }
         }
-        float measured = cui_textarea_width(ui, text, start, finish, metrics.font_size);
+        float measured = cui_textarea_width(ui, text, start, finish, metrics.font_size, style);
         state->lines[state->count++] = (cui_textarea_line){start, finish, next, measured, hard};
         maximum = fmaxf(maximum, measured);
         if (finish == text.length)
@@ -169,6 +174,10 @@ cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_text
         isfinite(state->scroll_y) ? fminf(state->maximum_y, fmaxf(0, state->scroll_y)) : 0;
     return state->error = CUI_TEXTAREA_OK;
 }
+cui_textarea_error cui_textarea_layout(cui_context *ui, cui_edit *edit, cui_textarea_state *state,
+                                       cui_textarea_metrics metrics, float width, bool wrap) {
+    return cui_textarea_layout_ex(ui, edit, state, metrics, width, wrap, (cui_text_style){0});
+}
 static size_t cui_textarea_offset(cui_context *ui, cui_str text, const cui_textarea_state *state,
                                   size_t row, float x) {
     cui_textarea_line line = state->lines[row];
@@ -176,12 +185,13 @@ static size_t cui_textarea_offset(cui_context *ui, cui_str text, const cui_texta
         return line.start;
     if (x >= line.width)
         return line.end;
-    size_t left = cui_textarea_fit(ui, text, line.start, line.end, state->font_size, x);
+    size_t left =
+        cui_textarea_fit(ui, text, line.start, line.end, state->font_size, x, state->text_style);
     size_t right = cui_textarea_next(text, left);
     if (right > line.end)
         right = line.end;
-    float a = cui_textarea_width(ui, text, line.start, left, state->font_size);
-    float b = cui_textarea_width(ui, text, line.start, right, state->font_size);
+    float a = cui_textarea_width(ui, text, line.start, left, state->font_size, state->text_style);
+    float b = cui_textarea_width(ui, text, line.start, right, state->font_size, state->text_style);
     return x - a < b - x ? left : right;
 }
 size_t cui_textarea_hit_test(cui_context *ui, cui_edit *edit, cui_textarea_state *state, float x,
@@ -199,7 +209,7 @@ static void cui_textarea_reveal(cui_context *ui, cui_edit *edit, cui_textarea_st
     cui_str text = cui_edit_get_text(edit);
     cui_textarea_line line = state->lines[state->caret_line];
     size_t cursor = state->cursor < line.end ? state->cursor : line.end;
-    float x = cui_textarea_width(ui, text, line.start, cursor, state->font_size);
+    float x = cui_textarea_width(ui, text, line.start, cursor, state->font_size, state->text_style);
     float y = state->caret_line * state->line_height;
     if (x < state->scroll_x)
         state->scroll_x = x;
@@ -243,13 +253,21 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
     bool external =
         state->initialized && (state->revision != before.revision ||
                                state->cursor != before.cursor || state->anchor != before.anchor);
+    external = external || (state->initialized &&
+                            (state->text_style.family != options.text_style.family ||
+                             state->text_style.weight != options.text_style.weight ||
+                             state->text_style.italic != options.text_style.italic ||
+                             state->text_style.monospace != options.text_style.monospace ||
+                             state->font_size != metrics.font_size ||
+                             state->line_height != metrics.line_height));
     if (external) {
         state->preferred_valid = false;
         state->upstream_affinity = false;
         state->dragging = false;
     }
     float width = state->viewport.w > 0 ? state->viewport.w : state->wrap_width;
-    result.error = cui_textarea_layout(ui, edit, state, metrics, width, !options.no_wrap);
+    result.error = cui_textarea_layout_ex(ui, edit, state, metrics, width, !options.no_wrap,
+                                          options.text_style);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
     cui_interaction interaction =
@@ -320,9 +338,10 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             size_t row = state->caret_line;
             cui_textarea_line line = state->lines[row];
             if (!state->preferred_valid) {
-                state->preferred_x = cui_textarea_width(
-                    ui, cui_edit_get_text(edit), line.start,
-                    selection.cursor < line.end ? selection.cursor : line.end, metrics.font_size);
+                state->preferred_x =
+                    cui_textarea_width(ui, cui_edit_get_text(edit), line.start,
+                                       selection.cursor < line.end ? selection.cursor : line.end,
+                                       metrics.font_size, options.text_style);
                 state->preferred_valid = true;
             }
             size_t step = event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN
@@ -410,7 +429,8 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             cui_consume_event(ui, i);
         if (result.edit_error == CUI_EDIT_OK && error != CUI_EDIT_OK)
             result.edit_error = error;
-        result.error = cui_textarea_layout(ui, edit, state, metrics, width, !options.no_wrap);
+        result.error = cui_textarea_layout_ex(ui, edit, state, metrics, width, !options.no_wrap,
+                                              options.text_style);
         if (result.error != CUI_TEXTAREA_OK)
             break;
         reveal |= move;

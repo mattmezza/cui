@@ -51,7 +51,12 @@ broader display maps, folding, diagnostics, completion, language services, and
 search features; those are not implemented here. This is a usable adapter, not
 full Editor parity. Navigation follows the existing UTF-8 scalar model rather
 than extended grapheme clusters; visual bidirectional navigation is unsupported.
-Fonts and shaping follow the configured core/text backend and textarea metrics;
-this API does not independently select a code font family or weight. Capacity
+Editor defaults select the portable monospace style. Set
+`options.textarea.text_style` to choose the registered font family, weight,
+italic style, and monospace flag; an all-zero style explicitly selects the
+ordinary default font. Measurement, syntax tokens, gutter numbers, selection,
+caret, and pointer geometry all use this complete style. Font size and line
+height continue to follow textarea size/design metrics. Fonts and shaping
+follow the configured core/text backend. Capacity
 errors require a larger visual-row workspace; document mutation is exclusively
 through the attached edit model.

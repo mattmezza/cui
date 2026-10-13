@@ -40,6 +40,10 @@ static void editor_interactions(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
     syntax_probe p = {0};
     cui_editor_options o = cui_editor_default();
+    assert(o.textarea.text_style.monospace);
+    o.textarea.text_style.family = 7;
+    o.textarea.text_style.weight = CUI_TEXT_WEIGHT_SEMIBOLD;
+    o.textarea.text_style.italic = true;
     o.textarea.width = 200;
     o.textarea.height = 70;
     o.language = cui_string("c");
@@ -53,6 +57,8 @@ static void editor_interactions(void) {
         const cui_draw_command *c = &commands.commands[i];
         if (c->type != CUI_DRAW_TEXT)
             continue;
+        assert(c->text_style.family == 7 && c->text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD &&
+               c->text_style.italic && c->text_style.monospace);
         if (c->color.r == 250 && c->color.g == 20)
             colored = true;
         if (c->text.length == 1 && c->text.data[0] == '1')

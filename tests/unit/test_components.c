@@ -607,6 +607,86 @@ static cui_draw_list group_frame(cui_context *ui, cui_theme *t, const cui_toggle
     assert(cui_last_error(ui) == CUI_OK);
     return list;
 }
+typedef struct {
+    bool *values;
+    unsigned calls;
+    bool accept;
+} controlled_group_owner;
+static void controlled_group_single(void *user, const bool *requested, size_t count) {
+    controlled_group_owner *owner = user;
+    assert(count == 3);
+    owner->calls++;
+    if (!owner->accept)
+        return;
+    for (size_t i = 0; i < count; i++)
+        if (requested[i] && !owner->values[i]) {
+            for (size_t j = 0; j < count; j++)
+                owner->values[j] = i == j;
+            return;
+        }
+}
+static void test_toggle_controlled_sibling_state(void) {
+    cui_toggle_item items[] = {{.id = 921, .label = {"Bold", 4}},
+                               {.id = 922, .label = {"Italic", 6}},
+                               {.id = 923, .label = {"Underline", 9}}};
+    for (unsigned pass = 0; pass < 2; pass++) {
+        bool accept = pass == 0;
+        cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+        assert(ui);
+        cui_theme theme = cui_theme_light();
+        theme.text = (cui_color){11, 22, 33, 255};
+        theme.accent_foreground = (cui_color){44, 55, 66, 255};
+        bool values[3] = {true, false, false}, requested[3];
+        controlled_group_owner owner = {values, 0, accept != 0};
+        cui_toggle_group_style_options options = {.on_change = controlled_group_single,
+                                                  .change_user = &owner,
+                                                  .requested_values = requested,
+                                                  .requested_capacity = 3};
+        group_frame(ui, &theme, items, values, options);
+        group_frame(ui, &theme, items, values, options);
+        cui_rect bounds = cui_bounds(ui, 922);
+        cui_event touch = {.type = CUI_EVENT_POINTER_DOWN,
+                           .pointer_type = CUI_POINTER_TOUCH,
+                           .pointer_id = 17,
+                           .pointer_button = CUI_POINTER_PRIMARY,
+                           .x = bounds.x + bounds.w / 2,
+                           .y = bounds.y + bounds.h / 2};
+        assert(cui_queue_event(ui, touch));
+        touch.type = CUI_EVENT_POINTER_UP;
+        assert(cui_queue_event(ui, touch));
+        group_frame(ui, &theme, items, values, options);
+        assert(owner.calls == 1 && values[0] == !accept && values[1] == (accept != 0) &&
+               !values[2]);
+        size_t count;
+        const cui_semantic *nodes = cui_semantics(ui, &count);
+        assert(count == 4);
+        for (size_t i = 0; i < 3; i++)
+            assert(nodes[i + 1].id == items[i].id && nodes[i + 1].checked == values[i] &&
+                   nodes[i + 1].value == (values[i] ? 1 : 0));
+        assert(cui_needs_redraw(ui));
+        cui_draw_list draw = group_frame(ui, &theme, items, values, options);
+        assert(owner.calls == 1); /* Repaint must not repeat the controlled request. */
+        if (accept) {
+            bool bold = false, italic = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                const cui_draw_command *command = &draw.commands[i];
+                if (command->type != CUI_DRAW_TEXT)
+                    continue;
+                if (command->text.length == 4 && !memcmp(command->text.data, "Bold", 4)) {
+                    assert(!memcmp(&command->color, &theme.text, sizeof(cui_color)));
+                    bold = true;
+                }
+                if (command->text.length == 6 && !memcmp(command->text.data, "Italic", 6)) {
+                    assert(!memcmp(&command->color, &theme.accent_foreground, sizeof(cui_color)));
+                    italic = true;
+                }
+            }
+            assert(bold && italic);
+        }
+        assert(!cui_needs_redraw(ui));
+        cui_destroy(ui);
+    }
+}
 static void test_toggle(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     assert(ui);
@@ -1338,6 +1418,7 @@ int main(void) {
     test_button_loading_artwork();
     test_theme_list_tokens();
     test_toggle();
+    test_toggle_controlled_sibling_state();
     test_switch();
     test_checkbox_geometry();
     test_radio_geometry();
